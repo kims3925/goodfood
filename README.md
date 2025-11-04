@@ -1,108 +1,62 @@
-# BandAuto - 밴드 자동화 판매 시스템
+# BandAuto
 
-도매 밴드의 상품을 자동으로 수집하여 AI로 상세페이지를 제작하고, 스룩페이를 통해 결제 링크를 생성한 후 소매 밴드에 자동으로 업로드하는 통합 자동화 시스템입니다.
+밴드 자동화 + 토스페이먼츠 통합 쇼핑몰 시스템
+
+## 📦 버전별 브랜치
+
+현재 개발 중인 프로젝트의 각 버전은 별도 브랜치로 관리됩니다.
+
+### 브랜치 목록
+
+- **[1.1](https://github.com/abcpharm00002-spec/bandauto/tree/1.1)** - AI 설정 시스템 재구축 (2025-11-03)
+  - Gemini + OpenAI 듀얼 지원
+  - 동적 API 키 관리
+  - 향상된 에러 처리
 
 ## 🚀 시작하기
 
-### 필수 요구사항
+원하는 버전의 브랜치를 클론하세요:
 
-- Node.js 18.0 이상
-- PostgreSQL 15 이상
-- Redis 6.0 이상
-- npm 또는 yarn
-
-### 설치
-
-1. **의존성 설치**
 ```bash
+# v1.1 브랜치 클론
+git clone -b 1.1 https://github.com/abcpharm00002-spec/bandauto.git
+cd bandauto
+
+# 의존성 설치
 npm install
-```
 
-2. **환경 변수 설정**
-```bash
+# 환경 변수 설정
 cp .env.example .env.local
-# .env.local 파일을 열어 필요한 API 키와 설정값 입력
-```
+# .env.local 파일을 편집하여 API 키 등 설정
 
-3. **데이터베이스 설정**
-- PostgreSQL과 Redis 설치 (DATABASE_SETUP.md 참고)
-- 데이터베이스 생성:
-```bash
-createdb bandauto
-```
-
-4. **Prisma 설정**
-```bash
-npx prisma migrate dev
+# 데이터베이스 초기화
 npx prisma generate
-```
+npx prisma db push
 
-5. **개발 서버 실행**
-```bash
-npm run dev
-```
-
-http://localhost:3000 에서 애플리케이션을 확인할 수 있습니다.
-
-## 📚 문서
-
-- [CLAUDE.md](./CLAUDE.md) - 프로젝트 상세 문서
-- [DEVELOPMENT_ROADMAP.md](./DEVELOPMENT_ROADMAP.md) - 개발 로드맵 및 체크리스트
-- [DATABASE_SETUP.md](./DATABASE_SETUP.md) - 데이터베이스 설정 가이드
-
-## 🛠 주요 기능
-
-1. **도매 밴드 상품 수집**: 도매 밴드에서 상품 게시물 자동 크롤링
-2. **AI 상세페이지 생성**: OpenAI/Claude API를 활용한 매력적인 상품 설명 자동 생성
-3. **스룩페이 자동화**: Playwright를 통한 자동 로그인 및 엑셀 업로드
-4. **결제 링크 생성**: 스룩페이 결제 링크 자동 생성 및 관리
-5. **소매 밴드 자동 포스팅**: 여러 소매 밴드에 동시 게시
-6. **주문 관리**: 자동 발주서 생성 및 알림 발송
-
-## 🔧 개발 명령어
-
-```bash
 # 개발 서버 실행
 npm run dev
-
-# 프로덕션 빌드
-npm run build
-npm run start
-
-# 린트 검사
-npm run lint
-
-# 타입 체크
-npm run type-check
-
-# 코드 포맷팅
-npm run format
-
-# Prisma 명령어
-npm run prisma:generate  # Prisma Client 생성
-npm run prisma:migrate   # 마이그레이션 실행
-npm run prisma:studio    # Prisma Studio 실행
 ```
 
-## 📁 프로젝트 구조
+## 📖 문서
 
-```
-bandauto/
-├── app/                # Next.js App Router
-├── components/         # React 컴포넌트
-├── lib/               # 라이브러리 & 유틸리티
-├── services/          # 비즈니스 로직 서비스
-├── prisma/            # 데이터베이스 스키마
-├── public/            # 정적 파일
-├── styles/            # 전역 스타일
-├── types/             # TypeScript 타입 정의
-└── hooks/             # Custom React Hooks
-```
+각 브랜치의 `VERSION.md` 또는 `CLAUDE.md` 파일을 참조하세요.
 
-## 🤝 기여하기
+## 🏷️ 릴리즈
 
-프로젝트에 기여하고 싶으시다면 Pull Request를 보내주세요!
+- [v1.1](https://github.com/abcpharm00002-spec/bandauto/releases/tag/v1.1) - AI Settings System Rebuild
 
-## 📄 라이센스
+## 🔧 기술 스택
+
+- Next.js 14
+- TypeScript
+- Prisma ORM
+- Gemini AI / OpenAI
+- Toss Payments
+
+## 📝 라이센스
 
 MIT License
+
+---
+
+**최신 버전**: [1.1 브랜치](https://github.com/abcpharm00002-spec/bandauto/tree/1.1)
