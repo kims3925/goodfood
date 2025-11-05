@@ -8,6 +8,7 @@ import path from 'path'
 
 const CONFIG_DIR = path.join(process.cwd(), '.config')
 const AI_SETTINGS_FILE = path.join(CONFIG_DIR, 'ai-settings.json')
+const API_SETTINGS_FILE = path.join(CONFIG_DIR, 'api-settings.json')
 
 export interface AISettings {
   provider: 'gemini' | 'openai'
@@ -123,4 +124,131 @@ export function deleteAISettings(): boolean {
  */
 export function hasAISettings(): boolean {
   return fs.existsSync(AI_SETTINGS_FILE)
+}
+
+// ====================================
+// API 설정 (Band, AliExpress, etc.)
+// ====================================
+
+export interface APISettings {
+  band: {
+    clientId: string
+    clientSecret: string
+    accessToken: string
+    refreshToken: string
+  }
+  aliexpress: {
+    apiKey: string
+    appSecret: string
+    accessToken: string
+    trackingId: string
+  }
+  taobao?: {
+    apiKey: string
+    appSecret: string
+  }
+  coupang?: {
+    accessKey: string
+    secretKey: string
+  }
+  mall1688?: {
+    apiKey: string
+    appSecret: string
+  }
+  updatedAt?: string
+}
+
+/**
+ * 기본 API 설정
+ */
+const DEFAULT_API_SETTINGS: APISettings = {
+  band: {
+    clientId: '',
+    clientSecret: '',
+    accessToken: '',
+    refreshToken: ''
+  },
+  aliexpress: {
+    apiKey: '',
+    appSecret: '',
+    accessToken: '',
+    trackingId: ''
+  }
+}
+
+/**
+ * API 설정 로드
+ */
+export function loadAPISettings(): APISettings {
+  try {
+    ensureConfigDirectory()
+
+    if (!fs.existsSync(API_SETTINGS_FILE)) {
+      return DEFAULT_API_SETTINGS
+    }
+
+    const fileContent = fs.readFileSync(API_SETTINGS_FILE, 'utf-8')
+    const settings = JSON.parse(fileContent) as APISettings
+
+    return {
+      ...DEFAULT_API_SETTINGS,
+      ...settings,
+    }
+  } catch (error) {
+    console.error('API 설정 로드 실패:', error)
+    return DEFAULT_API_SETTINGS
+  }
+}
+
+/**
+ * API 설정 저장
+ */
+export function saveAPISettings(settings: Partial<APISettings>): boolean {
+  try {
+    ensureConfigDirectory()
+
+    const currentSettings = loadAPISettings()
+
+    const updatedSettings: APISettings = {
+      ...currentSettings,
+      ...settings,
+      updatedAt: new Date().toISOString(),
+    }
+
+    fs.writeFileSync(
+      API_SETTINGS_FILE,
+      JSON.stringify(updatedSettings, null, 2),
+      'utf-8'
+    )
+
+    console.log('✅ API 설정 저장 완료:', API_SETTINGS_FILE)
+    return true
+  } catch (error) {
+    console.error('❌ API 설정 저장 실패:', error)
+    return false
+  }
+}
+
+/**
+ * API 설정 삭제
+ */
+export function deleteAPISettings(): boolean {
+  try {
+    if (fs.existsSync(API_SETTINGS_FILE)) {
+      fs.unlinkSync(API_SETTINGS_FILE)
+      console.log('✅ API 설정 삭제 완료')
+      return true
+    }
+    return false
+  } catch (error) {
+    console.error('❌ API 설정 삭제 실패:', error)
+    return false
+  }
+}
+
+/**
+ * API 설정 파일 존재 여부 확인
+ */
+export function hasAPISettings(): boolean {
+  return fs.existsSync(API_SETTINGS_FILE)
 }

@@ -393,9 +393,7 @@ export async function analyzeProductContent(
 전체 본문에서 가격과 관련된 내용을 분석하여 공급가와 판매가가 같이 기재된 경우 공급가만 가져와서 가격정책에 따라 판매가 선정
 `;
 
-    const result = await model.generateContent(prompt)
-    const response = await result.response
-    const text = response.text()
+    const text = await safeGenerateContent(model, prompt, 3)
     
     // 🔍 AI 응답 디버깅 로깅 추가
     console.log('🤖 Gemini AI 원본 응답:', text)
@@ -620,9 +618,7 @@ export async function analyzeProductContentWithPolicy(
 **중요**: 공급가 기준, 정책에 따른 마진 적용, 원문 그대로 추출
 `
 
-    const result = await model.generateContent(prompt)
-    const response = await result.response
-    const text = response.text()
+    const text = await safeGenerateContent(model, prompt, 3)
     
     // 🔍 정책 적용 AI 응답 디버깅 로깅 추가
     console.log('🏷️ 정책 적용 Gemini AI 원본 응답:', text)
@@ -680,6 +676,48 @@ export async function analyzeProductContentWithPolicy(
   }
 }
 
+// RPM 추적을 위한 전역 변수
+let requestTimestamps: number[] = []
+const RPM_LIMIT = 15  // Gemini Free Tier: 15 RPM
+
+// RPM 체크 및 대기 함수
+async function waitForRateLimit(): Promise<void> {
+  const now = Date.now()
+  const oneMinuteAgo = now - 60000
+
+  // 1분 이전 요청 제거 (RPM 카운터 초기화)
+  requestTimestamps = requestTimestamps.filter(ts => ts > oneMinuteAgo)
+
+  // 현재 1분 내 요청 수 확인
+  const requestsInLastMinute = requestTimestamps.length
+  console.log(`📊 현재 1분 내 요청 수: ${requestsInLastMinute}/${RPM_LIMIT}`)
+
+  // RPM 제한 도달 시
+  if (requestsInLastMinute >= RPM_LIMIT) {
+    // 가장 오래된 요청으로부터 1분 후까지 대기
+    const oldestRequest = requestTimestamps[0]
+    const waitTime = Math.max(0, oldestRequest + 60000 - now + 1000) // +1초 안전 마진
+
+    if (waitTime > 0) {
+      console.log(`⏳ RPM 제한 도달 (${requestsInLastMinute}/${RPM_LIMIT}). ${Math.ceil(waitTime / 1000)}초 대기...`)
+      await new Promise(resolve => setTimeout(resolve, waitTime))
+
+      // 대기 후 다시 정리
+      const afterWait = Date.now()
+      requestTimestamps = requestTimestamps.filter(ts => ts > afterWait - 60000)
+      console.log(`✅ RPM 초기화 완료. 현재 요청 수: ${requestTimestamps.length}/${RPM_LIMIT}`)
+    }
+  } else {
+    // 여유 있을 때는 최소 간격만 대기 (API 안정성)
+    const minDelay = 500  // 0.5초 최소 간격
+    console.log(`⏳ API 안정성을 위해 ${minDelay}ms 대기...`)
+    await new Promise(resolve => setTimeout(resolve, minDelay))
+  }
+
+  // 현재 요청 타임스탬프 기록
+  requestTimestamps.push(Date.now())
+}
+
 // 🚀 병렬 + 배치 처리 AI 분석 함수 (최고 성능)
 export async function parallelBatchAnalyzeProducts(
   posts: Array<{
@@ -692,7 +730,7 @@ export async function parallelBatchAnalyzeProducts(
   maxConcurrency: number = 1    // Rate limit 고려: 1개로 감소 (15 RPM 제한, 순차 처리)
 ): Promise<ProductAnalysis[]> {
   console.log(`🚀 병렬 배치 AI 분석 시작: ${posts.length}개 게시물, 배치크기=${batchSize}, 동시처리=${maxConcurrency}`)
-  
+
   const results: ProductAnalysis[] = []
   
   try {
@@ -718,34 +756,24 @@ export async function parallelBatchAnalyzeProducts(
     
     console.log(`🔄 ${batchGroups.length}개 그룹으로 병렬 처리`)
     
-    // 3단계: 각 그룹을 병렬로 처리
-    for (let groupIndex = 0; groupIndex < batchGroups.length; groupIndex++) {
-      const batchGroup = batchGroups[groupIndex]
-      console.log(`🚀 그룹 ${groupIndex + 1}/${batchGroups.length} 처리 시작: ${batchGroup.length}개 배치 병렬 실행`)
-      
-      const groupStartTime = Date.now()
-      
-      // 현재 그룹의 모든 배치를 병렬로 처리
-      const batchPromises = batchGroup.map(async (batch, batchIndex) => {
-        const actualBatchIndex = groupIndex * maxConcurrency + batchIndex
-        return await processSingleBatch(batch, actualBatchIndex)
-      })
-      
-      const groupResults = await Promise.all(batchPromises)
-      
-      // 결과를 순서대로 추가
-      groupResults.forEach(batchResults => {
-        results.push(...batchResults)
-      })
-      
-      const groupTime = Date.now() - groupStartTime
-      console.log(`✅ 그룹 ${groupIndex + 1} 완료: ${groupTime}ms (평균: ${groupTime / batchGroup.length}ms/배치)`)
-      
-      // 그룹 간 간격으로 API 제한 방지 (Gemini Free Tier: 15 RPM)
-      if (groupIndex < batchGroups.length - 1) {
-        console.log('⏳ 다음 배치 처리 전 대기 중... (6000ms, Rate Limit 방지)')
-        await new Promise(resolve => setTimeout(resolve, 6000))  // 6초로 증가 (안전 마진)
-      }
+    // 3단계: 각 배치를 순차적으로 처리 (RPM 추적 적용)
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex]
+      console.log(`🚀 배치 ${batchIndex + 1}/${batches.length} 처리 시작: ${batch.length}개 게시글`)
+
+      // RPM 체크 및 대기
+      await waitForRateLimit()
+
+      const batchStartTime = Date.now()
+
+      // 배치 처리
+      const batchResults = await processSingleBatch(batch, batchIndex)
+
+      // 결과 추가
+      results.push(...batchResults)
+
+      const batchTime = Date.now() - batchStartTime
+      console.log(`✅ 배치 ${batchIndex + 1} 완료: ${batchTime}ms (${batch.length}개 게시글)`)
     }
     
     console.log(`🎉 병렬 배치 분석 완료: ${results.length}개 결과`)
@@ -757,6 +785,51 @@ export async function parallelBatchAnalyzeProducts(
     // AI 분석 실패 시 명확한 에러를 던짐
     throw new Error(`AI 분석 실패: ${error instanceof Error ? error.message : String(error)}`)
   }
+}
+
+// 재시도 로직을 포함한 안전한 API 호출 함수
+async function safeGenerateContent(
+  model: any,
+  prompt: string,
+  maxRetries: number = 3
+): Promise<string> {
+  let lastError: any = null
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 API 호출 시도 ${attempt}/${maxRetries}`)
+      const result = await model.generateContent(prompt)
+      const response = await result.response
+      return response.text()
+    } catch (error: any) {
+      lastError = error
+      console.error(`❌ API 호출 실패 (시도 ${attempt}/${maxRetries}):`, error)
+
+      // Rate limit 오류 확인
+      const errorMessage = error?.message || String(error)
+      const isRateLimitError = errorMessage.includes('429') ||
+                               errorMessage.includes('quota') ||
+                               errorMessage.includes('rate limit')
+
+      if (isRateLimitError && attempt < maxRetries) {
+        // 에러 메시지에서 재시도 시간 추출
+        const retryMatch = errorMessage.match(/retry in ([0-9.]+)s/)
+        const retryDelay = retryMatch
+          ? Math.ceil(parseFloat(retryMatch[1]) * 1000) + 1000  // 추출된 시간 + 1초 버퍼
+          : 6000  // 기본 6초 대기
+
+        console.log(`⏳ Rate limit 오류 감지. ${retryDelay}ms 대기 후 재시도...`)
+        await new Promise(resolve => setTimeout(resolve, retryDelay))
+      } else if (attempt < maxRetries) {
+        // 다른 오류는 짧은 대기 후 재시도
+        console.log(`⏳ 2초 대기 후 재시도...`)
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+    }
+  }
+
+  // 모든 재시도 실패
+  throw new Error(`AI API 호출 ${maxRetries}회 실패: ${lastError?.message || String(lastError)}`)
 }
 
 // 단일 배치 처리 함수
@@ -805,9 +878,9 @@ JSON 배열 형식으로 응답:
 
 규칙: 20자 제목(가격/용량 제외), 가격은 원문 그대로, ${batch.length}개 정확히`
 
-    const result = await model.generateContent(batchPrompt)
-    const text = result.response.text()
-    
+    // 재시도 로직이 포함된 안전한 API 호출
+    const text = await safeGenerateContent(model, batchPrompt, 3)
+
     console.log(`🤖 배치 ${batchIndex} Gemini 응답 수신: ${text.length}자`)
     
     // JSON 배열 파싱

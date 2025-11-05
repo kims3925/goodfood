@@ -8,27 +8,29 @@ datasource db {
 }
 
 model User {
-  id               String          @id @default(cuid())
-  email            String          @unique
-  password         String
-  name             String?
-  role             String          @default("SUPPLIER") // "ADMIN", "SUPPLIER", "CUSTOMER"
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  bandClientId     String?
-  bandClientSecret String?
-  bandAccessToken  String?
-  collectedPosts   CollectedPost[]
-  orders           Order[]
-  products         Product[]
-  sourcingSites    SourcingSite[]
-  wholesaleBands   WholesaleBand[]
-  carts            Cart[]
-  productPages     ProductPage[]
-  shop             Shop?
-  retailBands      RetailBand[]
-  retailSettings   RetailSettings?
-  retailPosts      RetailPost[]
+  id                    String                  @id @default(cuid())
+  email                 String                  @unique
+  password              String
+  name                  String?
+  role                  String                  @default("SUPPLIER") // "ADMIN", "SUPPLIER", "CUSTOMER"
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  bandClientId          String?
+  bandClientSecret      String?
+  bandAccessToken       String?
+  collectedPosts        CollectedPost[]
+  orders                Order[]
+  products              Product[]
+  sourcingSites         SourcingSite[]
+  wholesaleBands        WholesaleBand[]
+  carts                 Cart[]
+  productPages          ProductPage[]
+  shop                  Shop?
+  retailBands           RetailBand[]
+  retailSettings        RetailSettings?
+  retailPosts           RetailPost[]
+  aliexpressSourcings   AliExpressSourcing[]    // AliExpress 소싱 설정
+  aliexpressProducts    AliExpressProduct[]     // AliExpress 수집 상품
 }
 
 model Product {
@@ -456,4 +458,100 @@ model RetailPost {
   @@index([productId])
   @@index([status])
   @@index([publishedAt])
+}
+
+// =====================================
+// AliExpress 통합 모델 (v1.2)
+// =====================================
+
+model AliExpressSourcing {
+  id              String              @id @default(cuid())
+  userId          String
+
+  // 검색 설정 (WholesaleBand의 bandKey 역할)
+  searchType      String              // "code" | "category"
+  searchValue     String              // 상품코드 또는 카테고리 ID
+  displayName     String              // 표시 이름 (예: "전자제품 카테고리")
+
+  // Band와 동일한 가격정책
+  pricingPolicy   String?             // 자유 텍스트 (AI가 해석)
+
+  // 수집 옵션
+  collectReviews  Boolean             @default(false) // 리뷰 수집 여부
+  minRating       Float?              @default(4.0)   // 최소 평점
+  minOrders       Int?                @default(100)   // 최소 주문 수
+  priceRange      String              @default("{}") // JSON: { min, max }
+
+  // 상태
+  isActive        Boolean             @default(true)
+  lastCollectedAt DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // 관계
+  products        AliExpressProduct[]
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([searchType, searchValue])
+  @@map("aliexpress_sourcings")
+}
+
+model AliExpressProduct {
+  id              String             @id @default(cuid())
+  userId          String
+  sourcingId      String             // AliExpressSourcing ID
+
+  // 원본 상품 정보 (Band의 bandPostId 역할)
+  productId       String             // AliExpress product ID
+  productUrl      String?            // 상품 URL
+  title           String
+  description     String?
+  images          String             @default("[]") // JSON 배열
+  reviews         String             @default("[]") // JSON 배열 (Band의 comments와 동일)
+
+  // AliExpress 고유 정보
+  originalPrice   Float              // USD 원가
+  discount        Int?               // 할인율 (%)
+  currency        String             @default("USD")
+  minOrderQty     Int?               // 최소주문량
+  shippingCost    Float?             // 배송비 (USD)
+  shippingDays    String?            // 배송 소요일
+  supplier        String?            // 공급자명
+  rating          Float?             // 별점 (0.0 ~ 5.0)
+  totalOrders     Int?               // 총 주문 수
+
+  // AI 분석 결과 (Band와 완전히 동일)
+  aiAnalyzed      Boolean            @default(false)
+  aiProcessedAt   DateTime?
+  hookingTitle    String?            // AI 생성 제목 (20자 고정)
+  hookingContent  String?            // AI 생성 핵심 포인트 (100자)
+  detailedContent String?            // AI 생성 상세 내용
+
+  // 가격 정보 (Band와 동일)
+  extractedPrice  Float?             // AI 추출 원가 (KRW 환산)
+  adjustedPrice   Float?             // 가격정책 적용 판매가 (KRW)
+  finalShippingFee Float?            // 최종 배송비 (KRW)
+  priceOptions    String             @default("[]") // JSON
+  priceCalculation String?           // 가격 계산 과정 (JSON)
+
+  // 분류 정보 (Band와 동일 - 5단계)
+  productCategory String             @default("OTHER") // SEAFOOD, MEAT, AGRICULTURE, PROCESSED, OTHER
+
+  // 상태 (Band와 동일)
+  status          String             @default("PENDING") // PENDING, SELECTED, PROCESSED
+  isAvailable     Boolean            @default(true)
+  unavailableReason String?
+  lastCheckedAt   DateTime?
+  policyApplied   Boolean            @default(false)
+
+  // 관계
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourcing        AliExpressSourcing @relation(fields: [sourcingId], references: [id], onDelete: Cascade)
+
+  // 중복 방지 (Band와 동일 패턴)
+  @@unique([sourcingId, productId])
+  @@index([userId, sourcingId, status])
+  @@index([productId])
+  @@map("aliexpress_products")
 }

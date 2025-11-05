@@ -20,6 +20,7 @@ import {
   Database,
   FileSpreadsheet,
   Link2,
+  Globe,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -38,7 +39,7 @@ interface MenuItem {
 
 export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const pathname = usePathname()
-  const [expandedItems, setExpandedItems] = useState<string[]>(['sourcing', 'products', 'automation'])
+  const [expandedItems, setExpandedItems] = useState<string[]>(['sourcing', 'products', 'automation', '1-2. AliExpress 소싱'])
 
   const menuItems: MenuItem[] = [
     {
@@ -59,6 +60,24 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           label: '수집 현황',
           href: '/automation/collected',
           icon: <List size={16} />,
+        },
+      ],
+    },
+    {
+      label: '1-2. AliExpress 소싱',
+      icon: <Globe size={20} />,
+      children: [
+        {
+          label: '소싱 관리',
+          href: '/admin/aliexpress',
+          icon: <Globe size={16} />,
+          badge: 'NEW',
+        },
+        {
+          label: '수집 상품',
+          href: '/admin/aliexpress/products',
+          icon: <Package size={16} />,
+          badge: 'NEW',
         },
       ],
     },
@@ -144,9 +163,9 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       icon: <Settings size={20} />,
       children: [
         {
-          label: '밴드API',
-          href: '/admin/settings/band',
-          icon: <Store size={16} />,
+          label: 'API 설정',
+          href: '/admin/settings/api',
+          icon: <Link2 size={16} />,
         },
         {
           label: '쇼핑몰 설정',

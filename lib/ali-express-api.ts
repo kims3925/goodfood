@@ -111,9 +111,72 @@ export class AliExpressAPI {
    * API 호출 (공통)
    */
   private async callAPI(method: string, params: any): Promise<any> {
-    // TODO: 실제 알리익스프레스 API 서명 및 호출 로직 구현
-    // 현재는 모의 데이터 반환
-    throw new Error('API 호출이 구현되지 않았습니다.')
+    const crypto = await import('crypto')
+
+    // 기본 파라미터
+    const apiParams: Record<string, any> = {
+      app_key: this.apiKey,
+      method: method,
+      timestamp: Date.now().toString(),
+      sign_method: 'md5',
+      format: 'json',
+      v: '2.0',
+      ...params
+    }
+
+    // MD5 서명 생성
+    const sign = this.generateSign(apiParams, crypto)
+    apiParams.sign = sign
+
+    // URL 생성
+    const queryString = new URLSearchParams(apiParams).toString()
+    const url = `${this.baseURL}?${queryString}`
+
+    // API 호출
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`API 호출 실패: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+
+    // 에러 응답 처리
+    if (data.error_response) {
+      throw new Error(`AliExpress API 오류: ${data.error_response.msg || 'Unknown error'}`)
+    }
+
+    return data
+  }
+
+  /**
+   * MD5 서명 생성 (AliExpress 요구사항)
+   */
+  private generateSign(params: Record<string, any>, crypto: typeof import('crypto')): string {
+    // 1. app_key, sign 제외한 파라미터 정렬
+    const sortedKeys = Object.keys(params)
+      .filter(key => key !== 'sign')
+      .sort()
+
+    // 2. key+value 형식으로 연결
+    const signString = sortedKeys
+      .map(key => `${key}${params[key]}`)
+      .join('')
+
+    // 3. app_secret으로 감싸기
+    const fullSignString = `${this.appSecret}${signString}${this.appSecret}`
+
+    // 4. MD5 해시 생성 (대문자)
+    return crypto
+      .createHash('md5')
+      .update(fullSignString, 'utf8')
+      .digest('hex')
+      .toUpperCase()
   }
 
   /**
@@ -134,12 +197,59 @@ export class AliExpressAPI {
    * API 응답 파싱
    */
   private parseSearchResponse(response: any): SearchResponse {
-    // TODO: 실제 API 응답 구조에 맞게 파싱
+    try {
+      // AliExpress Affiliate API 응답 구조
+      const result = response.aliexpress_affiliate_product_query_response?.resp_result
+
+      if (!result) {
+        return {
+          success: false,
+          products: [],
+          totalResults: 0,
+          currentPage: 1,
+          error: '응답 데이터가 없습니다.'
+        }
+      }
+
+      const resultData = typeof result === 'string' ? JSON.parse(result) : result
+      const products = resultData.result?.products || []
+
+      return {
+        success: true,
+        products: products.map((p: any) => this.parseProduct(p)),
+        totalResults: resultData.result?.total_results || products.length,
+        currentPage: resultData.result?.current_page_no || 1
+      }
+    } catch (error) {
+      console.error('응답 파싱 오류:', error)
+      return {
+        success: false,
+        products: [],
+        totalResults: 0,
+        currentPage: 1,
+        error: '응답 파싱 실패'
+      }
+    }
+  }
+
+  /**
+   * 개별 상품 데이터 파싱
+   */
+  private parseProduct(raw: any): AliExpressProduct {
     return {
-      success: true,
-      products: [],
-      totalResults: 0,
-      currentPage: 1,
+      productId: String(raw.product_id || raw.item_id || ''),
+      productTitle: raw.product_title || raw.subject || '',
+      productImage: raw.product_main_image_url || raw.product_small_image_urls?.string?.[0] || '',
+      productUrl: raw.promotion_link || raw.product_detail_url || '',
+      originalPrice: parseFloat(raw.original_price || raw.target_original_price || 0),
+      salePrice: parseFloat(raw.target_sale_price || raw.sale_price || 0),
+      discount: parseInt(raw.discount || 0),
+      currency: raw.target_sale_price_currency || raw.original_price_currency || 'USD',
+      rating: raw.evaluate_rate ? parseFloat(raw.evaluate_rate) : undefined,
+      totalOrders: raw.volume ? parseInt(raw.volume) : undefined,
+      shippingPrice: raw.estimated_price_ship ? parseFloat(raw.estimated_price_ship) : undefined,
+      categoryId: raw.first_level_category_id ? String(raw.first_level_category_id) : undefined,
+      sellerId: raw.shop_id ? String(raw.shop_id) : undefined
     }
   }
 
@@ -147,8 +257,25 @@ export class AliExpressAPI {
    * 상품 상세 파싱
    */
   private parseProductDetail(response: any): AliExpressProduct | null {
-    // TODO: 실제 API 응답 구조에 맞게 파싱
-    return null
+    try {
+      const result = response.aliexpress_affiliate_product_detail_response?.resp_result
+
+      if (!result) {
+        return null
+      }
+
+      const resultData = typeof result === 'string' ? JSON.parse(result) : result
+      const product = resultData.result?.products?.[0]
+
+      if (!product) {
+        return null
+      }
+
+      return this.parseProduct(product)
+    } catch (error) {
+      console.error('상품 상세 파싱 오류:', error)
+      return null
+    }
   }
 
   /**
