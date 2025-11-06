@@ -45,5 +45,10 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2분 대기
+    env: {
+      // 테스트 환경에서는 테스트 DB 사용
+      DATABASE_URL: 'file:./test.db',
+      NODE_ENV: 'test',
+    },
   },
 });

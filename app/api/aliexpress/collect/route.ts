@@ -133,11 +133,16 @@ export async function POST(request: NextRequest) {
     console.log(`✅ AliExpress 검색 결과: ${searchResult.products.length}개 상품 발견`)
 
     // 환율 조회 (캐싱 1시간)
-    const exchangeRate = await getExchangeRate()
-    console.log(`💰 현재 환율: ${exchangeRate} KRW/USD`)
+    const exchangeRateResult = await getExchangeRate()
+    console.log(`💰 현재 환율: ${exchangeRateResult.rate} KRW/USD ${exchangeRateResult.isDefault ? '(기본값)' : '(실시간)'}`)
+
+    // 기본 환율 사용 시 경고
+    if (exchangeRateResult.isDefault && exchangeRateResult.message) {
+      console.warn(`⚠️ ${exchangeRateResult.message}`)
+    }
 
     // 가격정책 파싱
-    const pricingPolicy = parsePricingPolicy(sourcing.pricingPolicy || '', exchangeRate)
+    const pricingPolicy = parsePricingPolicy(sourcing.pricingPolicy || '', exchangeRateResult.rate)
     console.log(`📋 가격정책 적용: 환율 ${pricingPolicy.exchangeRate}원, 마진 ${pricingPolicy.marginPercent}%`)
 
     // 5단계 중복 제거 프로세스
@@ -186,33 +191,28 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      // 4단계: DB에서 유사한 제목의 상품이 있는지 체크
+      // 4단계: DB에서 유사한 제목의 상품이 있는지 체크 (배치 쿼리로 최적화)
       if (cleanTitle && cleanTitle.length > 10) {
-        const keywords = cleanTitle.split(' ').filter(word => word.length > 2).slice(0, 3)
-        let foundSimilar = false
+        const keywords = cleanTitle.split(' ').filter(word => word.length >= 3).slice(0, 3)
 
-        for (const keyword of keywords) {
-          if (keyword.length >= 3) {
-            const similarProduct = await prisma.aliExpressProduct.findFirst({
-              where: {
-                sourcingId: sourcing.id,
-                OR: [
-                  { productTitle: { contains: keyword } },
-                  { hookingTitle: { contains: keyword } }
-                ]
-              }
-            })
+        if (keywords.length > 0) {
+          // 모든 키워드를 한 번의 쿼리로 조회 (N+1 문제 해결)
+          const similarProducts = await prisma.aliExpressProduct.findMany({
+            where: {
+              sourcingId: sourcing.id,
+              OR: keywords.flatMap(keyword => [
+                { productTitle: { contains: keyword } },
+                { hookingTitle: { contains: keyword } }
+              ])
+            },
+            take: 1,  // 하나라도 있으면 중복으로 판단
+            select: { productTitle: true }
+          })
 
-            if (similarProduct) {
-              console.log(`🔄 키워드 "${keyword}" 기반 유사 상품 존재: ${similarProduct.productTitle?.slice(0, 30)}...`)
-              foundSimilar = true
-              break
-            }
+          if (similarProducts.length > 0) {
+            console.log(`🔄 키워드 기반 유사 상품 존재: ${similarProducts[0].productTitle?.slice(0, 30)}...`)
+            continue
           }
-        }
-
-        if (foundSimilar) {
-          continue
         }
 
         seenTitles.add(cleanTitle)
@@ -264,6 +264,11 @@ export async function POST(request: NextRequest) {
     // AI 분석 및 데이터베이스 저장
     console.log('🤖 AI 분석 시작...')
     const savedProducts = []
+    const failedProducts: Array<{
+      productId: string
+      title: string
+      error: string
+    }> = []
 
     for (const product of uniqueProducts) {
       try {
@@ -328,24 +333,37 @@ export async function POST(request: NextRequest) {
         savedProducts.push(savedProduct)
         console.log(`✅ 상품 저장 완료: ${product.productId} - ${product.productTitle.slice(0, 30)}...`)
 
-        // API Rate Limit 방지 (1초 대기)
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // API Rate Limit 방지 (환경변수로 설정 가능)
+        const RATE_LIMIT_DELAY = parseInt(process.env.ALIEXPRESS_RATE_LIMIT_DELAY || '1000')
+        await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY))
       } catch (error) {
-        console.error(`❌ 상품 처리 실패 (${product.productId}):`, error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        console.error(`❌ 상품 처리 실패 (${product.productId}):`, errorMessage)
+
+        // 실패한 상품 정보 기록
+        failedProducts.push({
+          productId: product.productId,
+          title: product.productTitle?.slice(0, 50) || 'Unknown',
+          error: errorMessage
+        })
         continue
       }
     }
 
-    console.log(`🎉 AliExpress 수집 완료: ${savedProducts.length}개 상품 저장`)
+    console.log(`🎉 AliExpress 수집 완료: ${savedProducts.length}개 상품 저장, ${failedProducts.length}개 실패`)
 
     return NextResponse.json({
       success: true,
-      message: `${savedProducts.length}개의 새로운 AliExpress 상품을 수집했습니다! (중복 ${searchResult.products.length - uniqueProducts.length}개 제외)`,
+      message: `${savedProducts.length}개의 새로운 AliExpress 상품을 수집했습니다! (중복 ${searchResult.products.length - uniqueProducts.length}개 제외${failedProducts.length > 0 ? `, 실패 ${failedProducts.length}개` : ''})`,
       totalFound: searchResult.products.length,
       uniqueFound: uniqueProducts.length,
       duplicatesRemoved: searchResult.products.length - uniqueProducts.length,
       newPosts: savedProducts.length,
-      exchangeRate,
+      failedCount: failedProducts.length,
+      failedProducts: failedProducts.length > 0 ? failedProducts : undefined,
+      exchangeRate: exchangeRateResult.rate,
+      exchangeRateIsDefault: exchangeRateResult.isDefault,
+      exchangeRateWarning: exchangeRateResult.message,
       policyApplied: !!sourcing.pricingPolicy,
       posts: savedProducts
     })

@@ -5,6 +5,34 @@
  * 참고: https://developers.aliexpress.com/
  */
 
+/**
+ * AliExpress API 원본 응답 타입
+ */
+interface AliExpressAPIRawProduct {
+  product_id?: string | number
+  item_id?: string | number
+  product_title?: string
+  subject?: string
+  product_main_image_url?: string
+  product_small_image_urls?: {
+    string?: string[]
+  }
+  promotion_link?: string
+  product_detail_url?: string
+  original_price?: string | number
+  target_original_price?: string | number
+  target_sale_price?: string | number
+  sale_price?: string | number
+  discount?: string | number
+  target_sale_price_currency?: string
+  original_price_currency?: string
+  evaluate_rate?: string | number
+  volume?: string | number
+  estimated_price_ship?: string | number
+  first_level_category_id?: string | number
+  shop_id?: string | number
+}
+
 interface AliExpressProduct {
   productId: string
   productTitle: string
@@ -235,7 +263,7 @@ export class AliExpressAPI {
   /**
    * 개별 상품 데이터 파싱
    */
-  private parseProduct(raw: any): AliExpressProduct {
+  private parseProduct(raw: AliExpressAPIRawProduct): AliExpressProduct {
     return {
       productId: String(raw.product_id || raw.item_id || ''),
       productTitle: raw.product_title || raw.subject || '',

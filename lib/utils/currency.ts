@@ -6,42 +6,80 @@
 interface ExchangeRateCache {
   rate: number
   timestamp: number
+  isDefault: boolean
 }
 
 let cachedRate: ExchangeRateCache | null = null
 const CACHE_DURATION = 60 * 60 * 1000 // 1시간
 
 /**
+ * USD → KRW 환율 조회 결과
+ */
+export interface ExchangeRateResult {
+  rate: number
+  isDefault: boolean
+  message?: string
+}
+
+/**
  * USD → KRW 환율 조회 (1시간 캐싱)
  */
-export async function getExchangeRate(): Promise<number> {
+export async function getExchangeRate(): Promise<ExchangeRateResult> {
   const now = Date.now()
 
   // 캐시 확인
   if (cachedRate && (now - cachedRate.timestamp) < CACHE_DURATION) {
-    console.log(`💰 캐시된 환율 사용: ${cachedRate.rate} KRW/USD`)
-    return cachedRate.rate
+    const cacheType = cachedRate.isDefault ? '기본' : '실시간'
+    console.log(`💰 캐시된 환율 사용 (${cacheType}): ${cachedRate.rate} KRW/USD`)
+    return {
+      rate: cachedRate.rate,
+      isDefault: cachedRate.isDefault
+    }
   }
 
   try {
     // 환율 API 호출
     const apiUrl = process.env.EXCHANGE_RATE_API_URL || 'https://api.exchangerate-api.com/v4/latest/USD'
     const response = await fetch(apiUrl)
-    const data = await response.json()
 
-    const rate = data.rates?.KRW || 1300 // 기본값 1300원
+    if (!response.ok) {
+      throw new Error(`환율 API 응답 오류: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    const rate = data.rates?.KRW
+
+    if (!rate || isNaN(rate) || rate <= 0) {
+      throw new Error('유효하지 않은 환율 데이터')
+    }
 
     cachedRate = {
       rate,
-      timestamp: now
+      timestamp: now,
+      isDefault: false
     }
 
-    console.log(`💰 환율 업데이트: ${rate} KRW/USD`)
-    return rate
+    console.log(`💰 환율 업데이트 (실시간): ${rate} KRW/USD`)
+    return {
+      rate,
+      isDefault: false
+    }
 
   } catch (error) {
-    console.error('환율 조회 실패, 기본값 사용:', error)
-    return 1300 // 실패 시 기본 환율
+    console.error('⚠️ 환율 조회 실패, 기본값 사용:', error)
+
+    const defaultRate = 1300
+    cachedRate = {
+      rate: defaultRate,
+      timestamp: now,
+      isDefault: true
+    }
+
+    return {
+      rate: defaultRate,
+      isDefault: true,
+      message: '실시간 환율을 가져올 수 없어 기본 환율(1,300원)을 사용합니다.'
+    }
   }
 }
 

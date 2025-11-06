@@ -159,6 +159,63 @@ export interface APISettings {
 }
 
 /**
+ * 민감 정보 마스킹 함수
+ */
+function maskSensitiveValue(value: string): string {
+  if (!value || value.length === 0) return ''
+  if (value.length <= 8) return '***'
+  return `${value.slice(0, 4)}***${value.slice(-2)}`
+}
+
+/**
+ * API 설정 마스킹 (로깅용)
+ */
+function maskAPISettings(settings: Partial<APISettings>): any {
+  const masked: any = {}
+
+  if (settings.band) {
+    masked.band = {
+      clientId: maskSensitiveValue(settings.band.clientId || ''),
+      clientSecret: settings.band.clientSecret ? '***' : '',
+      accessToken: settings.band.accessToken ? '***' : '',
+      refreshToken: settings.band.refreshToken ? '***' : ''
+    }
+  }
+
+  if (settings.aliexpress) {
+    masked.aliexpress = {
+      apiKey: maskSensitiveValue(settings.aliexpress.apiKey || ''),
+      appSecret: settings.aliexpress.appSecret ? '***' : '',
+      accessToken: settings.aliexpress.accessToken ? '***' : '',
+      trackingId: maskSensitiveValue(settings.aliexpress.trackingId || '')
+    }
+  }
+
+  if (settings.taobao) {
+    masked.taobao = {
+      apiKey: maskSensitiveValue(settings.taobao.apiKey || ''),
+      appSecret: settings.taobao.appSecret ? '***' : ''
+    }
+  }
+
+  if (settings.coupang) {
+    masked.coupang = {
+      accessKey: maskSensitiveValue(settings.coupang.accessKey || ''),
+      secretKey: settings.coupang.secretKey ? '***' : ''
+    }
+  }
+
+  if (settings.mall1688) {
+    masked.mall1688 = {
+      apiKey: maskSensitiveValue(settings.mall1688.apiKey || ''),
+      appSecret: settings.mall1688.appSecret ? '***' : ''
+    }
+  }
+
+  return masked
+}
+
+/**
  * 기본 API 설정
  */
 const DEFAULT_API_SETTINGS: APISettings = {
@@ -221,7 +278,8 @@ export function saveAPISettings(settings: Partial<APISettings>): boolean {
       'utf-8'
     )
 
-    console.log('✅ API 설정 저장 완료:', API_SETTINGS_FILE)
+    // 마스킹된 정보 로그 출력 (보안)
+    console.log('✅ API 설정 저장 완료:', maskAPISettings(updatedSettings))
     return true
   } catch (error) {
     console.error('❌ API 설정 저장 실패:', error)
