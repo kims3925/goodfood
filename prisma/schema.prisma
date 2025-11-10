@@ -62,6 +62,7 @@ model Product {
   author            String?
   originalCreatedAt DateTime?
   order             Int          @default(0) // 상품 순서 (쇼핑몰 목록 정렬용)
+  isRegisteredToRetail Boolean   @default(false) // 소매밴드 등록 여부
   orders            Order[]
   cartItems         CartItem[]
   productPage       ProductPage?

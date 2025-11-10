@@ -54,9 +54,11 @@ export default function RetailPublishPage() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedProducts, setSelectedProducts] = useState<string[]>([])
+  const [selectedRetailBands, setSelectedRetailBands] = useState<string[]>([])
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null)
   const [isPublishing, setIsPublishing] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showBandSelector, setShowBandSelector] = useState(false)
   const [bandApiSettings, setBandApiSettings] = useState({
     clientId: '',
     clientSecret: '',
@@ -71,6 +73,7 @@ export default function RetailPublishPage() {
 
   useEffect(() => {
     loadProducts()
+    loadRetailBands()
   }, [])
 
   const loadProducts = async () => {
@@ -90,6 +93,19 @@ export default function RetailPublishPage() {
       console.error('Failed to load products:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadRetailBands = async () => {
+    try {
+      const response = await fetch('/api/retail/bands')
+      const data = await response.json()
+
+      if (data.success) {
+        setRetailBands(data.bands || [])
+      }
+    } catch (error) {
+      console.error('Failed to load retail bands:', error)
     }
   }
 
@@ -137,6 +153,16 @@ export default function RetailPublishPage() {
       return
     }
 
+    if (selectedRetailBands.length === 0) {
+      alert('등록할 소매밴드를 선택해주세요.')
+      setShowBandSelector(true)
+      return
+    }
+
+    if (!confirm(`선택한 ${selectedProducts.length}개 상품을 ${selectedRetailBands.length}개 소매밴드에 발행하시겠습니까?`)) {
+      return
+    }
+
     try {
       setIsPublishing(true)
 
@@ -146,15 +172,18 @@ export default function RetailPublishPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          productIds: selectedProducts
+          productIds: selectedProducts,
+          retailBandIds: selectedRetailBands,
         }),
       })
 
       const data = await response.json()
 
       if (data.success) {
-        alert(`${selectedProducts.length}개 상품이 소매밴드에 등록되었습니다.`)
+        alert(data.message || `${data.stats.successCount}건의 게시물이 발행되었습니다.`)
         setSelectedProducts([])
+        setSelectedRetailBands([])
+        setShowBandSelector(false)
         loadProducts()
       } else {
         alert('소매밴드 등록에 실패했습니다: ' + data.error)
@@ -164,6 +193,22 @@ export default function RetailPublishPage() {
       alert('소매밴드 등록 중 오류가 발생했습니다.')
     } finally {
       setIsPublishing(false)
+    }
+  }
+
+  const handleSelectRetailBand = (bandId: string) => {
+    setSelectedRetailBands(prev =>
+      prev.includes(bandId)
+        ? prev.filter(id => id !== bandId)
+        : [...prev, bandId]
+    )
+  }
+
+  const handleSelectAllRetailBands = () => {
+    if (selectedRetailBands.length === retailBands.filter(b => b.isActive).length) {
+      setSelectedRetailBands([])
+    } else {
+      setSelectedRetailBands(retailBands.filter(b => b.isActive).map(b => b.id))
     }
   }
 
@@ -340,12 +385,25 @@ export default function RetailPublishPage() {
           {selectedProducts.length > 0 && (
             <>
               <button
+                onClick={() => setShowBandSelector(!showBandSelector)}
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+                  selectedRetailBands.length > 0
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                <Package className="w-4 h-4" />
+                {selectedRetailBands.length > 0
+                  ? `밴드 선택됨 (${selectedRetailBands.length})`
+                  : '밴드 선택'}
+              </button>
+              <button
                 onClick={handlePublishToRetail}
-                disabled={isPublishing}
+                disabled={isPublishing || selectedRetailBands.length === 0}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
               >
                 <Share2 className="w-4 h-4" />
-                {isPublishing ? '등록 중...' : `소매밴드등록 (${selectedProducts.length})`}
+                {isPublishing ? '등록 중...' : `소매밴드 발행 (${selectedProducts.length})`}
               </button>
               <button
                 onClick={handleDeleteSelectedProducts}
@@ -865,6 +923,105 @@ export default function RetailPublishPage() {
                 className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 소매밴드 선택 모달 */}
+      {showBandSelector && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">소매밴드 선택</h2>
+              <button
+                onClick={() => setShowBandSelector(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {retailBands.length === 0 ? (
+                <div className="text-center py-12">
+                  <Package className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                  <p className="text-gray-600 mb-2">등록된 소매밴드가 없습니다</p>
+                  <p className="text-sm text-gray-500 mb-4">환경설정에서 소매밴드를 먼저 등록해주세요</p>
+                  <Link
+                    href="/admin/settings/retail"
+                    className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    소매밴드 등록하기
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 flex items-center justify-between">
+                    <p className="text-sm text-gray-600">
+                      발행할 소매밴드를 선택하세요 ({selectedRetailBands.length}/{retailBands.filter(b => b.isActive).length}개 선택됨)
+                    </p>
+                    <button
+                      onClick={handleSelectAllRetailBands}
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      {selectedRetailBands.length === retailBands.filter(b => b.isActive).length ? '전체 해제' : '전체 선택'}
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {retailBands.map((band) => (
+                      <div
+                        key={band.id}
+                        onClick={() => band.isActive && handleSelectRetailBand(band.id)}
+                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                          selectedRetailBands.includes(band.id)
+                            ? 'border-blue-500 bg-blue-50'
+                            : band.isActive
+                            ? 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                            : 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-medium text-gray-900">{band.bandName}</h3>
+                              {selectedRetailBands.includes(band.id) && (
+                                <CheckCircle className="w-5 h-5 text-blue-600" />
+                              )}
+                              {!band.isActive && (
+                                <span className="px-2 py-0.5 bg-gray-200 text-gray-600 text-xs rounded">비활성</span>
+                              )}
+                            </div>
+                            {band.description && (
+                              <p className="text-sm text-gray-600 mb-1">{band.description}</p>
+                            )}
+                            <p className="text-xs text-gray-500">
+                              멤버 수: {band.memberCount?.toLocaleString() || '0'}명
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowBandSelector(false)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => setShowBandSelector(false)}
+                disabled={selectedRetailBands.length === 0}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                선택 완료 ({selectedRetailBands.length}개)
               </button>
             </div>
           </div>

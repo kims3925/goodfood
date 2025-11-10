@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
     // 쇼핑몰 등록 상태 정보 추가
     const productsWithShopStatus = products.map(product => ({
       ...product,
-      isRegisteredToShop: product.status === 'ACTIVE'
+      isRegisteredToShop: product.status === 'ACTIVE',
+      // isRegisteredToRetail은 이미 Product 모델에 있으므로 그대로 사용
     }))
 
     return NextResponse.json({

@@ -1,5 +1,4 @@
 {
-  "vim": false,
   "permissions": {
     "allow": [
       "Bash(npx @anthropic-ai/cli:*)",
@@ -18,9 +17,12 @@
       "Bash(cp:*)",
       "Bash(mv:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(echo:*)",
+      "Bash(.env)"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "vim": false
 }

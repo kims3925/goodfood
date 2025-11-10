@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Badge, Button } from '@/components/ui'
-import { RefreshCw, Eye, Check, X } from 'lucide-react'
+import { RefreshCw, Eye, Check, X, Zap, Brain } from 'lucide-react'
 
 interface CollectedPost {
   id: string
@@ -27,18 +27,42 @@ export default function CollectedPage() {
   const [posts, setPosts] = useState<CollectedPost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [pendingAnalysisCount, setPendingAnalysisCount] = useState(0)
 
   const fetchCollectedPosts = async () => {
     try {
       setLoading(true)
+      setError(null)
       const response = await fetch('/api/wholesale/posts')
+
       if (!response.ok) {
-        throw new Error('Failed to fetch collected posts')
+        if (response.status === 401) {
+          setError('로그인이 필요합니다. 로그인 후 다시 시도해주세요.')
+        } else if (response.status === 403) {
+          setError('접근 권한이 없습니다.')
+        } else if (response.status === 404) {
+          setError('데이터를 찾을 수 없습니다.')
+        } else if (response.status >= 500) {
+          setError('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+        } else {
+          setError(`오류가 발생했습니다. (상태 코드: ${response.status})`)
+        }
+        setPosts([])
+        return
       }
+
       const data = await response.json()
       setPosts(data.posts || [])
+      setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      console.error('수집 게시물 조회 오류:', err)
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setError('네트워크 연결을 확인해주세요.')
+      } else {
+        setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.')
+      }
+      setPosts([])
     } finally {
       setLoading(false)
     }
@@ -46,7 +70,52 @@ export default function CollectedPage() {
 
   useEffect(() => {
     fetchCollectedPosts()
+    fetchPendingAnalysisCount()
   }, [])
+
+  const fetchPendingAnalysisCount = async () => {
+    try {
+      const response = await fetch('/api/wholesale/posts/analyze')
+      const data = await response.json()
+      if (data.success) {
+        setPendingAnalysisCount(data.pendingCount || 0)
+      }
+    } catch (err) {
+      console.error('미분석 게시물 개수 조회 실패:', err)
+    }
+  }
+
+  const handleRunAIAnalysis = async () => {
+    if (!confirm(`미분석된 ${pendingAnalysisCount}개 게시물을 AI로 분석하시겠습니까?`)) {
+      return
+    }
+
+    try {
+      setIsAnalyzing(true)
+      const response = await fetch('/api/wholesale/posts/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}), // 모든 미분석 게시물
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        alert(data.message || `${data.analyzed}개 게시물의 AI 분석이 완료되었습니다.`)
+        fetchCollectedPosts()
+        fetchPendingAnalysisCount()
+      } else {
+        alert('AI 분석 실패: ' + data.error)
+      }
+    } catch (error) {
+      console.error('AI 분석 오류:', error)
+      alert('AI 분석 중 오류가 발생했습니다.')
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -75,16 +144,39 @@ export default function CollectedPage() {
   }
 
   if (error) {
+    const isAuthError = error.includes('로그인') || error.includes('권한')
+
     return (
       <div className="container mx-auto p-6">
         <Card>
           <CardContent className="pt-6">
-            <div className="text-center text-red-600">
-              <X className="h-8 w-8 mx-auto mb-2" />
-              <p>오류가 발생했습니다: {error}</p>
-              <Button onClick={fetchCollectedPosts} className="mt-4">
-                다시 시도
-              </Button>
+            <div className="text-center">
+              <div className={`mx-auto mb-4 w-16 h-16 rounded-full flex items-center justify-center ${
+                isAuthError ? 'bg-yellow-100' : 'bg-red-100'
+              }`}>
+                <X className={`h-8 w-8 ${isAuthError ? 'text-yellow-600' : 'text-red-600'}`} />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">
+                {isAuthError ? '인증 필요' : '오류 발생'}
+              </h3>
+              <p className="text-muted-foreground mb-6">{error}</p>
+              <div className="flex gap-3 justify-center">
+                {isAuthError && (
+                  <Button
+                    onClick={() => window.location.href = '/auth/login'}
+                    variant="default"
+                  >
+                    로그인하기
+                  </Button>
+                )}
+                <Button
+                  onClick={fetchCollectedPosts}
+                  variant={isAuthError ? "outline" : "default"}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  다시 시도
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -99,10 +191,31 @@ export default function CollectedPage() {
           <h1 className="text-3xl font-bold">수집 현황</h1>
           <p className="text-muted-foreground">도매 밴드에서 수집된 게시물 현황을 확인합니다</p>
         </div>
-        <Button onClick={fetchCollectedPosts} variant="outline">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          새로고침
-        </Button>
+        <div className="flex gap-2">
+          {pendingAnalysisCount > 0 && (
+            <Button
+              onClick={handleRunAIAnalysis}
+              disabled={isAnalyzing}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {isAnalyzing ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  분석 중...
+                </>
+              ) : (
+                <>
+                  <Brain className="h-4 w-4 mr-2" />
+                  AI 분석 실행 ({pendingAnalysisCount}개)
+                </>
+              )}
+            </Button>
+          )}
+          <Button onClick={fetchCollectedPosts} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            새로고침
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-6">

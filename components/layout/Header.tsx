@@ -1,14 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { Menu, Bell, Zap, Package, Upload } from 'lucide-react'
+import { useSession, signOut } from 'next-auth/react'
+import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, User } from 'lucide-react'
 
 interface HeaderProps {
   onMenuClick?: () => void
 }
 
 export default function Header({ onMenuClick }: HeaderProps) {
+  const { data: session, status } = useSession()
   const [showNotifications, setShowNotifications] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
 
   // 실시간 상태 (실제로는 상태 관리 도구에서 가져올 것)
   const stats = {
@@ -16,6 +19,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
     pendingAI: 12,
     readyToUpload: 8,
     published: 25,
+  }
+
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: '/login' })
   }
 
   return (
@@ -118,6 +125,50 @@ export default function Header({ onMenuClick }: HeaderProps) {
             >
               전체 실행
             </button>
+
+            {/* User Menu */}
+            {status === 'loading' ? (
+              <div className="p-2">
+                <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse"></div>
+              </div>
+            ) : session ? (
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-2 p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface"
+                >
+                  <div className="w-8 h-8 rounded-full bg-primary-color flex items-center justify-center text-white font-semibold">
+                    {session.user?.name?.charAt(0) || session.user?.email?.charAt(0) || 'U'}
+                  </div>
+                </button>
+
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-border">
+                    <div className="p-4 border-b border-divider">
+                      <p className="text-sm font-semibold text-text-primary">{session.user?.name || '사용자'}</p>
+                      <p className="text-xs text-text-secondary truncate">{session.user?.email}</p>
+                    </div>
+                    <div className="p-2">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      >
+                        <LogOut size={16} />
+                        로그아웃
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => window.location.href = '/login'}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-color hover:bg-primary-light rounded-lg transition-colors"
+              >
+                <LogIn size={18} />
+                로그인
+              </button>
+            )}
           </div>
         </div>
       </div>
