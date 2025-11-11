@@ -29,6 +29,7 @@ model User {
   retailBands           RetailBand[]
   retailSettings        RetailSettings?
   retailPosts           RetailPost[]
+  automationSettings    AutomationSettings?
   aliexpressSourcings   AliExpressSourcing[]    // AliExpress 소싱 설정
   aliexpressProducts    AliExpressProduct[]     // AliExpress 수집 상품
 }
@@ -427,6 +428,17 @@ model RetailSettings {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AutomationSettings {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique // 사용자별 하나의 설정
+  defaultPricingPolicy    String   @default("수집가격 기준 구간별 마진 적용 (19,900원 이하 +1,000원, 20,000~29,900원 +2,000원, 30,000~39,900원 +3,000원, 40,000~49,900원 +4,000원, 50,000~59,900원 +5,000원, 60,001~70,000원 +6,000원, 70,001~80,000원 +7,000원, 80,001~90,000원 +8,000원, 90,001~100,000원 +9,000원, 100,001~150,000원 +12,000원, 150,001~200,000원 +20,000원, 200,001원 이상 +20,000원)") // 기본 가격정책
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

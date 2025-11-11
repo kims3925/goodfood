@@ -153,6 +153,12 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           badge: 'NEW',
         },
         {
+          label: '자동화 설정',
+          href: '/automation/settings',
+          icon: <Settings size={16} />,
+          badge: 'NEW',
+        },
+        {
           label: '스케줄 관리',
           href: '/automation/schedule',
           icon: <FileText size={16} />,

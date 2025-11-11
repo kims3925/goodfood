@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { loadAISettings } from './config-storage'
+import prisma from './db'
 
 // API 키 우선순위: 1. 설정 파일, 2. 환경변수
 function getGeminiAPIKey(): string {
@@ -56,16 +57,53 @@ function getModel() {
 const GEMINI_API_KEY = getGeminiAPIKey()
 const genAI = getGenAI()
 
+// 기본 가격정책 (fallback - 데이터베이스에서 로드 실패 시)
+const FALLBACK_PRICING_POLICY = `수집가격 기준 구간별 마진 적용 (19,900원 이하 +1,000원, 20,000~29,900원 +2,000원, 30,000~39,900원 +3,000원, 40,000~49,900원 +4,000원, 50,000~59,900원 +5,000원, 60,001~70,000원 +6,000원, 70,001~80,000원 +7,000원, 80,001~90,000원 +8,000원, 90,001~100,000원 +9,000원, 100,001~150,000원 +12,000원, 150,001~200,000원 +20,000원, 200,001원 이상 +20,000원)`
+
+// 데이터베이스에서 기본 가격정책 로드
+async function getDefaultPricingPolicy(userId: string): Promise<string> {
+  try {
+    const automationSettings = await prisma.automationSettings.findUnique({
+      where: { userId }
+    })
+
+    if (automationSettings && automationSettings.defaultPricingPolicy) {
+      return automationSettings.defaultPricingPolicy
+    }
+
+    // 설정이 없으면 fallback 사용
+    return FALLBACK_PRICING_POLICY
+  } catch (error) {
+    console.error('❌ 기본 가격정책 로드 실패, fallback 사용:', error)
+    return FALLBACK_PRICING_POLICY
+  }
+}
+
 // 문자열 기반 가격정책 적용 함수 - CLAUDE.md 기준 6개 밴드별 정확한 정책
-function applyPricingPolicyText(originalPrice: number, pricingPolicyText: string, shippingFee: number = 0): number {
-  if (!pricingPolicyText || !originalPrice) {
+async function applyPricingPolicyText(
+  originalPrice: number,
+  pricingPolicyText: string,
+  shippingFee: number = 0,
+  userId?: string
+): Promise<number> {
+  if (!originalPrice) {
     return originalPrice
   }
 
-  const policy = pricingPolicyText.toLowerCase()
+  // 정책이 없거나 공백이면 기본 정책 사용
+  let effectivePolicy = pricingPolicyText
+  if (!pricingPolicyText || pricingPolicyText.trim() === '') {
+    console.log('⚠️ 가격정책이 없음 → 기본 정책 로드')
+    effectivePolicy = userId
+      ? await getDefaultPricingPolicy(userId)
+      : FALLBACK_PRICING_POLICY
+    console.log(`📋 기본 정책 적용: ${effectivePolicy.substring(0, 50)}...`)
+  }
+
+  const policy = effectivePolicy.toLowerCase()
   let result = originalPrice
 
-  console.log(`🔧 가격정책 적용 시도: 원가 ${originalPrice}원, 배송비 ${shippingFee}원, 정책: ${pricingPolicyText.substring(0, 100)}...`)
+  console.log(`🔧 가격정책 적용 시도: 원가 ${originalPrice}원, 배송비 ${shippingFee}원, 정책: ${effectivePolicy.substring(0, 100)}...`)
 
   // 1️⃣ 가족도매방: 원가 그대로 판매 (단, 39,900원 이상은 구간별 마진 적용)
   if (policy.includes('원가 그대로') || policy.includes('원가그대로') || policy.includes('마진 없음') || policy.includes('마진없음')) {
@@ -725,6 +763,7 @@ export async function parallelBatchAnalyzeProducts(
     content: string
     comments: string[]
     pricingPolicy?: string
+    userId?: string
   }>,
   batchSize: number = 3,        // Rate limit 고려: 3개로 감소
   maxConcurrency: number = 1    // Rate limit 고려: 1개로 감소 (15 RPM 제한, 순차 처리)
@@ -839,6 +878,7 @@ async function processSingleBatch(
     content: string
     comments: string[]
     pricingPolicy?: string
+    userId?: string
   }>,
   batchIndex: number
 ): Promise<ProductAnalysis[]> {
@@ -848,7 +888,7 @@ async function processSingleBatch(
   try {
     const model = getModel() // 설정 파일에서 동적으로 모델 로드
     
-    // 배치용 통합 프롬프트 생성
+    // 배치용 통합 프롬프트 생성 (정책은 서버에서 처리하므로 AI에게 전달하지 않음)
     const batchPrompt = `
 ${batch.length}개 상품을 한 번에 분석해주세요.
 
@@ -857,7 +897,6 @@ ${batch.map((post, index) => `
 제목: ${post.title}
 내용: ${post.content}
 댓글: ${post.comments.join(', ')}
-${post.pricingPolicy ? `정책: ${post.pricingPolicy}` : ''}
 `).join('\n')}
 
 JSON 배열 형식으로 응답:
@@ -933,9 +972,14 @@ JSON 배열 형식으로 응답:
           }
 
           // 가격정책이 있고 가격이 추출된 경우 정책 적용
-          if (post.pricingPolicy && finalExtractedPrice) {
+          if (post.pricingPolicy !== undefined && finalExtractedPrice) {
             console.log(`   ✅ 정책 적용 조건 충족 - applyPricingPolicyText() 호출`)
-            const adjustedPrice = applyPricingPolicyText(finalExtractedPrice, post.pricingPolicy, analysis.shippingFee || 0)
+            const adjustedPrice = await applyPricingPolicyText(
+              finalExtractedPrice,
+              post.pricingPolicy,
+              analysis.shippingFee || 0,
+              post.userId
+            )
 
             console.log(`   💰 정책 적용 완료: ${finalExtractedPrice}원 → ${adjustedPrice}원`)
 

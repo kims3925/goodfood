@@ -565,6 +565,7 @@ export async function POST(request: NextRequest) {
         content: item.post.content || '',
         comments: item.comments,
         pricingPolicy: wholesaleBand.pricingPolicy || undefined,
+        userId: actualUser?.id, // 기본 가격정책 로드용
         bandName: wholesaleBand.name // 정책 적용 디버깅용
       }))
 
