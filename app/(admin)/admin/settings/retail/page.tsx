@@ -6,9 +6,6 @@ import Link from 'next/link'
 
 export default function RetailSettingsPage() {
   const [settings, setSettings] = useState({
-    bandClientId: '',
-    bandClientSecret: '',
-    bandAccessToken: '',
     autoPostInterval: 30,
     maxPostsPerDay: 20,
     enableAutoPosting: false,
@@ -21,10 +18,6 @@ export default function RetailSettingsPage() {
 
   const [isLocked, setIsLocked] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [showSecrets, setShowSecrets] = useState({
-    clientSecret: false,
-    accessToken: false
-  })
 
   // 소매밴드 관리 상태
   const [retailBands, setRetailBands] = useState<any[]>([])
@@ -37,7 +30,6 @@ export default function RetailSettingsPage() {
 
   useEffect(() => {
     loadSettings()
-    loadBandApiSettings()
     loadRetailBands()
   }, [])
 
@@ -52,25 +44,6 @@ export default function RetailSettingsPage() {
       }
     } catch (error) {
       console.error('Failed to load retail settings:', error)
-    }
-  }
-
-  // 밴드API 설정 로드 (밴드API 설정 페이지에서 가져오기)
-  const loadBandApiSettings = async () => {
-    try {
-      const response = await fetch('/api/settings/band')
-      const data = await response.json()
-
-      if (data.success && data.settings) {
-        setSettings(prev => ({
-          ...prev,
-          bandClientId: data.settings.clientId || '',
-          bandClientSecret: data.settings.clientSecret || '',
-          bandAccessToken: data.settings.accessToken || ''
-        }))
-      }
-    } catch (error) {
-      console.error('Failed to load band API settings:', error)
     }
   }
 
@@ -147,13 +120,6 @@ export default function RetailSettingsPage() {
 
   const toggleLock = () => {
     setIsLocked(!isLocked)
-  }
-
-  const toggleSecretVisibility = (field: string) => {
-    setShowSecrets(prev => ({
-      ...prev,
-      [field]: !prev[field]
-    }))
   }
 
   // 소매밴드 선택/해제
@@ -240,74 +206,31 @@ export default function RetailSettingsPage() {
         </div>
 
         <div className="space-y-8">
-          {/* 밴드 API 설정 */}
-          <div className="bg-white rounded-lg shadow-sm p-6" id="band-api-settings">
-            <h2 className="text-lg font-semibold mb-4 text-gray-900">밴드 API 설정</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Client ID
-                </label>
-                <input
-                  type="text"
-                  value={settings.bandClientId}
-                  onChange={(e) => handleInputChange('bandClientId', e.target.value)}
-                  disabled={isLocked}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                    isLocked ? 'bg-gray-100 cursor-not-allowed' : ''
-                  }`}
-                  placeholder="밴드 API Client ID를 입력하세요"
-                />
+          {/* Band API 설정 안내 */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Client Secret
-                </label>
-                <div className="relative">
-                  <input
-                    type={showSecrets.clientSecret ? "text" : "password"}
-                    value={settings.bandClientSecret}
-                    onChange={(e) => handleInputChange('bandClientSecret', e.target.value)}
-                    disabled={isLocked}
-                    className={`w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                      isLocked ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
-                    placeholder="밴드 API Client Secret을 입력하세요"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleSecretVisibility('clientSecret')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showSecrets.clientSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Access Token
-                </label>
-                <div className="relative">
-                  <input
-                    type={showSecrets.accessToken ? "text" : "password"}
-                    value={settings.bandAccessToken}
-                    onChange={(e) => handleInputChange('bandAccessToken', e.target.value)}
-                    disabled={isLocked}
-                    className={`w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                      isLocked ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
-                    placeholder="밴드 API Access Token을 입력하세요"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleSecretVisibility('accessToken')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showSecrets.accessToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-blue-900 mb-1">
+                  Band API 설정은 통합 API 설정 페이지에서 관리됩니다
+                </h3>
+                <p className="text-sm text-blue-700 mb-3">
+                  소매밴드 포스팅에 필요한 Band API 설정은 아래 링크에서 한 번만 설정하면 도매/소매 모두 사용됩니다.
+                </p>
+                <Link
+                  href="/admin/settings/api"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  통합 API 설정으로 이동
+                </Link>
               </div>
             </div>
           </div>

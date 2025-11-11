@@ -19,7 +19,9 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(echo:*)",
-      "Bash(.env)"
+      "Bash(.env)",
+      "WebFetch(domain:github.com)",
+      "Bash(git reset:*)"
     ],
     "deny": [],
     "ask": []

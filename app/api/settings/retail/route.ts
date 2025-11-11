@@ -22,9 +22,6 @@ export async function GET() {
     // 설정이 없으면 기본값 반환
     if (!retailSettings) {
       const defaultSettings = {
-        bandClientId: '',
-        bandClientSecret: '',
-        bandAccessToken: '',
         autoPostInterval: 30,
         maxPostsPerDay: 20,
         enableAutoPosting: false,
@@ -43,9 +40,6 @@ export async function GET() {
 
     // 데이터베이스 결과를 프론트엔드 형식으로 변환
     const formattedSettings = {
-      bandClientId: retailSettings.bandClientId || '',
-      bandClientSecret: retailSettings.bandClientSecret || '',
-      bandAccessToken: retailSettings.bandAccessToken || '',
       autoPostInterval: retailSettings.autoPostInterval,
       maxPostsPerDay: retailSettings.maxPostsPerDay,
       enableAutoPosting: retailSettings.enableAutoPosting,
@@ -87,9 +81,6 @@ export async function POST(req: Request) {
 
     // 프론트엔드 형식을 데이터베이스 형식으로 변환
     const dbData = {
-      bandClientId: body.bandClientId || null,
-      bandClientSecret: body.bandClientSecret || null,
-      bandAccessToken: body.bandAccessToken || null,
       autoPostInterval: body.autoPostInterval || 30,
       maxPostsPerDay: body.maxPostsPerDay || 20,
       enableAutoPosting: body.enableAutoPosting || false,
@@ -110,9 +101,6 @@ export async function POST(req: Request) {
 
     // 응답용 데이터 변환
     const responseSettings = {
-      bandClientId: savedSettings.bandClientId || '',
-      bandClientSecret: savedSettings.bandClientSecret || '',
-      bandAccessToken: savedSettings.bandAccessToken || '',
       autoPostInterval: savedSettings.autoPostInterval,
       maxPostsPerDay: savedSettings.maxPostsPerDay,
       enableAutoPosting: savedSettings.enableAutoPosting,
