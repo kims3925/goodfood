@@ -21,7 +21,8 @@
       "Bash(echo:*)",
       "Bash(.env)",
       "WebFetch(domain:github.com)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
