@@ -21,7 +21,13 @@
       "Bash(echo:*)",
       "Bash(.env)",
       "WebFetch(domain:github.com)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr list:*)",
+      "Bash(python generate_ppt.py:*)",
+      "Bash(pip install:*)",
+      "Bash(python generate_architecture_diagrams.py:*)",
+      "Bash(git mv:*)"
     ],
     "deny": [],
     "ask": []
