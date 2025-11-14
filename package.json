@@ -3,9 +3,8 @@
   "version": "1.2.0",
   "private": true,
   "scripts": {
-    "dev": "npm run cleanup-ports && next dev --port 3000",
+    "dev": "next dev --port 3000",
     "dev:direct": "next dev --port 3000",
-    "cleanup-ports": "node scripts/cleanup-ports.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -13,10 +12,9 @@
     "test:headed": "npx playwright test --headed",
     "test:ui": "npx playwright test --ui",
     "test:report": "npx playwright show-report",
-    "test:setup": "node scripts/test-db-setup.js",
     "test:seed": "node -e \"process.env.DATABASE_URL='file:./test.db'; require('./prisma/seed.ts')\"",
     "test:clean": "node -e \"const fs = require('fs'); const path = 'prisma/test.db'; if(fs.existsSync(path)) fs.unlinkSync(path); console.log('테스트 DB 삭제 완료')\"",
-    "test:prepare": "npm run test:clean && npm run test:setup && npm run test:seed",
+    "test:prepare": "npm run test:clean && npm run test:seed",
     "test:safe": "npm run test:prepare && npx playwright test",
     "backup:dev": "node -e \"const fs = require('fs'); const src = 'prisma/dev.db'; const dest = 'prisma/dev.db.backup'; if(fs.existsSync(src)) { fs.copyFileSync(src, dest); console.log('개발 DB 백업 완료: dev.db.backup'); } else { console.log('dev.db 파일을 찾을 수 없습니다.'); }\"",
     "seed": "npx tsx prisma/seed.ts"

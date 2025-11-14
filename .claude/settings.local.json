@@ -21,7 +21,13 @@
       "Bash(echo:*)",
       "Bash(.env)",
       "WebFetch(domain:github.com)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(rmdir:*)",
+      "Bash(xargs sed:*)",
+      "Bash(npm run build:*)",
+      "Bash(DATABASE_URL=\"file:./dev.db\" PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"yes 그리고 바뀐 주요 내용중에 모든 테이블의 id 속성의 타입이 text 였는데 Integer 로 바뀐 내용도 있어 해당 관련 코드도 전체 다 수정해야해\" npx prisma db push --force-reset --skip-generate)",
+      "Bash(npx tsc:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
