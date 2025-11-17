@@ -77,11 +77,13 @@ model CollectedPost {
 **현재 구조**:
 ```
 src/
-├── app/
-├── domain/
-├── lib/
-├── components/
-└── types/
+├── app/ 페이지 라우팅 API 엔드 포인트(Next.js)
+├── domain/ 비즈니스 로직 (DDD 패턴)
+├── lib/ 공통 라이브러리
+├── components/ 재사용 UI 컴포넌트
+├── types/ TypeScript 타입
+├── stores/ 클라이언트 상태 관리
+└── style/ 글로벌 CSS
 ```
 
 **개선 필요 사항**:
