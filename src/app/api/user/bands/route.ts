@@ -14,18 +14,18 @@ export async function GET(request: NextRequest) {
       }, { status: 401 })
     }
 
-    // 데이터베이스에서 사용자의 밴드 API 토큰 조회
+    // 데이터베이스에서 사용자의 Band API 설정 조회
     const userId = parseInt(session.user.id, 10)
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const bandSettings = await prisma.bandApiSettings.findUnique({
+      where: { userId },
       select: {
-        bandAccessToken: true,
-        bandClientId: true,
-        bandClientSecret: true
+        accessToken: true,
+        clientId: true,
+        clientSecret: true
       }
     })
 
-    const bandAccessToken = user?.bandAccessToken
+    const bandAccessToken = bandSettings?.accessToken
 
     if (!bandAccessToken) {
       // Band API 설정이 필요함을 명확히 알림

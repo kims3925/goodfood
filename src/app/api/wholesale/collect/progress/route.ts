@@ -519,9 +519,9 @@ async function handleCollectionProgress(bandId: number, dateRange?: any) {
               }
             })
 
-            // 그룹 단위로 병렬 배치 분석
+            // 그룹 단위로 병렬 배치 분석 (userId 전달)
             try {
-              const groupResults = await parallelBatchAnalyzeProducts(groupItems, batchSize, maxConcurrency)
+              const groupResults = await parallelBatchAnalyzeProducts(groupItems, actualUser.id, batchSize, maxConcurrency)
               aiAnalysisResults.push(...groupResults)
             } catch (aiError) {
               console.error(`❌ AI 분석 그룹 ${group + 1} 실패:`, aiError)

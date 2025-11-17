@@ -23,27 +23,20 @@ export async function GET(request: NextRequest) {
 
     // 사용자 DB에서 Band API 설정 로드
     const userId = parseInt(session.user.id, 10)
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const bandSettings = await prisma.bandApiSettings.findUnique({
+      where: { userId },
       select: {
-        bandClientId: true,
-        bandClientSecret: true,
-        bandAccessToken: true
+        clientId: true,
+        clientSecret: true,
+        accessToken: true
       }
     })
 
-    if (!user) {
-      return NextResponse.json({
-        success: false,
-        error: '사용자 정보를 찾을 수 없습니다.'
-      }, { status: 404 })
-    }
-
     // 데이터베이스 설정 확인
     const config = {
-      BAND_CLIENT_ID: user.bandClientId || '❌ 미설정',
-      BAND_CLIENT_SECRET: user.bandClientSecret ? '설정됨 (길이: ' + user.bandClientSecret.length + ')' : '❌ 미설정',
-      BAND_ACCESS_TOKEN: user.bandAccessToken ? '설정됨 (길이: ' + user.bandAccessToken.length + ')' : '❌ 미설정'
+      BAND_CLIENT_ID: bandSettings?.clientId || '❌ 미설정',
+      BAND_CLIENT_SECRET: bandSettings?.clientSecret ? '설정됨 (길이: ' + bandSettings.clientSecret.length + ')' : '❌ 미설정',
+      BAND_ACCESS_TOKEN: bandSettings?.accessToken ? '설정됨 (길이: ' + bandSettings.accessToken.length + ')' : '❌ 미설정'
     }
 
     console.log('📋 현재 설정 (데이터베이스):', config)
@@ -51,21 +44,21 @@ export async function GET(request: NextRequest) {
     // 1단계: 기본 설정 검증
     const validationErrors = []
 
-    if (!user.bandClientId) {
+    if (!bandSettings?.clientId) {
       validationErrors.push('BAND_CLIENT_ID가 설정되지 않음')
     }
 
-    if (!user.bandClientSecret) {
+    if (!bandSettings?.clientSecret) {
       validationErrors.push('BAND_CLIENT_SECRET가 설정되지 않음')
     }
 
-    if (!user.bandAccessToken) {
+    if (!bandSettings?.accessToken) {
       validationErrors.push('BAND_ACCESS_TOKEN이 설정되지 않음')
     }
 
     // 2단계: OAuth URL 생성 테스트
     let authUrlTest = null
-    if (validationErrors.length === 0 && user.bandClientId) {
+    if (validationErrors.length === 0 && bandSettings?.clientId) {
       try {
         const redirectUri = process.env.NEXT_PUBLIC_SITE_URL
           ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/band/callback`
@@ -73,7 +66,7 @@ export async function GET(request: NextRequest) {
 
         const authUrl = new URL('https://nid.naver.com/oauth2.0/authorize')
         authUrl.searchParams.append('response_type', 'code')
-        authUrl.searchParams.append('client_id', user.bandClientId)
+        authUrl.searchParams.append('client_id', bandSettings.clientId)
         authUrl.searchParams.append('redirect_uri', redirectUri)
         authUrl.searchParams.append('scope', 'band')
         authUrl.searchParams.append('state', 'test_' + Date.now())

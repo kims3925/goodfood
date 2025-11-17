@@ -222,7 +222,4 @@ data/
 # Cloud storage
 .storage/
 
-# Config files (AI settings, etc.)
-.config/
-*.config.json
 nul

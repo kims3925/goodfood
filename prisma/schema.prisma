@@ -26,12 +26,6 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Band API Integration
-  bandClientId     String?
-  bandClientSecret String?
-  bandAccessToken  String?
-  bandTokenExpiry  DateTime?
-
   // Relationships
   wholesaleBands      WholesaleBand[]
   collectedPosts      CollectedPost[]
@@ -46,6 +40,8 @@ model User {
   automationSettings  AutomationSettings?
   aliexpressSourcings AliExpressSourcing[]
   aliexpressProducts  AliExpressProduct[]
+  bandApiSettings     BandApiSettings?
+  geminiApiSettings   GeminiApiSettings?
 
   @@map("users")
 }
@@ -805,4 +801,43 @@ model AutomationSettings {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("automation_settings")
+}
+
+// =============================================
+// API SETTINGS MANAGEMENT
+// =============================================
+
+model BandApiSettings {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+
+  clientId     String
+  clientSecret String
+  accessToken  String?
+  refreshToken String?
+  tokenExpiry  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("band_api_settings")
+}
+
+model GeminiApiSettings {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+
+  apiKey      String
+  model       String   @default("gemini-2.5-flash")
+  temperature Float    @default(0.7)
+  maxTokens   Int      @default(2048)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("gemini_api_settings")
 }

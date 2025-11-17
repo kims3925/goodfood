@@ -66,7 +66,12 @@ export class ProductMonitor {
       include: {
         user: {
           select: {
-            bandAccessToken: true
+            id: true,
+            bandApiSettings: {
+              select: {
+                accessToken: true
+              }
+            }
           }
         },
         wholesaleBand: {
@@ -88,9 +93,15 @@ export class ProductMonitor {
       hasStockIssue: false
     }
 
+    const accessToken = post.user.bandApiSettings?.accessToken
+
+    if (!accessToken) {
+      throw new Error('Band API 설정이 없습니다.')
+    }
+
     try {
       // Band API에서 현재 게시물 상태 확인
-      const bandApiUrl = `https://openapi.band.us/v2/band/post?access_token=${post.user.bandAccessToken}&band_key=${post.wholesaleBand.bandKey}&post_key=${post.bandPostId}`
+      const bandApiUrl = `https://openapi.band.us/v2/band/post?access_token=${accessToken}&band_key=${post.wholesaleBand.bandKey}&post_key=${post.bandPostId}`
       
       const response = await fetch(bandApiUrl)
       const data = await response.json()

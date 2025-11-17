@@ -36,11 +36,17 @@ export default function AISettingsPage() {
 
   const loadSettings = async () => {
     try {
-      const response = await fetch('/api/settings/ai')
+      const response = await fetch('/api/settings/api')
       const data = await response.json()
 
-      if (data.success) {
-        setSettings(data.settings)
+      if (data.success && data.settings.gemini) {
+        setSettings({
+          ...settings,
+          geminiApiKey: data.settings.gemini.apiKey || '',  // 마스킹 없이 그대로 표시
+          geminiModel: data.settings.gemini.model,
+          temperature: data.settings.gemini.temperature,
+          maxTokens: data.settings.gemini.maxTokens,
+        })
       }
     } catch (error) {
       console.error('설정 로드 실패:', error)
@@ -51,12 +57,20 @@ export default function AISettingsPage() {
     try {
       setIsSaving(true)
 
-      const response = await fetch('/api/settings/ai', {
+      const response = await fetch('/api/settings/api', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(settings)
+        body: JSON.stringify({
+          provider: 'gemini',
+          settings: {
+            apiKey: settings.geminiApiKey,
+            model: settings.geminiModel,
+            temperature: settings.temperature,
+            maxTokens: settings.maxTokens,
+          }
+        })
       })
 
       const data = await response.json()
@@ -64,6 +78,7 @@ export default function AISettingsPage() {
       if (data.success) {
         alert('설정이 저장되었습니다!')
         setTestResult(null)
+        await loadSettings() // 저장 후 다시 로드
       } else {
         alert('설정 저장 실패: ' + data.error)
       }

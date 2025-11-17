@@ -22,9 +22,12 @@ export async function POST(request: NextRequest) {
 
     const { bandId, dateRange } = await request.json()
 
+    const userId = parseInt(session.user.id, 10)
+    console.log(`🔍 게시물 수집 요청: bandId=${bandId}, session.user.id=${session.user.id}, parseInt userId=${userId}`)
+
     const result = await bandCollectionService.collectPosts({
       bandId,
-      userId: parseInt(session.user.id, 10),
+      userId,
       dateRange
     })
 

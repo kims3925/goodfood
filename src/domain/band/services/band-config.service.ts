@@ -18,29 +18,33 @@ export interface BandConfig {
  * @throws 사용자를 찾을 수 없거나 Band API 설정이 없는 경우 에러 발생
  */
 export async function getBandConfig(userId: number): Promise<BandConfig> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
+  const bandSettings = await prisma.bandApiSettings.findUnique({
+    where: { userId },
     select: {
-      bandClientId: true,
-      bandClientSecret: true,
-      bandAccessToken: true,
+      clientId: true,
+      clientSecret: true,
+      accessToken: true,
+      refreshToken: true,
     },
   })
 
-  if (!user) {
-    throw new Error('사용자를 찾을 수 없습니다.')
+  if (!bandSettings) {
+    throw new Error(
+      'Band API 설정이 필요합니다. 설정 페이지(/admin/settings/api)에서 Band API 인증 정보를 입력해주세요.'
+    )
   }
 
-  if (!user.bandAccessToken || !user.bandClientId || !user.bandClientSecret) {
+  if (!bandSettings.accessToken || !bandSettings.clientId || !bandSettings.clientSecret) {
     throw new Error(
       'Band API 설정이 필요합니다. 설정 페이지(/admin/settings/api)에서 Band API 인증 정보를 입력해주세요.'
     )
   }
 
   return {
-    clientId: user.bandClientId,
-    clientSecret: user.bandClientSecret,
-    accessToken: user.bandAccessToken,
+    clientId: bandSettings.clientId,
+    clientSecret: bandSettings.clientSecret,
+    accessToken: bandSettings.accessToken,
+    refreshToken: bandSettings.refreshToken || undefined,
   }
 }
 

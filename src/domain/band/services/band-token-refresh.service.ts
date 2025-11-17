@@ -40,10 +40,11 @@ export async function refreshBandToken(userId: number, refreshToken?: string) {
     console.log('✅ 토큰 갱신 성공')
 
     // DB에 새 토큰 저장
-    await prisma.user.update({
-      where: { id: userId },
+    await prisma.bandApiSettings.update({
+      where: { userId },
       data: {
-        bandAccessToken: tokenData.access_token
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token || refreshToken,
       }
     })
 

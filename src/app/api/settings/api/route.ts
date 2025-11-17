@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/domain/auth'
-import { loadAPISettings, saveAPISettings } from '@/lib/config/storage'
 import prisma from '@/lib/database/client'
 
-// GET: API 설정 조회
+// GET: API 설정 조회 (Band + Gemini)
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -16,27 +15,55 @@ export async function GET(request: NextRequest) {
       }, { status: 401 })
     }
 
-    // Band API 설정은 데이터베이스에서 로드
     const userId = parseInt(session.user.id, 10)
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+
+    // Band API 설정 조회
+    const bandSettings = await prisma.bandApiSettings.findUnique({
+      where: { userId },
       select: {
-        bandClientId: true,
-        bandClientSecret: true,
-        bandAccessToken: true
+        clientId: true,
+        clientSecret: true,
+        accessToken: true,
+        refreshToken: true,
+        tokenExpiry: true,
       }
     })
 
-    // 나머지 API 설정은 파일에서 로드
-    const fileSettings = loadAPISettings()
+    // Gemini API 설정 조회
+    const geminiSettings = await prisma.geminiApiSettings.findUnique({
+      where: { userId },
+      select: {
+        apiKey: true,
+        model: true,
+        temperature: true,
+        maxTokens: true,
+      }
+    })
 
     const apiSettings = {
-      ...fileSettings,
-      band: {
-        clientId: user?.bandClientId || '',
-        clientSecret: user?.bandClientSecret || '',
-        accessToken: user?.bandAccessToken || '',
-        refreshToken: '' // Refresh Token은 별도 관리
+      band: bandSettings ? {
+        clientId: bandSettings.clientId,
+        clientSecret: bandSettings.clientSecret || '',
+        accessToken: bandSettings.accessToken || '',
+        refreshToken: bandSettings.refreshToken || '',
+        tokenExpiry: bandSettings.tokenExpiry,
+      } : {
+        clientId: '',
+        clientSecret: '',
+        accessToken: '',
+        refreshToken: '',
+        tokenExpiry: null,
+      },
+      gemini: geminiSettings ? {
+        apiKey: geminiSettings.apiKey,
+        model: geminiSettings.model,
+        temperature: geminiSettings.temperature,
+        maxTokens: geminiSettings.maxTokens,
+      } : {
+        apiKey: '',
+        model: 'gemini-2.5-flash',
+        temperature: 0.7,
+        maxTokens: 2048,
       }
     }
 
@@ -54,7 +81,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: API 설정 저장
+// POST: API 설정 저장 (Band 또는 Gemini)
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -75,16 +102,32 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Band API는 데이터베이스에 저장
+    const userId = parseInt(session.user.id, 10)
+
+    // Band API 저장
     if (provider === 'band') {
-      const userId = parseInt(session.user.id, 10)
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          bandClientId: settings.clientId || null,
-          bandClientSecret: settings.clientSecret || null,
-          bandAccessToken: settings.accessToken || null
-        }
+      if (!settings.clientId || !settings.clientSecret) {
+        return NextResponse.json({
+          success: false,
+          error: 'Client ID와 Client Secret은 필수입니다.'
+        }, { status: 400 })
+      }
+
+      await prisma.bandApiSettings.upsert({
+        where: { userId },
+        create: {
+          userId,
+          clientId: settings.clientId.trim(),
+          clientSecret: settings.clientSecret.trim(),
+          accessToken: settings.accessToken?.trim() || null,
+          refreshToken: settings.refreshToken?.trim() || null,
+        },
+        update: {
+          clientId: settings.clientId.trim(),
+          clientSecret: settings.clientSecret.trim(),
+          accessToken: settings.accessToken?.trim() || null,
+          refreshToken: settings.refreshToken?.trim() || null,
+        },
       })
 
       console.log('✅ Band API 설정이 데이터베이스에 저장되었습니다.')
@@ -95,22 +138,44 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 나머지 API 제공자는 파일에 저장
-    const currentSettings = loadAPISettings()
+    // Gemini API 저장
+    if (provider === 'gemini') {
+      if (!settings.apiKey) {
+        return NextResponse.json({
+          success: false,
+          error: 'API Key는 필수입니다.'
+        }, { status: 400 })
+      }
 
-    const updatedSettings = {
-      ...currentSettings,
-      [provider]: settings
+      await prisma.geminiApiSettings.upsert({
+        where: { userId },
+        create: {
+          userId,
+          apiKey: settings.apiKey.trim(),
+          model: settings.model || 'gemini-2.5-flash',
+          temperature: settings.temperature ?? 0.7,
+          maxTokens: settings.maxTokens ?? 2048,
+        },
+        update: {
+          apiKey: settings.apiKey.trim(),
+          model: settings.model || 'gemini-2.5-flash',
+          temperature: settings.temperature ?? 0.7,
+          maxTokens: settings.maxTokens ?? 2048,
+        },
+      })
+
+      console.log('✅ Gemini API 설정이 데이터베이스에 저장되었습니다.')
+
+      return NextResponse.json({
+        success: true,
+        message: 'Gemini API 설정이 저장되었습니다.'
+      })
     }
 
-    saveAPISettings(updatedSettings)
-
-    console.log(`✅ ${provider} API 설정 저장 완료 (파일)`)
-
     return NextResponse.json({
-      success: true,
-      message: 'API 설정이 저장되었습니다.'
-    })
+      success: false,
+      error: '지원하지 않는 API 제공자입니다.'
+    }, { status: 400 })
 
   } catch (error) {
     console.error('API 설정 저장 실패:', error)

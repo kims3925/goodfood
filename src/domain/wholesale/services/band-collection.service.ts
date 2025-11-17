@@ -136,9 +136,10 @@ export class BandCollectionService {
 
     let analysisResults: AIAnalysisResult[]
     try {
+      // userId를 두 번째 파라미터로 전달
       analysisResults = await parallelBatchAnalyzeProducts(
         analysisInputs,
-        data.userId
+        data.userId  // userId를 별도 파라미터로 전달
       )
     } catch (error: any) {
       console.error('❌ AI 분석 실패:', error)

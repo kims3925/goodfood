@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     const result = await productService.deleteProducts(
       productIds,
-      session.user.id
+      parseInt(session.user.id, 10)
     )
 
     console.log(`삭제 처리 완료: ${result.message}`)

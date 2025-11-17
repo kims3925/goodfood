@@ -1,67 +1,52 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { loadAISettings } from '@/lib/config/storage'
 import prisma from '@/lib/database/client'
 
-// API 키 우선순위: 1. 설정 파일, 2. 환경변수
-function getGeminiAPIKey(): string {
-  // 1순위: 설정 파일에서 로드
+// 사용자별 Gemini API 설정 조회 (데이터베이스 전용)
+async function getGeminiSettings(userId: number) {
   try {
-    const settings = loadAISettings()
-    if (settings.geminiApiKey && settings.geminiApiKey.trim()) {
-      console.log('✅ Gemini API Key: 설정 파일에서 로드됨')
-      return settings.geminiApiKey
+    const settings = await prisma.geminiApiSettings.findUnique({
+      where: { userId },
+      select: {
+        apiKey: true,
+        model: true,
+        temperature: true,
+        maxTokens: true,
+      }
+    })
+
+    if (!settings || !settings.apiKey) {
+      throw new Error(`❌ Gemini API 설정이 없습니다. /admin/settings/ai 페이지에서 API 키를 등록해주세요. (사용자 ID: ${userId})`)
     }
+
+    console.log(`✅ Gemini API Key: 사용자 ${userId} 데이터베이스에서 로드됨`)
+    return settings
   } catch (error) {
-    console.warn('⚠️ 설정 파일 로드 실패, 환경변수 사용:', error)
-  }
-
-  // 2순위: 환경변수
-  const envKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY
-  if (envKey) {
-    console.log('✅ Gemini API Key: 환경변수에서 로드됨')
-    return envKey
-  }
-
-  throw new Error('❌ Gemini API Key를 찾을 수 없습니다. 설정 페이지에서 API 키를 등록하거나 .env.local에 GEMINI_API_KEY를 설정해주세요.')
-}
-
-// 모델 이름 가져오기 (설정 파일 우선)
-function getGeminiModel(): string {
-  try {
-    const settings = loadAISettings()
-    if (settings.geminiModel && settings.geminiModel.trim()) {
-      console.log(`✅ Gemini Model: ${settings.geminiModel} (설정 파일)`)
-      return settings.geminiModel
+    if (error instanceof Error && error.message.includes('Gemini API 설정이 없습니다')) {
+      throw error
     }
-  } catch (error) {
-    console.warn('⚠️ 설정 파일에서 모델 로드 실패, 기본값 사용')
+    console.error('❌ 데이터베이스 설정 로드 실패:', error)
+    throw new Error('데이터베이스에서 Gemini API 설정을 불러올 수 없습니다.')
   }
-
-  return 'gemini-2.5-flash' // 기본값
 }
 
-// GoogleGenerativeAI 인스턴스 가져오기 (매번 최신 설정 반영)
-function getGenAI() {
-  const apiKey = getGeminiAPIKey()
-  return new GoogleGenerativeAI(apiKey)
+// GoogleGenerativeAI 인스턴스 가져오기
+async function getGenAI(userId: number) {
+  const settings = await getGeminiSettings(userId)
+  return new GoogleGenerativeAI(settings.apiKey)
 }
 
-// 모델 인스턴스 가져오기 (매번 최신 설정 반영)
-function getModel() {
-  const genAI = getGenAI()
-  const modelName = getGeminiModel()
-  return genAI.getGenerativeModel({ model: modelName })
+// 모델 인스턴스 가져오기 (사용자별 설정 반영)
+async function getModel(userId: number) {
+  const settings = await getGeminiSettings(userId)
+  const genAI = await getGenAI(userId)
+  return genAI.getGenerativeModel({ model: settings.model })
 }
-
-// 하위 호환성을 위한 레거시 변수 (deprecated)
-const GEMINI_API_KEY = getGeminiAPIKey()
-const genAI = getGenAI()
 
 // 기본 가격정책 (fallback - 데이터베이스에서 로드 실패 시)
 const FALLBACK_PRICING_POLICY = `수집가격 기준 구간별 마진 적용 (19,900원 이하 +1,000원, 20,000~29,900원 +2,000원, 30,000~39,900원 +3,000원, 40,000~49,900원 +4,000원, 50,000~59,900원 +5,000원, 60,001~70,000원 +6,000원, 70,001~80,000원 +7,000원, 80,001~90,000원 +8,000원, 90,001~100,000원 +9,000원, 100,001~150,000원 +12,000원, 150,001~200,000원 +20,000원, 200,001원 이상 +20,000원)`
 
 // 데이터베이스에서 기본 가격정책 로드
-async function getDefaultPricingPolicy(userId: string): Promise<string> {
+async function getDefaultPricingPolicy(userId: number): Promise<string> {
   try {
     const automationSettings = await prisma.automationSettings.findUnique({
       where: { userId }
@@ -84,7 +69,7 @@ async function applyPricingPolicyText(
   originalPrice: number,
   pricingPolicyText: string,
   shippingFee: number = 0,
-  userId?: string
+  userId?: number
 ): Promise<number> {
   if (!originalPrice) {
     return originalPrice
@@ -379,10 +364,11 @@ export interface ProductAnalysis {
 export async function analyzeProductContent(
   title: string,
   content: string,
-  comments: string[]
+  comments: string[],
+  userId: number
 ): Promise<ProductAnalysis> {
   try {
-    const model = getModel() // 설정 파일에서 동적으로 모델 로드
+    const model = await getModel(userId) // 사용자별 설정 로드
 
     const prompt = `
 도매 상품 게시물을 분석하여 판매용 정보를 추출해 주세요.
@@ -460,16 +446,7 @@ export async function analyzeProductContent(
       console.log('📊 파싱된 분석 결과:', JSON.stringify(analysis, null, 2))
       console.log('💰 추출된 priceOptions:', analysis.priceOptions)
       return analysis
-      
-      // JSON이 없으면 기본 분석 제공
-      return {
-        hookingTitle: title.length > 20 ? title.substring(0, 17) + "..." : title,
-        hookingContent: "엄선된 프리미엄 품질과 신선함을 자랑하는 특별한 상품입니다. 건강하고 맛있는 식탁을 위한 최고의 선택으로, 깊은 맛과 풍부한 영양을 만끽하실 수 있습니다. 정성스럽게 준비된 고품질 상품으로 특별한 식사 시간을 경험해보세요.",
-        detailedContent: content.length > 200 ? content.substring(0, 200) + '...' : content,
-        priceInfo: content,
-        productCategory: 'OTHER' as const
-      }
-      
+
     } catch (parseError) {
       console.error('JSON 파싱 오류:', parseError)
       console.log('Gemini 원본 응답:', text)
@@ -501,13 +478,14 @@ export async function batchAnalyzeProducts(posts: Array<{
   title: string
   content: string
   comments: string[]
+  userId: number
 }>): Promise<ProductAnalysis[]> {
   const results: ProductAnalysis[] = []
-  
+
   // API 과부하 방지를 위해 순차 처리
   for (const post of posts) {
     try {
-      const analysis = await analyzeProductContent(post.title, post.content, post.comments)
+      const analysis = await analyzeProductContent(post.title, post.content, post.comments, post.userId)
       results.push(analysis)
       
       // 각 요청 간 1초 대기 (API 제한 방지)
@@ -593,10 +571,11 @@ export async function analyzeProductContentWithPolicy(
   title: string,
   content: string,
   comments: string[],
-  pricingPolicy: string
+  pricingPolicy: string,
+  userId: number
 ): Promise<ProductAnalysis> {
   try {
-    const model = getModel() // 설정 파일에서 동적으로 모델 로드
+    const model = await getModel(userId) // 사용자별 설정 로드
 
     const prompt = `
 도매 상품 게시물을 가격정책에 따라 분석해 주세요.
@@ -763,15 +742,15 @@ export async function parallelBatchAnalyzeProducts(
     content: string
     comments: string[]
     pricingPolicy?: string
-    userId?: string
   }>,
-  batchSize: number = 3,        // Rate limit 고려: 3개로 감소
-  maxConcurrency: number = 1    // Rate limit 고려: 1개로 감소 (15 RPM 제한, 순차 처리)
+  userId: number,                 // userId를 별도 파라미터로 받음
+  batchSize: number = 3,          // Rate limit 고려: 3개로 감소
+  maxConcurrency: number = 1      // Rate limit 고려: 1개로 감소 (15 RPM 제한, 순차 처리)
 ): Promise<ProductAnalysis[]> {
   console.log(`🚀 병렬 배치 AI 분석 시작: ${posts.length}개 게시물, 배치크기=${batchSize}, 동시처리=${maxConcurrency}`)
 
   const results: ProductAnalysis[] = []
-  
+
   try {
     // 1단계: 게시물을 배치로 분할
     const batches: Array<{
@@ -780,21 +759,21 @@ export async function parallelBatchAnalyzeProducts(
       comments: string[]
       pricingPolicy?: string
     }[]> = []
-    
+
     for (let i = 0; i < posts.length; i += batchSize) {
       batches.push(posts.slice(i, i + batchSize))
     }
-    
+
     console.log(`📦 ${posts.length}개 게시물을 ${batches.length}개 배치로 분할`)
-    
+
     // 2단계: 배치들을 maxConcurrency 만큼 병렬 처리
     const batchGroups: Array<typeof batches> = []
     for (let i = 0; i < batches.length; i += maxConcurrency) {
       batchGroups.push(batches.slice(i, i + maxConcurrency))
     }
-    
+
     console.log(`🔄 ${batchGroups.length}개 그룹으로 병렬 처리`)
-    
+
     // 3단계: 각 배치를 순차적으로 처리 (RPM 추적 적용)
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex]
@@ -805,8 +784,8 @@ export async function parallelBatchAnalyzeProducts(
 
       const batchStartTime = Date.now()
 
-      // 배치 처리
-      const batchResults = await processSingleBatch(batch, batchIndex)
+      // 배치 처리 (userId 전달)
+      const batchResults = await processSingleBatch(batch, batchIndex, userId)
 
       // 결과 추가
       results.push(...batchResults)
@@ -814,10 +793,10 @@ export async function parallelBatchAnalyzeProducts(
       const batchTime = Date.now() - batchStartTime
       console.log(`✅ 배치 ${batchIndex + 1} 완료: ${batchTime}ms (${batch.length}개 게시글)`)
     }
-    
+
     console.log(`🎉 병렬 배치 분석 완료: ${results.length}개 결과`)
     return results
-    
+
   } catch (error) {
     console.error('🚫 병렬 배치 분석 오류:', error)
 
@@ -878,15 +857,16 @@ async function processSingleBatch(
     content: string
     comments: string[]
     pricingPolicy?: string
-    userId?: string
   }>,
-  batchIndex: number
+  batchIndex: number,
+  userId: number  // userId를 별도 파라미터로 받음
 ): Promise<ProductAnalysis[]> {
   const batchStartTime = Date.now()
   console.log(`🤖 배치 ${batchIndex} 처리 시작: ${batch.length}개 상품`)
 
   try {
-    const model = getModel() // 설정 파일에서 동적으로 모델 로드
+    // userId를 파라미터로 받아서 사용
+    const model = await getModel(userId) // 사용자별 설정 로드
     
     // 배치용 통합 프롬프트 생성 (정책은 서버에서 처리하므로 AI에게 전달하지 않음)
     const batchPrompt = `
@@ -1019,9 +999,9 @@ JSON 배열 형식으로 응답:
       const fallbackResults: ProductAnalysis[] = []
       for (const post of batch) {
         try {
-          const analysis = post.pricingPolicy 
-            ? await analyzeProductContentWithPolicy(post.title, post.content, post.comments, post.pricingPolicy)
-            : await analyzeProductContent(post.title, post.content, post.comments)
+          const analysis = post.pricingPolicy
+            ? await analyzeProductContentWithPolicy(post.title, post.content, post.comments, post.pricingPolicy, post.userId)
+            : await analyzeProductContent(post.title, post.content, post.comments, post.userId)
           fallbackResults.push(analysis)
         } catch (error) {
           fallbackResults.push({
