@@ -1,0 +1,843 @@
+// =============================================
+// BandAuto Database Schema v2.0
+// Renewal Date: 2025-11-14
+// Architecture: Integer IDs, 원 단위 가격, Proper Normalization
+// =============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================
+// CORE AUTHENTICATION & USER MANAGEMENT
+// =============================================
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("SUPPLIER") // ADMIN, SUPPLIER, CUSTOMER
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  wholesaleBands      WholesaleBand[]
+  collectedPosts      CollectedPost[]
+  products            Product[]
+  orders              Order[]
+  sourcingSites       SourcingSite[]
+  carts               Cart[]
+  shop                Shop?
+  retailBands         RetailBand[]
+  retailPosts         RetailPost[]
+  retailSettings      RetailSettings?
+  automationSettings  AutomationSettings?
+  aliexpressSourcings AliExpressSourcing[]
+  aliexpressProducts  AliExpressProduct[]
+  bandApiSettings     BandApiSettings?
+  geminiApiSettings   GeminiApiSettings?
+
+  @@map("users")
+}
+
+// =============================================
+// CUSTOMER MANAGEMENT
+// =============================================
+
+model Customer {
+  id        Int      @id @default(autoincrement())
+  email     String?  @unique
+  name      String
+  phone     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  orders    Order[]
+  addresses CustomerAddress[]
+
+  @@map("customers")
+}
+
+model CustomerAddress {
+  id         Int      @id @default(autoincrement())
+  customerId Int
+  label      String   // "집", "회사", "기본배송지"
+  recipient  String   // 수령인
+  phone      String
+  zipCode    String?
+  address1   String   // 기본주소
+  address2   String?  // 상세주소
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orders   Order[]
+
+  @@map("customer_addresses")
+}
+
+// =============================================
+// PRODUCT CATALOG SYSTEM
+// =============================================
+
+model ProductCategory {
+  id          Int      @id @default(autoincrement())
+  parentId    Int?     // Self-referencing for hierarchy
+  code        String   @unique // "SEAFOOD", "MEAT", "AGRICULTURE", etc.
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parent   ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children ProductCategory[] @relation("CategoryHierarchy")
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  categoryId  Int?
+  productCode String?  @unique // 자체상품코드 (0120250904001)
+
+  // Basic Info
+  title       String
+  description String
+
+  // Pricing (원 단위)
+  originalPrice Int // 원가 (원)
+  salePrice     Int // 판매가 (원)
+
+  // Status
+  status      String   @default("DRAFT") // DRAFT, ACTIVE, INACTIVE, SOLD_OUT
+  isAvailable Boolean  @default(true)
+
+  // Shipping (원 단위)
+  shippingFee Int? // 배송비 (원)
+
+  // Source Tracking
+  sourceType String? // "BAND", "ALIEXPRESS", "MANUAL"
+  sourceId   String? // CollectedPost.id or AliExpressProduct.id
+
+  // SEO & Marketing
+  slug String? @unique
+
+  // AI Generated Content
+  hookingTitle    String?
+  hookingContent  String?
+  detailedContent String?
+
+  // Additional Info
+  priceInfo         String?
+  specialNotes      String?
+  hasDeadline       Boolean  @default(false)
+  deadlineInfo      String?
+  unavailableReason String?
+  wholesaleBandName String?
+  author            String?
+  originalCreatedAt DateTime?
+  sortOrder         Int      @default(0) // 상품 순서
+  isRegisteredToRetail Boolean @default(false) // 소매밴드 등록 여부
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     ProductCategory?  @relation(fields: [categoryId], references: [id])
+  images       ProductImage[]
+  orderItems   OrderItem[]
+  cartItems    CartItem[]
+  retailPosts  RetailPost[]
+  shopProducts ShopProduct[]
+
+  @@map("products")
+}
+
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  url       String
+  altText   String?
+  sortOrder Int      @default(0)
+  isMain    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_images")
+}
+
+// =============================================
+// ORDER MANAGEMENT SYSTEM
+// =============================================
+
+model Order {
+  id          Int      @id @default(autoincrement())
+  orderNumber String   @unique // "ORD-20250114-0001"
+  userId      Int
+  customerId  Int
+  addressId   Int? // CustomerAddress
+
+  // Order Totals (원 단위)
+  subtotal       Int // 상품 총액
+  shippingFee    Int // 배송비
+  discountAmount Int @default(0) // 할인액
+  totalAmount    Int // 최종 결제액
+
+  // Status
+  status         String @default("PENDING") // PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED
+  paymentStatus  String @default("PENDING") // PENDING, PAID, FAILED, CANCELLED, REFUNDED
+  shippingStatus String @default("PREPARING") // PREPARING, SHIPPED, DELIVERED, RETURNED
+
+  // Customer Info (snapshot at order time)
+  customerName  String
+  customerEmail String?
+  customerPhone String
+  customerMemo  String? // 고객 요청사항
+
+  // Shipping Info
+  shippingAddress String? // JSON snapshot
+  trackingNumber  String?
+  shippingCompany String?
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  paidAt      DateTime?
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+  cancelledAt DateTime?
+
+  // Relationships
+  user     User             @relation(fields: [userId], references: [id])
+  customer Customer         @relation(fields: [customerId], references: [id])
+  address  CustomerAddress? @relation(fields: [addressId], references: [id])
+  items    OrderItem[]
+  payments Payment[]
+  refunds  Refund[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  productId Int
+
+  // Snapshot at order time (prices may change later)
+  productName String
+  quantity    Int
+  unitPrice   Int // 원 단위 (per item)
+  subtotal    Int // 원 단위 (quantity × unitPrice)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+// =============================================
+// PAYMENT SYSTEM
+// =============================================
+
+model PaymentMethod {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique // "TOSS", "STROKEPAY"
+  name      String   // "토스페이먼츠", "스룩페이"
+  isActive  Boolean  @default(true)
+  config    String   @default("{}") // JSON config
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payments Payment[]
+
+  @@map("payment_methods")
+}
+
+model Payment {
+  id              Int      @id @default(autoincrement())
+  orderId         Int
+  paymentMethodId Int
+
+  // Payment Provider Data
+  paymentKey String? @unique // 토스페이먼츠 결제 키
+  method     String  // "카드", "계좌이체", "가상계좌"
+  amount     Int     // 결제 금액 (원)
+
+  // Status
+  status      String    @default("PENDING") // PENDING, PROCESSING, PAID, FAILED, CANCELLED, REFUNDED
+  failReason  String?
+  webhookData String?   // JSON
+  approvedAt  DateTime?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentMethod PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+  refunds       Refund[]
+
+  @@map("payments")
+}
+
+model Refund {
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  paymentId Int?
+  amount    Int      // 원 단위
+  reason    String
+  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED, COMPLETED
+  adminMemo String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  processedAt DateTime?
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@map("refunds")
+}
+
+// =============================================
+// SHOPPING CART SYSTEM
+// =============================================
+
+model Cart {
+  id        Int      @id @default(autoincrement())
+  sessionId String   @unique // 비회원 지원
+  userId    Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  cartId    Int
+  productId Int
+  quantity  Int
+  priceAt   Int // 원 단위 (snapshot)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
+
+// =============================================
+// WHOLESALE BAND SYSTEM (도매 수집)
+// =============================================
+
+model WholesaleBand {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  bandKey         String   @unique
+  name            String
+  description     String?
+  memberCount     Int?
+  coverUrl        String?
+  isActive        Boolean  @default(true)
+  collectComments Boolean  @default(false)
+  pricingPolicy   String? // AI-interpreted pricing rules
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectedPosts CollectedPost[]
+
+  @@map("wholesale_bands")
+}
+
+model CollectedPost {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  wholesaleBandId Int
+  postKey         String
+
+  // Original Band Content
+  title   String
+  content String
+  author  String?
+
+  // AI Analysis Results
+  aiAnalyzed      Boolean   @default(false)
+  aiProcessedAt   DateTime?
+  hookingTitle    String?
+  hookingContent  String?
+  detailedContent String?
+  productCategory String    @default("OTHER") // SEAFOOD, MEAT, AGRICULTURE, PROCESSED, OTHER
+
+  // Price Information (원 단위)
+  extractedPrice   Int?    // AI extracted price
+  adjustedPrice    Int?    // Policy-adjusted price
+  shippingFee      Int?    // Shipping cost
+  priceOptions     String  @default("[]") // JSON array
+  priceCalculation String? // JSON calculation details
+  policyApplied    Boolean @default(false)
+
+  // Additional Info
+  priceInfo    String?
+  shippingPolicy String?
+
+  // Availability
+  hasDeadline       Boolean   @default(false)
+  deadlineInfo      String?
+  isAvailable       Boolean   @default(true)
+  unavailableReason String?
+  lastCheckedAt     DateTime?
+
+  // Status
+  status     String  @default("PENDING") // PENDING, SELECTED, PROCESSED, REJECTED
+  isSelected Boolean @default(false)
+
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  bandCreatedAt DateTime
+
+  // Relationships
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wholesaleBand WholesaleBand @relation(fields: [wholesaleBandId], references: [id], onDelete: Cascade)
+  images        PostImage[]
+
+  @@unique([wholesaleBandId, postKey])
+  @@map("collected_posts")
+}
+
+model PostImage {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  url       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  post CollectedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("post_images")
+}
+
+model SourcingSite {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  name              String
+  type              String   // "BAND", "ALIEXPRESS", "MANUAL"
+  category          String?
+  url               String?
+  customsBaseAmount Int?     // 원 단위
+  shippingCost      Int?     // 원 단위
+  isActive          Boolean  @default(true)
+
+  // API Credentials
+  bandKey         String?
+  bandAccessToken String?
+  apiKey          String?
+  secretKey       String?
+  sellerId        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sourcing_sites")
+}
+
+// =============================================
+// RETAIL BAND SYSTEM (소매 판매)
+// =============================================
+
+model RetailBand {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  bandKey     String
+  bandName    String
+  description String?
+  memberCount Int      @default(0)
+  isActive    Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  retailPosts RetailPost[]
+
+  @@unique([userId, bandKey])
+  @@map("retail_bands")
+}
+
+model RetailSettings {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique
+
+  // Band API Credentials
+  bandClientId     String?
+  bandClientSecret String?
+  bandAccessToken  String?
+
+  // Automation Settings
+  enableAutoPosting Boolean @default(false)
+  autoPostInterval  Int     @default(30) // minutes
+  maxPostsPerDay    Int     @default(20)
+  postingStart      String  @default("09:00")
+  postingEnd        String  @default("22:00")
+  isLocked          Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("retail_settings")
+}
+
+model RetailPost {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  retailBandId Int
+  productId    Int
+  bandPostId   String? // Band platform post ID
+
+  // Post Content
+  title       String
+  content     String
+  price       Int  // 원 단위
+  shippingFee Int? // 원 단위
+
+  // Status & Metrics
+  status       String   @default("PUBLISHED") // PUBLISHED, DELETED, FAILED
+  viewCount    Int      @default(0)
+  likeCount    Int      @default(0)
+  commentCount Int      @default(0)
+
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  publishedAt DateTime @default(now())
+
+  // Relationships
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  retailBand RetailBand @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  images     RetailPostImage[]
+
+  @@unique([retailBandId, bandPostId])
+  @@map("retail_posts")
+}
+
+model RetailPostImage {
+  id           Int      @id @default(autoincrement())
+  retailPostId Int
+  url          String
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  retailPost RetailPost @relation(fields: [retailPostId], references: [id], onDelete: Cascade)
+
+  @@map("retail_post_images")
+}
+
+// =============================================
+// ALIEXPRESS INTEGRATION
+// =============================================
+
+model AliExpressSourcing {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+
+  // Search Configuration
+  searchType  String // "code" | "category"
+  searchValue String
+  displayName String
+
+  // Pricing Policy
+  pricingPolicy String?
+
+  // Collection Settings
+  collectReviews Boolean  @default(false)
+  minRating      Float?   @default(4.0)
+  minOrders      Int?     @default(100)
+  priceRange     String   @default("{}") // JSON: { min, max }
+
+  // Status
+  isActive        Boolean   @default(true)
+  lastCollectedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products AliExpressProduct[]
+
+  @@map("aliexpress_sourcings")
+}
+
+model AliExpressProduct {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  sourcingId Int
+
+  // AliExpress Product Info
+  productId   String
+  productUrl  String?
+  title       String
+  description String?
+
+  // Pricing (원 단위 - USD에서 KRW로 환산됨)
+  originalPrice Int  // KRW 환산 원가
+  discount      Int? // percentage
+  currency      String @default("USD")
+  minOrderQty   Int?
+  shippingCost  Int? // KRW 환산 배송비
+  shippingDays  String?
+
+  // Supplier Info
+  supplier    String?
+  rating      Float?
+  totalOrders Int?
+
+  // AI Analysis (same as Band posts)
+  aiAnalyzed      Boolean   @default(false)
+  aiProcessedAt   DateTime?
+  hookingTitle    String?
+  hookingContent  String?
+  detailedContent String?
+  productCategory String    @default("OTHER")
+
+  // Price Calculation (KRW)
+  extractedPrice     Int?
+  adjustedPrice      Int?
+  finalShippingFee   Int?
+  priceOptions       String  @default("[]")
+  priceCalculation   String?
+
+  // Status
+  status            String    @default("PENDING")
+  isAvailable       Boolean   @default(true)
+  unavailableReason String?
+  lastCheckedAt     DateTime?
+  policyApplied     Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourcing AliExpressSourcing @relation(fields: [sourcingId], references: [id], onDelete: Cascade)
+  images   AliExpressProductImage[]
+  reviews  AliExpressProductReview[]
+
+  @@unique([sourcingId, productId])
+  @@map("aliexpress_products")
+}
+
+model AliExpressProductImage {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  url       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  product AliExpressProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("aliexpress_product_images")
+}
+
+model AliExpressProductReview {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  content   String
+  rating    Float?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  product AliExpressProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("aliexpress_product_reviews")
+}
+
+// =============================================
+// SHOP MANAGEMENT
+// =============================================
+
+model Shop {
+  id      Int     @id @default(autoincrement())
+  userId  Int     @unique
+  shopUrl String  @unique
+  shopName String
+
+  // Store Settings
+  noticeTitle   String?
+  noticeContent String?
+  isActive      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopProducts ShopProduct[]
+  shopSettings ShopSettings?
+
+  @@map("shops")
+}
+
+model ShopProduct {
+  id          Int     @id @default(autoincrement())
+  shopId      Int
+  productId   Int? // Link to main Product if exists
+  productCode String
+
+  // Product Info
+  category String
+  name     String
+  summary  String?
+
+  // Stock & Status
+  status String @default("ACTIVE") // ACTIVE, INACTIVE, SOLD_OUT
+  stock  Int    @default(0)
+
+  // Pricing (원 단위)
+  supplyPrice Int
+  salePrice   Int
+
+  // Shipping (원 단위)
+  shippingType String @default("FREE") // FREE, FIXED
+  shippingFee  Int    @default(0)
+  shippingUnit Int    @default(1)
+
+  // Options
+  hasOptions Boolean @default(false)
+  options    String  @default("[]") // JSON
+
+  // Content
+  thumbnail     String?
+  detailContent String?
+
+  // Settings
+  taxType     String  @default("TAXABLE") // TAXABLE, TAX_FREE
+  isPublished Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop    Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@unique([shopId, productCode])
+  @@map("shop_products")
+}
+
+model ShopSettings {
+  id     Int    @id @default(autoincrement())
+  shopId Int    @unique
+
+  // Business Info
+  shopName       String @default("BandAuto 쇼핑몰")
+  businessNumber String?
+  adminEmail     String?
+  customerService String?
+
+  // Shipping Defaults (원 단위)
+  defaultShippingFee Int @default(3000)
+  freeShippingAmount Int @default(30000)
+
+  // Policies
+  returnPolicy   String?
+  privacyPolicy  String?
+  termsOfService String?
+  bankAccount    String?
+
+  // SEO
+  seoTitle       String?
+  seoDescription String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@map("shop_settings")
+}
+
+// =============================================
+// AUTOMATION & SYSTEM SETTINGS
+// =============================================
+
+model AutomationSettings {
+  id                   Int      @id @default(autoincrement())
+  userId               Int      @unique
+  defaultPricingPolicy String   @default("수집가격 기준 구간별 마진 적용")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("automation_settings")
+}
+
+// =============================================
+// API SETTINGS MANAGEMENT
+// =============================================
+
+model BandApiSettings {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+
+  clientId     String
+  clientSecret String
+  accessToken  String?
+  refreshToken String?
+  tokenExpiry  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("band_api_settings")
+}
+
+model GeminiApiSettings {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+
+  apiKey      String
+  model       String   @default("gemini-2.5-flash")
+  temperature Float    @default(0.7)
+  maxTokens   Int      @default(2048)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("gemini_api_settings")
+}

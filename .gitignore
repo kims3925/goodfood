@@ -223,3 +223,4 @@ data/
 .storage/
 
 nul
+.claude/settings.local.json
