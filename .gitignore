@@ -223,3 +223,6 @@ data/
 .storage/
 
 nul
+.mcp.json
+docs/기능_정의서.md
+.mcp.json

@@ -1,3 +1,11 @@
+# 🌏 언어 설정 (Language Configuration)
+
+**중요: 이 프로젝트에서 Claude Code는 모든 대화를 한국어로 진행해야 합니다.**
+
+**IMPORTANT: Claude Code must communicate in Korean for all conversations in this project.**
+
+---
+
 # BandAuto - 밴드 자동화 + 토스페이먼츠 통합 쇼핑몰 시스템
 
 ## 📋 프로젝트 개요
