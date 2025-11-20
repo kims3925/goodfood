@@ -1,348 +1,363 @@
-# BandAuto v1.2 - 글로벌 도매 자동화 판매 시스템
+# BandAuto - Modular E-commerce & Sourcing Platform
 
-> 🌍 Band + AliExpress 통합 소싱부터 AI 상세페이지 제작, 자체 쇼핑몰 판매까지 완전 자동화
+BandAuto는 도매 밴드 상품 자동화부터 AI 상세페이지 생성, 토스페이먼츠 통합 쇼핑몰까지 제공하는 풀스택 자동화 플랫폼입니다.
 
-도매 밴드와 글로벌 마켓플레이스(AliExpress)의 상품을 자동으로 수집하여 AI로 상세페이지를 제작하고, 토스페이먼츠를 통합한 자체 쇼핑몰에서 직접 판매하는 통합 자동화 시스템입니다.
+## 🏗️ 프로젝트 구조
 
----
-
-## ✨ v1.2 주요 업데이트
-
-### 🌍 **AliExpress API 통합**
-- AliExpress Open Platform API 연동 (MD5 서명 인증)
-- 실시간 USD → KRW 환율 계산 (1시간 캐싱)
-- 가격정책 자동 적용 (환율, 배송비, 관세, 마진)
-- 모의 데이터 모드 (API 키 없이도 테스트 가능)
-
-### 🔄 **5단계 중복 제거 시스템**
-- productId 기반 DB 중복 체크
-- 제목 유사도 필터링 (Jaccard 80%)
-- 이미지 기반 중복 체크
-- DB 키워드 유사도 검색
-- 현재 배치 내 유사도 체크
-
-### ⚙️ **통합 API 설정 시스템**
-- 탭 기반 멀티 API 관리 (Band, AliExpress)
-- 각 API별 설정 가이드 및 발급 링크 버튼
-- 연결 테스트 기능
-- 향후 확장 준비 (Taobao, Coupang, 1688.com)
-
----
-
-## 🚀 빠른 시작
-
-### 필수 요구사항
-
-- Node.js 18.0 이상
-- npm 또는 yarn
-- SQLite (개발용) / PostgreSQL (프로덕션 권장)
-
-### 설치 및 실행
-
-```bash
-# 1. 의존성 설치
-npm install
-
-# 2. 환경 변수 설정
-cp .env.example .env.local
-# .env.local 파일을 열어 필요한 API 키 입력
-
-# 3. 데이터베이스 초기화
-npx prisma generate
-npx prisma db push
-
-# 4. 개발 서버 실행
-npm run dev
-```
-
-브라우저에서 http://localhost:3000 접속
-
----
-
-## 🛠 주요 기능
-
-### 1️⃣ **다중 소싱 시스템**
-- 🏪 **Band 도매**: 6개 도매밴드 가격정책 지원
-- 🌍 **AliExpress**: 글로벌 상품 소싱 (USD → KRW 자동 환산)
-- 🔜 **Taobao / 1688**: 중국 직구 (향후 지원)
-- 🔜 **Coupang**: 국내 파트너스 (향후 지원)
-
-### 2️⃣ **AI 상품 분석** (Gemini AI)
-- 20자 고정 제목 자동 생성
-- 5단계 자동 분류 (수산/축산/농산/가공품/기타)
-- 가격정책 자동 적용
-- 배치 병렬 처리 (초고속 분석)
-
-### 3️⃣ **자체 쇼핑몰**
-- 토스페이먼츠 통합 결제 시스템
-- 장바구니 및 주문 관리
-- 회원/비회원 모두 지원
-- SEO 최적화 상품 페이지
-
-### 4️⃣ **소매밴드 자동 포스팅**
-- 여러 소매 밴드에 동시 게시
-- 쇼핑몰 링크 자동 포함
-- 포스팅 이력 관리
-
-### 5️⃣ **주문 자동화**
-- 자동 발주서 생성
-- 도매업체 자동 발주
-- 실시간 알림 시스템
-
----
-
-## 📊 시스템 아키텍처
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    관리자 대시보드                       │
-├─────────────────────────────────────────────────────────┤
-│  도매 소싱           AI 분석          자체 쇼핑몰         │
-│  ├─ Band 6개밴드    ├─ Gemini AI     ├─ 상품 등록       │
-│  └─ AliExpress      └─ 5단계 분류    └─ 토스페이먼츠    │
-├─────────────────────────────────────────────────────────┤
-│                    자동화 엔진                           │
-│  ├─ 5단계 중복 제거                                     │
-│  ├─ 가격정책 자동 적용                                  │
-│  ├─ 환율 계산 (1시간 캐싱)                              │
-│  └─ 소매밴드 자동 포스팅                                │
-├─────────────────────────────────────────────────────────┤
-│              데이터베이스 (Prisma ORM)                   │
-│  ├─ 20개 모델 (User, Product, Order, Payment...)       │
-│  ├─ Band: WholesaleBand, CollectedPost                 │
-│  └─ AliExpress: AliExpressSourcing, AliExpressProduct   │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-## 🔧 개발 명령어
-
-```bash
-# 개발 서버 실행 (포트 자동 정리)
-npm run dev
-
-# 프로덕션 빌드
-npm run build
-npm run start
-
-# 린트 검사
-npm run lint
-
-# Prisma 데이터베이스
-npx prisma studio        # 데이터베이스 관리 UI
-npx prisma db push       # 스키마 동기화
-npx prisma generate      # 클라이언트 생성
-
-# 테스트 (Playwright E2E)
-npm test
-```
-
----
-
-## 📁 프로젝트 구조
+이 프로젝트는 **2개의 독립적인 Next.js 앱**과 **공유 모듈**로 구성된 모노레포입니다:
 
 ```
 bandauto/
-├── app/                        # Next.js 14 App Router
-│   ├── (admin)/               # 관리자 대시보드
-│   │   ├── admin/
-│   │   │   ├── wholesale/     # Band 도매 관리
-│   │   │   ├── aliexpress/    # AliExpress 소싱 (NEW)
-│   │   │   ├── products/      # 상품 관리
-│   │   │   └── settings/      # 설정
-│   │   │       └── api/       # 통합 API 설정 (NEW)
-│   │   └── automation/        # 자동화 시스템
-│   ├── store/                 # 고객용 쇼핑몰
-│   └── api/                   # API Routes
-│       ├── wholesale/         # Band API
-│       ├── aliexpress/        # AliExpress API (NEW)
-│       ├── payments/          # 결제 API
-│       └── settings/          # 설정 API
+├── e-commerce-app/          # 고객용 쇼핑몰 앱 (포트 3000)
+│   ├── src/
+│   │   ├── app/             # Next.js App Router
+│   │   ├── components/      # 쇼핑몰 UI 컴포넌트
+│   │   ├── stores/          # Zustand 상태 관리
+│   │   └── modules/         # E-commerce 전용 모듈
+│   │       ├── order/       # 주문 관리
+│   │       ├── payments/    # 결제 처리 (토스페이먼츠)
+│   │       ├── cart/        # 장바구니
+│   │       ├── product/     # 상품 관리
+│   │       └── user/        # 사용자/고객 관리
+│   └── .env.local           # E-commerce 환경변수
 │
-├── components/                # React 컴포넌트
-│   ├── layout/               # 레이아웃 (Header, Sidebar)
-│   ├── auth/                 # 인증
-│   └── ui/                   # UI 컴포넌트
+├── sourcing-app/            # 관리자/워커 앱 (포트 3001)
+│   ├── src/
+│   │   ├── app/             # Next.js App Router
+│   │   ├── components/      # 관리자 UI 컴포넌트
+│   │   └── modules/         # Sourcing 전용 모듈
+│   │       ├── config/      # API/AI 설정
+│   │       ├── sourcing/    # 도매 상품 수집
+│   │       ├── transformation/  # AI 상품 가공 (게시글 → 상세페이지)
+│   │       ├── catalog/     # 상품 카탈로그
+│   │       ├── shop/        # 쇼핑몰 관리
+│   │       └── monitoring/  # 파이프라인 모니터링
+│   └── .env.local           # Sourcing 환경변수
 │
-├── lib/                       # 라이브러리 & 유틸리티
-│   ├── gemini-ai.ts          # AI 분석 (873 lines)
-│   ├── ali-express-api.ts    # AliExpress API (NEW)
-│   ├── utils/
-│   │   └── currency.ts       # 환율 계산 (NEW)
-│   ├── payments/             # 토스페이먼츠
-│   └── config-storage.ts     # 설정 관리
+├── modules/                 # 공통 모듈
+│   └── common/
+│       ├── kernel/          # 공통 타입 정의
+│       ├── utils/           # 유틸리티 함수
+│       └── ui-kit/          # 공유 UI 컴포넌트
 │
-├── prisma/                    # 데이터베이스
-│   └── schema.prisma         # 20개 모델
+├── prisma/                  # 공유 데이터베이스
+│   ├── schema.prisma        # 20개 모델 정의
+│   ├── dev.db               # SQLite 데이터베이스 (개발 환경)
+│   └── migrations/          # 데이터베이스 마이그레이션 히스토리
 │
-├── types/                     # TypeScript 타입
-├── hooks/                     # Custom React Hooks
-└── docs/                      # 개발 문서
+└── docs/                    # 프로젝트 문서
+    ├── api/                 # API 레퍼런스
+    ├── project/             # 프로젝트 문서
+    ├── migration/           # 마이그레이션 가이드
+    │   └── DB-MIGRATION-GUIDE.md  # SQLite → MySQL 전환 가이드
+    └── architecture/        # 아키텍처 문서
 ```
 
----
+## 🎯 2-App 아키텍처
 
-## 🌐 API 설정 가이드
+### E-Commerce App (고객용 쇼핑몰)
+- **포트**: 3000
+- **역할**: 고객이 상품을 보고 구매하는 프론트엔드
+- **핵심 기능**:
+  - 상품 목록/상세 페이지
+  - 장바구니 (Zustand)
+  - 토스페이먼츠 결제
+  - 주문 관리
+  - 고객 계정 관리
 
-### 1️⃣ **Band API 설정**
-1. [Band Developers](https://developers.band.us) 접속
-2. 앱 생성 → Client ID, Secret 발급
-3. OAuth 인증 → Access Token 획득
-4. `/admin/settings/api` 에서 설정 저장
+### Sourcing App (관리자/워커)
+- **포트**: 3001
+- **역할**: 관리자가 상품을 수집하고 AI로 가공하는 백오피스
+- **핵심 기능**:
+  - 도매 밴드 크롤링 (Playwright)
+  - AI 상품 가공 (Gemini - 게시글 → 상세페이지)
+  - 상품 카탈로그 관리
+  - 쇼핑몰 설정
+  - 파이프라인 모니터링
 
-### 2️⃣ **AliExpress API 설정**
-1. [AliExpress Open Platform](https://portals.aliexpress.com) 가입
-2. App Key, App Secret 발급
-3. `/admin/settings/api` 에서 설정 저장
-4. ⚠️ API 키 없이도 모의 데이터 모드로 테스트 가능
+## 🚀 빠른 시작
 
-### 3️⃣ **Gemini AI 설정**
-1. [Google AI Studio](https://aistudio.google.com/apikey) 접속
-2. API 키 발급 (무료)
-3. `/admin/settings/ai` 에서 설정 저장
+### 1. 의존성 설치
+```bash
+npm install
+```
 
----
+### 2. 데이터베이스 초기화
+```bash
+npx prisma generate
+npx prisma db push
+```
 
-## 💰 가격정책 시스템
+### 3. 환경변수 설정
 
-### **Band 도매 (6개 밴드)**
-1. **가족도매방**: 원가 그대로 (공급가 90%)
-2. **요한이네♧소매방**: 구간별 마진 (+1,000원 ~ +20,000원)
-3. **초록이네**: 구간별 마진 (요한이네와 동일)
-4. **나은 상품 공급방**: 공급가 기준 (+4,000원 + 초과구간)
-5. **S D 푸드**: 공급가 기준 (나은과 동일)
-6. **폐쇄몰VIP도매**: 공급가 기준 (나은과 동일)
-
-### **AliExpress**
-- USD → KRW 실시간 환율 적용
-- 배송비, 관세, 마진 정책 자동 계산
-- 100원 단위 반올림
-
----
-
-## 📊 데이터베이스 스키마 (20개 모델)
-
-### **기본 시스템**
-- User, Customer, Product, Order, SourcingSite
-
-### **도매 관리**
-- WholesaleBand, CollectedPost
-- AliExpressSourcing, AliExpressProduct (NEW)
-
-### **결제 시스템**
-- Payment, PaymentMethod, Refund
-
-### **쇼핑몰**
-- Shop, ShopProduct, ShopSettings
-- Cart, CartItem
-- ProductPage, DeliveryTracker
-
-### **소매밴드**
-- RetailBand, RetailSettings, RetailPost
-
----
-
-## 🔐 환경 변수
-
+**e-commerce-app/.env.local**
 ```env
-# 데이터베이스
-DATABASE_URL="postgresql://..."
-REDIS_URL="redis://localhost:6379"
-
-# 인증
+DATABASE_URL="file:../prisma/dev.db"
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="your-secret-key"
-
-# Band API (필수)
-BAND_ACCESS_TOKEN="your-band-token"
-BAND_CLIENT_ID="your-client-id"
-BAND_CLIENT_SECRET="your-client-secret"
-
-# AliExpress API (선택사항)
-ALIEXPRESS_API_KEY="your-app-key"
-ALIEXPRESS_APP_SECRET="your-app-secret"
-
-# AI (필수)
-GOOGLE_AI_API_KEY="your-gemini-key"
-
-# 토스페이먼츠 (필수)
-TOSS_PAYMENTS_CLIENT_KEY="test_ck_..."
-TOSS_PAYMENTS_SECRET_KEY="test_sk_..."
-
-# 환율 API
-EXCHANGE_RATE_API_URL="https://api.exchangerate-api.com/v4/latest/USD"
+TOSS_PAYMENTS_CLIENT_KEY=""
+TOSS_PAYMENTS_SECRET_KEY=""
 ```
 
----
+**sourcing-app/.env.local**
+```env
+DATABASE_URL="file:../prisma/dev.db"
+NEXTAUTH_URL="http://localhost:3001"
+NEXTAUTH_SECRET="your-secret-key"
+GEMINI_API_KEY=""
+BAND_CLIENT_ID=""
+BAND_CLIENT_SECRET=""
+```
 
-## 📈 성능 최적화
+### 4. 개발 서버 실행
 
-- ✅ **병렬 배치 처리**: AI 분석 3개씩 동시 처리
-- ✅ **환율 캐싱**: 1시간 캐싱으로 API 호출 최소화
-- ✅ **5단계 중복 제거**: 불필요한 상품 수집 방지
-- ✅ **Prisma UPSERT**: 트랜잭션 안전성 보장
-- ✅ **Redis 세션**: 고속 세션 관리
+**각 앱 개별 실행:**
+```bash
+# E-commerce 앱 (포트 3000)
+npm run dev:ecommerce
 
----
+# Sourcing 앱 (포트 3001)
+npm run dev:sourcing
+```
 
-## 🚧 개발 로드맵
+**두 앱 동시 실행:**
+```bash
+npm run dev:all
+```
 
-### ✅ **v1.0** (완료)
-- Band 도매 수집 시스템
-- Gemini AI 분석
-- 기본 관리자 대시보드
+## 📦 모듈 접근 제어
 
-### ✅ **v1.1** (완료)
-- AI 설정 시스템 재구축
-- 5단계 중복 제거
-- 가격정책 자동 적용
+### 앱별 모듈 접근 규칙
 
-### ✅ **v1.2** (현재)
-- AliExpress API 통합
-- 통합 API 설정 시스템
-- 환율 계산 유틸리티
+1. **E-commerce App**
+   - ✅ `modules/common/*` 접근 가능 (공통 모듈)
+   - ✅ `src/modules/*` 접근 가능 (앱 전용 모듈)
+   - ❌ `sourcing-app/src/modules/*` 접근 불가
 
-### 🔜 **v1.3** (계획)
-- 토스페이먼츠 API 완전 구현
-- 고객용 쇼핑몰 UI 완성
-- 주문 관리 대시보드
+2. **Sourcing App**
+   - ✅ `modules/common/*` 접근 가능 (공통 모듈)
+   - ✅ `src/modules/*` 접근 가능 (앱 전용 모듈)
+   - ❌ `e-commerce-app/src/modules/*` 접근 불가
 
-### 🔜 **v2.0** (계획)
-- Taobao, 1688.com API 통합
-- Coupang 파트너스 연동
-- 자동 번역 시스템
-- 다국어 지원
+3. **Common Modules**
+   - 모든 앱에서 접근 가능
+   - 공통 타입, 유틸리티, UI 컴포넌트
 
----
+### Import 경로 예시
 
-## 📚 문서
+```typescript
+// E-commerce App에서
+import { Button } from '@common/ui-kit'                   // ✅ 공통 모듈
+import { OrderService } from '@modules/order'             // ✅ 앱 전용 모듈
+import { SourcingService } from '@modules/sourcing'       // ❌ ERROR (다른 앱)
 
-- [CLAUDE.md](./CLAUDE.md) - 프로젝트 상세 가이드
-- [VERSION.md](./VERSION.md) - 버전 히스토리
-- [docs/frontend/](./docs/frontend/) - 프론트엔드 가이드
-- [docs/backend/](./docs/backend/) - 백엔드 가이드
+// Sourcing App에서
+import { Button } from '@common/ui-kit'                   // ✅ 공통 모듈
+import { SourcingService } from '@modules/sourcing'       // ✅ 앱 전용 모듈
+import { TransformService } from '@modules/transformation' // ✅ 앱 전용 모듈
+import { OrderService } from '@modules/order'             // ❌ ERROR (다른 앱)
+```
 
----
+## 🛠️ 주요 명령어
 
-## 🤝 기여하기
+### 개발
+```bash
+npm run dev:ecommerce      # E-commerce 앱 실행 (포트 3000)
+npm run dev:sourcing       # Sourcing 앱 실행 (포트 3001)
+npm run dev:all            # 두 앱 동시 실행
+```
 
-프로젝트에 기여하고 싶으시다면 Pull Request를 보내주세요!
+### 빌드
+```bash
+npm run build:ecommerce    # E-commerce 앱 빌드
+npm run build:sourcing     # Sourcing 앱 빌드
+npm run build:all          # 두 앱 모두 빌드
+```
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+### 데이터베이스
+```bash
+npx prisma studio          # 데이터베이스 GUI
+npx prisma db push         # 스키마 동기화
+npm run seed               # 테스트 데이터 생성
+```
 
----
+### 테스트
+```bash
+npm test                   # E2E 테스트 (Playwright)
+npm run test:ui            # 테스트 UI 모드
+```
 
-## 📞 문의 및 지원
+## 🔧 기술 스택
 
-- GitHub Issues: [프로젝트 이슈](https://github.com/ABC-Group-Tech/bandauto/issues)
-- 이메일: admin@example.com
+### Frontend
+- **Framework**: Next.js 14.2.3 (App Router)
+- **Styling**: Tailwind CSS 3.4
+- **State**: Zustand 4.5
+- **Forms**: React Hook Form + Zod
+- **Payment**: 토스페이먼츠 SDK
 
----
+### Backend
+- **Runtime**: Node.js (Next.js API Routes)
+- **Database**: SQLite (개발) / MySQL (프로덕션) + Prisma ORM 6.19
+- **AI**: Google Gemini API
+- **Automation**: Playwright 1.55
+- **Queue**: Bull 4.16
+- **Cache**: Redis 4.6
+
+### Testing
+- **E2E**: Playwright 1.55
+
+## 🚀 구현된 API 엔드포인트
+
+E-Commerce App에 **11개의 REST API**가 완전히 구현되어 있습니다:
+
+### 🛒 Cart API (5개)
+```
+GET    /api/cart              # 장바구니 조회
+POST   /api/cart              # 상품 추가
+DELETE /api/cart              # 장바구니 비우기
+PATCH  /api/cart/items/:id    # 수량 변경
+DELETE /api/cart/items/:id    # 아이템 삭제
+```
+
+### 📦 Orders API (4개)
+```
+POST   /api/orders            # 주문 생성
+GET    /api/orders            # 주문 목록 조회
+GET    /api/orders/:id        # 주문 상세 조회
+PATCH  /api/orders/:id        # 주문 상태 업데이트 (관리자)
+```
+
+### 💳 Payments API (3개)
+```
+POST   /api/payments/confirm  # 결제 승인
+POST   /api/payments/cancel   # 결제 취소
+POST   /api/payments/webhook  # 웹훅 수신
+```
+
+**자세한 API 문서**: [docs/api/README.md](./docs/api/README.md)
+
+## 📚 상세 문서
+
+프로젝트 전체 문서는 `docs/` 디렉토리에서 확인하세요:
+
+- **[프로젝트 개요](./docs/project/CLAUDE.md)** - 전체 시스템 가이드
+- **[API 문서](./docs/api/README.md)** - REST API 레퍼런스 (11개 엔드포인트)
+- **[데이터베이스 마이그레이션](./docs/migration/DB-MIGRATION-GUIDE.md)** - SQLite → MySQL 전환 가이드
+- **[마이그레이션 가이드](./docs/migration/)** - 구조 변경 히스토리
+- **[아키텍처 문서](./docs/architecture/)** - 시스템 설계 문서
+
+## 🗄️ 데이터베이스 스키마
+
+### 현재 데이터베이스
+
+- **개발 환경**: SQLite (`prisma/dev.db`)
+- **프로덕션**: MySQL 지원 (마이그레이션 가이드 참조)
+- **ORM**: Prisma 6.19
+- **마이그레이션**: [SQLite → MySQL 가이드](./docs/migration/DB-MIGRATION-GUIDE.md)
+
+### 데이터 모델 (총 20개)
+
+**핵심 시스템:**
+- User, Customer, CustomerAddress
+- Product, ProductCategory, ProductImage
+- Order, OrderItem
+
+**도매/소매 관리:**
+- WholesaleBand, CollectedPost, PostImage
+- RetailBand, RetailSettings, RetailPost, RetailPostImage
+- SourcingSite
+
+**결제 시스템:**
+- Payment, PaymentMethod, Refund
+
+**쇼핑몰:**
+- Shop, ShopProduct, ShopSettings
+- Cart, CartItem
+
+**AliExpress 통합:**
+- AliExpressSourcing, AliExpressProduct
+- AliExpressProductImage, AliExpressProductReview
+
+**API 설정:**
+- BandApiSettings, GeminiApiSettings
+- AutomationSettings
+
+자세한 스키마는 `prisma/schema.prisma` 참조 (844 lines)
+
+## 🔐 보안 및 환경변수
+
+각 앱은 독립적인 `.env.local` 파일을 사용합니다:
+
+**공통 환경변수:**
+- `DATABASE_URL`: 데이터베이스 연결 문자열
+  - 개발: `file:../prisma/dev.db` (SQLite)
+  - 프로덕션: `mysql://user:pass@host:3306/bandauto` (MySQL)
+- `NEXTAUTH_SECRET`: 세션 암호화 키
+- `NEXTAUTH_URL`: 앱 URL
+
+**E-commerce App 전용:**
+- `TOSS_PAYMENTS_CLIENT_KEY`: 토스페이먼츠 클라이언트 키
+- `TOSS_PAYMENTS_SECRET_KEY`: 토스페이먼츠 시크릿 키
+- `TOSS_PAYMENTS_WEBHOOK_SECRET`: 웹훅 검증 시크릿
+
+**Sourcing App 전용:**
+- `GEMINI_API_KEY`: Google Gemini AI API 키
+- `BAND_CLIENT_ID`: Band API 클라이언트 ID
+- `BAND_CLIENT_SECRET`: Band API 클라이언트 시크릿
+
+⚠️ **환경변수는 절대로 Git에 커밋하지 마세요.**
+
+## 📊 개발 현황
+
+### ✅ 완료된 기능 (92%)
+
+**아키텍처 & 인프라:**
+- ✅ 2-App 모노레포 아키텍처 완성
+- ✅ 모듈 분리 및 src/ 통합 (DDD 패턴)
+- ✅ 공통 모듈 구조화 (`modules/common/`)
+- ✅ TypeScript 경로 별칭 설정 (`@/`, `@modules/*`, `@common/*`)
+- ✅ 독립 실행 환경 구축 (포트 3000, 3001)
+
+**데이터베이스:**
+- ✅ Prisma 스키마 완전 구현 (20개 모델, 844 lines)
+- ✅ SQLite 개발 환경 구축
+- ✅ MySQL 마이그레이션 가이드 작성
+- ✅ 데이터베이스 마이그레이션 히스토리 관리
+
+**백엔드 API:**
+- ✅ **REST API 완전 구현** (11개 엔드포인트)
+  - 🛒 Cart API (5개): 장바구니 CRUD
+  - 📦 Orders API (4개): 주문 생성/조회/관리
+  - 💳 Payments API (3개): 결제 승인/취소/웹훅
+- ✅ 서비스 레이어 완성 (Repository-Service 패턴)
+- ✅ NextAuth.js 인증 시스템
+- ✅ 세션 기반 장바구니 (비회원 지원)
+
+**프론트엔드:**
+- ✅ 관리자 대시보드 (Sourcing App)
+- ✅ 도매 밴드 관리 시스템
+- ✅ AI 상품 분석 시스템 (Gemini)
+- ✅ 소매 밴드 자동화 시스템
+
+**문서화:**
+- ✅ API 문서 (11개 엔드포인트 상세)
+- ✅ 데이터베이스 마이그레이션 가이드
+- ✅ 프로젝트 아키텍처 문서
+- ✅ README 최신화
+
+### 🚧 진행 중 (8%)
+- 🚧 고객용 쇼핑몰 UI (상품 상세, 장바구니, 주문서 페이지)
+- 🚧 토스페이먼츠 API 키 설정 및 테스트
+- 🚧 프론트엔드-백엔드 연동 통합 테스트
+- 🚧 MySQL 프로덕션 환경 전환
+
+## 🤝 기여 가이드
+
+1. 각 앱은 독립적으로 개발
+2. 공통 기능은 `modules/common/`에 추가
+3. 앱 간 직접 모듈 참조 금지
+4. 모든 문서는 `docs/`에 보관
 
 ## 📄 라이센스
 
@@ -350,16 +365,4 @@ MIT License
 
 ---
 
-## 🙏 감사의 말
-
-- [Next.js](https://nextjs.org/) - React 프레임워크
-- [Prisma](https://www.prisma.io/) - ORM
-- [Google Gemini](https://ai.google.dev/) - AI 분석
-- [TossPayments](https://www.tosspayments.com/) - 결제 시스템
-- [AliExpress Open Platform](https://developers.aliexpress.com/) - 글로벌 소싱
-
----
-
-**Made with ❤️ by ABC Group Tech**
-
-🚀 Powered by Next.js 14, Prisma, Gemini AI, TossPayments
+**Made with ❤️ by BandAuto Team**
