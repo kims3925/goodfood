@@ -32,5 +32,15 @@
     "deny": [],
     "ask": []
   },
-  "vim": false
+  "enabledMcpjsonServers": [
+    "sequential-thinking",
+    "playwright",
+    "shadcn-ui",
+    "filesystem",
+    "eslint",
+    "typescript",
+    "shadcn"
+  ],
+  "vim": false,
+  "enableAllProjectMcpServers": true
 }
