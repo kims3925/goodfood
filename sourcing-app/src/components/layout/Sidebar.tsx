@@ -47,11 +47,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       icon: <Store size={20} />,
       children: [
         {
-          label: '밴드관리',
-          href: '/automation/bands',
-          icon: <Store size={16} />,
-        },
-        {
           label: '게시물수집',
           href: '/automation/bands/collect',
           icon: <Database size={16} />,
@@ -107,7 +102,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           badge: 'NEW',
         },
         {
-          label: '소매밴드등록',
+          label: '발행 관리',
           href: '/retail/publish',
           icon: <Send size={16} />,
           badge: 'NEW',
@@ -139,6 +134,22 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           href: '/automation/settings',
           icon: <Settings size={16} />,
           badge: 'NEW',
+        },
+      ],
+    },
+    {
+      label: '밴드관리',
+      icon: <Store size={20} />,
+      children: [
+        {
+          label: '도매밴드 관리',
+          href: '/bands/wholesale',
+          icon: <Store size={16} />,
+        },
+        {
+          label: '소매밴드 관리',
+          href: '/bands/retail',
+          icon: <Send size={16} />,
         },
       ],
     },

@@ -9,7 +9,6 @@ interface APISettings {
     clientId: string
     clientSecret: string
     accessToken: string
-    refreshToken: string
   }
   // AliExpress API
   aliexpress: {
@@ -49,8 +48,7 @@ export default function APISettingsPage() {
     band: {
       clientId: '',
       clientSecret: '',
-      accessToken: '',
-      refreshToken: ''
+      accessToken: ''
     },
     aliexpress: {
       apiKey: '',
@@ -61,6 +59,13 @@ export default function APISettingsPage() {
   })
   const [isSaving, setIsSaving] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [testSuccess, setTestSuccess] = useState<Record<APIProvider, boolean>>({
+    band: false,
+    aliexpress: false,
+    taobao: false,
+    coupang: false,
+    mall1688: false,
+  })
 
   const tabs: TabConfig[] = [
     {
@@ -120,13 +125,18 @@ export default function APISettingsPage() {
     try {
       setIsSaving(true)
 
+      console.log('[설정 저장] 요청 시작:', { provider: activeTab, settings: settings[activeTab] })
+
       const response = await fetch('/api/settings/api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider: activeTab, settings: settings[activeTab] })
       })
 
+      console.log('[설정 저장] 응답 상태:', response.status)
+
       const data = await response.json()
+      console.log('[설정 저장] 응답 데이터:', data)
 
       if (data.success) {
         alert('✅ 설정이 저장되었습니다!')
@@ -156,12 +166,26 @@ export default function APISettingsPage() {
       setTestResult(data)
 
       if (data.success) {
-        alert('✅ 연결 테스트 성공!')
+        // 연결 테스트 성공 시 해당 탭의 성공 상태를 true로 설정
+        setTestSuccess(prev => ({
+          ...prev,
+          [activeTab]: true
+        }))
+        alert('✅ 연결 테스트 성공! 이제 설정을 저장할 수 있습니다.')
       } else {
+        // 실패 시 성공 상태를 false로 설정
+        setTestSuccess(prev => ({
+          ...prev,
+          [activeTab]: false
+        }))
         alert('❌ 연결 테스트 실패: ' + data.message)
       }
     } catch (error) {
       console.error('연결 테스트 실패:', error)
+      setTestSuccess(prev => ({
+        ...prev,
+        [activeTab]: false
+      }))
       setTestResult({
         success: false,
         message: '연결 테스트 중 오류가 발생했습니다.'
@@ -176,6 +200,11 @@ export default function APISettingsPage() {
         ...prev[provider],
         [field]: value
       }
+    }))
+    // 설정이 변경되면 해당 탭의 연결 테스트 성공 상태를 초기화
+    setTestSuccess(prev => ({
+      ...prev,
+      [provider]: false
     }))
   }
 
@@ -236,8 +265,9 @@ export default function APISettingsPage() {
                 </h3>
                 <ol className="text-sm text-blue-700 space-y-1 ml-6 list-decimal mb-4">
                   <li>Band Developers에서 앱 생성</li>
-                  <li>Client ID 및 Client Secret 발급</li>
-                  <li>OAuth 인증 후 Access Token 획득</li>
+                  <li>OAuth 인증 후 Access Token 발급</li>
+                  <li>발급받은 Access Token을 아래에 입력</li>
+                  <li>토큰 만료 시 새로운 토큰을 재발급하여 입력</li>
                 </ol>
                 <a
                   href="https://developers.band.us"
@@ -255,32 +285,6 @@ export default function APISettingsPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Client ID *
-                </label>
-                <input
-                  type="text"
-                  value={settings.band.clientId}
-                  onChange={(e) => updateSetting('band', 'clientId', e.target.value)}
-                  placeholder="Band Client ID 입력"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Client Secret *
-                </label>
-                <input
-                  type="password"
-                  value={settings.band.clientSecret}
-                  onChange={(e) => updateSetting('band', 'clientSecret', e.target.value)}
-                  placeholder="Band Client Secret 입력"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Access Token *
                 </label>
                 <textarea
@@ -290,19 +294,9 @@ export default function APISettingsPage() {
                   rows={3}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Refresh Token (선택사항)
-                </label>
-                <input
-                  type="text"
-                  value={settings.band.refreshToken}
-                  onChange={(e) => updateSetting('band', 'refreshToken', e.target.value)}
-                  placeholder="Band Refresh Token 입력"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Band Developers에서 발급받은 Access Token을 입력하세요. 토큰 만료 시 수동으로 재입력해주세요.
+                </p>
               </div>
             </div>
           )}
@@ -453,11 +447,12 @@ export default function APISettingsPage() {
               </button>
               <button
                 onClick={saveSettings}
-                disabled={isSaving}
-                className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                disabled={isSaving || !testSuccess[activeTab]}
+                title={!testSuccess[activeTab] && !isSaving ? '연결 테스트 성공 시 설정 저장 버튼이 활성화 됩니다.' : ''}
+                className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-5 h-5" />
-                {isSaving ? '저장 중...' : '설정 저장'}
+                설정 저장
               </button>
             </div>
           )}

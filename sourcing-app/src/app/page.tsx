@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { redirect } from 'next/navigation'
 
-export default function RootPage() {
-  redirect('/admin');
+export default function Home() {
+  redirect('/login')
 }

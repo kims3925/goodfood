@@ -1,16 +1,15 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { 
-  Package, 
-  Plus, 
-  Search, 
-  Filter, 
-  Edit, 
-  Trash2, 
-  Eye, 
+import {
+  Package,
+  Plus,
+  Search,
+  Filter,
+  Edit,
+  Trash2,
+  Eye,
   EyeOff,
   ShoppingCart,
   DollarSign,
@@ -47,7 +46,6 @@ interface Shop {
 }
 
 export default function ShopProductsPage() {
-  const { data: session, status } = useSession()
   const router = useRouter()
   const [shop, setShop] = useState<Shop | null>(null)
   const [products, setProducts] = useState<ShopProduct[]>([])
@@ -56,24 +54,33 @@ export default function ShopProductsPage() {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [showProductModal, setShowProductModal] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<ShopProduct | null>(null)
-  
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
   // 페이지네이션
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
-  // 인증 확인
+  // 인증 확인 및 데이터 로드
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/')
-    }
-  }, [status, router])
+    checkAuthAndFetchData()
+  }, [])
 
-  // 데이터 로드
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchShopAndProducts()
+  const checkAuthAndFetchData = async () => {
+    try {
+      const response = await fetch('/api/auth/session')
+      const data = await response.json()
+
+      if (data.success && data.user) {
+        setIsAuthenticated(true)
+        fetchShopAndProducts()
+      } else {
+        router.push('/login')
+      }
+    } catch (error) {
+      console.error('인증 확인 실패:', error)
+      router.push('/login')
     }
-  }, [session?.user?.id])
+  }
 
   const fetchShopAndProducts = async () => {
     try {

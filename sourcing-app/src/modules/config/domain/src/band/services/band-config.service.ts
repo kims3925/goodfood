@@ -2,12 +2,11 @@ import { prisma } from '@/lib/database/client'
 
 /**
  * Band API 설정 타입
+ * Note: Band API 호출 시 Access Token만 필요합니다.
+ * Client ID/Secret은 토큰 발급 시에만 사용되며, API 호출에는 불필요합니다.
  */
 export interface BandConfig {
-  clientId: string
-  clientSecret: string
   accessToken: string
-  refreshToken?: string
 }
 
 /**
@@ -18,33 +17,32 @@ export interface BandConfig {
  * @throws 사용자를 찾을 수 없거나 Band API 설정이 없는 경우 에러 발생
  */
 export async function getBandConfig(userId: number): Promise<BandConfig> {
-  const bandSettings = await prisma.bandApiSettings.findUnique({
-    where: { userId },
+  const bandSettings = await prisma.sourcingApiConfig.findFirst({
+    where: {
+      userId,
+      platform: 'BAND',
+      isActive: true,
+      deletedAt: null,
+    },
     select: {
-      clientId: true,
-      clientSecret: true,
       accessToken: true,
-      refreshToken: true,
     },
   })
 
   if (!bandSettings) {
     throw new Error(
-      'Band API 설정이 필요합니다. 설정 페이지(/admin/settings/api)에서 Band API 인증 정보를 입력해주세요.'
+      'Band API 설정이 필요합니다. 설정 페이지(/admin/settings/api)에서 Band API Access Token을 입력해주세요.'
     )
   }
 
-  if (!bandSettings.accessToken || !bandSettings.clientId || !bandSettings.clientSecret) {
+  if (!bandSettings.accessToken) {
     throw new Error(
-      'Band API 설정이 필요합니다. 설정 페이지(/admin/settings/api)에서 Band API 인증 정보를 입력해주세요.'
+      'Band Access Token이 필요합니다. 설정 페이지(/admin/settings/api)에서 Band API Access Token을 입력해주세요.'
     )
   }
 
   return {
-    clientId: bandSettings.clientId,
-    clientSecret: bandSettings.clientSecret,
     accessToken: bandSettings.accessToken,
-    refreshToken: bandSettings.refreshToken || undefined,
   }
 }
 

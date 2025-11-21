@@ -1,5 +1,4 @@
 import '@/styles/globals.css'
-import SessionProvider from '@/components/providers/SessionProvider'
 
 export const metadata = {
   title: '소싱 자동화 관리 시스템',
@@ -13,9 +12,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body>
-        <SessionProvider>{children}</SessionProvider>
-      </body>
+      <body>{children}</body>
     </html>
   )
 }

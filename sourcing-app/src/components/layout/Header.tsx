@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, User } from 'lucide-react'
 
 interface HeaderProps {
@@ -9,7 +9,9 @@ interface HeaderProps {
 }
 
 export default function Header({ onMenuClick }: HeaderProps) {
-  const { data: session, status } = useSession()
+  const router = useRouter()
+  const [user, setUser] = useState<{ email: string; name?: string | null } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
 
@@ -21,8 +23,42 @@ export default function Header({ onMenuClick }: HeaderProps) {
     published: 25,
   }
 
+  useEffect(() => {
+    checkSession()
+  }, [])
+
+  const checkSession = async () => {
+    try {
+      const response = await fetch('/api/auth/session')
+      const data = await response.json()
+
+      if (data.success && data.user) {
+        setUser(data.user)
+      }
+    } catch (error) {
+      console.error('세션 확인 실패:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleLogout = async () => {
-    await signOut({ callbackUrl: '/login' })
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        router.push('/login')
+      } else {
+        alert('로그아웃에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('로그아웃 실패:', error)
+      alert('로그아웃 중 오류가 발생했습니다.')
+    }
   }
 
   return (
@@ -38,7 +74,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
               <Menu size={24} />
             </button>
             
-            <a href="/" className="flex items-center ml-2 lg:ml-0 cursor-pointer hover:opacity-80 transition-opacity">
+            <a href="/admin/settings/api" className="flex items-center ml-2 lg:ml-0 cursor-pointer hover:opacity-80 transition-opacity">
               <h1 className="text-2xl font-bold text-primary-color">BandAuto</h1>
               <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded">v1.4</span>
             </a>
@@ -127,26 +163,26 @@ export default function Header({ onMenuClick }: HeaderProps) {
             </button>
 
             {/* User Menu */}
-            {status === 'loading' ? (
+            {isLoading ? (
               <div className="p-2">
                 <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse"></div>
               </div>
-            ) : session ? (
+            ) : user ? (
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center gap-2 p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface"
                 >
                   <div className="w-8 h-8 rounded-full bg-primary-color flex items-center justify-center text-white font-semibold">
-                    {session.user?.name?.charAt(0) || session.user?.email?.charAt(0) || 'U'}
+                    {user.name?.charAt(0) || user.email?.charAt(0) || 'U'}
                   </div>
                 </button>
 
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-border">
                     <div className="p-4 border-b border-divider">
-                      <p className="text-sm font-semibold text-text-primary">{session.user?.name || '사용자'}</p>
-                      <p className="text-xs text-text-secondary truncate">{session.user?.email}</p>
+                      <p className="text-sm font-semibold text-text-primary">{user.name || '사용자'}</p>
+                      <p className="text-xs text-text-secondary truncate">{user.email}</p>
                     </div>
                     <div className="p-2">
                       <button
@@ -162,7 +198,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
               </div>
             ) : (
               <button
-                onClick={() => window.location.href = '/login'}
+                onClick={() => router.push('/login')}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-color hover:bg-primary-light rounded-lg transition-colors"
               >
                 <LogIn size={18} />

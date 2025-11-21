@@ -1,4 +1,0 @@
--- CreateTable
-CREATE TABLE "test_table" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT
-);

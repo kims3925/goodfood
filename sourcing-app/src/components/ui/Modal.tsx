@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, ReactNode } from 'react'
+import { Fragment, ReactNode, useEffect } from 'react'
 import { X } from 'lucide-react'
 
 interface ModalProps {
@@ -8,7 +8,7 @@ interface ModalProps {
   onClose: () => void
   title?: string
   children: ReactNode
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
   closeOnOverlay?: boolean
 }
 
@@ -20,6 +20,18 @@ export default function Modal({
   size = 'md',
   closeOnOverlay = true,
 }: ModalProps) {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   const sizeClasses = {
@@ -27,6 +39,7 @@ export default function Modal({
     md: 'max-w-md',
     lg: 'max-w-lg',
     xl: 'max-w-xl',
+    '2xl': 'max-w-2xl',
   }
 
   const handleOverlayClick = () => {
@@ -47,12 +60,13 @@ export default function Modal({
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
           className={`
-            bg-white 
-            rounded-xl 
-            shadow-xl 
-            w-full 
+            bg-white
+            rounded-xl
+            shadow-xl
+            w-full
             ${sizeClasses[size]}
-            max-h-[90vh]
+            min-h-[75vh]
+            max-h-[95vh]
             overflow-hidden
             fade-in
           `}
@@ -72,7 +86,7 @@ export default function Modal({
           )}
 
           {/* Content */}
-          <div className="px-6 py-4 overflow-y-auto max-h-[calc(90vh-8rem)]">
+          <div className="px-6 pt-4 pb-2 overflow-y-auto max-h-[calc(95vh-8rem)]">
             {children}
           </div>
         </div>

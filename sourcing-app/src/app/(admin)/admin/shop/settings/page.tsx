@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Store, Globe, Bell, Save, AlertTriangle } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -19,14 +18,14 @@ interface Shop {
 }
 
 export default function ShopSettingsPage() {
-  const { data: session, status } = useSession()
   const router = useRouter()
   const [shop, setShop] = useState<Shop | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [showNoticeModal, setShowNoticeModal] = useState(false)
-  
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
   // 폼 데이터
   const [formData, setFormData] = useState({
     shopUrl: '',
@@ -35,19 +34,27 @@ export default function ShopSettingsPage() {
     noticeContent: ''
   })
 
-  // 인증 확인
+  // 인증 확인 및 쇼핑몰 정보 로드
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/')
-    }
-  }, [status, router])
+    checkAuthAndFetchData()
+  }, [])
 
-  // 쇼핑몰 정보 로드
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchShopData()
+  const checkAuthAndFetchData = async () => {
+    try {
+      const response = await fetch('/api/auth/session')
+      const data = await response.json()
+
+      if (data.success && data.user) {
+        setIsAuthenticated(true)
+        fetchShopData()
+      } else {
+        router.push('/login')
+      }
+    } catch (error) {
+      console.error('인증 확인 실패:', error)
+      router.push('/login')
     }
-  }, [session?.user?.id])
+  }
 
   const fetchShopData = async () => {
     try {
