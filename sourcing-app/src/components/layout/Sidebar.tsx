@@ -64,24 +64,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       ],
     },
     {
-      label: '1-2. AliExpress 소싱',
-      icon: <Globe size={20} />,
-      children: [
-        {
-          label: '소싱 관리',
-          href: '/admin/aliexpress',
-          icon: <Globe size={16} />,
-          badge: 'NEW',
-        },
-        {
-          label: '수집 상품',
-          href: '/admin/aliexpress/products',
-          icon: <Package size={16} />,
-          badge: 'NEW',
-        },
-      ],
-    },
-    {
       label: '2. 소싱확정상품',
       icon: <Package size={20} />,
       children: [
@@ -158,16 +140,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           icon: <Settings size={16} />,
           badge: 'NEW',
         },
-        {
-          label: '스케줄 관리',
-          href: '/automation/schedule',
-          icon: <FileText size={16} />,
-        },
-        {
-          label: '작업 모니터링',
-          href: '/automation/monitor',
-          icon: <List size={16} />,
-        },
       ],
     },
     {
@@ -180,19 +152,45 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           icon: <Link2 size={16} />,
         },
         {
+          label: 'AI 설정',
+          href: '/admin/settings/ai',
+          icon: <Bot size={16} />,
+        },
+      ],
+    },
+    {
+      label: '미구현 기능',
+      icon: <FileSpreadsheet size={20} />,
+      children: [
+        {
+          label: 'AliExpress 소싱',
+          href: '/admin/aliexpress',
+          icon: <Globe size={16} />,
+          badge: '개발중',
+        },
+        {
+          label: '스케줄 관리',
+          href: '/automation/schedule',
+          icon: <FileText size={16} />,
+          badge: '개발중',
+        },
+        {
+          label: '작업 모니터링',
+          href: '/automation/monitor',
+          icon: <List size={16} />,
+          badge: '개발중',
+        },
+        {
           label: '쇼핑몰 설정',
           href: '/admin/settings/shop',
           icon: <ShoppingCart size={16} />,
+          badge: '개발중',
         },
         {
           label: '소매밴드 설정',
           href: '/admin/settings/retail',
           icon: <Send size={16} />,
-        },
-        {
-          label: 'AI 설정',
-          href: '/admin/settings/ai',
-          icon: <Bot size={16} />,
+          badge: '개발중',
         },
       ],
     },
