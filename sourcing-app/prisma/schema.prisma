@@ -37,10 +37,10 @@ model User {
   // Relationships
   sourcingApiConfigs SourcingApiConfig[]
   aiApiConfigs       AiApiConfig[]
-  bands              Band[]
+  wholesaleBands     WholesaleBand[]
+  retailBands        RetailBand[]
   posts              Post[]
   aiAnalyses         AiAnalysis[]
-  publishedPosts     PublishedPost[]
 
   @@index([email])
   @@index([deletedAt])
@@ -82,8 +82,9 @@ model SourcingApiConfig {
   deletedAt     DateTime? @db.Timestamp(0)
 
   // Relationships
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bands Band[]
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wholesaleBands WholesaleBand[]
+  retailBands    RetailBand[]
 
   @@unique([userId, platform, deletedAt]) // 사용자당 플랫폼별 1개 (soft delete 고려)
   @@index([userId])
@@ -139,15 +140,10 @@ model AiApiConfig {
 }
 
 // =============================================
-// BAND MANAGEMENT
+// WHOLESALE BAND MANAGEMENT (도매밴드)
 // =============================================
 
-enum BandType {
-  WHOLESALE // 도매밴드 (게시물 수집용)
-  RETAIL    // 소매밴드 (게시물 발행용)
-}
-
-model Band {
+model WholesaleBand {
   id          Int      @id @default(autoincrement())
   userId      Int
   apiConfigId Int      // 어느 API 설정으로 연결되었는지
@@ -155,36 +151,67 @@ model Band {
   // Band API Data
   bandKey     String   @db.VarChar(255) // Band Platform unique key
   name        String   @db.VarChar(255)
-  type        BandType
   description String?  @db.Text
   coverUrl    String?  @db.VarChar(500)
   memberCount Int      @default(0)
 
   // Status
-  isActive    Boolean  @default(true)
+  isActive     Boolean   @default(true)
   lastSyncedAt DateTime? @db.Timestamp(0)
 
-  createdAt   DateTime  @default(now()) @db.Timestamp(0)
-  updatedAt   DateTime  @updatedAt @db.Timestamp(0)
-  deletedAt   DateTime? @db.Timestamp(0)
+  createdAt DateTime  @default(now()) @db.Timestamp(0)
+  updatedAt DateTime  @updatedAt @db.Timestamp(0)
+  deletedAt DateTime? @db.Timestamp(0)
 
   // Relationships
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  apiConfig        SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiConfig SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
 
-  // 도매밴드: 수집된 게시물
-  wholesalePosts   Post[]            @relation("WholesaleBand")
-
-  // 소매밴드: 발행된 게시물
-  publishedPosts   PublishedPost[]   @relation("RetailBand")
+  // 수집된 게시물
+  posts Post[] @relation("WholesaleBand")
 
   @@unique([userId, bandKey, deletedAt])
   @@index([userId])
   @@index([apiConfigId])
-  @@index([type])
   @@index([isActive])
   @@index([deletedAt])
-  @@map("band")
+  @@map("wholesale_band")
+}
+
+// =============================================
+// RETAIL BAND MANAGEMENT (소매밴드)
+// =============================================
+
+model RetailBand {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  apiConfigId Int      // 어느 API 설정으로 연결되었는지
+
+  // Band API Data
+  bandKey     String   @db.VarChar(255) // Band Platform unique key
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  coverUrl    String?  @db.VarChar(500)
+  memberCount Int      @default(0)
+
+  // Status
+  isActive     Boolean   @default(true)
+  lastSyncedAt DateTime? @db.Timestamp(0)
+
+  createdAt DateTime  @default(now()) @db.Timestamp(0)
+  updatedAt DateTime  @updatedAt @db.Timestamp(0)
+  deletedAt DateTime? @db.Timestamp(0)
+
+  // Relationships
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiConfig SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bandKey, deletedAt])
+  @@index([userId])
+  @@index([apiConfigId])
+  @@index([isActive])
+  @@index([deletedAt])
+  @@map("retail_band")
 }
 
 // =============================================
@@ -202,53 +229,37 @@ enum PostStatus {
 }
 
 model Post {
-  id         Int        @id @default(autoincrement())
-  userId     Int
-  bandId     Int        // 도매밴드 ID (출처)
-  externalId String     @db.VarChar(255) // Band API post_key or AliExpress product_id
+  id              Int    @id @default(autoincrement())
+  userId          Int
+  wholesaleBandId Int    // 도매밴드 ID (출처)
+  externalId      String @db.VarChar(255) // Band API post_key or AliExpress product_id
 
   // Original Content (수집 원본)
-  title           String  @db.VarChar(500)
-  content         String  @db.Text
-  originalContent String  @db.Text // AI 가공 전 원본 보존
-
-  // Processed Content (AI 가공 or 수동 수정)
-  processedTitle   String? @db.VarChar(500)
-  processedContent String? @db.Text
-
-  // Product Information (AI 추출)
-  productName  String? @db.VarChar(255)
-  price        Int?    // 원 단위 (기본 가격)
-  category     String? @db.VarChar(100)
-
-  // Price Options (다중 가격 지원, JSON Array)
-  // Example: [
-  //   { name: "1kg", price: 15000, stock: 100 },
-  //   { name: "3kg", price: 40000, stock: 50 }
-  // ]
-  priceOptions Json?   @default("[]") @db.Json
+  title           String @db.VarChar(500)
+  content         String @db.Text
+  originalContent String @db.Text // AI 가공 전 원본 보존
 
   // Metadata
-  author       String?   @db.VarChar(100)
-  publishedAt  DateTime? @db.Timestamp(0) // 원본 게시일
+  author      String?   @db.VarChar(100)
+  publishedAt DateTime? @db.Timestamp(0) // 원본 게시일
 
   // Status
-  status       PostStatus @default(COLLECTED)
+  status PostStatus @default(COLLECTED)
 
-  createdAt    DateTime   @default(now()) @db.Timestamp(0)
-  updatedAt    DateTime   @updatedAt @db.Timestamp(0)
-  deletedAt    DateTime?  @db.Timestamp(0)
+  createdAt DateTime  @default(now()) @db.Timestamp(0)
+  updatedAt DateTime  @updatedAt @db.Timestamp(0)
+  deletedAt DateTime? @db.Timestamp(0)
 
   // Relationships
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wholesaleBand   Band            @relation("WholesaleBand", fields: [bandId], references: [id], onDelete: Cascade)
-  images          PostImage[]
-  aiAnalyses      AiAnalysis[]
-  publishedPosts  PublishedPost[]
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wholesaleBand  WholesaleBand  @relation("WholesaleBand", fields: [wholesaleBandId], references: [id], onDelete: Cascade)
+  images         PostImage[]
+  comments       PostComment[]
+  aiAnalyses     AiAnalysis[]
 
-  @@unique([bandId, externalId, deletedAt])
+  @@unique([wholesaleBandId, externalId, deletedAt])
   @@index([userId])
-  @@index([bandId])
+  @@index([wholesaleBandId])
   @@index([status])
   @@index([createdAt]) // 최신순 조회
   @@index([deletedAt])
@@ -264,13 +275,11 @@ model PostImage {
   id          Int      @id @default(autoincrement())
   postId      Int
 
-  // Image URLs
-  imageUrl    String   @db.VarChar(1000) // 최종 이미지 URL (CDN or 로컬)
-  originalUrl String   @db.VarChar(1000) // 원본 이미지 URL (Band API)
+  // Image Info
+  name        String   @db.VarChar(255) // UUID_timestamp.ext
+  imageUrl    String   @db.VarChar(1000) // 상대 경로 (예: /assets/images/uuid_2024-01-01_12-00-00.jpg)
 
   // Image Metadata
-  width       Int?
-  height      Int?
   fileSize    Int?     // bytes
   sortOrder   Int      @default(0)
 
@@ -284,6 +293,33 @@ model PostImage {
   @@index([sortOrder])
   @@index([deletedAt])
   @@map("post_image")
+}
+
+// =============================================
+// POST COMMENTS
+// =============================================
+
+model PostComment {
+  id         Int      @id @default(autoincrement())
+  postId     Int
+
+  // Band API Data
+  author     String   @db.VarChar(100) // 댓글 작성자
+  content    String   @db.Text // 댓글 내용
+
+  // Metadata
+  publishedAt DateTime? @db.Timestamp(0) // 댓글 작성일
+
+  createdAt   DateTime @default(now()) @db.Timestamp(0)
+  deletedAt   DateTime? @db.Timestamp(0)
+
+  // Relationships
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([deletedAt])
+  @@index([createdAt])
+  @@map("post_comment")
 }
 
 // =============================================
@@ -340,47 +376,4 @@ model AiAnalysis {
   @@index([status])
   @@index([createdAt])
   @@map("ai_analysis")
-}
-
-// =============================================
-// PUBLISHED POST (발행 이력)
-// =============================================
-
-enum PublishStatus {
-  PENDING    // 발행 대기
-  PUBLISHING // 발행 중
-  PUBLISHED  // 발행 완료
-  FAILED     // 발행 실패
-}
-
-model PublishedPost {
-  id           Int           @id @default(autoincrement())
-  userId       Int
-  postId       Int           // 원본 게시물 ID
-  bandId       Int           // 소매밴드 ID (발행 대상)
-
-  // Band API Response
-  externalId   String?       @db.VarChar(255) // Band API에서 반환된 post_key
-  publishedUrl String?       @db.VarChar(1000) // 발행된 게시물 URL
-
-  // Status
-  status       PublishStatus @default(PENDING)
-  errorMessage String?       @db.Text
-  retryCount   Int           @default(0)
-
-  publishedAt  DateTime?     @db.Timestamp(0) // 실제 발행 완료 시간
-  createdAt    DateTime      @default(now()) @db.Timestamp(0)
-
-  // Relationships
-  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post        Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  retailBand  Band @relation("RetailBand", fields: [bandId], references: [id], onDelete: Cascade)
-
-  @@unique([postId, bandId]) // 같은 게시물을 같은 소매밴드에 중복 발행 방지
-  @@index([userId])
-  @@index([postId])
-  @@index([bandId])
-  @@index([status])
-  @@index([publishedAt])
-  @@map("published_post")
 }

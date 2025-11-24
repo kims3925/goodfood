@@ -896,7 +896,7 @@ export default function SourcingPage() {
     try {
       setIsIndividualProcessing(true)
 
-      const response = await fetch('/api/wholesale/posts/confirm', {
+      const response = await fetch('/api/wholesale/post/confirm', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

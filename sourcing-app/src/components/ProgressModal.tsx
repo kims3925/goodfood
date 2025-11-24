@@ -64,7 +64,7 @@ export default function ProgressModal({
         ...(dateRange?.endDate && { endDate: dateRange.endDate })
       })
 
-      const response = await fetch(`/api/bands/collect?${params}`, {
+      const response = await fetch(`/api/band/collect?${params}`, {
         method: 'POST'
       })
 

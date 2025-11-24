@@ -100,7 +100,7 @@ export class NaverBandClient {
    */
   async getBands(): Promise<BandInfo[]> {
     try {
-      const response = await this.makeRequest<{ bands: BandInfo[] }>('/bands')
+      const response = await this.makeRequest<{ bands: BandInfo[] }>('/band')
       
       if (response.result_code !== 1) {
         throw new Error(`Band API Error: ${response.result_message} (Code: ${response.result_code})`)
@@ -123,8 +123,8 @@ export class NaverBandClient {
     limit?: number  // max 20
   }): Promise<BandPost[]> {
     try {
-      // 네이버 밴드 API는 `/bands/{band_key}/posts` 형식을 사용
-      const response = await this.makeRequest<{ posts: BandPost[] }>(`/bands/${bandKey}/posts`, {
+      // 네이버 밴드 API는 `/band/{band_key}/posts` 형식을 사용
+      const response = await this.makeRequest<{ posts: BandPost[] }>(`/band/${bandKey}/posts`, {
         ...options
       })
       
@@ -144,7 +144,7 @@ export class NaverBandClient {
    */
   async getPostDetail(bandKey: string, postKey: string): Promise<BandPost | null> {
     try {
-      const response = await this.makeRequest<{ post: BandPost }>(`/bands/${bandKey}/posts/${postKey}`, {})
+      const response = await this.makeRequest<{ post: BandPost }>(`/band/${bandKey}/post/${postKey}`, {})
       
       if (response.result_code !== 1) {
         throw new Error(`Band API Error: ${response.result_message} (Code: ${response.result_code})`)

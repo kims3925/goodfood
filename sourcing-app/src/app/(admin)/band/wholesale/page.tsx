@@ -37,7 +37,7 @@ interface ApiBand {
   member_count: number
 }
 
-export default function RetailBandsPage() {
+export default function WholesaleBandsPage() {
   const router = useRouter()
   const [bands, setBands] = useState<Band[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -51,6 +51,7 @@ export default function RetailBandsPage() {
   const [selectedBandKeys, setSelectedBandKeys] = useState<string[]>([])
   const [isLoadingBands, setIsLoadingBands] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
+  const [selectAll, setSelectAll] = useState(false)
 
   // 폼 상태
   const [formData, setFormData] = useState({
@@ -68,7 +69,7 @@ export default function RetailBandsPage() {
   const loadBands = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/bands/retail?search=${searchTerm}`)
+      const response = await fetch(`/api/band/wholesale?search=${searchTerm}`)
       const data = await response.json()
 
       if (data.success) {
@@ -91,11 +92,12 @@ export default function RetailBandsPage() {
     setApiError(null)
     setAvailableBands([])
     setSelectedBandKeys([])
+    setSelectAll(false)
     setShowAddModal(true)
 
     try {
-      // TODO: 실제로는 userId를 세션에서 가져와야 함
-      const response = await fetch('/api/bands/user-bands?userId=1')
+      // 세션에서 userId를 자동으로 가져옴
+      const response = await fetch('/api/band/user-band')
       const data = await response.json()
 
       if (data.success) {
@@ -111,12 +113,27 @@ export default function RetailBandsPage() {
     }
   }
 
+  const handleToggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedBandKeys([])
+      setSelectAll(false)
+    } else {
+      const allBandKeys = availableBands.map(band => band.band_key)
+      setSelectedBandKeys(allBandKeys)
+      setSelectAll(true)
+    }
+  }
+
   const handleToggleBandSelection = (bandKey: string) => {
-    setSelectedBandKeys((prev) =>
-      prev.includes(bandKey)
+    setSelectedBandKeys((prev) => {
+      const newSelection = prev.includes(bandKey)
         ? prev.filter((key) => key !== bandKey)
         : [...prev, bandKey]
-    )
+
+      // 전체선택 상태 업데이트
+      setSelectAll(newSelection.length === availableBands.length)
+      return newSelection
+    })
   }
 
   const handleAddSelectedBands = async () => {
@@ -132,7 +149,7 @@ export default function RetailBandsPage() {
       )
 
       for (const band of selectedBands) {
-        await fetch('/api/bands/retail', {
+        await fetch('/api/band/wholesale', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -147,7 +164,7 @@ export default function RetailBandsPage() {
         })
       }
 
-      alert(`${selectedBands.length}개의 소매밴드가 등록되었습니다.`)
+      alert(`${selectedBands.length}개의 도매밴드가 등록되었습니다.`)
       setShowAddModal(false)
       setSelectedBandKeys([])
       loadBands()
@@ -161,7 +178,7 @@ export default function RetailBandsPage() {
     if (!selectedBand) return
 
     try {
-      const response = await fetch('/api/bands/retail', {
+      const response = await fetch('/api/band/wholesale', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -175,7 +192,7 @@ export default function RetailBandsPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('소매밴드가 수정되었습니다.')
+        alert('도매밴드가 수정되었습니다.')
         setShowEditModal(false)
         setSelectedBand(null)
         setFormData({ bandKey: '', name: '', description: '', coverUrl: '', memberCount: 0 })
@@ -193,14 +210,14 @@ export default function RetailBandsPage() {
     if (!confirm('정말 삭제하시겠습니까?')) return
 
     try {
-      const response = await fetch(`/api/bands/retail?id=${id}`, {
+      const response = await fetch(`/api/band/wholesale?id=${id}`, {
         method: 'DELETE',
       })
 
       const data = await response.json()
 
       if (data.success) {
-        alert('소매밴드가 삭제되었습니다.')
+        alert('도매밴드가 삭제되었습니다.')
         loadBands()
       } else {
         alert(data.error || '삭제에 실패했습니다.')
@@ -228,9 +245,9 @@ export default function RetailBandsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">소매밴드 관리</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">도매밴드 관리</h1>
           <p className="text-gray-600">
-            소매밴드를 등록하고 관리합니다. 등록된 밴드에 가공된 게시물을 발행할 수 있습니다.
+            도매밴드를 등록하고 관리합니다. 등록된 밴드에서 게시물을 수집할 수 있습니다.
           </p>
         </div>
 
@@ -292,13 +309,28 @@ export default function RetailBandsPage() {
               </TableHeader>
               <TableBody>
                 {bands.length === 0 ? (
-                  <TableEmpty message="등록된 소매밴드가 없습니다." colSpan={7} />
+                  <TableEmpty message="등록된 도매밴드가 없습니다." colSpan={7} />
                 ) : (
                   bands.map((band) => (
                     <TableRow key={band.id}>
                       <TableCell>
-                        <div className="font-medium text-gray-900">{band.name}</div>
-                        <div className="text-sm text-gray-500">{band.bandKey}</div>
+                        <div className="flex items-center gap-3">
+                          {band.coverUrl ? (
+                            <img
+                              src={band.coverUrl}
+                              alt={band.name}
+                              className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                              <span className="text-gray-400 text-xs">No Image</span>
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-gray-900">{band.name}</div>
+                            <div className="text-sm text-gray-500 truncate">{band.bandKey}</div>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="max-w-xs truncate text-gray-600">
@@ -364,9 +396,10 @@ export default function RetailBandsPage() {
           setApiError(null)
           setAvailableBands([])
           setSelectedBandKeys([])
+          setSelectAll(false)
         }}
-        title="소매밴드 추가"
-        size="lg"
+        title="도매밴드 추가"
+        size="2xl"
       >
         {isLoadingBands ? (
           <div className="py-12">
@@ -401,11 +434,22 @@ export default function RetailBandsPage() {
             </div>
           </div>
         ) : (
-          <>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              <p className="text-sm text-gray-600 mb-4">
-                추가할 밴드를 선택해주세요. (선택: {selectedBandKeys.length}개)
-              </p>
+          <div className="flex flex-col h-[calc(75vh-12rem)]">
+            <div className="flex-1 overflow-y-auto space-y-2">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={handleToggleSelectAll}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm font-medium text-gray-700">전체선택</span>
+                </div>
+                <p className="text-sm text-gray-600">
+                  선택: {selectedBandKeys.length}개 / 전체: {availableBands.length}개
+                </p>
+              </div>
               {availableBands.map((band) => (
                 <div
                   key={band.band_key}
@@ -419,30 +463,41 @@ export default function RetailBandsPage() {
                   `}
                   onClick={() => handleToggleBandSelection(band.band_key)}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-4">
                     <input
                       type="checkbox"
                       checked={selectedBandKeys.includes(band.band_key)}
-                      onChange={() => handleToggleBandSelection(band.band_key)}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        handleToggleBandSelection(band.band_key)
+                      }}
+                      onClick={(e) => e.stopPropagation()}
                       className="mt-1"
                     />
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between">
-                        <div>
+                    {band.cover && (
+                      <img
+                        src={band.cover}
+                        alt={band.name}
+                        className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-gray-900">{band.name}</h4>
-                          <p className="text-sm text-gray-500 mt-1">{band.description}</p>
+                          <p className="text-sm text-gray-500 mt-1 line-clamp-2">{band.description}</p>
                         </div>
-                        <span className="text-sm text-gray-600 whitespace-nowrap ml-4">
+                        <span className="text-sm text-gray-600 whitespace-nowrap">
                           {band.member_count.toLocaleString()}명
                         </span>
                       </div>
-                      <p className="text-xs text-gray-400 mt-2">{band.band_key}</p>
+                      <p className="text-xs text-gray-400 mt-2 truncate">{band.band_key}</p>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-            <ModalFooter>
+            <ModalFooter className="mt-0 pt-2 pb-2">
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -462,7 +517,7 @@ export default function RetailBandsPage() {
                 선택한 밴드 추가 ({selectedBandKeys.length})
               </Button>
             </ModalFooter>
-          </>
+          </div>
         )}
       </Modal>
 
@@ -474,7 +529,7 @@ export default function RetailBandsPage() {
           setSelectedBand(null)
           setFormData({ bandKey: '', name: '', description: '', coverUrl: '', memberCount: 0 })
         }}
-        title="소매밴드 수정"
+        title="도매밴드 수정"
         size="lg"
       >
         <div className="space-y-4">

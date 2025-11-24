@@ -34,7 +34,7 @@ export default function CollectedPage() {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetch('/api/wholesale/posts')
+      const response = await fetch('/api/wholesale/post')
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -75,7 +75,7 @@ export default function CollectedPage() {
 
   const fetchPendingAnalysisCount = async () => {
     try {
-      const response = await fetch('/api/wholesale/posts/analyze')
+      const response = await fetch('/api/wholesale/post/analyze')
       const data = await response.json()
       if (data.success) {
         setPendingAnalysisCount(data.pendingCount || 0)
@@ -92,7 +92,7 @@ export default function CollectedPage() {
 
     try {
       setIsAnalyzing(true)
-      const response = await fetch('/api/wholesale/posts/analyze', {
+      const response = await fetch('/api/wholesale/post/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -42,7 +42,7 @@ export default function WorkflowTestPage() {
       name: 'AI 상품 분석',
       description: 'Gemini AI로 상품 분류 및 제목/가격 추출',
       icon: '🤖',
-      apiEndpoint: '/api/wholesale/posts/analyze',
+      apiEndpoint: '/api/wholesale/post/analyze',
       status: 'idle',
     },
     {
@@ -50,7 +50,7 @@ export default function WorkflowTestPage() {
       name: '소싱 확정',
       description: '가격정책 적용 및 Product 생성',
       icon: '✅',
-      apiEndpoint: '/api/wholesale/posts/confirm',
+      apiEndpoint: '/api/wholesale/post/confirm',
       status: 'idle',
     },
     {
@@ -66,7 +66,7 @@ export default function WorkflowTestPage() {
       name: '소매밴드 발행',
       description: '소매밴드에 쇼핑몰 링크 포함 게시',
       icon: '📮',
-      apiEndpoint: '/api/retail/posts/publish',
+      apiEndpoint: '/api/retail/post/publish',
       status: 'idle',
     },
   ])
@@ -190,7 +190,7 @@ export default function WorkflowTestPage() {
 
       // 4단계: 소싱 확정 - PENDING 상태 게시물 조회
       if (step.id === 'confirm') {
-        const postsResponse = await fetch('/api/wholesale/posts?status=PENDING')
+        const postsResponse = await fetch('/api/wholesale/post?status=PENDING')
         const postsData = await postsResponse.json()
 
         if (!postsData.success || !postsData.posts || postsData.posts.length === 0) {

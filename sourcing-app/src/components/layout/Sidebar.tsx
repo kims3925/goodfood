@@ -48,7 +48,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       children: [
         {
           label: '게시물수집',
-          href: '/automation/bands/collect',
+          href: '/automation/band/collect',
           icon: <Database size={16} />,
         },
         {
@@ -143,15 +143,20 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       children: [
         {
           label: '도매밴드 관리',
-          href: '/bands/wholesale',
+          href: '/band/wholesale',
           icon: <Store size={16} />,
         },
         {
           label: '소매밴드 관리',
-          href: '/bands/retail',
+          href: '/band/retail',
           icon: <Send size={16} />,
         },
       ],
+    },
+    {
+      label: '게시물 관리',
+      href: '/post/list',
+      icon: <FileText size={20} />,
     },
     {
       label: '환경 설정',

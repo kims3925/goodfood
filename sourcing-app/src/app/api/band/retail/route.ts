@@ -9,9 +9,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || ''
 
-    const bands = await prisma.band.findMany({
+    const bands = await prisma.retailBand.findMany({
       where: {
-        type: 'RETAIL',
         deletedAt: null,
         ...(search && {
           OR: [
@@ -72,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 중복 체크 (같은 사용자의 같은 bandKey)
-    const existing = await prisma.band.findFirst({
+    const existing = await prisma.retailBand.findFirst({
       where: {
         userId,
         bandKey,
@@ -91,13 +90,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 소매밴드 생성
-    const band = await prisma.band.create({
+    const band = await prisma.retailBand.create({
       data: {
         userId,
         apiConfigId,
         bandKey,
         name,
-        type: 'RETAIL',
         description,
         coverUrl,
         memberCount: memberCount || 0,
@@ -144,7 +142,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // 밴드 존재 확인
-    const existing = await prisma.band.findFirst({
+    const existing = await prisma.retailBand.findFirst({
       where: {
         id,
         deletedAt: null,
@@ -162,7 +160,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // 소매밴드 수정
-    const band = await prisma.band.update({
+    const band = await prisma.retailBand.update({
       where: { id },
       data: {
         ...(name && { name }),
@@ -211,7 +209,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // 밴드 존재 확인
-    const existing = await prisma.band.findFirst({
+    const existing = await prisma.retailBand.findFirst({
       where: {
         id: parseInt(id),
         deletedAt: null,
@@ -229,7 +227,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Soft Delete
-    await prisma.band.update({
+    await prisma.retailBand.update({
       where: { id: parseInt(id) },
       data: {
         deletedAt: new Date(),

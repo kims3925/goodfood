@@ -111,7 +111,7 @@ export default function CollectPage() {
   const loadCollectedPosts = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/wholesale/posts')
+      const response = await fetch('/api/wholesale/post')
       const data = await response.json()
 
       if (data.success) {
@@ -147,7 +147,7 @@ export default function CollectPage() {
     }
 
     try {
-      const response = await fetch(`/api/wholesale/posts/delete?id=${postId}`, {
+      const response = await fetch(`/api/wholesale/post/delete?id=${postId}`, {
         method: 'DELETE'
       })
 
@@ -221,7 +221,7 @@ export default function CollectPage() {
 
       // 모든 선택된 게시물 삭제
       const deletePromises = selectedPosts.map(postId =>
-        fetch(`/api/wholesale/posts/delete?id=${postId}`, {
+        fetch(`/api/wholesale/post/delete?id=${postId}`, {
           method: 'DELETE'
         })
       )
@@ -274,7 +274,7 @@ export default function CollectPage() {
           finalContent: generateFinalPostingContent(post)
         }))
 
-      const response = await fetch('/api/wholesale/posts/confirm', {
+      const response = await fetch('/api/wholesale/post/confirm', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
