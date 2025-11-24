@@ -110,7 +110,6 @@ export class WholesaleBandService {
       name: data.name,
       bandKey: data.bandKey,
       description: data.description,
-      memberCount: data.memberCount,
       coverUrl: data.coverUrl,
       pricingPolicy: data.pricingPolicy,
       isActive: data.isActive ?? true
@@ -160,7 +159,6 @@ export class WholesaleBandService {
         name: band.name,
         bandKey: band.band_key,
         description: band.description || null,
-        memberCount: band.member_count || null,
         coverUrl: band.cover || null,
         isActive: true
       })
@@ -198,7 +196,6 @@ export class WholesaleBandService {
 
     if (data.name !== undefined) updateData.name = data.name
     if (data.description !== undefined) updateData.description = data.description
-    if (data.memberCount !== undefined) updateData.memberCount = data.memberCount
     if (data.coverUrl !== undefined) updateData.coverUrl = data.coverUrl
     if (data.pricingPolicy !== undefined)
       updateData.pricingPolicy = data.pricingPolicy

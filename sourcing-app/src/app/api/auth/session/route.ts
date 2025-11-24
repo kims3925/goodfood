@@ -20,7 +20,6 @@ export async function GET() {
     const user = await prisma.user.findUnique({
       where: {
         id: tokenPayload.userId,
-        deletedAt: null,
       },
       select: {
         id: true,

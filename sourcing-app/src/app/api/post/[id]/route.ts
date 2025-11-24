@@ -14,7 +14,6 @@ export async function GET(
     const post = await prisma.post.findFirst({
       where: {
         id,
-        deletedAt: null,
       },
       include: {
         wholesaleBand: {
@@ -32,17 +31,11 @@ export async function GET(
           },
         },
         images: {
-          where: {
-            deletedAt: null,
-          },
           orderBy: {
             sortOrder: 'asc',
           },
         },
         comments: {
-          where: {
-            deletedAt: null,
-          },
           orderBy: {
             createdAt: 'asc',
           },

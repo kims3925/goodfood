@@ -5,7 +5,6 @@ export interface ProductMonitoringResult {
   isAvailable: boolean
   unavailableReason?: string
   hasStockIssue: boolean
-  originalContent?: string
   currentContent?: string
 }
 
@@ -122,7 +121,6 @@ export class ProductMonitor {
       }
 
       const currentPost = data.result_data
-      result.originalContent = post.content
       result.currentContent = currentPost.content || ''
 
       // 품절 관련 키워드 확인

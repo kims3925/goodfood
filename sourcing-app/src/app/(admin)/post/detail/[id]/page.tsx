@@ -21,8 +21,8 @@ interface PostComment {
   postId: number
   author: string
   content: string
-  publishedAt: string | null
   createdAt: string
+  updatedAt: string
 }
 
 interface Post {
@@ -32,9 +32,7 @@ interface Post {
   externalId: string
   title: string
   content: string
-  originalContent: string
   author: string | null
-  publishedAt: string | null
   status: string
   createdAt: string
   wholesaleBand: {
@@ -249,14 +247,6 @@ export default function PostDetailPage() {
                 {new Date(post.createdAt).toLocaleString('ko-KR')}
               </div>
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">원본 발행일</label>
-              <div className="text-gray-900 mt-1">
-                {post.publishedAt
-                  ? new Date(post.publishedAt).toLocaleString('ko-KR')
-                  : '-'}
-              </div>
-            </div>
           </div>
         </div>
 
@@ -360,9 +350,7 @@ export default function PostDetailPage() {
                       <span className="font-medium text-gray-900">{comment.author}</span>
                     </div>
                     <span className="text-sm text-gray-500">
-                      {comment.publishedAt
-                        ? new Date(comment.publishedAt).toLocaleString('ko-KR')
-                        : new Date(comment.createdAt).toLocaleString('ko-KR')}
+                      {new Date(comment.createdAt).toLocaleString('ko-KR')}
                     </span>
                   </div>
                   <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>

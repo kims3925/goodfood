@@ -43,101 +43,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
   const menuItems: MenuItem[] = [
     {
-      label: '1. 도매밴드 수집',
-      icon: <Store size={20} />,
-      children: [
-        {
-          label: '게시물수집',
-          href: '/automation/band/collect',
-          icon: <Database size={16} />,
-        },
-        {
-          label: '수집 현황',
-          href: '/automation/collected',
-          icon: <List size={16} />,
-        },
-      ],
-    },
-    {
-      label: '2. 소싱확정상품',
-      icon: <Package size={20} />,
-      children: [
-        {
-          label: '소싱확정',
-          href: '/automation/sourcing',
-          icon: <Package size={16} />,
-        },
-      ],
-    },
-    {
-      label: '3. 쇼핑몰',
-      icon: <Store size={20} />,
-      children: [
-        {
-          label: '쇼핑몰 상품목록',
-          href: '/shop/list',
-          icon: <List size={16} />,
-          badge: 'NEW',
-        },
-        {
-          label: '판매샵',
-          href: '#',
-          icon: <Store size={16} />,
-          badge: 'NEW',
-          onClick: (e: React.MouseEvent) => {
-            e.preventDefault()
-            window.open('/store', '_blank')
-          },
-        },
-      ],
-    },
-    {
-      label: '4. 소매밴드 포스팅',
-      icon: <Send size={20} />,
-      children: [
-        {
-          label: '포스팅 작성',
-          href: '/retail/compose',
-          icon: <FileText size={16} />,
-          badge: 'NEW',
-        },
-        {
-          label: '발행 관리',
-          href: '/retail/publish',
-          icon: <Send size={16} />,
-          badge: 'NEW',
-        },
-        {
-          label: '발행 현황',
-          href: '/retail/status',
-          icon: <List size={16} />,
-        },
-      ],
-    },
-    {
-      label: '자동화 설정',
-      icon: <Zap size={20} />,
-      children: [
-        {
-          label: '워크플로우',
-          href: '/automation/workflow',
-          icon: <Zap size={16} />,
-        },
-        {
-          label: '워크플로우 테스트',
-          href: '/automation/workflow-test',
-          icon: <Bot size={16} />,
-          badge: 'NEW',
-        },
-        {
-          label: '자동화 설정',
-          href: '/automation/settings',
-          icon: <Settings size={16} />,
-          badge: 'NEW',
-        },
-      ],
-    },
-    {
       label: '밴드관리',
       icon: <Store size={20} />,
       children: [
@@ -159,6 +64,11 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       icon: <FileText size={20} />,
     },
     {
+      label: '상품 관리',
+      href: '/product/list',
+      icon: <Package size={20} />,
+    },
+    {
       label: '환경 설정',
       icon: <Settings size={20} />,
       children: [
@@ -171,42 +81,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           label: 'AI 설정',
           href: '/admin/settings/ai',
           icon: <Bot size={16} />,
-        },
-      ],
-    },
-    {
-      label: '미구현 기능',
-      icon: <FileSpreadsheet size={20} />,
-      children: [
-        {
-          label: 'AliExpress 소싱',
-          href: '/admin/aliexpress',
-          icon: <Globe size={16} />,
-          badge: '개발중',
-        },
-        {
-          label: '스케줄 관리',
-          href: '/automation/schedule',
-          icon: <FileText size={16} />,
-          badge: '개발중',
-        },
-        {
-          label: '작업 모니터링',
-          href: '/automation/monitor',
-          icon: <List size={16} />,
-          badge: '개발중',
-        },
-        {
-          label: '쇼핑몰 설정',
-          href: '/admin/settings/shop',
-          icon: <ShoppingCart size={16} />,
-          badge: '개발중',
-        },
-        {
-          label: '소매밴드 설정',
-          href: '/admin/settings/retail',
-          icon: <Send size={16} />,
-          badge: '개발중',
         },
       ],
     },
@@ -321,29 +195,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             >
               <X size={20} />
             </button>
-          </div>
-
-          {/* Workflow Progress */}
-          <div className="p-4 border-b border-divider">
-            <h3 className="text-xs font-semibold text-text-secondary uppercase mb-3">워크플로우 진행상황</h3>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-xs text-text-secondary">1. 도매밴드 수집</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-xs text-text-secondary">2. 소싱확정상품</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-text-secondary">3. 쇼핑몰</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                <span className="text-xs text-text-secondary">4. 소매밴드 포스팅</span>
-              </div>
-            </div>
           </div>
 
           {/* Menu items */}

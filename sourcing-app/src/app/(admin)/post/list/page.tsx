@@ -16,9 +16,7 @@ interface Post {
   externalId: string
   title: string
   content: string
-  originalContent: string
   author: string | null
-  publishedAt: string | null
   status: string
   createdAt: string
   wholesaleBand: {
@@ -33,13 +31,11 @@ interface AvailablePost {
   title: string
   content: string
   author: string
-  published_at: string
   images: string[]
   comments: Array<{
     comment_key: string
     author: string
     content: string
-    published_at: string
   }>
   band: {
     id: number
@@ -195,9 +191,7 @@ export default function PostsManagePage() {
             externalId: post.post_key,
             title: post.title,
             content: post.content,
-            originalContent: post.content,
             author: post.author,
-            publishedAt: post.published_at,
             comments: post.comments || [], // 댓글 추가
             images: post.images || [], // 이미지 추가
           }),
@@ -638,7 +632,7 @@ export default function PostsManagePage() {
                                         <div className="flex-1 min-w-0">
                                           <h4 className="font-medium text-gray-900 truncate">{post.title}</h4>
                                           <p className="text-sm text-gray-500 mt-1">
-                                            작성자: {post.author || '알 수 없음'} • {new Date(post.published_at).toLocaleDateString('ko-KR')}
+                                            작성자: {post.author || '알 수 없음'}
                                           </p>
                                         </div>
                                         <div className="flex items-center gap-2">

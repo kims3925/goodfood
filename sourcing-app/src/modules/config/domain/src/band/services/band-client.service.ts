@@ -8,7 +8,6 @@ export interface BandInfo {
   name: string
   description?: string
   cover?: string
-  member_count: number
   created_at: string
   is_public: boolean
 }

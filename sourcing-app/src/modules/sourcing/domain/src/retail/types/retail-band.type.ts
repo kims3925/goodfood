@@ -13,7 +13,6 @@ export interface CreateRetailBandDTO {
   bandKey: string
   bandName: string
   description?: string
-  memberCount?: number
   coverUrl?: string | null
   isActive?: boolean
 }
@@ -24,7 +23,6 @@ export interface CreateRetailBandDTO {
 export interface UpdateRetailBandDTO {
   bandName?: string
   description?: string
-  memberCount?: number
   coverUrl?: string | null
   isActive?: boolean
 }

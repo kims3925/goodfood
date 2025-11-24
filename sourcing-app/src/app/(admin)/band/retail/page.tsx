@@ -17,7 +17,6 @@ interface Band {
   name: string
   description: string | null
   coverUrl: string | null
-  memberCount: number
   isActive: boolean
   createdAt: string
   apiConfig: {
@@ -34,7 +33,6 @@ interface ApiBand {
   name: string
   description: string
   cover: string
-  member_count: number
 }
 
 export default function RetailBandsPage() {
@@ -59,7 +57,6 @@ export default function RetailBandsPage() {
     name: '',
     description: '',
     coverUrl: '',
-    memberCount: 0,
   })
 
   useEffect(() => {
@@ -159,7 +156,6 @@ export default function RetailBandsPage() {
             name: band.name,
             description: band.description,
             coverUrl: band.cover,
-            memberCount: band.member_count,
           }),
         })
       }
@@ -195,7 +191,7 @@ export default function RetailBandsPage() {
         alert('소매밴드가 수정되었습니다.')
         setShowEditModal(false)
         setSelectedBand(null)
-        setFormData({ bandKey: '', name: '', description: '', coverUrl: '', memberCount: 0 })
+        setFormData({ bandKey: '', name: '', description: '', coverUrl: '' })
         loadBands()
       } else {
         alert(data.error || '수정에 실패했습니다.')
@@ -235,7 +231,6 @@ export default function RetailBandsPage() {
       name: band.name,
       description: band.description || '',
       coverUrl: band.coverUrl || '',
-      memberCount: band.memberCount,
     })
     setShowEditModal(true)
   }
@@ -301,7 +296,6 @@ export default function RetailBandsPage() {
                   <TableHead>밴드명</TableHead>
                   <TableHead>설명</TableHead>
                   <TableHead>플랫폼</TableHead>
-                  <TableHead>멤버수</TableHead>
                   <TableHead>상태</TableHead>
                   <TableHead>등록일</TableHead>
                   <TableHead>작업</TableHead>
@@ -309,7 +303,7 @@ export default function RetailBandsPage() {
               </TableHeader>
               <TableBody>
                 {bands.length === 0 ? (
-                  <TableEmpty message="등록된 소매밴드가 없습니다." colSpan={7} />
+                  <TableEmpty message="등록된 소매밴드가 없습니다." colSpan={6} />
                 ) : (
                   bands.map((band) => (
                     <TableRow key={band.id}>
@@ -328,7 +322,6 @@ export default function RetailBandsPage() {
                           )}
                           <div className="min-w-0 flex-1">
                             <div className="font-medium text-gray-900">{band.name}</div>
-                            <div className="text-sm text-gray-500 truncate">{band.bandKey}</div>
                           </div>
                         </div>
                       </TableCell>
@@ -341,9 +334,6 @@ export default function RetailBandsPage() {
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           {band.apiConfig.platform}
                         </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-gray-600">{band.memberCount.toLocaleString()}명</span>
                       </TableCell>
                       <TableCell>
                         {band.isActive ? (
@@ -487,9 +477,6 @@ export default function RetailBandsPage() {
                           <h4 className="font-medium text-gray-900">{band.name}</h4>
                           <p className="text-sm text-gray-500 mt-1 line-clamp-2">{band.description}</p>
                         </div>
-                        <span className="text-sm text-gray-600 whitespace-nowrap">
-                          {band.member_count.toLocaleString()}명
-                        </span>
                       </div>
                       <p className="text-xs text-gray-400 mt-2 truncate">{band.band_key}</p>
                     </div>
@@ -527,7 +514,7 @@ export default function RetailBandsPage() {
         onClose={() => {
           setShowEditModal(false)
           setSelectedBand(null)
-          setFormData({ bandKey: '', name: '', description: '', coverUrl: '', memberCount: 0 })
+          setFormData({ bandKey: '', name: '', description: '', coverUrl: '' })
         }}
         title="소매밴드 수정"
         size="lg"
@@ -563,7 +550,7 @@ export default function RetailBandsPage() {
             onClick={() => {
               setShowEditModal(false)
               setSelectedBand(null)
-              setFormData({ bandKey: '', name: '', description: '', coverUrl: '', memberCount: 0 })
+              setFormData({ bandKey: '', name: '', description: '', coverUrl: '' })
             }}
           >
             취소

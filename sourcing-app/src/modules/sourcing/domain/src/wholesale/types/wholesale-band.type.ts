@@ -13,7 +13,6 @@ export interface CreateWholesaleBandDTO {
   name: string
   bandKey: string
   description?: string | null
-  memberCount?: number | null
   coverUrl?: string | null
   pricingPolicy?: string | null
   isActive?: boolean
@@ -25,7 +24,6 @@ export interface CreateWholesaleBandDTO {
 export interface UpdateWholesaleBandDTO {
   name?: string
   description?: string | null
-  memberCount?: number | null
   coverUrl?: string | null
   pricingPolicy?: string | null
   isActive?: boolean
@@ -47,7 +45,6 @@ export interface BandApiResponse {
   band_key: string
   name: string
   description?: string
-  member_count?: number
   cover?: string
   is_public?: boolean
 }

@@ -115,3 +115,39 @@ export async function downloadAndSaveImages(
 
   return results
 }
+
+/**
+ * 서버에서 이미지 파일 삭제
+ * @param fileName 파일명 (예: uuid_timestamp.jpg)
+ */
+export function deleteImageFile(fileName: string): void {
+  try {
+    // 환경 변수에서 저장 경로 가져오기
+    const storagePath = process.env.IMAGE_STORAGE_PATH || '~/assets/images'
+
+    // ~ (홈 디렉토리) 확장
+    const imagesDir = expandHomePath(storagePath)
+    const filePath = path.join(imagesDir, fileName)
+
+    // 파일이 존재하면 삭제
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath)
+      console.log(`이미지 파일 삭제 완료: ${fileName}`)
+    } else {
+      console.warn(`이미지 파일이 존재하지 않음: ${fileName}`)
+    }
+  } catch (error) {
+    console.error(`이미지 파일 삭제 실패 (${fileName}):`, error)
+    // 파일 삭제 실패해도 에러를 던지지 않음 (DB 삭제는 진행되어야 함)
+  }
+}
+
+/**
+ * 여러 이미지 파일을 삭제
+ * @param fileNames 파일명 배열
+ */
+export function deleteImageFiles(fileNames: string[]): void {
+  for (const fileName of fileNames) {
+    deleteImageFile(fileName)
+  }
+}

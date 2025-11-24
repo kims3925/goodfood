@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
       where: {
         userId: parseInt(userId),
         isActive: true,
-        deletedAt: null,
       },
       include: {
         apiConfig: {
@@ -122,7 +121,6 @@ export async function GET(request: NextRequest) {
                       comment_key: comment.comment_key,
                       author: comment.author?.name || '알 수 없음',
                       content: comment.content || '',
-                      published_at: comment.created_at || new Date().toISOString(),
                     }))
                   }
                 }
@@ -135,7 +133,6 @@ export async function GET(request: NextRequest) {
                 title: item.content ? item.content.substring(0, 100) : '(제목 없음)',
                 content: item.content || '',
                 author: item.author?.name || '알 수 없음',
-                published_at: item.created_at || new Date().toISOString(),
                 images: item.photos ? item.photos.map((photo: any) => photo.url) : [],
                 comments,
                 band: {

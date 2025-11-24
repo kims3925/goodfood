@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     // 사용자 찾기
     const user = await prisma.user.findUnique({
-      where: { email, deletedAt: null },
+      where: { email },
     })
 
     if (!user) {

@@ -107,7 +107,6 @@ export class RetailBandService {
       bandKey: data.bandKey,
       bandName: data.bandName,
       description: data.description || '',
-      memberCount: data.memberCount || 0,
       coverUrl: data.coverUrl,
       isActive: data.isActive ?? true
     })
@@ -142,7 +141,6 @@ export class RetailBandService {
 
     if (data.bandName !== undefined) updateData.bandName = data.bandName
     if (data.description !== undefined) updateData.description = data.description
-    if (data.memberCount !== undefined) updateData.memberCount = data.memberCount
     if (data.coverUrl !== undefined) updateData.coverUrl = data.coverUrl
     if (data.isActive !== undefined) updateData.isActive = data.isActive
 

@@ -11,12 +11,8 @@ export async function GET(request: NextRequest) {
 
     const bands = await prisma.wholesaleBand.findMany({
       where: {
-        deletedAt: null,
         ...(search && {
-          OR: [
-            { name: { contains: search } },
-            { description: { contains: search } },
-          ],
+          name: { contains: search },
         }),
       },
       include: {
@@ -57,7 +53,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId, apiConfigId, bandKey, name, description, coverUrl, memberCount } = body
+    const { userId, apiConfigId, bandKey, name, coverUrl } = body
 
     // 필수 필드 검증
     if (!userId || !apiConfigId || !bandKey || !name) {
@@ -73,9 +69,8 @@ export async function POST(request: NextRequest) {
     // 중복 체크 (같은 사용자의 같은 bandKey)
     const existing = await prisma.wholesaleBand.findFirst({
       where: {
-        userId,
-        bandKey,
-        deletedAt: null,
+        userId: userId,
+        bandKey: bandKey,
       },
     })
 
@@ -92,13 +87,11 @@ export async function POST(request: NextRequest) {
     // 도매밴드 생성
     const band = await prisma.wholesaleBand.create({
       data: {
-        userId,
-        apiConfigId,
-        bandKey,
+        userId: userId,
+        apiConfigId: apiConfigId,
+        bandKey: bandKey,
         name,
-        description,
-        coverUrl,
-        memberCount: memberCount || 0,
+        coverUrl: coverUrl,
       },
       include: {
         apiConfig: {
@@ -129,7 +122,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, name, description, isActive } = body
+    const { id, name, isActive } = body
 
     if (!id) {
       return NextResponse.json(
@@ -145,7 +138,6 @@ export async function PUT(request: NextRequest) {
     const existing = await prisma.wholesaleBand.findFirst({
       where: {
         id,
-        deletedAt: null,
       },
     })
 
@@ -164,8 +156,7 @@ export async function PUT(request: NextRequest) {
       where: { id },
       data: {
         ...(name && { name }),
-        ...(description !== undefined && { description }),
-        ...(isActive !== undefined && { isActive }),
+        ...(isActive !== undefined && { isActive: isActive }),
       },
       include: {
         apiConfig: {
@@ -192,7 +183,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE: 도매밴드 삭제 (Soft Delete)
+// DELETE: 도매밴드 삭제
 export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
@@ -212,7 +203,6 @@ export async function DELETE(request: NextRequest) {
     const existing = await prisma.wholesaleBand.findFirst({
       where: {
         id: parseInt(id),
-        deletedAt: null,
       },
     })
 
@@ -226,12 +216,9 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Soft Delete
-    await prisma.wholesaleBand.update({
+    // 밴드 삭제
+    await prisma.wholesaleBand.delete({
       where: { id: parseInt(id) },
-      data: {
-        deletedAt: new Date(),
-      },
     })
 
     return NextResponse.json({

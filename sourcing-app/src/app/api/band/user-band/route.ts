@@ -26,7 +26,6 @@ export async function GET(request: NextRequest) {
         userId,
         platform: 'BAND',
         isActive: true,
-        deletedAt: null,
       },
     })
 
@@ -70,7 +69,6 @@ export async function GET(request: NextRequest) {
             name: band.name,
             description: band.description || '',
             cover: band.cover || '',
-            member_count: band.member_count || 0,
           })),
         })
       } else {

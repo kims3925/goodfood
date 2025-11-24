@@ -23,8 +23,7 @@ export async function GET(request: NextRequest) {
     // 사용자의 API 설정 조회
     const configs = await prisma.sourcingApiConfig.findMany({
       where: {
-        userId,
-        deletedAt: null,
+        userId: userId,
       },
     })
 
@@ -126,9 +125,8 @@ export async function POST(request: NextRequest) {
     // 기존 설정 확인
     const existingConfig = await prisma.sourcingApiConfig.findFirst({
       where: {
-        userId,
+        userId: userId,
         platform,
-        deletedAt: null,
       },
     })
 
@@ -136,7 +134,7 @@ export async function POST(request: NextRequest) {
 
     // 저장할 데이터 준비
     const configData: any = {
-      userId,
+      userId: userId,
       platform,
       isActive: true,
     }
