@@ -262,19 +262,19 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
 
-                {/* Details Grid */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Details - Single Line */}
+                <div className="flex items-center gap-6">
                   <div>
                     <label className="text-sm font-medium text-gray-500">카테고리</label>
                     <p className="mt-1 text-gray-900">{product.categoryId || '-'}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">도매가</label>
-                    <p className="mt-1 text-gray-900 line-through">{formatPrice(product.wholesalePrice)}</p>
-                  </div>
-                  <div>
                     <label className="text-sm font-medium text-gray-500">판매가</label>
                     <p className="mt-1 text-lg font-semibold text-gray-900">{formatPrice(product.price)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">도매가</label>
+                    <p className="mt-1 text-gray-900">{formatPrice(product.wholesalePrice)}</p>
                   </div>
                 </div>
               </div>

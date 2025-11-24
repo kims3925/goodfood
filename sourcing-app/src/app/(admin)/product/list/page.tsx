@@ -294,9 +294,10 @@ export default function ProductListPage() {
                     />
                   </TableHead>
                   <TableHead className="w-[10%]">이미지</TableHead>
-                  <TableHead className="w-[25%]">상품명</TableHead>
-                  <TableHead className="w-[15%]">출처 밴드</TableHead>
-                  <TableHead className="w-[10%]">가격</TableHead>
+                  <TableHead className="w-[20%]">상품명</TableHead>
+                  <TableHead className="w-[12%]">출처 밴드</TableHead>
+                  <TableHead className="w-[10%]">도매가</TableHead>
+                  <TableHead className="w-[10%]">판매가</TableHead>
                   <TableHead className="w-[8%]">변형</TableHead>
                   <TableHead className="w-[10%]">상태</TableHead>
                   <TableHead className="w-[12%]">생성일</TableHead>
@@ -305,7 +306,7 @@ export default function ProductListPage() {
               </TableHeader>
               <TableBody>
                 {products.length === 0 ? (
-                  <TableEmpty message="등록된 상품이 없습니다." colSpan={9} />
+                  <TableEmpty message="등록된 상품이 없습니다." colSpan={10} />
                 ) : (
                   products.map((product) => (
                     <TableRow
@@ -352,13 +353,13 @@ export default function ProductListPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm">
-                          <div className="font-medium text-gray-900">{formatPrice(product.price)}</div>
-                          {product.wholesalePrice && (
-                            <div className="text-xs text-gray-500 line-through">
-                              {formatPrice(product.wholesalePrice)}
-                            </div>
-                          )}
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatPrice(product.wholesalePrice)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatPrice(product.price)}
                         </div>
                       </TableCell>
                       <TableCell>
