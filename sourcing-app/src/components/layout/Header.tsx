@@ -15,13 +15,40 @@ export default function Header({ onMenuClick }: HeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
 
-  // 실시간 상태 (실제로는 상태 관리 도구에서 가져올 것)
-  const stats = {
-    todayCollected: 45,
-    pendingAI: 12,
-    readyToUpload: 8,
-    published: 25,
-  }
+  // 실시간 통계
+  const [stats, setStats] = useState({
+    todayCollected: 0,
+    pendingAI: 0,
+    readyToUpload: 0,
+    published: 0,
+  })
+
+  // 통계 데이터 로드
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const response = await fetch('/api/automation/stats')
+        const data = await response.json()
+        if (data.success) {
+          setStats({
+            todayCollected: data.data.todayCollected || 0,
+            pendingAI: data.data.pendingTransform || 0,
+            readyToUpload: data.data.readyToPublish || 0,
+            published: data.data.todayPublished || 0,
+          })
+        }
+      } catch (error) {
+        console.error('통계 로드 실패:', error)
+      }
+    }
+
+    if (user) {
+      loadStats()
+      // 30초마다 갱신
+      const interval = setInterval(loadStats, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [user])
 
   useEffect(() => {
     checkSession()

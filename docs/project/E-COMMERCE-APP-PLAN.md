@@ -689,7 +689,11 @@ NEXT_PUBLIC_BASE_URL="http://localhost:3002"
 - [API 문서](https://docs.tosspayments.com/reference)
 - [테스트 카드](https://docs.tosspayments.com/resources/testing)
 
-### 8.2 기존 코드 참조
+### 8.2 배송 관련 API(Delivery Tracker)
+
+- [API 문서](https://tracker.delivery/docs/tracking-api)
+
+### 8.3 기존 코드 참조
 
 - `sourcing-app/prisma/schema.prisma` - DB 스키마
 - `sourcing-app/src/modules/auth/` - 인증 로직

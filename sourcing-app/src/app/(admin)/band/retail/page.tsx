@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Edit3, Trash2, RefreshCw, AlertCircle, ExternalLink } from 'lucide-react'
+import { Plus, Search, Trash2, RefreshCw, AlertCircle, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
@@ -41,8 +41,6 @@ export default function RetailBandsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [selectedBand, setSelectedBand] = useState<Band | null>(null)
 
   // Band API 조회 관련 상태
   const [availableBands, setAvailableBands] = useState<ApiBand[]>([])
@@ -51,13 +49,9 @@ export default function RetailBandsPage() {
   const [apiError, setApiError] = useState<string | null>(null)
   const [selectAll, setSelectAll] = useState(false)
 
-  // 폼 상태
-  const [formData, setFormData] = useState({
-    bandKey: '',
-    name: '',
-    description: '',
-    coverUrl: '',
-  })
+  // 선택 삭제 관련 상태
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     loadBands()
@@ -166,63 +160,47 @@ export default function RetailBandsPage() {
     }
   }
 
-  const handleEditBand = async () => {
-    if (!selectedBand) return
-
-    try {
-      const response = await fetch('/api/band/retail', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: selectedBand.id,
-          name: formData.name,
-          description: formData.description,
-          isActive: selectedBand.isActive,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setShowEditModal(false)
-        setSelectedBand(null)
-        setFormData({ bandKey: '', name: '', description: '', coverUrl: '' })
-        loadBands()
-      } else {
-      }
-    } catch (error) {
-      console.error('밴드 수정 실패:', error)
+  // 전체 선택/해제
+  const handleSelectAllBands = () => {
+    if (selectedIds.length === bands.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(bands.map(band => band.id))
     }
   }
 
-  const handleDeleteBand = async (id: number) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return
+  // 개별 선택/해제
+  const handleSelectBand = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
+  }
 
+  // 선택 삭제
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return
+    if (!confirm(`선택한 ${selectedIds.length}개의 밴드를 삭제하시겠습니까?`)) return
+
+    setIsDeleting(true)
     try {
-      const response = await fetch(`/api/band/retail?id=${id}`, {
-        method: 'DELETE',
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        loadBands()
-      } else {
+      for (const id of selectedIds) {
+        await fetch(`/api/band/retail?id=${id}`, {
+          method: 'DELETE',
+        })
       }
+      setSelectedIds([])
+      loadBands()
     } catch (error) {
       console.error('밴드 삭제 실패:', error)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
-  const openEditModal = (band: Band) => {
-    setSelectedBand(band)
-    setFormData({
-      bandKey: band.bandKey,
-      name: band.name,
-      description: band.description || '',
-      coverUrl: band.coverUrl || '',
-    })
-    setShowEditModal(true)
+  // 행 클릭 시 상세 페이지 이동
+  const handleRowClick = (id: number) => {
+    router.push(`/band/retail/${id}`)
   }
 
   return (
@@ -270,6 +248,14 @@ export default function RetailBandsPage() {
                   <Plus size={16} />
                   밴드 추가
                 </Button>
+                <Button
+                  variant="danger"
+                  onClick={handleDeleteSelected}
+                  disabled={selectedIds.length === 0 || isDeleting}
+                >
+                  <Trash2 size={16} />
+                  선택 삭제 {selectedIds.length > 0 && `(${selectedIds.length})`}
+                </Button>
               </div>
             </div>
           </div>
@@ -283,20 +269,38 @@ export default function RetailBandsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[25%]">밴드명</TableHead>
-                  <TableHead className="w-[30%]">설명</TableHead>
-                  <TableHead className="w-[10%]">플랫폼</TableHead>
-                  <TableHead className="w-[10%]">상태</TableHead>
-                  <TableHead className="w-[15%]">등록일</TableHead>
-                  <TableHead className="w-[10%]">작업</TableHead>
+                  <TableHead className="w-[50px]">
+                    <input
+                      type="checkbox"
+                      checked={bands.length > 0 && selectedIds.length === bands.length}
+                      onChange={handleSelectAllBands}
+                      className="w-4 h-4 rounded border-gray-300"
+                    />
+                  </TableHead>
+                  <TableHead className="w-[40%]">밴드명</TableHead>
+                  <TableHead className="w-[15%]">플랫폼</TableHead>
+                  <TableHead className="w-[15%]">상태</TableHead>
+                  <TableHead className="w-[20%]">등록일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {bands.length === 0 ? (
-                  <TableEmpty message="등록된 소매밴드가 없습니다." colSpan={6} />
+                  <TableEmpty message="등록된 소매밴드가 없습니다." colSpan={5} />
                 ) : (
                   bands.map((band) => (
-                    <TableRow key={band.id}>
+                    <TableRow
+                      key={band.id}
+                      onClick={() => handleRowClick(band.id)}
+                      className="cursor-pointer hover:bg-gray-50"
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(band.id)}
+                          onChange={(e) => handleSelectBand(band.id, e as unknown as React.MouseEvent)}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-4">
                           {band.coverUrl ? (
@@ -313,11 +317,6 @@ export default function RetailBandsPage() {
                           <div className="min-w-0 flex-1">
                             <div className="font-semibold text-gray-900 text-base">{band.name}</div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-md truncate text-gray-600">
-                          {band.description || '-'}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -340,24 +339,6 @@ export default function RetailBandsPage() {
                         <span className="text-gray-600">
                           {new Date(band.createdAt).toLocaleDateString('ko-KR')}
                         </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditModal(band)}
-                          >
-                            <Edit3 size={16} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteBand(band.id)}
-                          >
-                            <Trash2 size={16} className="text-red-500" />
-                          </Button>
-                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -498,58 +479,6 @@ export default function RetailBandsPage() {
         )}
       </Modal>
 
-      {/* 수정 모달 */}
-      <Modal
-        isOpen={showEditModal}
-        onClose={() => {
-          setShowEditModal(false)
-          setSelectedBand(null)
-          setFormData({ bandKey: '', name: '', description: '', coverUrl: '' })
-        }}
-        title="소매밴드 수정"
-        size="lg"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              밴드명 *
-            </label>
-            <Input
-              type="text"
-              placeholder="밴드 이름"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              설명
-            </label>
-            <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="밴드 설명"
-              rows={3}
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            />
-          </div>
-        </div>
-        <ModalFooter>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowEditModal(false)
-              setSelectedBand(null)
-              setFormData({ bandKey: '', name: '', description: '', coverUrl: '' })
-            }}
-          >
-            취소
-          </Button>
-          <Button variant="primary" onClick={handleEditBand}>
-            수정
-          </Button>
-        </ModalFooter>
-      </Modal>
     </div>
   )
 }
