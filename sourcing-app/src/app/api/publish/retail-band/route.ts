@@ -1,0 +1,234 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { PrismaClient } from '@prisma/client'
+import { getCurrentUser } from '@/modules/auth/auth.service'
+import { NaverBandClient } from '@/modules/config/domain/src/band/services/band-client.service'
+
+const prisma = new PrismaClient()
+
+interface PublishResult {
+  bandId: number
+  bandName: string
+  productId: number
+  productName: string
+  success: boolean
+  postKey?: string
+  error?: string
+}
+
+// POST: 소매밴드에 상품 발행
+export async function POST(request: NextRequest) {
+  try {
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: '인증이 필요합니다.' },
+        { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+    const { retailBandIds, productIds, publishSetting } = body
+
+    // 유효성 검사
+    if (!retailBandIds || retailBandIds.length === 0) {
+      return NextResponse.json(
+        { success: false, error: '발행할 소매밴드를 선택해주세요.' },
+        { status: 400 }
+      )
+    }
+
+    if (!productIds || productIds.length === 0) {
+      return NextResponse.json(
+        { success: false, error: '발행할 상품을 선택해주세요.' },
+        { status: 400 }
+      )
+    }
+
+    // 소매밴드 목록 조회
+    const retailBands = await prisma.retailBand.findMany({
+      where: {
+        id: { in: retailBandIds },
+        userId: user.userId,
+        isActive: true,
+      },
+      include: {
+        apiConfig: true,
+      },
+    })
+
+    if (retailBands.length === 0) {
+      return NextResponse.json(
+        { success: false, error: '유효한 소매밴드를 찾을 수 없습니다.' },
+        { status: 404 }
+      )
+    }
+
+    // API 토큰 확인 (모든 밴드에 대해)
+    const bandsWithoutToken = retailBands.filter(b => !b.apiConfig?.accessToken)
+    if (bandsWithoutToken.length > 0) {
+      const names = bandsWithoutToken.map(b => b.name).join(', ')
+      return NextResponse.json(
+        { success: false, error: `다음 밴드의 API 토큰이 설정되지 않았습니다: ${names}. API 설정을 확인해주세요.` },
+        { status: 400 }
+      )
+    }
+
+    // 상품 목록 조회
+    const products = await prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        userId: user.userId,
+      },
+      include: {
+        post: {
+          include: {
+            images: {
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
+      },
+    })
+
+    if (products.length === 0) {
+      return NextResponse.json(
+        { success: false, error: '발행할 상품을 찾을 수 없습니다.' },
+        { status: 404 }
+      )
+    }
+
+    // 발행 결과 저장
+    const results: PublishResult[] = []
+
+    // 각 밴드에 대해 상품 발행
+    for (const retailBand of retailBands) {
+      // Band API 클라이언트 초기화
+      const bandClient = new NaverBandClient(retailBand.apiConfig!.accessToken)
+
+      // 각 상품 발행
+      for (const product of products) {
+        try {
+          // 게시글 내용 생성
+          const postContent = buildPostContent(product, publishSetting)
+
+          // 게시글 작성
+          const { postKey } = await bandClient.createPost(retailBand.bandKey, postContent, {
+            doPush: false, // 푸시 알림 비활성화
+          })
+
+          // 댓글 작성 (주문서 URL + 추가 안내)
+          if (publishSetting?.orderFormUrl || publishSetting?.additionalComment) {
+            const commentContent = buildCommentContent(publishSetting)
+            if (commentContent) {
+              await bandClient.createComment(retailBand.bandKey, postKey, commentContent)
+            }
+          }
+
+          results.push({
+            bandId: retailBand.id,
+            bandName: retailBand.name,
+            productId: product.id,
+            productName: product.name,
+            success: true,
+            postKey,
+          })
+
+          console.log(`✅ 상품 발행 성공: ${retailBand.name} / ${product.name} -> post_key: ${postKey}`)
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류'
+          console.error(`❌ 상품 발행 실패: ${retailBand.name} / ${product.name}`, error)
+
+          results.push({
+            bandId: retailBand.id,
+            bandName: retailBand.name,
+            productId: product.id,
+            productName: product.name,
+            success: false,
+            error: errorMessage,
+          })
+        }
+      }
+    }
+
+    // 성공/실패 카운트
+    const successCount = results.filter(r => r.success).length
+    const failCount = results.filter(r => !r.success).length
+
+    return NextResponse.json({
+      success: true,
+      message: `${successCount}개 성공, ${failCount}개 실패`,
+      results,
+    })
+  } catch (error) {
+    console.error('발행 처리 실패:', error)
+    return NextResponse.json(
+      { success: false, error: '발행 처리에 실패했습니다.' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * 게시글 내용 생성
+ */
+function buildPostContent(
+  product: {
+    name: string
+    description: string | null
+    price: number | null
+    wholesalePrice: number | null
+    post?: {
+      content: string
+    } | null
+  },
+  publishSetting?: { orderFormUrl?: string; additionalComment?: string }
+): string {
+  const lines: string[] = []
+
+  // 상품명
+  lines.push(`🛍️ ${product.name}`)
+  lines.push('')
+
+  // 가격 정보
+  if (product.price) {
+    lines.push(`💰 판매가: ${product.price.toLocaleString()}원`)
+  }
+  if (product.wholesalePrice) {
+    lines.push(`📦 도매가: ${product.wholesalePrice.toLocaleString()}원`)
+  }
+  if (product.price || product.wholesalePrice) {
+    lines.push('')
+  }
+
+  // 상품 설명
+  if (product.description) {
+    lines.push(product.description)
+  } else if (product.post?.content) {
+    lines.push(product.post.content)
+  }
+
+  return lines.join('\n')
+}
+
+/**
+ * 댓글 내용 생성
+ */
+function buildCommentContent(
+  publishSetting?: { orderFormUrl?: string; additionalComment?: string }
+): string {
+  const lines: string[] = []
+
+  // 주문서 링크
+  if (publishSetting?.orderFormUrl) {
+    lines.push(`📋 주문서 작성하기`)
+    lines.push(publishSetting.orderFormUrl)
+  }
+
+  // 추가 안내
+  if (publishSetting?.additionalComment) {
+    if (lines.length > 0) lines.push('')
+    lines.push(publishSetting.additionalComment)
+  }
+
+  return lines.join('\n')
+}

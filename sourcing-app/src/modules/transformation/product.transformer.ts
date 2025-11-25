@@ -88,11 +88,36 @@ function parseAiResponse(aiResponse: AiResponse): AiProductAnalysis {
     // Extract JSON from response (handle markdown code blocks)
     let jsonText = aiResponse.content.trim()
 
-    // Remove markdown code blocks if present
-    const jsonMatch = jsonText.match(/```json\s*([\s\S]*?)\s*```/)
+    console.log('🔍 AI 원본 응답 (처음 500자):', jsonText.substring(0, 500))
+
+    // Remove markdown code blocks if present (handle various formats)
+    // 1. Try ```json ... ``` format with greedy matching
+    let jsonMatch = jsonText.match(/```(?:json|JSON)?\s*([\s\S]*)\s*```/)
     if (jsonMatch) {
       jsonText = jsonMatch[1].trim()
+      console.log('✅ 코드블록 추출 성공 (방법 1)')
     }
+
+    // 2. If still starts with ```, try to extract content after it (no closing ```)
+    if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/^```(?:json|JSON)?\s*\n?/, '').trim()
+      // Remove trailing ``` if exists
+      jsonText = jsonText.replace(/\n?\s*```\s*$/, '').trim()
+      console.log('✅ 코드블록 제거 (방법 2)')
+    }
+
+    // 3. If doesn't start with {, try to find JSON object in the text
+    if (!jsonText.startsWith('{')) {
+      // Find the first { and last } to extract JSON
+      const firstBrace = jsonText.indexOf('{')
+      const lastBrace = jsonText.lastIndexOf('}')
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        jsonText = jsonText.substring(firstBrace, lastBrace + 1)
+        console.log('✅ JSON 객체 직접 추출 (방법 3)')
+      }
+    }
+
+    console.log('🔍 파싱할 JSON (처음 500자):', jsonText.substring(0, 500))
 
     // Parse JSON
     const parsed = JSON.parse(jsonText)

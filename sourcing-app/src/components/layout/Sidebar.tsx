@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -39,7 +39,35 @@ interface MenuItem {
 
 export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const pathname = usePathname()
-  const [expandedItems, setExpandedItems] = useState<string[]>(['sourcing', 'products', 'automation', '1-2. AliExpress 소싱'])
+  const [expandedItems, setExpandedItems] = useState<string[]>([])
+
+  // 경로에 따라 해당 메뉴 그룹 자동 확장
+  useEffect(() => {
+    const pathToMenuMap: Record<string, string> = {
+      '/band': '밴드관리',
+      '/publish': '발행',
+      '/admin/settings': '환경 설정',
+    }
+
+    const matchedMenus: string[] = []
+    for (const [path, menu] of Object.entries(pathToMenuMap)) {
+      if (pathname.startsWith(path)) {
+        matchedMenus.push(menu)
+      }
+    }
+
+    if (matchedMenus.length > 0) {
+      setExpandedItems(prev => {
+        const newItems = [...prev]
+        matchedMenus.forEach(menu => {
+          if (!newItems.includes(menu)) {
+            newItems.push(menu)
+          }
+        })
+        return newItems
+      })
+    }
+  }, [pathname])
 
   const menuItems: MenuItem[] = [
     {
@@ -67,6 +95,22 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       label: '상품 관리',
       href: '/product/list',
       icon: <Package size={20} />,
+    },
+    {
+      label: '발행',
+      icon: <Send size={20} />,
+      children: [
+        {
+          label: '소매밴드 발행',
+          href: '/publish/retail-band',
+          icon: <Upload size={16} />,
+        },
+        {
+          label: '쇼핑몰 발행',
+          href: '/publish/shopping-mall',
+          icon: <Globe size={16} />,
+        },
+      ],
     },
     {
       label: '환경 설정',

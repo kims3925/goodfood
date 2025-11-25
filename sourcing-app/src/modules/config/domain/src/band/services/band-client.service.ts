@@ -193,4 +193,92 @@ export class NaverBandClient {
       return false
     }
   }
+
+  /**
+   * 밴드에 게시글 작성
+   * API: POST /v2.2/band/post/create
+   */
+  async createPost(bandKey: string, content: string, options?: {
+    doPush?: boolean  // 푸시 알림 여부
+  }): Promise<{ postKey: string }> {
+    try {
+      const url = new URL('https://openapi.band.us/v2.2/band/post/create')
+      url.searchParams.append('access_token', this.accessToken)
+      url.searchParams.append('band_key', bandKey)
+      url.searchParams.append('content', content)
+      if (options?.doPush !== undefined) {
+        url.searchParams.append('do_push', String(options.doPush))
+      }
+
+      console.log(`📝 Band API 게시글 작성 요청: band_key=${bandKey}`)
+
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const data = await response.json() as BandApiResponse<{ post_key: string }>
+
+      if (data.result_code !== 1) {
+        throw new Error(`Band API Error: ${data.result_message} (Code: ${data.result_code})`)
+      }
+
+      console.log('✅ 게시글 작성 성공:', data.result_data?.post_key)
+
+      return {
+        postKey: data.result_data?.post_key || '',
+      }
+    } catch (error) {
+      console.error('❌ 게시글 작성 실패:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 게시글에 댓글 작성
+   * API: POST /v2/band/post/comment/create
+   */
+  async createComment(bandKey: string, postKey: string, body: string): Promise<{ commentKey: string }> {
+    try {
+      const url = new URL('https://openapi.band.us/v2/band/post/comment/create')
+      url.searchParams.append('access_token', this.accessToken)
+      url.searchParams.append('band_key', bandKey)
+      url.searchParams.append('post_key', postKey)
+      url.searchParams.append('body', body)
+
+      console.log(`💬 Band API 댓글 작성 요청: band_key=${bandKey}, post_key=${postKey}`)
+
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const data = await response.json() as BandApiResponse<{ comment_key: string }>
+
+      if (data.result_code !== 1) {
+        throw new Error(`Band API Error: ${data.result_message} (Code: ${data.result_code})`)
+      }
+
+      console.log('✅ 댓글 작성 성공:', data.result_data?.comment_key)
+
+      return {
+        commentKey: data.result_data?.comment_key || '',
+      }
+    } catch (error) {
+      console.error('❌ 댓글 작성 실패:', error)
+      throw error
+    }
+  }
 }

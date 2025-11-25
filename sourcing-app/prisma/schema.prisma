@@ -39,6 +39,7 @@ model User {
   retailBands        RetailBand[]
   posts              Post[]
   products           Product[]
+  publishSetting     PublishSetting?
 
   @@index([email])
   @@map("user")
@@ -373,4 +374,29 @@ model ProductOption {
   @@index([productId])
   @@index([groupName])
   @@map("product_option")
+}
+
+// =============================================
+// PUBLISH SETTINGS (발행 설정)
+// =============================================
+
+model PublishSetting {
+  id                Int      @id @default(autoincrement())
+  userId            Int      @unique @map("user_id") // 사용자당 1개
+
+  // 주문서 설정
+  orderFormUrl      String?  @map("order_form_url") @db.VarChar(1000) // 주문서 URL
+  additionalComment String?  @map("additional_comment") @db.Text // 추가 안내 문구
+
+  // 자동 발행 설정
+  autoPush          Boolean  @map("auto_push") @default(false)
+
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("publish_setting")
 }
