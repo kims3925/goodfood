@@ -46,6 +46,9 @@ model User {
   publishHistories   PublishHistory[]
   purchaseOrders     PurchaseOrder[]
   internalOrders     InternalOrder[]
+  automationConfig   AutomationConfig?
+  workflowLogs       WorkflowLog[]
+  publishHistories   PublishHistory[]
 
   @@index([email])
   @@map("user")
@@ -660,4 +663,125 @@ model InternalOrder {
   @@index([status])
   @@index([createdAt])
   @@map("internal_order")
+}
+
+// =============================================
+// AUTOMATION CONFIGURATION (자동화 설정)
+// =============================================
+
+model AutomationConfig {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @unique @map("user_id") // 사용자당 1개
+
+  // 스케줄 설정
+  isEnabled       Boolean   @default(false) @map("is_enabled")
+  cronExpression  String?   @map("cron_expression") @db.VarChar(50) // "0 * * * *" (매 1시간)
+
+  // 수집 설정
+  collectFromAllBands Boolean @default(true) @map("collect_from_all_bands")
+  wholesaleBandIds    Json?   @map("wholesale_band_ids") @db.Json // 특정 밴드만 수집 시
+
+  // AI 설정
+  aiProvider      AiProvider @default(GEMINI) @map("ai_provider")
+  pricingPolicyId Int?       @map("pricing_policy_id")
+
+  // 발행 설정
+  autoPublish     Boolean   @default(false) @map("auto_publish")
+  retailBandIds   Json?     @map("retail_band_ids") @db.Json // 발행할 소매밴드 ID들
+
+  // 실행 상태
+  lastRunAt       DateTime? @map("last_run_at") @db.Timestamp(0)
+  nextRunAt       DateTime? @map("next_run_at") @db.Timestamp(0)
+
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pricingPolicy PricingPolicy? @relation(fields: [pricingPolicyId], references: [id], onDelete: SetNull)
+
+  @@index([isEnabled])
+  @@map("automation_config")
+}
+
+// =============================================
+// WORKFLOW EXECUTION LOG (워크플로우 실행 로그)
+// =============================================
+
+enum WorkflowType {
+  COLLECT       // 게시물 수집
+  TRANSFORM     // AI 변환
+  PUBLISH       // 소매밴드 발행
+  FULL_PIPELINE // 전체 파이프라인
+}
+
+enum WorkflowStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  PARTIAL_SUCCESS
+}
+
+model WorkflowLog {
+  id              Int            @id @default(autoincrement())
+  userId          Int            @map("user_id")
+
+  // 실행 정보
+  workflowType    WorkflowType   @map("workflow_type")
+  status          WorkflowStatus @default(PENDING)
+  startedAt       DateTime       @default(now()) @map("started_at") @db.Timestamp(0)
+  completedAt     DateTime?      @map("completed_at") @db.Timestamp(0)
+
+  // 결과 통계
+  totalItems      Int            @default(0) @map("total_items")
+  successCount    Int            @default(0) @map("success_count")
+  failedCount     Int            @default(0) @map("failed_count")
+
+  // 상세 로그
+  details         Json?          @db.Json // 각 항목별 결과, 진행률 등
+  errorMessage    String?        @map("error_message") @db.Text
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, workflowType, startedAt])
+  @@index([status])
+  @@map("workflow_log")
+}
+
+// =============================================
+// PUBLISH HISTORY (발행 이력)
+// =============================================
+
+enum PublishStatus {
+  SUCCESS
+  FAILED
+  PENDING
+}
+
+model PublishHistory {
+  id            Int           @id @default(autoincrement())
+  userId        Int           @map("user_id")
+  productId     Int           @map("product_id")
+  retailBandId  Int           @map("retail_band_id")
+
+  // Band API 결과
+  postKey       String?       @map("post_key") @db.VarChar(255) // Band API 반환값
+  status        PublishStatus @default(PENDING)
+  errorMessage  String?       @map("error_message") @db.Text
+
+  publishedAt   DateTime      @default(now()) @map("published_at") @db.Timestamp(0)
+
+  // Relationships
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  retailBand RetailBand @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, retailBandId]) // 같은 상품을 같은 밴드에 중복 발행 방지
+  @@index([userId])
+  @@index([productId])
+  @@index([retailBandId])
+  @@index([status])
+  @@map("publish_history")
 }
