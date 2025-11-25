@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { retailBandIds, productIds, publishSetting } = body
+    const { retailBandIds, productIds } = body
 
     // 유효성 검사
     if (!retailBandIds || retailBandIds.length === 0) {
@@ -109,16 +109,16 @@ export async function POST(request: NextRequest) {
       for (const product of products) {
         try {
           // 게시글 내용 생성
-          const postContent = buildPostContent(product, publishSetting)
+          const postContent = buildPostContent(product)
 
           // 게시글 작성
           const { postKey } = await bandClient.createPost(retailBand.bandKey, postContent, {
             doPush: false, // 푸시 알림 비활성화
           })
 
-          // 댓글 작성 (주문서 URL + 추가 안내)
-          if (publishSetting?.orderFormUrl || publishSetting?.additionalComment) {
-            const commentContent = buildCommentContent(publishSetting)
+          // 댓글 작성 (해당 밴드의 주문서 URL)
+          if (retailBand.formUrl) {
+            const commentContent = buildCommentContent(retailBand.formUrl)
             if (commentContent) {
               await bandClient.createComment(retailBand.bandKey, postKey, commentContent)
             }
@@ -180,8 +180,7 @@ function buildPostContent(
     post?: {
       content: string
     } | null
-  },
-  publishSetting?: { orderFormUrl?: string; additionalComment?: string }
+  }
 ): string {
   const lines: string[] = []
 
@@ -189,14 +188,9 @@ function buildPostContent(
   lines.push(`🛍️ ${product.name}`)
   lines.push('')
 
-  // 가격 정보
+  // 가격 정보 (판매가만 노출)
   if (product.price) {
     lines.push(`💰 판매가: ${product.price.toLocaleString()}원`)
-  }
-  if (product.wholesalePrice) {
-    lines.push(`📦 도매가: ${product.wholesalePrice.toLocaleString()}원`)
-  }
-  if (product.price || product.wholesalePrice) {
     lines.push('')
   }
 
@@ -211,24 +205,13 @@ function buildPostContent(
 }
 
 /**
- * 댓글 내용 생성
+ * 댓글 내용 생성 (주문서 URL)
  */
-function buildCommentContent(
-  publishSetting?: { orderFormUrl?: string; additionalComment?: string }
-): string {
+function buildCommentContent(formUrl: string): string {
   const lines: string[] = []
 
-  // 주문서 링크
-  if (publishSetting?.orderFormUrl) {
-    lines.push(`📋 주문서 작성하기`)
-    lines.push(publishSetting.orderFormUrl)
-  }
-
-  // 추가 안내
-  if (publishSetting?.additionalComment) {
-    if (lines.length > 0) lines.push('')
-    lines.push(publishSetting.additionalComment)
-  }
+  lines.push(`📋 주문서 작성하기`)
+  lines.push(formUrl)
 
   return lines.join('\n')
 }

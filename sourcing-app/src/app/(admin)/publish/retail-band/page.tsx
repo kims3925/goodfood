@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Send, RefreshCw, AlertCircle, CheckCircle2, Settings, ChevronDown, ChevronRight, Image as ImageIcon, MessageSquare } from 'lucide-react'
+import { Send, RefreshCw, AlertCircle, CheckCircle2, ChevronDown, ChevronRight, Image as ImageIcon, MessageSquare } from 'lucide-react'
 import Button from '@/components/ui/Button'
-import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
 
@@ -32,11 +31,6 @@ interface Product {
   }
 }
 
-interface PublishSetting {
-  orderFormUrl: string
-  additionalComment: string
-}
-
 export default function RetailBandPublishPage() {
   // 상태 관리
   const [retailBands, setRetailBands] = useState<RetailBand[]>([])
@@ -46,17 +40,6 @@ export default function RetailBandPublishPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isPublishing, setIsPublishing] = useState(false)
   const [expandedProductIds, setExpandedProductIds] = useState<number[]>([])
-
-  // 발행 설정
-  const [publishSetting, setPublishSetting] = useState<PublishSetting>({
-    orderFormUrl: '',
-    additionalComment: '',
-  })
-  const [showSettingModal, setShowSettingModal] = useState(false)
-  const [tempSetting, setTempSetting] = useState<PublishSetting>({
-    orderFormUrl: '',
-    additionalComment: '',
-  })
 
   // 발행 결과
   const [publishResults, setPublishResults] = useState<Array<{
@@ -82,16 +65,6 @@ export default function RetailBandPublishPage() {
       if (bandsData.success) {
         const activeBands = bandsData.data.filter((b: RetailBand) => b.isActive)
         setRetailBands(activeBands)
-      }
-
-      // 발행 설정 조회
-      const settingRes = await fetch('/api/settings/publish')
-      const settingData = await settingRes.json()
-      if (settingData.success && settingData.data) {
-        setPublishSetting({
-          orderFormUrl: settingData.data.orderFormUrl || '',
-          additionalComment: settingData.data.additionalComment || '',
-        })
       }
 
       // 발행 가능한 상품 목록 조회
@@ -155,32 +128,6 @@ export default function RetailBandPublishPage() {
     }
   }
 
-  const handleOpenSettingModal = () => {
-    setTempSetting({ ...publishSetting })
-    setShowSettingModal(true)
-  }
-
-  const handleSaveSetting = async () => {
-    try {
-      const res = await fetch('/api/settings/publish', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tempSetting),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setPublishSetting(tempSetting)
-        setShowSettingModal(false)
-        alert('발행 설정이 저장되었습니다.')
-      } else {
-        alert(data.error || '설정 저장에 실패했습니다.')
-      }
-    } catch (error) {
-      console.error('설정 저장 실패:', error)
-      alert('설정 저장에 실패했습니다.')
-    }
-  }
-
   const handlePublish = async () => {
     if (selectedBandIds.length === 0) {
       alert('발행할 소매밴드를 선택해주세요.')
@@ -211,7 +158,6 @@ export default function RetailBandPublishPage() {
         body: JSON.stringify({
           retailBandIds: selectedBandIds,
           productIds: selectedProductIds,
-          publishSetting,
         }),
       })
       const data = await res.json()
@@ -247,34 +193,8 @@ export default function RetailBandPublishPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">소매밴드 발행</h1>
           <p className="text-gray-600">
-            가공된 상품을 소매밴드에 게시글로 발행합니다. 주문서 링크와 추가 안내 댓글도 함께 등록됩니다.
+            가공된 상품을 소매밴드에 게시글로 발행합니다. 각 밴드에 설정된 주문서 URL이 댓글로 등록됩니다.
           </p>
-        </div>
-
-        {/* 발행 설정 카드 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">발행 설정</h2>
-            <Button variant="secondary" size="sm" onClick={handleOpenSettingModal}>
-              <Settings size={16} />
-              설정 변경
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">주문서 URL</label>
-              <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded truncate">
-                {publishSetting.orderFormUrl || '(설정되지 않음)'}
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">추가 안내 문구</label>
-              <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded truncate">
-                {publishSetting.additionalComment || '(설정되지 않음)'}
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* 소매밴드 선택 */}
@@ -540,56 +460,6 @@ export default function RetailBandPublishPage() {
           )}
         </div>
       </div>
-
-      {/* 발행 설정 모달 */}
-      <Modal
-        isOpen={showSettingModal}
-        onClose={() => setShowSettingModal(false)}
-        title="발행 설정"
-        size="md"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              주문서 URL
-            </label>
-            <Input
-              type="url"
-              value={tempSetting.orderFormUrl}
-              onChange={(e) => setTempSetting(prev => ({ ...prev, orderFormUrl: e.target.value }))}
-              placeholder="https://forms.google.com/..."
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              게시글 댓글에 포함될 주문서 링크입니다.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              추가 안내 문구
-            </label>
-            <textarea
-              value={tempSetting.additionalComment}
-              onChange={(e) => setTempSetting(prev => ({ ...prev, additionalComment: e.target.value }))}
-              placeholder="배송 안내, 결제 방법 등..."
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              게시글 댓글에 추가로 포함될 안내 문구입니다.
-            </p>
-          </div>
-        </div>
-
-        <ModalFooter>
-          <Button variant="secondary" onClick={() => setShowSettingModal(false)}>
-            취소
-          </Button>
-          <Button variant="primary" onClick={handleSaveSetting}>
-            저장
-          </Button>
-        </ModalFooter>
-      </Modal>
 
       {/* 발행 결과 모달 */}
       <Modal
