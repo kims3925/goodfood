@@ -41,6 +41,7 @@ model User {
   products           Product[]
   pricingPolicies    PricingPolicy[]
   publishSetting     PublishSetting?
+  orders             Order[]
 
   @@index([email])
   @@map("user")
@@ -425,4 +426,66 @@ model PricingPolicy {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("pricing_policy")
+}
+
+// =============================================
+// ORDER MANAGEMENT (주문서 관리)
+// =============================================
+
+enum OrderStatus {
+  PENDING    // 주문접수
+  CONFIRMED  // 주문확인
+  PREPARING  // 상품준비중
+  SHIPPING   // 배송중
+  DELIVERED  // 배송완료
+  CANCELLED  // 취소
+  REFUNDED   // 환불
+}
+
+model Order {
+  id              Int          @id @default(autoincrement())
+  userId          Int          @map("user_id")
+
+  // Google Forms 기본 정보
+  formResponseId  String?      @map("form_response_id") @db.VarChar(255) // Google Forms 응답 ID (중복 방지용)
+
+  // 주문자 정보
+  customerName    String       @map("customer_name") @db.VarChar(100)
+  customerPhone   String       @map("customer_phone") @db.VarChar(50)
+  customerAddress String?      @map("customer_address") @db.Text
+
+  // 상품 정보
+  productName     String       @map("product_name") @db.VarChar(500)
+  productOption   String?      @map("product_option") @db.VarChar(500) // 선택한 옵션 (예: "색상: 빨강, 사이즈: L")
+  quantity        Int          @default(1)
+  unitPrice       Int?         @map("unit_price") // 개당 가격
+  totalPrice      Int?         @map("total_price") // 총 주문 금액
+
+  // 주문 상태
+  status          OrderStatus  @default(PENDING)
+
+  // 메모
+  customerMemo    String?      @map("customer_memo") @db.Text // 고객 요청사항
+  adminMemo       String?      @map("admin_memo") @db.Text // 관리자 메모
+
+  // 배송 정보
+  trackingNumber  String?      @map("tracking_number") @db.VarChar(100)
+  shippedAt       DateTime?    @map("shipped_at") @db.Timestamp(0)
+  deliveredAt     DateTime?    @map("delivered_at") @db.Timestamp(0)
+
+  // Timestamps
+  orderedAt       DateTime     @default(now()) @map("ordered_at") @db.Timestamp(0) // Google Forms 제출 시간
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, formResponseId]) // 같은 사용자 내 중복 응답 방지
+  @@index([userId])
+  @@index([status])
+  @@index([customerName])
+  @@index([customerPhone])
+  @@index([orderedAt])
+  @@map("order")
 }

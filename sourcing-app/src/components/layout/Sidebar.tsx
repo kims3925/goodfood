@@ -22,6 +22,7 @@ import {
   Link2,
   Globe,
   ScrollText,
+  ClipboardList,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -112,6 +113,11 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           icon: <Globe size={16} />,
         },
       ],
+    },
+    {
+      label: '주문서 관리',
+      href: '/order/list',
+      icon: <ClipboardList size={20} />,
     },
     {
       label: '정책 관리',
