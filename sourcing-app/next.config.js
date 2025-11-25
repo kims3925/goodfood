@@ -2,6 +2,7 @@
 const path = require('path')
 
 const nextConfig = {
+  skipTrailingSlashRedirect: true,
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,

@@ -15,7 +15,7 @@ interface Band {
   bandKey: string
   name: string
   coverUrl: string | null
-  orderUrl: string | null
+  formUrl: string | null
   isActive: boolean
   createdAt: string
   apiConfig: {
@@ -41,9 +41,22 @@ export default function RetailBandDetailPage() {
   // 폼 상태
   const [formData, setFormData] = useState({
     name: '',
-    orderUrl: '',
+    formUrl: '',
     isActive: true,
   })
+
+  // 초기 데이터 (변경 감지용)
+  const [initialData, setInitialData] = useState({
+    name: '',
+    formUrl: '',
+    isActive: true,
+  })
+
+  // 변경사항 여부
+  const hasChanges =
+    formData.name !== initialData.name ||
+    formData.formUrl !== initialData.formUrl ||
+    formData.isActive !== initialData.isActive
 
   useEffect(() => {
     loadBand()
@@ -59,7 +72,7 @@ export default function RetailBandDetailPage() {
         setBand(data.data)
         setFormData({
           name: data.data.name,
-          orderUrl: data.data.orderUrl || '',
+          formUrl: data.data.formUrl || '',
           isActive: data.data.isActive,
         })
       } else {
@@ -234,13 +247,13 @@ export default function RetailBandDetailPage() {
               {isEditing ? (
                 <>
                   <Input
-                    type="text"
-                    value={formData.orderUrl}
-                    onChange={(e) => setFormData({ ...formData, orderUrl: e.target.value })}
-                    placeholder="주문서 URL을 입력하세요 (예: https://example.com/order)"
+                    type="url"
+                    value={formData.formUrl}
+                    onChange={(e) => setFormData({ ...formData, formUrl: e.target.value })}
+                    placeholder="https://forms.google.com/..."
                   />
                   <p className="mt-1 text-sm text-gray-500">
-                    이 밴드에서 사용할 주문서 페이지 URL을 입력하세요.
+                    발행 시 댓글에 포함될 주문서 링크입니다.
                   </p>
                 </>
               ) : (

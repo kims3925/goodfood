@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Script from 'next/script'
 import {
   Search,
   Minus,
@@ -174,8 +175,32 @@ export default function NewOrderPage() {
     return price.toLocaleString() + '원'
   }
 
+  // 다음 주소 검색 API
+  const openPostcode = () => {
+    new window.daum.Postcode({
+      oncomplete: (data) => {
+        // 도로명 주소 우선, 없으면 지번 주소
+        const fullAddress = data.roadAddress || data.jibunAddress
+
+        setPostalCode(data.zonecode)
+        setAddress(fullAddress)
+
+        // 건물명이 있으면 상세주소에 자동 입력
+        if (data.buildingName) {
+          setAddressDetail(data.buildingName)
+        }
+      },
+    }).open()
+  }
+
   return (
     <div className="p-6">
+      {/* Daum Postcode API Script */}
+      <Script
+        src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"
+        strategy="lazyOnload"
+      />
+
       {/* Header */}
       <div className="mb-6">
         <button
@@ -272,13 +297,15 @@ export default function NewOrderPage() {
                   <input
                     type="text"
                     value={postalCode}
-                    onChange={(e) => setPostalCode(e.target.value)}
+                    readOnly
                     placeholder="우편번호"
-                    className="w-32 px-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-light"
+                    onClick={openPostcode}
+                    className="w-32 px-4 py-2.5 border border-border rounded-lg bg-gray-50 cursor-pointer focus:outline-none"
                   />
                   <button
                     type="button"
-                    className="px-4 py-2.5 border border-border rounded-lg hover:bg-surface transition-colors text-sm"
+                    onClick={openPostcode}
+                    className="px-4 py-2.5 bg-primary-color text-white rounded-lg hover:bg-primary-dark transition-colors text-sm font-medium"
                   >
                     주소 검색
                   </button>
@@ -286,9 +313,10 @@ export default function NewOrderPage() {
                 <input
                   type="text"
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="기본 주소"
-                  className="w-full px-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-light mb-2"
+                  readOnly
+                  placeholder="주소 검색 버튼을 클릭하세요"
+                  onClick={openPostcode}
+                  className="w-full px-4 py-2.5 border border-border rounded-lg bg-gray-50 cursor-pointer focus:outline-none mb-2"
                 />
                 <input
                   type="text"

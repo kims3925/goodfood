@@ -40,12 +40,11 @@ model User {
   posts              Post[]
   products           Product[]
   pricingPolicies    PricingPolicy[]
-  publishSetting     PublishSetting?
-  purchaseOrders     PurchaseOrder[]
-  internalOrders     InternalOrder[]
   automationConfig   AutomationConfig?
   workflowLogs       WorkflowLog[]
   publishHistories   PublishHistory[]
+  purchaseOrders     PurchaseOrder[]
+  internalOrders     InternalOrder[]
 
   @@index([email])
   @@map("user")
@@ -184,7 +183,7 @@ model RetailBand {
   bandKey      String   @map("band_key") @db.VarChar(255) // Band Platform unique key
   name         String   @db.VarChar(255)
   coverUrl     String?  @map("cover_url") @db.VarChar(500)
-  orderUrl     String?  @map("order_url") @db.VarChar(500) // 주문서 URL
+  formUrl      String?  @map("form_url") @db.VarChar(500) // 구글 폼 URL
 
   // Status
   isActive     Boolean   @map("is_active") @default(true)
@@ -388,31 +387,6 @@ model ProductOption {
 }
 
 // =============================================
-// PUBLISH SETTINGS (발행 설정)
-// =============================================
-
-model PublishSetting {
-  id                Int      @id @default(autoincrement())
-  userId            Int      @unique @map("user_id") // 사용자당 1개
-
-  // 주문서 설정
-  orderFormUrl      String?  @map("order_form_url") @db.VarChar(1000) // 주문서 URL
-  additionalComment String?  @map("additional_comment") @db.Text // 추가 안내 문구
-
-  // 자동 발행 설정
-  autoPush          Boolean  @map("auto_push") @default(false)
-
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("publish_setting")
-}
-
-// =============================================
 // PRICING POLICY MANAGEMENT (가격 정책 관리)
 // =============================================
 
@@ -436,109 +410,6 @@ model PricingPolicy {
   automationConfigs AutomationConfig[]
 
   @@map("pricing_policy")
-}
-
-// =============================================
-// PURCHASE ORDER MANAGEMENT (주문서 관리)
-// =============================================
-
-model PurchaseOrder {
-  id              Int      @id @default(autoincrement())
-  userId          Int      @map("user_id")
-  productId       Int?     @map("product_id") // 매칭된 상품 ID (선택)
-
-  // 주문 정보
-  productName     String   @map("product_name") @db.VarChar(500)  // 상품명
-  totalPrice      Int?     @map("total_price")                    // 총금액
-  customerName    String   @map("customer_name") @db.VarChar(100) // 이름
-
-  // Timestamps
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([productId])
-  @@index([productName])
-  @@index([customerName])
-  @@map("purchase_order")
-}
-
-// =============================================
-// INTERNAL ORDER MANAGEMENT (내부 주문서 - 테스트용)
-// =============================================
-
-enum PaymentMethod {
-  CARD           // 카드
-  BANK_TRANSFER  // 계좌이체
-  VIRTUAL_ACCOUNT // 가상계좌
-}
-
-enum CashReceiptType {
-  NONE           // 미발행
-  INCOME         // 소득공제용
-  EXPENSE        // 지출증빙용
-}
-
-enum OrderStatus {
-  PENDING        // 주문대기
-  PAID           // 결제완료
-  PREPARING      // 상품준비중
-  SHIPPING       // 배송중
-  DELIVERED      // 배송완료
-  CANCELLED      // 주문취소
-}
-
-model InternalOrder {
-  id              Int           @id @default(autoincrement())
-  userId          Int           @map("user_id")
-  productId       Int?          @map("product_id")
-
-  // 주문자 정보
-  customerName    String        @map("customer_name") @db.VarChar(100)
-  customerPhone   String        @map("customer_phone") @db.VarChar(20)
-
-  // 배송지 정보
-  recipientName   String        @map("recipient_name") @db.VarChar(100)
-  recipientPhone  String        @map("recipient_phone") @db.VarChar(20)
-  postalCode      String        @map("postal_code") @db.VarChar(10)
-  address         String        @db.VarChar(500)
-  addressDetail   String?       @map("address_detail") @db.VarChar(500)
-  deliveryMemo    String?       @map("delivery_memo") @db.VarChar(500)
-
-  // 상품 정보
-  productName     String        @map("product_name") @db.VarChar(500)
-  quantity        Int           @default(1)
-  unitPrice       Int           @map("unit_price")      // 단가
-  shippingFee     Int           @map("shipping_fee") @default(0)  // 배송비
-  totalPrice      Int           @map("total_price")     // 총 결제금액
-
-  // 결제 정보
-  paymentMethod   PaymentMethod @map("payment_method")
-
-  // 현금영수증
-  cashReceiptType   CashReceiptType @map("cash_receipt_type") @default(NONE)
-  cashReceiptNumber String?         @map("cash_receipt_number") @db.VarChar(50)
-
-  // 주문 상태
-  status          OrderStatus   @default(PENDING)
-
-  // Timestamps
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([productId])
-  @@index([status])
-  @@index([createdAt])
-  @@map("internal_order")
 }
 
 // =============================================
@@ -660,4 +531,107 @@ model PublishHistory {
   @@index([retailBandId])
   @@index([status])
   @@map("publish_history")
+}
+
+// =============================================
+// PURCHASE ORDER MANAGEMENT (주문서 관리)
+// =============================================
+
+model PurchaseOrder {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  productId       Int?     @map("product_id") // 매칭된 상품 ID (선택)
+
+  // 주문 정보
+  productName     String   @map("product_name") @db.VarChar(500)  // 상품명
+  totalPrice      Int?     @map("total_price")                    // 총금액
+  customerName    String   @map("customer_name") @db.VarChar(100) // 이름
+
+  // Timestamps
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([productId])
+  @@index([productName])
+  @@index([customerName])
+  @@map("purchase_order")
+}
+
+// =============================================
+// INTERNAL ORDER MANAGEMENT (내부 주문서 - 테스트용)
+// =============================================
+
+enum PaymentMethod {
+  CARD           // 카드
+  BANK_TRANSFER  // 계좌이체
+  VIRTUAL_ACCOUNT // 가상계좌
+}
+
+enum CashReceiptType {
+  NONE           // 미발행
+  INCOME         // 소득공제용
+  EXPENSE        // 지출증빙용
+}
+
+enum OrderStatus {
+  PENDING        // 주문대기
+  PAID           // 결제완료
+  PREPARING      // 상품준비중
+  SHIPPING       // 배송중
+  DELIVERED      // 배송완료
+  CANCELLED      // 주문취소
+}
+
+model InternalOrder {
+  id              Int           @id @default(autoincrement())
+  userId          Int           @map("user_id")
+  productId       Int?          @map("product_id")
+
+  // 주문자 정보
+  customerName    String        @map("customer_name") @db.VarChar(100)
+  customerPhone   String        @map("customer_phone") @db.VarChar(20)
+
+  // 배송지 정보
+  recipientName   String        @map("recipient_name") @db.VarChar(100)
+  recipientPhone  String        @map("recipient_phone") @db.VarChar(20)
+  postalCode      String        @map("postal_code") @db.VarChar(10)
+  address         String        @db.VarChar(500)
+  addressDetail   String?       @map("address_detail") @db.VarChar(500)
+  deliveryMemo    String?       @map("delivery_memo") @db.VarChar(500)
+
+  // 상품 정보
+  productName     String        @map("product_name") @db.VarChar(500)
+  quantity        Int           @default(1)
+  unitPrice       Int           @map("unit_price")      // 단가
+  shippingFee     Int           @map("shipping_fee") @default(0)  // 배송비
+  totalPrice      Int           @map("total_price")     // 총 결제금액
+
+  // 결제 정보
+  paymentMethod   PaymentMethod @map("payment_method")
+
+  // 현금영수증
+  cashReceiptType   CashReceiptType @map("cash_receipt_type") @default(NONE)
+  cashReceiptNumber String?         @map("cash_receipt_number") @db.VarChar(50)
+
+  // 주문 상태
+  status          OrderStatus   @default(PENDING)
+
+  // Timestamps
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([productId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("internal_order")
 }
