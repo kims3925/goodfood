@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Edit3, Trash2, RefreshCw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Plus, Search, Trash2, RefreshCw } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
@@ -20,6 +21,7 @@ interface PricingPolicy {
 }
 
 export default function PolicyManagePage() {
+  const router = useRouter()
   const [policies, setPolicies] = useState<PricingPolicy[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -72,17 +74,6 @@ export default function PolicyManagePage() {
       description: '',
       content: '',
       isActive: true,
-    })
-    setShowModal(true)
-  }
-
-  const handleOpenEditModal = (policy: PricingPolicy) => {
-    setEditingPolicy(policy)
-    setFormData({
-      name: policy.name,
-      description: policy.description || '',
-      content: policy.content,
-      isActive: policy.isActive,
     })
     setShowModal(true)
   }
@@ -257,7 +248,7 @@ export default function PolicyManagePage() {
                     placeholder="정책 이름으로 검색..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                     className="pl-10"
                   />
                 </div>
@@ -308,8 +299,9 @@ export default function PolicyManagePage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[20%]">이름</TableHead>
-                  <TableHead className="w-[35%]">설명</TableHead>
+                  <TableHead className="w-[15%]">이름</TableHead>
+                  <TableHead className="w-[25%]">설명</TableHead>
+                  <TableHead className="w-[15%]">정책 내용</TableHead>
                   <TableHead className="w-[10%]">상태</TableHead>
                   <TableHead className="w-[15%]">생성일</TableHead>
                   <TableHead className="w-[15%]">작업</TableHead>
@@ -317,11 +309,15 @@ export default function PolicyManagePage() {
               </TableHeader>
               <TableBody>
                 {policies.length === 0 ? (
-                  <TableEmpty message="등록된 정책이 없습니다." colSpan={6} />
+                  <TableEmpty message="등록된 정책이 없습니다." />
                 ) : (
                   policies.map((policy) => (
-                    <TableRow key={policy.id} className="hover:bg-gray-50">
-                      <TableCell className="w-[5%]">
+                    <TableRow
+                      key={policy.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => router.push(`/policy/detail/${policy.id}`)}
+                    >
+                      <TableCell className="w-[5%]" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(policy.id)}
@@ -329,12 +325,17 @@ export default function PolicyManagePage() {
                           className="w-4 h-4 cursor-pointer"
                         />
                       </TableCell>
-                      <TableCell className="w-[20%]">
+                      <TableCell className="w-[15%]">
                         <span className="font-semibold text-gray-900 text-base">{policy.name}</span>
                       </TableCell>
-                      <TableCell className="w-[35%]">
+                      <TableCell className="w-[25%]">
                         <span className="text-gray-600">
-                          {policy.description ? truncateText(policy.description, 70) : '-'}
+                          {policy.description ? truncateText(policy.description, 50) : '-'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="w-[15%]">
+                        <span className="text-gray-600 text-sm">
+                          {truncateText(policy.content, 15)}
                         </span>
                       </TableCell>
                       <TableCell className="w-[10%]">
@@ -345,15 +346,8 @@ export default function PolicyManagePage() {
                           {new Date(policy.createdAt).toLocaleDateString('ko-KR')}
                         </span>
                       </TableCell>
-                      <TableCell className="w-[15%]">
+                      <TableCell className="w-[15%]" onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenEditModal(policy)}
-                          >
-                            <Edit3 size={16} className="text-blue-500" />
-                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"

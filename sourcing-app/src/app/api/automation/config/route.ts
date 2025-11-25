@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-import { CRON_EXPRESSIONS, CronInterval } from '@/modules/automation'
+import { CRON_EXPRESSIONS, CronInterval, updateScheduler } from '@/modules/automation'
 
 const prisma = new PrismaClient()
 
@@ -134,6 +134,9 @@ export async function POST(request: NextRequest) {
         nextRunAt,
       },
     })
+
+    // 스케줄러 업데이트
+    await updateScheduler(currentUser.userId)
 
     return NextResponse.json({
       success: true,

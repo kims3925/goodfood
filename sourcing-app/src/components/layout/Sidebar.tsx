@@ -24,6 +24,10 @@ import {
   ScrollText,
   ClipboardList,
   PlusCircle,
+  Play,
+  LayoutDashboard,
+  History,
+  Cog,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -50,6 +54,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       '/band': '밴드관리',
       '/publish': '발행',
       '/order': '주문서 관리',
+      '/automation': '자동화 관리',
       '/admin/settings': '환경 설정',
     }
 
@@ -74,6 +79,11 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   }, [pathname])
 
   const menuItems: MenuItem[] = [
+    {
+      label: '대시보드',
+      href: '/automation/dashboard',
+      icon: <LayoutDashboard size={20} />,
+    },
     {
       label: '밴드관리',
       icon: <Store size={20} />,
@@ -136,6 +146,22 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       label: '정책 관리',
       href: '/policy/list',
       icon: <ScrollText size={20} />,
+    },
+    {
+      label: '자동화 관리',
+      icon: <Zap size={20} />,
+      children: [
+        {
+          label: '자동화 설정',
+          href: '/automation/settings',
+          icon: <Cog size={16} />,
+        },
+        {
+          label: '실행 로그',
+          href: '/automation/logs',
+          icon: <History size={16} />,
+        },
+      ],
     },
     {
       label: '환경 설정',

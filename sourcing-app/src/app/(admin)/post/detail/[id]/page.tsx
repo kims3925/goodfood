@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Save, Trash2, MessageCircle } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Trash2, MessageCircle } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -57,6 +57,7 @@ export default function PostDetailPage() {
   const [post, setPost] = useState<Post | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
 
   // 수정 가능한 필드
   const [formData, setFormData] = useState({
@@ -115,6 +116,7 @@ export default function PostDetailPage() {
 
       if (data.success) {
         loadPost()
+        setIsEditing(false)
       } else {
       }
     } catch (error) {
@@ -122,6 +124,21 @@ export default function PostDetailPage() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handleStartEdit = () => {
+    setIsEditing(true)
+  }
+
+  const handleCancelEdit = () => {
+    if (post) {
+      setFormData({
+        title: post.title || '',
+        content: post.content || '',
+        author: post.author || '',
+      })
+    }
+    setIsEditing(false)
   }
 
   const handleDelete = async () => {
@@ -193,21 +210,33 @@ export default function PostDetailPage() {
             {getStatusBadge(post.status)}
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="danger"
-              onClick={handleDelete}
-            >
-              <Trash2 size={16} />
-              삭제
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSave}
-              disabled={isSaving}
-            >
-              <Save size={16} />
-              {isSaving ? '저장중...' : '저장'}
-            </Button>
+            {isEditing ? (
+              <>
+                <Button variant="secondary" onClick={handleCancelEdit}>
+                  <X size={16} />
+                  취소
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                >
+                  <Save size={16} />
+                  {isSaving ? '저장중...' : '저장'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="secondary" onClick={handleStartEdit}>
+                  <Edit size={16} />
+                  수정
+                </Button>
+                <Button variant="danger" onClick={handleDelete}>
+                  <Trash2 size={16} />
+                  삭제
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -242,49 +271,63 @@ export default function PostDetailPage() {
           </div>
         </div>
 
-        {/* 수정 폼 */}
+        {/* 게시물 정보 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">게시물 정보</h2>
 
           <div className="space-y-6">
             {/* 작성자 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-500 mb-2">
                 작성자
               </label>
-              <Input
-                type="text"
-                value={formData.author}
-                onChange={(e) => setFormData({ ...formData, author: e.target.value })}
-                placeholder="작성자"
-              />
+              {isEditing ? (
+                <Input
+                  type="text"
+                  value={formData.author}
+                  onChange={(e) => setFormData({ ...formData, author: e.target.value })}
+                  placeholder="작성자"
+                />
+              ) : (
+                <p className="text-gray-900">{post.author || '-'}</p>
+              )}
             </div>
 
             {/* 제목 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-500 mb-2">
                 제목
               </label>
-              <Input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="제목"
-              />
+              {isEditing ? (
+                <Input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="제목"
+                />
+              ) : (
+                <p className="text-gray-900 text-lg font-semibold">{post.title || '-'}</p>
+              )}
             </div>
 
             {/* 내용 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-500 mb-2">
                 내용
               </label>
-              <textarea
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={20}
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                placeholder="내용"
-              />
+              {isEditing ? (
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={20}
+                  value={formData.content}
+                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                  placeholder="내용"
+                />
+              ) : (
+                <pre className="whitespace-pre-wrap text-gray-800 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  {post.content || '-'}
+                </pre>
+              )}
             </div>
           </div>
         </div>
