@@ -65,7 +65,6 @@ export default function Modal({
             shadow-xl
             w-full
             ${sizeClasses[size]}
-            min-h-[75vh]
             max-h-[95vh]
             overflow-hidden
             fade-in
