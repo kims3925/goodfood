@@ -6,7 +6,13 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // 인증이 필요 없는 경로
-  const publicPaths = ['/login', '/signup', '/api/auth/login', '/api/auth/signup']
+  const publicPaths = [
+    '/login',
+    '/signup',
+    '/api/auth/login',
+    '/api/auth/signup',
+    '/api/order/webhook',  // Google Forms 웹훅
+  ]
 
   // 공개 경로는 통과
   if (publicPaths.some(path => pathname.startsWith(path))) {
