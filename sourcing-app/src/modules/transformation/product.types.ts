@@ -24,6 +24,7 @@ export interface ProductTransformationInput {
     temperature?: number
     maxTokens?: number
   }
+  policyContent?: string // 가격 정책 내용
 }
 
 // =============================================

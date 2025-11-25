@@ -56,7 +56,6 @@ export default function PolicyManagePage() {
       }
     } catch (error) {
       console.error('정책 목록 조회 실패:', error)
-      alert('정책 목록을 불러오는데 실패했습니다.')
     } finally {
       setIsLoading(false)
     }
@@ -101,11 +100,9 @@ export default function PolicyManagePage() {
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
-      alert('정책 이름을 입력해주세요.')
       return
     }
     if (!formData.content.trim()) {
-      alert('정책 내용을 입력해주세요.')
       return
     }
 
@@ -126,15 +123,11 @@ export default function PolicyManagePage() {
       const data = await response.json()
 
       if (data.success) {
-        alert(editingPolicy ? '정책이 수정되었습니다.' : '정책이 등록되었습니다.')
         handleCloseModal()
         loadPolicies()
-      } else {
-        alert(data.error || '저장에 실패했습니다.')
       }
     } catch (error) {
       console.error('정책 저장 실패:', error)
-      alert('정책 저장에 실패했습니다.')
     } finally {
       setIsSaving(false)
     }
@@ -151,14 +144,10 @@ export default function PolicyManagePage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('정책이 삭제되었습니다.')
         loadPolicies()
-      } else {
-        alert(data.error || '삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('정책 삭제 실패:', error)
-      alert('정책 삭제에 실패했습니다.')
     }
   }
 
@@ -189,7 +178,6 @@ export default function PolicyManagePage() {
   // 선택 삭제
   const handleDeleteSelected = async () => {
     if (selectedIds.length === 0) {
-      alert('삭제할 정책을 선택해주세요.')
       return
     }
 
@@ -219,18 +207,11 @@ export default function PolicyManagePage() {
         }
       }
 
-      if (failCount === 0) {
-        alert(`${successCount}개의 정책이 삭제되었습니다.`)
-      } else {
-        alert(`${successCount}개 삭제 성공, ${failCount}개 삭제 실패`)
-      }
-
       setSelectedIds([])
       setSelectAll(false)
       loadPolicies()
     } catch (error) {
       console.error('정책 일괄 삭제 실패:', error)
-      alert('정책 삭제에 실패했습니다.')
     }
   }
 
@@ -255,7 +236,7 @@ export default function PolicyManagePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">정책 관리</h1>
@@ -349,11 +330,11 @@ export default function PolicyManagePage() {
                         />
                       </TableCell>
                       <TableCell className="w-[20%]">
-                        <span className="font-medium text-gray-900">{policy.name}</span>
+                        <span className="font-semibold text-gray-900 text-base">{policy.name}</span>
                       </TableCell>
                       <TableCell className="w-[35%]">
-                        <span className="text-gray-600 text-sm">
-                          {policy.description ? truncateText(policy.description) : '-'}
+                        <span className="text-gray-600">
+                          {policy.description ? truncateText(policy.description, 70) : '-'}
                         </span>
                       </TableCell>
                       <TableCell className="w-[10%]">

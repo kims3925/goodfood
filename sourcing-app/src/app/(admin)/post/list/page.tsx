@@ -85,7 +85,6 @@ export default function PostsManagePage() {
       }
     } catch (error) {
       console.error('게시물 목록 조회 실패:', error)
-      alert('게시물 목록을 불러오는데 실패했습니다.')
     } finally {
       setIsLoading(false)
     }
@@ -177,7 +176,6 @@ export default function PostsManagePage() {
 
   const handleAddSelectedPosts = async () => {
     if (selectedPostKeys.length === 0) {
-      alert('추가할 게시물을 선택해주세요.')
       return
     }
 
@@ -230,13 +228,6 @@ export default function PostsManagePage() {
         }
       }
 
-      // 결과 메시지
-      if (failed === 0) {
-        alert(`${successCount}개의 게시물이 등록되었습니다.`)
-      } else {
-        alert(`${successCount}개 등록 완료, ${failed}개 실패`)
-      }
-
       setShowAddModal(false)
       setSelectedPostKeys([])
       setExpandedPostKeys([])
@@ -244,7 +235,6 @@ export default function PostsManagePage() {
       loadPosts()
     } catch (error) {
       console.error('게시물 등록 중 오류:', error)
-      alert('게시물 등록 중 오류가 발생했습니다.')
     } finally {
       setIsSubmitting(false)
       setCurrentIndex(0)
@@ -265,14 +255,10 @@ export default function PostsManagePage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('게시물이 삭제되었습니다.')
         loadPosts()
-      } else {
-        alert(data.error || '삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('게시물 삭제 실패:', error)
-      alert('게시물 삭제에 실패했습니다.')
     }
   }
 
@@ -303,7 +289,6 @@ export default function PostsManagePage() {
   // 선택한 게시물 일괄 삭제
   const handleDeleteSelectedPosts = async () => {
     if (selectedPostIds.length === 0) {
-      alert('삭제할 게시물을 선택해주세요.')
       return
     }
 
@@ -334,18 +319,11 @@ export default function PostsManagePage() {
         }
       }
 
-      if (failCount === 0) {
-        alert(`${successCount}개의 게시물이 삭제되었습니다.`)
-      } else {
-        alert(`${successCount}개 삭제 성공, ${failCount}개 삭제 실패`)
-      }
-
       setSelectedPostIds([])
       setSelectAllPosts(false)
       loadPosts()
     } catch (error) {
       console.error('게시물 일괄 삭제 실패:', error)
-      alert('게시물 삭제에 실패했습니다.')
     }
   }
 
@@ -379,7 +357,7 @@ export default function PostsManagePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">게시물 관리</h1>
@@ -484,21 +462,21 @@ export default function PostsManagePage() {
                         className="w-[20%] cursor-pointer"
                         onClick={() => router.push(`/post/detail/${post.id}`)}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           {post.wholesaleBand.coverUrl ? (
                             <img
                               src={post.wholesaleBand.coverUrl}
                               alt={post.wholesaleBand.name}
-                              className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                              className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                            <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
                               <span className="text-gray-400 text-xs">No</span>
                             </div>
                           )}
-                          <div className="text-sm min-w-0 flex-1">
-                            <div className="font-medium text-gray-900 truncate">{post.wholesaleBand.name}</div>
-                            <div className="text-gray-500 text-xs truncate">{post.wholesaleBand.bandKey}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-gray-900 truncate">{post.wholesaleBand.name}</div>
+                            <div className="text-gray-500 text-sm truncate mt-0.5">{post.wholesaleBand.bandKey}</div>
                           </div>
                         </div>
                       </TableCell>
@@ -506,15 +484,15 @@ export default function PostsManagePage() {
                         className="w-[10%] cursor-pointer"
                         onClick={() => router.push(`/post/detail/${post.id}`)}
                       >
-                        <span className="text-gray-600 text-sm">{post.author || '-'}</span>
+                        <span className="text-gray-600">{post.author || '-'}</span>
                       </TableCell>
                       <TableCell
                         className="w-[22%] cursor-pointer"
                         onClick={() => router.push(`/post/detail/${post.id}`)}
                       >
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium text-gray-900">
-                            {truncateText(post.title, 30)}
+                          <div className="font-semibold text-gray-900">
+                            {truncateText(post.title, 40)}
                           </div>
                         </div>
                       </TableCell>

@@ -85,12 +85,10 @@ export default function PostDetailPage() {
           author: data.data.author || '',
         })
       } else {
-        alert(data.error || '게시물을 찾을 수 없습니다.')
         router.push('/post/list')
       }
     } catch (error) {
       console.error('게시물 조회 실패:', error)
-      alert('게시물을 불러오는데 실패했습니다.')
       router.push('/post/list')
     } finally {
       setIsLoading(false)
@@ -116,14 +114,11 @@ export default function PostDetailPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('게시물이 저장되었습니다.')
         loadPost()
       } else {
-        alert(data.error || '저장에 실패했습니다.')
       }
     } catch (error) {
       console.error('게시물 저장 실패:', error)
-      alert('게시물 저장에 실패했습니다.')
     } finally {
       setIsSaving(false)
     }
@@ -141,14 +136,11 @@ export default function PostDetailPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('게시물이 삭제되었습니다.')
         router.push('/post/list')
       } else {
-        alert(data.error || '삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('게시물 삭제 실패:', error)
-      alert('게시물 삭제에 실패했습니다.')
     }
   }
 
@@ -186,7 +178,7 @@ export default function PostDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-4">

@@ -21,6 +21,7 @@ import {
   FileSpreadsheet,
   Link2,
   Globe,
+  ScrollText,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -67,6 +68,11 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       label: '상품 관리',
       href: '/product/list',
       icon: <Package size={20} />,
+    },
+    {
+      label: '정책 관리',
+      href: '/policy/list',
+      icon: <ScrollText size={20} />,
     },
     {
       label: '환경 설정',

@@ -74,7 +74,6 @@ export default function RetailBandsPage() {
       }
     } catch (error) {
       console.error('밴드 목록 조회 실패:', error)
-      alert('밴드 목록을 불러오는데 실패했습니다.')
     } finally {
       setIsLoading(false)
     }
@@ -135,7 +134,6 @@ export default function RetailBandsPage() {
 
   const handleAddSelectedBands = async () => {
     if (selectedBandKeys.length === 0) {
-      alert('추가할 밴드를 선택해주세요.')
       return
     }
 
@@ -160,13 +158,11 @@ export default function RetailBandsPage() {
         })
       }
 
-      alert(`${selectedBands.length}개의 소매밴드가 등록되었습니다.`)
       setShowAddModal(false)
       setSelectedBandKeys([])
       loadBands()
     } catch (error) {
       console.error('밴드 등록 실패:', error)
-      alert('밴드 등록에 실패했습니다.')
     }
   }
 
@@ -188,17 +184,14 @@ export default function RetailBandsPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('소매밴드가 수정되었습니다.')
         setShowEditModal(false)
         setSelectedBand(null)
         setFormData({ bandKey: '', name: '', description: '', coverUrl: '' })
         loadBands()
       } else {
-        alert(data.error || '수정에 실패했습니다.')
       }
     } catch (error) {
       console.error('밴드 수정 실패:', error)
-      alert('밴드 수정에 실패했습니다.')
     }
   }
 
@@ -213,14 +206,11 @@ export default function RetailBandsPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('소매밴드가 삭제되었습니다.')
         loadBands()
       } else {
-        alert(data.error || '삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('밴드 삭제 실패:', error)
-      alert('밴드 삭제에 실패했습니다.')
     }
   }
 
@@ -237,7 +227,7 @@ export default function RetailBandsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">소매밴드 관리</h1>
@@ -293,12 +283,12 @@ export default function RetailBandsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>밴드명</TableHead>
-                  <TableHead>설명</TableHead>
-                  <TableHead>플랫폼</TableHead>
-                  <TableHead>상태</TableHead>
-                  <TableHead>등록일</TableHead>
-                  <TableHead>작업</TableHead>
+                  <TableHead className="w-[25%]">밴드명</TableHead>
+                  <TableHead className="w-[30%]">설명</TableHead>
+                  <TableHead className="w-[10%]">플랫폼</TableHead>
+                  <TableHead className="w-[10%]">상태</TableHead>
+                  <TableHead className="w-[15%]">등록일</TableHead>
+                  <TableHead className="w-[10%]">작업</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -308,25 +298,25 @@ export default function RetailBandsPage() {
                   bands.map((band) => (
                     <TableRow key={band.id}>
                       <TableCell>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-4">
                           {band.coverUrl ? (
                             <img
                               src={band.coverUrl}
                               alt={band.name}
-                              className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                              className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                             />
                           ) : (
-                            <div className="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                            <div className="w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
                               <span className="text-gray-400 text-xs">No Image</span>
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
-                            <div className="font-medium text-gray-900">{band.name}</div>
+                            <div className="font-semibold text-gray-900 text-base">{band.name}</div>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="max-w-xs truncate text-gray-600">
+                        <div className="max-w-md truncate text-gray-600">
                           {band.description || '-'}
                         </div>
                       </TableCell>

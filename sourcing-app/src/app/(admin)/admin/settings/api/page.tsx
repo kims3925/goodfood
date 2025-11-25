@@ -139,14 +139,11 @@ export default function APISettingsPage() {
       console.log('[설정 저장] 응답 데이터:', data)
 
       if (data.success) {
-        alert('✅ 설정이 저장되었습니다!')
         setTestResult(null)
       } else {
-        alert('❌ 설정 저장 실패: ' + data.error)
       }
     } catch (error) {
       console.error('설정 저장 실패:', error)
-      alert('❌ 설정 저장 중 오류가 발생했습니다.')
     } finally {
       setIsSaving(false)
     }
@@ -171,14 +168,12 @@ export default function APISettingsPage() {
           ...prev,
           [activeTab]: true
         }))
-        alert('✅ 연결 테스트 성공! 이제 설정을 저장할 수 있습니다.')
       } else {
         // 실패 시 성공 상태를 false로 설정
         setTestSuccess(prev => ({
           ...prev,
           [activeTab]: false
         }))
-        alert('❌ 연결 테스트 실패: ' + data.message)
       }
     } catch (error) {
       console.error('연결 테스트 실패:', error)

@@ -22,9 +22,9 @@ const prisma = new PrismaClient()
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { postId, aiProvider } = body
+    const { postId, aiProvider, policyContent } = body
 
-    console.log('[AI Product Generation] Request:', { postId, aiProvider })
+    console.log('[AI Product Generation] Request:', { postId, aiProvider, hasPolicy: !!policyContent })
 
     // Authentication
     const currentUser = await getCurrentUser()
@@ -119,6 +119,7 @@ export async function POST(request: NextRequest) {
         temperature: config?.temperature || 0.7,
         maxTokens: config?.maxTokens || 2048,
       },
+      policyContent: policyContent || undefined,
     })
 
     console.log('[AI Product Generation] Draft generated:', {

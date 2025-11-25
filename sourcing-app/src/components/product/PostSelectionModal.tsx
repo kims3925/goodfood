@@ -367,9 +367,7 @@ export default function PostSelectionModal({
               disabled={selectedPostIds.length === 0}
             >
               <Package size={16} />
-              {selectedPostIds.length > 1
-                ? `${selectedPostIds.length}개 게시물로 상품 생성`
-                : '선택한 게시물로 상품 생성'
+              {'상품 생성'
               }
             </Button>
           </ModalFooter>

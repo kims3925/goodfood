@@ -42,7 +42,6 @@ export default function SignupPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('회원가입이 완료되었습니다!')
         router.push('/admin/settings/api')
       } else {
         setError(data.error || '회원가입에 실패했습니다.')

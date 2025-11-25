@@ -77,16 +77,13 @@ export default function AISettingsPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('설정이 저장되었습니다!')
         setTestResult(null)
         setIsTestSuccess(false)
         await loadSettings()
       } else {
-        alert('설정 저장 실패: ' + data.error)
       }
     } catch (error) {
       console.error('설정 저장 실패:', error)
-      alert('설정 저장 중 오류가 발생했습니다.')
     } finally {
       setIsSaving(false)
     }

@@ -53,11 +53,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
       if (data.success) {
         router.push('/login')
       } else {
-        alert('로그아웃에 실패했습니다.')
       }
     } catch (error) {
       console.error('로그아웃 실패:', error)
-      alert('로그아웃 중 오류가 발생했습니다.')
     }
   }
 

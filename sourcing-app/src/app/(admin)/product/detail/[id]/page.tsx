@@ -104,13 +104,10 @@ export default function ProductDetailPage() {
 
       if (data.success) {
         setProduct({ ...product, status: newStatus })
-        alert('상태가 변경되었습니다.')
       } else {
-        alert(data.error || '상태 변경에 실패했습니다.')
       }
     } catch (error) {
       console.error('상태 변경 실패:', error)
-      alert('상태 변경에 실패했습니다.')
     }
   }
 
@@ -126,14 +123,11 @@ export default function ProductDetailPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('상품이 삭제되었습니다.')
         router.push('/product/list')
       } else {
-        alert(data.error || '삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('상품 삭제 실패:', error)
-      alert('상품 삭제에 실패했습니다.')
     }
   }
 
@@ -188,7 +182,7 @@ export default function ProductDetailPage() {
   if (error || !product) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
             <div className="flex flex-col items-center justify-center space-y-4">
               <AlertCircle className="text-red-500" size={48} />
@@ -208,7 +202,7 @@ export default function ProductDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -232,15 +226,15 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6">
+          {/* Row 1: 기본정보 + 상태관리 */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
             {/* Basic Info Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-xl font-semibold text-gray-900">기본 정보</h2>
               </div>
-              <div className="p-6 space-y-6">
+              <div className="p-6 space-y-6 flex-1">
                 {/* Thumbnail & Name */}
                 <div className="flex gap-6">
                   {product.thumbnailUrl ? (
@@ -274,84 +268,18 @@ export default function ProductDetailPage() {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">도매가</label>
-                    <p className="mt-1 text-gray-900">{formatPrice(product.wholesalePrice)}</p>
+                    <p className="mt-1 text-lg font-semibold text-gray-900">{formatPrice(product.wholesalePrice)}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Options Card */}
-            {Object.keys(groupedOptions).length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div className="p-6 border-b border-gray-200">
-                  <h2 className="text-xl font-semibold text-gray-900">옵션 정보</h2>
-                </div>
-                <div className="p-6">
-                  <div className="space-y-4">
-                    {Object.entries(groupedOptions).map(([groupName, values]) => (
-                      <div key={groupName}>
-                        <label className="text-sm font-medium text-gray-700">{groupName}</label>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {values.map((value, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-50 text-purple-700 border border-purple-200"
-                            >
-                              {value}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-
-            {/* Source Post Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-900">출처 게시물</h2>
-                <Link
-                  href={`/post/detail/${product.post.id}`}
-                  className="inline-flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
-                >
-                  <FileText size={14} />
-                  게시물 보기
-                </Link>
-              </div>
-              <div className="p-6">
-                <div className="flex items-start gap-4">
-                  {product.post.images[0]?.imageUrl && (
-                    <img
-                      src={product.post.images[0].imageUrl}
-                      alt={product.post.title}
-                      className="w-24 h-24 rounded-lg object-cover flex-shrink-0"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-medium text-purple-600">
-                        {product.post.wholesaleBand.name}
-                      </span>
-                    </div>
-                    <h4 className="font-medium text-gray-900 mb-1">{product.post.title}</h4>
-                    <p className="text-sm text-gray-600 line-clamp-2">{product.post.content}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
             {/* Status Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">상태 관리</h2>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-4 flex-1">
                 <div>
                   <label className="text-sm font-medium text-gray-500 mb-2 block">현재 상태</label>
                   {getStatusBadge(product.status)}
@@ -388,13 +316,78 @@ export default function ProductDetailPage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Options Card (조건부, 전체 너비) */}
+          {Object.keys(groupedOptions).length > 0 && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-semibold text-gray-900">옵션 정보</h2>
+              </div>
+              <div className="p-6">
+                <div className="space-y-4">
+                  {Object.entries(groupedOptions).map(([groupName, values]) => (
+                    <div key={groupName}>
+                      <label className="text-sm font-medium text-gray-700">{groupName}</label>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {values.map((value, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-50 text-purple-700 border border-purple-200"
+                          >
+                            {value}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Row 2: 출처 게시물 + 메타데이터 */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+            {/* Source Post Card */}
+            <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">출처 게시물</h2>
+                <Link
+                  href={`/post/detail/${product.post.id}`}
+                  className="inline-flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
+                >
+                  <FileText size={14} />
+                  게시물 보기
+                </Link>
+              </div>
+              <div className="p-6 flex-1">
+                <div className="flex items-start gap-4">
+                  {product.post.images[0]?.imageUrl && (
+                    <img
+                      src={product.post.images[0].imageUrl}
+                      alt={product.post.title}
+                      className="w-24 h-24 rounded-lg object-cover flex-shrink-0"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-medium text-purple-600">
+                        {product.post.wholesaleBand.name}
+                      </span>
+                    </div>
+                    <h4 className="font-medium text-gray-900 mb-1">{product.post.title}</h4>
+                    <p className="text-sm text-gray-600 line-clamp-2">{product.post.content}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* Metadata Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">메타데이터</h2>
               </div>
-              <div className="p-6 space-y-3">
+              <div className="p-6 space-y-3 flex-1">
                 <div>
                   <label className="text-sm font-medium text-gray-500">생성일</label>
                   <p className="mt-1 text-sm text-gray-900">{formatDate(product.createdAt)}</p>
@@ -402,10 +395,6 @@ export default function ProductDetailPage() {
                 <div>
                   <label className="text-sm font-medium text-gray-500">수정일</label>
                   <p className="mt-1 text-sm text-gray-900">{formatDate(product.updatedAt)}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">상품 ID</label>
-                  <p className="mt-1 text-sm text-gray-900 font-mono">{product.id}</p>
                 </div>
               </div>
             </div>
