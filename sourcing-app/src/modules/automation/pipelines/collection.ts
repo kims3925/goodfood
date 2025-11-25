@@ -120,6 +120,7 @@ export async function runCollectionPipeline(
           }
 
           // 새 게시물 저장
+          // Note: Band API v2는 photos 필드 사용 (v2.1의 photo와 다름)
           await prisma.post.create({
             data: {
               userId,
@@ -129,7 +130,7 @@ export async function runCollectionPipeline(
               content: post.content,
               author: post.author?.name || null,
               images: {
-                create: (post.photo || []).map((photo: any, index: number) => ({
+                create: (post.photos || []).map((photo: any, index: number) => ({
                   name: `image_${index}`,
                   imageUrl: photo.url,
                   sortOrder: index,
@@ -188,30 +189,40 @@ export async function runCollectionPipeline(
 
 /**
  * Band API에서 게시물 가져오기
+ * Note: v2 API 사용 (v2.1이 아님) - /api/post/available과 동일한 방식
  */
 async function fetchBandPosts(
   accessToken: string,
   bandKey: string,
   limit: number
 ): Promise<any[]> {
-  const url = new URL('https://openapi.band.us/v2.1/band/posts')
+  // v2 API 사용 (게시물 추가 기능과 동일)
+  const url = new URL('https://openapi.band.us/v2/band/posts')
   url.searchParams.set('access_token', accessToken)
   url.searchParams.set('band_key', bandKey)
-  url.searchParams.set('limit', String(limit))
+  url.searchParams.set('locale', 'ko_KR')
+
+  console.log(`[Collection] Fetching from Band API v2: bandKey=${bandKey}`)
 
   const response = await fetch(url.toString())
 
   if (!response.ok) {
+    console.error(`[Collection] Band API HTTP error: ${response.status} ${response.statusText}`)
     throw new Error(`Band API error: ${response.status}`)
   }
 
   const data = await response.json()
+  console.log(`[Collection] Band API response: result_code=${data.result_code}, items=${data.result_data?.items?.length || 0}`)
 
   if (data.result_code !== 1) {
-    throw new Error(`Band API error: ${data.result_data?.message || 'Unknown error'}`)
+    console.error(`[Collection] Band API error response:`, JSON.stringify(data, null, 2))
+    throw new Error(`Band API error: ${data.result_data?.message || 'Unknown error'} (code: ${data.result_code})`)
   }
 
-  return data.result_data?.items || []
+  const items = data.result_data?.items || []
+  console.log(`[Collection] Fetched ${items.length} posts from Band API`)
+
+  return items
 }
 
 /**

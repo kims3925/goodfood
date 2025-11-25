@@ -6,14 +6,11 @@ import Image from 'next/image'
 import {
   Search,
   RefreshCw,
-  ChevronLeft,
-  ChevronRight,
   Trash2,
-  Edit,
-  X,
   ExternalLink,
   ImageOff,
 } from 'lucide-react'
+import Pagination from '@/components/ui/Pagination'
 
 interface MatchedProduct {
   id: number
@@ -39,15 +36,19 @@ export default function OrderListPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
-  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null)
-  const [isEditOpen, setIsEditOpen] = useState(false)
+
+  // 선택 삭제 관련 상태
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [selectAll, setSelectAll] = useState(false)
+
+  const itemsPerPage = 10
 
   const fetchOrders = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '20',
+        limit: itemsPerPage.toString(),
       })
 
       if (search) {
@@ -79,29 +80,58 @@ export default function OrderListPage() {
     fetchOrders()
   }
 
-  const handleDelete = async (orderId: number) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return
+  // 행 클릭 시 상세 페이지로 이동
+  const handleRowClick = (orderId: number) => {
+    router.push(`/order/${orderId}`)
+  }
 
-    try {
-      const res = await fetch(`/api/order/${orderId}`, {
-        method: 'DELETE',
-      })
+  const goToProduct = (productId: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push(`/product/${productId}`)
+  }
 
-      if (res.ok) {
-        fetchOrders()
-      }
-    } catch (error) {
-      console.error('삭제 실패:', error)
+  // 전체 선택/해제
+  const handleToggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedIds([])
+      setSelectAll(false)
+    } else {
+      const allIds = orders.map(order => order.id)
+      setSelectedIds(allIds)
+      setSelectAll(true)
     }
   }
 
-  const openEdit = (order: PurchaseOrder) => {
-    setSelectedOrder(order)
-    setIsEditOpen(true)
+  // 개별 선택/해제
+  const handleToggleSelection = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedIds((prev) => {
+      const newSelection = prev.includes(id)
+        ? prev.filter((i) => i !== id)
+        : [...prev, id]
+
+      setSelectAll(newSelection.length === orders.length)
+      return newSelection
+    })
   }
 
-  const goToProduct = (productId: number) => {
-    router.push(`/product/${productId}`)
+  // 선택 삭제
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return
+    if (!confirm(`선택한 ${selectedIds.length}개의 주문을 삭제하시겠습니까?`)) return
+
+    try {
+      for (const id of selectedIds) {
+        await fetch(`/api/order/${id}`, {
+          method: 'DELETE',
+        })
+      }
+      setSelectedIds([])
+      setSelectAll(false)
+      fetchOrders()
+    } catch (error) {
+      console.error('삭제 실패:', error)
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -154,13 +184,23 @@ export default function OrderListPage() {
           </button>
         </form>
 
-        <button
-          onClick={fetchOrders}
-          className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-surface transition-colors"
-        >
-          <RefreshCw size={18} />
-          <span>새로고침</span>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={fetchOrders}
+            className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-surface transition-colors"
+          >
+            <RefreshCw size={18} />
+            <span>새로고침</span>
+          </button>
+          <button
+            onClick={handleDeleteSelected}
+            disabled={selectedIds.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Trash2 size={18} />
+            <span>선택 삭제 ({selectedIds.length})</span>
+          </button>
+        </div>
       </div>
 
       {/* Order Table */}
@@ -169,12 +209,19 @@ export default function OrderListPage() {
           <table className="w-full">
             <thead className="bg-surface">
               <tr>
+                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary w-[50px]">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={handleToggleSelectAll}
+                    className="w-4 h-4 cursor-pointer"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">ID</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">상품</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">총금액</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">이름</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">등록일</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -192,7 +239,19 @@ export default function OrderListPage() {
                 </tr>
               ) : (
                 orders.map((order) => (
-                  <tr key={order.id} className="hover:bg-surface/50">
+                  <tr
+                    key={order.id}
+                    className="hover:bg-surface/50 cursor-pointer"
+                    onClick={() => handleRowClick(order.id)}
+                  >
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(order.id)}
+                        onChange={(e) => handleToggleSelection(order.id, e as unknown as React.MouseEvent)}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-4 py-3 text-sm text-text-secondary">
                       {order.id}
                     </td>
@@ -202,7 +261,7 @@ export default function OrderListPage() {
                         {order.product?.thumbnailUrl ? (
                           <div
                             className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-primary-color transition-all"
-                            onClick={() => order.product && goToProduct(order.product.id)}
+                            onClick={(e) => order.product && goToProduct(order.product.id, e)}
                           >
                             <Image
                               src={order.product.thumbnailUrl}
@@ -223,7 +282,7 @@ export default function OrderListPage() {
                           <p className="text-sm text-text-primary truncate">{order.productName}</p>
                           {order.product ? (
                             <button
-                              onClick={() => goToProduct(order.product!.id)}
+                              onClick={(e) => goToProduct(order.product!.id, e)}
                               className="text-xs text-primary-color hover:underline flex items-center gap-1 mt-0.5"
                             >
                               상품 보기
@@ -244,24 +303,6 @@ export default function OrderListPage() {
                     <td className="px-4 py-3 text-sm text-text-secondary whitespace-nowrap">
                       {formatDate(order.createdAt)}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => openEdit(order)}
-                          className="p-2 text-text-secondary hover:text-primary-color hover:bg-surface rounded-lg transition-colors"
-                          title="수정"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(order.id)}
-                          className="p-2 text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          title="삭제"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 ))
               )}
@@ -270,170 +311,13 @@ export default function OrderListPage() {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-            <p className="text-sm text-text-secondary">
-              총 {total}건 중 {(page - 1) * 20 + 1}-{Math.min(page * 20, total)}건
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="p-2 rounded-lg hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <span className="text-sm text-text-secondary">
-                {page} / {totalPages}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="p-2 rounded-lg hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Edit Modal */}
-      {isEditOpen && selectedOrder && (
-        <EditOrderModal
-          order={selectedOrder}
-          onClose={() => {
-            setIsEditOpen(false)
-            setSelectedOrder(null)
-          }}
-          onUpdate={fetchOrders}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={total}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setPage}
         />
-      )}
-    </div>
-  )
-}
-
-// Edit Order Modal Component
-interface EditOrderModalProps {
-  order: PurchaseOrder
-  onClose: () => void
-  onUpdate: () => void
-}
-
-function EditOrderModal({ order, onClose, onUpdate }: EditOrderModalProps) {
-  const [productName, setProductName] = useState(order.productName)
-  const [totalPrice, setTotalPrice] = useState(order.totalPrice?.toString() || '')
-  const [customerName, setCustomerName] = useState(order.customerName)
-  const [saving, setSaving] = useState(false)
-
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/order/${order.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productName,
-          totalPrice: totalPrice ? parseInt(totalPrice) : null,
-          customerName,
-        }),
-      })
-
-      if (res.ok) {
-        onUpdate()
-        onClose()
-      }
-    } catch (error) {
-      console.error('저장 실패:', error)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full">
-        {/* Header */}
-        <div className="border-b border-border px-6 py-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold">주문 수정</h2>
-          <button onClick={onClose} className="text-text-secondary hover:text-text-primary">
-            <X size={24} />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 space-y-4">
-          {/* 매칭된 상품 정보 */}
-          {order.product && (
-            <div className="bg-surface rounded-lg p-3 flex items-center gap-3">
-              {order.product.thumbnailUrl ? (
-                <Image
-                  src={order.product.thumbnailUrl}
-                  alt={order.product.name}
-                  width={48}
-                  height={48}
-                  className="w-12 h-12 rounded-lg object-cover"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center">
-                  <ImageOff size={20} className="text-gray-400" />
-                </div>
-              )}
-              <div>
-                <p className="text-xs text-text-secondary">매칭된 상품</p>
-                <p className="text-sm font-medium">{order.product.name}</p>
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">상품명</label>
-            <input
-              type="text"
-              value={productName}
-              onChange={(e) => setProductName(e.target.value)}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-light"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">총금액</label>
-            <input
-              type="number"
-              value={totalPrice}
-              onChange={(e) => setTotalPrice(e.target.value)}
-              placeholder="0"
-              className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-light"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">이름</label>
-            <input
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-light"
-            />
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-border px-6 py-4 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-border rounded-lg hover:bg-surface transition-colors"
-          >
-            취소
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-2 bg-primary-color text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
-          >
-            {saving ? '저장 중...' : '저장'}
-          </button>
-        </div>
       </div>
     </div>
   )

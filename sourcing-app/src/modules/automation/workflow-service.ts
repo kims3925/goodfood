@@ -186,6 +186,65 @@ export async function getRunningWorkflow(userId: number) {
 }
 
 /**
+ * 워크플로우 취소 (RUNNING -> FAILED로 변경)
+ */
+export async function cancelWorkflow(
+  workflowId: number,
+  userId: number
+): Promise<boolean> {
+  const workflow = await prisma.workflowLog.findFirst({
+    where: {
+      id: workflowId,
+      userId,
+      status: WorkflowStatus.RUNNING,
+    },
+  })
+
+  if (!workflow) {
+    return false
+  }
+
+  await prisma.workflowLog.update({
+    where: { id: workflowId },
+    data: {
+      status: WorkflowStatus.FAILED,
+      completedAt: new Date(),
+      errorMessage: '사용자에 의해 취소됨',
+    },
+  })
+
+  return true
+}
+
+/**
+ * 오래된 RUNNING 워크플로우 정리 (서버 재시작 등의 이유로 stuck 된 경우)
+ * @param userId 사용자 ID
+ * @param maxAgeMinutes 이 시간(분) 이상 RUNNING인 워크플로우를 정리
+ */
+export async function cleanupStaleWorkflows(
+  userId: number,
+  maxAgeMinutes: number = 30
+): Promise<number> {
+  const cutoffTime = new Date()
+  cutoffTime.setMinutes(cutoffTime.getMinutes() - maxAgeMinutes)
+
+  const result = await prisma.workflowLog.updateMany({
+    where: {
+      userId,
+      status: WorkflowStatus.RUNNING,
+      startedAt: { lt: cutoffTime },
+    },
+    data: {
+      status: WorkflowStatus.FAILED,
+      completedAt: new Date(),
+      errorMessage: '타임아웃으로 인한 자동 취소',
+    },
+  })
+
+  return result.count
+}
+
+/**
  * 워크플로우 통계 (일별)
  */
 export async function getDailyWorkflowStats(userId: number, days: number = 7) {

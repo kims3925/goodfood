@@ -2,12 +2,19 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Edit3, Trash2, RefreshCw, AlertCircle, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react'
+import { Plus, Search, Trash2, RefreshCw, AlertCircle, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
+import Pagination from '@/components/ui/Pagination'
+
+interface PostImage {
+  id: number
+  imageUrl: string
+  sortOrder: number
+}
 
 interface Post {
   id: number
@@ -17,13 +24,13 @@ interface Post {
   title: string
   content: string
   author: string | null
-  status: string
   createdAt: string
   wholesaleBand: {
     name: string
     bandKey: string
     coverUrl: string | null
   }
+  images: PostImage[]
 }
 
 interface AvailablePost {
@@ -51,6 +58,12 @@ export default function PostsManagePage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const itemsPerPage = 10
+
   // 게시물 선택 삭제 관련 상태
   const [selectedPostIds, setSelectedPostIds] = useState<number[]>([])
   const [selectAllPosts, setSelectAllPosts] = useState(false)
@@ -72,16 +85,18 @@ export default function PostsManagePage() {
 
   useEffect(() => {
     loadPosts()
-  }, [])
+  }, [currentPage])
 
   const loadPosts = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/post?search=${searchTerm}`)
+      const response = await fetch(`/api/post?search=${searchTerm}&page=${currentPage}&limit=${itemsPerPage}`)
       const data = await response.json()
 
       if (data.success) {
         setPosts(data.data)
+        setTotalItems(data.pagination?.total || 0)
+        setTotalPages(data.pagination?.totalPages || 1)
       }
     } catch (error) {
       console.error('게시물 목록 조회 실패:', error)
@@ -91,7 +106,12 @@ export default function PostsManagePage() {
   }
 
   const handleSearch = () => {
+    setCurrentPage(1)
     loadPosts()
+  }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
   }
 
   const handleOpenAddModal = async () => {
@@ -335,26 +355,6 @@ export default function PostsManagePage() {
     return text
   }
 
-  const getStatusBadge = (status: string) => {
-    const statusMap: { [key: string]: { label: string; color: string } } = {
-      COLLECTED: { label: '수집됨', color: 'bg-blue-100 text-blue-800' },
-      ANALYZING: { label: 'AI 분석중', color: 'bg-yellow-100 text-yellow-800' },
-      ANALYZED: { label: 'AI 분석완료', color: 'bg-green-100 text-green-800' },
-      MODIFIED: { label: '수정됨', color: 'bg-purple-100 text-purple-800' },
-      READY: { label: '발행준비', color: 'bg-indigo-100 text-indigo-800' },
-      PUBLISHED: { label: '발행완료', color: 'bg-gray-100 text-gray-800' },
-      FAILED: { label: '실패', color: 'bg-red-100 text-red-800' },
-    }
-
-    const statusInfo = statusMap[status] || { label: status, color: 'bg-gray-100 text-gray-800' }
-
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
-        {statusInfo.label}
-      </span>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -429,17 +429,15 @@ export default function PostsManagePage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[20%]">출처 밴드</TableHead>
+                  <TableHead className="w-[25%]">출처 밴드</TableHead>
                   <TableHead className="w-[10%]">작성자</TableHead>
-                  <TableHead className="w-[22%]">제목</TableHead>
-                  <TableHead className="w-[10%]">상태</TableHead>
-                  <TableHead className="w-[12%]">수집일</TableHead>
-                  <TableHead className="w-[10%]">작업</TableHead>
+                  <TableHead className="w-[40%]">제목</TableHead>
+                  <TableHead className="w-[15%]">수집일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {posts.length === 0 ? (
-                  <TableEmpty message="수집된 게시물이 없습니다." colSpan={7} />
+                  <TableEmpty message="수집된 게시물이 없습니다." colSpan={5} />
                 ) : (
                   posts.map((post) => (
                     <TableRow
@@ -459,7 +457,7 @@ export default function PostsManagePage() {
                         />
                       </TableCell>
                       <TableCell
-                        className="w-[20%] cursor-pointer"
+                        className="w-[25%] cursor-pointer"
                         onClick={() => router.push(`/post/detail/${post.id}`)}
                       >
                         <div className="flex items-center gap-3">
@@ -487,42 +485,35 @@ export default function PostsManagePage() {
                         <span className="text-gray-600">{post.author || '-'}</span>
                       </TableCell>
                       <TableCell
-                        className="w-[22%] cursor-pointer"
+                        className="w-[40%] cursor-pointer"
                         onClick={() => router.push(`/post/detail/${post.id}`)}
                       >
-                        <div className="min-w-0 flex-1">
-                          <div className="font-semibold text-gray-900">
-                            {truncateText(post.title, 40)}
+                        <div className="flex items-center gap-3">
+                          {post.images && post.images.length > 0 ? (
+                            <img
+                              src={post.images[0].imageUrl}
+                              alt={post.title}
+                              className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                              <span className="text-gray-400 text-xs">No</span>
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-gray-900">
+                              {truncateText(post.title, 40)}
+                            </div>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell
-                        className="w-[10%] cursor-pointer"
-                        onClick={() => router.push(`/post/detail/${post.id}`)}
-                      >
-                        {getStatusBadge(post.status)}
-                      </TableCell>
-                      <TableCell
-                        className="w-[12%] cursor-pointer"
+                        className="w-[15%] cursor-pointer"
                         onClick={() => router.push(`/post/detail/${post.id}`)}
                       >
                         <span className="text-gray-600 text-sm">
                           {new Date(post.createdAt).toLocaleDateString('ko-KR')}
                         </span>
-                      </TableCell>
-                      <TableCell className="w-[10%]">
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeletePost(post.id)
-                            }}
-                          >
-                            <Trash2 size={16} className="text-red-500" />
-                          </Button>
-                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -530,6 +521,15 @@ export default function PostsManagePage() {
               </TableBody>
             </Table>
           )}
+
+          {/* Pagination */}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+          />
         </div>
       </div>
 

@@ -171,24 +171,14 @@ export default function RetailBandPublishPage() {
       if (data.success) {
         setPublishSetting(tempSetting)
         setShowSettingModal(false)
-        alert('발행 설정이 저장되었습니다.')
-      } else {
-        alert(data.error || '설정 저장에 실패했습니다.')
       }
     } catch (error) {
       console.error('설정 저장 실패:', error)
-      alert('설정 저장에 실패했습니다.')
     }
   }
 
   const handlePublish = async () => {
-    if (selectedBandIds.length === 0) {
-      alert('발행할 소매밴드를 선택해주세요.')
-      return
-    }
-
-    if (selectedProductIds.length === 0) {
-      alert('발행할 상품을 선택해주세요.')
+    if (selectedBandIds.length === 0 || selectedProductIds.length === 0) {
       return
     }
 
@@ -221,12 +211,9 @@ export default function RetailBandPublishPage() {
         setShowResultModal(true)
         setSelectedProductIds([])
         loadProducts()
-      } else {
-        alert(data.error || '발행에 실패했습니다.')
       }
     } catch (error) {
       console.error('발행 실패:', error)
-      alert('발행에 실패했습니다.')
     } finally {
       setIsPublishing(false)
     }

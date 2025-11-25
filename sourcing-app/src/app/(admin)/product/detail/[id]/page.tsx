@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
-import ProductFormModal from '@/components/product/ProductFormModal'
 import Link from 'next/link'
 
 interface Product {
@@ -58,7 +58,17 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<Product | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showEditModal, setShowEditModal] = useState(false)
+
+  // 편집 모드 상태
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    categoryId: '',
+    price: '',
+    wholesalePrice: '',
+  })
 
   useEffect(() => {
     if (productId) {
@@ -76,6 +86,13 @@ export default function ProductDetailPage() {
 
       if (data.success) {
         setProduct(data.data)
+        setFormData({
+          name: data.data.name || '',
+          description: data.data.description || '',
+          categoryId: data.data.categoryId || '',
+          price: data.data.price?.toString() || '',
+          wholesalePrice: data.data.wholesalePrice?.toString() || '',
+        })
       } else {
         setError(data.error || '상품을 불러오는데 실패했습니다.')
       }
@@ -84,6 +101,56 @@ export default function ProductDetailPage() {
       setError('상품을 불러오는데 실패했습니다.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleStartEdit = () => {
+    setIsEditing(true)
+  }
+
+  const handleCancelEdit = () => {
+    if (product) {
+      setFormData({
+        name: product.name || '',
+        description: product.description || '',
+        categoryId: product.categoryId || '',
+        price: product.price?.toString() || '',
+        wholesalePrice: product.wholesalePrice?.toString() || '',
+      })
+    }
+    setIsEditing(false)
+  }
+
+  const handleSave = async () => {
+    if (!product || !formData.name.trim()) {
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const response = await fetch('/api/product', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: product.id,
+          name: formData.name.trim(),
+          description: formData.description.trim() || null,
+          categoryId: formData.categoryId.trim() || null,
+          price: formData.price ? parseInt(formData.price) : null,
+          wholesalePrice: formData.wholesalePrice ? parseInt(formData.wholesalePrice) : null,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        loadProduct()
+        setIsEditing(false)
+      }
+    } catch (error) {
+      console.error('상품 저장 실패:', error)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -104,7 +171,6 @@ export default function ProductDetailPage() {
 
       if (data.success) {
         setProduct({ ...product, status: newStatus })
-      } else {
       }
     } catch (error) {
       console.error('상태 변경 실패:', error)
@@ -124,16 +190,10 @@ export default function ProductDetailPage() {
 
       if (data.success) {
         router.push('/product/list')
-      } else {
       }
     } catch (error) {
       console.error('상품 삭제 실패:', error)
     }
-  }
-
-  const handleEditComplete = () => {
-    setShowEditModal(false)
-    loadProduct() // Reload product data
   }
 
   const getStatusBadge = (status: string) => {
@@ -215,14 +275,29 @@ export default function ProductDetailPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setShowEditModal(true)}>
-              <Edit size={16} />
-              수정
-            </Button>
-            <Button variant="danger" onClick={handleDelete}>
-              <Trash2 size={16} />
-              삭제
-            </Button>
+            {isEditing ? (
+              <>
+                <Button variant="secondary" onClick={handleCancelEdit}>
+                  <X size={16} />
+                  취소
+                </Button>
+                <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+                  <Save size={16} />
+                  {isSaving ? '저장 중...' : '저장'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="secondary" onClick={handleStartEdit}>
+                  <Edit size={16} />
+                  수정
+                </Button>
+                <Button variant="danger" onClick={handleDelete}>
+                  <Trash2 size={16} />
+                  삭제
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -249,26 +324,81 @@ export default function ProductDetailPage() {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">{product.name}</h3>
-                    {product.description && (
-                      <p className="text-gray-600 whitespace-pre-wrap">{product.description}</p>
+                    {isEditing ? (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-500 mb-2 block">
+                            상품명 <span className="text-red-500">*</span>
+                          </label>
+                          <Input
+                            type="text"
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            placeholder="상품명"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500 mb-2 block">설명</label>
+                          <textarea
+                            value={formData.description}
+                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                            placeholder="상품 설명"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            rows={8}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">{product.name}</h3>
+                        {product.description && (
+                          <p className="text-gray-600 whitespace-pre-wrap">{product.description}</p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
 
-                {/* Details - Single Line */}
-                <div className="flex items-center gap-6">
+                {/* Details */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-500">카테고리</label>
-                    <p className="mt-1 text-gray-900">{product.categoryId || '-'}</p>
+                    <label className="text-sm font-medium text-gray-500 mb-2 block">카테고리</label>
+                    {isEditing ? (
+                      <Input
+                        type="text"
+                        value={formData.categoryId}
+                        onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                        placeholder="카테고리"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{product.categoryId || '-'}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">판매가</label>
-                    <p className="mt-1 text-lg font-semibold text-gray-900">{formatPrice(product.price)}</p>
+                    <label className="text-sm font-medium text-gray-500 mb-2 block">판매가</label>
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        value={formData.price}
+                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                        placeholder="0"
+                      />
+                    ) : (
+                      <p className="text-lg font-semibold text-gray-900">{formatPrice(product.price)}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">도매가</label>
-                    <p className="mt-1 text-lg font-semibold text-gray-900">{formatPrice(product.wholesalePrice)}</p>
+                    <label className="text-sm font-medium text-gray-500 mb-2 block">도매가</label>
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        value={formData.wholesalePrice}
+                        onChange={(e) => setFormData({ ...formData, wholesalePrice: e.target.value })}
+                        placeholder="0"
+                      />
+                    ) : (
+                      <p className="text-lg font-semibold text-gray-900">{formatPrice(product.wholesalePrice)}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -427,36 +557,6 @@ export default function ProductDetailPage() {
           </div>
         </div>
       </div>
-
-      {/* Edit Modal */}
-      {showEditModal && (
-        <ProductFormModal
-          isOpen={showEditModal}
-          onClose={() => setShowEditModal(false)}
-          postId={product.postId}
-          productId={product.id}
-          initialData={{
-            name: product.name,
-            description: product.description || '',
-            categoryId: product.categoryId || '',
-            currency: product.currency,
-            price: product.price || 0,
-            wholesalePrice: product.wholesalePrice || undefined,
-            options: Object.entries(groupedOptions).map(([groupName, values]) => ({
-              groupName,
-              values,
-            })),
-            variants: product.variants.map((v) => ({
-              optionSummary: v.optionSummary || '',
-              price: v.price,
-              wholesalePrice: v.wholesalePrice || undefined,
-              stock: v.stock,
-              options: {},
-            })),
-          }}
-          onSaved={handleEditComplete}
-        />
-      )}
     </div>
   )
 }

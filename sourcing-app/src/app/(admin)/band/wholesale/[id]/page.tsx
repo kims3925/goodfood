@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Trash2, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, RefreshCw, Edit, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Input from '@/components/ui/Input'
@@ -14,7 +14,6 @@ interface Band {
   apiConfigId: number
   bandKey: string
   name: string
-  description: string | null
   coverUrl: string | null
   isActive: boolean
   createdAt: string
@@ -36,26 +35,13 @@ export default function WholesaleBandDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
 
   // 폼 상태
   const [formData, setFormData] = useState({
     name: '',
-    description: '',
     isActive: true,
   })
-
-  // 초기 데이터 (변경 감지용)
-  const [initialData, setInitialData] = useState({
-    name: '',
-    description: '',
-    isActive: true,
-  })
-
-  // 변경사항 여부
-  const hasChanges =
-    formData.name !== initialData.name ||
-    formData.description !== initialData.description ||
-    formData.isActive !== initialData.isActive
 
   useEffect(() => {
     loadBand()
@@ -69,15 +55,11 @@ export default function WholesaleBandDetailPage() {
 
       if (data.success) {
         setBand(data.data)
-        const initial = {
+        setFormData({
           name: data.data.name,
-          description: data.data.description || '',
           isActive: data.data.isActive,
-        }
-        setFormData(initial)
-        setInitialData(initial)
+        })
       } else {
-        alert(data.error || '밴드를 불러오는데 실패했습니다.')
         router.push('/band/wholesale')
       }
     } catch (error) {
@@ -88,9 +70,21 @@ export default function WholesaleBandDetailPage() {
     }
   }
 
-  const handleSave = async () => {
-    if (!hasChanges) return
+  const handleStartEdit = () => {
+    setIsEditing(true)
+  }
 
+  const handleCancelEdit = () => {
+    if (band) {
+      setFormData({
+        name: band.name,
+        isActive: band.isActive,
+      })
+    }
+    setIsEditing(false)
+  }
+
+  const handleSave = async () => {
     setIsSaving(true)
     try {
       const response = await fetch(`/api/band/wholesale/${bandId}`, {
@@ -102,14 +96,11 @@ export default function WholesaleBandDetailPage() {
       const data = await response.json()
 
       if (data.success) {
-        setInitialData(formData)
         setBand(data.data)
-      } else {
-        alert(data.error || '저장에 실패했습니다.')
+        setIsEditing(false)
       }
     } catch (error) {
       console.error('저장 실패:', error)
-      alert('저장 중 오류가 발생했습니다.')
     } finally {
       setIsSaving(false)
     }
@@ -128,12 +119,9 @@ export default function WholesaleBandDetailPage() {
 
       if (data.success) {
         router.push('/band/wholesale')
-      } else {
-        alert(data.error || '삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('삭제 실패:', error)
-      alert('삭제 중 오류가 발생했습니다.')
     } finally {
       setIsDeleting(false)
     }
@@ -165,22 +153,37 @@ export default function WholesaleBandDetailPage() {
           </button>
 
           <div className="flex gap-2">
-            <Button
-              variant="danger"
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? <RefreshCw size={16} className="animate-spin" /> : <Trash2 size={16} />}
-              삭제
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSave}
-              disabled={!hasChanges || isSaving}
-            >
-              {isSaving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
-              저장
-            </Button>
+            {isEditing ? (
+              <>
+                <Button variant="secondary" onClick={handleCancelEdit}>
+                  <X size={16} />
+                  취소
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+                  저장
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="secondary" onClick={handleStartEdit}>
+                  <Edit size={16} />
+                  수정
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? <RefreshCw size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                  삭제
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -204,48 +207,44 @@ export default function WholesaleBandDetailPage() {
 
             {/* 밴드명 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                밴드명 *
+              <label className="block text-sm font-medium text-gray-500 mb-2">
+                밴드명
               </label>
-              <Input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="밴드 이름을 입력하세요"
-              />
-            </div>
-
-            {/* 설명 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                설명
-              </label>
-              <textarea
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                rows={4}
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="밴드 설명을 입력하세요"
-              />
+              {isEditing ? (
+                <Input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="밴드 이름을 입력하세요"
+                />
+              ) : (
+                <p className="text-lg font-semibold text-gray-900">{band.name}</p>
+              )}
             </div>
 
             {/* 상태 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-500 mb-2">
                 상태
               </label>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                <span className="ml-3 text-sm font-medium text-gray-700">
-                  {formData.isActive ? '활성' : '비활성'}
+              {isEditing ? (
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isActive}
+                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  <span className="ml-3 text-sm font-medium text-gray-700">
+                    {formData.isActive ? '활성' : '비활성'}
+                  </span>
+                </label>
+              ) : (
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${band.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                  {band.isActive ? '활성' : '비활성'}
                 </span>
-              </label>
+              )}
             </div>
 
             {/* 읽기 전용 정보 */}

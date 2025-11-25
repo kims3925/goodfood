@@ -12,6 +12,8 @@ import {
   executePublishPipeline,
   executeFullPipeline,
   getRunningWorkflow,
+  cancelWorkflow,
+  cleanupStaleWorkflows,
 } from '@/modules/automation'
 
 const prisma = new PrismaClient()
@@ -153,6 +155,90 @@ export async function GET() {
     console.error('실행 상태 조회 실패:', error)
     return NextResponse.json(
       { success: false, error: '상태 조회에 실패했습니다.' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE /api/automation/execute
+ * 실행 중인 워크플로우 취소
+ *
+ * Query Params:
+ * - workflowId: 취소할 워크플로우 ID (없으면 현재 실행 중인 워크플로우 취소)
+ * - cleanup: 'true'인 경우 오래된 stuck 워크플로우 정리
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: '로그인이 필요합니다.' },
+        { status: 401 }
+      )
+    }
+
+    const { searchParams } = new URL(request.url)
+    const workflowIdParam = searchParams.get('workflowId')
+    const cleanup = searchParams.get('cleanup') === 'true'
+
+    // 오래된 워크플로우 정리 모드
+    if (cleanup) {
+      const cleanedCount = await cleanupStaleWorkflows(currentUser.userId, 30)
+      return NextResponse.json({
+        success: true,
+        data: {
+          cleanedCount,
+          message: cleanedCount > 0
+            ? `${cleanedCount}개의 오래된 워크플로우가 정리되었습니다.`
+            : '정리할 워크플로우가 없습니다.',
+        },
+      })
+    }
+
+    // 특정 워크플로우 취소
+    let workflowId: number | null = null
+
+    if (workflowIdParam) {
+      workflowId = parseInt(workflowIdParam, 10)
+      if (isNaN(workflowId)) {
+        return NextResponse.json(
+          { success: false, error: '잘못된 워크플로우 ID입니다.' },
+          { status: 400 }
+        )
+      }
+    } else {
+      // 현재 실행 중인 워크플로우 찾기
+      const running = await getRunningWorkflow(currentUser.userId)
+      if (!running) {
+        return NextResponse.json(
+          { success: false, error: '실행 중인 워크플로우가 없습니다.' },
+          { status: 404 }
+        )
+      }
+      workflowId = running.id
+    }
+
+    const cancelled = await cancelWorkflow(workflowId, currentUser.userId)
+
+    if (!cancelled) {
+      return NextResponse.json(
+        { success: false, error: '워크플로우를 취소할 수 없습니다. 이미 완료되었거나 존재하지 않습니다.' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        workflowId,
+        message: '워크플로우가 취소되었습니다.',
+      },
+    })
+  } catch (error) {
+    console.error('워크플로우 취소 실패:', error)
+    return NextResponse.json(
+      { success: false, error: '워크플로우 취소에 실패했습니다.' },
       { status: 500 }
     )
   }

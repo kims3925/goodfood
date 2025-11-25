@@ -87,7 +87,7 @@ export const TableCell = forwardRef<HTMLTableCellElement, TdHTMLAttributes<HTMLT
     return (
       <td
         ref={ref}
-        className={`px-4 py-3 text-sm text-text-secondary ${className}`}
+        className={`px-4 py-3 text-left text-sm text-text-secondary ${className}`}
         {...props}
       >
         {children}

@@ -87,6 +87,8 @@ export {
   getRecentWorkflowLogs,
   getWorkflowLogsByType,
   getRunningWorkflow,
+  cancelWorkflow,
+  cleanupStaleWorkflows,
   getDailyWorkflowStats,
 } from './workflow-service'
 

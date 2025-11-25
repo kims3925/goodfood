@@ -72,6 +72,17 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // 사용자가 이미 등록한 게시물의 externalId 목록 조회
+    const existingPosts = await prisma.post.findMany({
+      where: {
+        userId: parseInt(userId),
+      },
+      select: {
+        externalId: true,
+      },
+    })
+    const existingPostKeys = new Set(existingPosts.map((post) => post.externalId))
+
     // 모든 도매밴드에서 게시물 조회
     const allPosts: any[] = []
 
@@ -152,9 +163,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // 이미 등록된 게시물 제외
+    const filteredPosts = allPosts.filter(
+      (post) => !existingPostKeys.has(post.post_key)
+    )
+
     return NextResponse.json({
       success: true,
-      data: allPosts,
+      data: filteredPosts,
     })
   } catch (error) {
     console.error('게시물 조회 실패:', error)

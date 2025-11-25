@@ -19,18 +19,24 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+
+    const where = {
+      userId: userId,
+      ...(search && {
+        OR: [
+          { title: { contains: search } },
+          { content: { contains: search } },
+          { author: { contains: search } },
+        ],
+      }),
+    }
+
+    const total = await prisma.post.count({ where })
 
     const posts = await prisma.post.findMany({
-      where: {
-        userId: userId,
-        ...(search && {
-          OR: [
-            { title: { contains: search } },
-            { content: { contains: search } },
-            { author: { contains: search } },
-          ],
-        }),
-      },
+      where,
       include: {
         wholesaleBand: {
           select: {
@@ -60,11 +66,19 @@ export async function GET(request: NextRequest) {
       orderBy: {
         createdAt: 'desc',
       },
+      skip: (page - 1) * limit,
+      take: limit,
     })
 
     return NextResponse.json({
       success: true,
       data: posts,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     })
   } catch (error) {
     console.error('게시물 조회 실패:', error)

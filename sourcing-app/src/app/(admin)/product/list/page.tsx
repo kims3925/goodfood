@@ -10,6 +10,7 @@ import Loading from '@/components/ui/Loading'
 import PostSelectionModal from '@/components/product/PostSelectionModal'
 import PolicySelectionModal from '@/components/product/PolicySelectionModal'
 import ProductFormModal from '@/components/product/ProductFormModal'
+import Pagination from '@/components/ui/Pagination'
 
 interface Product {
   id: number
@@ -45,6 +46,12 @@ export default function ProductListPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const itemsPerPage = 10
+
   // Modal states
   const [showPostSelectionModal, setShowPostSelectionModal] = useState(false)
   const [showPolicyModal, setShowPolicyModal] = useState(false)
@@ -61,16 +68,18 @@ export default function ProductListPage() {
 
   useEffect(() => {
     loadProducts()
-  }, [])
+  }, [currentPage])
 
   const loadProducts = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/product?search=${searchTerm}`)
+      const response = await fetch(`/api/product?search=${searchTerm}&page=${currentPage}&limit=${itemsPerPage}`)
       const data = await response.json()
 
       if (data.success) {
         setProducts(data.data)
+        setTotalItems(data.total || 0)
+        setTotalPages(Math.ceil((data.total || 0) / itemsPerPage))
       }
     } catch (error) {
       console.error('상품 목록 조회 실패:', error)
@@ -80,7 +89,12 @@ export default function ProductListPage() {
   }
 
   const handleSearch = () => {
+    setCurrentPage(1)
     loadProducts()
+  }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
   }
 
   const handleOpenAddProductFlow = () => {
@@ -349,18 +363,17 @@ export default function ProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[15%]">이미지</TableHead>
-                  <TableHead className="w-[25%]">상품명</TableHead>
+                  <TableHead className="w-[40%]">상품명</TableHead>
                   <TableHead className="w-[15%]">출처 밴드</TableHead>
                   <TableHead className="w-[10%]">도매가</TableHead>
                   <TableHead className="w-[10%]">판매가</TableHead>
-                  <TableHead className="w-[12%]">상태</TableHead>
-                  <TableHead className="w-[13%]">생성일</TableHead>
+                  <TableHead className="w-[10%]">상태</TableHead>
+                  <TableHead className="w-[10%]">생성일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {products.length === 0 ? (
-                  <TableEmpty message="등록된 상품이 없습니다." colSpan={8} />
+                  <TableEmpty message="등록된 상품이 없습니다." colSpan={7} />
                 ) : (
                   products.map((product) => (
                     <TableRow
@@ -379,26 +392,26 @@ export default function ProductListPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        {product.thumbnailUrl ? (
-                          <img
-                            src={product.thumbnailUrl}
-                            alt={product.name}
-                            className="w-20 h-20 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="w-20 h-20 rounded-lg bg-gray-200 flex items-center justify-center">
-                            <Package size={28} className="text-gray-400" />
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="min-w-0">
-                          <div className="font-semibold text-gray-900 truncate text-base">{product.name}</div>
-                          {product.description && (
-                            <div className="text-sm text-gray-500 truncate mt-1">
-                              {product.description.substring(0, 60)}...
+                        <div className="flex items-center gap-3">
+                          {product.thumbnailUrl ? (
+                            <img
+                              src={product.thumbnailUrl}
+                              alt={product.name}
+                              className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                              <Package size={24} className="text-gray-400" />
                             </div>
                           )}
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-gray-900 text-base">{product.name}</div>
+                            {product.description && (
+                              <div className="text-sm text-gray-500 truncate mt-1">
+                                {product.description.substring(0, 60)}...
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -428,6 +441,15 @@ export default function ProductListPage() {
               </TableBody>
             </Table>
           )}
+
+          {/* Pagination */}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+          />
         </div>
       </div>
 

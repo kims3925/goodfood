@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Search, Trash2, RefreshCw } from 'lucide-react'
 import Button from '@/components/ui/Button'
-import Modal, { ModalFooter } from '@/components/ui/Modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
+import Pagination from '@/components/ui/Pagination'
 
 interface PricingPolicy {
   id: number
@@ -26,35 +26,30 @@ export default function PolicyManagePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const itemsPerPage = 10
+
   // 선택 삭제 관련 상태
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
 
-  // 모달 관련 상태
-  const [showModal, setShowModal] = useState(false)
-  const [editingPolicy, setEditingPolicy] = useState<PricingPolicy | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
-
-  // 폼 상태
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    content: '',
-    isActive: true,
-  })
-
   useEffect(() => {
     loadPolicies()
-  }, [])
+  }, [currentPage])
 
   const loadPolicies = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/policy?search=${searchTerm}`)
+      const response = await fetch(`/api/policy?search=${searchTerm}&page=${currentPage}&limit=${itemsPerPage}`)
       const data = await response.json()
 
       if (data.success) {
         setPolicies(data.data)
+        setTotalItems(data.pagination?.total || 0)
+        setTotalPages(data.pagination?.totalPages || 1)
       }
     } catch (error) {
       console.error('정책 목록 조회 실패:', error)
@@ -64,82 +59,12 @@ export default function PolicyManagePage() {
   }
 
   const handleSearch = () => {
+    setCurrentPage(1)
     loadPolicies()
   }
 
-  const handleOpenAddModal = () => {
-    setEditingPolicy(null)
-    setFormData({
-      name: '',
-      description: '',
-      content: '',
-      isActive: true,
-    })
-    setShowModal(true)
-  }
-
-  const handleCloseModal = () => {
-    setShowModal(false)
-    setEditingPolicy(null)
-    setFormData({
-      name: '',
-      description: '',
-      content: '',
-      isActive: true,
-    })
-  }
-
-  const handleSave = async () => {
-    if (!formData.name.trim()) {
-      return
-    }
-    if (!formData.content.trim()) {
-      return
-    }
-
-    setIsSaving(true)
-    try {
-      const url = '/api/policy'
-      const method = editingPolicy ? 'PUT' : 'POST'
-      const body = editingPolicy
-        ? { id: editingPolicy.id, ...formData }
-        : formData
-
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        handleCloseModal()
-        loadPolicies()
-      }
-    } catch (error) {
-      console.error('정책 저장 실패:', error)
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleDeletePolicy = async (id: number) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return
-
-    try {
-      const response = await fetch(`/api/policy?id=${id}`, {
-        method: 'DELETE',
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        loadPolicies()
-      }
-    } catch (error) {
-      console.error('정책 삭제 실패:', error)
-    }
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
   }
 
   // 전체 선택/해제
@@ -155,7 +80,8 @@ export default function PolicyManagePage() {
   }
 
   // 개별 선택/해제
-  const handleToggleSelection = (id: number) => {
+  const handleToggleSelection = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation()
     setSelectedIds((prev) => {
       const newSelection = prev.includes(id)
         ? prev.filter((i) => i !== id)
@@ -177,24 +103,13 @@ export default function PolicyManagePage() {
     }
 
     try {
-      let successCount = 0
-      let failCount = 0
-
       for (const id of selectedIds) {
         try {
-          const response = await fetch(`/api/policy?id=${id}`, {
+          await fetch(`/api/policy?id=${id}`, {
             method: 'DELETE',
           })
-          const data = await response.json()
-
-          if (data.success) {
-            successCount++
-          } else {
-            failCount++
-          }
         } catch (error) {
           console.error(`정책 삭제 실패 (ID: ${id}):`, error)
-          failCount++
         }
       }
 
@@ -204,6 +119,11 @@ export default function PolicyManagePage() {
     } catch (error) {
       console.error('정책 일괄 삭제 실패:', error)
     }
+  }
+
+  // 행 클릭 시 상세 페이지로 이동
+  const handleRowClick = (id: number) => {
+    router.push(`/policy/detail/${id}`)
   }
 
   const truncateText = (text: string, maxLength: number = 50) => {
@@ -266,7 +186,7 @@ export default function PolicyManagePage() {
                   <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
                   새로고침
                 </Button>
-                <Button variant="primary" onClick={handleOpenAddModal}>
+                <Button variant="primary" onClick={() => router.push('/policy/new')}>
                   <Plus size={16} />
                   정책 추가
                 </Button>
@@ -291,7 +211,7 @@ export default function PolicyManagePage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[5%]">
+                  <TableHead className="w-[50px]">
                     <input
                       type="checkbox"
                       checked={selectAll}
@@ -299,63 +219,51 @@ export default function PolicyManagePage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[15%]">이름</TableHead>
-                  <TableHead className="w-[25%]">설명</TableHead>
-                  <TableHead className="w-[15%]">정책 내용</TableHead>
+                  <TableHead className="w-[20%]">이름</TableHead>
+                  <TableHead className="w-[30%]">설명</TableHead>
+                  <TableHead className="w-[20%]">정책 내용</TableHead>
                   <TableHead className="w-[10%]">상태</TableHead>
                   <TableHead className="w-[15%]">생성일</TableHead>
-                  <TableHead className="w-[15%]">작업</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {policies.length === 0 ? (
-                  <TableEmpty message="등록된 정책이 없습니다." />
+                  <TableEmpty message="등록된 정책이 없습니다." colSpan={6} />
                 ) : (
                   policies.map((policy) => (
                     <TableRow
                       key={policy.id}
                       className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/policy/detail/${policy.id}`)}
+                      onClick={() => handleRowClick(policy.id)}
                     >
-                      <TableCell className="w-[5%]" onClick={(e) => e.stopPropagation()}>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(policy.id)}
-                          onChange={() => handleToggleSelection(policy.id)}
+                          onChange={(e) => handleToggleSelection(policy.id, e as unknown as React.MouseEvent)}
                           className="w-4 h-4 cursor-pointer"
                         />
                       </TableCell>
-                      <TableCell className="w-[15%]">
+                      <TableCell>
                         <span className="font-semibold text-gray-900 text-base">{policy.name}</span>
                       </TableCell>
-                      <TableCell className="w-[25%]">
+                      <TableCell>
                         <span className="text-gray-600">
                           {policy.description ? truncateText(policy.description, 50) : '-'}
                         </span>
                       </TableCell>
-                      <TableCell className="w-[15%]">
+                      <TableCell>
                         <span className="text-gray-600 text-sm">
-                          {truncateText(policy.content, 15)}
+                          {truncateText(policy.content, 30)}
                         </span>
                       </TableCell>
-                      <TableCell className="w-[10%]">
+                      <TableCell>
                         {getStatusBadge(policy.isActive)}
                       </TableCell>
-                      <TableCell className="w-[15%]">
+                      <TableCell>
                         <span className="text-gray-600 text-sm">
                           {new Date(policy.createdAt).toLocaleDateString('ko-KR')}
                         </span>
-                      </TableCell>
-                      <TableCell className="w-[15%]" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeletePolicy(policy.id)}
-                          >
-                            <Trash2 size={16} className="text-red-500" />
-                          </Button>
-                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -363,86 +271,17 @@ export default function PolicyManagePage() {
               </TableBody>
             </Table>
           )}
+
+          {/* Pagination */}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+          />
         </div>
       </div>
-
-      {/* 정책 추가/수정 모달 */}
-      <Modal
-        isOpen={showModal}
-        onClose={handleCloseModal}
-        title={editingPolicy ? '정책 수정' : '정책 추가'}
-        size="lg"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              정책 이름 <span className="text-red-500">*</span>
-            </label>
-            <Input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="예: 가족도매방 정책"
-              maxLength={100}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              설명
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="정책에 대한 간단한 설명을 입력하세요"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={2}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              정책 내용 <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              placeholder="예: 원가 그대로, 수집가격 기준 구간별 마진 적용 등"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={10}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              AI가 가격을 계산할 때 참조하는 정책 내용을 입력하세요.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="isActive"
-              checked={formData.isActive}
-              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-              className="w-4 h-4"
-            />
-            <label htmlFor="isActive" className="text-sm text-gray-700">
-              활성화
-            </label>
-          </div>
-        </div>
-
-        <ModalFooter>
-          <Button variant="secondary" onClick={handleCloseModal}>
-            취소
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleSave}
-            disabled={isSaving}
-          >
-            {isSaving ? '저장 중...' : editingPolicy ? '수정' : '등록'}
-          </Button>
-        </ModalFooter>
-      </Modal>
     </div>
   )
 }

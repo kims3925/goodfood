@@ -8,6 +8,7 @@ import Modal, { ModalFooter } from '@/components/ui/Modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
+import Pagination from '@/components/ui/Pagination'
 
 interface Band {
   id: number
@@ -15,7 +16,6 @@ interface Band {
   apiConfigId: number
   bandKey: string
   name: string
-  description: string | null
   coverUrl: string | null
   isActive: boolean
   createdAt: string
@@ -31,7 +31,6 @@ interface Band {
 interface ApiBand {
   band_key: string
   name: string
-  description: string
   cover: string
 }
 
@@ -41,6 +40,12 @@ export default function RetailBandsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const itemsPerPage = 10
 
   // Band API 조회 관련 상태
   const [availableBands, setAvailableBands] = useState<ApiBand[]>([])
@@ -55,16 +60,18 @@ export default function RetailBandsPage() {
 
   useEffect(() => {
     loadBands()
-  }, [])
+  }, [currentPage])
 
   const loadBands = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/band/retail?search=${searchTerm}`)
+      const response = await fetch(`/api/band/retail?search=${searchTerm}&page=${currentPage}&limit=${itemsPerPage}`)
       const data = await response.json()
 
       if (data.success) {
         setBands(data.data)
+        setTotalItems(data.pagination?.total || 0)
+        setTotalPages(data.pagination?.totalPages || 1)
       }
     } catch (error) {
       console.error('밴드 목록 조회 실패:', error)
@@ -74,7 +81,12 @@ export default function RetailBandsPage() {
   }
 
   const handleSearch = () => {
+    setCurrentPage(1)
     loadBands()
+  }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
   }
 
   const handleOpenAddModal = async () => {
@@ -146,7 +158,6 @@ export default function RetailBandsPage() {
             apiConfigId: 1, // 임시 값
             bandKey: band.band_key,
             name: band.name,
-            description: band.description,
             coverUrl: band.cover,
           }),
         })
@@ -302,16 +313,16 @@ export default function RetailBandsPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                           {band.coverUrl ? (
                             <img
                               src={band.coverUrl}
                               alt={band.name}
-                              className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                              className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
                             />
                           ) : (
-                            <div className="w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                              <span className="text-gray-400 text-xs">No Image</span>
+                            <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                              <span className="text-gray-400 text-xs">No</span>
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
@@ -346,6 +357,15 @@ export default function RetailBandsPage() {
               </TableBody>
             </Table>
           )}
+
+          {/* Pagination */}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+          />
         </div>
       </div>
 
@@ -443,12 +463,7 @@ export default function RetailBandsPage() {
                       />
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-gray-900">{band.name}</h4>
-                          <p className="text-sm text-gray-500 mt-1 line-clamp-2">{band.description}</p>
-                        </div>
-                      </div>
+                      <h4 className="font-medium text-gray-900">{band.name}</h4>
                       <p className="text-xs text-gray-400 mt-2 truncate">{band.band_key}</p>
                     </div>
                   </div>

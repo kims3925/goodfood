@@ -12,9 +12,11 @@ import {
   AlertCircle,
   Clock,
   TrendingUp,
+  XCircle,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
+import { useToast } from '@/components/ui/Toast'
 
 interface AutomationStats {
   todayCollected: number
@@ -41,11 +43,13 @@ interface RunningWorkflow {
 }
 
 export default function AutomationDashboardPage() {
+  const toast = useToast()
   const [stats, setStats] = useState<AutomationStats | null>(null)
   const [config, setConfig] = useState<AutomationConfig | null>(null)
   const [runningWorkflow, setRunningWorkflow] = useState<RunningWorkflow | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isExecuting, setIsExecuting] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -89,15 +93,40 @@ export default function AutomationDashboardPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert(`${getTypeName(type)} 실행이 완료되었습니다.`)
+        toast.success(`${getTypeName(type)} 실행이 완료되었습니다.`)
         loadData()
       } else {
-        alert(data.error || '실행에 실패했습니다.')
+        toast.error(data.error || '실행에 실패했습니다.')
       }
     } catch (error) {
-      alert('실행 중 오류가 발생했습니다.')
+      toast.error('실행 중 오류가 발생했습니다.')
     } finally {
       setIsExecuting(false)
+    }
+  }
+
+  const handleCancel = async () => {
+    if (isCancelling || !runningWorkflow) return
+
+    setIsCancelling(true)
+    try {
+      const response = await fetch('/api/automation/execute', {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success('워크플로우가 취소되었습니다.')
+        setRunningWorkflow(null)
+        loadData()
+      } else {
+        toast.error(data.error || '취소에 실패했습니다.')
+      }
+    } catch (error) {
+      toast.error('취소 중 오류가 발생했습니다.')
+    } finally {
+      setIsCancelling(false)
     }
   }
 
@@ -213,15 +242,27 @@ export default function AutomationDashboardPage() {
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-600">
-                진행: {runningWorkflow.successCount} / {runningWorkflow.totalItems}
-              </p>
-              {runningWorkflow.failedCount > 0 && (
-                <p className="text-sm text-red-600">
-                  실패: {runningWorkflow.failedCount}
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm text-gray-600">
+                  진행: {runningWorkflow.successCount} / {runningWorkflow.totalItems}
                 </p>
-              )}
+                {runningWorkflow.failedCount > 0 && (
+                  <p className="text-sm text-red-600">
+                    실패: {runningWorkflow.failedCount}
+                  </p>
+                )}
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleCancel}
+                disabled={isCancelling}
+                className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <XCircle size={16} />
+                {isCancelling ? '취소 중...' : '취소'}
+              </Button>
             </div>
           </div>
         </Card>

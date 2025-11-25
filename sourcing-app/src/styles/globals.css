@@ -148,4 +148,20 @@
     background-size: 200% 100%;
     animation: loading 1.5s infinite;
   }
+
+  /* Toast Slide In Animation */
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease forwards;
+  }
 }

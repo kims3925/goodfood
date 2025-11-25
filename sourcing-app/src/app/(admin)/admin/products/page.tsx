@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Package, Search, Edit3, Trash2, Plus, Eye, DollarSign, Calendar, Tag, Download, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react'
+import { Package, Search, Edit3, Trash2, Plus, DollarSign, Calendar, Tag, Download, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react'
 
 interface Product {
   id: string
@@ -907,20 +907,19 @@ export default function ProductsPage() {
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">소싱처</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">상태</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">생성일</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                       <Package className="h-6 w-6 mx-auto mb-2 animate-pulse" />
                       상품을 불러오는 중...
                     </td>
                   </tr>
                 ) : paginatedProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                       <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                       <p className="text-lg font-medium text-gray-900 mb-2">등록된 상품이 없습니다</p>
                       <p className="text-gray-500">도매 밴드에서 게시물을 수집하여 상품을 생성해보세요.</p>
@@ -928,11 +927,11 @@ export default function ProductsPage() {
                   </tr>
                 ) : (
                   paginatedProducts.map((product, index) => (
-                    <tr key={product.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <input 
-                          type="checkbox" 
-                          className="rounded border-gray-300" 
+                    <tr key={product.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleShowDetail(product)}>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300"
                           checked={selectedProducts.includes(product.id)}
                           onChange={(e) => handleProductSelect(product.id, e.target.checked)}
                         />
@@ -1022,31 +1021,6 @@ export default function ProductsPage() {
                             원본: {formatDate(product.originalCreatedAt)}
                           </div>
                         )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => handleShowDetail(product)}
-                            className="text-blue-500 hover:text-blue-700 p-1 rounded"
-                            title="상세보기"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          <button 
-                            onClick={() => handleShowDetail(product)}
-                            className="text-green-500 hover:text-green-700 p-1 rounded"
-                            title="편집하기"
-                          >
-                            <Edit3 className="h-4 w-4" />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteProduct(product.id, product.title)}
-                            className="text-red-500 hover:text-red-700 p-1 rounded"
-                            title="삭제하기"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   ))

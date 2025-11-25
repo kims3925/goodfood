@@ -127,24 +127,7 @@ export default function NewOrderPage() {
   // 주문 제출
   const handleSubmit = async () => {
     // 유효성 검사
-    if (!selectedProduct) {
-      alert('상품을 선택해주세요.')
-      return
-    }
-    if (!customerName.trim()) {
-      alert('주문자 이름을 입력해주세요.')
-      return
-    }
-    if (!customerPhone.trim()) {
-      alert('주문자 연락처를 입력해주세요.')
-      return
-    }
-    if (!recipientName.trim()) {
-      alert('받는 분 이름을 입력해주세요.')
-      return
-    }
-    if (!address.trim()) {
-      alert('배송지 주소를 입력해주세요.')
+    if (!selectedProduct || !customerName.trim() || !customerPhone.trim() || !recipientName.trim() || !address.trim()) {
       return
     }
 
@@ -177,14 +160,10 @@ export default function NewOrderPage() {
       const data = await res.json()
 
       if (data.success) {
-        alert('주문이 등록되었습니다!')
         router.push('/order/list')
-      } else {
-        alert(data.error || '주문 등록에 실패했습니다.')
       }
     } catch (error) {
       console.error('주문 등록 실패:', error)
-      alert('주문 등록에 실패했습니다.')
     } finally {
       setSubmitting(false)
     }

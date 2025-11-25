@@ -18,25 +18,39 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+
+    const where = {
+      userId: userId,
+      ...(search && {
+        OR: [
+          { name: { contains: search } },
+          { description: { contains: search } },
+        ],
+      }),
+    }
+
+    const total = await prisma.pricingPolicy.count({ where })
 
     const policies = await prisma.pricingPolicy.findMany({
-      where: {
-        userId: userId,
-        ...(search && {
-          OR: [
-            { name: { contains: search } },
-            { description: { contains: search } },
-          ],
-        }),
-      },
+      where,
       orderBy: {
         createdAt: 'desc',
       },
+      skip: (page - 1) * limit,
+      take: limit,
     })
 
     return NextResponse.json({
       success: true,
       data: policies,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     })
   } catch (error) {
     console.error('정책 조회 실패:', error)

@@ -8,13 +8,19 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+
+    const where = {
+      ...(search && {
+        name: { contains: search },
+      }),
+    }
+
+    const total = await prisma.wholesaleBand.count({ where })
 
     const bands = await prisma.wholesaleBand.findMany({
-      where: {
-        ...(search && {
-          name: { contains: search },
-        }),
-      },
+      where,
       include: {
         apiConfig: {
           select: {
@@ -31,11 +37,19 @@ export async function GET(request: NextRequest) {
       orderBy: {
         createdAt: 'desc',
       },
+      skip: (page - 1) * limit,
+      take: limit,
     })
 
     return NextResponse.json({
       success: true,
       data: bands,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     })
   } catch (error) {
     console.error('도매밴드 조회 실패:', error)
