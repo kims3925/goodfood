@@ -318,6 +318,32 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
+          {/* 이미지 갤러리 카드 */}
+          {product.post.images.length > 0 && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  상품 이미지
+                  <span className="text-sm font-normal text-gray-500 ml-2">
+                    ({product.post.images.length}개)
+                  </span>
+                </h2>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {product.post.images.map((image, index) => (
+                    <img
+                      key={index}
+                      src={image.imageUrl}
+                      alt={`상품 이미지 ${index + 1}`}
+                      className="w-full aspect-square object-cover rounded-lg border border-gray-200"
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Options Card (조건부, 전체 너비) */}
           {Object.keys(groupedOptions).length > 0 && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
