@@ -22,6 +22,8 @@ import {
   Link2,
   Globe,
   ScrollText,
+  ClipboardList,
+  PlusCircle,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -47,6 +49,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     const pathToMenuMap: Record<string, string> = {
       '/band': '밴드관리',
       '/publish': '발행',
+      '/order': '주문서 관리',
       '/admin/settings': '환경 설정',
     }
 
@@ -110,6 +113,22 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           label: '쇼핑몰 발행',
           href: '/publish/shopping-mall',
           icon: <Globe size={16} />,
+        },
+      ],
+    },
+    {
+      label: '주문서 관리',
+      icon: <ClipboardList size={20} />,
+      children: [
+        {
+          label: '주문 목록',
+          href: '/order/list',
+          icon: <List size={16} />,
+        },
+        {
+          label: '주문서 작성',
+          href: '/order/new',
+          icon: <PlusCircle size={16} />,
         },
       ],
     },
