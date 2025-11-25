@@ -127,7 +127,6 @@ export default function ProductsPage() {
   // 스룩페이 등록 함수 (선택된 상품)
   const handleStrokePayRegistration = async () => {
     if (selectedProducts.length === 0) {
-      alert('등록할 상품을 선택해주세요.')
       return
     }
 
@@ -137,7 +136,6 @@ export default function ProductsPage() {
   // 전체 상품 스룩페이 등록 함수
   const handleAllProductsRegistration = async () => {
     if (products.length === 0) {
-      alert('등록할 상품이 없습니다.')
       return
     }
 
@@ -188,14 +186,11 @@ export default function ProductsPage() {
       })
 
       if (automationResponse.ok) {
-        alert(`${description} 상품이 스룩페이에 등록 중입니다.`)
       } else {
-        alert('엑셀 파일이 다운로드되었습니다. 수동으로 업로드해주세요.')
       }
       
     } catch (error) {
       console.error('스룩페이 등록 오류:', error)
-      alert('스룩페이 등록 중 오류가 발생했습니다.')
     }
   }
 
@@ -475,11 +470,9 @@ export default function ProductsPage() {
         console.log('상품 업데이트 성공')
       } else {
         console.error('상품 업데이트 실패:', data.error)
-        alert('상품 업데이트에 실패했습니다: ' + data.error)
       }
     } catch (error) {
       console.error('상품 업데이트 오류:', error)
-      alert('상품 업데이트 중 오류가 발생했습니다.')
     } finally {
       setIsSaving(false)
     }
@@ -588,18 +581,15 @@ export default function ProductsPage() {
       } else {
         const errorData = await response.json()
         console.error('엑셀 생성 실패:', errorData.error)
-        alert('엑셀 파일 생성에 실패했습니다: ' + errorData.error)
       }
     } catch (error) {
       console.error('엑셀 다운로드 오류:', error)
-      alert('엑셀 파일 다운로드 중 오류가 발생했습니다.')
     }
   }
 
   // 선택된 상품 일괄 삭제
   const handleSelectedDelete = async () => {
     if (selectedProducts.length === 0) {
-      alert('삭제할 상품을 선택해주세요.')
       return
     }
 
@@ -645,14 +635,11 @@ export default function ProductsPage() {
       }
 
       if (failedDeletes.length > 0) {
-        alert(`${failedDeletes.length}개 상품 삭제에 실패했습니다.`)
       } else {
-        alert(`${successfulDeletes.length}개 상품이 성공적으로 삭제되었습니다.`)
       }
       
     } catch (error) {
       console.error('일괄 삭제 오류:', error)
-      alert('상품 삭제 중 오류가 발생했습니다.')
     }
   }
 
@@ -707,11 +694,9 @@ export default function ProductsPage() {
           navigateToProduct('next')
         }, 1000)
       } else {
-        alert('소싱 확정에 실패했습니다: ' + data.error)
       }
     } catch (error) {
       console.error('소싱 확정 오류:', error)
-      alert('소싱 확정 중 오류가 발생했습니다.')
     } finally {
       setIsIndividualProcessing(false)
     }
@@ -743,11 +728,9 @@ export default function ProductsPage() {
         }
       } else {
         console.error('상품 삭제 실패:', data.error)
-        alert('상품 삭제에 실패했습니다: ' + data.error)
       }
     } catch (error) {
       console.error('상품 삭제 오류:', error)
-      alert('상품 삭제 중 오류가 발생했습니다.')
     }
   }
 

@@ -223,10 +223,4 @@ data/
 .storage/
 
 nul
-<<<<<<< HEAD
 .mcp.json
-docs/기능_정의서.md
-.mcp.json
-=======
-.claude/settings.local.json
->>>>>>> f805065a443f9a4bfd0abc1805f1a85cf1412bda

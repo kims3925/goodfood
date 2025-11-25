@@ -23,8 +23,38 @@ import { generateVariants } from './variant.generator'
  * Generate AI prompt for product extraction
  */
 function buildProductExtractionPrompt(input: ProductTransformationInput): string {
-  const { post } = input
+  const { post, policyContent } = input
   const imageCount = post.images?.length || 0
+
+  // 정책 섹션 생성
+  const policySection = policyContent
+    ? `
+# 가격 정책
+다음 정책을 참고하여 판매가(price)를 계산해주세요:
+${policyContent}
+`
+    : ''
+
+  // 가격 추출 규칙 (정책 유무에 따라 다름)
+  const pricingRule = policyContent
+    ? `5. **가격**:
+   - wholesalePrice: 게시물에서 추출한 가격 (도매가/원가)
+   - price: 위의 가격 정책을 적용하여 계산한 판매가`
+    : `5. **가격**: 가격 정보가 있다면 추출합니다 (숫자만, 원화 기준).
+   - 추출된 가격은 도매가(원가)로 간주합니다
+   - wholesalePrice: 도매가 (원가)`
+
+  // 응답 형식 (정책 유무에 따라 다름)
+  const pricingResponse = policyContent
+    ? `"pricing": {
+    "wholesalePrice": 도매가_숫자,
+    "price": 판매가_숫자,
+    "currency": "KRW"
+  }`
+    : `"pricing": {
+    "wholesalePrice": 숫자,
+    "currency": "KRW"
+  }`
 
   return `당신은 온라인 쇼핑몰 상품 정보 추출 전문가입니다.
 다음 게시물에서 상품 정보를 추출하여 JSON 형식으로 반환해주세요.
@@ -36,7 +66,7 @@ function buildProductExtractionPrompt(input: ProductTransformationInput): string
 ${post.content}
 
 이미지: ${imageCount}개
-
+${policySection}
 # 추출 규칙
 1. **상품명**: 게시물에서 판매하는 상품의 이름을 추출합니다. 정확하고 간결하게 작성하세요.
 2. **상품 설명**: 상품의 특징, 재질, 용도 등을 포함한 설명을 작성합니다 (200-500자).
@@ -44,9 +74,7 @@ ${post.content}
 4. **옵션**: 색상, 사이즈, 용량 등의 옵션이 있다면 추출합니다.
    - 옵션 그룹명과 옵션 값들을 명확히 구분하세요.
    - 예: { "groupName": "색상", "values": ["빨강", "파랑", "초록"] }
-5. **가격**: 가격 정보가 있다면 추출합니다 (숫자만, 원화 기준).
-   - 추출된 가격은 도매가(원가)로 간주합니다
-   - wholesalePrice: 도매가 (원가)
+${pricingRule}
 
 # 응답 형식
 반드시 다음 JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요.
@@ -62,10 +90,7 @@ ${post.content}
       "values": ["값1", "값2", "값3"]
     }
   ],
-  "pricing": {
-    "wholesalePrice": 숫자,
-    "currency": "KRW"
-  }
+  ${pricingResponse}
 }
 \`\`\`
 
@@ -134,7 +159,7 @@ function parseAiResponse(aiResponse: AiResponse): AiProductAnalysis {
       category: parsed.category || undefined,
       options: parsed.options || [],
       pricing: {
-        price: undefined, // AI-extracted price is now wholesalePrice
+        price: parsed.pricing?.price, // 정책 적용 시 AI가 계산한 판매가
         wholesalePrice: parsed.pricing?.wholesalePrice,
         currency: parsed.pricing?.currency || 'KRW',
       },
@@ -175,10 +200,10 @@ function buildProductDraft(
     ? generateVariants(analysis.options)
     : []
 
-  // If variants exist, set their wholesale prices
-  if (variants.length > 0 && analysis.pricing.wholesalePrice) {
+  // If variants exist, set their prices
+  if (variants.length > 0) {
     variants.forEach((variant) => {
-      variant.price = undefined // User will set selling price later
+      variant.price = analysis.pricing.price // 정책 적용 시 AI가 계산한 판매가
       variant.wholesalePrice = analysis.pricing.wholesalePrice
       variant.stock = 0 // Default stock
     })
@@ -191,7 +216,7 @@ function buildProductDraft(
     categoryId: analysis.category,
     thumbnailUrl: thumbnailUrl || undefined,
     currency: analysis.pricing.currency || 'KRW',
-    price: undefined, // User will set selling price later
+    price: analysis.pricing.price, // 정책 적용 시 AI가 계산한 판매가
     wholesalePrice: analysis.pricing.wholesalePrice,
     options: analysis.options,
     variants,

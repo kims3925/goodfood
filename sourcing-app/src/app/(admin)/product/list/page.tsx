@@ -8,6 +8,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmp
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import PostSelectionModal from '@/components/product/PostSelectionModal'
+import PolicySelectionModal from '@/components/product/PolicySelectionModal'
 import ProductFormModal from '@/components/product/ProductFormModal'
 
 interface Product {
@@ -46,10 +47,13 @@ export default function ProductListPage() {
 
   // Modal states
   const [showPostSelectionModal, setShowPostSelectionModal] = useState(false)
+  const [showPolicyModal, setShowPolicyModal] = useState(false)
   const [showProductFormModal, setShowProductFormModal] = useState(false)
-  const [selectedPostId, setSelectedPostId] = useState<number | null>(null)
-  const [productDraft, setProductDraft] = useState<any>(null)
+  const [selectedPostIds, setSelectedPostIds] = useState<number[]>([]) // 다중 선택 지원
+  const [pendingPostIds, setPendingPostIds] = useState<number[]>([]) // 정책 선택 대기 중인 게시물
+  const [productDrafts, setProductDrafts] = useState<any[]>([]) // 다중 AI 결과
   const [isGenerating, setIsGenerating] = useState(false)
+  const [generatingProgress, setGeneratingProgress] = useState({ current: 0, total: 0 })
 
   // Selection states
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([])
@@ -70,7 +74,6 @@ export default function ProductListPage() {
       }
     } catch (error) {
       console.error('상품 목록 조회 실패:', error)
-      alert('상품 목록을 불러오는데 실패했습니다.')
     } finally {
       setIsLoading(false)
     }
@@ -84,43 +87,103 @@ export default function ProductListPage() {
     setShowPostSelectionModal(true)
   }
 
+  // 단일 게시물 선택 (하위 호환성)
   const handlePostSelected = async (postId: number) => {
-    setSelectedPostId(postId)
+    await handleMultiplePostsSelected([postId])
+  }
+
+  // 다중 게시물 선택 처리 - 정책 선택 모달로 이동
+  const handleMultiplePostsSelected = async (postIds: number[]) => {
+    setPendingPostIds(postIds)
     setShowPostSelectionModal(false)
+    setShowPolicyModal(true)
+  }
+
+  // 정책 선택 후 AI 변환 시작
+  const handlePolicySelected = async (policyId: number | null, policyContent: string | null) => {
+    setShowPolicyModal(false)
+    setSelectedPostIds(pendingPostIds)
     setIsGenerating(true)
+    setGeneratingProgress({ current: 0, total: pendingPostIds.length })
 
     try {
-      // AI 상품 생성 API 호출
-      const response = await fetch('/api/product/ai-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId }),
-      })
+      const drafts: any[] = []
 
-      const data = await response.json()
+      // 각 게시물에 대해 AI 상품 생성
+      for (let i = 0; i < pendingPostIds.length; i++) {
+        const postId = pendingPostIds[i]
+        setGeneratingProgress({ current: i + 1, total: pendingPostIds.length })
 
-      if (data.success) {
-        setProductDraft(data.draft)
+        try {
+          const response = await fetch('/api/product/ai-generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ postId, policyContent }),
+          })
+
+          const data = await response.json()
+
+          if (data.success) {
+            drafts.push({
+              postId,
+              draft: data.draft,
+            })
+          } else {
+            console.error(`게시물 ${postId} AI 생성 실패:`, data.error)
+            // 실패한 게시물도 빈 draft로 추가 (사용자가 직접 입력 가능)
+            drafts.push({
+              postId,
+              draft: {
+                name: `게시물 ${postId} (AI 생성 실패)`,
+                description: '',
+                categoryId: '',
+                price: '',
+                wholesalePrice: '',
+                options: [],
+                variants: [],
+              },
+              error: data.error,
+            })
+          }
+        } catch (error) {
+          console.error(`게시물 ${postId} AI 생성 오류:`, error)
+          drafts.push({
+            postId,
+            draft: {
+              name: `게시물 ${postId} (AI 생성 오류)`,
+              description: '',
+              categoryId: '',
+              price: '',
+              wholesalePrice: '',
+              options: [],
+              variants: [],
+            },
+            error: '네트워크 오류',
+          })
+        }
+      }
+
+      if (drafts.length > 0) {
+        setProductDrafts(drafts)
         setShowProductFormModal(true)
-      } else {
-        alert(data.error || 'AI 상품 생성에 실패했습니다.')
       }
     } catch (error) {
       console.error('AI 상품 생성 실패:', error)
-      alert('AI 상품 생성 중 오류가 발생했습니다.')
     } finally {
       setIsGenerating(false)
+      setGeneratingProgress({ current: 0, total: 0 })
+      setPendingPostIds([])
     }
   }
 
   const handleProductSaved = () => {
     setShowProductFormModal(false)
-    setProductDraft(null)
-    setSelectedPostId(null)
+    setProductDrafts([])
+    setSelectedPostIds([])
     loadProducts()
   }
 
-  const handleDeleteProduct = async (id: string) => {
+  const handleDeleteProduct = async (id: number) => {
     if (!confirm('정말 삭제하시겠습니까?')) return
 
     try {
@@ -131,14 +194,10 @@ export default function ProductListPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('상품이 삭제되었습니다.')
         loadProducts()
-      } else {
-        alert(data.error || '삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('상품 삭제 실패:', error)
-      alert('상품 삭제에 실패했습니다.')
     }
   }
 
@@ -153,7 +212,7 @@ export default function ProductListPage() {
     }
   }
 
-  const handleToggleSelection = (id: string) => {
+  const handleToggleSelection = (id: number) => {
     setSelectedProductIds((prev) => {
       const newSelection = prev.includes(id)
         ? prev.filter((pid) => pid !== id)
@@ -165,7 +224,6 @@ export default function ProductListPage() {
 
   const handleDeleteSelected = async () => {
     if (selectedProductIds.length === 0) {
-      alert('삭제할 상품을 선택해주세요.')
       return
     }
 
@@ -187,13 +245,11 @@ export default function ProductListPage() {
         }
       }
 
-      alert(`${successCount}개의 상품이 삭제되었습니다.`)
       setSelectedProductIds([])
       setSelectAll(false)
       loadProducts()
     } catch (error) {
       console.error('상품 일괄 삭제 실패:', error)
-      alert('상품 삭제에 실패했습니다.')
     }
   }
 
@@ -221,7 +277,7 @@ export default function ProductListPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">상품 관리</h1>
@@ -293,20 +349,18 @@ export default function ProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[10%]">이미지</TableHead>
-                  <TableHead className="w-[20%]">상품명</TableHead>
-                  <TableHead className="w-[12%]">출처 밴드</TableHead>
+                  <TableHead className="w-[15%]">이미지</TableHead>
+                  <TableHead className="w-[25%]">상품명</TableHead>
+                  <TableHead className="w-[15%]">출처 밴드</TableHead>
                   <TableHead className="w-[10%]">도매가</TableHead>
                   <TableHead className="w-[10%]">판매가</TableHead>
-                  <TableHead className="w-[8%]">변형</TableHead>
-                  <TableHead className="w-[10%]">상태</TableHead>
-                  <TableHead className="w-[12%]">생성일</TableHead>
-                  <TableHead className="w-[5%]">작업</TableHead>
+                  <TableHead className="w-[12%]">상태</TableHead>
+                  <TableHead className="w-[13%]">생성일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {products.length === 0 ? (
-                  <TableEmpty message="등록된 상품이 없습니다." colSpan={10} />
+                  <TableEmpty message="등록된 상품이 없습니다." colSpan={8} />
                 ) : (
                   products.map((product) => (
                     <TableRow
@@ -329,58 +383,44 @@ export default function ProductListPage() {
                           <img
                             src={product.thumbnailUrl}
                             alt={product.name}
-                            className="w-16 h-16 rounded object-cover"
+                            className="w-20 h-20 rounded-lg object-cover"
                           />
                         ) : (
-                          <div className="w-16 h-16 rounded bg-gray-200 flex items-center justify-center">
-                            <Package size={24} className="text-gray-400" />
+                          <div className="w-20 h-20 rounded-lg bg-gray-200 flex items-center justify-center">
+                            <Package size={28} className="text-gray-400" />
                           </div>
                         )}
                       </TableCell>
                       <TableCell>
                         <div className="min-w-0">
-                          <div className="font-medium text-gray-900 truncate">{product.name}</div>
+                          <div className="font-semibold text-gray-900 truncate text-base">{product.name}</div>
                           {product.description && (
-                            <div className="text-sm text-gray-500 truncate">
-                              {product.description.substring(0, 50)}...
+                            <div className="text-sm text-gray-500 truncate mt-1">
+                              {product.description.substring(0, 60)}...
                             </div>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm text-gray-600 truncate">
+                        <div className="text-gray-600 truncate">
                           {product.post?.wholesaleBand?.name || '-'}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="font-medium text-gray-900">
                           {formatPrice(product.wholesalePrice)}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="font-medium text-gray-900">
                           {formatPrice(product.price)}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {product.variants.length}개
-                        </span>
                       </TableCell>
                       <TableCell>{getStatusBadge(product.status)}</TableCell>
                       <TableCell>
                         <span className="text-sm text-gray-600">
                           {new Date(product.createdAt).toLocaleDateString('ko-KR')}
                         </span>
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteProduct(product.id)}
-                        >
-                          <Trash2 size={16} className="text-red-500" />
-                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
@@ -401,6 +441,19 @@ export default function ProductListPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   AI가 상품 정보를 생성하고 있습니다...
                 </h3>
+                {generatingProgress.total > 1 && (
+                  <div className="mb-3">
+                    <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-purple-500 transition-all duration-300"
+                        style={{ width: `${(generatingProgress.current / generatingProgress.total) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-sm text-purple-600 mt-2 font-medium">
+                      {generatingProgress.current} / {generatingProgress.total} 게시물 처리 중
+                    </p>
+                  </div>
+                )}
                 <p className="text-sm text-gray-600">
                   게시물을 분석하여 상품명, 옵션, 가격 등을 추출 중입니다.
                 </p>
@@ -415,19 +468,32 @@ export default function ProductListPage() {
         isOpen={showPostSelectionModal}
         onClose={() => setShowPostSelectionModal(false)}
         onPostSelected={handlePostSelected}
+        onMultiplePostsSelected={handleMultiplePostsSelected}
+      />
+
+      {/* 정책 선택 모달 */}
+      <PolicySelectionModal
+        isOpen={showPolicyModal}
+        onClose={() => {
+          setShowPolicyModal(false)
+          setPendingPostIds([])
+        }}
+        onPolicySelected={handlePolicySelected}
+        selectedPostCount={pendingPostIds.length}
       />
 
       {/* 상품 정보 수정 모달 */}
-      {productDraft && (
+      {productDrafts.length > 0 && (
         <ProductFormModal
           isOpen={showProductFormModal}
           onClose={() => {
             setShowProductFormModal(false)
-            setProductDraft(null)
-            setSelectedPostId(null)
+            setProductDrafts([])
+            setSelectedPostIds([])
           }}
-          postId={selectedPostId!}
-          initialData={productDraft}
+          postId={selectedPostIds[0]}
+          initialData={productDrafts[0]?.draft}
+          initialDrafts={productDrafts}
           onSaved={handleProductSaved}
         />
       )}

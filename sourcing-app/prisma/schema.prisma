@@ -39,6 +39,7 @@ model User {
   retailBands        RetailBand[]
   posts              Post[]
   products           Product[]
+  pricingPolicies    PricingPolicy[]
   publishSetting     PublishSetting?
 
   @@index([email])
@@ -399,4 +400,29 @@ model PublishSetting {
 
   @@index([userId])
   @@map("publish_setting")
+}
+
+// =============================================
+// PRICING POLICY MANAGEMENT (가격 정책 관리)
+// =============================================
+
+model PricingPolicy {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+
+  // Policy Info
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  content     String   @db.Text // 가격 정책 텍스트 (예: "원가 그대로", "수집가격 기준 구간별 마진 적용")
+
+  // Status
+  isActive    Boolean  @default(true) @map("is_active")
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("pricing_policy")
 }

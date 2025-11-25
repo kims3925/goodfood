@@ -64,6 +64,12 @@ export default function PostsManagePage() {
   const [expandedPostKeys, setExpandedPostKeys] = useState<string[]>([])
   const [expandedBandKeys, setExpandedBandKeys] = useState<string[]>([])
 
+  // 게시물 등록 진행 상태
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [totalCount, setTotalCount] = useState(0)
+  const [failedCount, setFailedCount] = useState(0)
+
   useEffect(() => {
     loadPosts()
   }, [])
@@ -79,7 +85,6 @@ export default function PostsManagePage() {
       }
     } catch (error) {
       console.error('게시물 목록 조회 실패:', error)
-      alert('게시물 목록을 불러오는데 실패했습니다.')
     } finally {
       setIsLoading(false)
     }
@@ -171,42 +176,70 @@ export default function PostsManagePage() {
 
   const handleAddSelectedPosts = async () => {
     if (selectedPostKeys.length === 0) {
-      alert('추가할 게시물을 선택해주세요.')
       return
     }
 
-    try {
-      // TODO: 실제로는 userId를 세션에서 가져와야 함
-      const selectedPosts = availablePosts.filter((post) =>
-        selectedPostKeys.includes(post.post_key)
-      )
+    // TODO: 실제로는 userId를 세션에서 가져와야 함
+    const selectedPosts = availablePosts.filter((post) =>
+      selectedPostKeys.includes(post.post_key)
+    )
 
-      for (const post of selectedPosts) {
-        await fetch('/api/post', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: 1, // 임시 값
-            wholesaleBandId: post.band.id, // 게시물의 출처 밴드 ID
-            externalId: post.post_key,
-            title: post.title,
-            content: post.content,
-            author: post.author,
-            comments: post.comments || [], // 댓글 추가
-            images: post.images || [], // 이미지 추가
-          }),
-        })
+    // 진행 상태 초기화
+    setIsSubmitting(true)
+    setCurrentIndex(0)
+    setTotalCount(selectedPosts.length)
+    setFailedCount(0)
+
+    let successCount = 0
+    let failed = 0
+
+    try {
+      for (let i = 0; i < selectedPosts.length; i++) {
+        const post = selectedPosts[i]
+        setCurrentIndex(i + 1)
+
+        try {
+          const response = await fetch('/api/post', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: 1, // 임시 값
+              wholesaleBandId: post.band.id, // 게시물의 출처 밴드 ID
+              externalId: post.post_key,
+              title: post.title,
+              content: post.content,
+              author: post.author,
+              comments: post.comments || [], // 댓글 추가
+              images: post.images || [], // 이미지 추가
+            }),
+          })
+
+          const data = await response.json()
+          if (data.success) {
+            successCount++
+          } else {
+            failed++
+            setFailedCount(prev => prev + 1)
+          }
+        } catch (error) {
+          console.error(`게시물 등록 실패 (${post.post_key}):`, error)
+          failed++
+          setFailedCount(prev => prev + 1)
+        }
       }
 
-      alert(`${selectedPosts.length}개의 게시물이 등록되었습니다.`)
       setShowAddModal(false)
       setSelectedPostKeys([])
       setExpandedPostKeys([])
       setExpandedBandKeys([])
       loadPosts()
     } catch (error) {
-      console.error('게시물 등록 실패:', error)
-      alert('게시물 등록에 실패했습니다.')
+      console.error('게시물 등록 중 오류:', error)
+    } finally {
+      setIsSubmitting(false)
+      setCurrentIndex(0)
+      setTotalCount(0)
+      setFailedCount(0)
     }
   }
 
@@ -222,14 +255,10 @@ export default function PostsManagePage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('게시물이 삭제되었습니다.')
         loadPosts()
-      } else {
-        alert(data.error || '삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('게시물 삭제 실패:', error)
-      alert('게시물 삭제에 실패했습니다.')
     }
   }
 
@@ -260,7 +289,6 @@ export default function PostsManagePage() {
   // 선택한 게시물 일괄 삭제
   const handleDeleteSelectedPosts = async () => {
     if (selectedPostIds.length === 0) {
-      alert('삭제할 게시물을 선택해주세요.')
       return
     }
 
@@ -291,18 +319,11 @@ export default function PostsManagePage() {
         }
       }
 
-      if (failCount === 0) {
-        alert(`${successCount}개의 게시물이 삭제되었습니다.`)
-      } else {
-        alert(`${successCount}개 삭제 성공, ${failCount}개 삭제 실패`)
-      }
-
       setSelectedPostIds([])
       setSelectAllPosts(false)
       loadPosts()
     } catch (error) {
       console.error('게시물 일괄 삭제 실패:', error)
-      alert('게시물 삭제에 실패했습니다.')
     }
   }
 
@@ -336,7 +357,7 @@ export default function PostsManagePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">게시물 관리</h1>
@@ -441,21 +462,21 @@ export default function PostsManagePage() {
                         className="w-[20%] cursor-pointer"
                         onClick={() => router.push(`/post/detail/${post.id}`)}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           {post.wholesaleBand.coverUrl ? (
                             <img
                               src={post.wholesaleBand.coverUrl}
                               alt={post.wholesaleBand.name}
-                              className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                              className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                            <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
                               <span className="text-gray-400 text-xs">No</span>
                             </div>
                           )}
-                          <div className="text-sm min-w-0 flex-1">
-                            <div className="font-medium text-gray-900 truncate">{post.wholesaleBand.name}</div>
-                            <div className="text-gray-500 text-xs truncate">{post.wholesaleBand.bandKey}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-gray-900 truncate">{post.wholesaleBand.name}</div>
+                            <div className="text-gray-500 text-sm truncate mt-0.5">{post.wholesaleBand.bandKey}</div>
                           </div>
                         </div>
                       </TableCell>
@@ -463,15 +484,15 @@ export default function PostsManagePage() {
                         className="w-[10%] cursor-pointer"
                         onClick={() => router.push(`/post/detail/${post.id}`)}
                       >
-                        <span className="text-gray-600 text-sm">{post.author || '-'}</span>
+                        <span className="text-gray-600">{post.author || '-'}</span>
                       </TableCell>
                       <TableCell
                         className="w-[22%] cursor-pointer"
                         onClick={() => router.push(`/post/detail/${post.id}`)}
                       >
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium text-gray-900">
-                            {truncateText(post.title, 30)}
+                          <div className="font-semibold text-gray-900">
+                            {truncateText(post.title, 40)}
                           </div>
                         </div>
                       </TableCell>
@@ -613,37 +634,33 @@ export default function PostsManagePage() {
                               >
                                 {/* 간략 정보 */}
                                 <div
-                                  className="p-4 cursor-pointer hover:bg-gray-50"
-                                  onClick={() => handleToggleExpand(post.post_key)}
+                                  className={`p-4 cursor-pointer transition-colors ${
+                                    selectedPostKeys.includes(post.post_key)
+                                      ? 'hover:bg-blue-100'
+                                      : 'hover:bg-gray-50'
+                                  }`}
+                                  onClick={() => handleToggleModalPostSelection(post.post_key)}
                                 >
-                                  <div className="flex items-start gap-4">
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedPostKeys.includes(post.post_key)}
-                                      onChange={(e) => {
-                                        e.stopPropagation()
-                                        handleToggleModalPostSelection(post.post_key)
-                                      }}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="mt-1"
-                                    />
+                                  <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1 min-w-0">
-                                      <div className="flex items-start justify-between gap-4">
-                                        <div className="flex-1 min-w-0">
-                                          <h4 className="font-medium text-gray-900 truncate">{post.title}</h4>
-                                          <p className="text-sm text-gray-500 mt-1">
-                                            작성자: {post.author || '알 수 없음'}
-                                          </p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          {isExpanded ? (
-                                            <ChevronDown size={20} className="text-gray-400" />
-                                          ) : (
-                                            <ChevronRight size={20} className="text-gray-400" />
-                                          )}
-                                        </div>
-                                      </div>
+                                      <h4 className="font-medium text-gray-900 truncate">{post.title}</h4>
+                                      <p className="text-sm text-gray-500 mt-1">
+                                        작성자: {post.author || '알 수 없음'}
+                                      </p>
                                     </div>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleToggleExpand(post.post_key)
+                                      }}
+                                      className="p-1 hover:bg-gray-200 rounded transition-colors"
+                                    >
+                                      {isExpanded ? (
+                                        <ChevronDown size={20} className="text-gray-400" />
+                                      ) : (
+                                        <ChevronRight size={20} className="text-gray-400" />
+                                      )}
+                                    </button>
                                   </div>
                                 </div>
 
@@ -728,6 +745,41 @@ export default function PostsManagePage() {
           </div>
         )}
       </Modal>
+
+      {/* 게시물 등록 로딩 오버레이 */}
+      {isSubmitting && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+            <div className="flex flex-col items-center gap-4">
+              {/* 스피너 */}
+              <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+
+              {/* 진행 상황 */}
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  게시물을 등록하고 있습니다...
+                </h3>
+                <p className="text-gray-600">
+                  {currentIndex}/{totalCount}개 등록 중...
+                </p>
+                {failedCount > 0 && (
+                  <p className="text-sm text-red-500 mt-2">
+                    (실패: {failedCount}개)
+                  </p>
+                )}
+              </div>
+
+              {/* 진행률 바 */}
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div
+                  className="bg-blue-500 h-2.5 rounded-full transition-all duration-300"
+                  style={{ width: `${totalCount > 0 ? (currentIndex / totalCount) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -373,11 +373,19 @@ export async function DELETE(request: NextRequest) {
     const userId = currentUser.userId
 
     const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
+    const idParam = searchParams.get('id')
 
-    if (!id) {
+    if (!idParam) {
       return NextResponse.json(
         { success: false, error: 'id가 필요합니다.' },
+        { status: 400 }
+      )
+    }
+
+    const id = parseInt(idParam, 10)
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { success: false, error: '유효하지 않은 id입니다.' },
         { status: 400 }
       )
     }
