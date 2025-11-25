@@ -41,7 +41,8 @@ model User {
   products           Product[]
   pricingPolicies    PricingPolicy[]
   publishSetting     PublishSetting?
-  orders             Order[]
+  purchaseOrders     PurchaseOrder[]
+  internalOrders     InternalOrder[]
 
   @@index([email])
   @@map("user")
@@ -318,10 +319,12 @@ model Product {
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
 
   // Relationships
-  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post     Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
-  variants ProductVariant[]
-  options  ProductOption[]
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post           Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  variants       ProductVariant[]
+  options        ProductOption[]
+  purchaseOrders PurchaseOrder[]
+  internalOrders InternalOrder[]
 
   @@index([userId])
   @@index([postId])
@@ -429,63 +432,104 @@ model PricingPolicy {
 }
 
 // =============================================
-// ORDER MANAGEMENT (주문서 관리)
+// PURCHASE ORDER MANAGEMENT (주문서 관리)
 // =============================================
 
-enum OrderStatus {
-  PENDING    // 주문접수
-  CONFIRMED  // 주문확인
-  PREPARING  // 상품준비중
-  SHIPPING   // 배송중
-  DELIVERED  // 배송완료
-  CANCELLED  // 취소
-  REFUNDED   // 환불
-}
+model PurchaseOrder {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  productId       Int?     @map("product_id") // 매칭된 상품 ID (선택)
 
-model Order {
-  id              Int          @id @default(autoincrement())
-  userId          Int          @map("user_id")
-
-  // Google Forms 기본 정보
-  formResponseId  String?      @map("form_response_id") @db.VarChar(255) // Google Forms 응답 ID (중복 방지용)
-
-  // 주문자 정보
-  customerName    String       @map("customer_name") @db.VarChar(100)
-  customerPhone   String       @map("customer_phone") @db.VarChar(50)
-  customerAddress String?      @map("customer_address") @db.Text
-
-  // 상품 정보
-  productName     String       @map("product_name") @db.VarChar(500)
-  productOption   String?      @map("product_option") @db.VarChar(500) // 선택한 옵션 (예: "색상: 빨강, 사이즈: L")
-  quantity        Int          @default(1)
-  unitPrice       Int?         @map("unit_price") // 개당 가격
-  totalPrice      Int?         @map("total_price") // 총 주문 금액
-
-  // 주문 상태
-  status          OrderStatus  @default(PENDING)
-
-  // 메모
-  customerMemo    String?      @map("customer_memo") @db.Text // 고객 요청사항
-  adminMemo       String?      @map("admin_memo") @db.Text // 관리자 메모
-
-  // 배송 정보
-  trackingNumber  String?      @map("tracking_number") @db.VarChar(100)
-  shippedAt       DateTime?    @map("shipped_at") @db.Timestamp(0)
-  deliveredAt     DateTime?    @map("delivered_at") @db.Timestamp(0)
+  // 주문 정보
+  productName     String   @map("product_name") @db.VarChar(500)  // 상품명
+  totalPrice      Int?     @map("total_price")                    // 총금액
+  customerName    String   @map("customer_name") @db.VarChar(100) // 이름
 
   // Timestamps
-  orderedAt       DateTime     @default(now()) @map("ordered_at") @db.Timestamp(0) // Google Forms 제출 시간
-  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamp(0)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 
   // Relationships
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, formResponseId]) // 같은 사용자 내 중복 응답 방지
   @@index([userId])
-  @@index([status])
+  @@index([productId])
+  @@index([productName])
   @@index([customerName])
-  @@index([customerPhone])
-  @@index([orderedAt])
-  @@map("order")
+  @@map("purchase_order")
+}
+
+// =============================================
+// INTERNAL ORDER MANAGEMENT (내부 주문서 - 테스트용)
+// =============================================
+
+enum PaymentMethod {
+  CARD           // 카드
+  BANK_TRANSFER  // 계좌이체
+  VIRTUAL_ACCOUNT // 가상계좌
+}
+
+enum CashReceiptType {
+  NONE           // 미발행
+  INCOME         // 소득공제용
+  EXPENSE        // 지출증빙용
+}
+
+enum OrderStatus {
+  PENDING        // 주문대기
+  PAID           // 결제완료
+  PREPARING      // 상품준비중
+  SHIPPING       // 배송중
+  DELIVERED      // 배송완료
+  CANCELLED      // 주문취소
+}
+
+model InternalOrder {
+  id              Int           @id @default(autoincrement())
+  userId          Int           @map("user_id")
+  productId       Int?          @map("product_id")
+
+  // 주문자 정보
+  customerName    String        @map("customer_name") @db.VarChar(100)
+  customerPhone   String        @map("customer_phone") @db.VarChar(20)
+
+  // 배송지 정보
+  recipientName   String        @map("recipient_name") @db.VarChar(100)
+  recipientPhone  String        @map("recipient_phone") @db.VarChar(20)
+  postalCode      String        @map("postal_code") @db.VarChar(10)
+  address         String        @db.VarChar(500)
+  addressDetail   String?       @map("address_detail") @db.VarChar(500)
+  deliveryMemo    String?       @map("delivery_memo") @db.VarChar(500)
+
+  // 상품 정보
+  productName     String        @map("product_name") @db.VarChar(500)
+  quantity        Int           @default(1)
+  unitPrice       Int           @map("unit_price")      // 단가
+  shippingFee     Int           @map("shipping_fee") @default(0)  // 배송비
+  totalPrice      Int           @map("total_price")     // 총 결제금액
+
+  // 결제 정보
+  paymentMethod   PaymentMethod @map("payment_method")
+
+  // 현금영수증
+  cashReceiptType   CashReceiptType @map("cash_receipt_type") @default(NONE)
+  cashReceiptNumber String?         @map("cash_receipt_number") @db.VarChar(50)
+
+  // 주문 상태
+  status          OrderStatus   @default(PENDING)
+
+  // Timestamps
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([productId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("internal_order")
 }

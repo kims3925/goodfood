@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, OrderStatus } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 const prisma = new PrismaClient()
@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
-    const status = searchParams.get('status') as OrderStatus | null
     const search = searchParams.get('search') || ''
 
     // 필터 조건
@@ -26,40 +25,32 @@ export async function GET(request: NextRequest) {
       userId: user.userId,
     }
 
-    if (status) {
-      where.status = status
-    }
-
     if (search) {
       where.OR = [
         { customerName: { contains: search } },
-        { customerPhone: { contains: search } },
         { productName: { contains: search } },
       ]
     }
 
     // 총 개수 조회
-    const total = await prisma.order.count({ where })
+    const total = await prisma.purchaseOrder.count({ where })
 
-    // 주문 목록 조회
-    const orders = await prisma.order.findMany({
+    // 주문 목록 조회 (상품 정보 포함)
+    const orders = await prisma.purchaseOrder.findMany({
       where,
-      orderBy: { orderedAt: 'desc' },
+      orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
       take: limit,
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            thumbnailUrl: true,
+          },
+        },
+      },
     })
-
-    // 상태별 개수 조회
-    const statusCounts = await prisma.order.groupBy({
-      by: ['status'],
-      where: { userId: user.userId },
-      _count: { status: true },
-    })
-
-    const statusCountMap = statusCounts.reduce((acc, item) => {
-      acc[item.status] = item._count.status
-      return acc
-    }, {} as Record<string, number>)
 
     return NextResponse.json({
       success: true,
@@ -71,7 +62,6 @@ export async function GET(request: NextRequest) {
           total,
           totalPages: Math.ceil(total / limit),
         },
-        statusCounts: statusCountMap,
       },
     })
   } catch (error) {
@@ -99,7 +89,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 사용자 확인 (간단한 인증)
+    // 사용자 확인
     const user = await prisma.user.findUnique({
       where: { id: userId },
     })
@@ -112,53 +102,56 @@ export async function POST(request: NextRequest) {
     }
 
     // 필수 필드 검증
-    const { customerName, customerPhone, productName } = body
-    if (!customerName || !customerPhone || !productName) {
+    const { customerName, productName } = body
+    if (!customerName || !productName) {
       return NextResponse.json(
-        { success: false, error: '필수 필드가 누락되었습니다.' },
+        { success: false, error: '필수 필드가 누락되었습니다. (이름, 상품명)' },
         { status: 400 }
       )
     }
 
-    // 중복 체크 (formResponseId가 있는 경우)
-    if (body.formResponseId) {
-      const existing = await prisma.order.findFirst({
-        where: {
-          userId,
-          formResponseId: body.formResponseId,
-        },
-      })
+    // 상품명으로 Product 매칭 시도 (정확히 일치하거나 포함하는 경우)
+    let productId: number | null = null
+    const matchedProduct = await prisma.product.findFirst({
+      where: {
+        userId,
+        OR: [
+          { name: productName }, // 정확히 일치
+          { name: { contains: productName } }, // 포함
+        ],
+      },
+      select: { id: true },
+    })
 
-      if (existing) {
-        return NextResponse.json({
-          success: true,
-          message: '이미 등록된 주문입니다.',
-          data: existing,
-        })
-      }
+    if (matchedProduct) {
+      productId = matchedProduct.id
     }
 
     // 주문 생성
-    const order = await prisma.order.create({
+    const order = await prisma.purchaseOrder.create({
       data: {
         userId,
-        formResponseId: body.formResponseId || null,
-        customerName,
-        customerPhone,
-        customerAddress: body.customerAddress || null,
+        productId,
         productName,
-        productOption: body.productOption || null,
-        quantity: body.quantity || 1,
-        unitPrice: body.unitPrice || null,
         totalPrice: body.totalPrice || null,
-        customerMemo: body.customerMemo || null,
-        orderedAt: body.orderedAt ? new Date(body.orderedAt) : new Date(),
+        customerName,
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            thumbnailUrl: true,
+          },
+        },
       },
     })
 
     return NextResponse.json({
       success: true,
-      message: '주문이 등록되었습니다.',
+      message: productId
+        ? '주문이 등록되었습니다. (상품 매칭됨)'
+        : '주문이 등록되었습니다. (매칭되는 상품 없음)',
       data: order,
     })
   } catch (error) {

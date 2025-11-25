@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, OrderStatus } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 const prisma = new PrismaClient()
@@ -21,7 +21,7 @@ export async function GET(
     const { id } = await params
     const orderId = parseInt(id)
 
-    const order = await prisma.order.findFirst({
+    const order = await prisma.purchaseOrder.findFirst({
       where: {
         id: orderId,
         userId: user.userId,
@@ -48,7 +48,7 @@ export async function GET(
   }
 }
 
-// PATCH: 주문 수정 (상태 변경, 메모, 배송정보 등)
+// PATCH: 주문 수정
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -67,7 +67,7 @@ export async function PATCH(
     const body = await request.json()
 
     // 기존 주문 확인
-    const existingOrder = await prisma.order.findFirst({
+    const existingOrder = await prisma.purchaseOrder.findFirst({
       where: {
         id: orderId,
         userId: user.userId,
@@ -84,44 +84,18 @@ export async function PATCH(
     // 업데이트 데이터 구성
     const updateData: any = {}
 
-    if (body.status) {
-      updateData.status = body.status as OrderStatus
-
-      // 상태에 따라 자동으로 시간 기록
-      if (body.status === 'SHIPPING' && !existingOrder.shippedAt) {
-        updateData.shippedAt = new Date()
-      }
-      if (body.status === 'DELIVERED' && !existingOrder.deliveredAt) {
-        updateData.deliveredAt = new Date()
-      }
+    if (body.productName !== undefined) {
+      updateData.productName = body.productName
     }
-
-    if (body.adminMemo !== undefined) {
-      updateData.adminMemo = body.adminMemo
-    }
-
-    if (body.trackingNumber !== undefined) {
-      updateData.trackingNumber = body.trackingNumber
-    }
-
-    if (body.customerAddress !== undefined) {
-      updateData.customerAddress = body.customerAddress
-    }
-
-    if (body.quantity !== undefined) {
-      updateData.quantity = body.quantity
-    }
-
-    if (body.unitPrice !== undefined) {
-      updateData.unitPrice = body.unitPrice
-    }
-
     if (body.totalPrice !== undefined) {
       updateData.totalPrice = body.totalPrice
     }
+    if (body.customerName !== undefined) {
+      updateData.customerName = body.customerName
+    }
 
     // 주문 업데이트
-    const order = await prisma.order.update({
+    const order = await prisma.purchaseOrder.update({
       where: { id: orderId },
       data: updateData,
     })
@@ -158,7 +132,7 @@ export async function DELETE(
     const orderId = parseInt(id)
 
     // 기존 주문 확인
-    const existingOrder = await prisma.order.findFirst({
+    const existingOrder = await prisma.purchaseOrder.findFirst({
       where: {
         id: orderId,
         userId: user.userId,
@@ -173,7 +147,7 @@ export async function DELETE(
     }
 
     // 주문 삭제
-    await prisma.order.delete({
+    await prisma.purchaseOrder.delete({
       where: { id: orderId },
     })
 
