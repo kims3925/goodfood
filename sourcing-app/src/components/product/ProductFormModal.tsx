@@ -8,16 +8,47 @@ import Input from '../ui/Input'
 import { ProductDraft, OptionGroup, GeneratedVariant } from '@/modules/transformation'
 import { generateVariants, calculateVariantCount } from '@/modules/transformation'
 
+interface DraftWithPostId {
+  postId: number
+  draft: ProductDraft
+  error?: string
+}
+
 interface ProductFormModalProps {
   isOpen: boolean
   onClose: () => void
   postId: number
   productId?: number // Optional - if provided, we're in edit mode
   initialData: ProductDraft
+  initialDrafts?: DraftWithPostId[] // 다중 게시물 AI 결과
   onSaved: () => void
 }
 
 type TabType = 'basic' | 'options' | 'variants'
+
+// 개별 상품 데이터 타입
+interface ProductFormData {
+  id: string
+  name: string
+  description: string
+  categoryId: string
+  price: number | ''
+  wholesalePrice: number | ''
+  options: OptionGroup[]
+  variants: GeneratedVariant[]
+}
+
+// 기본 상품 데이터 생성 함수
+const createEmptyProductData = (id: string): ProductFormData => ({
+  id,
+  name: '',
+  description: '',
+  categoryId: '',
+  price: '',
+  wholesalePrice: '',
+  options: [],
+  variants: [],
+})
 
 export default function ProductFormModal({
   isOpen,
@@ -25,39 +56,109 @@ export default function ProductFormModal({
   postId,
   productId,
   initialData,
+  initialDrafts,
   onSaved,
 }: ProductFormModalProps) {
   const isEditMode = !!productId
   const [activeTab, setActiveTab] = useState<TabType>('basic')
   const [isSaving, setIsSaving] = useState(false)
 
-  // Form state
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [categoryId, setCategoryId] = useState('')
-  const [price, setPrice] = useState<number | ''>('')
-  const [wholesalePrice, setWholesalePrice] = useState<number | ''>('')
+  // 다중 상품 탭 관리
+  const [productTabs, setProductTabs] = useState<(ProductFormData & { postId?: number })[]>([])
+  const [activeProductIndex, setActiveProductIndex] = useState(0)
 
-  // Options state
-  const [options, setOptions] = useState<OptionGroup[]>([])
+  // 현재 활성 상품 데이터 getter
+  const currentProduct = productTabs[activeProductIndex] || createEmptyProductData('1')
+
+  // Options state (for new option input)
   const [newOptionGroup, setNewOptionGroup] = useState('')
   const [newOptionValues, setNewOptionValues] = useState('')
 
-  // Variants state
-  const [variants, setVariants] = useState<GeneratedVariant[]>([])
-
-  // Initialize form with AI-generated data
+  // Initialize form with AI-generated data (다중 게시물 지원)
   useEffect(() => {
-    if (initialData) {
-      setName(initialData.name || '')
-      setDescription(initialData.description || '')
-      setCategoryId(initialData.categoryId || '')
-      setPrice(initialData.price || '')
-      setWholesalePrice(initialData.wholesalePrice || '')
-      setOptions(initialData.options || [])
-      setVariants(initialData.variants || [])
+    if (!isOpen) return
+
+    // 다중 게시물 AI 결과가 있으면 사용
+    if (initialDrafts && initialDrafts.length > 0) {
+      const tabs = initialDrafts.map((item, index) => ({
+        id: String(index + 1),
+        postId: item.postId,
+        name: item.draft?.name || '',
+        description: item.draft?.description || '',
+        categoryId: item.draft?.categoryId || '',
+        price: item.draft?.price || '',
+        wholesalePrice: item.draft?.wholesalePrice || '',
+        options: item.draft?.options || [],
+        variants: item.draft?.variants || [],
+      }))
+      setProductTabs(tabs)
+      setActiveProductIndex(0)
+    } else if (initialData) {
+      // 단일 게시물 (기존 로직)
+      const initialProduct: ProductFormData & { postId?: number } = {
+        id: '1',
+        postId: postId,
+        name: initialData.name || '',
+        description: initialData.description || '',
+        categoryId: initialData.categoryId || '',
+        price: initialData.price || '',
+        wholesalePrice: initialData.wholesalePrice || '',
+        options: initialData.options || [],
+        variants: initialData.variants || [],
+      }
+      setProductTabs([initialProduct])
+      setActiveProductIndex(0)
     }
-  }, [initialData])
+  }, [initialData, initialDrafts, isOpen, postId])
+
+  // 현재 상품 데이터 업데이트 함수
+  const updateCurrentProduct = (updates: Partial<ProductFormData>) => {
+    setProductTabs(prev => {
+      const newTabs = [...prev]
+      newTabs[activeProductIndex] = { ...newTabs[activeProductIndex], ...updates }
+      return newTabs
+    })
+  }
+
+  // 새 상품 탭 추가
+  const addProductTab = () => {
+    const newId = String(productTabs.length + 1)
+    const newProduct = createEmptyProductData(newId)
+    // 기본 정보 복사 옵션 (카테고리만 복사)
+    if (currentProduct) {
+      newProduct.categoryId = currentProduct.categoryId
+    }
+    setProductTabs(prev => [...prev, newProduct])
+    setActiveProductIndex(productTabs.length)
+  }
+
+  // 상품 탭 삭제
+  const removeProductTab = (index: number) => {
+    if (productTabs.length <= 1) {
+      alert('최소 1개의 상품은 필요합니다.')
+      return
+    }
+    setProductTabs(prev => prev.filter((_, i) => i !== index))
+    if (activeProductIndex >= index && activeProductIndex > 0) {
+      setActiveProductIndex(activeProductIndex - 1)
+    }
+  }
+
+  // Getter/Setter shortcuts for current product
+  const name = currentProduct.name
+  const setName = (value: string) => updateCurrentProduct({ name: value })
+  const description = currentProduct.description
+  const setDescription = (value: string) => updateCurrentProduct({ description: value })
+  const categoryId = currentProduct.categoryId
+  const setCategoryId = (value: string) => updateCurrentProduct({ categoryId: value })
+  const price = currentProduct.price
+  const setPrice = (value: number | '') => updateCurrentProduct({ price: value })
+  const wholesalePrice = currentProduct.wholesalePrice
+  const setWholesalePrice = (value: number | '') => updateCurrentProduct({ wholesalePrice: value })
+  const options = currentProduct.options
+  const setOptions = (value: OptionGroup[]) => updateCurrentProduct({ options: value })
+  const variants = currentProduct.variants
+  const setVariants = (value: GeneratedVariant[]) => updateCurrentProduct({ variants: value })
 
   // Regenerate variants when options change
   useEffect(() => {
@@ -106,16 +207,19 @@ export default function ProductFormModal({
     setVariants(updated)
   }
 
-  const handleSave = async () => {
-    // Validation
-    if (!name.trim()) {
+  // 현재 상품만 개별 등록
+  const handleSaveCurrentProduct = async () => {
+    const product = currentProduct
+
+    // 유효성 검사
+    if (!product.name.trim()) {
       alert('상품명을 입력해주세요.')
       setActiveTab('basic')
       return
     }
 
-    if (variants.length > 0) {
-      const hasInvalidPrice = variants.some((v) => !v.price || v.price <= 0)
+    if (product.variants.length > 0) {
+      const hasInvalidPrice = product.variants.some((v) => !v.price || v.price <= 0)
       if (hasInvalidPrice) {
         alert('모든 변형의 가격을 입력해주세요.')
         setActiveTab('variants')
@@ -125,54 +229,23 @@ export default function ProductFormModal({
 
     try {
       setIsSaving(true)
+      const success = await saveSingleProduct(product, false)
 
-      // Prepare options data
-      const optionsData = options.flatMap((group) =>
-        group.values.map((value, index) => ({
-          groupName: group.groupName,
-          value,
-          sortOrder: index,
-        }))
-      )
-
-      // Prepare variants data
-      const variantsData = variants.map((variant) => ({
-        optionSummary: variant.optionSummary,
-        price: variant.price || 0,
-        wholesalePrice: variant.wholesalePrice,
-        stock: variant.stock || 0,
-      }))
-
-      // Calculate price from variants
-      const calculatedPrice = variants.length > 0
-        ? Math.min(...variants.map((v) => v.price || 0))
-        : (typeof price === 'number' ? price : 0)
-
-      // Create or update product
-      const response = await fetch('/api/product', {
-        method: isEditMode ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...(isEditMode && { id: productId }),
-          postId,
-          name: name.trim(),
-          description: description.trim() || null,
-          categoryId: categoryId.trim() || null,
-          currency: 'KRW',
-          price: calculatedPrice,
-          wholesalePrice: typeof wholesalePrice === 'number' ? wholesalePrice : null,
-          options: optionsData,
-          variants: variantsData,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        alert(isEditMode ? '상품이 수정되었습니다!' : '상품이 등록되었습니다!')
-        onSaved()
-      } else {
-        alert(data.error || (isEditMode ? '상품 수정에 실패했습니다.' : '상품 등록에 실패했습니다.'))
+      if (success) {
+        // 등록 성공 시 해당 탭 제거
+        if (productTabs.length === 1) {
+          // 마지막 상품이면 모달 닫기
+          onSaved()
+        } else {
+          // 탭에서 제거하고 다음 탭으로 이동
+          const newTabs = productTabs.filter((_, i) => i !== activeProductIndex)
+          setProductTabs(newTabs)
+          // 현재 인덱스가 마지막이었으면 이전 탭으로, 아니면 현재 위치 유지
+          if (activeProductIndex >= newTabs.length) {
+            setActiveProductIndex(newTabs.length - 1)
+          }
+          alert('상품이 등록되었습니다! 나머지 상품을 계속 등록해주세요.')
+        }
       }
     } catch (error) {
       console.error('상품 등록 실패:', error)
@@ -182,21 +255,164 @@ export default function ProductFormModal({
     }
   }
 
+  // 편집 모드 또는 단일 상품 저장
+  const handleSave = async () => {
+    // 편집 모드일 때는 단일 상품 저장
+    if (isEditMode) {
+      setIsSaving(true)
+      try {
+        const success = await saveSingleProduct(currentProduct)
+        if (success) {
+          onSaved()
+        }
+      } finally {
+        setIsSaving(false)
+      }
+      return
+    }
+
+    // 다중 상품일 때는 개별 등록 사용
+    await handleSaveCurrentProduct()
+  }
+
+  // 단일 상품 저장 함수
+  const saveSingleProduct = async (product: ProductFormData & { postId?: number }, silent = false): Promise<boolean> => {
+    try {
+      // Prepare options data
+      const optionsData = product.options.flatMap((group) =>
+        group.values.map((value, index) => ({
+          groupName: group.groupName,
+          value,
+          sortOrder: index,
+        }))
+      )
+
+      // Prepare variants data
+      const variantsData = product.variants.map((variant) => ({
+        optionSummary: variant.optionSummary,
+        price: variant.price || 0,
+        wholesalePrice: variant.wholesalePrice,
+        stock: variant.stock || 0,
+      }))
+
+      // Calculate price from variants
+      const calculatedPrice = product.variants.length > 0
+        ? Math.min(...product.variants.map((v) => v.price || 0))
+        : (typeof product.price === 'number' ? product.price : 0)
+
+      // 각 상품의 postId 사용 (없으면 props의 postId 사용)
+      const targetPostId = product.postId || postId
+
+      // Create or update product
+      const response = await fetch('/api/product', {
+        method: isEditMode ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(isEditMode && { id: productId }),
+          postId: targetPostId,
+          name: product.name.trim(),
+          description: product.description.trim() || null,
+          categoryId: product.categoryId.trim() || null,
+          currency: 'KRW',
+          price: calculatedPrice,
+          wholesalePrice: typeof product.wholesalePrice === 'number' ? product.wholesalePrice : null,
+          options: optionsData,
+          variants: variantsData,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        if (!silent) {
+          alert(isEditMode ? '상품이 수정되었습니다!' : '상품이 등록되었습니다!')
+          onSaved()
+        }
+        return true
+      } else {
+        if (!silent) {
+          alert(data.error || (isEditMode ? '상품 수정에 실패했습니다.' : '상품 등록에 실패했습니다.'))
+        }
+        return false
+      }
+    } catch (error) {
+      console.error('상품 저장 실패:', error)
+      if (!silent) {
+        alert('상품 저장 중 오류가 발생했습니다.')
+      }
+      return false
+    }
+  }
+
   const variantCount = calculateVariantCount(options)
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditMode ? '상품 정보 수정' : '상품 등록'}
+      title={isEditMode ? '상품 정보 수정' : `상품 등록 (${productTabs.length}개)`}
       size="2xl"
     >
       <div className="flex flex-col h-[calc(80vh-8rem)]">
+        {/* 다중 상품 탭 - 편집 모드가 아닐 때만 표시 */}
+        {!isEditMode && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm font-medium text-gray-700">상품 목록</span>
+              <span className="text-xs text-gray-500">({productTabs.length}개)</span>
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto pb-2">
+              {productTabs.map((product, index) => (
+                <div
+                  key={product.id}
+                  className={`flex items-center gap-1 px-3 py-2 rounded-lg border-2 transition-all cursor-pointer min-w-fit ${
+                    activeProductIndex === index
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                  onClick={() => setActiveProductIndex(index)}
+                >
+                  <span className={`text-sm font-medium ${
+                    activeProductIndex === index ? 'text-purple-700' : 'text-gray-700'
+                  }`}>
+                    {product.name || `상품 ${index + 1}`}
+                  </span>
+                  {productTabs.length > 1 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        removeProductTab(index)
+                      }}
+                      className="ml-1 p-0.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500 transition-colors"
+                      title="상품 삭제"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={addProductTab}
+                className="flex items-center gap-1 px-3 py-2 rounded-lg border-2 border-dashed border-gray-300 text-gray-500 hover:border-purple-400 hover:text-purple-600 hover:bg-purple-50 transition-all min-w-fit"
+                title="새 상품 추가"
+              >
+                <Plus size={16} />
+                <span className="text-sm">추가</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* AI 생성 안내 */}
         <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-start gap-2">
           <AlertCircle size={20} className="text-purple-600 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-purple-800">
-            AI가 생성한 정보입니다. 내용을 확인하고 수정한 후 저장해주세요.
+            {isEditMode
+              ? 'AI가 생성한 정보입니다. 내용을 확인하고 수정한 후 저장해주세요.'
+              : productTabs.length > 1
+                ? `현재 "${currentProduct.name || `상품 ${activeProductIndex + 1}`}"을(를) 편집 중입니다. 하단의 "현재 상품 등록" 버튼을 클릭하면 이 상품만 등록되고, 탭에서 사라집니다.`
+                : 'AI가 생성한 정보입니다. 내용을 확인하고 수정한 후 저장해주세요.'
+            }
           </p>
         </div>
 
@@ -476,23 +692,42 @@ export default function ProductFormModal({
 
         {/* Footer */}
         <ModalFooter className="mt-4">
-          <Button variant="secondary" onClick={onClose} disabled={isSaving}>
-            <X size={16} />
-            취소
-          </Button>
-          <Button variant="primary" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                저장 중...
-              </>
-            ) : (
-              <>
-                <Save size={16} />
-                {isEditMode ? '상품 수정' : '상품 등록'}
-              </>
-            )}
-          </Button>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={onClose} disabled={isSaving}>
+                <X size={16} />
+                {productTabs.length > 1 ? '모두 취소' : '취소'}
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* 다중 상품일 때 남은 개수 표시 */}
+              {!isEditMode && productTabs.length > 1 && (
+                <span className="text-sm text-gray-500">
+                  남은 상품: {productTabs.length}개
+                </span>
+              )}
+
+              <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    저장 중...
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    {isEditMode
+                      ? '상품 수정'
+                      : productTabs.length > 1
+                        ? `현재 상품 등록 (${activeProductIndex + 1}/${productTabs.length})`
+                        : '상품 등록'
+                    }
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </ModalFooter>
       </div>
     </Modal>

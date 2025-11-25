@@ -25,17 +25,19 @@ interface PostSelectionModalProps {
   isOpen: boolean
   onClose: () => void
   onPostSelected: (postId: number) => void
+  onMultiplePostsSelected?: (postIds: number[]) => void // 다중 선택 콜백
 }
 
 export default function PostSelectionModal({
   isOpen,
   onClose,
   onPostSelected,
+  onMultiplePostsSelected,
 }: PostSelectionModalProps) {
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selectedPostId, setSelectedPostId] = useState<number | null>(null)
+  const [selectedPostIds, setSelectedPostIds] = useState<number[]>([]) // 다중 선택으로 변경
   const [expandedPostIds, setExpandedPostIds] = useState<number[]>([])
   const [expandedBandKeys, setExpandedBandKeys] = useState<string[]>([])
 
@@ -118,9 +120,36 @@ export default function PostSelectionModal({
     )
   }
 
+  // 게시물 선택/해제 토글
+  const handleToggleSelect = (postId: number) => {
+    setSelectedPostIds(prev =>
+      prev.includes(postId)
+        ? prev.filter(id => id !== postId)
+        : [...prev, postId]
+    )
+  }
+
+  // 밴드 전체 선택/해제
+  const handleToggleBandSelect = (bandPosts: Post[]) => {
+    const bandPostIds = bandPosts.map(p => p.id)
+    const allSelected = bandPostIds.every(id => selectedPostIds.includes(id))
+
+    if (allSelected) {
+      // 모두 선택되어 있으면 해제
+      setSelectedPostIds(prev => prev.filter(id => !bandPostIds.includes(id)))
+    } else {
+      // 하나라도 선택 안 되어 있으면 모두 선택
+      setSelectedPostIds(prev => [...new Set([...prev, ...bandPostIds])])
+    }
+  }
+
   const handleConfirm = () => {
-    if (selectedPostId) {
-      onPostSelected(selectedPostId)
+    if (selectedPostIds.length === 0) return
+
+    if (onMultiplePostsSelected && selectedPostIds.length > 0) {
+      onMultiplePostsSelected(selectedPostIds)
+    } else if (selectedPostIds.length === 1) {
+      onPostSelected(selectedPostIds[0])
     }
   }
 
@@ -164,13 +193,32 @@ export default function PostSelectionModal({
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
               💡 게시물을 선택하면 AI가 자동으로 상품 정보를 생성합니다.
+              <strong className="ml-1">여러 게시물을 선택하여 한 번에 등록할 수 있습니다.</strong>
             </p>
           </div>
+
+          {/* 선택된 게시물 수 표시 */}
+          {selectedPostIds.length > 0 && (
+            <div className="mb-4 p-2 bg-purple-50 border border-purple-200 rounded-lg flex items-center justify-between">
+              <span className="text-sm text-purple-800 font-medium">
+                {selectedPostIds.length}개 게시물 선택됨
+              </span>
+              <button
+                onClick={() => setSelectedPostIds([])}
+                className="text-sm text-purple-600 hover:text-purple-800 underline"
+              >
+                선택 해제
+              </button>
+            </div>
+          )}
 
           <div className="flex-1 overflow-y-auto">
             <div className="space-y-3">
               {Object.entries(groupedPosts).map(([bandKey, group]) => {
                 const isBandExpanded = expandedBandKeys.includes(bandKey)
+                const bandPostIds = group.posts.map(p => p.id)
+                const selectedInBand = bandPostIds.filter(id => selectedPostIds.includes(id)).length
+                const allBandSelected = selectedInBand === group.posts.length
                 return (
                   <div key={bandKey} className="border rounded-lg bg-white">
                     {/* 밴드 헤더 */}
@@ -180,13 +228,26 @@ export default function PostSelectionModal({
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
+                          {/* 밴드 전체 선택 체크박스 */}
+                          <input
+                            type="checkbox"
+                            checked={allBandSelected && group.posts.length > 0}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              handleToggleBandSelect(group.posts)
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-4 h-4 cursor-pointer rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                          />
                           {isBandExpanded ? (
                             <ChevronDown size={20} className="text-gray-600" />
                           ) : (
                             <ChevronRight size={20} className="text-gray-600" />
                           )}
                           <h3 className="font-semibold text-gray-900">{group.band.name}</h3>
-                          <span className="text-sm text-gray-500">({group.posts.length}개)</span>
+                          <span className="text-sm text-gray-500">
+                            ({selectedInBand > 0 ? `${selectedInBand}/` : ''}{group.posts.length}개)
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -196,7 +257,7 @@ export default function PostSelectionModal({
                       <div className="p-2 space-y-2">
                         {group.posts.map((post) => {
                           const isExpanded = expandedPostIds.includes(post.id)
-                          const isSelected = selectedPostId === post.id
+                          const isSelected = selectedPostIds.includes(post.id)
                           return (
                             <div
                               key={post.id}
@@ -204,16 +265,17 @@ export default function PostSelectionModal({
                                 border rounded-lg transition-colors cursor-pointer
                                 ${isSelected ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}
                               `}
-                              onClick={() => setSelectedPostId(post.id)}
+                              onClick={() => handleToggleSelect(post.id)}
                             >
                               {/* 간략 정보 */}
                               <div className="p-4">
                                 <div className="flex items-start gap-4">
                                   <input
-                                    type="radio"
+                                    type="checkbox"
                                     checked={isSelected}
-                                    onChange={() => setSelectedPostId(post.id)}
-                                    className="mt-1 cursor-pointer"
+                                    onChange={() => handleToggleSelect(post.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="mt-1 w-4 h-4 cursor-pointer rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                                   />
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-start justify-between gap-4">
@@ -302,10 +364,13 @@ export default function PostSelectionModal({
             <Button
               variant="primary"
               onClick={handleConfirm}
-              disabled={!selectedPostId}
+              disabled={selectedPostIds.length === 0}
             >
               <Package size={16} />
-              선택한 게시물로 상품 생성
+              {selectedPostIds.length > 1
+                ? `${selectedPostIds.length}개 게시물로 상품 생성`
+                : '선택한 게시물로 상품 생성'
+              }
             </Button>
           </ModalFooter>
         </div>

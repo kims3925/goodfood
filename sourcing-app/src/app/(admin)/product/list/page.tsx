@@ -47,9 +47,10 @@ export default function ProductListPage() {
   // Modal states
   const [showPostSelectionModal, setShowPostSelectionModal] = useState(false)
   const [showProductFormModal, setShowProductFormModal] = useState(false)
-  const [selectedPostId, setSelectedPostId] = useState<number | null>(null)
-  const [productDraft, setProductDraft] = useState<any>(null)
+  const [selectedPostIds, setSelectedPostIds] = useState<number[]>([]) // 다중 선택 지원
+  const [productDrafts, setProductDrafts] = useState<any[]>([]) // 다중 AI 결과
   const [isGenerating, setIsGenerating] = useState(false)
+  const [generatingProgress, setGeneratingProgress] = useState({ current: 0, total: 0 })
 
   // Selection states
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([])
@@ -84,39 +85,94 @@ export default function ProductListPage() {
     setShowPostSelectionModal(true)
   }
 
+  // 단일 게시물 선택 (하위 호환성)
   const handlePostSelected = async (postId: number) => {
-    setSelectedPostId(postId)
+    await handleMultiplePostsSelected([postId])
+  }
+
+  // 다중 게시물 선택 처리
+  const handleMultiplePostsSelected = async (postIds: number[]) => {
+    setSelectedPostIds(postIds)
     setShowPostSelectionModal(false)
     setIsGenerating(true)
+    setGeneratingProgress({ current: 0, total: postIds.length })
 
     try {
-      // AI 상품 생성 API 호출
-      const response = await fetch('/api/product/ai-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId }),
-      })
+      const drafts: any[] = []
 
-      const data = await response.json()
+      // 각 게시물에 대해 AI 상품 생성
+      for (let i = 0; i < postIds.length; i++) {
+        const postId = postIds[i]
+        setGeneratingProgress({ current: i + 1, total: postIds.length })
 
-      if (data.success) {
-        setProductDraft(data.draft)
+        try {
+          const response = await fetch('/api/product/ai-generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ postId }),
+          })
+
+          const data = await response.json()
+
+          if (data.success) {
+            drafts.push({
+              postId,
+              draft: data.draft,
+            })
+          } else {
+            console.error(`게시물 ${postId} AI 생성 실패:`, data.error)
+            // 실패한 게시물도 빈 draft로 추가 (사용자가 직접 입력 가능)
+            drafts.push({
+              postId,
+              draft: {
+                name: `게시물 ${postId} (AI 생성 실패)`,
+                description: '',
+                categoryId: '',
+                price: '',
+                wholesalePrice: '',
+                options: [],
+                variants: [],
+              },
+              error: data.error,
+            })
+          }
+        } catch (error) {
+          console.error(`게시물 ${postId} AI 생성 오류:`, error)
+          drafts.push({
+            postId,
+            draft: {
+              name: `게시물 ${postId} (AI 생성 오류)`,
+              description: '',
+              categoryId: '',
+              price: '',
+              wholesalePrice: '',
+              options: [],
+              variants: [],
+            },
+            error: '네트워크 오류',
+          })
+        }
+      }
+
+      if (drafts.length > 0) {
+        setProductDrafts(drafts)
         setShowProductFormModal(true)
       } else {
-        alert(data.error || 'AI 상품 생성에 실패했습니다.')
+        alert('AI 상품 생성에 실패했습니다.')
       }
     } catch (error) {
       console.error('AI 상품 생성 실패:', error)
       alert('AI 상품 생성 중 오류가 발생했습니다.')
     } finally {
       setIsGenerating(false)
+      setGeneratingProgress({ current: 0, total: 0 })
     }
   }
 
   const handleProductSaved = () => {
     setShowProductFormModal(false)
-    setProductDraft(null)
-    setSelectedPostId(null)
+    setProductDrafts([])
+    setSelectedPostIds([])
     loadProducts()
   }
 
@@ -401,6 +457,19 @@ export default function ProductListPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   AI가 상품 정보를 생성하고 있습니다...
                 </h3>
+                {generatingProgress.total > 1 && (
+                  <div className="mb-3">
+                    <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-purple-500 transition-all duration-300"
+                        style={{ width: `${(generatingProgress.current / generatingProgress.total) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-sm text-purple-600 mt-2 font-medium">
+                      {generatingProgress.current} / {generatingProgress.total} 게시물 처리 중
+                    </p>
+                  </div>
+                )}
                 <p className="text-sm text-gray-600">
                   게시물을 분석하여 상품명, 옵션, 가격 등을 추출 중입니다.
                 </p>
@@ -415,19 +484,21 @@ export default function ProductListPage() {
         isOpen={showPostSelectionModal}
         onClose={() => setShowPostSelectionModal(false)}
         onPostSelected={handlePostSelected}
+        onMultiplePostsSelected={handleMultiplePostsSelected}
       />
 
       {/* 상품 정보 수정 모달 */}
-      {productDraft && (
+      {productDrafts.length > 0 && (
         <ProductFormModal
           isOpen={showProductFormModal}
           onClose={() => {
             setShowProductFormModal(false)
-            setProductDraft(null)
-            setSelectedPostId(null)
+            setProductDrafts([])
+            setSelectedPostIds([])
           }}
-          postId={selectedPostId!}
-          initialData={productDraft}
+          postId={selectedPostIds[0]}
+          initialData={productDrafts[0]?.draft}
+          initialDrafts={productDrafts}
           onSaved={handleProductSaved}
         />
       )}
