@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@bandauto/db'
 import { downloadAndSaveImages, deleteImageFiles } from '@/modules/utils/imageUtils'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@bandauto/db'
 
 declare global {
   // eslint-disable-next-line no-var

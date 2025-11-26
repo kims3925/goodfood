@@ -4,7 +4,7 @@
  */
 
 import prisma from '@/lib/database/client'
-import { Refund, Prisma } from '@prisma/client'
+import { Refund, Prisma } from '@bandauto/db'
 
 export class RefundRepository {
   /**

@@ -2,7 +2,7 @@
  * WholesaleBand Service DTO 타입 정의
  */
 
-import { WholesaleBand } from '@prisma/client'
+import { WholesaleBand } from '@bandauto/db'
 import { BaseFilter } from './common'
 
 /**

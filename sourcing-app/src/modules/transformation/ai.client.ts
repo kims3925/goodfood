@@ -4,7 +4,7 @@
  * Provides a unified interface for different AI providers (Gemini, OpenAI)
  */
 
-import { AiProvider } from '@prisma/client'
+import { AiProvider } from '@bandauto/db'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { ProductTransformationError, TransformationErrorCode } from './product.types'
 

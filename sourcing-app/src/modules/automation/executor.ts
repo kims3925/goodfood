@@ -3,7 +3,7 @@
  * 전체 자동화 파이프라인 실행
  */
 
-import { PrismaClient, WorkflowType, WorkflowStatus } from '@prisma/client'
+import { PrismaClient, WorkflowType, WorkflowStatus } from '@bandauto/db'
 import { setBatchContext, clearBatchContext, createBatchContextFromUserId } from './context'
 import { runCollectionPipeline } from './pipelines/collection'
 import { runTransformPipeline } from './pipelines/transform'

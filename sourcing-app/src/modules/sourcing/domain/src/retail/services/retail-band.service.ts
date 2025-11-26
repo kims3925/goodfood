@@ -3,7 +3,7 @@
  * 소매 밴드 비즈니스 로직 레이어
  */
 
-import { RetailBand } from '@prisma/client'
+import { RetailBand } from '@bandauto/db'
 import {
   retailBandRepository,
   RetailBandRepository

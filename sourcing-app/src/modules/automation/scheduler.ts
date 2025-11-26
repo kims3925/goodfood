@@ -4,7 +4,7 @@
  */
 
 import cron from 'node-cron'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@bandauto/db'
 import { executeFullPipeline } from './executor'
 
 const prisma = new PrismaClient()

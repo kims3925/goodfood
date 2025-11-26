@@ -3,7 +3,7 @@
  * 주문 서비스 타입 정의
  */
 
-import { Order, Customer, Product, Payment, OrderItem } from '@prisma/client'
+import { Order, Customer, Product, Payment, OrderItem } from '@bandauto/db'
 
 export interface CreateOrderDTO {
   userId: number

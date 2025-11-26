@@ -3,7 +3,7 @@
  * 자동화 워크플로우 타입 정의
  */
 
-import { WorkflowType, WorkflowStatus, AiProvider, PublishStatus } from '@prisma/client'
+import { WorkflowType, WorkflowStatus, AiProvider, PublishStatus } from '@bandauto/db'
 
 // =============================================
 // CONTEXT TYPES

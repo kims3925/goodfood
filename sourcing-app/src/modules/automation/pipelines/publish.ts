@@ -3,7 +3,7 @@
  * 상품을 소매밴드에 발행
  */
 
-import { PrismaClient, ProductStatus, PublishStatus } from '@prisma/client'
+import { PrismaClient, ProductStatus, PublishStatus } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { NaverBandClient } from '@/modules/config/domain/src/band/services/band-client.service'

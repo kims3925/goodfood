@@ -2,7 +2,7 @@
  * Product Service DTO 타입 정의
  */
 
-import { Product, ProductStatus } from '@prisma/client'
+import { Product, ProductStatus } from '@bandauto/db'
 import { BaseFilter } from './common'
 
 /**

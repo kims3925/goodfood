@@ -1,5 +1,5 @@
 import prisma from '@/lib/database/client'
-import { Order, Customer, Payment, OrderItem, Product, User, CustomerAddress } from '@prisma/client'
+import { Order, Customer, Payment, OrderItem, Product, User, CustomerAddress } from '@bandauto/db'
 
 export interface OrderItemWithProduct extends OrderItem {
   product: Product

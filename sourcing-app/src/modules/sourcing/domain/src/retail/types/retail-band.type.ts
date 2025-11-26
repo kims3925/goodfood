@@ -2,7 +2,7 @@
  * RetailBand Service DTO 타입 정의
  */
 
-import { RetailBand } from '@prisma/client'
+import { RetailBand } from '@bandauto/db'
 import { BaseFilter } from './common'
 
 /**

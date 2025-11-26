@@ -4,7 +4,7 @@
  */
 
 import prisma from '@/lib/database/client'
-import { Customer, Prisma } from '@prisma/client'
+import { Customer, Prisma } from '@bandauto/db'
 import { CustomerFilter } from '@/types/services/customer'
 
 export class CustomerRepository {

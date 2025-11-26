@@ -3,7 +3,7 @@
  * 주문 비즈니스 로직 레이어
  */
 
-import { Order } from '@prisma/client'
+import { Order } from '@bandauto/db'
 import { getOrderRepository } from '@/domain/orders/repository/order.repository'
 import { customerService, CustomerService } from '@/domain/customers/services/customer.service'
 import { cartService, CartService } from '@/domain/cart/services/cart.service'

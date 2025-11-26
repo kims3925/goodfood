@@ -1,5 +1,5 @@
 import prisma from '@/lib/database/client'
-import { Cart, CartItem, Product } from '@prisma/client'
+import { Cart, CartItem, Product } from '@bandauto/db'
 
 export interface CartWithItems extends Cart {
   items: (CartItem & { product: Product })[]

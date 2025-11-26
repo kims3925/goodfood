@@ -3,7 +3,7 @@
  * 고객 서비스 타입 정의
  */
 
-import { Customer, Order } from '@prisma/client'
+import { Customer, Order } from '@bandauto/db'
 
 export interface CustomerFilter {
   search?: string

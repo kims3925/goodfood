@@ -3,7 +3,7 @@
  * 도매밴드에서 게시물 수집
  */
 
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import {

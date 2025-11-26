@@ -6,7 +6,7 @@
  * @example Basic Usage
  * ```typescript
  * import { transformPostToProduct } from '@/modules/transformation'
- * import { AiProvider } from '@prisma/client'
+ * import { AiProvider } from '@bandauto/db'
  *
  * const draft = await transformPostToProduct({
  *   post: myPost,

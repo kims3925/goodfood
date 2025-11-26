@@ -7,7 +7,7 @@
  * BatchContext를 통해 사용자 정보를 주입하여 처리.
  */
 
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@bandauto/db'
 import { BatchContext } from './types'
 
 const prisma = new PrismaClient()

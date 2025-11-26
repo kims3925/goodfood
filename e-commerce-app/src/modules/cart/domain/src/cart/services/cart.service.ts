@@ -3,13 +3,13 @@
  * 장바구니 비즈니스 로직 레이어
  */
 
-import prisma from '@/lib/database/client'
+import prisma from '@bandauto/db'
 import { v4 as uuidv4 } from 'uuid'
 import {
   ValidationError,
   NotFoundError,
   BusinessLogicError
-} from '@/lib/errors/handlers'
+} from '@/modules/common/utils/src/errors/handlers'
 
 export interface CartItem {
   id: number

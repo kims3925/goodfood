@@ -3,7 +3,7 @@
  * 상품 비즈니스 로직 레이어
  */
 
-import { Product, ProductStatus } from '@prisma/client'
+import { Product, ProductStatus } from '@bandauto/db'
 import { productRepository, ProductRepository } from '@/domain/products/repository/product.repository'
 import {
   CreateProductDTO,

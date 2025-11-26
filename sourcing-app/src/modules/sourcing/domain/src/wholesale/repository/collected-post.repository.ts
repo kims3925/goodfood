@@ -4,7 +4,7 @@
  */
 
 import prisma from '@/lib/database/client'
-import { CollectedPost, Prisma } from '@prisma/client'
+import { CollectedPost, Prisma } from '@bandauto/db'
 import { CollectedPostFilter } from '@/types/services/wholesale'
 
 export interface CollectedPostWithRelations extends CollectedPost {

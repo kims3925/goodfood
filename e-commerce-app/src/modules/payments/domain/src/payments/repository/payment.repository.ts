@@ -4,7 +4,7 @@
  */
 
 import prisma from '@/lib/database/client'
-import { Payment, Refund, Prisma } from '@prisma/client'
+import { Payment, Refund, Prisma } from '@bandauto/db'
 import { PaymentFilter } from '@/types/services/payment'
 
 export interface PaymentWithRelations extends Payment {

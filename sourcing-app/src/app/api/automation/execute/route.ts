@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, WorkflowType } from '@prisma/client'
+import { PrismaClient, WorkflowType } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import {
   executeCollectionPipeline,

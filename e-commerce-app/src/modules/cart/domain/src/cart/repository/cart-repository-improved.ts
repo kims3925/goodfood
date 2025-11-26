@@ -1,5 +1,5 @@
 import prisma from '@/lib/database/client'
-import { Cart, CartItem, Product } from '@prisma/client'
+import { Cart, CartItem, Product } from '@bandauto/db'
 import { RepositoryError, NotFoundError } from '@/lib/errors/types'
 import { logError } from '@/lib/helpers/logger'
 

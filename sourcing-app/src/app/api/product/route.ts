@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, ProductStatus } from '@prisma/client'
+import { PrismaClient, ProductStatus } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 const prisma = new PrismaClient()

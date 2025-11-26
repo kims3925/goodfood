@@ -3,7 +3,7 @@
  * 결제 비즈니스 로직 레이어
  */
 
-import { Payment } from '@prisma/client'
+import { Payment } from '@bandauto/db'
 import { getTossPaymentsService } from '@/domain/payments'
 import { paymentRepository, PaymentRepository } from '@/domain/payments/repository/payment.repository'
 import { refundRepository, RefundRepository } from '@/domain/payments/repository/refund.repository'

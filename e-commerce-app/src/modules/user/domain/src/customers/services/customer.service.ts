@@ -3,7 +3,7 @@
  * 고객 비즈니스 로직 레이어
  */
 
-import { Customer } from '@prisma/client'
+import { Customer } from '@bandauto/db'
 import {
   customerRepository,
   CustomerRepository

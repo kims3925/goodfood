@@ -3,7 +3,7 @@
  * 도매 밴드 비즈니스 로직 레이어
  */
 
-import { WholesaleBand } from '@prisma/client'
+import { WholesaleBand } from '@bandauto/db'
 import {
   wholesaleBandRepository,
   WholesaleBandRepository

@@ -4,7 +4,7 @@
  */
 
 import prisma from '@/lib/database/client'
-import { RetailBand, Prisma } from '@prisma/client'
+import { RetailBand, Prisma } from '@bandauto/db'
 import { RetailBandFilter } from '@/types/services/retail-band'
 
 export class RetailBandRepository {

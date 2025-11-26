@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, PublishStatus } from '@prisma/client'
+import { PrismaClient, PublishStatus } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { NaverBandClient } from '@/modules/config/domain/src/band/services/band-client.service'
 

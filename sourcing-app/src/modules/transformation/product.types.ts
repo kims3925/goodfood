@@ -4,7 +4,7 @@
  * This file defines all TypeScript interfaces and types for product transformation
  */
 
-import { Post, PostImage, AiProvider } from '@prisma/client'
+import { Post, PostImage, AiProvider } from '@bandauto/db'
 
 // =============================================
 // INPUT TYPES
