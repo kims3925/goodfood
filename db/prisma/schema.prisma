@@ -1,7 +1,7 @@
 // =============================================
-// BANDAUTO SHOP-DB DATABASE SCHEMA
+// BANDAUTO SOURCING-APP DATABASE SCHEMA
 // =============================================
-// Purpose: 도매밴드 게시물 수집 → AI 가공 → 소매밴드 발행 + 쇼핑몰
+// Purpose: 도매밴드 게시물 수집 → AI 가공 → 소매밴드 발행
 // Tech Stack: MySQL 8.0+, Prisma, TypeScript
 // Design Principles:
 // - 3NF Normalization
@@ -45,7 +45,6 @@ model User {
   workflowLogs       WorkflowLog[]
   publishHistories   PublishHistory[]
   purchaseOrders     PurchaseOrder[]
-  internalOrders     InternalOrder[]
 
   @@index([email])
   @@map("user")
@@ -326,75 +325,18 @@ model Product {
   // Relationships
   user                   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   post                   Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
-  variants               ProductVariant[]
-  options                ProductOption[]
   purchaseOrders PurchaseOrder[]
-  internalOrders InternalOrder[]
   publishHistories PublishHistory[]
-
-  // E-Commerce Relations
+// E-Commerce Relations
   cartItems              CartItem[]
   sessionCartItems       SessionCartItem[]
   customerOrderItems     CustomerOrderItem[]
-
   @@index([userId])
   @@index([postId])
   @@index([status])
   @@index([categoryId])
   @@index([createdAt])
   @@map("product")
-}
-
-model ProductVariant {
-  id            Int       @id @default(autoincrement())
-  productId     Int       @map("product_id")
-
-  // Variant Info
-  sku           String?   @db.VarChar(100)
-  optionSummary String?   @map("option_summary") @db.VarChar(500) // "색상:빨강, 사이즈:L"
-
-  // Pricing & Stock
-  price          Int   // 판매가
-  wholesalePrice Int?  @map("wholesale_price") // 도매가
-  stock          Int   @default(0)
-
-  // Additional Info
-  weight  Float?  // kg
-  barcode String? @db.VarChar(50)
-
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  // E-Commerce Relations
-  cartItems          CartItem[]
-  sessionCartItems   SessionCartItem[]
-  customerOrderItems CustomerOrderItem[]
-
-  @@index([productId])
-  @@index([sku])
-  @@map("product_variant")
-}
-
-model ProductOption {
-  id        Int    @id @default(autoincrement())
-  productId Int    @map("product_id")
-
-  // Option Info
-  groupName String @map("group_name") @db.VarChar(100) // "색상", "사이즈"
-  value     String @db.VarChar(200) // "빨강", "파랑", "L", "XL"
-  sortOrder Int    @map("sort_order") @default(0)
-
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-
-  // Relationships
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@index([productId])
-  @@index([groupName])
-  @@map("product_option")
 }
 
 // =============================================
@@ -571,80 +513,6 @@ model PurchaseOrder {
   @@index([productName])
   @@index([customerName])
   @@map("purchase_order")
-}
-
-// =============================================
-// INTERNAL ORDER MANAGEMENT (내부 주문서 - 테스트용)
-// =============================================
-
-enum PaymentMethod {
-  CARD           // 카드
-  BANK_TRANSFER  // 계좌이체
-  VIRTUAL_ACCOUNT // 가상계좌
-}
-
-enum CashReceiptType {
-  NONE           // 미발행
-  INCOME         // 소득공제용
-  EXPENSE        // 지출증빙용
-}
-
-enum OrderStatus {
-  PENDING        // 주문대기
-  PAID           // 결제완료
-  PREPARING      // 상품준비중
-  SHIPPING       // 배송중
-  DELIVERED      // 배송완료
-  CANCELLED      // 주문취소
-}
-
-model InternalOrder {
-  id              Int           @id @default(autoincrement())
-  userId          Int           @map("user_id")
-  productId       Int?          @map("product_id")
-
-  // 주문자 정보
-  customerName    String        @map("customer_name") @db.VarChar(100)
-  customerPhone   String        @map("customer_phone") @db.VarChar(20)
-
-  // 배송지 정보
-  recipientName   String        @map("recipient_name") @db.VarChar(100)
-  recipientPhone  String        @map("recipient_phone") @db.VarChar(20)
-  postalCode      String        @map("postal_code") @db.VarChar(10)
-  address         String        @db.VarChar(500)
-  addressDetail   String?       @map("address_detail") @db.VarChar(500)
-  deliveryMemo    String?       @map("delivery_memo") @db.VarChar(500)
-
-  // 상품 정보
-  productName     String        @map("product_name") @db.VarChar(500)
-  quantity        Int           @default(1)
-  unitPrice       Int           @map("unit_price")      // 단가
-  shippingFee     Int           @map("shipping_fee") @default(0)  // 배송비
-  totalPrice      Int           @map("total_price")     // 총 결제금액
-
-  // 결제 정보
-  paymentMethod   PaymentMethod @map("payment_method")
-
-  // 현금영수증
-  cashReceiptType   CashReceiptType @map("cash_receipt_type") @default(NONE)
-  cashReceiptNumber String?         @map("cash_receipt_number") @db.VarChar(50)
-
-  // 주문 상태
-  status          OrderStatus   @default(PENDING)
-
-  // Timestamps
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([productId])
-  @@index([status])
-  @@index([createdAt])
-  @@map("internal_order")
 }
 
 // =============================================
