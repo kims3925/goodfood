@@ -28,6 +28,7 @@ import {
   LayoutDashboard,
   History,
   Cog,
+  Calculator,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -55,6 +56,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       '/publish': '발행',
       '/order': '주문서 관리',
       '/automation': '자동화 관리',
+      '/settlement': '정산 관리',
       '/admin/settings': '환경 설정',
     }
 
@@ -162,6 +164,11 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           icon: <History size={16} />,
         },
       ],
+    },
+    {
+      label: '정산 관리',
+      href: '/settlement/list',
+      icon: <Calculator size={20} />,
     },
     {
       label: '환경 설정',

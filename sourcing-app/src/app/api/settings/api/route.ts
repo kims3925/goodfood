@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-
-const prisma = new PrismaClient()
+import prisma from '@/lib/prisma'
 
 // GET: API 설정 조회
 export async function GET(request: NextRequest) {
@@ -57,7 +55,12 @@ export async function GET(request: NextRequest) {
     // AliExpress API 설정
     const aliexpressConfig = configs.find((c) => c.platform === 'ALIEXPRESS')
     if (aliexpressConfig) {
-      const metadata = aliexpressConfig.metadata as any
+      let metadata: any = {}
+      try {
+        metadata = aliexpressConfig.metadata ? JSON.parse(aliexpressConfig.metadata) : {}
+      } catch {
+        metadata = {}
+      }
       settings.aliexpress = {
         apiKey: aliexpressConfig.apiKey || '',
         appSecret: metadata?.appSecret || '',
@@ -143,15 +146,15 @@ export async function POST(request: NextRequest) {
       // Band: Access Token만 저장 (자동 갱신 없음, 만료 시 수동 재입력)
       configData.accessToken = settings.accessToken || null
       configData.refreshToken = null
-      configData.metadata = {}
+      configData.metadata = null
     } else if (provider === 'aliexpress') {
       // AliExpress: apiKey는 직접 필드에, appSecret/trackingId는 metadata에
       configData.apiKey = settings.apiKey || null
       configData.accessToken = settings.accessToken || null
-      configData.metadata = {
+      configData.metadata = JSON.stringify({
         appSecret: settings.appSecret || null,
         trackingId: settings.trackingId || null,
-      }
+      })
     }
 
     console.log('[API 설정 저장] 저장할 데이터:', configData)

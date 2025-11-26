@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-
-const prisma = new PrismaClient()
+import prisma from '@/lib/prisma'
 
 // GET: AI 설정 조회
 export async function GET(request: NextRequest) {

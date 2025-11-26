@@ -106,6 +106,73 @@ ${pricingRule}
 // =============================================
 
 /**
+ * Attempt to repair truncated JSON by closing open brackets/braces
+ */
+function repairTruncatedJson(jsonText: string): string {
+  // First, try parsing as-is
+  try {
+    JSON.parse(jsonText)
+    return jsonText // Already valid
+  } catch {
+    // Continue with repair
+  }
+
+  console.log('🔧 JSON 복구 시도 중...')
+
+  // Remove trailing comma if present
+  jsonText = jsonText.replace(/,\s*$/, '')
+
+  // Count open brackets and braces
+  let openBraces = 0
+  let openBrackets = 0
+  let inString = false
+  let escapeNext = false
+
+  for (const char of jsonText) {
+    if (escapeNext) {
+      escapeNext = false
+      continue
+    }
+    if (char === '\\') {
+      escapeNext = true
+      continue
+    }
+    if (char === '"') {
+      inString = !inString
+      continue
+    }
+    if (inString) continue
+
+    if (char === '{') openBraces++
+    else if (char === '}') openBraces--
+    else if (char === '[') openBrackets++
+    else if (char === ']') openBrackets--
+  }
+
+  // Close any unclosed string (if we're still in a string)
+  if (inString) {
+    jsonText += '"'
+  }
+
+  // Remove incomplete key-value pair at the end
+  // Pattern: "key": or "key": "incomplete or "key": 123
+  jsonText = jsonText.replace(/,?\s*"[^"]*":\s*("[^"]*)?$/m, '')
+  jsonText = jsonText.replace(/,?\s*"[^"]*":\s*\d*$/m, '')
+
+  // Close open brackets and braces
+  for (let i = 0; i < openBrackets; i++) {
+    jsonText += ']'
+  }
+  for (let i = 0; i < openBraces; i++) {
+    jsonText += '}'
+  }
+
+  console.log('🔧 JSON 복구 완료')
+
+  return jsonText
+}
+
+/**
  * Parse AI response to structured product analysis
  */
 function parseAiResponse(aiResponse: AiResponse): AiProductAnalysis {
@@ -143,6 +210,9 @@ function parseAiResponse(aiResponse: AiResponse): AiProductAnalysis {
     }
 
     console.log('🔍 파싱할 JSON (처음 500자):', jsonText.substring(0, 500))
+
+    // Try to repair truncated JSON
+    jsonText = repairTruncatedJson(jsonText)
 
     // Parse JSON
     const parsed = JSON.parse(jsonText)

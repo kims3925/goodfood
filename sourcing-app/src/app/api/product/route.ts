@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, ProductStatus } from '@bandauto/db'
+import { ProductStatus } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-
-const prisma = new PrismaClient()
+import prisma from '@/lib/prisma'
 
 /**
  * GET /api/product
@@ -82,8 +81,6 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        variants: true,
-        options: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -201,7 +198,7 @@ export async function POST(request: NextRequest) {
     // Get thumbnail from post
     const thumbnailUrl = post.images[0]?.imageUrl || null
 
-    // Create product with options and variants
+    // Create product
     const product = await prisma.product.create({
       data: {
         userId,
@@ -214,32 +211,6 @@ export async function POST(request: NextRequest) {
         price: price || null,
         wholesalePrice: wholesalePrice || null,
         thumbnailUrl,
-        options: options
-          ? {
-              create: options.map((opt: any, index: number) => ({
-                groupName: opt.groupName,
-                value: opt.value,
-                sortOrder: opt.sortOrder ?? index,
-              })),
-            }
-          : undefined,
-        variants: variants
-          ? {
-              create: variants.map((variant: any) => ({
-                sku: variant.sku || null,
-                optionSummary: variant.optionSummary || null,
-                price: variant.price,
-                wholesalePrice: variant.wholesalePrice || null,
-                stock: variant.stock ?? 0,
-                weight: variant.weight || null,
-                barcode: variant.barcode || null,
-              })),
-            }
-          : undefined,
-      },
-      include: {
-        options: true,
-        variants: true,
       },
     })
 
@@ -331,10 +302,6 @@ export async function PUT(request: NextRequest) {
     const product = await prisma.product.update({
       where: { id },
       data,
-      include: {
-        options: true,
-        variants: true,
-      },
     })
 
     return NextResponse.json({

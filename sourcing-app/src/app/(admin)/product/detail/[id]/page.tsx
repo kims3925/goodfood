@@ -223,13 +223,13 @@ export default function ProductDetailPage() {
   }
 
   // Group options by groupName
-  const groupedOptions = product?.options.reduce((acc, option) => {
+  const groupedOptions = (product?.options || []).reduce((acc, option) => {
     if (!acc[option.groupName]) {
       acc[option.groupName] = []
     }
     acc[option.groupName].push(option.value)
     return acc
-  }, {} as Record<string, string[]>) || {}
+  }, {} as Record<string, string[]>)
 
   if (isLoading) {
     return (

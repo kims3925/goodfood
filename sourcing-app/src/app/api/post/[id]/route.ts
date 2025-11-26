@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@bandauto/db'
-
-const prisma = new PrismaClient()
+import prisma from '@/lib/prisma'
 
 // GET: 특정 게시물 상세 조회
 export async function GET(

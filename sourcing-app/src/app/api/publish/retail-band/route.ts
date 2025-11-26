@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, PublishStatus } from '@bandauto/db'
+import { PublishStatus } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { NaverBandClient } from '@/modules/config/domain/src/band/services/band-client.service'
-
-const prisma = new PrismaClient()
+import prisma from '@/lib/prisma'
 
 interface PublishResult {
   bandId: number

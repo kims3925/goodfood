@@ -178,10 +178,10 @@ exports.Prisma.RetailBandScalarFieldEnum = {
   bandKey: 'bandKey',
   name: 'name',
   coverUrl: 'coverUrl',
-  formUrl: 'formUrl',
   isActive: 'isActive',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  formUrl: 'formUrl'
 };
 
 exports.Prisma.PostScalarFieldEnum = {
@@ -229,6 +229,29 @@ exports.Prisma.ProductScalarFieldEnum = {
   wholesalePrice: 'wholesalePrice',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ProductVariantScalarFieldEnum = {
+  id: 'id',
+  productId: 'productId',
+  sku: 'sku',
+  optionSummary: 'optionSummary',
+  price: 'price',
+  wholesalePrice: 'wholesalePrice',
+  stock: 'stock',
+  weight: 'weight',
+  barcode: 'barcode',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ProductOptionScalarFieldEnum = {
+  id: 'id',
+  productId: 'productId',
+  groupName: 'groupName',
+  value: 'value',
+  sortOrder: 'sortOrder',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.PricingPolicyScalarFieldEnum = {
@@ -335,7 +358,8 @@ exports.Prisma.SessionCartItemScalarFieldEnum = {
   quantity: 'quantity',
   priceAt: 'priceAt',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  variantId: 'variantId'
 };
 
 exports.Prisma.CartItemScalarFieldEnum = {
@@ -344,7 +368,8 @@ exports.Prisma.CartItemScalarFieldEnum = {
   productId: 'productId',
   quantity: 'quantity',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  variantId: 'variantId'
 };
 
 exports.Prisma.CustomerOrderScalarFieldEnum = {
@@ -381,7 +406,8 @@ exports.Prisma.CustomerOrderItemScalarFieldEnum = {
   quantity: 'quantity',
   unitPrice: 'unitPrice',
   totalPrice: 'totalPrice',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  variantId: 'variantId'
 };
 
 exports.Prisma.PaymentScalarFieldEnum = {
@@ -412,11 +438,6 @@ exports.Prisma.SortOrder = {
   desc: 'desc'
 };
 
-exports.Prisma.NullableJsonNullValueInput = {
-  DbNull: Prisma.DbNull,
-  JsonNull: Prisma.JsonNull
-};
-
 exports.Prisma.NullsOrder = {
   first: 'first',
   last: 'last'
@@ -428,26 +449,17 @@ exports.Prisma.UserOrderByRelevanceFieldEnum = {
   name: 'name'
 };
 
-exports.Prisma.JsonNullValueFilter = {
-  DbNull: Prisma.DbNull,
-  JsonNull: Prisma.JsonNull,
-  AnyNull: Prisma.AnyNull
-};
-
-exports.Prisma.QueryMode = {
-  default: 'default',
-  insensitive: 'insensitive'
-};
-
 exports.Prisma.SourcingApiConfigOrderByRelevanceFieldEnum = {
   apiKey: 'apiKey',
   accessToken: 'accessToken',
-  refreshToken: 'refreshToken'
+  refreshToken: 'refreshToken',
+  metadata: 'metadata'
 };
 
 exports.Prisma.AiApiConfigOrderByRelevanceFieldEnum = {
   apiKey: 'apiKey',
-  model: 'model'
+  model: 'model',
+  config: 'config'
 };
 
 exports.Prisma.WholesaleBandOrderByRelevanceFieldEnum = {
@@ -488,6 +500,17 @@ exports.Prisma.ProductOrderByRelevanceFieldEnum = {
   currency: 'currency'
 };
 
+exports.Prisma.ProductVariantOrderByRelevanceFieldEnum = {
+  sku: 'sku',
+  optionSummary: 'optionSummary',
+  barcode: 'barcode'
+};
+
+exports.Prisma.ProductOptionOrderByRelevanceFieldEnum = {
+  groupName: 'groupName',
+  value: 'value'
+};
+
 exports.Prisma.PricingPolicyOrderByRelevanceFieldEnum = {
   name: 'name',
   description: 'description',
@@ -495,10 +518,13 @@ exports.Prisma.PricingPolicyOrderByRelevanceFieldEnum = {
 };
 
 exports.Prisma.AutomationConfigOrderByRelevanceFieldEnum = {
-  cronExpression: 'cronExpression'
+  cronExpression: 'cronExpression',
+  wholesaleBandIds: 'wholesaleBandIds',
+  retailBandIds: 'retailBandIds'
 };
 
 exports.Prisma.WorkflowLogOrderByRelevanceFieldEnum = {
+  details: 'details',
   errorMessage: 'errorMessage'
 };
 
@@ -555,7 +581,8 @@ exports.Prisma.PaymentOrderByRelevanceFieldEnum = {
   virtualAccountBank: 'virtualAccountBank',
   cardCompany: 'cardCompany',
   cardNumber: 'cardNumber',
-  cancelReason: 'cancelReason'
+  cancelReason: 'cancelReason',
+  rawResponse: 'rawResponse'
 };
 exports.SourcingPlatform = exports.$Enums.SourcingPlatform = {
   BAND: 'BAND',
@@ -635,6 +662,8 @@ exports.Prisma.ModelName = {
   PostImage: 'PostImage',
   PostComment: 'PostComment',
   Product: 'Product',
+  ProductVariant: 'ProductVariant',
+  ProductOption: 'ProductOption',
   PricingPolicy: 'PricingPolicy',
   AutomationConfig: 'AutomationConfig',
   WorkflowLog: 'WorkflowLog',

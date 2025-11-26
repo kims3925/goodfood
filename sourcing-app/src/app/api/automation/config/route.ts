@@ -55,13 +55,23 @@ export async function GET() {
     // cronExpression에서 interval 추출
     const cronInterval = getCronIntervalFromExpression(config.cronExpression)
 
+    // Parse JSON strings back to arrays
+    let wholesaleBandIds: number[] = []
+    let retailBandIds: number[] = []
+    try {
+      wholesaleBandIds = config.wholesaleBandIds ? JSON.parse(config.wholesaleBandIds) : []
+    } catch { wholesaleBandIds = [] }
+    try {
+      retailBandIds = config.retailBandIds ? JSON.parse(config.retailBandIds) : []
+    } catch { retailBandIds = [] }
+
     return NextResponse.json({
       success: true,
       data: {
         ...config,
         cronInterval,
-        wholesaleBandIds: config.wholesaleBandIds || [],
-        retailBandIds: config.retailBandIds || [],
+        wholesaleBandIds,
+        retailBandIds,
       },
     })
   } catch (error) {
@@ -115,22 +125,22 @@ export async function POST(request: NextRequest) {
         isEnabled: isEnabled ?? false,
         cronExpression,
         collectFromAllBands: collectFromAllBands ?? true,
-        wholesaleBandIds: wholesaleBandIds || [],
+        wholesaleBandIds: JSON.stringify(wholesaleBandIds || []),
         aiProvider: aiProvider || 'GEMINI',
         pricingPolicyId: pricingPolicyId || null,
         autoPublish: autoPublish ?? false,
-        retailBandIds: retailBandIds || [],
+        retailBandIds: JSON.stringify(retailBandIds || []),
         nextRunAt,
       },
       update: {
         isEnabled: isEnabled ?? false,
         cronExpression,
         collectFromAllBands: collectFromAllBands ?? true,
-        wholesaleBandIds: wholesaleBandIds || [],
+        wholesaleBandIds: JSON.stringify(wholesaleBandIds || []),
         aiProvider: aiProvider || 'GEMINI',
         pricingPolicyId: pricingPolicyId || null,
         autoPublish: autoPublish ?? false,
-        retailBandIds: retailBandIds || [],
+        retailBandIds: JSON.stringify(retailBandIds || []),
         nextRunAt,
       },
     })
