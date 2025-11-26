@@ -643,7 +643,6 @@ model SessionCartItem {
   id          Int      @id @default(autoincrement())
   cartId      Int      @map("cart_id")
   productId   Int      @map("product_id")
-  variantId   Int?     @map("variant_id")
 
   quantity    Int      @default(1)
   priceAt     Int      @map("price_at") // 담을 때 가격 스냅샷
@@ -654,9 +653,8 @@ model SessionCartItem {
   // Relationships
   cart        SessionCart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product     Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  variant     ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
-  @@unique([cartId, productId, variantId])
+  @@unique([cartId, productId])
   @@index([cartId])
   @@index([productId])
   @@map("session_cart_item")
@@ -670,7 +668,6 @@ model CartItem {
   id          Int      @id @default(autoincrement())
   customerId  Int      @map("customer_id")
   productId   Int      @map("product_id")
-  variantId   Int?     @map("variant_id") // Optional: specific variant
 
   quantity    Int      @default(1)
 
@@ -680,10 +677,9 @@ model CartItem {
   // Relationships
   customer Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
   product  Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  variant  ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
-  // Prevent duplicate items (same product+variant) in cart
-  @@unique([customerId, productId, variantId])
+  // Prevent duplicate items (same product) in cart
+  @@unique([customerId, productId])
   @@index([customerId])
   @@index([productId])
   @@map("cart_item")
@@ -748,7 +744,6 @@ model CustomerOrderItem {
   id          Int     @id @default(autoincrement())
   orderId     Int     @map("order_id")
   productId   Int?    @map("product_id") // Nullable: product may be deleted
-  variantId   Int?    @map("variant_id") // Nullable: variant may be deleted
 
   // Product Snapshot (preserved even if product changes/deleted)
   productName   String  @map("product_name") @db.VarChar(500)
@@ -765,7 +760,6 @@ model CustomerOrderItem {
   // Relationships
   order   CustomerOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
-  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([productId])

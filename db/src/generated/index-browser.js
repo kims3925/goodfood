@@ -231,29 +231,6 @@ exports.Prisma.ProductScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
-exports.Prisma.ProductVariantScalarFieldEnum = {
-  id: 'id',
-  productId: 'productId',
-  sku: 'sku',
-  optionSummary: 'optionSummary',
-  price: 'price',
-  wholesalePrice: 'wholesalePrice',
-  stock: 'stock',
-  weight: 'weight',
-  barcode: 'barcode',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
-exports.Prisma.ProductOptionScalarFieldEnum = {
-  id: 'id',
-  productId: 'productId',
-  groupName: 'groupName',
-  value: 'value',
-  sortOrder: 'sortOrder',
-  createdAt: 'createdAt'
-};
-
 exports.Prisma.PricingPolicyScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -318,31 +295,6 @@ exports.Prisma.PurchaseOrderScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
-exports.Prisma.InternalOrderScalarFieldEnum = {
-  id: 'id',
-  userId: 'userId',
-  productId: 'productId',
-  customerName: 'customerName',
-  customerPhone: 'customerPhone',
-  recipientName: 'recipientName',
-  recipientPhone: 'recipientPhone',
-  postalCode: 'postalCode',
-  address: 'address',
-  addressDetail: 'addressDetail',
-  deliveryMemo: 'deliveryMemo',
-  productName: 'productName',
-  quantity: 'quantity',
-  unitPrice: 'unitPrice',
-  shippingFee: 'shippingFee',
-  totalPrice: 'totalPrice',
-  paymentMethod: 'paymentMethod',
-  cashReceiptType: 'cashReceiptType',
-  cashReceiptNumber: 'cashReceiptNumber',
-  status: 'status',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
 exports.Prisma.CustomerScalarFieldEnum = {
   id: 'id',
   email: 'email',
@@ -380,7 +332,6 @@ exports.Prisma.SessionCartItemScalarFieldEnum = {
   id: 'id',
   cartId: 'cartId',
   productId: 'productId',
-  variantId: 'variantId',
   quantity: 'quantity',
   priceAt: 'priceAt',
   createdAt: 'createdAt',
@@ -391,7 +342,6 @@ exports.Prisma.CartItemScalarFieldEnum = {
   id: 'id',
   customerId: 'customerId',
   productId: 'productId',
-  variantId: 'variantId',
   quantity: 'quantity',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -425,7 +375,6 @@ exports.Prisma.CustomerOrderItemScalarFieldEnum = {
   id: 'id',
   orderId: 'orderId',
   productId: 'productId',
-  variantId: 'variantId',
   productName: 'productName',
   optionSummary: 'optionSummary',
   thumbnailUrl: 'thumbnailUrl',
@@ -539,17 +488,6 @@ exports.Prisma.ProductOrderByRelevanceFieldEnum = {
   currency: 'currency'
 };
 
-exports.Prisma.ProductVariantOrderByRelevanceFieldEnum = {
-  sku: 'sku',
-  optionSummary: 'optionSummary',
-  barcode: 'barcode'
-};
-
-exports.Prisma.ProductOptionOrderByRelevanceFieldEnum = {
-  groupName: 'groupName',
-  value: 'value'
-};
-
 exports.Prisma.PricingPolicyOrderByRelevanceFieldEnum = {
   name: 'name',
   description: 'description',
@@ -572,19 +510,6 @@ exports.Prisma.PublishHistoryOrderByRelevanceFieldEnum = {
 exports.Prisma.PurchaseOrderOrderByRelevanceFieldEnum = {
   productName: 'productName',
   customerName: 'customerName'
-};
-
-exports.Prisma.InternalOrderOrderByRelevanceFieldEnum = {
-  customerName: 'customerName',
-  customerPhone: 'customerPhone',
-  recipientName: 'recipientName',
-  recipientPhone: 'recipientPhone',
-  postalCode: 'postalCode',
-  address: 'address',
-  addressDetail: 'addressDetail',
-  deliveryMemo: 'deliveryMemo',
-  productName: 'productName',
-  cashReceiptNumber: 'cashReceiptNumber'
 };
 
 exports.Prisma.CustomerOrderByRelevanceFieldEnum = {
@@ -670,27 +595,6 @@ exports.PublishStatus = exports.$Enums.PublishStatus = {
   PENDING: 'PENDING'
 };
 
-exports.PaymentMethod = exports.$Enums.PaymentMethod = {
-  CARD: 'CARD',
-  BANK_TRANSFER: 'BANK_TRANSFER',
-  VIRTUAL_ACCOUNT: 'VIRTUAL_ACCOUNT'
-};
-
-exports.CashReceiptType = exports.$Enums.CashReceiptType = {
-  NONE: 'NONE',
-  INCOME: 'INCOME',
-  EXPENSE: 'EXPENSE'
-};
-
-exports.OrderStatus = exports.$Enums.OrderStatus = {
-  PENDING: 'PENDING',
-  PAID: 'PAID',
-  PREPARING: 'PREPARING',
-  SHIPPING: 'SHIPPING',
-  DELIVERED: 'DELIVERED',
-  CANCELLED: 'CANCELLED'
-};
-
 exports.CustomerOrderStatus = exports.$Enums.CustomerOrderStatus = {
   PENDING: 'PENDING',
   PAID: 'PAID',
@@ -731,14 +635,11 @@ exports.Prisma.ModelName = {
   PostImage: 'PostImage',
   PostComment: 'PostComment',
   Product: 'Product',
-  ProductVariant: 'ProductVariant',
-  ProductOption: 'ProductOption',
   PricingPolicy: 'PricingPolicy',
   AutomationConfig: 'AutomationConfig',
   WorkflowLog: 'WorkflowLog',
   PublishHistory: 'PublishHistory',
   PurchaseOrder: 'PurchaseOrder',
-  InternalOrder: 'InternalOrder',
   Customer: 'Customer',
   CustomerAddress: 'CustomerAddress',
   SessionCart: 'SessionCart',
