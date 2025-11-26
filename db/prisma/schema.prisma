@@ -339,6 +339,58 @@ model Product {
   @@map("product")
 }
 
+model ProductVariant {
+  id            Int       @id @default(autoincrement())
+  productId     Int       @map("product_id")
+
+  // Variant Info
+  sku           String?   @db.VarChar(100)
+  optionSummary String?   @map("option_summary") @db.VarChar(500) // "색상:빨강, 사이즈:L"
+
+  // Pricing & Stock
+  price          Int   // 판매가
+  wholesalePrice Int?  @map("wholesale_price") // 도매가
+  stock          Int   @default(0)
+
+  // Additional Info
+  weight  Float?  // kg
+  barcode String? @db.VarChar(50)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // E-Commerce Relations
+  cartItems          CartItem[]
+  sessionCartItems   SessionCartItem[]
+  customerOrderItems CustomerOrderItem[]
+
+  @@index([productId])
+  @@index([sku])
+  @@map("product_variant")
+}
+
+model ProductOption {
+  id        Int    @id @default(autoincrement())
+  productId Int    @map("product_id")
+
+  // Option Info
+  groupName String @map("group_name") @db.VarChar(100) // "색상", "사이즈"
+  value     String @db.VarChar(200) // "빨강", "파랑", "L", "XL"
+  sortOrder Int    @map("sort_order") @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+
+  // Relationships
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([groupName])
+  @@map("product_option")
+}
+
 // =============================================
 // PRICING POLICY MANAGEMENT (가격 정책 관리)
 // =============================================
