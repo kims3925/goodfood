@@ -6,6 +6,7 @@
 import { PrismaClient, ProductStatus, PublishStatus } from '@prisma/client'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
+import { NaverBandClient } from '@/modules/config/domain/src/band/services/band-client.service'
 import {
   PublishConfig,
   PublishResult,
@@ -15,6 +16,12 @@ import {
 } from '../types'
 
 const prisma = new PrismaClient()
+
+// 지연 함수
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+// Band API 쿨다운 지연 시간 (10초)
+const BAND_API_COOLDOWN_MS = 10000
 
 // =============================================
 // PUBLISH PIPELINE
@@ -38,15 +45,14 @@ export async function runPublishPipeline(
 
   console.log(`[Publish] Starting for user ${userId}`)
 
-  // 발행할 상품 조회
+  // 발행할 상품 조회 (판매중 상태의 상품만)
   const whereClause: any = {
     userId,
+    status: ProductStatus.ACTIVE, // 판매중 상태 상품만 발행
   }
 
   if (config.productIds?.length) {
     whereClause.id = { in: config.productIds }
-  } else if (config.publishReadyOnly) {
-    whereClause.status = ProductStatus.DRAFT
   }
 
   const products = await prisma.product.findMany({
@@ -98,11 +104,6 @@ export async function runPublishPipeline(
 
   console.log(`[Publish] Publishing to ${retailBands.length} retail bands`)
 
-  // 발행 설정 조회
-  const publishSetting = await prisma.publishSetting.findUnique({
-    where: { userId },
-  })
-
   // 진행 상황 초기화
   const { workflowLogId } = context
   const totalItems = products.length * retailBands.length
@@ -131,6 +132,9 @@ export async function runPublishPipeline(
       continue
     }
 
+    // Band API 클라이언트 초기화
+    const bandClient = new NaverBandClient(band.apiConfig.accessToken)
+
     // 각 상품 발행
     for (const product of products) {
       bandResult.attempted++
@@ -157,16 +161,25 @@ export async function runPublishPipeline(
       }
 
       try {
-        // 발행 콘텐츠 생성
-        const content = buildPublishContent(product, publishSetting)
+        // 첫 번째 상품이 아니면 쿨다운 대기 (Band API 제한)
+        if (bandResult.attempted > 1) {
+          console.log(`[Publish] Waiting ${BAND_API_COOLDOWN_MS / 1000}s for Band API cooldown...`)
+          await delay(BAND_API_COOLDOWN_MS)
+        }
+
+        // 게시글 내용 생성
+        const postContent = buildPostContent(product)
 
         // Band API로 게시물 작성
-        const postKey = await publishToBand(
-          band.apiConfig.accessToken,
-          band.bandKey,
-          content,
-          product.post?.images.map((img) => img.imageUrl) || []
-        )
+        const { postKey } = await bandClient.createPost(band.bandKey, postContent, {
+          doPush: false, // 푸시 알림 비활성화
+        })
+
+        // 댓글로 주문서 URL 추가 (밴드의 formUrl 사용)
+        if (band.formUrl) {
+          const commentContent = buildCommentContent(band.formUrl)
+          await bandClient.createComment(band.bandKey, postKey, commentContent)
+        }
 
         // 발행 이력 저장/업데이트
         await prisma.publishHistory.upsert({
@@ -191,12 +204,6 @@ export async function runPublishPipeline(
           },
         })
 
-        // 상품 상태 업데이트
-        await prisma.product.update({
-          where: { id: product.id },
-          data: { status: ProductStatus.ACTIVE },
-        })
-
         bandResult.success++
         currentSuccess++
         publishedProducts.push({
@@ -211,7 +218,7 @@ export async function runPublishPipeline(
           await updateWorkflowProgress(workflowLogId, totalItems, currentSuccess, currentFailed)
         }
 
-        console.log(`[Publish] Published product ${product.id} to ${band.name}`)
+        console.log(`[Publish] Published product ${product.id} to ${band.name} -> post_key: ${postKey}`)
       } catch (publishError: any) {
         console.error(
           `[Publish] Error publishing product ${product.id} to ${band.name}:`,
@@ -287,85 +294,39 @@ export async function runPublishPipeline(
 // =============================================
 
 /**
- * 발행 콘텐츠 생성
+ * 게시글 내용 생성
  */
-function buildPublishContent(
-  product: any,
-  publishSetting: any
-): string {
-  let content = ''
+function buildPostContent(product: any): string {
+  const lines: string[] = []
 
   // 상품명
-  content += `${product.name}\n\n`
+  lines.push(`🛍️ ${product.name}`)
+  lines.push('')
+
+  // 가격 정보 (판매가만 노출)
+  if (product.price) {
+    lines.push(`💰 판매가: ${product.price.toLocaleString()}원`)
+    lines.push('')
+  }
 
   // 상품 설명
   if (product.description) {
-    content += `${product.description}\n\n`
+    lines.push(product.description)
+  } else if (product.post?.content) {
+    lines.push(product.post.content)
   }
 
-  // 가격 정보
-  if (product.price) {
-    content += `가격: ${product.price.toLocaleString()}원\n`
-  }
-
-  // 옵션 정보
-  if (product.variants?.length > 0) {
-    content += '\n옵션:\n'
-    for (const variant of product.variants) {
-      content += `- ${variant.optionSummary || '기본'}: ${variant.price.toLocaleString()}원\n`
-    }
-  }
-
-  // 주문서 URL
-  if (publishSetting?.orderFormUrl) {
-    content += `\n주문서: ${publishSetting.orderFormUrl}\n`
-  }
-
-  // 추가 안내
-  if (publishSetting?.additionalComment) {
-    content += `\n${publishSetting.additionalComment}\n`
-  }
-
-  return content
+  return lines.join('\n')
 }
 
 /**
- * Band API로 게시물 발행
+ * 댓글 내용 생성 (주문서 URL)
  */
-async function publishToBand(
-  accessToken: string,
-  bandKey: string,
-  content: string,
-  imageUrls: string[]
-): Promise<string> {
-  // Band API 게시물 작성 (실제 구현 필요)
-  // 참고: 이미지 업로드는 동료가 별도 구현 예정
+function buildCommentContent(formUrl: string): string {
+  const lines: string[] = []
 
-  const url = 'https://openapi.band.us/v2.2/band/post/create'
+  lines.push(`📋 주문서 작성하기`)
+  lines.push(formUrl)
 
-  const formData = new FormData()
-  formData.append('access_token', accessToken)
-  formData.append('band_key', bandKey)
-  formData.append('content', content)
-  formData.append('do_push', 'true')
-
-  // TODO: 이미지 업로드 구현 (동료 담당)
-  // imageUrls가 있을 경우 photo 파라미터로 업로드
-
-  const response = await fetch(url, {
-    method: 'POST',
-    body: formData,
-  })
-
-  if (!response.ok) {
-    throw new Error(`Band API error: ${response.status}`)
-  }
-
-  const data = await response.json()
-
-  if (data.result_code !== 1) {
-    throw new Error(`Band API error: ${data.result_data?.message || 'Unknown error'}`)
-  }
-
-  return data.result_data?.post_key || ''
+  return lines.join('\n')
 }

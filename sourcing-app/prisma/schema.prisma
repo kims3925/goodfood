@@ -183,7 +183,7 @@ model RetailBand {
   bandKey      String   @map("band_key") @db.VarChar(255) // Band Platform unique key
   name         String   @db.VarChar(255)
   coverUrl     String?  @map("cover_url") @db.VarChar(500)
-  formUrl      String?  @map("form_url") @db.VarChar(500) // 구글 폼 URL
+  formUrl      String?  @map("form_url") @db.VarChar(500) // 주문서 URL
 
   // Status
   isActive     Boolean   @map("is_active") @default(true)

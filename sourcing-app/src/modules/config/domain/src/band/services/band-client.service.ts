@@ -226,7 +226,8 @@ export class NaverBandClient {
       const data = await response.json() as BandApiResponse<{ post_key: string }>
 
       if (data.result_code !== 1) {
-        throw new Error(`Band API Error: ${data.result_message} (Code: ${data.result_code})`)
+        console.error('❌ Band API 응답:', JSON.stringify(data, null, 2))
+        throw new Error(`Band API Error: ${data.result_message || 'Unknown error'} (Code: ${data.result_code})`)
       }
 
       console.log('✅ 게시글 작성 성공:', data.result_data?.post_key)

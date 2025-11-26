@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, PublishStatus } from '@prisma/client'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { NaverBandClient } from '@/modules/config/domain/src/band/services/band-client.service'
 
@@ -123,6 +123,29 @@ export async function POST(request: NextRequest) {
               await bandClient.createComment(retailBand.bandKey, postKey, commentContent)
             }
           }
+
+          // 발행 이력 저장 (자동화와 중복 방지)
+          await prisma.publishHistory.upsert({
+            where: {
+              productId_retailBandId: {
+                productId: product.id,
+                retailBandId: retailBand.id,
+              },
+            },
+            create: {
+              userId: user.userId,
+              productId: product.id,
+              retailBandId: retailBand.id,
+              postKey,
+              status: PublishStatus.SUCCESS,
+            },
+            update: {
+              postKey,
+              status: PublishStatus.SUCCESS,
+              errorMessage: null,
+              publishedAt: new Date(),
+            },
+          })
 
           results.push({
             bandId: retailBand.id,

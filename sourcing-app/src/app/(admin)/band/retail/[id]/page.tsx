@@ -70,11 +70,13 @@ export default function RetailBandDetailPage() {
 
       if (data.success) {
         setBand(data.data)
-        setFormData({
+        const newFormData = {
           name: data.data.name,
           formUrl: data.data.formUrl || '',
           isActive: data.data.isActive,
-        })
+        }
+        setFormData(newFormData)
+        setInitialData(newFormData)
       } else {
         router.push('/band/retail')
       }
@@ -94,7 +96,7 @@ export default function RetailBandDetailPage() {
     if (band) {
       setFormData({
         name: band.name,
-        orderUrl: band.orderUrl || '',
+        formUrl: band.formUrl || '',
         isActive: band.isActive,
       })
     }
@@ -258,9 +260,9 @@ export default function RetailBandDetailPage() {
                 </>
               ) : (
                 <p className="text-gray-900">
-                  {band.orderUrl ? (
-                    <a href={band.orderUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                      {band.orderUrl}
+                  {band.formUrl ? (
+                    <a href={band.formUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      {band.formUrl}
                     </a>
                   ) : '-'}
                 </p>
