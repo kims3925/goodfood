@@ -88,6 +88,25 @@ export async function failWorkflowLog(
   })
 }
 
+/**
+ * 워크플로우 진행 상황 업데이트 (실시간)
+ */
+export async function updateWorkflowProgress(
+  logId: number,
+  totalItems: number,
+  successCount: number,
+  failedCount: number
+): Promise<void> {
+  await prisma.workflowLog.update({
+    where: { id: logId },
+    data: {
+      totalItems,
+      successCount,
+      failedCount,
+    },
+  })
+}
+
 // =============================================
 // STATS QUERIES
 // =============================================

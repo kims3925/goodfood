@@ -5,6 +5,7 @@
 
 import { PrismaClient } from '@prisma/client'
 import { getBatchContext } from '../context'
+import { updateWorkflowProgress } from '../workflow-service'
 import {
   CollectionConfig,
   CollectionResult,
@@ -71,6 +72,16 @@ export async function runCollectionPipeline(
   }
 
   console.log(`[Collection] Found ${wholesaleBands.length} bands to collect from`)
+
+  // 진행 상황 초기화
+  const { workflowLogId } = context
+  if (workflowLogId) {
+    await updateWorkflowProgress(workflowLogId, wholesaleBands.length, 0, 0)
+  }
+
+  let processedBands = 0
+  let successBands = 0
+  let failedBands = 0
 
   // 각 밴드에서 게시물 수집
   for (const band of wholesaleBands) {
@@ -152,6 +163,8 @@ export async function runCollectionPipeline(
       console.log(
         `[Collection] ${band.name}: ${bandResult.newPosts} new, ${bandResult.duplicates} duplicates`
       )
+
+      successBands++
     } catch (bandError: any) {
       console.error(`[Collection] Error collecting from ${band.name}:`, bandError)
       errors.push({
@@ -160,9 +173,16 @@ export async function runCollectionPipeline(
         timestamp: new Date(),
       })
       bandResult.errors.push(bandError.message)
+      failedBands++
     }
 
     bandResults.push(bandResult)
+    processedBands++
+
+    // 진행 상황 업데이트
+    if (workflowLogId) {
+      await updateWorkflowProgress(workflowLogId, wholesaleBands.length, successBands, failedBands)
+    }
   }
 
   const totalItems = bandResults.reduce((sum, r) => sum + r.fetched, 0)

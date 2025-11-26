@@ -83,6 +83,7 @@ export {
   updateWorkflowLog,
   completeWorkflowLog,
   failWorkflowLog,
+  updateWorkflowProgress,
   getAutomationStats,
   getRecentWorkflowLogs,
   getWorkflowLogsByType,

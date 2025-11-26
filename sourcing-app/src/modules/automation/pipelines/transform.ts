@@ -5,6 +5,7 @@
 
 import { PrismaClient, AiProvider, ProductStatus } from '@prisma/client'
 import { getBatchContext } from '../context'
+import { updateWorkflowProgress } from '../workflow-service'
 import { transformPostToProduct } from '@/modules/transformation'
 import {
   TransformConfig,
@@ -86,6 +87,12 @@ export async function runTransformPipeline(
   }
 
   console.log(`[Transform] Found ${posts.length} posts to transform`)
+
+  // 진행 상황 초기화 (totalItems 설정)
+  const { workflowLogId } = context
+  if (workflowLogId) {
+    await updateWorkflowProgress(workflowLogId, posts.length, 0, 0)
+  }
 
   // 가격 정책 조회
   let pricingPolicyContent: string | null = null
@@ -198,6 +205,13 @@ export async function runTransformPipeline(
     }
 
     transformedPosts.push(transformedPost)
+
+    // 진행 상황 업데이트
+    if (workflowLogId) {
+      const currentSuccess = transformedPosts.filter((p) => p.status === 'success').length
+      const currentFailed = transformedPosts.filter((p) => p.status === 'failed').length
+      await updateWorkflowProgress(workflowLogId, posts.length, currentSuccess, currentFailed)
+    }
   }
 
   const successCount = transformedPosts.filter((p) => p.status === 'success').length

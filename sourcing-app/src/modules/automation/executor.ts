@@ -35,12 +35,15 @@ export async function executeCollectionPipeline(
   config?: Partial<FullPipelineConfig['collection']>
 ): Promise<CollectionResult> {
   const context = await createBatchContextFromUserId(userId)
-  setBatchContext(context)
 
   const logId = await createWorkflowLog({
     userId,
     workflowType: WorkflowType.COLLECT,
   })
+
+  // context에 workflowLogId 설정
+  context.workflowLogId = logId
+  setBatchContext(context)
 
   try {
     // 자동화 설정 조회
@@ -82,12 +85,15 @@ export async function executeTransformPipeline(
   config?: Partial<FullPipelineConfig['transform']>
 ): Promise<TransformResult> {
   const context = await createBatchContextFromUserId(userId)
-  setBatchContext(context)
 
   const logId = await createWorkflowLog({
     userId,
     workflowType: WorkflowType.TRANSFORM,
   })
+
+  // context에 workflowLogId 설정
+  context.workflowLogId = logId
+  setBatchContext(context)
 
   try {
     // 자동화 설정 조회
@@ -134,12 +140,15 @@ export async function executePublishPipeline(
   config?: Partial<FullPipelineConfig['publish']>
 ): Promise<PublishResult> {
   const context = await createBatchContextFromUserId(userId)
-  setBatchContext(context)
 
   const logId = await createWorkflowLog({
     userId,
     workflowType: WorkflowType.PUBLISH,
   })
+
+  // context에 workflowLogId 설정
+  context.workflowLogId = logId
+  setBatchContext(context)
 
   try {
     // 자동화 설정 조회

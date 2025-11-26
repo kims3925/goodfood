@@ -13,6 +13,7 @@ export interface BatchContext {
   userId: number
   email: string
   automationConfigId?: number
+  workflowLogId?: number
 }
 
 // =============================================

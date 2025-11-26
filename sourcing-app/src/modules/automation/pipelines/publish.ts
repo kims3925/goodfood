@@ -5,6 +5,7 @@
 
 import { PrismaClient, ProductStatus, PublishStatus } from '@prisma/client'
 import { getBatchContext } from '../context'
+import { updateWorkflowProgress } from '../workflow-service'
 import {
   PublishConfig,
   PublishResult,
@@ -102,6 +103,16 @@ export async function runPublishPipeline(
     where: { userId },
   })
 
+  // 진행 상황 초기화
+  const { workflowLogId } = context
+  const totalItems = products.length * retailBands.length
+  let currentSuccess = 0
+  let currentFailed = 0
+
+  if (workflowLogId) {
+    await updateWorkflowProgress(workflowLogId, totalItems, 0, 0)
+  }
+
   // 각 소매밴드에 발행
   for (const band of retailBands) {
     const bandResult: BandPublishResult = {
@@ -187,12 +198,18 @@ export async function runPublishPipeline(
         })
 
         bandResult.success++
+        currentSuccess++
         publishedProducts.push({
           productId: product.id,
           retailBandId: band.id,
           postKey,
           status: PublishStatus.SUCCESS,
         })
+
+        // 진행 상황 업데이트
+        if (workflowLogId) {
+          await updateWorkflowProgress(workflowLogId, totalItems, currentSuccess, currentFailed)
+        }
 
         console.log(`[Publish] Published product ${product.id} to ${band.name}`)
       } catch (publishError: any) {
@@ -224,6 +241,7 @@ export async function runPublishPipeline(
         })
 
         bandResult.failed++
+        currentFailed++
         bandResult.errors.push(`Product ${product.id}: ${publishError.message}`)
         publishedProducts.push({
           productId: product.id,
@@ -231,6 +249,11 @@ export async function runPublishPipeline(
           status: PublishStatus.FAILED,
           error: publishError.message,
         })
+
+        // 진행 상황 업데이트
+        if (workflowLogId) {
+          await updateWorkflowProgress(workflowLogId, totalItems, currentSuccess, currentFailed)
+        }
 
         errors.push({
           itemId: `${product.id}-${band.id}`,
