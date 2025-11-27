@@ -33,10 +33,14 @@ export async function GET(
         },
         orders: {
           include: {
-            purchaseOrder: {
+            order: {
               include: {
-                product: {
-                  select: { id: true, name: true, thumbnailUrl: true },
+                items: {
+                  include: {
+                    product: {
+                      select: { id: true, name: true, thumbnailUrl: true },
+                    },
+                  },
                 },
               },
             },

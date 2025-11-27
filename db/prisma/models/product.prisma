@@ -30,9 +30,9 @@ model Product {
   post                   Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
   variants               ProductVariant[]
   options                ProductOption[]
-  purchaseOrders         PurchaseOrder[]
   productPublishes       ProductPublish[]
   publishHistories       PublishHistory[]
+  orderTests             OrderTest[]
   // E-Commerce Relations
   cartItems              CartItem[]
   sessionCartItems       SessionCartItem[]

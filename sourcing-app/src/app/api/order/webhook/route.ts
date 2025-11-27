@@ -146,8 +146,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 주문 생성
-    const order = await prisma.purchaseOrder.create({
+    // 테스트 주문 생성
+    const order = await prisma.orderTest.create({
       data: {
         userId: DEFAULT_USER_ID,
         productId,

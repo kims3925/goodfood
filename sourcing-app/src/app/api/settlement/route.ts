@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import prisma from '@/lib/prisma'
-import { SettlementStatus } from '@bandauto/db'
 
 /**
  * GET /api/settlement
@@ -12,22 +11,6 @@ import { SettlementStatus } from '@bandauto/db'
  * - retailBandId?: number - 특정 소매밴드 필터
  * - startDate?: string - 시작 날짜 (YYYY-MM-DD)
  * - endDate?: string - 종료 날짜 (YYYY-MM-DD)
- *
- * Response:
- * - success: boolean
- * - data: {
- *     retailBands: Array<{
- *       id: number
- *       name: string
- *       orderCount: number
- *       totalAmount: number
- *       orders: Array<Order>
- *     }>
- *     summary: {
- *       totalOrders: number
- *       totalAmount: number
- *     }
- *   }
  */
 export async function GET(request: NextRequest) {
   try {
@@ -66,45 +49,22 @@ export async function GET(request: NextRequest) {
       dateFilter.lte = end
     }
 
-    // 발행 이력 조회 (상품 → 소매밴드 매핑)
-    const publishHistories = await prisma.publishHistory.findMany({
+    // 소매밴드별 주문 조회 (Order 테이블 사용)
+    const orders = await prisma.order.findMany({
       where: {
         userId,
-        status: 'SUCCESS',
-        ...(retailBandId ? { retailBandId: parseInt(retailBandId) } : {}),
-        ...(Object.keys(dateFilter).length > 0 ? { publishedAt: dateFilter } : {}),
+        retailBandId: retailBandId ? parseInt(retailBandId) : { not: null },
+        ...(Object.keys(dateFilter).length > 0 ? { orderedAt: dateFilter } : {}),
       },
       include: {
-        product: true,
         retailBand: true,
-      },
-    })
-
-    // 발행된 상품 ID 목록
-    const publishedProductIds = publishHistories.map(ph => ph.productId)
-
-    // 주문서 조회 (발행된 상품과 매칭된 주문)
-    const orders = await prisma.purchaseOrder.findMany({
-      where: {
-        userId,
-        productId: { in: publishedProductIds.length > 0 ? publishedProductIds : [-1] },
-        ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
-      },
-      include: {
-        product: {
+        items: {
           include: {
-            publishHistories: {
-              where: {
-                status: 'SUCCESS',
-              },
-              include: {
-                retailBand: true,
-              },
-            },
+            product: true,
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { orderedAt: 'desc' },
     })
 
     // 소매밴드별로 주문 그룹화
@@ -131,49 +91,40 @@ export async function GET(request: NextRequest) {
 
     // 주문 분류
     orders.forEach(order => {
-      if (!order.product?.publishHistories) return
+      if (!order.retailBandId) return
 
-      order.product.publishHistories.forEach(ph => {
-        const bandData = retailBandMap.get(ph.retailBandId)
-        if (bandData) {
-          bandData.orders.push({
-            id: order.id,
-            productId: order.productId,
-            productName: order.productName,
-            matchedProductName: order.product?.name || null,
-            thumbnailUrl: order.product?.thumbnailUrl || null,
-            totalPrice: order.totalPrice,
-            customerName: order.customerName,
-            createdAt: order.createdAt,
-          })
-          bandData.orderCount++
-          bandData.totalAmount += order.totalPrice || 0
-        }
-      })
+      const bandData = retailBandMap.get(order.retailBandId)
+      if (bandData) {
+        const totalAmount = Number(order.totalAmount) || 0
+        bandData.orders.push({
+          id: order.id,
+          orderNumber: order.orderNumber,
+          recipientName: order.recipientName,
+          totalAmount,
+          status: order.status,
+          orderedAt: order.orderedAt,
+          items: order.items.map(item => ({
+            productName: item.productName,
+            quantity: item.quantity,
+            totalPrice: Number(item.totalPrice),
+          })),
+        })
+        bandData.orderCount++
+        bandData.totalAmount += totalAmount
+      }
     })
 
-    // 미분류 주문 (발행되지 않은 상품의 주문)
-    const unclassifiedOrders = await prisma.purchaseOrder.findMany({
+    // 미분류 주문 (소매밴드 없는 주문)
+    const unclassifiedOrders = await prisma.order.findMany({
       where: {
         userId,
-        OR: [
-          { productId: null },
-          {
-            product: {
-              publishHistories: {
-                none: {
-                  status: 'SUCCESS',
-                }
-              }
-            }
-          }
-        ],
-        ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
+        retailBandId: null,
+        ...(Object.keys(dateFilter).length > 0 ? { orderedAt: dateFilter } : {}),
       },
       include: {
-        product: true,
+        items: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { orderedAt: 'desc' },
     })
 
     // 결과 정리
@@ -192,20 +143,18 @@ export async function GET(request: NextRequest) {
         unclassified: {
           orders: unclassifiedOrders.map(order => ({
             id: order.id,
-            productId: order.productId,
-            productName: order.productName,
-            matchedProductName: order.product?.name || null,
-            thumbnailUrl: order.product?.thumbnailUrl || null,
-            totalPrice: order.totalPrice,
-            customerName: order.customerName,
-            createdAt: order.createdAt,
+            orderNumber: order.orderNumber,
+            recipientName: order.recipientName,
+            totalAmount: Number(order.totalAmount),
+            status: order.status,
+            orderedAt: order.orderedAt,
           })),
           orderCount: unclassifiedOrders.length,
-          totalAmount: unclassifiedOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0),
+          totalAmount: unclassifiedOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0),
         },
         summary: {
           totalOrders: totalOrders + unclassifiedOrders.length,
-          totalAmount: totalAmount + unclassifiedOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0),
+          totalAmount: totalAmount + unclassifiedOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0),
           classifiedOrders: totalOrders,
           classifiedAmount: totalAmount,
         },
@@ -285,12 +234,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 해당 기간의 미정산 주문 조회
-    const orders = await prisma.purchaseOrder.findMany({
+    // 해당 기간의 미정산 주문 조회 (Order 테이블 사용)
+    const orders = await prisma.order.findMany({
       where: {
         userId,
         retailBandId,
-        createdAt: {
+        orderedAt: {
           gte: startDate,
           lte: endDate,
         },
@@ -309,7 +258,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 정산 생성
-    const totalAmount = orders.reduce((sum, o) => sum + (o.totalPrice || 0), 0)
+    const totalAmount = orders.reduce((sum, o) => sum + Number(o.totalAmount), 0)
 
     const settlement = await prisma.settlement.create({
       data: {
@@ -318,13 +267,13 @@ export async function POST(request: NextRequest) {
         periodStart: startDate,
         periodEnd: endDate,
         totalOrders: orders.length,
-        totalAmount,
+        totalAmount: Math.round(totalAmount),
         status: 'PENDING',
         memo: memo || null,
         orders: {
           create: orders.map(order => ({
-            purchaseOrderId: order.id,
-            amount: order.totalPrice || 0,
+            orderId: order.id,
+            amount: Math.round(Number(order.totalAmount)),
           })),
         },
       },

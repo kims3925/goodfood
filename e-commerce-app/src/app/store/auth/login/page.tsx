@@ -12,6 +12,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isKakaoLoading, setIsKakaoLoading] = useState(false)
+  const [isNaverLoading, setIsNaverLoading] = useState(false)
   const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,6 +38,28 @@ export default function LoginPage() {
       setError('로그인 중 오류가 발생했습니다.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleKakaoLogin = async () => {
+    setIsKakaoLoading(true)
+    setError('')
+    try {
+      await signIn('kakao', { callbackUrl: '/store' })
+    } catch (err) {
+      setError('카카오 로그인 중 오류가 발생했습니다.')
+      setIsKakaoLoading(false)
+    }
+  }
+
+  const handleNaverLogin = async () => {
+    setIsNaverLoading(true)
+    setError('')
+    try {
+      await signIn('naver', { callbackUrl: '/store' })
+    } catch (err) {
+      setError('네이버 로그인 중 오류가 발생했습니다.')
+      setIsNaverLoading(false)
     }
   }
 
@@ -155,11 +179,37 @@ export default function LoginPage() {
               </svg>
               <span className="text-gray-700">Google로 로그인</span>
             </button>
-            <button className="w-full py-3 bg-[#FEE500] rounded-md flex items-center justify-center gap-2 hover:bg-[#fdd835] transition">
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#3C1E1E" d="M12 3C6.477 3 2 6.463 2 10.691c0 2.726 1.8 5.117 4.5 6.473-.2.744-.725 2.694-.831 3.116-.13.524.192.517.405.377.167-.11 2.658-1.8 3.726-2.527.7.1 1.421.153 2.2.153 5.523 0 10-3.463 10-7.692S17.523 3 12 3z"/>
-              </svg>
-              <span className="text-[#3C1E1E] font-medium">카카오로 로그인</span>
+            <button
+              onClick={handleKakaoLogin}
+              disabled={isKakaoLoading}
+              className="w-full py-3 bg-[#FEE500] rounded-md flex items-center justify-center gap-2 hover:bg-[#fdd835] disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              {isKakaoLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin text-[#3C1E1E]" />
+              ) : (
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#3C1E1E" d="M12 3C6.477 3 2 6.463 2 10.691c0 2.726 1.8 5.117 4.5 6.473-.2.744-.725 2.694-.831 3.116-.13.524.192.517.405.377.167-.11 2.658-1.8 3.726-2.527.7.1 1.421.153 2.2.153 5.523 0 10-3.463 10-7.692S17.523 3 12 3z"/>
+                </svg>
+              )}
+              <span className="text-[#3C1E1E] font-medium">
+                {isKakaoLoading ? '로그인 중...' : '카카오로 로그인'}
+              </span>
+            </button>
+            <button
+              onClick={handleNaverLogin}
+              disabled={isNaverLoading}
+              className="w-full py-3 bg-[#03C75A] rounded-md flex items-center justify-center gap-2 hover:bg-[#02b351] disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              {isNaverLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin text-white" />
+              ) : (
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#fff" d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/>
+                </svg>
+              )}
+              <span className="text-white font-medium">
+                {isNaverLoading ? '로그인 중...' : '네이버로 로그인'}
+              </span>
             </button>
           </div>
 

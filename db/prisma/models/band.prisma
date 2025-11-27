@@ -35,11 +35,12 @@ model RetailBand {
   updatedAt        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   formUrl          String?           @map("form_url") @db.VarChar(500)
   publishHistories PublishHistory[]
-  purchaseOrders   PurchaseOrder[]
   orders           Order[]
+  orderTests       OrderTest[]
   apiConfig        SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
   productPublishes ProductPublish[]
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settlements      Settlement[]
 
   @@unique([userId, bandKey])
   @@index([userId])

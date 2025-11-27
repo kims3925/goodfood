@@ -1,0 +1,25 @@
+// =============================================
+// OAUTH ACCOUNT (소셜 로그인 연동)
+// =============================================
+
+model OAuthAccount {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @map("user_id")
+  provider     String    @db.VarChar(50) // "kakao", "google", "naver"
+  providerId   String    @map("provider_id") @db.VarChar(100)
+  email        String?   @db.VarChar(255)
+  nickname     String?   @db.VarChar(100)
+  profileImage String?   @map("profile_image") @db.VarChar(500)
+  accessToken  String?   @map("access_token") @db.Text
+  refreshToken String?   @map("refresh_token") @db.Text
+  expiresAt    DateTime? @map("expires_at") @db.Timestamp(0)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+  @@index([provider])
+  @@map("oauth_account")
+}

@@ -34,7 +34,14 @@ export default function LoginPage() {
       console.log('[로그인] 응답 데이터:', data)
 
       if (data.success) {
-        console.log('[로그인] 성공! 페이지 이동 시작...')
+        console.log('[로그인] 성공! 역할:', data.user?.role)
+
+        // 관리자가 아니면 접근 거부 페이지로
+        if (data.user?.role !== 'ADMIN') {
+          window.location.href = '/unauthorized'
+          return
+        }
+
         window.location.href = '/admin/settings/api'
       } else {
         console.log('[로그인] 실패:', data.error)

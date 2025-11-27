@@ -33,10 +33,10 @@ export async function GET(request: NextRequest) {
     }
 
     // 총 개수 조회
-    const total = await prisma.purchaseOrder.count({ where })
+    const total = await prisma.orderTest.count({ where })
 
     // 주문 목록 조회 (상품 정보 포함)
-    const orders = await prisma.purchaseOrder.findMany({
+    const orders = await prisma.orderTest.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
@@ -127,8 +127,8 @@ export async function POST(request: NextRequest) {
       productId = matchedProduct.id
     }
 
-    // 주문 생성
-    const order = await prisma.purchaseOrder.create({
+    // 테스트 주문 생성
+    const order = await prisma.orderTest.create({
       data: {
         userId,
         productId,
