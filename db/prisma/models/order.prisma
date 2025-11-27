@@ -71,7 +71,9 @@ model OrderTest {
   productId    Int?        @map("product_id")
   retailBandId Int?        @map("retail_band_id")
   productName  String      @map("product_name") @db.VarChar(500)
-  totalPrice   Int?        @map("total_price")
+  quantity     Int         @default(1)
+  unitPrice    Int?        @map("unit_price")   // 매칭된 상품의 단가
+  totalPrice   Int?        @map("total_price")  // unitPrice * quantity
   customerName String      @map("customer_name") @db.VarChar(100)
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamp(0)

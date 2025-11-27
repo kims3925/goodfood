@@ -33,7 +33,14 @@ export async function POST(request: NextRequest) {
     }
 
     // 필수 필드 검증
-    const { customerName, productName, totalPrice, formUrl } = body
+    const {
+      customerName,
+      productName,
+      quantity: rawQuantity,  // 수량 (필수)
+      totalPrice,             // 총액 (선택 - 없으면 자동 계산)
+      retailBandId: rawRetailBandId,
+      formUrl
+    } = body
 
     if (!customerName) {
       return NextResponse.json(
@@ -47,6 +54,17 @@ export async function POST(request: NextRequest) {
         { success: false, error: '상품명이 필요합니다.' },
         { status: 400, headers }
       )
+    }
+
+    // 수량 파싱 (기본값: 1)
+    let quantity = 1
+    if (rawQuantity) {
+      const parsed = typeof rawQuantity === 'number'
+        ? rawQuantity
+        : parseInt(String(rawQuantity).replace(/[^0-9]/g, ''))
+      if (!isNaN(parsed) && parsed > 0) {
+        quantity = parsed
+      }
     }
 
     // 사용자 확인
@@ -63,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     // 상품명으로 Product 매칭 시도 (다단계 매칭)
     let productId: number | null = null
-    let matchedProduct: { id: number; name: string } | null = null
+    let matchedProduct: { id: number; name: string; price: number | null } | null = null
 
     // 입력값 정규화 (공백 제거, 소문자)
     const normalizedInput = productName.trim().toLowerCase().replace(/\s+/g, '')
@@ -74,7 +92,7 @@ export async function POST(request: NextRequest) {
         userId: DEFAULT_USER_ID,
         name: productName,
       },
-      select: { id: true, name: true },
+      select: { id: true, name: true, price: true },
     })
 
     // 2단계: 포함 매칭
@@ -84,7 +102,7 @@ export async function POST(request: NextRequest) {
           userId: DEFAULT_USER_ID,
           name: { contains: productName },
         },
-        select: { id: true, name: true },
+        select: { id: true, name: true, price: true },
       })
     }
 
@@ -92,7 +110,7 @@ export async function POST(request: NextRequest) {
     if (!matchedProduct) {
       const allProducts = await prisma.product.findMany({
         where: { userId: DEFAULT_USER_ID },
-        select: { id: true, name: true },
+        select: { id: true, name: true, price: true },
       })
 
       // 정규화된 이름으로 매칭 시도
@@ -109,8 +127,27 @@ export async function POST(request: NextRequest) {
     // 소매밴드 매칭
     let retailBandId: number | null = null
 
-    // 1순위: formUrl로 RetailBand 매칭
-    if (formUrl) {
+    // 1순위: retailBandId 직접 전달 (가장 간단하고 확실한 방법)
+    if (rawRetailBandId) {
+      const parsedBandId = typeof rawRetailBandId === 'number'
+        ? rawRetailBandId
+        : parseInt(String(rawRetailBandId))
+
+      if (!isNaN(parsedBandId)) {
+        // 해당 retailBandId가 실제 존재하는지 확인
+        const retailBand = await prisma.retailBand.findFirst({
+          where: {
+            id: parsedBandId,
+            userId: DEFAULT_USER_ID,
+          },
+          select: { id: true },
+        })
+        retailBandId = retailBand?.id || null
+      }
+    }
+
+    // 2순위: formUrl로 RetailBand 매칭 (기존 방식 호환)
+    if (!retailBandId && formUrl) {
       const retailBand = await prisma.retailBand.findFirst({
         where: {
           userId: DEFAULT_USER_ID,
@@ -121,7 +158,7 @@ export async function POST(request: NextRequest) {
       retailBandId = retailBand?.id || null
     }
 
-    // 2순위: formUrl 없으면 PublishHistory로 매칭
+    // 3순위: PublishHistory로 매칭 (최후 폴백)
     if (!retailBandId && productId) {
       const publishHistory = await prisma.publishHistory.findFirst({
         where: {
@@ -134,15 +171,28 @@ export async function POST(request: NextRequest) {
       retailBandId = publishHistory?.retailBandId || null
     }
 
-    // 가격 파싱 (문자열이나 숫자 모두 처리)
-    let parsedPrice: number | null = null
-    if (totalPrice) {
+    // 가격 계산 로직
+    let unitPrice: number | null = null
+    let calculatedTotalPrice: number | null = null
+
+    // 1순위: 매칭된 상품의 가격으로 자동 계산
+    if (matchedProduct?.price) {
+      unitPrice = matchedProduct.price
+      calculatedTotalPrice = unitPrice * quantity
+    }
+
+    // 2순위: 폼에서 직접 입력한 totalPrice가 있으면 사용 (기존 방식 호환)
+    if (!calculatedTotalPrice && totalPrice) {
       if (typeof totalPrice === 'number') {
-        parsedPrice = totalPrice
+        calculatedTotalPrice = totalPrice
       } else if (typeof totalPrice === 'string') {
         // "15,000원" 또는 "15000" 형태 처리
         const cleaned = totalPrice.replace(/[^0-9]/g, '')
-        parsedPrice = cleaned ? parseInt(cleaned) : null
+        calculatedTotalPrice = cleaned ? parseInt(cleaned) : null
+      }
+      // 직접 입력한 경우 unitPrice 역산 시도
+      if (calculatedTotalPrice && quantity > 0) {
+        unitPrice = Math.round(calculatedTotalPrice / quantity)
       }
     }
 
@@ -153,7 +203,9 @@ export async function POST(request: NextRequest) {
         productId,
         retailBandId,
         productName,
-        totalPrice: parsedPrice,
+        quantity,
+        unitPrice,
+        totalPrice: calculatedTotalPrice,
         customerName,
       },
       include: {
@@ -161,23 +213,33 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             name: true,
+            price: true,
             thumbnailUrl: true,
           },
         },
       },
     })
 
-    console.log(`[Webhook] 주문 생성 완료: ID=${order.id}, 고객=${customerName}, 상품=${productName}, 밴드ID=${retailBandId || '미분류'}`)
+    const bandSource = rawRetailBandId ? '직접전달' : formUrl ? 'formUrl' : productId ? 'PublishHistory' : '미분류'
+    const priceSource = matchedProduct?.price ? '자동계산' : totalPrice ? '직접입력' : '없음'
+    console.log(`[Webhook] 주문 생성 완료: ID=${order.id}, 고객=${customerName}, 상품=${productName}(${quantity}개), 단가=${unitPrice || '?'}원, 총액=${calculatedTotalPrice || '?'}원(${priceSource}), 밴드ID=${retailBandId || '없음'}(${bandSource})`)
 
     return NextResponse.json(
       {
         success: true,
         message: productId
-          ? `주문이 등록되었습니다. (상품 "${matchedProduct?.name}" 매칭됨)`
-          : '주문이 등록되었습니다. (매칭되는 상품 없음)',
+          ? `주문이 등록되었습니다. (상품 "${matchedProduct?.name}" 매칭됨, ${quantity}개 × ${unitPrice?.toLocaleString() || '?'}원 = ${calculatedTotalPrice?.toLocaleString() || '?'}원)`
+          : `주문이 등록되었습니다. (매칭되는 상품 없음, 수량: ${quantity}개)`,
         data: {
           orderId: order.id,
           productMatched: !!productId,
+          matchedProductName: matchedProduct?.name || null,
+          quantity,
+          unitPrice,
+          totalPrice: calculatedTotalPrice,
+          priceSource,
+          retailBandId,
+          retailBandSource: bandSource,
         },
       },
       { headers }

@@ -18,32 +18,49 @@ import {
   History,
   Zap,
   CheckCircle,
+  Database,
+  Webhook,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import SettlementModal from '@/components/settlement/SettlementModal'
 
+interface OrderItem {
+  productName: string
+  quantity: number
+  totalPrice: number
+}
+
 interface Order {
   id: number
-  productId: number | null
-  productName: string
-  matchedProductName: string | null
-  thumbnailUrl: string | null
-  totalPrice: number | null
-  customerName: string
-  createdAt: string
+  orderNumber: string
+  recipientName: string
+  totalAmount: number
+  status: string
+  orderedAt: string
+  items: OrderItem[]
 }
 
 interface RetailBandData {
   id: number
   name: string
   coverUrl: string | null
+  platform: string
   orders: Order[]
   orderCount: number
   totalAmount: number
 }
 
+interface PlatformGroup {
+  platform: string
+  platformName: string
+  retailBands: RetailBandData[]
+  orderCount: number
+  totalAmount: number
+}
+
 interface SettlementData {
+  platforms: PlatformGroup[]
   retailBands: RetailBandData[]
   unclassified: {
     orders: Order[]
@@ -63,12 +80,15 @@ export default function SettlementListPage() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<SettlementData | null>(null)
   const [expandedBands, setExpandedBands] = useState<Set<number>>(new Set())
+  const [expandedPlatforms, setExpandedPlatforms] = useState<Set<string>>(new Set(['BAND', 'ALIEXPRESS']))
   const [showUnclassified, setShowUnclassified] = useState(false)
 
   // 필터 상태
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('') // 전체, BAND, ALIEXPRESS
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [selectedBandId, setSelectedBandId] = useState<string>('')
+  const [dataSource, setDataSource] = useState<'order' | 'orderTest'>('order') // 데이터 소스
 
   // 정산 모달 상태
   const [settlementModal, setSettlementModal] = useState<{
@@ -82,9 +102,11 @@ export default function SettlementListPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
+      if (selectedPlatform) params.set('platform', selectedPlatform)
       if (startDate) params.set('startDate', startDate)
       if (endDate) params.set('endDate', endDate)
       if (selectedBandId) params.set('retailBandId', selectedBandId)
+      params.set('dataSource', dataSource)
 
       const res = await fetch(`/api/settlement?${params}`)
       const result = await res.json()
@@ -97,7 +119,7 @@ export default function SettlementListPage() {
     } finally {
       setLoading(false)
     }
-  }, [startDate, endDate, selectedBandId])
+  }, [selectedPlatform, startDate, endDate, selectedBandId, dataSource])
 
   useEffect(() => {
     fetchData()
@@ -110,6 +132,18 @@ export default function SettlementListPage() {
         newSet.delete(bandId)
       } else {
         newSet.add(bandId)
+      }
+      return newSet
+    })
+  }
+
+  const togglePlatformExpansion = (platform: string) => {
+    setExpandedPlatforms(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(platform)) {
+        newSet.delete(platform)
+      } else {
+        newSet.add(platform)
       }
       return newSet
     })
@@ -134,18 +168,38 @@ export default function SettlementListPage() {
     router.push(`/order/${orderId}`)
   }
 
-  const goToProduct = (productId: number) => {
-    router.push(`/product/detail/${productId}`)
-  }
-
   const handleFilter = () => {
     fetchData()
   }
 
   const handleResetFilter = () => {
+    setSelectedPlatform('')
     setStartDate('')
     setEndDate('')
     setSelectedBandId('')
+  }
+
+  // 소싱처별 아이콘
+  const getPlatformIcon = (platform: string) => {
+    switch (platform) {
+      case 'BAND':
+        return <Store size={20} className="text-green-600" />
+      case 'ALIEXPRESS':
+        return <Package size={20} className="text-orange-600" />
+      default:
+        return <Store size={20} className="text-gray-600" />
+    }
+  }
+
+  const getPlatformColor = (platform: string) => {
+    switch (platform) {
+      case 'BAND':
+        return 'bg-green-100 border-green-200'
+      case 'ALIEXPRESS':
+        return 'bg-orange-100 border-orange-200'
+      default:
+        return 'bg-gray-100 border-gray-200'
+    }
   }
 
   const openSettlementModal = (bandId: number, bandName: string) => {
@@ -207,6 +261,39 @@ export default function SettlementListPage() {
           </div>
         </div>
 
+        {/* 데이터 소스 토글 */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium text-gray-700">데이터 소스:</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDataSource('order')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
+                  dataSource === 'order'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <Database size={16} />
+                <span className="font-medium">주문 데이터</span>
+                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">Order 테이블</span>
+              </button>
+              <button
+                onClick={() => setDataSource('orderTest')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
+                  dataSource === 'orderTest'
+                    ? 'border-purple-500 bg-purple-50 text-purple-700 ring-2 ring-purple-200'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <Webhook size={16} />
+                <span className="font-medium">웹훅 주문</span>
+                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">테스트용</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* 통계 카드 */}
         {data && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -257,11 +344,72 @@ export default function SettlementListPage() {
           </div>
         )}
 
+        {/* 소싱처 탭 */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setSelectedPlatform('')}
+              className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
+                selectedPlatform === ''
+                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <ShoppingBag size={18} />
+                <span>전체</span>
+                {data && (
+                  <span className="text-xs bg-gray-200 px-2 py-0.5 rounded-full">
+                    {data.summary.totalOrders}건
+                  </span>
+                )}
+              </div>
+            </button>
+            <button
+              onClick={() => setSelectedPlatform('BAND')}
+              className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
+                selectedPlatform === 'BAND'
+                  ? 'text-green-600 border-b-2 border-green-600 bg-green-50'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Store size={18} />
+                <span>밴드</span>
+                {data && (
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                    {data.platforms.find(p => p.platform === 'BAND')?.orderCount || 0}건
+                  </span>
+                )}
+              </div>
+            </button>
+            <button
+              onClick={() => setSelectedPlatform('ALIEXPRESS')}
+              className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
+                selectedPlatform === 'ALIEXPRESS'
+                  ? 'text-orange-600 border-b-2 border-orange-600 bg-orange-50'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Package size={18} />
+                <span>알리익스프레스</span>
+                {data && (
+                  <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                    {data.platforms.find(p => p.platform === 'ALIEXPRESS')?.orderCount || 0}건
+                  </span>
+                )}
+              </div>
+            </button>
+          </div>
+        </div>
+
         {/* 필터 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-              <div className="flex flex-wrap gap-4 items-center">
+          <div className="p-4">
+            <div className="flex flex-col gap-4">
+              {/* 날짜 필터 및 버튼 */}
+              <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Calendar size={16} className="text-gray-400" />
                   <input
@@ -278,39 +426,74 @@ export default function SettlementListPage() {
                     className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                {data && data.retailBands.length > 0 && (
-                  <select
-                    value={selectedBandId}
-                    onChange={(e) => setSelectedBandId(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={handleResetFilter}>
+                    초기화
+                  </Button>
+                  <Button variant="primary" onClick={handleFilter}>
+                    <Filter size={16} />
+                    필터 적용
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={fetchData}
+                    disabled={loading}
                   >
-                    <option value="">전체 소매밴드</option>
-                    {data.retailBands.map((band) => (
-                      <option key={band.id} value={band.id.toString()}>
-                        {band.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                    <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                    새로고침
+                  </Button>
+                </div>
               </div>
 
-              <div className="flex gap-2">
-                <Button variant="secondary" onClick={handleResetFilter}>
-                  초기화
-                </Button>
-                <Button variant="primary" onClick={handleFilter}>
-                  <Filter size={16} />
-                  필터 적용
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={fetchData}
-                  disabled={loading}
-                >
-                  <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                  새로고침
-                </Button>
-              </div>
+              {/* 소매밴드 썸네일 버튼 */}
+              {data && data.retailBands.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+                  <button
+                    onClick={() => setSelectedBandId('')}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                      selectedBandId === ''
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center">
+                      <Store size={14} className="text-white" />
+                    </div>
+                    <span className="text-sm font-medium">전체</span>
+                  </button>
+                  {data.retailBands.map((band) => (
+                    <button
+                      key={band.id}
+                      onClick={() => setSelectedBandId(band.id.toString())}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                        selectedBandId === band.id.toString()
+                          ? 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                      title={`${band.name} (${band.orderCount}건)`}
+                    >
+                      {band.coverUrl ? (
+                        <Image
+                          src={band.coverUrl}
+                          alt={band.name}
+                          width={32}
+                          height={32}
+                          className="w-8 h-8 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                          <Store size={14} className="text-white" />
+                        </div>
+                      )}
+                      <div className="text-left">
+                        <p className="text-sm font-medium line-clamp-1 max-w-[120px]">{band.name}</p>
+                        <p className="text-xs text-gray-400">{band.orderCount}건</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -321,9 +504,39 @@ export default function SettlementListPage() {
             <Loading />
           </div>
         ) : data ? (
-          <div className="space-y-4">
-            {/* 소매밴드별 주문 목록 */}
-            {data.retailBands.map((band) => (
+          <div className="space-y-6">
+            {/* 소싱처별 그룹 */}
+            {data.platforms.map((platformGroup) => (
+              <div key={platformGroup.platform} className="space-y-4">
+                {/* 소싱처 헤더 */}
+                <button
+                  onClick={() => togglePlatformExpansion(platformGroup.platform)}
+                  className={`w-full p-4 rounded-lg border ${getPlatformColor(platformGroup.platform)} flex items-center justify-between hover:opacity-90 transition-opacity`}
+                >
+                  <div className="flex items-center gap-3">
+                    {getPlatformIcon(platformGroup.platform)}
+                    <div className="text-left">
+                      <h2 className="text-lg font-bold text-gray-900">{platformGroup.platformName}</h2>
+                      <p className="text-sm text-gray-600">
+                        소매밴드 {platformGroup.retailBands.length}개 | 주문 {platformGroup.orderCount}건 | 매출 {formatPrice(platformGroup.totalAmount)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-xl font-bold text-gray-900">{formatPrice(platformGroup.totalAmount)}</p>
+                      <p className="text-sm text-gray-500">{platformGroup.orderCount}건</p>
+                    </div>
+                    {expandedPlatforms.has(platformGroup.platform) ? (
+                      <ChevronUp size={24} className="text-gray-400" />
+                    ) : (
+                      <ChevronDown size={24} className="text-gray-400" />
+                    )}
+                  </div>
+                </button>
+
+                {/* 소매밴드 목록 */}
+                {expandedPlatforms.has(platformGroup.platform) && platformGroup.retailBands.map((band) => (
               <div
                 key={band.id}
                 className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
@@ -385,13 +598,16 @@ export default function SettlementListPage() {
                         <thead className="bg-gray-50">
                           <tr>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              주문 ID
+                              주문번호
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              상품
+                              주문상품
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               주문자
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              상태
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               금액
@@ -407,62 +623,62 @@ export default function SettlementListPage() {
                         <tbody className="divide-y divide-gray-200">
                           {band.orders.map((order) => (
                             <tr key={order.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 text-sm text-gray-900">
-                                #{order.id}
+                              <td className="px-4 py-3 text-sm text-gray-900 font-mono">
+                                {order.orderNumber}
                               </td>
                               <td className="px-4 py-3">
-                                <div className="flex items-center gap-3">
-                                  {order.thumbnailUrl ? (
-                                    <Image
-                                      src={order.thumbnailUrl}
-                                      alt={order.productName}
-                                      width={40}
-                                      height={40}
-                                      className="w-10 h-10 rounded-lg object-cover"
-                                    />
+                                <div className="space-y-1">
+                                  {order.items && order.items.length > 0 ? (
+                                    order.items.map((item, idx) => (
+                                      <div key={idx} className="flex items-center gap-2">
+                                        <Package size={14} className="text-gray-400 flex-shrink-0" />
+                                        <span className="text-sm text-gray-900 line-clamp-1">
+                                          {item.productName}
+                                        </span>
+                                        <span className="text-xs text-gray-500 flex-shrink-0">
+                                          x{item.quantity}
+                                        </span>
+                                        <span className="text-xs text-gray-500 flex-shrink-0">
+                                          ({formatPrice(item.totalPrice)})
+                                        </span>
+                                      </div>
+                                    ))
                                   ) : (
-                                    <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center">
-                                      <Package size={16} className="text-gray-400" />
-                                    </div>
+                                    <span className="text-sm text-gray-400">상품 정보 없음</span>
                                   )}
-                                  <div>
-                                    <p className="text-sm font-medium text-gray-900 line-clamp-1">
-                                      {order.productName}
-                                    </p>
-                                    {order.matchedProductName && order.matchedProductName !== order.productName && (
-                                      <p className="text-xs text-gray-500 line-clamp-1">
-                                        매칭: {order.matchedProductName}
-                                      </p>
-                                    )}
-                                  </div>
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-600">
-                                {order.customerName}
-                              </td>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                                {formatPrice(order.totalPrice)}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-500">
-                                {formatDate(order.createdAt)}
+                                {order.recipientName}
                               </td>
                               <td className="px-4 py-3">
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => goToOrder(order.id)}
-                                    className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                                  >
-                                    주문 <ExternalLink size={12} />
-                                  </button>
-                                  {order.productId && (
-                                    <button
-                                      onClick={() => goToProduct(order.productId!)}
-                                      className="text-purple-600 hover:text-purple-800 text-sm flex items-center gap-1"
-                                    >
-                                      상품 <ExternalLink size={12} />
-                                    </button>
-                                  )}
-                                </div>
+                                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                  order.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
+                                  order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-700' :
+                                  order.status === 'PAID' ? 'bg-yellow-100 text-yellow-700' :
+                                  order.status === 'WEBHOOK' ? 'bg-purple-100 text-purple-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {order.status === 'DELIVERED' ? '배송완료' :
+                                   order.status === 'SHIPPED' ? '배송중' :
+                                   order.status === 'PAID' ? '결제완료' :
+                                   order.status === 'PENDING' ? '대기중' :
+                                   order.status === 'WEBHOOK' ? '웹훅' : order.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                {formatPrice(order.totalAmount)}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-500">
+                                {formatDate(order.orderedAt)}
+                              </td>
+                              <td className="px-4 py-3">
+                                <button
+                                  onClick={() => goToOrder(order.id)}
+                                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                                >
+                                  상세 <ExternalLink size={12} />
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -473,9 +689,11 @@ export default function SettlementListPage() {
                 )}
               </div>
             ))}
+          </div>
+        ))}
 
-            {/* 미분류 주문 */}
-            {data.unclassified.orderCount > 0 && (
+        {/* 미분류 주문 */}
+        {data.unclassified.orderCount > 0 && (
               <div className="bg-white rounded-lg shadow-sm border border-orange-200 overflow-hidden">
                 <button
                   onClick={() => setShowUnclassified(!showUnclassified)}
@@ -514,13 +732,13 @@ export default function SettlementListPage() {
                         <thead className="bg-orange-50">
                           <tr>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              주문 ID
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              상품
+                              주문번호
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               주문자
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              상태
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               금액
@@ -536,60 +754,40 @@ export default function SettlementListPage() {
                         <tbody className="divide-y divide-orange-100">
                           {data.unclassified.orders.map((order) => (
                             <tr key={order.id} className="hover:bg-orange-50">
-                              <td className="px-4 py-3 text-sm text-gray-900">
-                                #{order.id}
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-3">
-                                  {order.thumbnailUrl ? (
-                                    <Image
-                                      src={order.thumbnailUrl}
-                                      alt={order.productName}
-                                      width={40}
-                                      height={40}
-                                      className="w-10 h-10 rounded-lg object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center">
-                                      <Package size={16} className="text-gray-400" />
-                                    </div>
-                                  )}
-                                  <div>
-                                    <p className="text-sm font-medium text-gray-900 line-clamp-1">
-                                      {order.productName}
-                                    </p>
-                                    {!order.productId && (
-                                      <p className="text-xs text-orange-600">매칭된 상품 없음</p>
-                                    )}
-                                  </div>
-                                </div>
+                              <td className="px-4 py-3 text-sm text-gray-900 font-mono">
+                                {order.orderNumber}
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-600">
-                                {order.customerName}
-                              </td>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                                {formatPrice(order.totalPrice)}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-500">
-                                {formatDate(order.createdAt)}
+                                {order.recipientName}
                               </td>
                               <td className="px-4 py-3">
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => goToOrder(order.id)}
-                                    className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                                  >
-                                    주문 <ExternalLink size={12} />
-                                  </button>
-                                  {order.productId && (
-                                    <button
-                                      onClick={() => goToProduct(order.productId!)}
-                                      className="text-purple-600 hover:text-purple-800 text-sm flex items-center gap-1"
-                                    >
-                                      상품 <ExternalLink size={12} />
-                                    </button>
-                                  )}
-                                </div>
+                                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                  order.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
+                                  order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-700' :
+                                  order.status === 'PAID' ? 'bg-yellow-100 text-yellow-700' :
+                                  order.status === 'WEBHOOK' ? 'bg-purple-100 text-purple-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {order.status === 'DELIVERED' ? '배송완료' :
+                                   order.status === 'SHIPPED' ? '배송중' :
+                                   order.status === 'PAID' ? '결제완료' :
+                                   order.status === 'PENDING' ? '대기중' :
+                                   order.status === 'WEBHOOK' ? '웹훅' : order.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                {formatPrice(order.totalAmount)}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-500">
+                                {formatDate(order.orderedAt)}
+                              </td>
+                              <td className="px-4 py-3">
+                                <button
+                                  onClick={() => goToOrder(order.id)}
+                                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                                >
+                                  상세 <ExternalLink size={12} />
+                                </button>
                               </td>
                             </tr>
                           ))}

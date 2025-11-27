@@ -5,12 +5,14 @@ import prisma from '@/lib/prisma'
 /**
  * GET /api/settlement
  *
- * 소매밴드별 주문 정산 데이터 조회
+ * 소싱처별/소매밴드별 주문 정산 데이터 조회
  *
  * Query Parameters:
+ * - platform?: string - 소싱처 필터 (BAND, ALIEXPRESS)
  * - retailBandId?: number - 특정 소매밴드 필터
  * - startDate?: string - 시작 날짜 (YYYY-MM-DD)
  * - endDate?: string - 종료 날짜 (YYYY-MM-DD)
+ * - dataSource?: string - 데이터 소스 ('order' | 'orderTest')
  */
 export async function GET(request: NextRequest) {
   try {
@@ -24,16 +26,24 @@ export async function GET(request: NextRequest) {
     const userId = currentUser.userId
 
     const { searchParams } = new URL(request.url)
+    const platform = searchParams.get('platform')
     const retailBandId = searchParams.get('retailBandId')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const dataSource = searchParams.get('dataSource') || 'order' // 기본값: order
 
-    // 사용자의 소매밴드 목록 조회
+    // 사용자의 소매밴드 목록 조회 (소싱처 정보 포함)
     const retailBands = await prisma.retailBand.findMany({
       where: {
         userId,
         isActive: true,
         ...(retailBandId ? { id: parseInt(retailBandId) } : {}),
+        ...(platform ? { apiConfig: { platform: platform as any } } : {}),
+      },
+      include: {
+        apiConfig: {
+          select: { platform: true },
+        },
       },
       orderBy: { name: 'asc' },
     })
@@ -49,29 +59,68 @@ export async function GET(request: NextRequest) {
       dateFilter.lte = end
     }
 
-    // 소매밴드별 주문 조회 (Order 테이블 사용)
-    const orders = await prisma.order.findMany({
-      where: {
-        userId,
-        retailBandId: retailBandId ? parseInt(retailBandId) : { not: null },
-        ...(Object.keys(dateFilter).length > 0 ? { orderedAt: dateFilter } : {}),
-      },
-      include: {
-        retailBand: true,
-        items: {
-          include: {
-            product: true,
+    // 데이터 소스에 따라 다른 테이블 조회
+    let orders: any[] = []
+
+    if (dataSource === 'orderTest') {
+      // OrderTest 테이블 (웹훅 주문)
+      const orderTestData = await prisma.orderTest.findMany({
+        where: {
+          userId,
+          retailBandId: retailBandId ? parseInt(retailBandId) : { not: null },
+          ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
+        },
+        include: {
+          retailBand: true,
+          product: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      // OrderTest를 Order 형식으로 변환
+      orders = orderTestData.map(ot => ({
+        id: ot.id,
+        retailBandId: ot.retailBandId,
+        orderNumber: `WH-${ot.id.toString().padStart(6, '0')}`, // 웹훅 주문 번호
+        recipientName: ot.customerName,
+        totalAmount: ot.totalPrice || 0,
+        status: 'WEBHOOK', // 웹훅 주문 상태
+        orderedAt: ot.createdAt,
+        items: [{
+          productName: ot.productName,
+          quantity: 1,
+          totalPrice: ot.totalPrice || 0,
+        }],
+        retailBand: ot.retailBand,
+      }))
+    } else {
+      // Order 테이블 (더미/실제 주문)
+      const orderData = await prisma.order.findMany({
+        where: {
+          userId,
+          retailBandId: retailBandId ? parseInt(retailBandId) : { not: null },
+          ...(Object.keys(dateFilter).length > 0 ? { orderedAt: dateFilter } : {}),
+        },
+        include: {
+          retailBand: true,
+          items: {
+            include: {
+              product: true,
+            },
           },
         },
-      },
-      orderBy: { orderedAt: 'desc' },
-    })
+        orderBy: { orderedAt: 'desc' },
+      })
 
-    // 소매밴드별로 주문 그룹화
+      orders = orderData
+    }
+
+    // 소매밴드별로 주문 그룹화 (소싱처 정보 포함)
     const retailBandMap = new Map<number, {
       id: number
       name: string
       coverUrl: string | null
+      platform: string
       orders: any[]
       orderCount: number
       totalAmount: number
@@ -83,6 +132,7 @@ export async function GET(request: NextRequest) {
         id: band.id,
         name: band.name,
         coverUrl: band.coverUrl,
+        platform: band.apiConfig?.platform || 'UNKNOWN',
         orders: [],
         orderCount: 0,
         totalAmount: 0,
@@ -115,22 +165,84 @@ export async function GET(request: NextRequest) {
     })
 
     // 미분류 주문 (소매밴드 없는 주문)
-    const unclassifiedOrders = await prisma.order.findMany({
-      where: {
-        userId,
-        retailBandId: null,
-        ...(Object.keys(dateFilter).length > 0 ? { orderedAt: dateFilter } : {}),
-      },
-      include: {
-        items: true,
-      },
-      orderBy: { orderedAt: 'desc' },
-    })
+    let unclassifiedOrders: any[] = []
+
+    if (dataSource === 'orderTest') {
+      const unclassifiedTestOrders = await prisma.orderTest.findMany({
+        where: {
+          userId,
+          retailBandId: null,
+          ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      unclassifiedOrders = unclassifiedTestOrders.map(ot => ({
+        id: ot.id,
+        orderNumber: `WH-${ot.id.toString().padStart(6, '0')}`,
+        recipientName: ot.customerName,
+        totalAmount: ot.totalPrice || 0,
+        status: 'WEBHOOK',
+        orderedAt: ot.createdAt,
+      }))
+    } else {
+      const unclassifiedOrderData = await prisma.order.findMany({
+        where: {
+          userId,
+          retailBandId: null,
+          ...(Object.keys(dateFilter).length > 0 ? { orderedAt: dateFilter } : {}),
+        },
+        include: {
+          items: true,
+        },
+        orderBy: { orderedAt: 'desc' },
+      })
+
+      unclassifiedOrders = unclassifiedOrderData.map(order => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        recipientName: order.recipientName,
+        totalAmount: Number(order.totalAmount),
+        status: order.status,
+        orderedAt: order.orderedAt,
+      }))
+    }
 
     // 결과 정리
     const retailBandResults = Array.from(retailBandMap.values())
       .filter(band => band.orderCount > 0 || retailBandId)
       .sort((a, b) => b.totalAmount - a.totalAmount)
+
+    // 소싱처별로 그룹화
+    const platformGroups: Record<string, {
+      platform: string
+      platformName: string
+      retailBands: typeof retailBandResults
+      orderCount: number
+      totalAmount: number
+    }> = {}
+
+    const platformNames: Record<string, string> = {
+      BAND: '밴드',
+      ALIEXPRESS: '알리익스프레스',
+      UNKNOWN: '기타',
+    }
+
+    retailBandResults.forEach(band => {
+      const platform = band.platform
+      if (!platformGroups[platform]) {
+        platformGroups[platform] = {
+          platform,
+          platformName: platformNames[platform] || platform,
+          retailBands: [],
+          orderCount: 0,
+          totalAmount: 0,
+        }
+      }
+      platformGroups[platform].retailBands.push(band)
+      platformGroups[platform].orderCount += band.orderCount
+      platformGroups[platform].totalAmount += band.totalAmount
+    })
 
     // 전체 통계
     const totalOrders = retailBandResults.reduce((sum, b) => sum + b.orderCount, 0)
@@ -139,19 +251,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
+        platforms: Object.values(platformGroups).sort((a, b) => b.totalAmount - a.totalAmount),
         retailBands: retailBandResults,
         unclassified: {
-          orders: unclassifiedOrders.map(order => ({
-            id: order.id,
-            orderNumber: order.orderNumber,
-            recipientName: order.recipientName,
-            totalAmount: Number(order.totalAmount),
-            status: order.status,
-            orderedAt: order.orderedAt,
-          })),
+          orders: unclassifiedOrders,
           orderCount: unclassifiedOrders.length,
-          totalAmount: unclassifiedOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0),
+          totalAmount: unclassifiedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0),
         },
+        dataSource, // 현재 데이터 소스 반환
         summary: {
           totalOrders: totalOrders + unclassifiedOrders.length,
           totalAmount: totalAmount + unclassifiedOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0),
