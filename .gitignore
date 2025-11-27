@@ -224,3 +224,4 @@ data/
 
 nul
 .mcp.json
+db/src/generated/libquery_engine-darwin-arm64.dylib.node

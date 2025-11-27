@@ -50,7 +50,7 @@ Prisma.PrismaClientRustPanicError = PrismaClientRustPanicError
 Prisma.PrismaClientInitializationError = PrismaClientInitializationError
 Prisma.PrismaClientValidationError = PrismaClientValidationError
 Prisma.Decimal = Decimal
-
+                               
 /**
  * Re-export of sql-template-tag
  */
