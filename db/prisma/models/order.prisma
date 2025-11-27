@@ -24,9 +24,10 @@ model Order {
   cancelledAt    DateTime?           @map("cancelled_at") @db.Timestamp(0)
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamp(0)
-  user           User                @relation(fields: [userId], references: [id])
-  items          OrderItem[]
-  payment        Payment?
+  user             User                @relation(fields: [userId], references: [id])
+  items            OrderItem[]
+  payment          Payment?
+  settlementOrders SettlementOrder[]
 
   @@index([userId])
   @@index([orderNumber])
