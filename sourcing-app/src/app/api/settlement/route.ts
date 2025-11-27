@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import prisma from '@/lib/prisma'
+import { SettlementStatus } from '@bandauto/db'
 
 /**
  * GET /api/settlement
@@ -214,6 +215,138 @@ export async function GET(request: NextRequest) {
     console.error('정산 데이터 조회 실패:', error)
     return NextResponse.json(
       { success: false, error: '정산 데이터를 불러오는데 실패했습니다.' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * POST /api/settlement
+ *
+ * 정산 생성
+ *
+ * Body:
+ * - retailBandId: number - 소매밴드 ID
+ * - periodStart: string - 정산 시작일 (YYYY-MM-DD)
+ * - periodEnd: string - 정산 종료일 (YYYY-MM-DD)
+ * - memo?: string - 메모
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: '로그인이 필요합니다.' },
+        { status: 401 }
+      )
+    }
+    const userId = currentUser.userId
+
+    const body = await request.json()
+    const { retailBandId, periodStart, periodEnd, memo } = body
+
+    if (!retailBandId || !periodStart || !periodEnd) {
+      return NextResponse.json(
+        { success: false, error: '소매밴드, 시작일, 종료일은 필수입니다.' },
+        { status: 400 }
+      )
+    }
+
+    const startDate = new Date(periodStart)
+    const endDate = new Date(periodEnd)
+    endDate.setHours(23, 59, 59, 999)
+
+    // 소매밴드 확인
+    const retailBand = await prisma.retailBand.findFirst({
+      where: { id: retailBandId, userId },
+    })
+
+    if (!retailBand) {
+      return NextResponse.json(
+        { success: false, error: '소매밴드를 찾을 수 없습니다.' },
+        { status: 404 }
+      )
+    }
+
+    // 중복 정산 확인
+    const existingSettlement = await prisma.settlement.findFirst({
+      where: {
+        userId,
+        retailBandId,
+        periodStart: startDate,
+        periodEnd: endDate,
+      },
+    })
+
+    if (existingSettlement) {
+      return NextResponse.json(
+        { success: false, error: '동일 기간의 정산이 이미 존재합니다.' },
+        { status: 400 }
+      )
+    }
+
+    // 해당 기간의 미정산 주문 조회
+    const orders = await prisma.purchaseOrder.findMany({
+      where: {
+        userId,
+        retailBandId,
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+        // 이미 정산된 주문 제외
+        settlementOrders: {
+          none: {},
+        },
+      },
+    })
+
+    if (orders.length === 0) {
+      return NextResponse.json(
+        { success: false, error: '해당 기간에 정산할 주문이 없습니다.' },
+        { status: 400 }
+      )
+    }
+
+    // 정산 생성
+    const totalAmount = orders.reduce((sum, o) => sum + (o.totalPrice || 0), 0)
+
+    const settlement = await prisma.settlement.create({
+      data: {
+        userId,
+        retailBandId,
+        periodStart: startDate,
+        periodEnd: endDate,
+        totalOrders: orders.length,
+        totalAmount,
+        status: 'PENDING',
+        memo: memo || null,
+        orders: {
+          create: orders.map(order => ({
+            purchaseOrderId: order.id,
+            amount: order.totalPrice || 0,
+          })),
+        },
+      },
+      include: {
+        retailBand: {
+          select: { id: true, name: true },
+        },
+        _count: {
+          select: { orders: true },
+        },
+      },
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: `정산이 생성되었습니다. (${orders.length}건, ${totalAmount.toLocaleString()}원)`,
+      data: settlement,
+    })
+  } catch (error) {
+    console.error('정산 생성 실패:', error)
+    return NextResponse.json(
+      { success: false, error: '정산 생성에 실패했습니다.' },
       { status: 500 }
     )
   }

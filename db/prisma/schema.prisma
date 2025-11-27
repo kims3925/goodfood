@@ -27,6 +27,7 @@ model User {
   sourcingApiConfigs SourcingApiConfig[]
   wholesaleBands     WholesaleBand[]
   workflowLogs       WorkflowLog[]
+  settlements        Settlement[]
 
   @@index([email])
   @@map("user")
@@ -114,6 +115,7 @@ model RetailBand {
   apiConfig        SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
   productPublishes ProductPublish[]
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settlements      Settlement[]
 
   @@unique([userId, bandKey])
   @@index([userId])
@@ -236,8 +238,6 @@ model ProductVariant {
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
   product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-
   @@index([productId])
   @@index([sku])
   @@map("product_variant")
@@ -250,8 +250,6 @@ model ProductOption {
   value     String   @db.VarChar(200)
   sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
@@ -388,9 +386,10 @@ model PurchaseOrder {
   customerName String      @map("customer_name") @db.VarChar(100)
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamp(0)
-  product      Product?    @relation(fields: [productId], references: [id])
-  retailBand   RetailBand? @relation(fields: [retailBandId], references: [id])
-  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product          Product?          @relation(fields: [productId], references: [id])
+  retailBand       RetailBand?       @relation(fields: [retailBandId], references: [id])
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settlementOrders SettlementOrder[]
 
   @@index([userId])
   @@index([productId])
@@ -631,4 +630,54 @@ enum TossPaymentStatus {
   PARTIAL_CANCELED
   ABORTED
   EXPIRED
+}
+
+// =============================================
+// 정산 관리
+// =============================================
+
+enum SettlementStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+model Settlement {
+  id               Int              @id @default(autoincrement())
+  userId           Int              @map("user_id")
+  retailBandId     Int              @map("retail_band_id")
+  periodStart      DateTime         @map("period_start") @db.Date
+  periodEnd        DateTime         @map("period_end") @db.Date
+  totalOrders      Int              @default(0) @map("total_orders")
+  totalAmount      Int              @default(0) @map("total_amount")
+  status           SettlementStatus @default(PENDING)
+  memo             String?          @db.Text
+  settledAt        DateTime?        @map("settled_at") @db.Timestamp(0)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  retailBand       RetailBand       @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
+  orders           SettlementOrder[]
+
+  @@unique([userId, retailBandId, periodStart, periodEnd])
+  @@index([userId])
+  @@index([retailBandId])
+  @@index([status])
+  @@map("settlement")
+}
+
+model SettlementOrder {
+  id              Int           @id @default(autoincrement())
+  settlementId    Int           @map("settlement_id")
+  purchaseOrderId Int           @map("purchase_order_id")
+  amount          Int
+
+  settlement      Settlement    @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@unique([settlementId, purchaseOrderId])
+  @@index([settlementId])
+  @@index([purchaseOrderId])
+  @@map("settlement_order")
 }

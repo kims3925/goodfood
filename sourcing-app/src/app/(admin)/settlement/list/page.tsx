@@ -15,9 +15,13 @@ import {
   ExternalLink,
   AlertCircle,
   Filter,
+  History,
+  Zap,
+  CheckCircle,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
+import SettlementModal from '@/components/settlement/SettlementModal'
 
 interface Order {
   id: number
@@ -65,6 +69,14 @@ export default function SettlementListPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [selectedBandId, setSelectedBandId] = useState<string>('')
+
+  // 정산 모달 상태
+  const [settlementModal, setSettlementModal] = useState<{
+    isOpen: boolean
+    bandId: number
+    bandName: string
+  } | null>(null)
+  const [migrating, setMigrating] = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -136,15 +148,63 @@ export default function SettlementListPage() {
     setSelectedBandId('')
   }
 
+  const openSettlementModal = (bandId: number, bandName: string) => {
+    setSettlementModal({ isOpen: true, bandId, bandName })
+  }
+
+  const closeSettlementModal = () => {
+    setSettlementModal(null)
+  }
+
+  const handleMigrate = async () => {
+    if (!confirm('미분류 주문을 소매밴드와 매칭하시겠습니까?')) return
+
+    setMigrating(true)
+    try {
+      const res = await fetch('/api/settlement/migrate', { method: 'POST' })
+      const result = await res.json()
+
+      if (result.success) {
+        alert(result.message)
+        fetchData()
+      } else {
+        alert(result.error || '마이그레이션에 실패했습니다.')
+      }
+    } catch (error) {
+      alert('마이그레이션에 실패했습니다.')
+    } finally {
+      setMigrating(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">정산 관리</h1>
-          <p className="text-gray-600">
-            소매밴드별로 주문된 상품을 확인하고 정산 내역을 관리합니다.
-          </p>
+        <div className="mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">정산 관리</h1>
+            <p className="text-gray-600">
+              소매밴드별로 주문된 상품을 확인하고 정산 내역을 관리합니다.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleMigrate}
+              disabled={migrating}
+            >
+              <Zap size={16} className={migrating ? 'animate-pulse' : ''} />
+              {migrating ? '처리중...' : '미분류 주문 매칭'}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => router.push('/settlement/history')}
+            >
+              <History size={16} />
+              정산 이력
+            </Button>
+          </div>
         </div>
 
         {/* 통계 카드 */}
@@ -299,6 +359,16 @@ export default function SettlementListPage() {
                       <p className="text-lg font-bold text-gray-900">{formatPrice(band.totalAmount)}</p>
                       <p className="text-sm text-gray-500">{band.orderCount}건</p>
                     </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openSettlementModal(band.id, band.name)
+                      }}
+                      className="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+                    >
+                      <CheckCircle size={14} />
+                      정산하기
+                    </button>
                     {expandedBands.has(band.id) ? (
                       <ChevronUp size={20} className="text-gray-400" />
                     ) : (
@@ -555,6 +625,19 @@ export default function SettlementListPage() {
           </div>
         )}
       </div>
+
+      {/* 정산 모달 */}
+      {settlementModal && (
+        <SettlementModal
+          retailBandId={settlementModal.bandId}
+          retailBandName={settlementModal.bandName}
+          onClose={closeSettlementModal}
+          onSuccess={() => {
+            fetchData()
+            alert('정산이 생성되었습니다.')
+          }}
+        />
+      )}
     </div>
   )
 }

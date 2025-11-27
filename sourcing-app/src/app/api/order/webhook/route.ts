@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 필수 필드 검증
-    const { customerName, productName, totalPrice } = body
+    const { customerName, productName, totalPrice, formUrl } = body
 
     if (!customerName) {
       return NextResponse.json(
@@ -106,6 +106,34 @@ export async function POST(request: NextRequest) {
       productId = matchedProduct.id
     }
 
+    // 소매밴드 매칭
+    let retailBandId: number | null = null
+
+    // 1순위: formUrl로 RetailBand 매칭
+    if (formUrl) {
+      const retailBand = await prisma.retailBand.findFirst({
+        where: {
+          userId: DEFAULT_USER_ID,
+          formUrl: { contains: formUrl },
+        },
+        select: { id: true },
+      })
+      retailBandId = retailBand?.id || null
+    }
+
+    // 2순위: formUrl 없으면 PublishHistory로 매칭
+    if (!retailBandId && productId) {
+      const publishHistory = await prisma.publishHistory.findFirst({
+        where: {
+          productId,
+          status: 'SUCCESS',
+        },
+        orderBy: { publishedAt: 'desc' },
+        select: { retailBandId: true },
+      })
+      retailBandId = publishHistory?.retailBandId || null
+    }
+
     // 가격 파싱 (문자열이나 숫자 모두 처리)
     let parsedPrice: number | null = null
     if (totalPrice) {
@@ -123,6 +151,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId: DEFAULT_USER_ID,
         productId,
+        retailBandId,
         productName,
         totalPrice: parsedPrice,
         customerName,
@@ -138,7 +167,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    console.log(`[Webhook] 주문 생성 완료: ID=${order.id}, 고객=${customerName}, 상품=${productName}`)
+    console.log(`[Webhook] 주문 생성 완료: ID=${order.id}, 고객=${customerName}, 상품=${productName}, 밴드ID=${retailBandId || '미분류'}`)
 
     return NextResponse.json(
       {
