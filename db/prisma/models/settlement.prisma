@@ -1,0 +1,43 @@
+// =============================================
+// SETTLEMENT (정산 관리)
+// =============================================
+
+model Settlement {
+  id               Int              @id @default(autoincrement())
+  userId           Int              @map("user_id")
+  retailBandId     Int              @map("retail_band_id")
+  periodStart      DateTime         @map("period_start") @db.Date
+  periodEnd        DateTime         @map("period_end") @db.Date
+  totalOrders      Int              @default(0) @map("total_orders")
+  totalAmount      Int              @default(0) @map("total_amount")
+  status           SettlementStatus @default(PENDING)
+  memo             String?          @db.Text
+  settledAt        DateTime?        @map("settled_at") @db.Timestamp(0)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  retailBand       RetailBand       @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
+  orders           SettlementOrder[]
+
+  @@unique([userId, retailBandId, periodStart, periodEnd])
+  @@index([userId])
+  @@index([retailBandId])
+  @@index([status])
+  @@map("settlement")
+}
+
+model SettlementOrder {
+  id           Int        @id @default(autoincrement())
+  settlementId Int        @map("settlement_id")
+  orderId      Int        @map("order_id")
+  amount       Int
+
+  settlement   Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([settlementId, orderId])
+  @@index([settlementId])
+  @@index([orderId])
+  @@map("settlement_order")
+}

@@ -9,8 +9,10 @@ export async function middleware(request: NextRequest) {
   const publicPaths = [
     '/login',
     '/signup',
+    '/unauthorized',
     '/api/auth/login',
     '/api/auth/signup',
+    '/api/auth/logout',
     '/api/order/webhook',  // Google Forms 웹훅
   ]
 
@@ -35,10 +37,7 @@ export async function middleware(request: NextRequest) {
 
   // sourcing-app은 ADMIN 역할만 접근 가능
   if (payload.role !== 'ADMIN') {
-    return NextResponse.json(
-      { error: '관리자만 접근 가능합니다.' },
-      { status: 403 }
-    )
+    return NextResponse.redirect(new URL('/unauthorized', request.url))
   }
 
   return NextResponse.next()
