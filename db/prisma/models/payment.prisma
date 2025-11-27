@@ -1,0 +1,33 @@
+// =============================================
+// PAYMENT (결제)
+// =============================================
+
+model Payment {
+  id                    Int               @id @default(autoincrement())
+  orderId               Int               @unique @map("order_id")
+  paymentKey            String            @unique @map("payment_key") @db.VarChar(200)
+  tossOrderId           String            @map("toss_order_id") @db.VarChar(100)
+  method                TossPaymentMethod
+  status                TossPaymentStatus @default(READY)
+  amount                Decimal           @db.Decimal(12, 2)
+  virtualAccountNumber  String?           @map("virtual_account_number") @db.VarChar(50)
+  virtualAccountBank    String?           @map("virtual_account_bank") @db.VarChar(20)
+  virtualAccountDueDate DateTime?         @map("virtual_account_due_date") @db.Timestamp(0)
+  cardCompany           String?           @map("card_company") @db.VarChar(50)
+  cardNumber            String?           @map("card_number") @db.VarChar(20)
+  installmentMonth      Int?              @map("installment_month")
+  cancelReason          String?           @map("cancel_reason") @db.VarChar(500)
+  cancelledAmount       Decimal?          @map("cancelled_amount") @db.Decimal(12, 2)
+  rawResponse           String?           @map("raw_response") @db.LongText
+  approvedAt            DateTime?         @map("approved_at") @db.Timestamp(0)
+  cancelledAt           DateTime?         @map("cancelled_at") @db.Timestamp(0)
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamp(0)
+  order                 Order             @relation(fields: [orderId], references: [id])
+
+  @@index([paymentKey])
+  @@index([tossOrderId])
+  @@index([status])
+  @@index([approvedAt])
+  @@map("payment")
+}

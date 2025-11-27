@@ -196,6 +196,7 @@ export default function CheckoutPage() {
       if (fromCart) {
         orderData.fromCart = true
       } else {
+        orderData.fromCart = false
         orderData.items = [{
           productId: parseInt(productId!),
           quantity

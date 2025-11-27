@@ -1,0 +1,49 @@
+// =============================================
+// BAND (도매/소매 밴드)
+// =============================================
+
+model WholesaleBand {
+  id          Int               @id @default(autoincrement())
+  userId      Int               @map("user_id")
+  apiConfigId Int               @map("api_config_id")
+  bandKey     String            @map("band_key") @db.VarChar(255)
+  name        String            @db.VarChar(255)
+  coverUrl    String?           @map("cover_url") @db.VarChar(500)
+  isActive    Boolean           @default(true) @map("is_active")
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  posts       Post[]            @relation("WholesaleBand")
+  apiConfig   SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bandKey])
+  @@index([userId])
+  @@index([apiConfigId])
+  @@index([isActive])
+  @@map("wholesale_band")
+}
+
+model RetailBand {
+  id               Int               @id @default(autoincrement())
+  userId           Int               @map("user_id")
+  apiConfigId      Int               @map("api_config_id")
+  bandKey          String            @map("band_key") @db.VarChar(255)
+  name             String            @db.VarChar(255)
+  coverUrl         String?           @map("cover_url") @db.VarChar(500)
+  isActive         Boolean           @default(true) @map("is_active")
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  formUrl          String?           @map("form_url") @db.VarChar(500)
+  publishHistories PublishHistory[]
+  purchaseOrders   PurchaseOrder[]
+  orders           Order[]
+  apiConfig        SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
+  productPublishes ProductPublish[]
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bandKey])
+  @@index([userId])
+  @@index([apiConfigId])
+  @@index([isActive])
+  @@map("retail_band")
+}

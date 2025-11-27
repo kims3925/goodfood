@@ -1,0 +1,82 @@
+// =============================================
+// PRODUCT MANAGEMENT (상품 관리)
+// =============================================
+
+model Product {
+  id           Int           @id @default(autoincrement())
+  userId       Int           @map("user_id") // 생성한 사용자
+  postId       Int           @unique @map("post_id") // 게시물 ID (1:1 관계)
+
+  // Basic Info
+  name         String        @db.VarChar(500)
+  description  String?       @db.Text
+
+  // Images (post_image 재사용)
+  thumbnailUrl String?       @map("thumbnail_url") @db.VarChar(1000) // 첫번째 post_image URL 캐싱
+
+  // Category
+  categoryId   String?       @map("category_id") @db.VarChar(100)
+
+  // Pricing
+  currency       String  @default("KRW") @db.VarChar(10)
+  price          Int?    // 판매가
+  wholesalePrice Int?    @map("wholesale_price") // 도매가
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  user                   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post                   Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  variants               ProductVariant[]
+  options                ProductOption[]
+  purchaseOrders         PurchaseOrder[]
+  productPublishes       ProductPublish[]
+  publishHistories       PublishHistory[]
+  // E-Commerce Relations
+  cartItems              CartItem[]
+  sessionCartItems       SessionCartItem[]
+  orderItems             OrderItem[]
+
+  @@index([userId])
+  @@index([postId])
+  @@index([categoryId])
+  @@index([createdAt])
+  @@map("product")
+}
+
+model ProductVariant {
+  id             Int      @id @default(autoincrement())
+  productId      Int      @map("product_id")
+  sku            String?  @db.VarChar(100)
+  optionSummary  String?  @map("option_summary") @db.VarChar(500)
+  price          Int
+  wholesalePrice Int?     @map("wholesale_price")
+  stock          Int      @default(0)
+  weight         Float?
+  barcode        String?  @db.VarChar(50)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  product          Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sessionCartItems SessionCartItem[]
+
+  @@index([productId])
+  @@index([sku])
+  @@map("product_variant")
+}
+
+model ProductOption {
+  id        Int      @id @default(autoincrement())
+  productId Int      @map("product_id")
+  groupName String   @map("group_name") @db.VarChar(100)
+  value     String   @db.VarChar(200)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([groupName])
+  @@map("product_option")
+}
