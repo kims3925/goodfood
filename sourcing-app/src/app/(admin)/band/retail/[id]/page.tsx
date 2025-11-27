@@ -16,6 +16,9 @@ interface Band {
   name: string
   coverUrl: string | null
   formUrl: string | null
+  accountHolder: string | null
+  bankName: string | null
+  bankAccount: string | null
   isActive: boolean
   createdAt: string
   apiConfig: {
@@ -42,6 +45,9 @@ export default function RetailBandDetailPage() {
   const [formData, setFormData] = useState({
     name: '',
     formUrl: '',
+    accountHolder: '',
+    bankName: '',
+    bankAccount: '',
     isActive: true,
   })
 
@@ -49,6 +55,9 @@ export default function RetailBandDetailPage() {
   const [initialData, setInitialData] = useState({
     name: '',
     formUrl: '',
+    accountHolder: '',
+    bankName: '',
+    bankAccount: '',
     isActive: true,
   })
 
@@ -56,6 +65,9 @@ export default function RetailBandDetailPage() {
   const hasChanges =
     formData.name !== initialData.name ||
     formData.formUrl !== initialData.formUrl ||
+    formData.accountHolder !== initialData.accountHolder ||
+    formData.bankName !== initialData.bankName ||
+    formData.bankAccount !== initialData.bankAccount ||
     formData.isActive !== initialData.isActive
 
   useEffect(() => {
@@ -73,6 +85,9 @@ export default function RetailBandDetailPage() {
         const newFormData = {
           name: data.data.name,
           formUrl: data.data.formUrl || '',
+          accountHolder: data.data.accountHolder || '',
+          bankName: data.data.bankName || '',
+          bankAccount: data.data.bankAccount || '',
           isActive: data.data.isActive,
         }
         setFormData(newFormData)
@@ -97,6 +112,9 @@ export default function RetailBandDetailPage() {
       setFormData({
         name: band.name,
         formUrl: band.formUrl || '',
+        accountHolder: band.accountHolder || '',
+        bankName: band.bankName || '',
+        bankAccount: band.bankAccount || '',
         isActive: band.isActive,
       })
     }
@@ -265,6 +283,63 @@ export default function RetailBandDetailPage() {
                       {band.formUrl}
                     </a>
                   ) : '-'}
+                </p>
+              )}
+            </div>
+
+            {/* 계좌 정보 */}
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">계좌 정보</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-2">
+                    은행명
+                  </label>
+                  {isEditing ? (
+                    <Input
+                      type="text"
+                      value={formData.bankName}
+                      onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                      placeholder="예: 국민은행"
+                    />
+                  ) : (
+                    <p className="text-gray-900">{band.bankName || '-'}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-2">
+                    계좌번호
+                  </label>
+                  {isEditing ? (
+                    <Input
+                      type="text"
+                      value={formData.bankAccount}
+                      onChange={(e) => setFormData({ ...formData, bankAccount: e.target.value })}
+                      placeholder="예: 123-456-789012"
+                    />
+                  ) : (
+                    <p className="text-gray-900 font-mono">{band.bankAccount || '-'}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-2">
+                    예금주
+                  </label>
+                  {isEditing ? (
+                    <Input
+                      type="text"
+                      value={formData.accountHolder}
+                      onChange={(e) => setFormData({ ...formData, accountHolder: e.target.value })}
+                      placeholder="예: 홍길동"
+                    />
+                  ) : (
+                    <p className="text-gray-900">{band.accountHolder || '-'}</p>
+                  )}
+                </div>
+              </div>
+              {isEditing && (
+                <p className="mt-2 text-sm text-gray-500">
+                  정산 시 사용할 계좌 정보입니다.
                 </p>
               )}
             </div>

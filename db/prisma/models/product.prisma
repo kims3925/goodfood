@@ -32,7 +32,6 @@ model Product {
   options                ProductOption[]
   productPublishes       ProductPublish[]
   publishHistories       PublishHistory[]
-  orderTests             OrderTest[]
   // E-Commerce Relations
   cartItems              CartItem[]
   // sessionCartItems는 제거 (productPublish를 통해 관계)

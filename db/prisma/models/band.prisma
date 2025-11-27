@@ -34,11 +34,10 @@ model RetailBand {
   createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt        DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   formUrl          String?            @map("form_url") @db.VarChar(500)
+  accountHolder    String?            @map("account_holder") @db.VarChar(100)
+  bankAccount      String?            @map("bank_account") @db.VarChar(50)
+  bankName         String?            @map("bank_name") @db.VarChar(50)
   publishHistories PublishHistory[]
-  orderTests       OrderTest[]
-  settlements      Settlement[]
-  // orderItems는 제거 (productPublish를 통해 관계)
-  // cartItems는 제거 (productPublish를 통해 관계)
   apiConfig        SourcingApiConfig  @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
   productPublishes ProductPublish[]
   user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
