@@ -65,7 +65,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, formUrl, isActive } = body
+    const { name, formUrl, accountHolder, bankName, bankAccount, isActive } = body
 
     const existing = await prisma.retailBand.findUnique({
       where: { id: bandId },
@@ -83,6 +83,9 @@ export async function PUT(
       data: {
         ...(name !== undefined && { name }),
         ...(formUrl !== undefined && { formUrl }),
+        ...(accountHolder !== undefined && { accountHolder }),
+        ...(bankName !== undefined && { bankName }),
+        ...(bankAccount !== undefined && { bankAccount }),
         ...(isActive !== undefined && { isActive }),
       },
       include: {
