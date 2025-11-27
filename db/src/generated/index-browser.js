@@ -311,6 +311,7 @@ exports.Prisma.PurchaseOrderScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   productId: 'productId',
+  retailBandId: 'retailBandId',
   productName: 'productName',
   totalPrice: 'totalPrice',
   customerName: 'customerName',

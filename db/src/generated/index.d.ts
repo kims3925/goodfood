@@ -3082,10 +3082,12 @@ export namespace Prisma {
 
   export type RetailBandCountOutputType = {
     publishHistories: number
+    purchaseOrders: number
   }
 
   export type RetailBandCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     publishHistories?: boolean | RetailBandCountOutputTypeCountPublishHistoriesArgs
+    purchaseOrders?: boolean | RetailBandCountOutputTypeCountPurchaseOrdersArgs
   }
 
   // Custom InputTypes
@@ -3104,6 +3106,13 @@ export namespace Prisma {
    */
   export type RetailBandCountOutputTypeCountPublishHistoriesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: PublishHistoryWhereInput
+  }
+
+  /**
+   * RetailBandCountOutputType without action
+   */
+  export type RetailBandCountOutputTypeCountPurchaseOrdersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: PurchaseOrderWhereInput
   }
 
 
@@ -8039,6 +8048,7 @@ export namespace Prisma {
     updatedAt?: boolean
     formUrl?: boolean
     publishHistories?: boolean | RetailBand$publishHistoriesArgs<ExtArgs>
+    purchaseOrders?: boolean | RetailBand$purchaseOrdersArgs<ExtArgs>
     apiConfig?: boolean | SourcingApiConfigDefaultArgs<ExtArgs>
     user?: boolean | UserDefaultArgs<ExtArgs>
     _count?: boolean | RetailBandCountOutputTypeDefaultArgs<ExtArgs>
@@ -8062,6 +8072,7 @@ export namespace Prisma {
   export type RetailBandOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "apiConfigId" | "bandKey" | "name" | "coverUrl" | "isActive" | "createdAt" | "updatedAt" | "formUrl", ExtArgs["result"]["retailBand"]>
   export type RetailBandInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     publishHistories?: boolean | RetailBand$publishHistoriesArgs<ExtArgs>
+    purchaseOrders?: boolean | RetailBand$purchaseOrdersArgs<ExtArgs>
     apiConfig?: boolean | SourcingApiConfigDefaultArgs<ExtArgs>
     user?: boolean | UserDefaultArgs<ExtArgs>
     _count?: boolean | RetailBandCountOutputTypeDefaultArgs<ExtArgs>
@@ -8071,6 +8082,7 @@ export namespace Prisma {
     name: "RetailBand"
     objects: {
       publishHistories: Prisma.$PublishHistoryPayload<ExtArgs>[]
+      purchaseOrders: Prisma.$PurchaseOrderPayload<ExtArgs>[]
       apiConfig: Prisma.$SourcingApiConfigPayload<ExtArgs>
       user: Prisma.$UserPayload<ExtArgs>
     }
@@ -8426,6 +8438,7 @@ export namespace Prisma {
   export interface Prisma__RetailBandClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     publishHistories<T extends RetailBand$publishHistoriesArgs<ExtArgs> = {}>(args?: Subset<T, RetailBand$publishHistoriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PublishHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    purchaseOrders<T extends RetailBand$purchaseOrdersArgs<ExtArgs> = {}>(args?: Subset<T, RetailBand$purchaseOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PurchaseOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     apiConfig<T extends SourcingApiConfigDefaultArgs<ExtArgs> = {}>(args?: Subset<T, SourcingApiConfigDefaultArgs<ExtArgs>>): Prisma__SourcingApiConfigClient<$Result.GetResult<Prisma.$SourcingApiConfigPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     /**
@@ -8831,6 +8844,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: PublishHistoryScalarFieldEnum | PublishHistoryScalarFieldEnum[]
+  }
+
+  /**
+   * RetailBand.purchaseOrders
+   */
+  export type RetailBand$purchaseOrdersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PurchaseOrder
+     */
+    select?: PurchaseOrderSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PurchaseOrder
+     */
+    omit?: PurchaseOrderOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PurchaseOrderInclude<ExtArgs> | null
+    where?: PurchaseOrderWhereInput
+    orderBy?: PurchaseOrderOrderByWithRelationInput | PurchaseOrderOrderByWithRelationInput[]
+    cursor?: PurchaseOrderWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: PurchaseOrderScalarFieldEnum | PurchaseOrderScalarFieldEnum[]
   }
 
   /**
@@ -19277,6 +19314,7 @@ export namespace Prisma {
     id: number | null
     userId: number | null
     productId: number | null
+    retailBandId: number | null
     totalPrice: number | null
   }
 
@@ -19284,6 +19322,7 @@ export namespace Prisma {
     id: number | null
     userId: number | null
     productId: number | null
+    retailBandId: number | null
     totalPrice: number | null
   }
 
@@ -19291,6 +19330,7 @@ export namespace Prisma {
     id: number | null
     userId: number | null
     productId: number | null
+    retailBandId: number | null
     productName: string | null
     totalPrice: number | null
     customerName: string | null
@@ -19302,6 +19342,7 @@ export namespace Prisma {
     id: number | null
     userId: number | null
     productId: number | null
+    retailBandId: number | null
     productName: string | null
     totalPrice: number | null
     customerName: string | null
@@ -19313,6 +19354,7 @@ export namespace Prisma {
     id: number
     userId: number
     productId: number
+    retailBandId: number
     productName: number
     totalPrice: number
     customerName: number
@@ -19326,6 +19368,7 @@ export namespace Prisma {
     id?: true
     userId?: true
     productId?: true
+    retailBandId?: true
     totalPrice?: true
   }
 
@@ -19333,6 +19376,7 @@ export namespace Prisma {
     id?: true
     userId?: true
     productId?: true
+    retailBandId?: true
     totalPrice?: true
   }
 
@@ -19340,6 +19384,7 @@ export namespace Prisma {
     id?: true
     userId?: true
     productId?: true
+    retailBandId?: true
     productName?: true
     totalPrice?: true
     customerName?: true
@@ -19351,6 +19396,7 @@ export namespace Prisma {
     id?: true
     userId?: true
     productId?: true
+    retailBandId?: true
     productName?: true
     totalPrice?: true
     customerName?: true
@@ -19362,6 +19408,7 @@ export namespace Prisma {
     id?: true
     userId?: true
     productId?: true
+    retailBandId?: true
     productName?: true
     totalPrice?: true
     customerName?: true
@@ -19460,6 +19507,7 @@ export namespace Prisma {
     id: number
     userId: number
     productId: number | null
+    retailBandId: number | null
     productName: string
     totalPrice: number | null
     customerName: string
@@ -19490,12 +19538,14 @@ export namespace Prisma {
     id?: boolean
     userId?: boolean
     productId?: boolean
+    retailBandId?: boolean
     productName?: boolean
     totalPrice?: boolean
     customerName?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     product?: boolean | PurchaseOrder$productArgs<ExtArgs>
+    retailBand?: boolean | PurchaseOrder$retailBandArgs<ExtArgs>
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["purchaseOrder"]>
 
@@ -19505,6 +19555,7 @@ export namespace Prisma {
     id?: boolean
     userId?: boolean
     productId?: boolean
+    retailBandId?: boolean
     productName?: boolean
     totalPrice?: boolean
     customerName?: boolean
@@ -19512,9 +19563,10 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type PurchaseOrderOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "productId" | "productName" | "totalPrice" | "customerName" | "createdAt" | "updatedAt", ExtArgs["result"]["purchaseOrder"]>
+  export type PurchaseOrderOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "productId" | "retailBandId" | "productName" | "totalPrice" | "customerName" | "createdAt" | "updatedAt", ExtArgs["result"]["purchaseOrder"]>
   export type PurchaseOrderInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     product?: boolean | PurchaseOrder$productArgs<ExtArgs>
+    retailBand?: boolean | PurchaseOrder$retailBandArgs<ExtArgs>
     user?: boolean | UserDefaultArgs<ExtArgs>
   }
 
@@ -19522,12 +19574,14 @@ export namespace Prisma {
     name: "PurchaseOrder"
     objects: {
       product: Prisma.$ProductPayload<ExtArgs> | null
+      retailBand: Prisma.$RetailBandPayload<ExtArgs> | null
       user: Prisma.$UserPayload<ExtArgs>
     }
     scalars: $Extensions.GetPayloadResult<{
       id: number
       userId: number
       productId: number | null
+      retailBandId: number | null
       productName: string
       totalPrice: number | null
       customerName: string
@@ -19874,6 +19928,7 @@ export namespace Prisma {
   export interface Prisma__PurchaseOrderClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     product<T extends PurchaseOrder$productArgs<ExtArgs> = {}>(args?: Subset<T, PurchaseOrder$productArgs<ExtArgs>>): Prisma__ProductClient<$Result.GetResult<Prisma.$ProductPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    retailBand<T extends PurchaseOrder$retailBandArgs<ExtArgs> = {}>(args?: Subset<T, PurchaseOrder$retailBandArgs<ExtArgs>>): Prisma__RetailBandClient<$Result.GetResult<Prisma.$RetailBandPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -19907,6 +19962,7 @@ export namespace Prisma {
     readonly id: FieldRef<"PurchaseOrder", 'Int'>
     readonly userId: FieldRef<"PurchaseOrder", 'Int'>
     readonly productId: FieldRef<"PurchaseOrder", 'Int'>
+    readonly retailBandId: FieldRef<"PurchaseOrder", 'Int'>
     readonly productName: FieldRef<"PurchaseOrder", 'String'>
     readonly totalPrice: FieldRef<"PurchaseOrder", 'Int'>
     readonly customerName: FieldRef<"PurchaseOrder", 'String'>
@@ -20271,6 +20327,25 @@ export namespace Prisma {
      */
     include?: ProductInclude<ExtArgs> | null
     where?: ProductWhereInput
+  }
+
+  /**
+   * PurchaseOrder.retailBand
+   */
+  export type PurchaseOrder$retailBandArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RetailBand
+     */
+    select?: RetailBandSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RetailBand
+     */
+    omit?: RetailBandOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: RetailBandInclude<ExtArgs> | null
+    where?: RetailBandWhereInput
   }
 
   /**
@@ -29087,6 +29162,7 @@ export namespace Prisma {
     id: 'id',
     userId: 'userId',
     productId: 'productId',
+    retailBandId: 'retailBandId',
     productName: 'productName',
     totalPrice: 'totalPrice',
     customerName: 'customerName',
@@ -29955,6 +30031,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"RetailBand"> | Date | string
     formUrl?: StringNullableFilter<"RetailBand"> | string | null
     publishHistories?: PublishHistoryListRelationFilter
+    purchaseOrders?: PurchaseOrderListRelationFilter
     apiConfig?: XOR<SourcingApiConfigScalarRelationFilter, SourcingApiConfigWhereInput>
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }
@@ -29971,6 +30048,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     formUrl?: SortOrderInput | SortOrder
     publishHistories?: PublishHistoryOrderByRelationAggregateInput
+    purchaseOrders?: PurchaseOrderOrderByRelationAggregateInput
     apiConfig?: SourcingApiConfigOrderByWithRelationInput
     user?: UserOrderByWithRelationInput
     _relevance?: RetailBandOrderByRelevanceInput
@@ -29992,6 +30070,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"RetailBand"> | Date | string
     formUrl?: StringNullableFilter<"RetailBand"> | string | null
     publishHistories?: PublishHistoryListRelationFilter
+    purchaseOrders?: PurchaseOrderListRelationFilter
     apiConfig?: XOR<SourcingApiConfigScalarRelationFilter, SourcingApiConfigWhereInput>
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }, "id" | "userId_bandKey">
@@ -30870,12 +30949,14 @@ export namespace Prisma {
     id?: IntFilter<"PurchaseOrder"> | number
     userId?: IntFilter<"PurchaseOrder"> | number
     productId?: IntNullableFilter<"PurchaseOrder"> | number | null
+    retailBandId?: IntNullableFilter<"PurchaseOrder"> | number | null
     productName?: StringFilter<"PurchaseOrder"> | string
     totalPrice?: IntNullableFilter<"PurchaseOrder"> | number | null
     customerName?: StringFilter<"PurchaseOrder"> | string
     createdAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
     updatedAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
     product?: XOR<ProductNullableScalarRelationFilter, ProductWhereInput> | null
+    retailBand?: XOR<RetailBandNullableScalarRelationFilter, RetailBandWhereInput> | null
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }
 
@@ -30883,12 +30964,14 @@ export namespace Prisma {
     id?: SortOrder
     userId?: SortOrder
     productId?: SortOrderInput | SortOrder
+    retailBandId?: SortOrderInput | SortOrder
     productName?: SortOrder
     totalPrice?: SortOrderInput | SortOrder
     customerName?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     product?: ProductOrderByWithRelationInput
+    retailBand?: RetailBandOrderByWithRelationInput
     user?: UserOrderByWithRelationInput
     _relevance?: PurchaseOrderOrderByRelevanceInput
   }
@@ -30900,12 +30983,14 @@ export namespace Prisma {
     NOT?: PurchaseOrderWhereInput | PurchaseOrderWhereInput[]
     userId?: IntFilter<"PurchaseOrder"> | number
     productId?: IntNullableFilter<"PurchaseOrder"> | number | null
+    retailBandId?: IntNullableFilter<"PurchaseOrder"> | number | null
     productName?: StringFilter<"PurchaseOrder"> | string
     totalPrice?: IntNullableFilter<"PurchaseOrder"> | number | null
     customerName?: StringFilter<"PurchaseOrder"> | string
     createdAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
     updatedAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
     product?: XOR<ProductNullableScalarRelationFilter, ProductWhereInput> | null
+    retailBand?: XOR<RetailBandNullableScalarRelationFilter, RetailBandWhereInput> | null
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }, "id">
 
@@ -30913,6 +30998,7 @@ export namespace Prisma {
     id?: SortOrder
     userId?: SortOrder
     productId?: SortOrderInput | SortOrder
+    retailBandId?: SortOrderInput | SortOrder
     productName?: SortOrder
     totalPrice?: SortOrderInput | SortOrder
     customerName?: SortOrder
@@ -30932,6 +31018,7 @@ export namespace Prisma {
     id?: IntWithAggregatesFilter<"PurchaseOrder"> | number
     userId?: IntWithAggregatesFilter<"PurchaseOrder"> | number
     productId?: IntNullableWithAggregatesFilter<"PurchaseOrder"> | number | null
+    retailBandId?: IntNullableWithAggregatesFilter<"PurchaseOrder"> | number | null
     productName?: StringWithAggregatesFilter<"PurchaseOrder"> | string
     totalPrice?: IntNullableWithAggregatesFilter<"PurchaseOrder"> | number | null
     customerName?: StringWithAggregatesFilter<"PurchaseOrder"> | string
@@ -32072,6 +32159,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     formUrl?: string | null
     publishHistories?: PublishHistoryCreateNestedManyWithoutRetailBandInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutRetailBandInput
     apiConfig: SourcingApiConfigCreateNestedOneWithoutRetailBandsInput
     user: UserCreateNestedOneWithoutRetailBandsInput
   }
@@ -32088,6 +32176,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     formUrl?: string | null
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutRetailBandInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutRetailBandInput
   }
 
   export type RetailBandUpdateInput = {
@@ -32099,6 +32188,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     publishHistories?: PublishHistoryUpdateManyWithoutRetailBandNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutRetailBandNestedInput
     apiConfig?: SourcingApiConfigUpdateOneRequiredWithoutRetailBandsNestedInput
     user?: UserUpdateOneRequiredWithoutRetailBandsNestedInput
   }
@@ -32115,6 +32205,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutRetailBandNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutRetailBandNestedInput
   }
 
   export type RetailBandCreateManyInput = {
@@ -33014,6 +33105,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     product?: ProductCreateNestedOneWithoutPurchaseOrdersInput
+    retailBand?: RetailBandCreateNestedOneWithoutPurchaseOrdersInput
     user: UserCreateNestedOneWithoutPurchaseOrdersInput
   }
 
@@ -33021,6 +33113,7 @@ export namespace Prisma {
     id?: number
     userId: number
     productId?: number | null
+    retailBandId?: number | null
     productName: string
     totalPrice?: number | null
     customerName: string
@@ -33035,6 +33128,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     product?: ProductUpdateOneWithoutPurchaseOrdersNestedInput
+    retailBand?: RetailBandUpdateOneWithoutPurchaseOrdersNestedInput
     user?: UserUpdateOneRequiredWithoutPurchaseOrdersNestedInput
   }
 
@@ -33042,6 +33136,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     userId?: IntFieldUpdateOperationsInput | number
     productId?: NullableIntFieldUpdateOperationsInput | number | null
+    retailBandId?: NullableIntFieldUpdateOperationsInput | number | null
     productName?: StringFieldUpdateOperationsInput | string
     totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
     customerName?: StringFieldUpdateOperationsInput | string
@@ -33053,6 +33148,7 @@ export namespace Prisma {
     id?: number
     userId: number
     productId?: number | null
+    retailBandId?: number | null
     productName: string
     totalPrice?: number | null
     customerName: string
@@ -33072,6 +33168,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     userId?: IntFieldUpdateOperationsInput | number
     productId?: NullableIntFieldUpdateOperationsInput | number | null
+    retailBandId?: NullableIntFieldUpdateOperationsInput | number | null
     productName?: StringFieldUpdateOperationsInput | string
     totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
     customerName?: StringFieldUpdateOperationsInput | string
@@ -35260,6 +35357,11 @@ export namespace Prisma {
     _max?: NestedEnumPublishStatusFilter<$PrismaModel>
   }
 
+  export type RetailBandNullableScalarRelationFilter = {
+    is?: RetailBandWhereInput | null
+    isNot?: RetailBandWhereInput | null
+  }
+
   export type PurchaseOrderOrderByRelevanceInput = {
     fields: PurchaseOrderOrderByRelevanceFieldEnum | PurchaseOrderOrderByRelevanceFieldEnum[]
     sort: SortOrder
@@ -35270,6 +35372,7 @@ export namespace Prisma {
     id?: SortOrder
     userId?: SortOrder
     productId?: SortOrder
+    retailBandId?: SortOrder
     productName?: SortOrder
     totalPrice?: SortOrder
     customerName?: SortOrder
@@ -35281,6 +35384,7 @@ export namespace Prisma {
     id?: SortOrder
     userId?: SortOrder
     productId?: SortOrder
+    retailBandId?: SortOrder
     totalPrice?: SortOrder
   }
 
@@ -35288,6 +35392,7 @@ export namespace Prisma {
     id?: SortOrder
     userId?: SortOrder
     productId?: SortOrder
+    retailBandId?: SortOrder
     productName?: SortOrder
     totalPrice?: SortOrder
     customerName?: SortOrder
@@ -35299,6 +35404,7 @@ export namespace Prisma {
     id?: SortOrder
     userId?: SortOrder
     productId?: SortOrder
+    retailBandId?: SortOrder
     productName?: SortOrder
     totalPrice?: SortOrder
     customerName?: SortOrder
@@ -35310,6 +35416,7 @@ export namespace Prisma {
     id?: SortOrder
     userId?: SortOrder
     productId?: SortOrder
+    retailBandId?: SortOrder
     totalPrice?: SortOrder
   }
 
@@ -36654,6 +36761,13 @@ export namespace Prisma {
     connect?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
   }
 
+  export type PurchaseOrderCreateNestedManyWithoutRetailBandInput = {
+    create?: XOR<PurchaseOrderCreateWithoutRetailBandInput, PurchaseOrderUncheckedCreateWithoutRetailBandInput> | PurchaseOrderCreateWithoutRetailBandInput[] | PurchaseOrderUncheckedCreateWithoutRetailBandInput[]
+    connectOrCreate?: PurchaseOrderCreateOrConnectWithoutRetailBandInput | PurchaseOrderCreateOrConnectWithoutRetailBandInput[]
+    createMany?: PurchaseOrderCreateManyRetailBandInputEnvelope
+    connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+  }
+
   export type SourcingApiConfigCreateNestedOneWithoutRetailBandsInput = {
     create?: XOR<SourcingApiConfigCreateWithoutRetailBandsInput, SourcingApiConfigUncheckedCreateWithoutRetailBandsInput>
     connectOrCreate?: SourcingApiConfigCreateOrConnectWithoutRetailBandsInput
@@ -36673,6 +36787,13 @@ export namespace Prisma {
     connect?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
   }
 
+  export type PurchaseOrderUncheckedCreateNestedManyWithoutRetailBandInput = {
+    create?: XOR<PurchaseOrderCreateWithoutRetailBandInput, PurchaseOrderUncheckedCreateWithoutRetailBandInput> | PurchaseOrderCreateWithoutRetailBandInput[] | PurchaseOrderUncheckedCreateWithoutRetailBandInput[]
+    connectOrCreate?: PurchaseOrderCreateOrConnectWithoutRetailBandInput | PurchaseOrderCreateOrConnectWithoutRetailBandInput[]
+    createMany?: PurchaseOrderCreateManyRetailBandInputEnvelope
+    connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+  }
+
   export type PublishHistoryUpdateManyWithoutRetailBandNestedInput = {
     create?: XOR<PublishHistoryCreateWithoutRetailBandInput, PublishHistoryUncheckedCreateWithoutRetailBandInput> | PublishHistoryCreateWithoutRetailBandInput[] | PublishHistoryUncheckedCreateWithoutRetailBandInput[]
     connectOrCreate?: PublishHistoryCreateOrConnectWithoutRetailBandInput | PublishHistoryCreateOrConnectWithoutRetailBandInput[]
@@ -36685,6 +36806,20 @@ export namespace Prisma {
     update?: PublishHistoryUpdateWithWhereUniqueWithoutRetailBandInput | PublishHistoryUpdateWithWhereUniqueWithoutRetailBandInput[]
     updateMany?: PublishHistoryUpdateManyWithWhereWithoutRetailBandInput | PublishHistoryUpdateManyWithWhereWithoutRetailBandInput[]
     deleteMany?: PublishHistoryScalarWhereInput | PublishHistoryScalarWhereInput[]
+  }
+
+  export type PurchaseOrderUpdateManyWithoutRetailBandNestedInput = {
+    create?: XOR<PurchaseOrderCreateWithoutRetailBandInput, PurchaseOrderUncheckedCreateWithoutRetailBandInput> | PurchaseOrderCreateWithoutRetailBandInput[] | PurchaseOrderUncheckedCreateWithoutRetailBandInput[]
+    connectOrCreate?: PurchaseOrderCreateOrConnectWithoutRetailBandInput | PurchaseOrderCreateOrConnectWithoutRetailBandInput[]
+    upsert?: PurchaseOrderUpsertWithWhereUniqueWithoutRetailBandInput | PurchaseOrderUpsertWithWhereUniqueWithoutRetailBandInput[]
+    createMany?: PurchaseOrderCreateManyRetailBandInputEnvelope
+    set?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    disconnect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    delete?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    update?: PurchaseOrderUpdateWithWhereUniqueWithoutRetailBandInput | PurchaseOrderUpdateWithWhereUniqueWithoutRetailBandInput[]
+    updateMany?: PurchaseOrderUpdateManyWithWhereWithoutRetailBandInput | PurchaseOrderUpdateManyWithWhereWithoutRetailBandInput[]
+    deleteMany?: PurchaseOrderScalarWhereInput | PurchaseOrderScalarWhereInput[]
   }
 
   export type SourcingApiConfigUpdateOneRequiredWithoutRetailBandsNestedInput = {
@@ -36715,6 +36850,20 @@ export namespace Prisma {
     update?: PublishHistoryUpdateWithWhereUniqueWithoutRetailBandInput | PublishHistoryUpdateWithWhereUniqueWithoutRetailBandInput[]
     updateMany?: PublishHistoryUpdateManyWithWhereWithoutRetailBandInput | PublishHistoryUpdateManyWithWhereWithoutRetailBandInput[]
     deleteMany?: PublishHistoryScalarWhereInput | PublishHistoryScalarWhereInput[]
+  }
+
+  export type PurchaseOrderUncheckedUpdateManyWithoutRetailBandNestedInput = {
+    create?: XOR<PurchaseOrderCreateWithoutRetailBandInput, PurchaseOrderUncheckedCreateWithoutRetailBandInput> | PurchaseOrderCreateWithoutRetailBandInput[] | PurchaseOrderUncheckedCreateWithoutRetailBandInput[]
+    connectOrCreate?: PurchaseOrderCreateOrConnectWithoutRetailBandInput | PurchaseOrderCreateOrConnectWithoutRetailBandInput[]
+    upsert?: PurchaseOrderUpsertWithWhereUniqueWithoutRetailBandInput | PurchaseOrderUpsertWithWhereUniqueWithoutRetailBandInput[]
+    createMany?: PurchaseOrderCreateManyRetailBandInputEnvelope
+    set?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    disconnect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    delete?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    update?: PurchaseOrderUpdateWithWhereUniqueWithoutRetailBandInput | PurchaseOrderUpdateWithWhereUniqueWithoutRetailBandInput[]
+    updateMany?: PurchaseOrderUpdateManyWithWhereWithoutRetailBandInput | PurchaseOrderUpdateManyWithWhereWithoutRetailBandInput[]
+    deleteMany?: PurchaseOrderScalarWhereInput | PurchaseOrderScalarWhereInput[]
   }
 
   export type UserCreateNestedOneWithoutPostsInput = {
@@ -37307,6 +37456,12 @@ export namespace Prisma {
     connect?: ProductWhereUniqueInput
   }
 
+  export type RetailBandCreateNestedOneWithoutPurchaseOrdersInput = {
+    create?: XOR<RetailBandCreateWithoutPurchaseOrdersInput, RetailBandUncheckedCreateWithoutPurchaseOrdersInput>
+    connectOrCreate?: RetailBandCreateOrConnectWithoutPurchaseOrdersInput
+    connect?: RetailBandWhereUniqueInput
+  }
+
   export type UserCreateNestedOneWithoutPurchaseOrdersInput = {
     create?: XOR<UserCreateWithoutPurchaseOrdersInput, UserUncheckedCreateWithoutPurchaseOrdersInput>
     connectOrCreate?: UserCreateOrConnectWithoutPurchaseOrdersInput
@@ -37321,6 +37476,16 @@ export namespace Prisma {
     delete?: ProductWhereInput | boolean
     connect?: ProductWhereUniqueInput
     update?: XOR<XOR<ProductUpdateToOneWithWhereWithoutPurchaseOrdersInput, ProductUpdateWithoutPurchaseOrdersInput>, ProductUncheckedUpdateWithoutPurchaseOrdersInput>
+  }
+
+  export type RetailBandUpdateOneWithoutPurchaseOrdersNestedInput = {
+    create?: XOR<RetailBandCreateWithoutPurchaseOrdersInput, RetailBandUncheckedCreateWithoutPurchaseOrdersInput>
+    connectOrCreate?: RetailBandCreateOrConnectWithoutPurchaseOrdersInput
+    upsert?: RetailBandUpsertWithoutPurchaseOrdersInput
+    disconnect?: RetailBandWhereInput | boolean
+    delete?: RetailBandWhereInput | boolean
+    connect?: RetailBandWhereUniqueInput
+    update?: XOR<XOR<RetailBandUpdateToOneWithWhereWithoutPurchaseOrdersInput, RetailBandUpdateWithoutPurchaseOrdersInput>, RetailBandUncheckedUpdateWithoutPurchaseOrdersInput>
   }
 
   export type UserUpdateOneRequiredWithoutPurchaseOrdersNestedInput = {
@@ -38327,11 +38492,13 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     product?: ProductCreateNestedOneWithoutPurchaseOrdersInput
+    retailBand?: RetailBandCreateNestedOneWithoutPurchaseOrdersInput
   }
 
   export type PurchaseOrderUncheckedCreateWithoutUserInput = {
     id?: number
     productId?: number | null
+    retailBandId?: number | null
     productName: string
     totalPrice?: number | null
     customerName: string
@@ -38358,6 +38525,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     formUrl?: string | null
     publishHistories?: PublishHistoryCreateNestedManyWithoutRetailBandInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutRetailBandInput
     apiConfig: SourcingApiConfigCreateNestedOneWithoutRetailBandsInput
   }
 
@@ -38372,6 +38540,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     formUrl?: string | null
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutRetailBandInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutRetailBandInput
   }
 
   export type RetailBandCreateOrConnectWithoutUserInput = {
@@ -38717,6 +38886,7 @@ export namespace Prisma {
     id?: IntFilter<"PurchaseOrder"> | number
     userId?: IntFilter<"PurchaseOrder"> | number
     productId?: IntNullableFilter<"PurchaseOrder"> | number | null
+    retailBandId?: IntNullableFilter<"PurchaseOrder"> | number | null
     productName?: StringFilter<"PurchaseOrder"> | string
     totalPrice?: IntNullableFilter<"PurchaseOrder"> | number | null
     customerName?: StringFilter<"PurchaseOrder"> | string
@@ -38863,6 +39033,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     formUrl?: string | null
     publishHistories?: PublishHistoryCreateNestedManyWithoutRetailBandInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutRetailBandInput
     user: UserCreateNestedOneWithoutRetailBandsInput
   }
 
@@ -38877,6 +39048,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     formUrl?: string | null
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutRetailBandInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutRetailBandInput
   }
 
   export type RetailBandCreateOrConnectWithoutApiConfigInput = {
@@ -39384,6 +39556,37 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type PurchaseOrderCreateWithoutRetailBandInput = {
+    productName: string
+    totalPrice?: number | null
+    customerName: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    product?: ProductCreateNestedOneWithoutPurchaseOrdersInput
+    user: UserCreateNestedOneWithoutPurchaseOrdersInput
+  }
+
+  export type PurchaseOrderUncheckedCreateWithoutRetailBandInput = {
+    id?: number
+    userId: number
+    productId?: number | null
+    productName: string
+    totalPrice?: number | null
+    customerName: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PurchaseOrderCreateOrConnectWithoutRetailBandInput = {
+    where: PurchaseOrderWhereUniqueInput
+    create: XOR<PurchaseOrderCreateWithoutRetailBandInput, PurchaseOrderUncheckedCreateWithoutRetailBandInput>
+  }
+
+  export type PurchaseOrderCreateManyRetailBandInputEnvelope = {
+    data: PurchaseOrderCreateManyRetailBandInput | PurchaseOrderCreateManyRetailBandInput[]
+    skipDuplicates?: boolean
+  }
+
   export type SourcingApiConfigCreateWithoutRetailBandsInput = {
     platform: $Enums.SourcingPlatform
     apiKey?: string | null
@@ -39476,6 +39679,22 @@ export namespace Prisma {
   export type PublishHistoryUpdateManyWithWhereWithoutRetailBandInput = {
     where: PublishHistoryScalarWhereInput
     data: XOR<PublishHistoryUpdateManyMutationInput, PublishHistoryUncheckedUpdateManyWithoutRetailBandInput>
+  }
+
+  export type PurchaseOrderUpsertWithWhereUniqueWithoutRetailBandInput = {
+    where: PurchaseOrderWhereUniqueInput
+    update: XOR<PurchaseOrderUpdateWithoutRetailBandInput, PurchaseOrderUncheckedUpdateWithoutRetailBandInput>
+    create: XOR<PurchaseOrderCreateWithoutRetailBandInput, PurchaseOrderUncheckedCreateWithoutRetailBandInput>
+  }
+
+  export type PurchaseOrderUpdateWithWhereUniqueWithoutRetailBandInput = {
+    where: PurchaseOrderWhereUniqueInput
+    data: XOR<PurchaseOrderUpdateWithoutRetailBandInput, PurchaseOrderUncheckedUpdateWithoutRetailBandInput>
+  }
+
+  export type PurchaseOrderUpdateManyWithWhereWithoutRetailBandInput = {
+    where: PurchaseOrderScalarWhereInput
+    data: XOR<PurchaseOrderUpdateManyMutationInput, PurchaseOrderUncheckedUpdateManyWithoutRetailBandInput>
   }
 
   export type SourcingApiConfigUpsertWithoutRetailBandsInput = {
@@ -40234,12 +40453,14 @@ export namespace Prisma {
     customerName: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    retailBand?: RetailBandCreateNestedOneWithoutPurchaseOrdersInput
     user: UserCreateNestedOneWithoutPurchaseOrdersInput
   }
 
   export type PurchaseOrderUncheckedCreateWithoutProductInput = {
     id?: number
     userId: number
+    retailBandId?: number | null
     productName: string
     totalPrice?: number | null
     customerName: string
@@ -40953,6 +41174,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     formUrl?: string | null
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutRetailBandInput
     apiConfig: SourcingApiConfigCreateNestedOneWithoutRetailBandsInput
     user: UserCreateNestedOneWithoutRetailBandsInput
   }
@@ -40968,6 +41190,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     formUrl?: string | null
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutRetailBandInput
   }
 
   export type RetailBandCreateOrConnectWithoutPublishHistoriesInput = {
@@ -41086,6 +41309,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutRetailBandNestedInput
     apiConfig?: SourcingApiConfigUpdateOneRequiredWithoutRetailBandsNestedInput
     user?: UserUpdateOneRequiredWithoutRetailBandsNestedInput
   }
@@ -41101,6 +41325,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutRetailBandNestedInput
   }
 
   export type UserUpsertWithoutPublishHistoriesInput = {
@@ -41195,6 +41420,38 @@ export namespace Prisma {
     create: XOR<ProductCreateWithoutPurchaseOrdersInput, ProductUncheckedCreateWithoutPurchaseOrdersInput>
   }
 
+  export type RetailBandCreateWithoutPurchaseOrdersInput = {
+    bandKey: string
+    name: string
+    coverUrl?: string | null
+    isActive?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    formUrl?: string | null
+    publishHistories?: PublishHistoryCreateNestedManyWithoutRetailBandInput
+    apiConfig: SourcingApiConfigCreateNestedOneWithoutRetailBandsInput
+    user: UserCreateNestedOneWithoutRetailBandsInput
+  }
+
+  export type RetailBandUncheckedCreateWithoutPurchaseOrdersInput = {
+    id?: number
+    userId: number
+    apiConfigId: number
+    bandKey: string
+    name: string
+    coverUrl?: string | null
+    isActive?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    formUrl?: string | null
+    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutRetailBandInput
+  }
+
+  export type RetailBandCreateOrConnectWithoutPurchaseOrdersInput = {
+    where: RetailBandWhereUniqueInput
+    create: XOR<RetailBandCreateWithoutPurchaseOrdersInput, RetailBandUncheckedCreateWithoutPurchaseOrdersInput>
+  }
+
   export type UserCreateWithoutPurchaseOrdersInput = {
     email: string
     password: string
@@ -41285,6 +41542,44 @@ export namespace Prisma {
     customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUncheckedUpdateManyWithoutProductNestedInput
+  }
+
+  export type RetailBandUpsertWithoutPurchaseOrdersInput = {
+    update: XOR<RetailBandUpdateWithoutPurchaseOrdersInput, RetailBandUncheckedUpdateWithoutPurchaseOrdersInput>
+    create: XOR<RetailBandCreateWithoutPurchaseOrdersInput, RetailBandUncheckedCreateWithoutPurchaseOrdersInput>
+    where?: RetailBandWhereInput
+  }
+
+  export type RetailBandUpdateToOneWithWhereWithoutPurchaseOrdersInput = {
+    where?: RetailBandWhereInput
+    data: XOR<RetailBandUpdateWithoutPurchaseOrdersInput, RetailBandUncheckedUpdateWithoutPurchaseOrdersInput>
+  }
+
+  export type RetailBandUpdateWithoutPurchaseOrdersInput = {
+    bandKey?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    coverUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    formUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    publishHistories?: PublishHistoryUpdateManyWithoutRetailBandNestedInput
+    apiConfig?: SourcingApiConfigUpdateOneRequiredWithoutRetailBandsNestedInput
+    user?: UserUpdateOneRequiredWithoutRetailBandsNestedInput
+  }
+
+  export type RetailBandUncheckedUpdateWithoutPurchaseOrdersInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    apiConfigId?: IntFieldUpdateOperationsInput | number
+    bandKey?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    coverUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    formUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutRetailBandNestedInput
   }
 
   export type UserUpsertWithoutPurchaseOrdersInput = {
@@ -42469,6 +42764,7 @@ export namespace Prisma {
   export type PurchaseOrderCreateManyUserInput = {
     id?: number
     productId?: number | null
+    retailBandId?: number | null
     productName: string
     totalPrice?: number | null
     customerName: string
@@ -42723,11 +43019,13 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     product?: ProductUpdateOneWithoutPurchaseOrdersNestedInput
+    retailBand?: RetailBandUpdateOneWithoutPurchaseOrdersNestedInput
   }
 
   export type PurchaseOrderUncheckedUpdateWithoutUserInput = {
     id?: IntFieldUpdateOperationsInput | number
     productId?: NullableIntFieldUpdateOperationsInput | number | null
+    retailBandId?: NullableIntFieldUpdateOperationsInput | number | null
     productName?: StringFieldUpdateOperationsInput | string
     totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
     customerName?: StringFieldUpdateOperationsInput | string
@@ -42738,6 +43036,7 @@ export namespace Prisma {
   export type PurchaseOrderUncheckedUpdateManyWithoutUserInput = {
     id?: IntFieldUpdateOperationsInput | number
     productId?: NullableIntFieldUpdateOperationsInput | number | null
+    retailBandId?: NullableIntFieldUpdateOperationsInput | number | null
     productName?: StringFieldUpdateOperationsInput | string
     totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
     customerName?: StringFieldUpdateOperationsInput | string
@@ -42754,6 +43053,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     publishHistories?: PublishHistoryUpdateManyWithoutRetailBandNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutRetailBandNestedInput
     apiConfig?: SourcingApiConfigUpdateOneRequiredWithoutRetailBandsNestedInput
   }
 
@@ -42768,6 +43068,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutRetailBandNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutRetailBandNestedInput
   }
 
   export type RetailBandUncheckedUpdateManyWithoutUserInput = {
@@ -42931,6 +43232,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     publishHistories?: PublishHistoryUpdateManyWithoutRetailBandNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutRetailBandNestedInput
     user?: UserUpdateOneRequiredWithoutRetailBandsNestedInput
   }
 
@@ -42945,6 +43247,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutRetailBandNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutRetailBandNestedInput
   }
 
   export type RetailBandUncheckedUpdateManyWithoutApiConfigInput = {
@@ -43052,6 +43355,17 @@ export namespace Prisma {
     publishedAt?: Date | string
   }
 
+  export type PurchaseOrderCreateManyRetailBandInput = {
+    id?: number
+    userId: number
+    productId?: number | null
+    productName: string
+    totalPrice?: number | null
+    customerName: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type PublishHistoryUpdateWithoutRetailBandInput = {
     postKey?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
@@ -43079,6 +43393,38 @@ export namespace Prisma {
     status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
     errorMessage?: NullableStringFieldUpdateOperationsInput | string | null
     publishedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PurchaseOrderUpdateWithoutRetailBandInput = {
+    productName?: StringFieldUpdateOperationsInput | string
+    totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
+    customerName?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    product?: ProductUpdateOneWithoutPurchaseOrdersNestedInput
+    user?: UserUpdateOneRequiredWithoutPurchaseOrdersNestedInput
+  }
+
+  export type PurchaseOrderUncheckedUpdateWithoutRetailBandInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    productId?: NullableIntFieldUpdateOperationsInput | number | null
+    productName?: StringFieldUpdateOperationsInput | string
+    totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
+    customerName?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PurchaseOrderUncheckedUpdateManyWithoutRetailBandInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    productId?: NullableIntFieldUpdateOperationsInput | number | null
+    productName?: StringFieldUpdateOperationsInput | string
+    totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
+    customerName?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type PostCommentCreateManyPostInput = {
@@ -43182,6 +43528,7 @@ export namespace Prisma {
   export type PurchaseOrderCreateManyProductInput = {
     id?: number
     userId: number
+    retailBandId?: number | null
     productName: string
     totalPrice?: number | null
     customerName: string
@@ -43298,12 +43645,14 @@ export namespace Prisma {
     customerName?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    retailBand?: RetailBandUpdateOneWithoutPurchaseOrdersNestedInput
     user?: UserUpdateOneRequiredWithoutPurchaseOrdersNestedInput
   }
 
   export type PurchaseOrderUncheckedUpdateWithoutProductInput = {
     id?: IntFieldUpdateOperationsInput | number
     userId?: IntFieldUpdateOperationsInput | number
+    retailBandId?: NullableIntFieldUpdateOperationsInput | number | null
     productName?: StringFieldUpdateOperationsInput | string
     totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
     customerName?: StringFieldUpdateOperationsInput | string
@@ -43314,6 +43663,7 @@ export namespace Prisma {
   export type PurchaseOrderUncheckedUpdateManyWithoutProductInput = {
     id?: IntFieldUpdateOperationsInput | number
     userId?: IntFieldUpdateOperationsInput | number
+    retailBandId?: NullableIntFieldUpdateOperationsInput | number | null
     productName?: StringFieldUpdateOperationsInput | string
     totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
     customerName?: StringFieldUpdateOperationsInput | string

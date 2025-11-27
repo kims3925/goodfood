@@ -109,6 +109,7 @@ model RetailBand {
   updatedAt        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   formUrl          String?           @map("form_url") @db.VarChar(500)
   publishHistories PublishHistory[]
+  purchaseOrders   PurchaseOrder[]
   apiConfig        SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -313,19 +314,22 @@ model PublishHistory {
 }
 
 model PurchaseOrder {
-  id           Int      @id @default(autoincrement())
-  userId       Int      @map("user_id")
-  productId    Int?     @map("product_id")
-  productName  String   @map("product_name") @db.VarChar(500)
-  totalPrice   Int?     @map("total_price")
-  customerName String   @map("customer_name") @db.VarChar(100)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-  product      Product? @relation(fields: [productId], references: [id])
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           Int         @id @default(autoincrement())
+  userId       Int         @map("user_id")
+  productId    Int?        @map("product_id")
+  retailBandId Int?        @map("retail_band_id")
+  productName  String      @map("product_name") @db.VarChar(500)
+  totalPrice   Int?        @map("total_price")
+  customerName String      @map("customer_name") @db.VarChar(100)
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamp(0)
+  product      Product?    @relation(fields: [productId], references: [id])
+  retailBand   RetailBand? @relation(fields: [retailBandId], references: [id])
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([productId])
+  @@index([retailBandId])
   @@index([productName])
   @@index([customerName])
   @@map("purchase_order")
