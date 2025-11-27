@@ -33,6 +33,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  // sourcing-app은 ADMIN 역할만 접근 가능
+  if (payload.role !== 'ADMIN') {
+    return NextResponse.json(
+      { error: '관리자만 접근 가능합니다.' },
+      { status: 403 }
+    )
+  }
+
   return NextResponse.next()
 }
 

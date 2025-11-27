@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 주문 확인
-    const order = await prisma.customerOrder.findUnique({
+    const order = await prisma.order.findUnique({
       where: { orderNumber: orderId },
       include: { payment: true },
     })
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
     })
 
     // 주문 상태 업데이트
-    await prisma.customerOrder.update({
+    await prisma.order.update({
       where: { id: order.id },
       data: {
         status: 'PAID',
