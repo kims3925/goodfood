@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PublishStatus } from '@bandauto/db'
+import { prisma, PublishStatus } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { NaverBandClient } from '@/modules/config/domain/src/band/services/band-client.service'
 
 // API 라우트 타임아웃 설정 (10분 = 600초)
 // 상품 10개 × 밴드 5개 = 50개 발행 × 10초 = 500초 예상
 export const maxDuration = 600
-
-const prisma = new PrismaClient()
 
 // 지연 함수
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))

@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     // Gemini AI 설정
     const geminiConfig = aiConfigs.find((c) => c.provider === 'GEMINI')
     if (geminiConfig) {
-      const config = geminiConfig.config as any
+      const config = geminiConfig.config ? JSON.parse(geminiConfig.config) : {}
       settings.gemini = {
         apiKey: geminiConfig.apiKey || '',
         model: geminiConfig.model || 'gemini-2.5-flash',
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     // OpenAI 설정
     const openaiConfig = aiConfigs.find((c) => c.provider === 'OPENAI')
     if (openaiConfig) {
-      const config = openaiConfig.config as any
+      const config = openaiConfig.config ? JSON.parse(openaiConfig.config) : {}
       settings.openai = {
         apiKey: openaiConfig.apiKey || '',
         model: openaiConfig.model || 'gpt-4o-mini',
@@ -140,10 +140,10 @@ export async function POST(request: NextRequest) {
       const updateData = {
         apiKey: settings.apiKey,
         model: settings.model,
-        config: {
+        config: JSON.stringify({
           temperature: settings.temperature || 0.7,
           maxTokens: settings.maxTokens || 2048,
-        },
+        }),
         isActive: true,
       }
 
@@ -163,10 +163,10 @@ export async function POST(request: NextRequest) {
         provider: aiProvider as any,
         apiKey: settings.apiKey,
         model: settings.model,
-        config: {
+        config: JSON.stringify({
           temperature: settings.temperature || 0.7,
           maxTokens: settings.maxTokens || 2048,
-        },
+        }),
         isActive: true,
       }
 
