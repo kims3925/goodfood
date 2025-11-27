@@ -13,12 +13,15 @@ import {
   ShoppingBag,
   CheckCircle,
   AlertCircle,
+  Edit,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Loading from '@/components/ui/Loading'
-import Pagination from '@/components/ui/Pagination'
 
 interface MatchedProduct {
   id: number
@@ -46,12 +49,12 @@ export default function OrderListPage() {
   const [total, setTotal] = useState(0)
 
   // 선택 삭제 관련 상태
-  const [selectedIds, setSelectedIds] = useState<number[]>([])
-  const [selectAll, setSelectAll] = useState(false)
-
-  // 선택 삭제 관련 상태
   const [selectedOrderIds, setSelectedOrderIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
+
+  // 수정 모달 관련 상태
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null)
 
   const itemsPerPage = 10
 
@@ -91,58 +94,8 @@ export default function OrderListPage() {
     fetchOrders()
   }
 
-  // 행 클릭 시 상세 페이지로 이동
-  const handleRowClick = (orderId: number) => {
-    router.push(`/order/${orderId}`)
-  }
-
-  const goToProduct = (productId: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    router.push(`/product/${productId}`)
-  }
-
-  // 전체 선택/해제
-  const handleToggleSelectAll = () => {
-    if (selectAll) {
-      setSelectedIds([])
-      setSelectAll(false)
-    } else {
-      const allIds = orders.map(order => order.id)
-      setSelectedIds(allIds)
-      setSelectAll(true)
-    }
-  }
-
-  // 개별 선택/해제
-  const handleToggleSelection = (id: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setSelectedIds((prev) => {
-      const newSelection = prev.includes(id)
-        ? prev.filter((i) => i !== id)
-        : [...prev, id]
-
-      setSelectAll(newSelection.length === orders.length)
-      return newSelection
-    })
-  }
-
-  // 선택 삭제
-  const handleDeleteSelected = async () => {
-    if (selectedIds.length === 0) return
-    if (!confirm(`선택한 ${selectedIds.length}개의 주문을 삭제하시겠습니까?`)) return
-
-    try {
-      for (const id of selectedIds) {
-        await fetch(`/api/order/${id}`, {
-          method: 'DELETE',
-        })
-      }
-      setSelectedIds([])
-      setSelectAll(false)
-      fetchOrders()
-    } catch (error) {
-      console.error('삭제 실패:', error)
-    }
+  const goToProduct = (productId: number) => {
+    router.push(`/product/detail/${productId}`)
   }
 
   // 전체 선택/해제
@@ -175,13 +128,11 @@ export default function OrderListPage() {
     if (!confirm(`선택한 ${selectedOrderIds.length}개의 주문을 삭제하시겠습니까?`)) return
 
     try {
-      let successCount = 0
       for (const id of selectedOrderIds) {
         try {
-          const res = await fetch(`/api/order/${id}`, {
+          await fetch(`/api/order/${id}`, {
             method: 'DELETE',
           })
-          if (res.ok) successCount++
         } catch (error) {
           console.error(`주문 삭제 실패 (ID: ${id}):`, error)
         }
@@ -195,13 +146,23 @@ export default function OrderListPage() {
     }
   }
 
+  // 개별 삭제
+  const handleDelete = async (id: number) => {
+    if (!confirm('이 주문을 삭제하시겠습니까?')) return
+
+    try {
+      await fetch(`/api/order/${id}`, {
+        method: 'DELETE',
+      })
+      fetchOrders()
+    } catch (error) {
+      console.error('주문 삭제 실패:', error)
+    }
+  }
+
   const openEdit = (order: PurchaseOrder) => {
     setSelectedOrder(order)
     setIsEditOpen(true)
-  }
-
-  const goToProduct = (productId: number) => {
-    router.push(`/product/detail/${productId}`)
   }
 
   const formatDate = (dateString: string) => {
@@ -423,7 +384,7 @@ export default function OrderListPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
               <p className="text-sm text-gray-600">
-                총 {total}건 중 {(page - 1) * 20 + 1}-{Math.min(page * 20, total)}건
+                총 {total}건 중 {(page - 1) * itemsPerPage + 1}-{Math.min(page * itemsPerPage, total)}건
               </p>
               <div className="flex items-center gap-2">
                 <button

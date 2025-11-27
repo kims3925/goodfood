@@ -178,10 +178,10 @@ exports.Prisma.RetailBandScalarFieldEnum = {
   bandKey: 'bandKey',
   name: 'name',
   coverUrl: 'coverUrl',
-  formUrl: 'formUrl',
   isActive: 'isActive',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  formUrl: 'formUrl'
 };
 
 exports.Prisma.PostScalarFieldEnum = {
@@ -320,6 +320,7 @@ exports.Prisma.PurchaseOrderScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   productId: 'productId',
+  retailBandId: 'retailBandId',
   productName: 'productName',
   totalPrice: 'totalPrice',
   customerName: 'customerName',
@@ -364,21 +365,21 @@ exports.Prisma.SessionCartItemScalarFieldEnum = {
   id: 'id',
   cartId: 'cartId',
   productId: 'productId',
-  variantId: 'variantId',
   quantity: 'quantity',
   priceAt: 'priceAt',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  variantId: 'variantId'
 };
 
 exports.Prisma.CartItemScalarFieldEnum = {
   id: 'id',
   customerId: 'customerId',
   productId: 'productId',
-  variantId: 'variantId',
   quantity: 'quantity',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  variantId: 'variantId'
 };
 
 exports.Prisma.CustomerOrderScalarFieldEnum = {
@@ -409,14 +410,14 @@ exports.Prisma.CustomerOrderItemScalarFieldEnum = {
   id: 'id',
   orderId: 'orderId',
   productId: 'productId',
-  variantId: 'variantId',
   productName: 'productName',
   optionSummary: 'optionSummary',
   thumbnailUrl: 'thumbnailUrl',
   quantity: 'quantity',
   unitPrice: 'unitPrice',
   totalPrice: 'totalPrice',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  variantId: 'variantId'
 };
 
 exports.Prisma.PaymentScalarFieldEnum = {
@@ -447,11 +448,6 @@ exports.Prisma.SortOrder = {
   desc: 'desc'
 };
 
-exports.Prisma.NullableJsonNullValueInput = {
-  DbNull: Prisma.DbNull,
-  JsonNull: Prisma.JsonNull
-};
-
 exports.Prisma.NullsOrder = {
   first: 'first',
   last: 'last'
@@ -463,26 +459,17 @@ exports.Prisma.UserOrderByRelevanceFieldEnum = {
   name: 'name'
 };
 
-exports.Prisma.JsonNullValueFilter = {
-  DbNull: Prisma.DbNull,
-  JsonNull: Prisma.JsonNull,
-  AnyNull: Prisma.AnyNull
-};
-
-exports.Prisma.QueryMode = {
-  default: 'default',
-  insensitive: 'insensitive'
-};
-
 exports.Prisma.SourcingApiConfigOrderByRelevanceFieldEnum = {
   apiKey: 'apiKey',
   accessToken: 'accessToken',
-  refreshToken: 'refreshToken'
+  refreshToken: 'refreshToken',
+  metadata: 'metadata'
 };
 
 exports.Prisma.AiApiConfigOrderByRelevanceFieldEnum = {
   apiKey: 'apiKey',
-  model: 'model'
+  model: 'model',
+  config: 'config'
 };
 
 exports.Prisma.WholesaleBandOrderByRelevanceFieldEnum = {
@@ -541,10 +528,13 @@ exports.Prisma.PricingPolicyOrderByRelevanceFieldEnum = {
 };
 
 exports.Prisma.AutomationConfigOrderByRelevanceFieldEnum = {
-  cronExpression: 'cronExpression'
+  cronExpression: 'cronExpression',
+  wholesaleBandIds: 'wholesaleBandIds',
+  retailBandIds: 'retailBandIds'
 };
 
 exports.Prisma.WorkflowLogOrderByRelevanceFieldEnum = {
+  details: 'details',
   errorMessage: 'errorMessage'
 };
 
@@ -601,7 +591,8 @@ exports.Prisma.PaymentOrderByRelevanceFieldEnum = {
   virtualAccountBank: 'virtualAccountBank',
   cardCompany: 'cardCompany',
   cardNumber: 'cardNumber',
-  cancelReason: 'cancelReason'
+  cancelReason: 'cancelReason',
+  rawResponse: 'rawResponse'
 };
 exports.SourcingPlatform = exports.$Enums.SourcingPlatform = {
   BAND: 'BAND',

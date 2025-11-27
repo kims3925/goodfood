@@ -85,11 +85,25 @@ export default function ProductsPage() {
   const loadProducts = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/products')
+      const response = await fetch('/api/product')
       const data = await response.json()
       
       if (data.success) {
-        setProducts(data.products || [])
+        // API 응답을 페이지 인터페이스에 맞게 매핑
+        const mappedProducts = (data.data || []).map((p: any) => ({
+          id: String(p.id),
+          title: p.name || '',
+          originalPrice: p.wholesalePrice || 0,
+          salePrice: p.price || 0,
+          description: p.description || '',
+          status: p.status || 'DRAFT',
+          productCategory: p.categoryId || null,
+          images: p.thumbnailUrl ? JSON.stringify([p.thumbnailUrl]) : undefined,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+          wholesaleBandName: p.post?.wholesaleBand?.name || null,
+        }))
+        setProducts(mappedProducts)
       } else {
         console.error('상품 로드 실패:', data.error)
         setProducts([])
@@ -439,23 +453,18 @@ export default function ProductsPage() {
 
     try {
       setIsSaving(true)
-      const response = await fetch(`/api/products/${editedProduct.id}`, {
+      const response = await fetch('/api/product', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: editedProduct.title,
+          id: editedProduct.id,
+          name: editedProduct.title,
           description: editedProduct.description,
-          hookingTitle: editedProduct.hookingTitle,
-          hookingContent: editedProduct.hookingContent,
-          detailedContent: editedProduct.detailedContent,
-          originalPrice: editedProduct.originalPrice,
-          salePrice: editedProduct.salePrice,
-          shippingFee: editedProduct.shippingFee,
-          priceInfo: editedProduct.priceInfo,
-          specialNotes: editedProduct.specialNotes,
-          productCategory: editedProduct.productCategory,
+          price: editedProduct.salePrice,
+          wholesalePrice: editedProduct.originalPrice,
+          categoryId: editedProduct.productCategory,
           status: editedProduct.status,
         }),
       })
@@ -603,8 +612,8 @@ export default function ProductsPage() {
 
     try {
       // 병렬로 모든 선택된 상품 삭제 요청
-      const deletePromises = selectedProducts.map(productId => 
-        fetch(`/api/products/${productId}`, {
+      const deletePromises = selectedProducts.map(productId =>
+        fetch(`/api/product?id=${productId}`, {
           method: 'DELETE',
         }).then(response => response.json())
       )
@@ -708,7 +717,7 @@ export default function ProductsPage() {
     }
 
     try {
-      const response = await fetch(`/api/products/${productId}`, {
+      const response = await fetch(`/api/product?id=${productId}`, {
         method: 'DELETE',
       })
 

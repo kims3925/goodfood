@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@bandauto/db'
-
-const prisma = new PrismaClient()
+import prisma from '@/lib/prisma'
 
 // GET: 도매밴드에서 수집 가능한 게시물 목록 조회
 export async function GET(request: NextRequest) {

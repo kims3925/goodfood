@@ -1,15 +1,3 @@
-// =============================================
-// BANDAUTO SOURCING-APP DATABASE SCHEMA
-// =============================================
-// Purpose: 도매밴드 게시물 수집 → AI 가공 → 소매밴드 발행
-// Tech Stack: MySQL 8.0+, Prisma, TypeScript
-// Design Principles:
-// - 3NF Normalization
-// - Cascade Delete
-// - Multi-platform Support (Band, AliExpress)
-// - Multi-AI Provider (Gemini, OpenAI)
-// =============================================
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated"
@@ -20,74 +8,46 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// =============================================
-// AUTHENTICATION DOMAIN
-// =============================================
-
 model User {
-  id        Int       @id @default(autoincrement())
-  email     String    @unique @db.VarChar(255)
-  password  String    @db.VarChar(255) // bcrypt hashed
-  name      String?   @db.VarChar(100)
-
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  sourcingApiConfigs SourcingApiConfig[]
+  id                 Int                 @id @default(autoincrement())
+  email              String              @unique @db.VarChar(255)
+  password           String              @db.VarChar(255)
+  name               String?             @db.VarChar(100)
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   aiApiConfigs       AiApiConfig[]
-  wholesaleBands     WholesaleBand[]
-  retailBands        RetailBand[]
-  posts              Post[]
-  products           Product[]
-  pricingPolicies    PricingPolicy[]
   automationConfig   AutomationConfig?
-  workflowLogs       WorkflowLog[]
+  posts              Post[]
+  pricingPolicies    PricingPolicy[]
+  products           Product[]
   productPublishes   ProductPublish[]
   publishHistories   PublishHistory[]
   purchaseOrders     PurchaseOrder[]
+  retailBands        RetailBand[]
+  sourcingApiConfigs SourcingApiConfig[]
+  wholesaleBands     WholesaleBand[]
+  workflowLogs       WorkflowLog[]
 
   @@index([email])
   @@map("user")
 }
 
-// =============================================
-// SOURCING PLATFORM API CONFIGURATION
-// =============================================
-
-enum SourcingPlatform {
-  BAND        // 네이버 밴드
-  ALIEXPRESS  // 알리익스프레스
-  // 확장 가능: TAOBAO, COUPANG, etc.
-}
-
 model SourcingApiConfig {
-  id       Int               @id @default(autoincrement())
-  userId   Int               @map("user_id")
-  platform SourcingPlatform
-
-  // Common Fields
-  apiKey        String?   @map("api_key") @db.VarChar(500)
-  accessToken   String?   @map("access_token") @db.Text // Band: Access Token만 사용 (만료 시 수동 재입력)
-  refreshToken  String?   @map("refresh_token") @db.Text // [미사용] 자동 갱신 기능 없음
-  tokenExpiry   DateTime? @map("token_expiry") @db.Timestamp(0)
-
-  // Platform-specific metadata (JSON)
-  // Band: {} (Access Token만 사용, metadata 불필요)
-  // AliExpress: { appSecret, trackingId }
-  metadata      Json?     @default("{}") @db.Json
-
-  // Status
-  isActive      Boolean   @map("is_active") @default(true)
-  lastSyncedAt  DateTime? @map("last_synced_at") @db.Timestamp(0)
-
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wholesaleBands WholesaleBand[]
+  id             Int              @id @default(autoincrement())
+  userId         Int              @map("user_id")
+  platform       SourcingPlatform
+  apiKey         String?          @map("api_key") @db.VarChar(500)
+  accessToken    String?          @map("access_token") @db.Text
+  refreshToken   String?          @map("refresh_token") @db.Text
+  tokenExpiry    DateTime?        @map("token_expiry") @db.Timestamp(0)
+  metadata       String?          @db.LongText
+  isActive       Boolean          @default(true) @map("is_active")
+  lastSyncedAt   DateTime?        @map("last_synced_at") @db.Timestamp(0)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   retailBands    RetailBand[]
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wholesaleBands WholesaleBand[]
 
   @@unique([userId, platform])
   @@index([userId])
@@ -96,73 +56,40 @@ model SourcingApiConfig {
   @@map("sourcing_api_config")
 }
 
-// =============================================
-// AI PROVIDER API CONFIGURATION
-// =============================================
-
-enum AiProvider {
-  GEMINI  // Google Gemini
-  OPENAI  // OpenAI GPT
-  // 확장 가능: CLAUDE, LLAMA, etc.
-}
-
 model AiApiConfig {
-  id       Int        @id @default(autoincrement())
-  userId   Int        @map("user_id")
-  provider AiProvider
+  id         Int        @id @default(autoincrement())
+  userId     Int        @map("user_id")
+  provider   AiProvider
+  apiKey     String     @map("api_key") @db.VarChar(500)
+  model      String     @db.VarChar(100)
+  config     String?    @db.LongText
+  isActive   Boolean    @default(true) @map("is_active")
+  usageCount Int        @default(0) @map("usage_count")
+  lastUsedAt DateTime?  @map("last_used_at") @db.Timestamp(0)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Common Fields
-  apiKey       String  @map("api_key") @db.VarChar(500)
-  model        String  @db.VarChar(100) // "gemini-2.5-flash", "gpt-4o"
-
-  // Configuration (JSON)
-  // { temperature: 0.7, maxTokens: 2048, topP: 1.0 }
-  config       Json?   @default("{}") @db.Json
-
-  // Status & Usage
-  isActive     Boolean   @map("is_active") @default(true)
-  usageCount   Int       @map("usage_count") @default(0) // 총 호출 횟수
-  lastUsedAt   DateTime? @map("last_used_at") @db.Timestamp(0)
-
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, provider]) // 사용자당 제공자별 1개
+  @@unique([userId, provider])
   @@index([userId])
   @@index([provider])
   @@index([isActive])
   @@map("ai_api_config")
 }
 
-// =============================================
-// WHOLESALE BAND MANAGEMENT (도매밴드)
-// =============================================
-
 model WholesaleBand {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")
-  apiConfigId Int      @map("api_config_id") // 어느 API 설정으로 연결되었는지
-
-  // Band API Data
-  bandKey      String   @map("band_key") @db.VarChar(255) // Band Platform unique key
-  name         String   @db.VarChar(255)
-  coverUrl     String?  @map("cover_url") @db.VarChar(500)
-
-  // Status
-  isActive     Boolean   @map("is_active") @default(true)
-
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  apiConfig SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
-
-  // 수집된 게시물
-  posts Post[] @relation("WholesaleBand")
+  id          Int               @id @default(autoincrement())
+  userId      Int               @map("user_id")
+  apiConfigId Int               @map("api_config_id")
+  bandKey     String            @map("band_key") @db.VarChar(255)
+  name        String            @db.VarChar(255)
+  coverUrl    String?           @map("cover_url") @db.VarChar(500)
+  isActive    Boolean           @default(true) @map("is_active")
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  posts       Post[]            @relation("WholesaleBand")
+  apiConfig   SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, bandKey])
   @@index([userId])
@@ -171,32 +98,22 @@ model WholesaleBand {
   @@map("wholesale_band")
 }
 
-// =============================================
-// RETAIL BAND MANAGEMENT (소매밴드)
-// =============================================
-
 model RetailBand {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")
-  apiConfigId Int      @map("api_config_id") // 어느 API 설정으로 연결되었는지
-
-  // Band API Data
-  bandKey      String   @map("band_key") @db.VarChar(255) // Band Platform unique key
-  name         String   @db.VarChar(255)
-  coverUrl     String?  @map("cover_url") @db.VarChar(500)
-  formUrl      String?  @map("form_url") @db.VarChar(500) // 주문서 URL
-
-  // Status
-  isActive     Boolean   @map("is_active") @default(true)
-
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               Int               @id @default(autoincrement())
+  userId           Int               @map("user_id")
+  apiConfigId      Int               @map("api_config_id")
+  bandKey          String            @map("band_key") @db.VarChar(255)
+  name             String            @db.VarChar(255)
+  coverUrl         String?           @map("cover_url") @db.VarChar(500)
+  isActive         Boolean           @default(true) @map("is_active")
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  formUrl          String?           @map("form_url") @db.VarChar(500)
+  publishHistories PublishHistory[]
+  purchaseOrders   PurchaseOrder[]
   apiConfig        SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
   productPublishes ProductPublish[]
-  publishHistories PublishHistory[]
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, bandKey])
   @@index([userId])
@@ -205,84 +122,53 @@ model RetailBand {
   @@map("retail_band")
 }
 
-// =============================================
-// POST MANAGEMENT (게시물 라이프사이클)
-// =============================================
-
 model Post {
-  id              Int    @id @default(autoincrement())
-  userId          Int    @map("user_id")
-  wholesaleBandId Int    @map("wholesale_band_id") // 도매밴드 ID (출처)
-  externalId      String @map("external_id") @db.VarChar(255) // Band API post_key or AliExpress product_id
-
-  // Original Content (수집 원본)
-  title           String @db.VarChar(500)
-  content         String @db.Text
-
-  // Metadata
-  author       String?   @db.VarChar(100)
-
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wholesaleBand WholesaleBand @relation("WholesaleBand", fields: [wholesaleBandId], references: [id], onDelete: Cascade)
-  images        PostImage[]
-  comments      PostComment[]
-  product       Product?      // 1:1 관계 (하나의 게시물은 최대 1개의 상품)
+  id              Int           @id @default(autoincrement())
+  userId          Int           @map("user_id")
+  wholesaleBandId Int           @map("wholesale_band_id")
+  externalId      String        @map("external_id") @db.VarChar(255)
+  title           String        @db.VarChar(500)
+  content         String        @db.Text
+  author          String?       @db.VarChar(100)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wholesaleBand   WholesaleBand @relation("WholesaleBand", fields: [wholesaleBandId], references: [id], onDelete: Cascade)
+  comments        PostComment[]
+  images          PostImage[]
+  product         Product?
 
   @@unique([wholesaleBandId, externalId])
   @@index([userId])
   @@index([wholesaleBandId])
-  @@index([createdAt]) // 최신순 조회
+  @@index([createdAt])
   @@index([externalId])
   @@map("post")
 }
 
-// =============================================
-// POST IMAGES
-// =============================================
-
 model PostImage {
   id        Int      @id @default(autoincrement())
   postId    Int      @map("post_id")
-
-  // Image Info
-  name      String   @db.VarChar(255) // UUID_timestamp.ext
-  imageUrl  String   @map("image_url") @db.VarChar(1000) // 상대 경로 (예: /assets/images/uuid_2024-01-01_12-00-00.jpg)
-
-  // Image Metadata
-  fileSize  Int?     @map("file_size") // bytes
-  sortOrder Int      @map("sort_order") @default(0)
-
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-
-  // Relationships
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  name      String   @db.VarChar(255)
+  imageUrl  String   @map("image_url") @db.VarChar(1000)
+  fileSize  Int?     @map("file_size")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId])
   @@index([sortOrder])
   @@map("post_image")
 }
 
-// =============================================
-// POST COMMENTS
-// =============================================
-
 model PostComment {
-  id          Int      @id @default(autoincrement())
-  postId      Int      @map("post_id")
-
-  // Band API Data
-  author      String   @db.VarChar(100) // 댓글 작성자
-  content     String   @db.Text // 댓글 내용
-
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id        Int      @id @default(autoincrement())
+  postId    Int      @map("post_id")
+  author    String   @db.VarChar(100)
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId])
   @@index([createdAt])
@@ -337,32 +223,17 @@ model Product {
 }
 
 model ProductVariant {
-  id            Int       @id @default(autoincrement())
-  productId     Int       @map("product_id")
-
-  // Variant Info
-  sku           String?   @db.VarChar(100)
-  optionSummary String?   @map("option_summary") @db.VarChar(500) // "색상:빨강, 사이즈:L"
-
-  // Pricing & Stock
-  price          Int   // 판매가
-  wholesalePrice Int?  @map("wholesale_price") // 도매가
-  stock          Int   @default(0)
-
-  // Additional Info
-  weight  Float?  // kg
-  barcode String? @db.VarChar(50)
-
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  // E-Commerce Relations
-  cartItems          CartItem[]
-  sessionCartItems   SessionCartItem[]
-  customerOrderItems CustomerOrderItem[]
+  id             Int      @id @default(autoincrement())
+  productId      Int      @map("product_id")
+  sku            String?  @db.VarChar(100)
+  optionSummary  String?  @map("option_summary") @db.VarChar(500)
+  price          Int
+  wholesalePrice Int?     @map("wholesale_price")
+  stock          Int      @default(0)
+  weight         Float?
+  barcode        String?  @db.VarChar(50)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 
   @@index([productId])
   @@index([sku])
@@ -370,129 +241,70 @@ model ProductVariant {
 }
 
 model ProductOption {
-  id        Int    @id @default(autoincrement())
-  productId Int    @map("product_id")
-
-  // Option Info
-  groupName String @map("group_name") @db.VarChar(100) // "색상", "사이즈"
-  value     String @db.VarChar(200) // "빨강", "파랑", "L", "XL"
-  sortOrder Int    @map("sort_order") @default(0)
-
+  id        Int      @id @default(autoincrement())
+  productId Int      @map("product_id")
+  groupName String   @map("group_name") @db.VarChar(100)
+  value     String   @db.VarChar(200)
+  sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-
-  // Relationships
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([groupName])
   @@map("product_option")
 }
 
-// =============================================
-// PRICING POLICY MANAGEMENT (가격 정책 관리)
-// =============================================
-
 model PricingPolicy {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")
-
-  // Policy Info
-  name        String   @db.VarChar(100)
-  description String?  @db.Text
-  content     String   @db.Text // 가격 정책 텍스트 (예: "원가 그대로", "수집가격 기준 구간별 마진 적용")
-
-  // Status
-  isActive    Boolean  @default(true) @map("is_active")
-
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                Int                @id @default(autoincrement())
+  userId            Int                @map("user_id")
+  name              String             @db.VarChar(100)
+  description       String?            @db.Text
+  content           String             @db.Text
+  isActive          Boolean            @default(true) @map("is_active")
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamp(0)
   automationConfigs AutomationConfig[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId], map: "pricing_policy_user_id_fkey")
   @@map("pricing_policy")
 }
 
-// =============================================
-// AUTOMATION CONFIGURATION (자동화 설정)
-// =============================================
-
 model AutomationConfig {
-  id              Int       @id @default(autoincrement())
-  userId          Int       @unique @map("user_id") // 사용자당 1개
-
-  // 스케줄 설정
-  isEnabled       Boolean   @default(false) @map("is_enabled")
-  cronExpression  String?   @map("cron_expression") @db.VarChar(50) // "0 * * * *" (매 1시간)
-
-  // 수집 설정
-  collectFromAllBands Boolean @default(true) @map("collect_from_all_bands")
-  wholesaleBandIds    Json?   @map("wholesale_band_ids") @db.Json // 특정 밴드만 수집 시
-
-  // AI 설정
-  aiProvider      AiProvider @default(GEMINI) @map("ai_provider")
-  pricingPolicyId Int?       @map("pricing_policy_id")
-
-  // 발행 설정
-  autoPublish     Boolean   @default(false) @map("auto_publish")
-  retailBandIds   Json?     @map("retail_band_ids") @db.Json // 발행할 소매밴드 ID들
-
-  // 실행 상태
-  lastRunAt       DateTime? @map("last_run_at") @db.Timestamp(0)
-  nextRunAt       DateTime? @map("next_run_at") @db.Timestamp(0)
-
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pricingPolicy PricingPolicy? @relation(fields: [pricingPolicyId], references: [id], onDelete: SetNull)
+  id                  Int            @id @default(autoincrement())
+  userId              Int            @unique @map("user_id")
+  isEnabled           Boolean        @default(false) @map("is_enabled")
+  cronExpression      String?        @map("cron_expression") @db.VarChar(50)
+  collectFromAllBands Boolean        @default(true) @map("collect_from_all_bands")
+  wholesaleBandIds    String?        @map("wholesale_band_ids") @db.LongText
+  aiProvider          AiProvider     @default(GEMINI) @map("ai_provider")
+  pricingPolicyId     Int?           @map("pricing_policy_id")
+  autoPublish         Boolean        @default(false) @map("auto_publish")
+  retailBandIds       String?        @map("retail_band_ids") @db.LongText
+  lastRunAt           DateTime?      @map("last_run_at") @db.Timestamp(0)
+  nextRunAt           DateTime?      @map("next_run_at") @db.Timestamp(0)
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamp(0)
+  pricingPolicy       PricingPolicy? @relation(fields: [pricingPolicyId], references: [id])
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([isEnabled])
+  @@index([pricingPolicyId], map: "automation_config_pricing_policy_id_fkey")
   @@map("automation_config")
 }
 
-// =============================================
-// WORKFLOW EXECUTION LOG (워크플로우 실행 로그)
-// =============================================
-
-enum WorkflowType {
-  COLLECT       // 게시물 수집
-  TRANSFORM     // AI 변환
-  PUBLISH       // 소매밴드 발행
-  FULL_PIPELINE // 전체 파이프라인
-}
-
-enum WorkflowStatus {
-  PENDING
-  RUNNING
-  COMPLETED
-  FAILED
-  PARTIAL_SUCCESS
-}
-
 model WorkflowLog {
-  id              Int            @id @default(autoincrement())
-  userId          Int            @map("user_id")
-
-  // 실행 정보
-  workflowType    WorkflowType   @map("workflow_type")
-  status          WorkflowStatus @default(PENDING)
-  startedAt       DateTime       @default(now()) @map("started_at") @db.Timestamp(0)
-  completedAt     DateTime?      @map("completed_at") @db.Timestamp(0)
-
-  // 결과 통계
-  totalItems      Int            @default(0) @map("total_items")
-  successCount    Int            @default(0) @map("success_count")
-  failedCount     Int            @default(0) @map("failed_count")
-
-  // 상세 로그
-  details         Json?          @db.Json // 각 항목별 결과, 진행률 등
-  errorMessage    String?        @map("error_message") @db.Text
-
-  // Relationships
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           Int            @id @default(autoincrement())
+  userId       Int            @map("user_id")
+  workflowType WorkflowType   @map("workflow_type")
+  status       WorkflowStatus @default(PENDING)
+  startedAt    DateTime       @default(now()) @map("started_at") @db.Timestamp(0)
+  completedAt  DateTime?      @map("completed_at") @db.Timestamp(0)
+  totalItems   Int            @default(0) @map("total_items")
+  successCount Int            @default(0) @map("success_count")
+  failedCount  Int            @default(0) @map("failed_count")
+  details      String?        @db.LongText
+  errorMessage String?        @map("error_message") @db.Text
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, workflowType, startedAt])
   @@index([status])
@@ -539,22 +351,17 @@ enum PublishStatus {
 }
 
 model PublishHistory {
-  id            Int           @id @default(autoincrement())
-  userId        Int           @map("user_id")
-  productId     Int           @map("product_id")
-  retailBandId  Int           @map("retail_band_id")
-
-  // Band API 결과
-  postKey       String?       @map("post_key") @db.VarChar(255) // Band API 반환값
-  status        PublishStatus @default(PENDING)
-  errorMessage  String?       @map("error_message") @db.Text
-
-  publishedAt   DateTime      @default(now()) @map("published_at") @db.Timestamp(0)
-
-  // Relationships
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  retailBand RetailBand @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
+  id           Int           @id @default(autoincrement())
+  userId       Int           @map("user_id")
+  productId    Int           @map("product_id")
+  retailBandId Int           @map("retail_band_id")
+  postKey      String?       @map("post_key") @db.VarChar(255)
+  status       PublishStatus @default(PENDING)
+  errorMessage String?       @map("error_message") @db.Text
+  publishedAt  DateTime      @default(now()) @map("published_at") @db.Timestamp(0)
+  product      Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  retailBand   RetailBand    @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([productId, retailBandId])
   @@index([userId])
@@ -565,152 +372,72 @@ model PublishHistory {
   @@map("publish_history")
 }
 
-// =============================================
-// PURCHASE ORDER MANAGEMENT (주문서 관리)
-// =============================================
-
 model PurchaseOrder {
-  id              Int      @id @default(autoincrement())
-  userId          Int      @map("user_id")
-  productId       Int?     @map("product_id") // 매칭된 상품 ID (선택)
-
-  // 주문 정보
-  productName     String   @map("product_name") @db.VarChar(500)  // 상품명
-  totalPrice      Int?     @map("total_price")                    // 총금액
-  customerName    String   @map("customer_name") @db.VarChar(100) // 이름
-
-  // Timestamps
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  id           Int         @id @default(autoincrement())
+  userId       Int         @map("user_id")
+  productId    Int?        @map("product_id")
+  retailBandId Int?        @map("retail_band_id")
+  productName  String      @map("product_name") @db.VarChar(500)
+  totalPrice   Int?        @map("total_price")
+  customerName String      @map("customer_name") @db.VarChar(100)
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamp(0)
+  product      Product?    @relation(fields: [productId], references: [id])
+  retailBand   RetailBand? @relation(fields: [retailBandId], references: [id])
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([productId])
+  @@index([retailBandId])
   @@index([productName])
   @@index([customerName])
   @@map("purchase_order")
 }
 
-// =============================================
-// E-COMMERCE DOMAIN - CUSTOMER FACING
-// =============================================
-
-// ---------------------------------------------
-// ENUMS
-// ---------------------------------------------
-
-enum CustomerOrderStatus {
-  PENDING    // 주문 대기 (결제 전)
-  PAID       // 결제 완료
-  SHIPPED    // 배송 중
-  DELIVERED  // 배송 완료
-  CANCELLED  // 주문 취소
-  REFUNDED   // 환불 완료
-}
-
-enum TossPaymentMethod {
-  CARD             // 카드
-  VIRTUAL_ACCOUNT  // 가상계좌
-  TRANSFER         // 계좌이체
-  MOBILE           // 휴대폰
-  CULTURE_GIFT     // 문화상품권
-  BOOK_GIFT        // 도서문화상품권
-  GAME_GIFT        // 게임문화상품권
-}
-
-enum TossPaymentStatus {
-  READY              // 결제 준비
-  IN_PROGRESS        // 결제 진행 중
-  WAITING_FOR_DEPOSIT // 입금 대기 (가상계좌)
-  DONE               // 결제 완료
-  CANCELED           // 결제 취소
-  PARTIAL_CANCELED   // 부분 취소
-  ABORTED            // 결제 승인 실패
-  EXPIRED            // 결제 만료
-}
-
-// ---------------------------------------------
-// CUSTOMER (고객)
-// ---------------------------------------------
-
 model Customer {
-  id           Int      @id @default(autoincrement())
-
-  // Authentication
-  email        String   @unique @db.VarChar(255)
-  passwordHash String   @map("password_hash") @db.VarChar(255) // bcrypt hashed
-
-  // Profile
-  name         String   @db.VarChar(100)
-  phone        String?  @db.VarChar(20)
-
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
+  id           Int               @id @default(autoincrement())
+  email        String            @unique @db.VarChar(255)
+  passwordHash String            @map("password_hash") @db.VarChar(255)
+  name         String            @db.VarChar(100)
+  phone        String?           @db.VarChar(20)
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime          @updatedAt @map("updated_at") @db.Timestamp(0)
   addresses    CustomerAddress[]
-  cartItems    CartItem[]
-  sessionCarts SessionCart[]
   orders       CustomerOrder[]
+  sessionCarts SessionCart[]
 
   @@index([email])
   @@index([phone])
   @@map("customer")
 }
 
-// ---------------------------------------------
-// CUSTOMER ADDRESS (배송 주소)
-// ---------------------------------------------
-
 model CustomerAddress {
-  id          Int      @id @default(autoincrement())
-  customerId  Int      @map("customer_id")
-
-  // Address Label
-  label       String?  @db.VarChar(50) // "집", "회사", etc.
-
-  // Recipient Info
-  recipientName  String @map("recipient_name") @db.VarChar(100)
-  recipientPhone String @map("recipient_phone") @db.VarChar(20)
-
-  // Address Details
-  postalCode    String  @map("postal_code") @db.VarChar(10)
-  address       String  @db.VarChar(500) // 기본 주소
-  addressDetail String? @map("address_detail") @db.VarChar(500) // 상세 주소
-
-  // Default Flag
-  isDefault   Boolean  @default(false) @map("is_default")
-
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id             Int      @id @default(autoincrement())
+  customerId     Int      @map("customer_id")
+  label          String?  @db.VarChar(50)
+  recipientName  String   @map("recipient_name") @db.VarChar(100)
+  recipientPhone String   @map("recipient_phone") @db.VarChar(20)
+  postalCode     String   @map("postal_code") @db.VarChar(10)
+  address        String   @db.VarChar(500)
+  addressDetail  String?  @map("address_detail") @db.VarChar(500)
+  isDefault      Boolean  @default(false) @map("is_default")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
   @@index([customerId, isDefault])
   @@map("customer_address")
 }
 
-// ---------------------------------------------
-// SESSION CART (세션 기반 장바구니 - 비회원용)
-// ---------------------------------------------
-
 model SessionCart {
-  id          Int      @id @default(autoincrement())
-  sessionId   String   @unique @map("session_id") @db.VarChar(100)
-  customerId  Int?     @map("customer_id") // 로그인 시 연결
-
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-  expiresAt   DateTime @map("expires_at") @db.Timestamp(0) // 세션 만료 시간
-
-  // Relationships
-  customer    Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  items       SessionCartItem[]
+  id         Int       @id @default(autoincrement())
+  sessionId  String    @unique @map("session_id") @db.VarChar(100)
+  customerId Int?      @map("customer_id")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamp(0)
+  customer   Customer? @relation(fields: [customerId], references: [id])
 
   @@index([sessionId])
   @@index([customerId])
@@ -719,97 +446,65 @@ model SessionCart {
 }
 
 model SessionCartItem {
-  id          Int      @id @default(autoincrement())
-  cartId      Int      @map("cart_id")
-  productId   Int      @map("product_id")
-  variantId   Int?     @map("variant_id")
-
-  quantity    Int      @default(1)
-  priceAt     Int      @map("price_at") // 담을 때 가격 스냅샷
-
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  cart        SessionCart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product     Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  variant     ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  id        Int      @id @default(autoincrement())
+  cartId    Int      @map("cart_id")
+  productId Int      @map("product_id")
+  quantity  Int      @default(1)
+  priceAt   Int      @map("price_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+  variantId Int?     @map("variant_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([cartId, productId, variantId])
   @@index([cartId])
   @@index([productId])
+  @@index([variantId])
   @@map("session_cart_item")
 }
 
-// ---------------------------------------------
-// CART ITEM (장바구니 - 로그인 회원용)
-// ---------------------------------------------
-
 model CartItem {
-  id          Int      @id @default(autoincrement())
-  customerId  Int      @map("customer_id")
-  productId   Int      @map("product_id")
-  variantId   Int?     @map("variant_id") // Optional: specific variant
+  id         Int      @id @default(autoincrement())
+  customerId Int      @map("customer_id")
+  productId  Int      @map("product_id")
+  quantity   Int      @default(1)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+  variantId  Int?     @map("variant_id")
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  quantity    Int      @default(1)
-
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  customer Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  product  Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  variant  ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-
-  // Prevent duplicate items (same product+variant) in cart
   @@unique([customerId, productId, variantId])
   @@index([customerId])
   @@index([productId])
+  @@index([variantId])
   @@map("cart_item")
 }
 
-// ---------------------------------------------
-// CUSTOMER ORDER (주문)
-// ---------------------------------------------
-
 model CustomerOrder {
-  id           Int                 @id @default(autoincrement())
-  customerId   Int                 @map("customer_id")
-
-  // Order Identifier (for display, e.g., "ORD-20240101-001")
-  orderNumber  String              @unique @map("order_number") @db.VarChar(50)
-
-  // Order Status
-  status       CustomerOrderStatus @default(PENDING)
-
-  // Shipping Address (snapshot at order time)
-  recipientName  String  @map("recipient_name") @db.VarChar(100)
-  recipientPhone String  @map("recipient_phone") @db.VarChar(20)
-  postalCode     String  @map("postal_code") @db.VarChar(10)
-  address        String  @db.VarChar(500)
-  addressDetail  String? @map("address_detail") @db.VarChar(500)
-  deliveryMemo   String? @map("delivery_memo") @db.VarChar(500)
-
-  // Pricing
-  subtotalAmount Decimal @map("subtotal_amount") @db.Decimal(12, 2) // 상품 합계
-  shippingFee    Decimal @map("shipping_fee") @db.Decimal(10, 2) @default(0)
-  discountAmount Decimal @map("discount_amount") @db.Decimal(10, 2) @default(0)
-  totalAmount    Decimal @map("total_amount") @db.Decimal(12, 2) // 최종 결제금액
-
-  // Timestamps
-  orderedAt    DateTime  @default(now()) @map("ordered_at") @db.Timestamp(0)
-  paidAt       DateTime? @map("paid_at") @db.Timestamp(0)
-  shippedAt    DateTime? @map("shipped_at") @db.Timestamp(0)
-  deliveredAt  DateTime? @map("delivered_at") @db.Timestamp(0)
-  cancelledAt  DateTime? @map("cancelled_at") @db.Timestamp(0)
-
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  customer Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  items    CustomerOrderItem[]
-  payment  Payment?
+  id             Int                 @id @default(autoincrement())
+  customerId     Int                 @map("customer_id")
+  orderNumber    String              @unique @map("order_number") @db.VarChar(50)
+  status         CustomerOrderStatus @default(PENDING)
+  recipientName  String              @map("recipient_name") @db.VarChar(100)
+  recipientPhone String              @map("recipient_phone") @db.VarChar(20)
+  postalCode     String              @map("postal_code") @db.VarChar(10)
+  address        String              @db.VarChar(500)
+  addressDetail  String?             @map("address_detail") @db.VarChar(500)
+  deliveryMemo   String?             @map("delivery_memo") @db.VarChar(500)
+  subtotalAmount Decimal             @map("subtotal_amount") @db.Decimal(12, 2)
+  shippingFee    Decimal             @default(0.00) @map("shipping_fee") @db.Decimal(10, 2)
+  discountAmount Decimal             @default(0.00) @map("discount_amount") @db.Decimal(10, 2)
+  totalAmount    Decimal             @map("total_amount") @db.Decimal(12, 2)
+  orderedAt      DateTime            @default(now()) @map("ordered_at") @db.Timestamp(0)
+  paidAt         DateTime?           @map("paid_at") @db.Timestamp(0)
+  shippedAt      DateTime?           @map("shipped_at") @db.Timestamp(0)
+  deliveredAt    DateTime?           @map("delivered_at") @db.Timestamp(0)
+  cancelledAt    DateTime?           @map("cancelled_at") @db.Timestamp(0)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamp(0)
+  customer       Customer            @relation(fields: [customerId], references: [id])
+  items          CustomerOrderItem[]
+  payment        Payment?
 
   @@index([customerId])
   @@index([orderNumber])
@@ -819,85 +514,121 @@ model CustomerOrder {
   @@map("customer_order")
 }
 
-// ---------------------------------------------
-// CUSTOMER ORDER ITEM (주문 상품)
-// ---------------------------------------------
-
 model CustomerOrderItem {
-  id          Int     @id @default(autoincrement())
-  orderId     Int     @map("order_id")
-  productId   Int?    @map("product_id") // Nullable: product may be deleted
-  variantId   Int?    @map("variant_id") // Nullable: variant may be deleted
-
-  // Product Snapshot (preserved even if product changes/deleted)
-  productName   String  @map("product_name") @db.VarChar(500)
-  optionSummary String? @map("option_summary") @db.VarChar(500) // "색상:빨강, 사이즈:L"
-  thumbnailUrl  String? @map("thumbnail_url") @db.VarChar(1000)
-
-  // Pricing
-  quantity   Int
-  unitPrice  Decimal @map("unit_price") @db.Decimal(10, 2)
-  totalPrice Decimal @map("total_price") @db.Decimal(12, 2)
-
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-
-  // Relationships
-  order   CustomerOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
-  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  id            Int           @id @default(autoincrement())
+  orderId       Int           @map("order_id")
+  productId     Int?          @map("product_id")
+  productName   String        @map("product_name") @db.VarChar(500)
+  optionSummary String?       @map("option_summary") @db.VarChar(500)
+  thumbnailUrl  String?       @map("thumbnail_url") @db.VarChar(1000)
+  quantity      Int
+  unitPrice     Decimal       @map("unit_price") @db.Decimal(10, 2)
+  totalPrice    Decimal       @map("total_price") @db.Decimal(12, 2)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  variantId     Int?          @map("variant_id")
+  order         CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       Product?      @relation(fields: [productId], references: [id])
 
   @@index([orderId])
   @@index([productId])
+  @@index([variantId])
   @@map("customer_order_item")
 }
 
-// ---------------------------------------------
-// PAYMENT (결제 - TossPayments)
-// ---------------------------------------------
-
 model Payment {
-  id          Int                @id @default(autoincrement())
-  orderId     Int                @unique @map("order_id") // 1:1 with order
-
-  // TossPayments Transaction Info
-  paymentKey  String             @unique @map("payment_key") @db.VarChar(200)
-  tossOrderId String             @map("toss_order_id") @db.VarChar(100)
-
-  // Payment Details
-  method      TossPaymentMethod
-  status      TossPaymentStatus  @default(READY)
-  amount      Decimal            @db.Decimal(12, 2)
-
-  // Virtual Account Info (for VIRTUAL_ACCOUNT method)
-  virtualAccountNumber String?   @map("virtual_account_number") @db.VarChar(50)
-  virtualAccountBank   String?   @map("virtual_account_bank") @db.VarChar(20)
-  virtualAccountDueDate DateTime? @map("virtual_account_due_date") @db.Timestamp(0)
-
-  // Card Info (for CARD method)
-  cardCompany    String? @map("card_company") @db.VarChar(50)
-  cardNumber     String? @map("card_number") @db.VarChar(20) // Masked: 1234-****-****-5678
-  installmentMonth Int?   @map("installment_month") // 0 = 일시불
-
-  // Refund Info
-  cancelReason   String? @map("cancel_reason") @db.VarChar(500)
-  cancelledAmount Decimal? @map("cancelled_amount") @db.Decimal(12, 2)
-
-  // TossPayments Response (full response for debugging/auditing)
-  rawResponse    Json?   @map("raw_response") @db.Json
-
-  // Timestamps
-  approvedAt     DateTime? @map("approved_at") @db.Timestamp(0)
-  cancelledAt    DateTime? @map("cancelled_at") @db.Timestamp(0)
-
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  order CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  id                    Int               @id @default(autoincrement())
+  orderId               Int               @unique @map("order_id")
+  paymentKey            String            @unique @map("payment_key") @db.VarChar(200)
+  tossOrderId           String            @map("toss_order_id") @db.VarChar(100)
+  method                TossPaymentMethod
+  status                TossPaymentStatus @default(READY)
+  amount                Decimal           @db.Decimal(12, 2)
+  virtualAccountNumber  String?           @map("virtual_account_number") @db.VarChar(50)
+  virtualAccountBank    String?           @map("virtual_account_bank") @db.VarChar(20)
+  virtualAccountDueDate DateTime?         @map("virtual_account_due_date") @db.Timestamp(0)
+  cardCompany           String?           @map("card_company") @db.VarChar(50)
+  cardNumber            String?           @map("card_number") @db.VarChar(20)
+  installmentMonth      Int?              @map("installment_month")
+  cancelReason          String?           @map("cancel_reason") @db.VarChar(500)
+  cancelledAmount       Decimal?          @map("cancelled_amount") @db.Decimal(12, 2)
+  rawResponse           String?           @map("raw_response") @db.LongText
+  approvedAt            DateTime?         @map("approved_at") @db.Timestamp(0)
+  cancelledAt           DateTime?         @map("cancelled_at") @db.Timestamp(0)
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamp(0)
+  order                 CustomerOrder     @relation(fields: [orderId], references: [id])
 
   @@index([paymentKey])
   @@index([tossOrderId])
   @@index([status])
   @@index([approvedAt])
   @@map("payment")
+}
+
+enum SourcingPlatform {
+  BAND
+  ALIEXPRESS
+}
+
+enum AiProvider {
+  GEMINI
+  OPENAI
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  SOLDOUT
+}
+
+enum WorkflowType {
+  COLLECT
+  TRANSFORM
+  PUBLISH
+  FULL_PIPELINE
+}
+
+enum WorkflowStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  PARTIAL_SUCCESS
+}
+
+enum PublishStatus {
+  SUCCESS
+  FAILED
+  PENDING
+}
+
+enum CustomerOrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum TossPaymentMethod {
+  CARD
+  VIRTUAL_ACCOUNT
+  TRANSFER
+  MOBILE
+  CULTURE_GIFT
+  BOOK_GIFT
+  GAME_GIFT
+}
+
+enum TossPaymentStatus {
+  READY
+  IN_PROGRESS
+  WAITING_FOR_DEPOSIT
+  DONE
+  CANCELED
+  PARTIAL_CANCELED
+  ABORTED
+  EXPIRED
 }

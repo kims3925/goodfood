@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-
-const prisma = new PrismaClient()
+import prisma from '@/lib/prisma'
 
 /**
  * GET /api/product/[id]
@@ -43,12 +41,6 @@ export async function GET(
             },
             wholesaleBand: true,
           },
-        },
-        options: {
-          orderBy: { sortOrder: 'asc' },
-        },
-        variants: {
-          orderBy: { createdAt: 'asc' },
         },
       },
     })

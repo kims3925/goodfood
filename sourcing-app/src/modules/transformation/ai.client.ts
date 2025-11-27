@@ -62,7 +62,28 @@ export class GeminiClient extends BaseAiClient {
       })
 
       const response = await result.response
+
+      // Check for safety filter blocking
+      const promptFeedback = response.promptFeedback
+      if (promptFeedback?.blockReason) {
+        throw new ProductTransformationError(
+          `Gemini가 콘텐츠를 차단했습니다: ${promptFeedback.blockReason}`,
+          TransformationErrorCode.AI_API_ERROR,
+          { blockReason: promptFeedback.blockReason, safetyRatings: promptFeedback.safetyRatings }
+        )
+      }
+
       const text = response.text()
+
+      // Check for empty response
+      if (!text || text.trim() === '') {
+        console.error('[GeminiClient] Empty response received. Candidates:', JSON.stringify(response.candidates, null, 2))
+        throw new ProductTransformationError(
+          'Gemini가 빈 응답을 반환했습니다. 게시물 내용을 확인하거나 다시 시도해주세요.',
+          TransformationErrorCode.AI_API_ERROR,
+          { candidates: response.candidates }
+        )
+      }
 
       return {
         content: text,
@@ -71,6 +92,10 @@ export class GeminiClient extends BaseAiClient {
         provider: AiProvider.GEMINI,
       }
     } catch (error: any) {
+      // Re-throw ProductTransformationError as-is
+      if (error instanceof ProductTransformationError) {
+        throw error
+      }
       throw new ProductTransformationError(
         `Gemini API Error: ${error.message}`,
         TransformationErrorCode.AI_API_ERROR,
