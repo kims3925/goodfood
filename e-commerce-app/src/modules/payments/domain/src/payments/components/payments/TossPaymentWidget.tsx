@@ -192,7 +192,7 @@ export default function TossPaymentWidget({
 
       console.log('토스페이먼츠 SDK 로드 시작...')
       const script = document.createElement('script')
-      script.src = 'https://js.tosspayments.com/v2'
+      script.src = 'https://js.tosspayments.com/v2/standard'
       script.async = true
       script.defer = true
 
@@ -240,8 +240,9 @@ export default function TossPaymentWidget({
         orderName,
         successUrl: `${window.location.origin}/store/payment/success`,
         failUrl: `${window.location.origin}/store/payment/fail`,
-        // v2에서는 고객 정보를 여기서 직접 전달하지 않음
-        // customerKey로 이미 식별됨
+        customerEmail: customerEmail,
+        customerName: customerName,
+        customerMobilePhone: undefined, // 필요시 추가 가능
       })
     } catch (error: any) {
       console.error('결제 요청 실패:', error)

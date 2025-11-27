@@ -30,6 +30,11 @@ model User {
   addresses          UserAddress[]
   orders             Order[]
   sessionCarts       SessionCart[]
+  userCoupons        UserCoupon[]
+  wishlists          Wishlist[]
+  reviews            Review[]
+  inquiries          Inquiry[]
+  returnRequests     ReturnRequest[]
 
   @@index([email])
   @@index([phone])

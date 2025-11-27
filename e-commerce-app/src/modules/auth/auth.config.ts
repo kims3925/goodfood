@@ -16,24 +16,25 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        const customer = await prisma.customer.findUnique({
+        // User 테이블에서 사용자 조회
+        const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         })
 
-        if (!customer || !customer.passwordHash) {
+        if (!user || !user.password) {
           return null
         }
 
-        const isValid = await bcrypt.compare(credentials.password, customer.passwordHash)
+        const isValid = await bcrypt.compare(credentials.password, user.password)
 
         if (!isValid) {
           return null
         }
 
         return {
-          id: customer.id.toString(),
-          email: customer.email,
-          name: customer.name,
+          id: user.id,
+          email: user.email,
+          name: user.name || user.email,
         }
       },
     }),

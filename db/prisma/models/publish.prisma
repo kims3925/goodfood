@@ -15,9 +15,11 @@ model ProductPublish {
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 
   // Relationships
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  retailBand RetailBand @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product        Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  retailBand     RetailBand        @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
+  orderItems     OrderItem[]       // 주문 아이템 관계 추가
+  sessionCartItems SessionCartItem[] // 장바구니 아이템 관계 추가
 
   @@unique([productId, retailBandId]) // 같은 상품을 같은 밴드에 중복 발행 방지
   @@index([userId])

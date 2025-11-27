@@ -4,8 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@bandauto/db'
-import { Decimal } from '@prisma/client/runtime/library'
+import prisma, { Prisma } from '@bandauto/db'
+
+const Decimal = Prisma.Decimal
 
 const TOSS_SECRET_KEY = process.env.TOSS_PAYMENTS_SECRET_KEY || ''
 
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // TossPayments 결제 승인 API 호출
+    // TossPayments 결제 승인 API 호출 (V1 엔드포인트 - Payment Widget V2도 V1 API 사용)
     const authHeader = Buffer.from(`${TOSS_SECRET_KEY}:`).toString('base64')
 
     const tossResponse = await fetch('https://api.tosspayments.com/v1/payments/confirm', {

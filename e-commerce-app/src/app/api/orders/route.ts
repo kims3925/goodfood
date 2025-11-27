@@ -1,11 +1,13 @@
 /**
  * Orders API
  * 주문 생성 및 조회
+ * product_publish 기반으로 변경
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@bandauto/db'
-import { Decimal } from '@prisma/client/runtime/library'
+import prisma, { PublishStatus, Prisma } from '@bandauto/db'
+
+const Decimal = Prisma.Decimal
 
 // 주문번호 생성
 function generateOrderNumber(): string {
@@ -28,11 +30,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const {
-      items, // [{ productId, variantId?, quantity }] 또는 장바구니에서 가져오기
+      items, // [{ productPublishId, variantId?, quantity }] 또는 장바구니에서 가져오기
       customerInfo,
       shippingAddress,
       fromCart = true, // 장바구니에서 주문 생성 여부
-      retailBandId, // 소매밴드 ID (optional)
     } = body
 
     // 고객 정보 검증 (이메일은 선택)
@@ -68,9 +69,14 @@ export async function POST(req: NextRequest) {
         include: {
           items: {
             include: {
-              product: {
+              productPublish: {
                 include: {
-                  variants: { take: 1 },
+                  product: {
+                    include: {
+                      variants: { take: 1 },
+                    },
+                  },
+                  retailBand: true,
                 },
               },
               variant: true,
@@ -86,17 +92,24 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      orderItems = cart.items.map((item) => ({
-        productId: item.product.id,
-        variantId: item.variant?.id || null,
-        productName: item.product.name,
-        optionSummary: item.variant?.optionSummary || null,
-        thumbnailUrl: item.product.thumbnailUrl,
-        quantity: item.quantity,
-        unitPrice: item.variant?.price || item.product.variants[0]?.price || item.product.price || 0,
-      }))
+      orderItems = cart.items.map((item) => {
+        const productPublish = item.productPublish
+        const product = productPublish.product
+        const variant = item.variant
+        const mainVariant = product.variants[0]
+
+        return {
+          productPublishId: productPublish.id,
+          variantId: variant?.id || null,
+          productName: product.name,
+          optionSummary: variant?.optionSummary || null,
+          thumbnailUrl: product.thumbnailUrl,
+          quantity: item.quantity,
+          unitPrice: variant?.price || mainVariant?.price || product.price || 0,
+        }
+      })
     } else {
-      // 직접 상품 지정
+      // 직접 상품 지정 (상품 상세페이지에서 바로 구매)
       if (!items || items.length === 0) {
         return NextResponse.json(
           { success: false, error: '주문 상품이 없습니다' },
@@ -105,14 +118,24 @@ export async function POST(req: NextRequest) {
       }
 
       for (const item of items) {
-        const product = await prisma.product.findUnique({
-          where: { id: parseInt(item.productId) },
-          include: { variants: { take: 1 } },
+        const productPublish = await prisma.productPublish.findFirst({
+          where: {
+            id: parseInt(item.productPublishId),
+            status: PublishStatus.SUCCESS,
+          },
+          include: {
+            product: {
+              include: {
+                variants: { take: 1 },
+              },
+            },
+            retailBand: true,
+          },
         })
 
-        if (!product) {
+        if (!productPublish) {
           return NextResponse.json(
-            { success: false, error: `상품 ${item.productId}를 찾을 수 없습니다` },
+            { success: false, error: `상품 ${item.productPublishId}를 찾을 수 없거나 판매 중인 상품이 아닙니다` },
             { status: 404 }
           )
         }
@@ -124,14 +147,17 @@ export async function POST(req: NextRequest) {
           })
         }
 
+        const product = productPublish.product
+        const mainVariant = product.variants[0]
+
         orderItems.push({
-          productId: product.id,
+          productPublishId: productPublish.id,
           variantId: variant?.id || null,
           productName: product.name,
           optionSummary: variant?.optionSummary || null,
           thumbnailUrl: product.thumbnailUrl,
           quantity: item.quantity || 1,
-          unitPrice: variant?.price || product.variants[0]?.price || product.price || 0,
+          unitPrice: variant?.price || mainVariant?.price || product.price || 0,
         })
       }
     }
@@ -145,23 +171,24 @@ export async function POST(req: NextRequest) {
     const discountAmount = 0
     const totalAmount = subtotal + shippingFee - discountAmount
 
-    // 고객 생성 또는 조회
-    let customer = null
-    const customerEmail = customerInfo.email || `guest_${Date.now()}@guest.local`
+    // 사용자 생성 또는 조회
+    let user = null
+    const userEmail = customerInfo.email || `guest_${Date.now()}@guest.local`
 
     if (customerInfo.email) {
-      customer = await prisma.customer.findUnique({
+      user = await prisma.user.findUnique({
         where: { email: customerInfo.email },
       })
     }
 
-    if (!customer) {
-      customer = await prisma.customer.create({
+    if (!user) {
+      user = await prisma.user.create({
         data: {
-          email: customerEmail,
+          email: userEmail,
           name: customerInfo.name,
-          phone: customerInfo.phone,
-          passwordHash: '', // 비회원 주문
+          phone: customerInfo.phone || '',
+          password: '', // 비회원 주문
+          role: 'CUSTOMER',
         },
       })
     }
@@ -169,8 +196,7 @@ export async function POST(req: NextRequest) {
     // 주문 생성
     const order = await prisma.order.create({
       data: {
-        customerId: customer.id,
-        retailBandId: retailBandId ? parseInt(retailBandId) : null,
+        userId: user.id,
         orderNumber: generateOrderNumber(),
         status: 'PENDING',
         recipientName: shippingAddress.recipientName || customerInfo.name,
@@ -185,7 +211,7 @@ export async function POST(req: NextRequest) {
         totalAmount: new Decimal(totalAmount),
         items: {
           create: orderItems.map((item) => ({
-            productId: item.productId,
+            productPublishId: item.productPublishId,
             variantId: item.variantId,
             productName: item.productName,
             optionSummary: item.optionSummary,
@@ -223,8 +249,8 @@ export async function POST(req: NextRequest) {
         ? `${orderItems[0].productName} 외 ${orderItems.length - 1}건`
         : orderItems[0].productName,
       amount: totalAmount,
-      customerName: customer.name,
-      customerEmail: customer.email,
+      customerName: user.name,
+      customerEmail: user.email,
       successUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/store/payment/success`,
       failUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/store/payment/fail`,
     }
@@ -270,13 +296,20 @@ export async function GET(req: NextRequest) {
       const order = await prisma.order.findUnique({
         where: { orderNumber },
         include: {
-          items: true,
-          payment: true,
-          customer: {
-            select: { name: true, email: true, phone: true },
+          items: {
+            include: {
+              productPublish: {
+                include: {
+                  retailBand: {
+                    select: { id: true, name: true },
+                  },
+                },
+              },
+            },
           },
-          retailBand: {
-            select: { id: true, name: true },
+          payment: true,
+          user: {
+            select: { name: true, email: true, phone: true },
           },
         },
       })
@@ -294,8 +327,7 @@ export async function GET(req: NextRequest) {
           id: order.id,
           orderNumber: order.orderNumber,
           status: order.status,
-          customer: order.customer,
-          retailBand: order.retailBand,
+          customer: order.user,
           recipientName: order.recipientName,
           recipientPhone: order.recipientPhone,
           address: `${order.address} ${order.addressDetail || ''}`.trim(),
@@ -312,6 +344,7 @@ export async function GET(req: NextRequest) {
             quantity: item.quantity,
             unitPrice: Number(item.unitPrice),
             totalPrice: Number(item.totalPrice),
+            retailBand: item.productPublish?.retailBand,
           })),
           payment: order.payment ? {
             status: order.payment.status,
@@ -334,11 +367,11 @@ export async function GET(req: NextRequest) {
     }
 
     // 이메일로 주문 목록 조회
-    const customer = await prisma.customer.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email },
     })
 
-    if (!customer) {
+    if (!user) {
       return NextResponse.json({
         success: true,
         orders: [],
@@ -346,13 +379,20 @@ export async function GET(req: NextRequest) {
     }
 
     const orders = await prisma.order.findMany({
-      where: { customerId: customer.id },
+      where: { userId: user.id },
       include: {
-        items: true,
-        payment: true,
-        retailBand: {
-          select: { id: true, name: true },
+        items: {
+          include: {
+            productPublish: {
+              include: {
+                retailBand: {
+                  select: { id: true, name: true },
+                },
+              },
+            },
+          },
         },
+        payment: true,
       },
       orderBy: { orderedAt: 'desc' },
     })
@@ -363,7 +403,6 @@ export async function GET(req: NextRequest) {
         id: order.id,
         orderNumber: order.orderNumber,
         status: order.status,
-        retailBand: order.retailBand,
         totalAmount: Number(order.totalAmount),
         itemCount: order.items.length,
         firstItemName: order.items[0]?.productName,

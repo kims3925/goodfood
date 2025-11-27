@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma, PublishStatus } from '@bandauto/db'
+import prisma, { PublishStatus } from '@bandauto/db'
 
 export async function GET(req: NextRequest) {
   try {

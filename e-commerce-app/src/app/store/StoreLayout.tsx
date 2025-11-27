@@ -97,7 +97,7 @@ export default function StoreLayout({
                             마이페이지
                           </Link>
                           <Link
-                            href="/store/orders"
+                            href="/store/mypage/orders"
                             className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
                             onClick={() => setIsUserMenuOpen(false)}
                           >
@@ -216,11 +216,11 @@ export default function StoreLayout({
 
             {/* Header Icons */}
             <div className="kurly-header-icons">
-              <Link href="/store/location" className="kurly-header-icon">
+              <Link href="/store/mypage/addresses" className="kurly-header-icon">
                 <MapPin className="w-6 h-6" />
                 <span className="text-xs mt-1">배송지</span>
               </Link>
-              <Link href="/store/wishlist" className="kurly-header-icon">
+              <Link href="/store/mypage/wishlist" className="kurly-header-icon">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>

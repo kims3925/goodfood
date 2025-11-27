@@ -14,6 +14,7 @@ import {
 
 interface Product {
   id: string
+  productPublishId?: string
   title: string
   description?: string
   originalPrice: number
@@ -168,19 +169,17 @@ export default function BandProductsPage() {
     e.stopPropagation()
     e.preventDefault()
 
-    try {
-      let sessionId = localStorage.getItem('sessionId')
-      if (!sessionId) {
-        sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2)
-        localStorage.setItem('sessionId', sessionId)
-      }
+    if (!product.productPublishId) {
+      alert('상품 정보가 올바르지 않습니다. 상품 상세페이지에서 추가해주세요.')
+      return
+    }
 
+    try {
       const response = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionId,
-          productId: product.id,
+          productPublishId: product.productPublishId,
           quantity: 1,
         }),
       })
@@ -236,31 +235,33 @@ export default function BandProductsPage() {
     <div className="bg-gray-50 min-h-screen">
       {/* 헤더 */}
       {band && (
-        <div
-          className="relative h-40 bg-gradient-to-r overflow-hidden"
-          style={{
-            backgroundImage: band.coverUrl ? `url(${band.coverUrl})` : undefined,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundColor: band.coverUrl ? undefined : '#FFF0F0',
-          }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/30" />
-          <div className="relative h-full kurly-container flex items-center">
-            <Link
-              href="/main"
-              className="absolute top-4 left-4 flex items-center gap-2 text-white/80 hover:text-white transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5" />
-              <span className="text-sm">돌아가기</span>
-            </Link>
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center border-2 border-[#FF6B6B]">
-                <Store className="w-8 h-8 text-[#FF6B6B]" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">{band.name}</h1>
-                <p className="text-sm text-white/80">{pagination.total}개 상품</p>
+        <div className="kurly-container py-4">
+          <div
+            className="relative h-40 bg-gradient-to-r overflow-hidden rounded-xl"
+            style={{
+              backgroundImage: band.coverUrl ? `url(${band.coverUrl})` : undefined,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundColor: band.coverUrl ? undefined : '#FFF0F0',
+            }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/30" />
+            <div className="relative h-full px-6 flex items-center">
+              <Link
+                href="/main"
+                className="absolute top-4 left-4 flex items-center gap-2 text-white/80 hover:text-white transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                <span className="text-sm">돌아가기</span>
+              </Link>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center border-2 border-[#FF6B6B]">
+                  <Store className="w-8 h-8 text-[#FF6B6B]" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-white">{band.name}</h1>
+                  <p className="text-sm text-white/80">{pagination.total}개 상품</p>
+                </div>
               </div>
             </div>
           </div>

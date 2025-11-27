@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma, PublishStatus } from '@bandauto/db'
+import prisma, { PublishStatus } from '@bandauto/db'
 
 export async function GET(
   req: NextRequest,
@@ -84,14 +84,19 @@ export async function GET(
       sku: variant.sku,
     }))
 
-    // 밴드 이름 가져오기 (product_publish -> retail_band)
-    const bandName = product.productPublishes[0]?.retailBand?.name || null
+    // 밴드 정보 가져오기 (product_publish -> retail_band)
+    const productPublish = product.productPublishes[0]
+    const retailBand = productPublish?.retailBand
+    const bandName = retailBand?.name || null
+    const retailBandId = retailBand?.id || null
+    const productPublishId = productPublish?.id || null
 
     // 판매자 정보 가져오기 (post -> wholesaleBand)
     const sellerName = product.post?.wholesaleBand?.name || null
 
     const formattedProduct = {
       id: product.id.toString(),
+      productPublishId: productPublishId?.toString() || null, // 추가: 장바구니/주문에 필요
       title: product.name,
       description: product.description || '',
       originalPrice,
@@ -104,6 +109,7 @@ export async function GET(
       rating: 4.5,
       reviews: 100,
       bandName,
+      retailBandId,
       sellerName,
       shippingInfo: {
         defaultShippingFee: 3000,

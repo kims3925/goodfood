@@ -86,3 +86,44 @@ enum TossPaymentStatus {
   ABORTED
   EXPIRED
 }
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum InquiryType {
+  PRODUCT
+  DELIVERY
+  ORDER
+  PAYMENT
+  RETURN
+  EXCHANGE
+  GENERAL
+}
+
+enum InquiryStatus {
+  PENDING
+  ANSWERED
+}
+
+enum ReturnType {
+  CANCEL
+  RETURN
+  EXCHANGE
+}
+
+enum ReturnStatus {
+  REQUESTED
+  REVIEWING
+  APPROVED
+  REJECTED
+  PROCESSING
+  COMPLETED
+}
+
+enum RefundMethod {
+  CREDIT_CARD
+  BANK_TRANSFER
+  POINTS
+}

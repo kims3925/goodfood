@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@bandauto/db'
+import prisma from '@bandauto/db'
 
 function getSessionId(req: NextRequest): string | null {
   return req.cookies.get('cart_session')?.value || null
