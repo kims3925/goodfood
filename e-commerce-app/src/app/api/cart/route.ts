@@ -1,10 +1,11 @@
 /**
  * Cart API
  * 세션 기반 장바구니 CRUD
+ * product_publish 기반으로 변경
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@bandauto/db'
+import prisma, { PublishStatus } from '@bandauto/db'
 import { v4 as uuidv4 } from 'uuid'
 
 // 세션 만료 시간 (7일)
@@ -34,19 +35,24 @@ async function getOrCreateCart(sessionId: string) {
     include: {
       items: {
         include: {
-          product: {
+          productPublish: {
             include: {
-              post: {
+              product: {
                 include: {
-                  images: {
-                    orderBy: { sortOrder: 'asc' },
+                  post: {
+                    include: {
+                      images: {
+                        orderBy: { sortOrder: 'asc' },
+                        take: 1,
+                      },
+                    },
+                  },
+                  variants: {
                     take: 1,
                   },
                 },
               },
-              variants: {
-                take: 1,
-              },
+              retailBand: true,
             },
           },
           variant: true,
@@ -65,19 +71,24 @@ async function getOrCreateCart(sessionId: string) {
       include: {
         items: {
           include: {
-            product: {
+            productPublish: {
               include: {
-                post: {
+                product: {
                   include: {
-                    images: {
-                      orderBy: { sortOrder: 'asc' },
+                    post: {
+                      include: {
+                        images: {
+                          orderBy: { sortOrder: 'asc' },
+                          take: 1,
+                        },
+                      },
+                    },
+                    variants: {
                       take: 1,
                     },
                   },
                 },
-                variants: {
-                  take: 1,
-                },
+                retailBand: true,
               },
             },
             variant: true,
@@ -93,15 +104,19 @@ async function getOrCreateCart(sessionId: string) {
 // 장바구니 데이터 포맷팅
 function formatCart(cart: any) {
   const items = cart.items.map((item: any) => {
-    const product = item.product
+    const productPublish = item.productPublish
+    const product = productPublish.product
     const variant = item.variant
     const mainVariant = product.variants[0]
     const image = product.post?.images?.[0]?.imageUrl || product.thumbnailUrl || '/placeholder.jpg'
 
     return {
       id: item.id,
+      productPublishId: productPublish.id,
       productId: product.id,
       variantId: variant?.id || null,
+      retailBandId: productPublish.retailBandId,
+      retailBandName: productPublish.retailBand?.name || null,
       name: product.name,
       optionSummary: variant?.optionSummary || null,
       image,
@@ -111,6 +126,11 @@ function formatCart(cart: any) {
     }
   })
 
+  // 모든 아이템이 동일한 retailBandId를 가지고 있는지 확인
+  const retailBandIds = items.map((item: any) => item.retailBandId).filter(Boolean)
+  const uniqueRetailBandIds = [...new Set(retailBandIds)]
+  const retailBandId = uniqueRetailBandIds.length === 1 ? uniqueRetailBandIds[0] : null
+
   const totalItems = items.reduce((sum: number, item: any) => sum + item.quantity, 0)
   const subtotal = items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0)
   const shippingFee = subtotal >= 30000 ? 0 : 3000
@@ -119,6 +139,7 @@ function formatCart(cart: any) {
   return {
     id: cart.id,
     sessionId: cart.sessionId,
+    retailBandId,
     items,
     totalItems,
     subtotal,
@@ -162,33 +183,43 @@ export async function GET(req: NextRequest) {
 /**
  * POST /api/cart
  * 장바구니에 상품 추가
+ * productPublishId를 받아서 처리
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { productId, variantId, quantity = 1, sessionId: bodySessionId } = body
+    const { productPublishId, variantId, quantity = 1, sessionId: bodySessionId } = body
 
-    if (!productId) {
+    if (!productPublishId) {
       return NextResponse.json(
-        { success: false, error: '상품 ID는 필수입니다' },
+        { success: false, error: 'productPublishId는 필수입니다' },
         { status: 400 }
       )
     }
 
-    // 상품 확인
-    const product = await prisma.product.findUnique({
-      where: { id: parseInt(productId) },
-      include: { variants: { take: 1 } },
+    // productPublish 확인 (STATUS가 SUCCESS인 것만)
+    const productPublish = await prisma.productPublish.findFirst({
+      where: {
+        id: parseInt(productPublishId),
+        status: PublishStatus.SUCCESS,
+      },
+      include: {
+        product: {
+          include: {
+            variants: { take: 1 },
+          },
+        },
+      },
     })
 
-    if (!product) {
+    if (!productPublish) {
       return NextResponse.json(
-        { success: false, error: '상품을 찾을 수 없습니다' },
+        { success: false, error: '상품을 찾을 수 없거나 판매 중인 상품이 아닙니다' },
         { status: 404 }
       )
     }
 
-    // 세션 ID 가져오기 또는 생성 (쿠키 우선, 없으면 body, 둘 다 없으면 새로 생성)
+    // 세션 ID 가져오기 또는 생성
     let sessionId = getSessionId(req) || bodySessionId
     const isNewSession = !getSessionId(req)
 
@@ -197,13 +228,13 @@ export async function POST(req: NextRequest) {
     }
 
     const cart = await getOrCreateCart(sessionId)
-    const price = product.variants[0]?.price || product.price || 0
+    const price = productPublish.product.variants[0]?.price || productPublish.product.price || 0
 
     // 기존 아이템 확인
     const existingItem = await prisma.sessionCartItem.findFirst({
       where: {
         cartId: cart.id,
-        productId: parseInt(productId),
+        productPublishId: parseInt(productPublishId),
         variantId: variantId ? parseInt(variantId) : null,
       },
     })
@@ -219,7 +250,7 @@ export async function POST(req: NextRequest) {
       await prisma.sessionCartItem.create({
         data: {
           cartId: cart.id,
-          productId: parseInt(productId),
+          productPublishId: parseInt(productPublishId),
           variantId: variantId ? parseInt(variantId) : null,
           quantity: parseInt(quantity),
           priceAt: price,

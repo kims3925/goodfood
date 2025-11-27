@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma, PublishStatus } from '@bandauto/db'
+import prisma, { PublishStatus } from '@bandauto/db'
 
 export async function GET(req: NextRequest) {
   try {
@@ -63,6 +63,7 @@ export async function GET(req: NextRequest) {
 
             return {
               id: product.id.toString(),
+              productPublishId: pp.id.toString(), // 추가: 장바구니/주문에 필요
               title: product.name,
               description: product.description,
               originalPrice,
@@ -89,7 +90,8 @@ export async function GET(req: NextRequest) {
     // 상품이 있는 섹션만 반환
     const filteredSections = sections.filter((section) => section.products.length > 0)
 
-    // 3. 도매밴드별 섹션도 추가 (소매밴드에 발행되지 않은 상품 포함)
+    // 3. 도매밴드별 섹션 (발행된 상품만 포함)
+    // 쇼핑몰에서는 product_publish를 통해서만 상품을 판매할 수 있음
     const wholesaleBands = await prisma.wholesaleBand.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
@@ -97,21 +99,29 @@ export async function GET(req: NextRequest) {
 
     const wholesaleSections = await Promise.all(
       wholesaleBands.map(async (band) => {
-        const products = await prisma.product.findMany({
+        // 해당 도매밴드의 상품 중 발행된 것만 조회
+        const productPublishes = await prisma.productPublish.findMany({
           where: {
-            post: {
-              wholesaleBandId: band.id,
+            status: PublishStatus.SUCCESS,
+            product: {
+              post: {
+                wholesaleBandId: band.id,
+              },
             },
           },
           include: {
-            variants: {
-              orderBy: { id: 'asc' },
-              take: 1,
-            },
-            post: {
+            product: {
               include: {
-                images: {
-                  orderBy: { sortOrder: 'asc' },
+                variants: {
+                  orderBy: { id: 'asc' },
+                  take: 1,
+                },
+                post: {
+                  include: {
+                    images: {
+                      orderBy: { sortOrder: 'asc' },
+                    },
+                  },
                 },
               },
             },
@@ -120,30 +130,34 @@ export async function GET(req: NextRequest) {
           take: limit,
         })
 
-        const formattedProducts = products.map((product) => {
-          const mainVariant = product.variants[0]
-          const images = product.post?.images?.map((img) => img.imageUrl) || []
+        const formattedProducts = productPublishes
+          .filter((pp) => pp.product)
+          .map((pp) => {
+            const product = pp.product
+            const mainVariant = product.variants[0]
+            const images = product.post?.images?.map((img) => img.imageUrl) || []
 
-          const salePrice = mainVariant?.price || product.price || 0
-          const originalPrice = mainVariant?.wholesalePrice || product.wholesalePrice || salePrice
-          const discount = originalPrice > salePrice
-            ? Math.round(((originalPrice - salePrice) / originalPrice) * 100)
-            : 0
+            const salePrice = mainVariant?.price || product.price || 0
+            const originalPrice = mainVariant?.wholesalePrice || product.wholesalePrice || salePrice
+            const discount = originalPrice > salePrice
+              ? Math.round(((originalPrice - salePrice) / originalPrice) * 100)
+              : 0
 
-          return {
-            id: product.id.toString(),
-            title: product.name,
-            description: product.description,
-            originalPrice,
-            salePrice,
-            discount,
-            images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
-            category: product.categoryId || '',
-            rating: 4.5,
-            reviews: 100,
-            stock: mainVariant?.stock || 100,
-          }
-        })
+            return {
+              id: product.id.toString(),
+              productPublishId: pp.id.toString(), // 추가: 장바구니/주문에 필요
+              title: product.name,
+              description: product.description,
+              originalPrice,
+              salePrice,
+              discount,
+              images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
+              category: product.categoryId || '',
+              rating: 4.5,
+              reviews: 100,
+              stock: mainVariant?.stock || 100,
+            }
+          })
 
         return {
           id: `wholesale_${band.id}`,

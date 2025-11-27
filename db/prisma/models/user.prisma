@@ -30,6 +30,11 @@ model User {
   orders             Order[]
   orderTests         OrderTest[]
   sessionCarts       SessionCart[]
+  userCoupons        UserCoupon[]
+  wishlists          Wishlist[]
+  reviews            Review[]
+  inquiries          Inquiry[]
+  returnRequests     ReturnRequest[]
 
   // OAuth relations
   oauthAccounts      OAuthAccount[]

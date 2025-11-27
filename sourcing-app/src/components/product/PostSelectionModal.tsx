@@ -52,8 +52,8 @@ export default function PostSelectionModal({
       setIsLoading(true)
       setError(null)
 
-      // 게시물 목록 조회
-      const response = await fetch('/api/post')
+      // 게시물 목록 조회 (limit=0으로 전체 조회)
+      const response = await fetch('/api/post?limit=0')
       const data = await response.json()
 
       if (!data.success) {

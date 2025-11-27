@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma, PublishStatus } from '@bandauto/db'
+import prisma, { PublishStatus } from '@bandauto/db'
 
 export async function GET(
   req: NextRequest,
@@ -74,6 +74,7 @@ export async function GET(
 
         return {
           id: product.id.toString(),
+          productPublishId: pp.id.toString(), // 추가: 장바구니/주문에 필요
           title: product.name,
           description: product.description,
           originalPrice,

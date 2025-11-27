@@ -33,6 +33,12 @@ export async function GET(request: NextRequest) {
 
     const total = await prisma.post.count({ where })
 
+    // limit=0이면 전체 조회, 그렇지 않으면 페이지네이션
+    const paginationOptions = limit > 0 ? {
+      skip: (page - 1) * limit,
+      take: limit,
+    } : {}
+
     const posts = await prisma.post.findMany({
       where,
       include: {
@@ -64,8 +70,7 @@ export async function GET(request: NextRequest) {
       orderBy: {
         createdAt: 'desc',
       },
-      skip: (page - 1) * limit,
-      take: limit,
+      ...paginationOptions,
     })
 
     return NextResponse.json({

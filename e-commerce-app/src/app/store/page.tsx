@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, ShoppingCart, Store, ArrowRight } from 'luci
 
 interface Product {
   id: string
+  productPublishId?: string
   title: string
   description?: string
   originalPrice: number
@@ -79,19 +80,17 @@ export default function StorePage() {
     e.stopPropagation()
     e.preventDefault()
 
-    try {
-      let sessionId = localStorage.getItem('sessionId')
-      if (!sessionId) {
-        sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2)
-        localStorage.setItem('sessionId', sessionId)
-      }
+    if (!product.productPublishId) {
+      alert('상품 정보가 올바르지 않습니다. 상품 상세페이지에서 추가해주세요.')
+      return
+    }
 
+    try {
       const response = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionId,
-          productId: product.id,
+          productPublishId: product.productPublishId,
           quantity: 1,
         }),
       })

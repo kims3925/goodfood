@@ -16,7 +16,7 @@ if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma
 }
 
-// Re-export everything from generated client for convenience
+// Re-export everything from Prisma client for convenience
 export * from './generated'
 
 // Default export for backwards compatibility

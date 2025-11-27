@@ -2,8 +2,9 @@
   "name": "@bandauto/db",
   "version": "0.0.1",
   "description": "Shared Prisma database client for Bandauto apps",
+  "type": "module",
   "main": "src/client.ts",
-  "types": "src/index.d.ts",
+  "types": "src/client.ts",
   "scripts": {
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
@@ -23,11 +24,11 @@
   },
   "exports": {
     ".": {
-      "types": "./src/index.d.ts",
+      "types": "./src/client.ts",
       "default": "./src/client.ts"
     },
     "./client": {
-      "types": "./src/index.d.ts",
+      "types": "./src/client.ts",
       "default": "./src/client.ts"
     }
   }

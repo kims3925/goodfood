@@ -1,0 +1,28 @@
+// =============================================
+// INQUIRY (상품 문의)
+// =============================================
+
+model Inquiry {
+  id              Int           @id @default(autoincrement())
+  userId          Int           @map("user_id")
+  productId       Int?          @map("product_id") // null이면 일반 문의
+  inquiryType     InquiryType   @map("inquiry_type")
+  title           String        @db.VarChar(200)
+  content         String        @db.Text
+  isPrivate       Boolean       @default(false) @map("is_private")
+  status          InquiryStatus @default(PENDING)
+  adminReply      String?       @map("admin_reply") @db.Text
+  repliedAt       DateTime?     @map("replied_at") @db.Timestamp(0)
+  repliedBy       Int?          @map("replied_by")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product         Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([productId])
+  @@index([status])
+  @@index([userId, status])
+  @@map("inquiry")
+}

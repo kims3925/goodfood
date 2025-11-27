@@ -35,8 +35,11 @@ model Product {
   orderTests             OrderTest[]
   // E-Commerce Relations
   cartItems              CartItem[]
-  sessionCartItems       SessionCartItem[]
-  orderItems             OrderItem[]
+  // sessionCartItems는 제거 (productPublish를 통해 관계)
+  // orderItems는 제거 (productPublish를 통해 관계)
+  wishlists              Wishlist[]
+  reviews                Review[]
+  inquiries              Inquiry[]
 
   @@index([userId])
   @@index([postId])
@@ -61,6 +64,7 @@ model ProductVariant {
   // Relationships
   product          Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
   sessionCartItems SessionCartItem[]
+  orderItems       OrderItem[]
 
   @@index([productId])
   @@index([sku])

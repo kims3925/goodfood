@@ -1,14 +1,32 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { ArrowLeft, Package, User, MapPin, CreditCard, Truck } from 'lucide-react'
+import { ArrowLeft, Package, User, MapPin, CreditCard, Truck, Plus, Check } from 'lucide-react'
 import TossPaymentWidget from '@/modules/payments/domain/src/payments/components/payments/TossPaymentWidget'
+
+declare global {
+  interface Window {
+    daum: any
+  }
+}
+
+interface Address {
+  id: number
+  label: string | null
+  recipientName: string
+  recipientPhone: string
+  postalCode: string
+  address: string
+  addressDetail: string | null
+  isDefault: boolean
+}
 
 interface CartItem {
   id: number
-  productId: number
+  productPublishId: number
   variantId: number | null
   name: string
   optionSummary: string | null
@@ -33,14 +51,22 @@ interface CheckoutFormData {
 }
 
 export default function CheckoutPage() {
+  const router = useRouter()
   const searchParams = useSearchParams()
+  const { data: session, status } = useSession()
   const fromCart = searchParams.get('fromCart') === 'true'
-  const productId = searchParams.get('productId')
+  const productPublishId = searchParams.get('productPublishId') // productId → productPublishId로 변경
   const quantity = parseInt(searchParams.get('quantity') || '1')
 
   const [product, setProduct] = useState<any>(null)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [cartRetailBandId, setCartRetailBandId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // 회원 배송지 관련
+  const [addresses, setAddresses] = useState<Address[]>([])
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
+
   const [formData, setFormData] = useState<CheckoutFormData>({
     customerName: '',
     customerPhone: '',
@@ -59,15 +85,89 @@ export default function CheckoutPage() {
   const [showPaymentWidget, setShowPaymentWidget] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Daum 우편번호 API (레이어 방식)
+  const openAddressSearch = () => {
+    new window.daum.Postcode({
+      oncomplete: function (data: any) {
+        const fullAddress = data.userSelectedType === 'R' ? data.roadAddress : data.jibunAddress
+        setFormData(prev => ({
+          ...prev,
+          shippingAddress: {
+            ...prev.shippingAddress,
+            zipCode: data.zonecode,
+            address: fullAddress,
+          }
+        }))
+        // 레이어 닫기
+        const layer = document.getElementById('addressLayer')
+        if (layer) layer.style.display = 'none'
+        // body 스크롤 복원
+        document.body.style.overflow = 'unset'
+      },
+      width: '100%',
+      height: '100%',
+    }).embed(document.getElementById('addressSearchIframe'))
+
+    // 레이어 표시 및 body 스크롤 막기
+    const layer = document.getElementById('addressLayer')
+    if (layer) layer.style.display = 'block'
+    document.body.style.overflow = 'hidden'
+  }
+
+  const closeAddressLayer = () => {
+    const layer = document.getElementById('addressLayer')
+    if (layer) layer.style.display = 'none'
+    // body 스크롤 복원
+    document.body.style.overflow = 'unset'
+  }
+
   useEffect(() => {
-    if (fromCart) {
-      loadCartItems()
-    } else if (productId) {
-      loadProduct()
-    } else {
+    loadCheckoutData()
+  }, [fromCart, productPublishId, session, status])
+
+  const loadCheckoutData = async () => {
+    try {
+      setIsLoading(true)
+
+      // 장바구니 또는 상품 로드
+      if (fromCart) {
+        await loadCartItems()
+      } else if (productPublishId) {
+        await loadProduct()
+      }
+
+      // 회원인 경우 배송지 로드
+      if (session) {
+        const addressResponse = await fetch('/api/mypage/addresses')
+        const addressData = await addressResponse.json()
+
+        if (addressData.success) {
+          setAddresses(addressData.addresses)
+
+          // 기본 배송지 자동 선택
+          const defaultAddress = addressData.addresses.find((addr: Address) => addr.isDefault)
+          if (defaultAddress) {
+            setSelectedAddressId(defaultAddress.id)
+            // 배송지 정보 자동 입력
+            setFormData(prev => ({
+              ...prev,
+              recipientName: defaultAddress.recipientName,
+              recipientPhone: defaultAddress.recipientPhone,
+              shippingAddress: {
+                address: defaultAddress.address,
+                detailAddress: defaultAddress.addressDetail || '',
+                zipCode: defaultAddress.postalCode,
+              }
+            }))
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load checkout data:', error)
+    } finally {
       setIsLoading(false)
     }
-  }, [fromCart, productId])
+  }
 
   // 주문자 정보와 수령인 정보 동기화
   useEffect(() => {
@@ -80,14 +180,32 @@ export default function CheckoutPage() {
     }
   }, [formData.customerName, formData.customerPhone, formData.sameAsCustomer])
 
+  // 배송지 선택 시 formData 업데이트
+  const handleAddressSelect = (addressId: number) => {
+    setSelectedAddressId(addressId)
+    const selected = addresses.find(addr => addr.id === addressId)
+    if (selected) {
+      setFormData(prev => ({
+        ...prev,
+        recipientName: selected.recipientName,
+        recipientPhone: selected.recipientPhone,
+        shippingAddress: {
+          address: selected.address,
+          detailAddress: selected.addressDetail || '',
+          zipCode: selected.postalCode,
+        }
+      }))
+    }
+  }
+
   const loadCartItems = async () => {
     try {
-      setIsLoading(true)
       const response = await fetch('/api/cart')
       const data = await response.json()
 
       if (data.success && data.cart?.items?.length > 0) {
         setCartItems(data.cart.items)
+        setCartRetailBandId(data.cart.retailBandId || null)
       } else {
         // 장바구니가 비어있으면 장바구니 페이지로 이동
         window.location.href = '/store/cart'
@@ -95,22 +213,23 @@ export default function CheckoutPage() {
     } catch (error) {
       console.error('장바구니 로딩 실패:', error)
       window.location.href = '/store/cart'
-    } finally {
-      setIsLoading(false)
     }
   }
 
   const loadProduct = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/shop/products/${productId}`)
+      // productPublishId로 상품 조회 - API는 product ID를 받지만 productPublish 정보를 포함해서 반환
+      // 실제로는 productPublishId를 통해 product를 찾아야 하지만,
+      // 현재 API 구조상 product.id를 통해 조회하고 productPublishId 정보를 함께 반환받음
+      const response = await fetch(`/api/shop/products/${productPublishId}`)
       const data = await response.json()
 
       if (data.success) {
         setProduct(data.product)
       } else {
         setProduct({
-          id: productId,
+          id: productPublishId,
           title: '상품',
           images: ['/placeholder.jpg'],
           originalPrice: 0,
@@ -198,7 +317,7 @@ export default function CheckoutPage() {
       } else {
         orderData.fromCart = false
         orderData.items = [{
-          productId: parseInt(productId!),
+          productPublishId: parseInt(productPublishId!),
           quantity
         }]
       }
@@ -303,13 +422,90 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-32">
+    <>
+      {/* Daum Postcode Script */}
+      <script
+        src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"
+        async
+      />
+
+      {/* 주소 검색 레이어 */}
+      <div
+        id="addressLayer"
+        style={{
+          display: 'none',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          zIndex: 9999,
+        }}
+        onClick={closeAddressLayer}
+      >
+        <div
+          style={{
+            position: 'relative',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '90%',
+            maxWidth: '500px',
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            overflow: 'hidden',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* 헤더 섹션 */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 20px',
+              borderBottom: '1px solid #e5e7eb',
+              backgroundColor: '#fff',
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111' }}>
+              주소 검색
+            </h3>
+            <button
+              onClick={closeAddressLayer}
+              style={{
+                backgroundColor: 'transparent',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#6b7280',
+                padding: 0,
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* 주소 검색 iframe */}
+          <div style={{ height: '600px' }}>
+            <div id="addressSearchIframe" style={{ width: '100%', height: '100%' }}></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="min-h-screen bg-gray-50 pb-32">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
           <div className="flex items-center gap-4 mb-6">
             <Link
-              href={fromCart ? '/store/cart' : `/store/product/${productId}`}
+              href={fromCart ? '/store/cart' : `/store/product/${product?.id || productPublishId}`}
               className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -420,83 +616,151 @@ export default function CheckoutPage() {
               배송지 정보
             </h2>
 
-            {/* 수령인 동일 체크 */}
-            <label className="flex items-center gap-2 mb-4 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.sameAsCustomer}
-                onChange={(e) => handleFormChange('sameAsCustomer', e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700">주문자 정보와 동일</span>
-            </label>
+            {/* 회원: 배송지 선택 */}
+            {session && addresses.length > 0 && (
+              <div className="space-y-3 mb-4">
+                {addresses.map((address) => (
+                  <div
+                    key={address.id}
+                    onClick={() => handleAddressSelect(address.id)}
+                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                      selectedAddressId === address.id
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          {address.label && (
+                            <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                              {address.label}
+                            </span>
+                          )}
+                          {address.isDefault && (
+                            <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded">
+                              기본배송지
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-medium text-gray-900 text-sm">{address.recipientName}</p>
+                        <p className="text-sm text-gray-600">{address.recipientPhone}</p>
+                        <p className="text-sm text-gray-600">
+                          ({address.postalCode}) {address.address}
+                        </p>
+                        {address.addressDetail && (
+                          <p className="text-sm text-gray-600">{address.addressDetail}</p>
+                        )}
+                      </div>
+                      {selectedAddressId === address.id && (
+                        <Check className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                      )}
+                    </div>
+                  </div>
+                ))}
 
-            <div className="space-y-4">
-              {!formData.sameAsCustomer && (
-                <>
+                <button
+                  type="button"
+                  onClick={() => router.push('/store/mypage/addresses')}
+                  className="w-full py-3 border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:border-blue-600 hover:text-blue-600 transition-colors flex items-center justify-center gap-2 text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  새 배송지 추가
+                </button>
+              </div>
+            )}
+
+            {/* 회원: 등록된 배송지 없음 */}
+            {session && addresses.length === 0 && (
+              <div className="text-center py-8 bg-gray-50 rounded-lg mb-4">
+                <p className="text-gray-600 mb-4">등록된 배송지가 없습니다</p>
+                <button
+                  onClick={() => router.push('/store/mypage/addresses')}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  배송지 추가하기
+                </button>
+              </div>
+            )}
+
+            {/* 비회원: 배송지 직접 입력 */}
+            {!session && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      수령인 이름 <span className="text-red-500">*</span>
+                      받는 분 <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={formData.recipientName}
                       onChange={(e) => handleFormChange('recipientName', e.target.value)}
+                      placeholder="이름"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="홍길동"
+                      required
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      수령인 휴대폰 <span className="text-red-500">*</span>
+                      연락처 <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="tel"
                       value={formData.recipientPhone}
                       onChange={(e) => handleFormChange('recipientPhone', e.target.value)}
+                      placeholder="01012345678"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="010-1234-5678"
+                      required
                     />
                   </div>
-                </>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  우편번호
-                </label>
-                <input
-                  type="text"
-                  value={formData.shippingAddress.zipCode}
-                  onChange={(e) => handleFormChange('shippingAddress.zipCode', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="12345"
-                />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    주소 <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={formData.shippingAddress.zipCode}
+                      placeholder="우편번호"
+                      className="w-32 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                      readOnly
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={openAddressSearch}
+                      className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm"
+                    >
+                      주소 검색
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={formData.shippingAddress.address}
+                    placeholder="기본 주소"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 mb-2"
+                    readOnly
+                    required
+                  />
+                  <input
+                    type="text"
+                    value={formData.shippingAddress.detailAddress}
+                    onChange={(e) => handleFormChange('shippingAddress.detailAddress', e.target.value)}
+                    placeholder="상세 주소를 입력해주세요"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    💡 회원가입하시면 배송지를 저장하고 다음에도 빠르게 주문할 수 있습니다
+                  </p>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  주소 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.shippingAddress.address}
-                  onChange={(e) => handleFormChange('shippingAddress.address', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="서울특별시 강남구 테헤란로 123"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  상세주소
-                </label>
-                <input
-                  type="text"
-                  value={formData.shippingAddress.detailAddress}
-                  onChange={(e) => handleFormChange('shippingAddress.detailAddress', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="101동 1001호"
-                />
-              </div>
-            </div>
+            )}
           </div>
 
           {/* 배송 메모 */}
@@ -563,6 +827,7 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }

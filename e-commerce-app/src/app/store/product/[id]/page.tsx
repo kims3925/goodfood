@@ -2,73 +2,152 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { ArrowLeft, Heart, Share2, Minus, Plus } from 'lucide-react'
 
 export default function ProductDetailPage() {
   const params = useParams()
   const searchParams = useSearchParams()
+  const { data: session } = useSession()
   const bandId = searchParams.get('bandId')
   const [product, setProduct] = useState<any>(null)
   const [quantity, setQuantity] = useState(1)
   const [selectedImage, setSelectedImage] = useState(0)
   const [activeTab, setActiveTab] = useState('detail')
   const [isLoading, setIsLoading] = useState(true)
+  const [isWishlisted, setIsWishlisted] = useState(false)
+  const [wishlistLoading, setWishlistLoading] = useState(false)
 
   useEffect(() => {
     loadProduct()
   }, [params.id, bandId])
 
+  useEffect(() => {
+    if (session && product) {
+      checkWishlistStatus()
+    }
+  }, [session, product])
+
   const loadProduct = async () => {
     try {
       setIsLoading(true)
-      // 실제 API 호출
       const apiUrl = bandId
         ? `/api/shop/products/${params.id}?bandId=${bandId}`
         : `/api/shop/products/${params.id}`
       const response = await fetch(apiUrl)
       const data = await response.json()
-      
+
       if (data.success) {
         setProduct(data.product)
       } else {
-        // 목업 데이터
-        setProduct(getMockProduct())
+        console.error('Failed to load product:', data.error)
+        setProduct(null)
       }
     } catch (error) {
       console.error('Failed to load product:', error)
-      setProduct(getMockProduct())
+      setProduct(null)
     } finally {
       setIsLoading(false)
     }
   }
 
-  const getMockProduct = () => ({
-    id: params.id,
-    title: '[500g 2,900원] 택배비보다 싼!! 가마솥 사골 도가니탕 2종',
-    description: '진한 사골 육수와 쫄깃한 도가니가 들어있는 프리미엄 도가니탕입니다. 간편하게 데워먹기만 하면 되는 간편 조리 제품입니다.',
-    originalPrice: 4900,
-    salePrice: 2900,
-    discount: 41,
-    images: [
-      'https://via.placeholder.com/600x600/FF6B6B/FFFFFF?text=도가니탕1',
-      'https://via.placeholder.com/600x600/4ECDC4/FFFFFF?text=도가니탕2',
-      'https://via.placeholder.com/600x600/F7B731/FFFFFF?text=도가니탕3',
-    ],
-    category: '육류',
-    shippingFee: 3000,
-    freeShippingAmount: 30000,
-    options: [
-      { name: '사골도가니탕 500g', price: 2900 },
-      { name: '사골도가니탕 1kg', price: 5400 },
-      { name: '사골도가니탕 2kg', price: 9900 },
-    ],
-    detailImages: [
-      'https://via.placeholder.com/800x1200/FF6B6B/FFFFFF?text=상품상세1',
-      'https://via.placeholder.com/800x1200/4ECDC4/FFFFFF?text=상품상세2',
-      'https://via.placeholder.com/800x1200/F7B731/FFFFFF?text=상품상세3',
-    ],
-  })
+  const checkWishlistStatus = async () => {
+    if (!session) return
+
+    try {
+      const response = await fetch('/api/mypage/wishlist')
+      const data = await response.json()
+
+      if (data.success) {
+        const isInWishlist = data.wishlists.some(
+          (item: any) => item.product.id === parseInt(params.id as string)
+        )
+        setIsWishlisted(isInWishlist)
+      }
+    } catch (error) {
+      console.error('Failed to check wishlist status:', error)
+    }
+  }
+
+  const handleToggleWishlist = async () => {
+    if (!session) {
+      alert('로그인이 필요합니다')
+      window.location.href = '/store/auth/login'
+      return
+    }
+
+    if (wishlistLoading) return
+
+    // productId를 숫자로 확실하게 변환
+    const productIdNum = typeof params.id === 'string' ? parseInt(params.id) : params.id
+    if (isNaN(productIdNum)) {
+      alert('잘못된 상품 ID입니다')
+      return
+    }
+
+    try {
+      setWishlistLoading(true)
+
+      if (isWishlisted) {
+        // 찜 해제 - 먼저 찜 목록에서 해당 상품의 wishlist ID를 찾아야 함
+        const response = await fetch('/api/mypage/wishlist')
+        const data = await response.json()
+
+        if (data.success) {
+          const wishlistItem = data.wishlists.find(
+            (item: any) => item.product.id === productIdNum
+          )
+
+          if (wishlistItem) {
+            const deleteResponse = await fetch(`/api/mypage/wishlist/${wishlistItem.id}`, {
+              method: 'DELETE',
+            })
+            const deleteData = await deleteResponse.json()
+
+            if (deleteData.success) {
+              setIsWishlisted(false)
+              alert('찜 목록에서 삭제되었습니다')
+            }
+          }
+        }
+      } else {
+        // 찜 추가
+        console.log('[Wishlist] Adding product:', productIdNum)
+
+        const response = await fetch('/api/mypage/wishlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId: productIdNum }),
+        })
+
+        const data = await response.json()
+        console.log('[Wishlist] Add response:', data)
+
+        if (data.success) {
+          setIsWishlisted(true)
+          alert('찜 목록에 추가되었습니다')
+        } else {
+          console.error('[Wishlist] Error:', data.error)
+          // 상세한 에러 메시지 표시
+          if (data.error && typeof data.error === 'string') {
+            if (data.error.includes('Foreign key constraint') || data.error.includes('foreign key')) {
+              alert('이 상품은 아직 찜할 수 없습니다.\n\n실제 등록된 상품 페이지(/store)에서 상품을 선택해주세요.')
+            } else {
+              alert(`찜하기 실패: ${data.error}`)
+            }
+          } else {
+            alert('찜하기에 실패했습니다')
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[Wishlist] Failed to toggle wishlist:', error)
+      alert('처리 중 오류가 발생했습니다')
+    } finally {
+      setWishlistLoading(false)
+    }
+  }
 
   const formatPrice = (price: number | undefined | null) => {
     if (price === undefined || price === null || isNaN(price)) {
@@ -86,6 +165,11 @@ export default function ProductDetailPage() {
   }
 
   const handleAddToCart = async () => {
+    if (!product?.productPublishId) {
+      alert('상품 정보를 불러올 수 없습니다')
+      return
+    }
+
     try {
       // 세션 ID 생성 (실제로는 세션 관리 라이브러리 사용)
       let sessionId = localStorage.getItem('sessionId')
@@ -94,16 +178,18 @@ export default function ProductDetailPage() {
         localStorage.setItem('sessionId', sessionId)
       }
 
+      const cartData = {
+        sessionId,
+        productPublishId: product.productPublishId,
+        quantity
+      }
+
       const response = await fetch('/api/cart', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          sessionId,
-          productId: product.id,
-          quantity
-        })
+        body: JSON.stringify(cartData)
       })
 
       const data = await response.json()
@@ -120,7 +206,12 @@ export default function ProductDetailPage() {
   }
 
   const handleBuyNow = () => {
-    const checkoutUrl = `/store/checkout?productId=${product.id}&quantity=${quantity}`
+    // productPublishId를 체크아웃 페이지로 전달
+    if (!product?.productPublishId) {
+      alert('상품 정보를 불러올 수 없습니다')
+      return
+    }
+    const checkoutUrl = `/store/checkout?productPublishId=${product.productPublishId}&quantity=${quantity}`
     window.location.href = checkoutUrl
   }
 
@@ -159,8 +250,14 @@ export default function ProductDetailPage() {
             {product.title}
           </h1>
           <div className="flex items-center gap-2">
-            <button className="p-1">
-              <Heart className="h-5 w-5" />
+            <button
+              onClick={handleToggleWishlist}
+              disabled={wishlistLoading}
+              className="p-1"
+            >
+              <Heart
+                className={`h-5 w-5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-700'}`}
+              />
             </button>
             <button onClick={handleShare} className="p-1">
               <Share2 className="h-5 w-5" />
@@ -225,15 +322,20 @@ export default function ProductDetailPage() {
               <div className="flex">
                 <dt className="w-20 text-gray-500 flex-shrink-0">배송</dt>
                 <dd className="text-gray-900">
-                  <p className="font-medium">택배배송 3,000원</p>
+                  <p className="font-medium">
+                    택배배송 {formatPrice(product.shippingInfo?.defaultShippingFee || 3000)}원
+                  </p>
                   <p className="text-xs text-gray-500 mt-0.5">
+                    {formatPrice(product.shippingInfo?.freeShippingAmount || 30000)}원 이상 무료배송
+                  </p>
+                  <p className="text-xs text-gray-500">
                     제주 추가 3,000원, 제주 외 도서지역 추가 5,000원
                   </p>
                 </dd>
               </div>
               <div className="flex">
                 <dt className="w-20 text-gray-500 flex-shrink-0">판매자</dt>
-                <dd className="text-gray-900">{product.bandName || product.seller || '판매자'}</dd>
+                <dd className="text-gray-900">{product.sellerName || product.bandName || '판매자'}</dd>
               </div>
               <div className="flex">
                 <dt className="w-20 text-gray-500 flex-shrink-0">포장타입</dt>
@@ -293,8 +395,14 @@ export default function ProductDetailPage() {
 
             {/* Action Buttons - 마켓컬리 스타일 */}
             <div className="flex gap-2">
-              <button className="w-12 h-12 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center flex-shrink-0">
-                <Heart className="h-5 w-5 text-gray-500" />
+              <button
+                onClick={handleToggleWishlist}
+                disabled={wishlistLoading}
+                className="w-12 h-12 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center flex-shrink-0"
+              >
+                <Heart
+                  className={`h-5 w-5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-500'}`}
+                />
               </button>
               <button
                 onClick={handleAddToCart}
@@ -352,7 +460,7 @@ export default function ProductDetailPage() {
                 <div>
                   <h3 className="font-medium mb-2">배송 안내</h3>
                   <ul className="space-y-1 text-gray-600">
-                    <li>• 배송비: {formatPrice(product.shippingFee)}원 ({formatPrice(product.freeShippingAmount)}원 이상 무료)</li>
+                    <li>• 배송비: {formatPrice(product.shippingInfo?.defaultShippingFee || 3000)}원 ({formatPrice(product.shippingInfo?.freeShippingAmount || 30000)}원 이상 무료)</li>
                     <li>• 배송기간: 결제 후 2-3일 이내</li>
                     <li>• 택배사: CJ대한통운</li>
                   </ul>
@@ -375,8 +483,14 @@ export default function ProductDetailPage() {
       {/* Mobile Bottom Fixed Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 lg:hidden z-40">
         <div className="flex gap-2">
-          <button className="w-12 h-12 border border-gray-300 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Heart className="h-5 w-5 text-gray-500" />
+          <button
+            onClick={handleToggleWishlist}
+            disabled={wishlistLoading}
+            className="w-12 h-12 border border-gray-300 rounded-lg flex items-center justify-center flex-shrink-0"
+          >
+            <Heart
+              className={`h-5 w-5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-500'}`}
+            />
           </button>
           <button
             onClick={handleAddToCart}

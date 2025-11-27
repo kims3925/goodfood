@@ -26,6 +26,7 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
+        // User 테이블에서 사용자 조회
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         })
@@ -43,7 +44,7 @@ export const authOptions: NextAuthOptions = {
         return {
           id: user.id.toString(),
           email: user.email,
-          name: user.name,
+          name: user.name || user.email,
         }
       },
     }),

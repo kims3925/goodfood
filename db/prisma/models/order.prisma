@@ -5,7 +5,6 @@
 model Order {
   id             Int                 @id @default(autoincrement())
   userId         Int                 @map("user_id")
-  retailBandId   Int?                @map("retail_band_id")
   orderNumber    String              @unique @map("order_number") @db.VarChar(50)
   status         CustomerOrderStatus @default(PENDING)
   recipientName  String              @map("recipient_name") @db.VarChar(100)
@@ -26,13 +25,11 @@ model Order {
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamp(0)
   user             User                @relation(fields: [userId], references: [id])
-  retailBand       RetailBand?         @relation(fields: [retailBandId], references: [id])
   items            OrderItem[]
   payment          Payment?
   settlementOrders SettlementOrder[]
 
   @@index([userId])
-  @@index([retailBandId])
   @@index([orderNumber])
   @@index([status])
   @@index([orderedAt])
@@ -41,22 +38,23 @@ model Order {
 }
 
 model OrderItem {
-  id            Int      @id @default(autoincrement())
-  orderId       Int      @map("order_id")
-  productId     Int?     @map("product_id")
-  productName   String   @map("product_name") @db.VarChar(500)
-  optionSummary String?  @map("option_summary") @db.VarChar(500)
-  thumbnailUrl  String?  @map("thumbnail_url") @db.VarChar(1000)
-  quantity      Int
-  unitPrice     Decimal  @map("unit_price") @db.Decimal(10, 2)
-  totalPrice    Decimal  @map("total_price") @db.Decimal(12, 2)
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  variantId     Int?     @map("variant_id")
-  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product       Product? @relation(fields: [productId], references: [id])
+  id               Int             @id @default(autoincrement())
+  orderId          Int             @map("order_id")
+  productPublishId Int             @map("product_publish_id") // product_publish 테이블 참조 (변경)
+  variantId        Int?            @map("variant_id")
+  productName      String          @map("product_name") @db.VarChar(500)
+  optionSummary    String?         @map("option_summary") @db.VarChar(500)
+  thumbnailUrl     String?         @map("thumbnail_url") @db.VarChar(1000)
+  quantity         Int
+  unitPrice        Decimal         @map("unit_price") @db.Decimal(10, 2)
+  totalPrice       Decimal         @map("total_price") @db.Decimal(12, 2)
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
+  order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productPublish   ProductPublish  @relation(fields: [productPublishId], references: [id]) // 변경
+  variant          ProductVariant? @relation(fields: [variantId], references: [id])
 
   @@index([orderId])
-  @@index([productId])
+  @@index([productPublishId])
   @@index([variantId])
   @@map("order_item")
 }
