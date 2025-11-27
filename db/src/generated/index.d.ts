@@ -143,7 +143,16 @@ export type Payment = $Result.DefaultSelection<Prisma.$PaymentPayload>
  * Enums
  */
 export namespace $Enums {
-  export const SourcingPlatform: {
+  export const PublishStatus: {
+  SUCCESS: 'SUCCESS',
+  FAILED: 'FAILED',
+  PENDING: 'PENDING'
+};
+
+export type PublishStatus = (typeof PublishStatus)[keyof typeof PublishStatus]
+
+
+export const SourcingPlatform: {
   BAND: 'BAND',
   ALIEXPRESS: 'ALIEXPRESS'
 };
@@ -157,6 +166,16 @@ export const AiProvider: {
 };
 
 export type AiProvider = (typeof AiProvider)[keyof typeof AiProvider]
+
+
+export const ProductStatus: {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+  SOLDOUT: 'SOLDOUT'
+};
+
+export type ProductStatus = (typeof ProductStatus)[keyof typeof ProductStatus]
 
 
 export const WorkflowType: {
@@ -178,15 +197,6 @@ export const WorkflowStatus: {
 };
 
 export type WorkflowStatus = (typeof WorkflowStatus)[keyof typeof WorkflowStatus]
-
-
-export const PublishStatus: {
-  SUCCESS: 'SUCCESS',
-  FAILED: 'FAILED',
-  PENDING: 'PENDING'
-};
-
-export type PublishStatus = (typeof PublishStatus)[keyof typeof PublishStatus]
 
 
 export const CustomerOrderStatus: {
@@ -229,6 +239,10 @@ export type TossPaymentStatus = (typeof TossPaymentStatus)[keyof typeof TossPaym
 
 }
 
+export type PublishStatus = $Enums.PublishStatus
+
+export const PublishStatus: typeof $Enums.PublishStatus
+
 export type SourcingPlatform = $Enums.SourcingPlatform
 
 export const SourcingPlatform: typeof $Enums.SourcingPlatform
@@ -237,6 +251,10 @@ export type AiProvider = $Enums.AiProvider
 
 export const AiProvider: typeof $Enums.AiProvider
 
+export type ProductStatus = $Enums.ProductStatus
+
+export const ProductStatus: typeof $Enums.ProductStatus
+
 export type WorkflowType = $Enums.WorkflowType
 
 export const WorkflowType: typeof $Enums.WorkflowType
@@ -244,10 +262,6 @@ export const WorkflowType: typeof $Enums.WorkflowType
 export type WorkflowStatus = $Enums.WorkflowStatus
 
 export const WorkflowStatus: typeof $Enums.WorkflowStatus
-
-export type PublishStatus = $Enums.PublishStatus
-
-export const PublishStatus: typeof $Enums.PublishStatus
 
 export type CustomerOrderStatus = $Enums.CustomerOrderStatus
 
@@ -1112,11 +1126,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-<<<<<<< HEAD
       modelProps: "user" | "sourcingApiConfig" | "aiApiConfig" | "wholesaleBand" | "retailBand" | "post" | "postImage" | "postComment" | "product" | "productVariant" | "productOption" | "pricingPolicy" | "automationConfig" | "workflowLog" | "productPublish" | "publishHistory" | "purchaseOrder" | "customer" | "customerAddress" | "sessionCart" | "sessionCartItem" | "cartItem" | "customerOrder" | "customerOrderItem" | "payment"
-=======
-      modelProps: "user" | "sourcingApiConfig" | "aiApiConfig" | "wholesaleBand" | "retailBand" | "post" | "postImage" | "postComment" | "product" | "productVariant" | "productOption" | "pricingPolicy" | "automationConfig" | "workflowLog" | "publishHistory" | "purchaseOrder" | "customer" | "customerAddress" | "sessionCart" | "sessionCartItem" | "cartItem" | "customerOrder" | "customerOrderItem" | "payment"
->>>>>>> release-1
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2974,40 +2984,28 @@ export namespace Prisma {
     aiApiConfigs: number
     posts: number
     pricingPolicies: number
-<<<<<<< HEAD
-    workflowLogs: number
-    productPublishes: number
-    publishHistories: number
-    purchaseOrders: number
-=======
     products: number
+    productPublishes: number
     publishHistories: number
     purchaseOrders: number
     retailBands: number
     sourcingApiConfigs: number
     wholesaleBands: number
     workflowLogs: number
->>>>>>> release-1
   }
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     aiApiConfigs?: boolean | UserCountOutputTypeCountAiApiConfigsArgs
     posts?: boolean | UserCountOutputTypeCountPostsArgs
     pricingPolicies?: boolean | UserCountOutputTypeCountPricingPoliciesArgs
-<<<<<<< HEAD
-    workflowLogs?: boolean | UserCountOutputTypeCountWorkflowLogsArgs
-    productPublishes?: boolean | UserCountOutputTypeCountProductPublishesArgs
-    publishHistories?: boolean | UserCountOutputTypeCountPublishHistoriesArgs
-    purchaseOrders?: boolean | UserCountOutputTypeCountPurchaseOrdersArgs
-=======
     products?: boolean | UserCountOutputTypeCountProductsArgs
+    productPublishes?: boolean | UserCountOutputTypeCountProductPublishesArgs
     publishHistories?: boolean | UserCountOutputTypeCountPublishHistoriesArgs
     purchaseOrders?: boolean | UserCountOutputTypeCountPurchaseOrdersArgs
     retailBands?: boolean | UserCountOutputTypeCountRetailBandsArgs
     sourcingApiConfigs?: boolean | UserCountOutputTypeCountSourcingApiConfigsArgs
     wholesaleBands?: boolean | UserCountOutputTypeCountWholesaleBandsArgs
     workflowLogs?: boolean | UserCountOutputTypeCountWorkflowLogsArgs
->>>>>>> release-1
   }
 
   // Custom InputTypes
@@ -3070,8 +3068,6 @@ export namespace Prisma {
     where?: PurchaseOrderWhereInput
   }
 
-<<<<<<< HEAD
-=======
   /**
    * UserCountOutputType without action
    */
@@ -3100,7 +3096,6 @@ export namespace Prisma {
     where?: WorkflowLogWhereInput
   }
 
->>>>>>> release-1
 
   /**
    * Count Type SourcingApiConfigCountOutputType
@@ -3178,15 +3173,15 @@ export namespace Prisma {
    */
 
   export type RetailBandCountOutputType = {
-    productPublishes: number
     publishHistories: number
     purchaseOrders: number
+    productPublishes: number
   }
 
   export type RetailBandCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    productPublishes?: boolean | RetailBandCountOutputTypeCountProductPublishesArgs
     publishHistories?: boolean | RetailBandCountOutputTypeCountPublishHistoriesArgs
     purchaseOrders?: boolean | RetailBandCountOutputTypeCountPurchaseOrdersArgs
+    productPublishes?: boolean | RetailBandCountOutputTypeCountProductPublishesArgs
   }
 
   // Custom InputTypes
@@ -3203,13 +3198,6 @@ export namespace Prisma {
   /**
    * RetailBandCountOutputType without action
    */
-  export type RetailBandCountOutputTypeCountProductPublishesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    where?: ProductPublishWhereInput
-  }
-
-  /**
-   * RetailBandCountOutputType without action
-   */
   export type RetailBandCountOutputTypeCountPublishHistoriesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: PublishHistoryWhereInput
   }
@@ -3219,6 +3207,13 @@ export namespace Prisma {
    */
   export type RetailBandCountOutputTypeCountPurchaseOrdersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: PurchaseOrderWhereInput
+  }
+
+  /**
+   * RetailBandCountOutputType without action
+   */
+  export type RetailBandCountOutputTypeCountProductPublishesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ProductPublishWhereInput
   }
 
 
@@ -3267,35 +3262,25 @@ export namespace Prisma {
    */
 
   export type ProductCountOutputType = {
-<<<<<<< HEAD
     variants: number
     options: number
     purchaseOrders: number
     productPublishes: number
     publishHistories: number
-=======
->>>>>>> release-1
     cartItems: number
-    customerOrderItems: number
-    publishHistories: number
-    purchaseOrders: number
     sessionCartItems: number
+    customerOrderItems: number
   }
 
   export type ProductCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-<<<<<<< HEAD
     variants?: boolean | ProductCountOutputTypeCountVariantsArgs
     options?: boolean | ProductCountOutputTypeCountOptionsArgs
     purchaseOrders?: boolean | ProductCountOutputTypeCountPurchaseOrdersArgs
     productPublishes?: boolean | ProductCountOutputTypeCountProductPublishesArgs
     publishHistories?: boolean | ProductCountOutputTypeCountPublishHistoriesArgs
-=======
->>>>>>> release-1
     cartItems?: boolean | ProductCountOutputTypeCountCartItemsArgs
-    customerOrderItems?: boolean | ProductCountOutputTypeCountCustomerOrderItemsArgs
-    publishHistories?: boolean | ProductCountOutputTypeCountPublishHistoriesArgs
-    purchaseOrders?: boolean | ProductCountOutputTypeCountPurchaseOrdersArgs
     sessionCartItems?: boolean | ProductCountOutputTypeCountSessionCartItemsArgs
+    customerOrderItems?: boolean | ProductCountOutputTypeCountCustomerOrderItemsArgs
   }
 
   // Custom InputTypes
@@ -3312,14 +3297,13 @@ export namespace Prisma {
   /**
    * ProductCountOutputType without action
    */
-  export type ProductCountOutputTypeCountCartItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    where?: CartItemWhereInput
+  export type ProductCountOutputTypeCountVariantsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ProductVariantWhereInput
   }
 
   /**
    * ProductCountOutputType without action
    */
-<<<<<<< HEAD
   export type ProductCountOutputTypeCountOptionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: ProductOptionWhereInput
   }
@@ -3336,10 +3320,6 @@ export namespace Prisma {
    */
   export type ProductCountOutputTypeCountProductPublishesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: ProductPublishWhereInput
-=======
-  export type ProductCountOutputTypeCountCustomerOrderItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    where?: CustomerOrderItemWhereInput
->>>>>>> release-1
   }
 
   /**
@@ -3352,8 +3332,8 @@ export namespace Prisma {
   /**
    * ProductCountOutputType without action
    */
-  export type ProductCountOutputTypeCountPurchaseOrdersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    where?: PurchaseOrderWhereInput
+  export type ProductCountOutputTypeCountCartItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CartItemWhereInput
   }
 
   /**
@@ -3361,6 +3341,13 @@ export namespace Prisma {
    */
   export type ProductCountOutputTypeCountSessionCartItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: SessionCartItemWhereInput
+  }
+
+  /**
+   * ProductCountOutputType without action
+   */
+  export type ProductCountOutputTypeCountCustomerOrderItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CustomerOrderItemWhereInput
   }
 
 
@@ -3687,22 +3674,16 @@ export namespace Prisma {
     updatedAt?: boolean
     aiApiConfigs?: boolean | User$aiApiConfigsArgs<ExtArgs>
     automationConfig?: boolean | User$automationConfigArgs<ExtArgs>
-<<<<<<< HEAD
-    workflowLogs?: boolean | User$workflowLogsArgs<ExtArgs>
-    productPublishes?: boolean | User$productPublishesArgs<ExtArgs>
-    publishHistories?: boolean | User$publishHistoriesArgs<ExtArgs>
-    purchaseOrders?: boolean | User$purchaseOrdersArgs<ExtArgs>
-=======
     posts?: boolean | User$postsArgs<ExtArgs>
     pricingPolicies?: boolean | User$pricingPoliciesArgs<ExtArgs>
     products?: boolean | User$productsArgs<ExtArgs>
+    productPublishes?: boolean | User$productPublishesArgs<ExtArgs>
     publishHistories?: boolean | User$publishHistoriesArgs<ExtArgs>
     purchaseOrders?: boolean | User$purchaseOrdersArgs<ExtArgs>
     retailBands?: boolean | User$retailBandsArgs<ExtArgs>
     sourcingApiConfigs?: boolean | User$sourcingApiConfigsArgs<ExtArgs>
     wholesaleBands?: boolean | User$wholesaleBandsArgs<ExtArgs>
     workflowLogs?: boolean | User$workflowLogsArgs<ExtArgs>
->>>>>>> release-1
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -3721,22 +3702,16 @@ export namespace Prisma {
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     aiApiConfigs?: boolean | User$aiApiConfigsArgs<ExtArgs>
     automationConfig?: boolean | User$automationConfigArgs<ExtArgs>
-<<<<<<< HEAD
-    workflowLogs?: boolean | User$workflowLogsArgs<ExtArgs>
-    productPublishes?: boolean | User$productPublishesArgs<ExtArgs>
-    publishHistories?: boolean | User$publishHistoriesArgs<ExtArgs>
-    purchaseOrders?: boolean | User$purchaseOrdersArgs<ExtArgs>
-=======
     posts?: boolean | User$postsArgs<ExtArgs>
     pricingPolicies?: boolean | User$pricingPoliciesArgs<ExtArgs>
     products?: boolean | User$productsArgs<ExtArgs>
+    productPublishes?: boolean | User$productPublishesArgs<ExtArgs>
     publishHistories?: boolean | User$publishHistoriesArgs<ExtArgs>
     purchaseOrders?: boolean | User$purchaseOrdersArgs<ExtArgs>
     retailBands?: boolean | User$retailBandsArgs<ExtArgs>
     sourcingApiConfigs?: boolean | User$sourcingApiConfigsArgs<ExtArgs>
     wholesaleBands?: boolean | User$wholesaleBandsArgs<ExtArgs>
     workflowLogs?: boolean | User$workflowLogsArgs<ExtArgs>
->>>>>>> release-1
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
 
@@ -3745,22 +3720,16 @@ export namespace Prisma {
     objects: {
       aiApiConfigs: Prisma.$AiApiConfigPayload<ExtArgs>[]
       automationConfig: Prisma.$AutomationConfigPayload<ExtArgs> | null
-<<<<<<< HEAD
-      workflowLogs: Prisma.$WorkflowLogPayload<ExtArgs>[]
-      productPublishes: Prisma.$ProductPublishPayload<ExtArgs>[]
-      publishHistories: Prisma.$PublishHistoryPayload<ExtArgs>[]
-      purchaseOrders: Prisma.$PurchaseOrderPayload<ExtArgs>[]
-=======
       posts: Prisma.$PostPayload<ExtArgs>[]
       pricingPolicies: Prisma.$PricingPolicyPayload<ExtArgs>[]
       products: Prisma.$ProductPayload<ExtArgs>[]
+      productPublishes: Prisma.$ProductPublishPayload<ExtArgs>[]
       publishHistories: Prisma.$PublishHistoryPayload<ExtArgs>[]
       purchaseOrders: Prisma.$PurchaseOrderPayload<ExtArgs>[]
       retailBands: Prisma.$RetailBandPayload<ExtArgs>[]
       sourcingApiConfigs: Prisma.$SourcingApiConfigPayload<ExtArgs>[]
       wholesaleBands: Prisma.$WholesaleBandPayload<ExtArgs>[]
       workflowLogs: Prisma.$WorkflowLogPayload<ExtArgs>[]
->>>>>>> release-1
     }
     scalars: $Extensions.GetPayloadResult<{
       id: number
@@ -4111,22 +4080,16 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     aiApiConfigs<T extends User$aiApiConfigsArgs<ExtArgs> = {}>(args?: Subset<T, User$aiApiConfigsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AiApiConfigPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     automationConfig<T extends User$automationConfigArgs<ExtArgs> = {}>(args?: Subset<T, User$automationConfigArgs<ExtArgs>>): Prisma__AutomationConfigClient<$Result.GetResult<Prisma.$AutomationConfigPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
-<<<<<<< HEAD
-    workflowLogs<T extends User$workflowLogsArgs<ExtArgs> = {}>(args?: Subset<T, User$workflowLogsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-    productPublishes<T extends User$productPublishesArgs<ExtArgs> = {}>(args?: Subset<T, User$productPublishesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProductPublishPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-    publishHistories<T extends User$publishHistoriesArgs<ExtArgs> = {}>(args?: Subset<T, User$publishHistoriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PublishHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-    purchaseOrders<T extends User$purchaseOrdersArgs<ExtArgs> = {}>(args?: Subset<T, User$purchaseOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PurchaseOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-=======
     posts<T extends User$postsArgs<ExtArgs> = {}>(args?: Subset<T, User$postsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PostPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     pricingPolicies<T extends User$pricingPoliciesArgs<ExtArgs> = {}>(args?: Subset<T, User$pricingPoliciesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PricingPolicyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     products<T extends User$productsArgs<ExtArgs> = {}>(args?: Subset<T, User$productsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProductPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    productPublishes<T extends User$productPublishesArgs<ExtArgs> = {}>(args?: Subset<T, User$productPublishesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProductPublishPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     publishHistories<T extends User$publishHistoriesArgs<ExtArgs> = {}>(args?: Subset<T, User$publishHistoriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PublishHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     purchaseOrders<T extends User$purchaseOrdersArgs<ExtArgs> = {}>(args?: Subset<T, User$purchaseOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PurchaseOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     retailBands<T extends User$retailBandsArgs<ExtArgs> = {}>(args?: Subset<T, User$retailBandsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RetailBandPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     sourcingApiConfigs<T extends User$sourcingApiConfigsArgs<ExtArgs> = {}>(args?: Subset<T, User$sourcingApiConfigsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SourcingApiConfigPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     wholesaleBands<T extends User$wholesaleBandsArgs<ExtArgs> = {}>(args?: Subset<T, User$wholesaleBandsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WholesaleBandPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     workflowLogs<T extends User$workflowLogsArgs<ExtArgs> = {}>(args?: Subset<T, User$workflowLogsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
->>>>>>> release-1
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -4692,8 +4655,6 @@ export namespace Prisma {
   }
 
   /**
-<<<<<<< HEAD
-=======
    * User.retailBands
    */
   export type User$retailBandsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -4790,7 +4751,6 @@ export namespace Prisma {
   }
 
   /**
->>>>>>> release-1
    * User without action
    */
   export type UserDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -8242,16 +8202,11 @@ export namespace Prisma {
     isActive?: boolean
     createdAt?: boolean
     updatedAt?: boolean
-<<<<<<< HEAD
-    user?: boolean | UserDefaultArgs<ExtArgs>
-    apiConfig?: boolean | SourcingApiConfigDefaultArgs<ExtArgs>
-    productPublishes?: boolean | RetailBand$productPublishesArgs<ExtArgs>
-=======
     formUrl?: boolean
->>>>>>> release-1
     publishHistories?: boolean | RetailBand$publishHistoriesArgs<ExtArgs>
     purchaseOrders?: boolean | RetailBand$purchaseOrdersArgs<ExtArgs>
     apiConfig?: boolean | SourcingApiConfigDefaultArgs<ExtArgs>
+    productPublishes?: boolean | RetailBand$productPublishesArgs<ExtArgs>
     user?: boolean | UserDefaultArgs<ExtArgs>
     _count?: boolean | RetailBandCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["retailBand"]>
@@ -8273,15 +8228,10 @@ export namespace Prisma {
 
   export type RetailBandOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "apiConfigId" | "bandKey" | "name" | "coverUrl" | "isActive" | "createdAt" | "updatedAt" | "formUrl", ExtArgs["result"]["retailBand"]>
   export type RetailBandInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-<<<<<<< HEAD
-    user?: boolean | UserDefaultArgs<ExtArgs>
-    apiConfig?: boolean | SourcingApiConfigDefaultArgs<ExtArgs>
-    productPublishes?: boolean | RetailBand$productPublishesArgs<ExtArgs>
-=======
->>>>>>> release-1
     publishHistories?: boolean | RetailBand$publishHistoriesArgs<ExtArgs>
     purchaseOrders?: boolean | RetailBand$purchaseOrdersArgs<ExtArgs>
     apiConfig?: boolean | SourcingApiConfigDefaultArgs<ExtArgs>
+    productPublishes?: boolean | RetailBand$productPublishesArgs<ExtArgs>
     user?: boolean | UserDefaultArgs<ExtArgs>
     _count?: boolean | RetailBandCountOutputTypeDefaultArgs<ExtArgs>
   }
@@ -8289,15 +8239,10 @@ export namespace Prisma {
   export type $RetailBandPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "RetailBand"
     objects: {
-<<<<<<< HEAD
-      user: Prisma.$UserPayload<ExtArgs>
-      apiConfig: Prisma.$SourcingApiConfigPayload<ExtArgs>
-      productPublishes: Prisma.$ProductPublishPayload<ExtArgs>[]
-=======
->>>>>>> release-1
       publishHistories: Prisma.$PublishHistoryPayload<ExtArgs>[]
       purchaseOrders: Prisma.$PurchaseOrderPayload<ExtArgs>[]
       apiConfig: Prisma.$SourcingApiConfigPayload<ExtArgs>
+      productPublishes: Prisma.$ProductPublishPayload<ExtArgs>[]
       user: Prisma.$UserPayload<ExtArgs>
     }
     scalars: $Extensions.GetPayloadResult<{
@@ -8651,15 +8596,10 @@ export namespace Prisma {
    */
   export interface Prisma__RetailBandClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
-<<<<<<< HEAD
-    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-    apiConfig<T extends SourcingApiConfigDefaultArgs<ExtArgs> = {}>(args?: Subset<T, SourcingApiConfigDefaultArgs<ExtArgs>>): Prisma__SourcingApiConfigClient<$Result.GetResult<Prisma.$SourcingApiConfigPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-    productPublishes<T extends RetailBand$productPublishesArgs<ExtArgs> = {}>(args?: Subset<T, RetailBand$productPublishesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProductPublishPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-=======
->>>>>>> release-1
     publishHistories<T extends RetailBand$publishHistoriesArgs<ExtArgs> = {}>(args?: Subset<T, RetailBand$publishHistoriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PublishHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     purchaseOrders<T extends RetailBand$purchaseOrdersArgs<ExtArgs> = {}>(args?: Subset<T, RetailBand$purchaseOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PurchaseOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     apiConfig<T extends SourcingApiConfigDefaultArgs<ExtArgs> = {}>(args?: Subset<T, SourcingApiConfigDefaultArgs<ExtArgs>>): Prisma__SourcingApiConfigClient<$Result.GetResult<Prisma.$SourcingApiConfigPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    productPublishes<T extends RetailBand$productPublishesArgs<ExtArgs> = {}>(args?: Subset<T, RetailBand$productPublishesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProductPublishPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -9043,30 +8983,6 @@ export namespace Prisma {
   }
 
   /**
-   * RetailBand.productPublishes
-   */
-  export type RetailBand$productPublishesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the ProductPublish
-     */
-    select?: ProductPublishSelect<ExtArgs> | null
-    /**
-     * Omit specific fields from the ProductPublish
-     */
-    omit?: ProductPublishOmit<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well
-     */
-    include?: ProductPublishInclude<ExtArgs> | null
-    where?: ProductPublishWhereInput
-    orderBy?: ProductPublishOrderByWithRelationInput | ProductPublishOrderByWithRelationInput[]
-    cursor?: ProductPublishWhereUniqueInput
-    take?: number
-    skip?: number
-    distinct?: ProductPublishScalarFieldEnum | ProductPublishScalarFieldEnum[]
-  }
-
-  /**
    * RetailBand.publishHistories
    */
   export type RetailBand$publishHistoriesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -9112,6 +9028,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: PurchaseOrderScalarFieldEnum | PurchaseOrderScalarFieldEnum[]
+  }
+
+  /**
+   * RetailBand.productPublishes
+   */
+  export type RetailBand$productPublishesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProductPublish
+     */
+    select?: ProductPublishSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProductPublish
+     */
+    omit?: ProductPublishOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductPublishInclude<ExtArgs> | null
+    where?: ProductPublishWhereInput
+    orderBy?: ProductPublishOrderByWithRelationInput | ProductPublishOrderByWithRelationInput[]
+    cursor?: ProductPublishWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ProductPublishScalarFieldEnum | ProductPublishScalarFieldEnum[]
   }
 
   /**
@@ -12478,7 +12418,6 @@ export namespace Prisma {
     wholesalePrice?: boolean
     createdAt?: boolean
     updatedAt?: boolean
-<<<<<<< HEAD
     user?: boolean | UserDefaultArgs<ExtArgs>
     post?: boolean | PostDefaultArgs<ExtArgs>
     variants?: boolean | Product$variantsArgs<ExtArgs>
@@ -12486,15 +12425,9 @@ export namespace Prisma {
     purchaseOrders?: boolean | Product$purchaseOrdersArgs<ExtArgs>
     productPublishes?: boolean | Product$productPublishesArgs<ExtArgs>
     publishHistories?: boolean | Product$publishHistoriesArgs<ExtArgs>
-=======
->>>>>>> release-1
     cartItems?: boolean | Product$cartItemsArgs<ExtArgs>
-    customerOrderItems?: boolean | Product$customerOrderItemsArgs<ExtArgs>
-    post?: boolean | PostDefaultArgs<ExtArgs>
-    user?: boolean | UserDefaultArgs<ExtArgs>
-    publishHistories?: boolean | Product$publishHistoriesArgs<ExtArgs>
-    purchaseOrders?: boolean | Product$purchaseOrdersArgs<ExtArgs>
     sessionCartItems?: boolean | Product$sessionCartItemsArgs<ExtArgs>
+    customerOrderItems?: boolean | Product$customerOrderItemsArgs<ExtArgs>
     _count?: boolean | ProductCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["product"]>
 
@@ -12517,7 +12450,6 @@ export namespace Prisma {
 
   export type ProductOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "postId" | "name" | "description" | "thumbnailUrl" | "categoryId" | "currency" | "price" | "wholesalePrice" | "createdAt" | "updatedAt", ExtArgs["result"]["product"]>
   export type ProductInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-<<<<<<< HEAD
     user?: boolean | UserDefaultArgs<ExtArgs>
     post?: boolean | PostDefaultArgs<ExtArgs>
     variants?: boolean | Product$variantsArgs<ExtArgs>
@@ -12525,22 +12457,15 @@ export namespace Prisma {
     purchaseOrders?: boolean | Product$purchaseOrdersArgs<ExtArgs>
     productPublishes?: boolean | Product$productPublishesArgs<ExtArgs>
     publishHistories?: boolean | Product$publishHistoriesArgs<ExtArgs>
-=======
->>>>>>> release-1
     cartItems?: boolean | Product$cartItemsArgs<ExtArgs>
-    customerOrderItems?: boolean | Product$customerOrderItemsArgs<ExtArgs>
-    post?: boolean | PostDefaultArgs<ExtArgs>
-    user?: boolean | UserDefaultArgs<ExtArgs>
-    publishHistories?: boolean | Product$publishHistoriesArgs<ExtArgs>
-    purchaseOrders?: boolean | Product$purchaseOrdersArgs<ExtArgs>
     sessionCartItems?: boolean | Product$sessionCartItemsArgs<ExtArgs>
+    customerOrderItems?: boolean | Product$customerOrderItemsArgs<ExtArgs>
     _count?: boolean | ProductCountOutputTypeDefaultArgs<ExtArgs>
   }
 
   export type $ProductPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Product"
     objects: {
-<<<<<<< HEAD
       user: Prisma.$UserPayload<ExtArgs>
       post: Prisma.$PostPayload<ExtArgs>
       variants: Prisma.$ProductVariantPayload<ExtArgs>[]
@@ -12548,15 +12473,9 @@ export namespace Prisma {
       purchaseOrders: Prisma.$PurchaseOrderPayload<ExtArgs>[]
       productPublishes: Prisma.$ProductPublishPayload<ExtArgs>[]
       publishHistories: Prisma.$PublishHistoryPayload<ExtArgs>[]
-=======
->>>>>>> release-1
       cartItems: Prisma.$CartItemPayload<ExtArgs>[]
-      customerOrderItems: Prisma.$CustomerOrderItemPayload<ExtArgs>[]
-      post: Prisma.$PostPayload<ExtArgs>
-      user: Prisma.$UserPayload<ExtArgs>
-      publishHistories: Prisma.$PublishHistoryPayload<ExtArgs>[]
-      purchaseOrders: Prisma.$PurchaseOrderPayload<ExtArgs>[]
       sessionCartItems: Prisma.$SessionCartItemPayload<ExtArgs>[]
+      customerOrderItems: Prisma.$CustomerOrderItemPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: number
@@ -12911,7 +12830,6 @@ export namespace Prisma {
    */
   export interface Prisma__ProductClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
-<<<<<<< HEAD
     user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     post<T extends PostDefaultArgs<ExtArgs> = {}>(args?: Subset<T, PostDefaultArgs<ExtArgs>>): Prisma__PostClient<$Result.GetResult<Prisma.$PostPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     variants<T extends Product$variantsArgs<ExtArgs> = {}>(args?: Subset<T, Product$variantsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProductVariantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -12919,15 +12837,9 @@ export namespace Prisma {
     purchaseOrders<T extends Product$purchaseOrdersArgs<ExtArgs> = {}>(args?: Subset<T, Product$purchaseOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PurchaseOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     productPublishes<T extends Product$productPublishesArgs<ExtArgs> = {}>(args?: Subset<T, Product$productPublishesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProductPublishPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     publishHistories<T extends Product$publishHistoriesArgs<ExtArgs> = {}>(args?: Subset<T, Product$publishHistoriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PublishHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-=======
->>>>>>> release-1
     cartItems<T extends Product$cartItemsArgs<ExtArgs> = {}>(args?: Subset<T, Product$cartItemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CartItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-    customerOrderItems<T extends Product$customerOrderItemsArgs<ExtArgs> = {}>(args?: Subset<T, Product$customerOrderItemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CustomerOrderItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-    post<T extends PostDefaultArgs<ExtArgs> = {}>(args?: Subset<T, PostDefaultArgs<ExtArgs>>): Prisma__PostClient<$Result.GetResult<Prisma.$PostPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-    publishHistories<T extends Product$publishHistoriesArgs<ExtArgs> = {}>(args?: Subset<T, Product$publishHistoriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PublishHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-    purchaseOrders<T extends Product$purchaseOrdersArgs<ExtArgs> = {}>(args?: Subset<T, Product$purchaseOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PurchaseOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     sessionCartItems<T extends Product$sessionCartItemsArgs<ExtArgs> = {}>(args?: Subset<T, Product$sessionCartItemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionCartItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    customerOrderItems<T extends Product$customerOrderItemsArgs<ExtArgs> = {}>(args?: Subset<T, Product$customerOrderItemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CustomerOrderItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -13312,51 +13224,50 @@ export namespace Prisma {
   }
 
   /**
-   * Product.cartItems
+   * Product.variants
    */
-  export type Product$cartItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+  export type Product$variantsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     /**
-     * Select specific fields to fetch from the CartItem
+     * Select specific fields to fetch from the ProductVariant
      */
-    select?: CartItemSelect<ExtArgs> | null
+    select?: ProductVariantSelect<ExtArgs> | null
     /**
-     * Omit specific fields from the CartItem
+     * Omit specific fields from the ProductVariant
      */
-    omit?: CartItemOmit<ExtArgs> | null
+    omit?: ProductVariantOmit<ExtArgs> | null
     /**
      * Choose, which related nodes to fetch as well
      */
-    include?: CartItemInclude<ExtArgs> | null
-    where?: CartItemWhereInput
-    orderBy?: CartItemOrderByWithRelationInput | CartItemOrderByWithRelationInput[]
-    cursor?: CartItemWhereUniqueInput
+    include?: ProductVariantInclude<ExtArgs> | null
+    where?: ProductVariantWhereInput
+    orderBy?: ProductVariantOrderByWithRelationInput | ProductVariantOrderByWithRelationInput[]
+    cursor?: ProductVariantWhereUniqueInput
     take?: number
     skip?: number
-    distinct?: CartItemScalarFieldEnum | CartItemScalarFieldEnum[]
+    distinct?: ProductVariantScalarFieldEnum | ProductVariantScalarFieldEnum[]
   }
 
   /**
-   * Product.customerOrderItems
+   * Product.options
    */
-  export type Product$customerOrderItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+  export type Product$optionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     /**
-     * Select specific fields to fetch from the CustomerOrderItem
+     * Select specific fields to fetch from the ProductOption
      */
-    select?: CustomerOrderItemSelect<ExtArgs> | null
+    select?: ProductOptionSelect<ExtArgs> | null
     /**
-     * Omit specific fields from the CustomerOrderItem
+     * Omit specific fields from the ProductOption
      */
-    omit?: CustomerOrderItemOmit<ExtArgs> | null
+    omit?: ProductOptionOmit<ExtArgs> | null
     /**
      * Choose, which related nodes to fetch as well
      */
-    include?: CustomerOrderItemInclude<ExtArgs> | null
-    where?: CustomerOrderItemWhereInput
-    orderBy?: CustomerOrderItemOrderByWithRelationInput | CustomerOrderItemOrderByWithRelationInput[]
-    cursor?: CustomerOrderItemWhereUniqueInput
+    include?: ProductOptionInclude<ExtArgs> | null
+    where?: ProductOptionWhereInput
+    orderBy?: ProductOptionOrderByWithRelationInput | ProductOptionOrderByWithRelationInput[]
+    cursor?: ProductOptionWhereUniqueInput
     take?: number
     skip?: number
-<<<<<<< HEAD
     distinct?: ProductOptionScalarFieldEnum | ProductOptionScalarFieldEnum[]
   }
 
@@ -13406,9 +13317,6 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: ProductPublishScalarFieldEnum | ProductPublishScalarFieldEnum[]
-=======
-    distinct?: CustomerOrderItemScalarFieldEnum | CustomerOrderItemScalarFieldEnum[]
->>>>>>> release-1
   }
 
   /**
@@ -13436,27 +13344,27 @@ export namespace Prisma {
   }
 
   /**
-   * Product.purchaseOrders
+   * Product.cartItems
    */
-  export type Product$purchaseOrdersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+  export type Product$cartItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     /**
-     * Select specific fields to fetch from the PurchaseOrder
+     * Select specific fields to fetch from the CartItem
      */
-    select?: PurchaseOrderSelect<ExtArgs> | null
+    select?: CartItemSelect<ExtArgs> | null
     /**
-     * Omit specific fields from the PurchaseOrder
+     * Omit specific fields from the CartItem
      */
-    omit?: PurchaseOrderOmit<ExtArgs> | null
+    omit?: CartItemOmit<ExtArgs> | null
     /**
      * Choose, which related nodes to fetch as well
      */
-    include?: PurchaseOrderInclude<ExtArgs> | null
-    where?: PurchaseOrderWhereInput
-    orderBy?: PurchaseOrderOrderByWithRelationInput | PurchaseOrderOrderByWithRelationInput[]
-    cursor?: PurchaseOrderWhereUniqueInput
+    include?: CartItemInclude<ExtArgs> | null
+    where?: CartItemWhereInput
+    orderBy?: CartItemOrderByWithRelationInput | CartItemOrderByWithRelationInput[]
+    cursor?: CartItemWhereUniqueInput
     take?: number
     skip?: number
-    distinct?: PurchaseOrderScalarFieldEnum | PurchaseOrderScalarFieldEnum[]
+    distinct?: CartItemScalarFieldEnum | CartItemScalarFieldEnum[]
   }
 
   /**
@@ -13481,6 +13389,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: SessionCartItemScalarFieldEnum | SessionCartItemScalarFieldEnum[]
+  }
+
+  /**
+   * Product.customerOrderItems
+   */
+  export type Product$customerOrderItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CustomerOrderItem
+     */
+    select?: CustomerOrderItemSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CustomerOrderItem
+     */
+    omit?: CustomerOrderItemOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CustomerOrderItemInclude<ExtArgs> | null
+    where?: CustomerOrderItemWhereInput
+    orderBy?: CustomerOrderItemOrderByWithRelationInput | CustomerOrderItemOrderByWithRelationInput[]
+    cursor?: CustomerOrderItemWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: CustomerOrderItemScalarFieldEnum | CustomerOrderItemScalarFieldEnum[]
   }
 
   /**
@@ -13768,6 +13700,7 @@ export namespace Prisma {
     barcode?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    product?: boolean | ProductDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["productVariant"]>
 
 
@@ -13787,10 +13720,15 @@ export namespace Prisma {
   }
 
   export type ProductVariantOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "productId" | "sku" | "optionSummary" | "price" | "wholesalePrice" | "stock" | "weight" | "barcode" | "createdAt" | "updatedAt", ExtArgs["result"]["productVariant"]>
+  export type ProductVariantInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    product?: boolean | ProductDefaultArgs<ExtArgs>
+  }
 
   export type $ProductVariantPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "ProductVariant"
-    objects: {}
+    objects: {
+      product: Prisma.$ProductPayload<ExtArgs>
+    }
     scalars: $Extensions.GetPayloadResult<{
       id: number
       productId: number
@@ -14143,6 +14081,7 @@ export namespace Prisma {
    */
   export interface Prisma__ProductVariantClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    product<T extends ProductDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ProductDefaultArgs<ExtArgs>>): Prisma__ProductClient<$Result.GetResult<Prisma.$ProductPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -14200,6 +14139,10 @@ export namespace Prisma {
      */
     omit?: ProductVariantOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductVariantInclude<ExtArgs> | null
+    /**
      * Filter, which ProductVariant to fetch.
      */
     where: ProductVariantWhereUniqueInput
@@ -14218,6 +14161,10 @@ export namespace Prisma {
      */
     omit?: ProductVariantOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductVariantInclude<ExtArgs> | null
+    /**
      * Filter, which ProductVariant to fetch.
      */
     where: ProductVariantWhereUniqueInput
@@ -14235,6 +14182,10 @@ export namespace Prisma {
      * Omit specific fields from the ProductVariant
      */
     omit?: ProductVariantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductVariantInclude<ExtArgs> | null
     /**
      * Filter, which ProductVariant to fetch.
      */
@@ -14284,6 +14235,10 @@ export namespace Prisma {
      */
     omit?: ProductVariantOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductVariantInclude<ExtArgs> | null
+    /**
      * Filter, which ProductVariant to fetch.
      */
     where?: ProductVariantWhereInput
@@ -14332,6 +14287,10 @@ export namespace Prisma {
      */
     omit?: ProductVariantOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductVariantInclude<ExtArgs> | null
+    /**
      * Filter, which ProductVariants to fetch.
      */
     where?: ProductVariantWhereInput
@@ -14375,6 +14334,10 @@ export namespace Prisma {
      */
     omit?: ProductVariantOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductVariantInclude<ExtArgs> | null
+    /**
      * The data needed to create a ProductVariant.
      */
     data: XOR<ProductVariantCreateInput, ProductVariantUncheckedCreateInput>
@@ -14403,6 +14366,10 @@ export namespace Prisma {
      * Omit specific fields from the ProductVariant
      */
     omit?: ProductVariantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductVariantInclude<ExtArgs> | null
     /**
      * The data needed to update a ProductVariant.
      */
@@ -14444,6 +14411,10 @@ export namespace Prisma {
      */
     omit?: ProductVariantOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductVariantInclude<ExtArgs> | null
+    /**
      * The filter to search for the ProductVariant to update in case it exists.
      */
     where: ProductVariantWhereUniqueInput
@@ -14469,6 +14440,10 @@ export namespace Prisma {
      * Omit specific fields from the ProductVariant
      */
     omit?: ProductVariantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductVariantInclude<ExtArgs> | null
     /**
      * Filter which ProductVariant to delete.
      */
@@ -14501,6 +14476,10 @@ export namespace Prisma {
      * Omit specific fields from the ProductVariant
      */
     omit?: ProductVariantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductVariantInclude<ExtArgs> | null
   }
 
 
@@ -14718,6 +14697,7 @@ export namespace Prisma {
     value?: boolean
     sortOrder?: boolean
     createdAt?: boolean
+    product?: boolean | ProductDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["productOption"]>
 
 
@@ -14732,10 +14712,15 @@ export namespace Prisma {
   }
 
   export type ProductOptionOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "productId" | "groupName" | "value" | "sortOrder" | "createdAt", ExtArgs["result"]["productOption"]>
+  export type ProductOptionInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    product?: boolean | ProductDefaultArgs<ExtArgs>
+  }
 
   export type $ProductOptionPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "ProductOption"
-    objects: {}
+    objects: {
+      product: Prisma.$ProductPayload<ExtArgs>
+    }
     scalars: $Extensions.GetPayloadResult<{
       id: number
       productId: number
@@ -15083,6 +15068,7 @@ export namespace Prisma {
    */
   export interface Prisma__ProductOptionClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    product<T extends ProductDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ProductDefaultArgs<ExtArgs>>): Prisma__ProductClient<$Result.GetResult<Prisma.$ProductPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -15135,6 +15121,10 @@ export namespace Prisma {
      */
     omit?: ProductOptionOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductOptionInclude<ExtArgs> | null
+    /**
      * Filter, which ProductOption to fetch.
      */
     where: ProductOptionWhereUniqueInput
@@ -15153,6 +15143,10 @@ export namespace Prisma {
      */
     omit?: ProductOptionOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductOptionInclude<ExtArgs> | null
+    /**
      * Filter, which ProductOption to fetch.
      */
     where: ProductOptionWhereUniqueInput
@@ -15170,6 +15164,10 @@ export namespace Prisma {
      * Omit specific fields from the ProductOption
      */
     omit?: ProductOptionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductOptionInclude<ExtArgs> | null
     /**
      * Filter, which ProductOption to fetch.
      */
@@ -15219,6 +15217,10 @@ export namespace Prisma {
      */
     omit?: ProductOptionOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductOptionInclude<ExtArgs> | null
+    /**
      * Filter, which ProductOption to fetch.
      */
     where?: ProductOptionWhereInput
@@ -15267,6 +15269,10 @@ export namespace Prisma {
      */
     omit?: ProductOptionOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductOptionInclude<ExtArgs> | null
+    /**
      * Filter, which ProductOptions to fetch.
      */
     where?: ProductOptionWhereInput
@@ -15310,6 +15316,10 @@ export namespace Prisma {
      */
     omit?: ProductOptionOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductOptionInclude<ExtArgs> | null
+    /**
      * The data needed to create a ProductOption.
      */
     data: XOR<ProductOptionCreateInput, ProductOptionUncheckedCreateInput>
@@ -15338,6 +15348,10 @@ export namespace Prisma {
      * Omit specific fields from the ProductOption
      */
     omit?: ProductOptionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductOptionInclude<ExtArgs> | null
     /**
      * The data needed to update a ProductOption.
      */
@@ -15379,6 +15393,10 @@ export namespace Prisma {
      */
     omit?: ProductOptionOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductOptionInclude<ExtArgs> | null
+    /**
      * The filter to search for the ProductOption to update in case it exists.
      */
     where: ProductOptionWhereUniqueInput
@@ -15404,6 +15422,10 @@ export namespace Prisma {
      * Omit specific fields from the ProductOption
      */
     omit?: ProductOptionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductOptionInclude<ExtArgs> | null
     /**
      * Filter which ProductOption to delete.
      */
@@ -15436,6 +15458,10 @@ export namespace Prisma {
      * Omit specific fields from the ProductOption
      */
     omit?: ProductOptionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductOptionInclude<ExtArgs> | null
   }
 
 
@@ -30996,22 +31022,16 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"User"> | Date | string
     aiApiConfigs?: AiApiConfigListRelationFilter
     automationConfig?: XOR<AutomationConfigNullableScalarRelationFilter, AutomationConfigWhereInput> | null
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogListRelationFilter
-    productPublishes?: ProductPublishListRelationFilter
-    publishHistories?: PublishHistoryListRelationFilter
-    purchaseOrders?: PurchaseOrderListRelationFilter
-=======
     posts?: PostListRelationFilter
     pricingPolicies?: PricingPolicyListRelationFilter
     products?: ProductListRelationFilter
+    productPublishes?: ProductPublishListRelationFilter
     publishHistories?: PublishHistoryListRelationFilter
     purchaseOrders?: PurchaseOrderListRelationFilter
     retailBands?: RetailBandListRelationFilter
     sourcingApiConfigs?: SourcingApiConfigListRelationFilter
     wholesaleBands?: WholesaleBandListRelationFilter
     workflowLogs?: WorkflowLogListRelationFilter
->>>>>>> release-1
   }
 
   export type UserOrderByWithRelationInput = {
@@ -31023,22 +31043,16 @@ export namespace Prisma {
     updatedAt?: SortOrder
     aiApiConfigs?: AiApiConfigOrderByRelationAggregateInput
     automationConfig?: AutomationConfigOrderByWithRelationInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogOrderByRelationAggregateInput
-    productPublishes?: ProductPublishOrderByRelationAggregateInput
-    publishHistories?: PublishHistoryOrderByRelationAggregateInput
-    purchaseOrders?: PurchaseOrderOrderByRelationAggregateInput
-=======
     posts?: PostOrderByRelationAggregateInput
     pricingPolicies?: PricingPolicyOrderByRelationAggregateInput
     products?: ProductOrderByRelationAggregateInput
+    productPublishes?: ProductPublishOrderByRelationAggregateInput
     publishHistories?: PublishHistoryOrderByRelationAggregateInput
     purchaseOrders?: PurchaseOrderOrderByRelationAggregateInput
     retailBands?: RetailBandOrderByRelationAggregateInput
     sourcingApiConfigs?: SourcingApiConfigOrderByRelationAggregateInput
     wholesaleBands?: WholesaleBandOrderByRelationAggregateInput
     workflowLogs?: WorkflowLogOrderByRelationAggregateInput
->>>>>>> release-1
     _relevance?: UserOrderByRelevanceInput
   }
 
@@ -31054,22 +31068,16 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"User"> | Date | string
     aiApiConfigs?: AiApiConfigListRelationFilter
     automationConfig?: XOR<AutomationConfigNullableScalarRelationFilter, AutomationConfigWhereInput> | null
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogListRelationFilter
-    productPublishes?: ProductPublishListRelationFilter
-    publishHistories?: PublishHistoryListRelationFilter
-    purchaseOrders?: PurchaseOrderListRelationFilter
-=======
     posts?: PostListRelationFilter
     pricingPolicies?: PricingPolicyListRelationFilter
     products?: ProductListRelationFilter
+    productPublishes?: ProductPublishListRelationFilter
     publishHistories?: PublishHistoryListRelationFilter
     purchaseOrders?: PurchaseOrderListRelationFilter
     retailBands?: RetailBandListRelationFilter
     sourcingApiConfigs?: SourcingApiConfigListRelationFilter
     wholesaleBands?: WholesaleBandListRelationFilter
     workflowLogs?: WorkflowLogListRelationFilter
->>>>>>> release-1
   }, "id" | "email">
 
   export type UserOrderByWithAggregationInput = {
@@ -31385,16 +31393,11 @@ export namespace Prisma {
     isActive?: BoolFilter<"RetailBand"> | boolean
     createdAt?: DateTimeFilter<"RetailBand"> | Date | string
     updatedAt?: DateTimeFilter<"RetailBand"> | Date | string
-<<<<<<< HEAD
-    user?: XOR<UserScalarRelationFilter, UserWhereInput>
-    apiConfig?: XOR<SourcingApiConfigScalarRelationFilter, SourcingApiConfigWhereInput>
-    productPublishes?: ProductPublishListRelationFilter
-=======
     formUrl?: StringNullableFilter<"RetailBand"> | string | null
->>>>>>> release-1
     publishHistories?: PublishHistoryListRelationFilter
     purchaseOrders?: PurchaseOrderListRelationFilter
     apiConfig?: XOR<SourcingApiConfigScalarRelationFilter, SourcingApiConfigWhereInput>
+    productPublishes?: ProductPublishListRelationFilter
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }
 
@@ -31408,16 +31411,11 @@ export namespace Prisma {
     isActive?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-<<<<<<< HEAD
-    user?: UserOrderByWithRelationInput
-    apiConfig?: SourcingApiConfigOrderByWithRelationInput
-    productPublishes?: ProductPublishOrderByRelationAggregateInput
-=======
     formUrl?: SortOrderInput | SortOrder
->>>>>>> release-1
     publishHistories?: PublishHistoryOrderByRelationAggregateInput
     purchaseOrders?: PurchaseOrderOrderByRelationAggregateInput
     apiConfig?: SourcingApiConfigOrderByWithRelationInput
+    productPublishes?: ProductPublishOrderByRelationAggregateInput
     user?: UserOrderByWithRelationInput
     _relevance?: RetailBandOrderByRelevanceInput
   }
@@ -31436,16 +31434,11 @@ export namespace Prisma {
     isActive?: BoolFilter<"RetailBand"> | boolean
     createdAt?: DateTimeFilter<"RetailBand"> | Date | string
     updatedAt?: DateTimeFilter<"RetailBand"> | Date | string
-<<<<<<< HEAD
-    user?: XOR<UserScalarRelationFilter, UserWhereInput>
-    apiConfig?: XOR<SourcingApiConfigScalarRelationFilter, SourcingApiConfigWhereInput>
-    productPublishes?: ProductPublishListRelationFilter
-=======
     formUrl?: StringNullableFilter<"RetailBand"> | string | null
->>>>>>> release-1
     publishHistories?: PublishHistoryListRelationFilter
     purchaseOrders?: PurchaseOrderListRelationFilter
     apiConfig?: XOR<SourcingApiConfigScalarRelationFilter, SourcingApiConfigWhereInput>
+    productPublishes?: ProductPublishListRelationFilter
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }, "id" | "userId_bandKey">
 
@@ -31721,7 +31714,6 @@ export namespace Prisma {
     wholesalePrice?: IntNullableFilter<"Product"> | number | null
     createdAt?: DateTimeFilter<"Product"> | Date | string
     updatedAt?: DateTimeFilter<"Product"> | Date | string
-<<<<<<< HEAD
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
     post?: XOR<PostScalarRelationFilter, PostWhereInput>
     variants?: ProductVariantListRelationFilter
@@ -31729,15 +31721,9 @@ export namespace Prisma {
     purchaseOrders?: PurchaseOrderListRelationFilter
     productPublishes?: ProductPublishListRelationFilter
     publishHistories?: PublishHistoryListRelationFilter
-=======
->>>>>>> release-1
     cartItems?: CartItemListRelationFilter
-    customerOrderItems?: CustomerOrderItemListRelationFilter
-    post?: XOR<PostScalarRelationFilter, PostWhereInput>
-    user?: XOR<UserScalarRelationFilter, UserWhereInput>
-    publishHistories?: PublishHistoryListRelationFilter
-    purchaseOrders?: PurchaseOrderListRelationFilter
     sessionCartItems?: SessionCartItemListRelationFilter
+    customerOrderItems?: CustomerOrderItemListRelationFilter
   }
 
   export type ProductOrderByWithRelationInput = {
@@ -31753,7 +31739,6 @@ export namespace Prisma {
     wholesalePrice?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-<<<<<<< HEAD
     user?: UserOrderByWithRelationInput
     post?: PostOrderByWithRelationInput
     variants?: ProductVariantOrderByRelationAggregateInput
@@ -31761,15 +31746,9 @@ export namespace Prisma {
     purchaseOrders?: PurchaseOrderOrderByRelationAggregateInput
     productPublishes?: ProductPublishOrderByRelationAggregateInput
     publishHistories?: PublishHistoryOrderByRelationAggregateInput
-=======
->>>>>>> release-1
     cartItems?: CartItemOrderByRelationAggregateInput
-    customerOrderItems?: CustomerOrderItemOrderByRelationAggregateInput
-    post?: PostOrderByWithRelationInput
-    user?: UserOrderByWithRelationInput
-    publishHistories?: PublishHistoryOrderByRelationAggregateInput
-    purchaseOrders?: PurchaseOrderOrderByRelationAggregateInput
     sessionCartItems?: SessionCartItemOrderByRelationAggregateInput
+    customerOrderItems?: CustomerOrderItemOrderByRelationAggregateInput
     _relevance?: ProductOrderByRelevanceInput
   }
 
@@ -31789,7 +31768,6 @@ export namespace Prisma {
     wholesalePrice?: IntNullableFilter<"Product"> | number | null
     createdAt?: DateTimeFilter<"Product"> | Date | string
     updatedAt?: DateTimeFilter<"Product"> | Date | string
-<<<<<<< HEAD
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
     post?: XOR<PostScalarRelationFilter, PostWhereInput>
     variants?: ProductVariantListRelationFilter
@@ -31797,15 +31775,9 @@ export namespace Prisma {
     purchaseOrders?: PurchaseOrderListRelationFilter
     productPublishes?: ProductPublishListRelationFilter
     publishHistories?: PublishHistoryListRelationFilter
-=======
->>>>>>> release-1
     cartItems?: CartItemListRelationFilter
-    customerOrderItems?: CustomerOrderItemListRelationFilter
-    post?: XOR<PostScalarRelationFilter, PostWhereInput>
-    user?: XOR<UserScalarRelationFilter, UserWhereInput>
-    publishHistories?: PublishHistoryListRelationFilter
-    purchaseOrders?: PurchaseOrderListRelationFilter
     sessionCartItems?: SessionCartItemListRelationFilter
+    customerOrderItems?: CustomerOrderItemListRelationFilter
   }, "id" | "postId">
 
   export type ProductOrderByWithAggregationInput = {
@@ -31861,6 +31833,7 @@ export namespace Prisma {
     barcode?: StringNullableFilter<"ProductVariant"> | string | null
     createdAt?: DateTimeFilter<"ProductVariant"> | Date | string
     updatedAt?: DateTimeFilter<"ProductVariant"> | Date | string
+    product?: XOR<ProductScalarRelationFilter, ProductWhereInput>
   }
 
   export type ProductVariantOrderByWithRelationInput = {
@@ -31875,6 +31848,7 @@ export namespace Prisma {
     barcode?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    product?: ProductOrderByWithRelationInput
     _relevance?: ProductVariantOrderByRelevanceInput
   }
 
@@ -31893,6 +31867,7 @@ export namespace Prisma {
     barcode?: StringNullableFilter<"ProductVariant"> | string | null
     createdAt?: DateTimeFilter<"ProductVariant"> | Date | string
     updatedAt?: DateTimeFilter<"ProductVariant"> | Date | string
+    product?: XOR<ProductScalarRelationFilter, ProductWhereInput>
   }, "id">
 
   export type ProductVariantOrderByWithAggregationInput = {
@@ -31941,6 +31916,7 @@ export namespace Prisma {
     value?: StringFilter<"ProductOption"> | string
     sortOrder?: IntFilter<"ProductOption"> | number
     createdAt?: DateTimeFilter<"ProductOption"> | Date | string
+    product?: XOR<ProductScalarRelationFilter, ProductWhereInput>
   }
 
   export type ProductOptionOrderByWithRelationInput = {
@@ -31950,6 +31926,7 @@ export namespace Prisma {
     value?: SortOrder
     sortOrder?: SortOrder
     createdAt?: SortOrder
+    product?: ProductOrderByWithRelationInput
     _relevance?: ProductOptionOrderByRelevanceInput
   }
 
@@ -31963,6 +31940,7 @@ export namespace Prisma {
     value?: StringFilter<"ProductOption"> | string
     sortOrder?: IntFilter<"ProductOption"> | number
     createdAt?: DateTimeFilter<"ProductOption"> | Date | string
+    product?: XOR<ProductScalarRelationFilter, ProductWhereInput>
   }, "id">
 
   export type ProductOptionOrderByWithAggregationInput = {
@@ -33241,22 +33219,16 @@ export namespace Prisma {
     updatedAt?: Date | string
     aiApiConfigs?: AiApiConfigCreateNestedManyWithoutUserInput
     automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
-=======
     posts?: PostCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
     products?: ProductCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
     retailBands?: RetailBandCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
     wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
     workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
->>>>>>> release-1
   }
 
   export type UserUncheckedCreateInput = {
@@ -33268,22 +33240,16 @@ export namespace Prisma {
     updatedAt?: Date | string
     aiApiConfigs?: AiApiConfigUncheckedCreateNestedManyWithoutUserInput
     automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
-=======
     posts?: PostUncheckedCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
     products?: ProductUncheckedCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
     retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
     wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
     workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
->>>>>>> release-1
   }
 
   export type UserUpdateInput = {
@@ -33294,22 +33260,16 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     aiApiConfigs?: AiApiConfigUpdateManyWithoutUserNestedInput
     automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
-=======
     posts?: PostUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
     products?: ProductUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
     wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
     workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
->>>>>>> release-1
   }
 
   export type UserUncheckedUpdateInput = {
@@ -33321,22 +33281,16 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     aiApiConfigs?: AiApiConfigUncheckedUpdateManyWithoutUserNestedInput
     automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
-=======
     posts?: PostUncheckedUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
     products?: ProductUncheckedUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
     wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
     workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
->>>>>>> release-1
   }
 
   export type UserCreateManyInput = {
@@ -33658,16 +33612,11 @@ export namespace Prisma {
     isActive?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
-    user: UserCreateNestedOneWithoutRetailBandsInput
-    apiConfig: SourcingApiConfigCreateNestedOneWithoutRetailBandsInput
-    productPublishes?: ProductPublishCreateNestedManyWithoutRetailBandInput
-=======
     formUrl?: string | null
->>>>>>> release-1
     publishHistories?: PublishHistoryCreateNestedManyWithoutRetailBandInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutRetailBandInput
     apiConfig: SourcingApiConfigCreateNestedOneWithoutRetailBandsInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutRetailBandInput
     user: UserCreateNestedOneWithoutRetailBandsInput
   }
 
@@ -33681,13 +33630,10 @@ export namespace Prisma {
     isActive?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutRetailBandInput
-=======
     formUrl?: string | null
->>>>>>> release-1
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutRetailBandInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutRetailBandInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutRetailBandInput
   }
 
   export type RetailBandUpdateInput = {
@@ -33697,16 +33643,11 @@ export namespace Prisma {
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
-    user?: UserUpdateOneRequiredWithoutRetailBandsNestedInput
-    apiConfig?: SourcingApiConfigUpdateOneRequiredWithoutRetailBandsNestedInput
-    productPublishes?: ProductPublishUpdateManyWithoutRetailBandNestedInput
-=======
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
->>>>>>> release-1
     publishHistories?: PublishHistoryUpdateManyWithoutRetailBandNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutRetailBandNestedInput
     apiConfig?: SourcingApiConfigUpdateOneRequiredWithoutRetailBandsNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutRetailBandNestedInput
     user?: UserUpdateOneRequiredWithoutRetailBandsNestedInput
   }
 
@@ -33720,13 +33661,10 @@ export namespace Prisma {
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutRetailBandNestedInput
-=======
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
->>>>>>> release-1
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutRetailBandNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutRetailBandNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutRetailBandNestedInput
   }
 
   export type RetailBandCreateManyInput = {
@@ -33991,7 +33929,6 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     user: UserCreateNestedOneWithoutProductsInput
     post: PostCreateNestedOneWithoutProductInput
     variants?: ProductVariantCreateNestedManyWithoutProductInput
@@ -33999,15 +33936,9 @@ export namespace Prisma {
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutProductInput
     productPublishes?: ProductPublishCreateNestedManyWithoutProductInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     cartItems?: CartItemCreateNestedManyWithoutProductInput
-    customerOrderItems?: CustomerOrderItemCreateNestedManyWithoutProductInput
-    post: PostCreateNestedOneWithoutProductInput
-    user: UserCreateNestedOneWithoutProductsInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutProductInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutProductInput
     sessionCartItems?: SessionCartItemCreateNestedManyWithoutProductInput
+    customerOrderItems?: CustomerOrderItemCreateNestedManyWithoutProductInput
   }
 
   export type ProductUncheckedCreateInput = {
@@ -34023,19 +33954,14 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedCreateNestedManyWithoutProductInput
     options?: ProductOptionUncheckedCreateNestedManyWithoutProductInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutProductInput
     productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutProductInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUncheckedCreateNestedManyWithoutProductInput
-    customerOrderItems?: CustomerOrderItemUncheckedCreateNestedManyWithoutProductInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutProductInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutProductInput
     sessionCartItems?: SessionCartItemUncheckedCreateNestedManyWithoutProductInput
+    customerOrderItems?: CustomerOrderItemUncheckedCreateNestedManyWithoutProductInput
   }
 
   export type ProductUpdateInput = {
@@ -34048,7 +33974,6 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     user?: UserUpdateOneRequiredWithoutProductsNestedInput
     post?: PostUpdateOneRequiredWithoutProductNestedInput
     variants?: ProductVariantUpdateManyWithoutProductNestedInput
@@ -34056,15 +33981,9 @@ export namespace Prisma {
     purchaseOrders?: PurchaseOrderUpdateManyWithoutProductNestedInput
     productPublishes?: ProductPublishUpdateManyWithoutProductNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutProductNestedInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUpdateManyWithoutProductNestedInput
-    customerOrderItems?: CustomerOrderItemUpdateManyWithoutProductNestedInput
-    post?: PostUpdateOneRequiredWithoutProductNestedInput
-    user?: UserUpdateOneRequiredWithoutProductsNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutProductNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUpdateManyWithoutProductNestedInput
+    customerOrderItems?: CustomerOrderItemUpdateManyWithoutProductNestedInput
   }
 
   export type ProductUncheckedUpdateInput = {
@@ -34080,19 +33999,14 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedUpdateManyWithoutProductNestedInput
     options?: ProductOptionUncheckedUpdateManyWithoutProductNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput
     productPublishes?: ProductPublishUncheckedUpdateManyWithoutProductNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutProductNestedInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUncheckedUpdateManyWithoutProductNestedInput
-    customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutProductNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUncheckedUpdateManyWithoutProductNestedInput
+    customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
   }
 
   export type ProductCreateManyInput = {
@@ -34138,7 +34052,6 @@ export namespace Prisma {
   }
 
   export type ProductVariantCreateInput = {
-    productId: number
     sku?: string | null
     optionSummary?: string | null
     price: number
@@ -34148,6 +34061,7 @@ export namespace Prisma {
     barcode?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    product: ProductCreateNestedOneWithoutVariantsInput
   }
 
   export type ProductVariantUncheckedCreateInput = {
@@ -34165,7 +34079,6 @@ export namespace Prisma {
   }
 
   export type ProductVariantUpdateInput = {
-    productId?: IntFieldUpdateOperationsInput | number
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     optionSummary?: NullableStringFieldUpdateOperationsInput | string | null
     price?: IntFieldUpdateOperationsInput | number
@@ -34175,6 +34088,7 @@ export namespace Prisma {
     barcode?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    product?: ProductUpdateOneRequiredWithoutVariantsNestedInput
   }
 
   export type ProductVariantUncheckedUpdateInput = {
@@ -34206,7 +34120,6 @@ export namespace Prisma {
   }
 
   export type ProductVariantUpdateManyMutationInput = {
-    productId?: IntFieldUpdateOperationsInput | number
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     optionSummary?: NullableStringFieldUpdateOperationsInput | string | null
     price?: IntFieldUpdateOperationsInput | number
@@ -34233,11 +34146,11 @@ export namespace Prisma {
   }
 
   export type ProductOptionCreateInput = {
-    productId: number
     groupName: string
     value: string
     sortOrder?: number
     createdAt?: Date | string
+    product: ProductCreateNestedOneWithoutOptionsInput
   }
 
   export type ProductOptionUncheckedCreateInput = {
@@ -34250,11 +34163,11 @@ export namespace Prisma {
   }
 
   export type ProductOptionUpdateInput = {
-    productId?: IntFieldUpdateOperationsInput | number
     groupName?: StringFieldUpdateOperationsInput | string
     value?: StringFieldUpdateOperationsInput | string
     sortOrder?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    product?: ProductUpdateOneRequiredWithoutOptionsNestedInput
   }
 
   export type ProductOptionUncheckedUpdateInput = {
@@ -34276,7 +34189,6 @@ export namespace Prisma {
   }
 
   export type ProductOptionUpdateManyMutationInput = {
-    productId?: IntFieldUpdateOperationsInput | number
     groupName?: StringFieldUpdateOperationsInput | string
     value?: StringFieldUpdateOperationsInput | string
     sortOrder?: IntFieldUpdateOperationsInput | number
@@ -35682,8 +35594,6 @@ export namespace Prisma {
     none?: PurchaseOrderWhereInput
   }
 
-<<<<<<< HEAD
-=======
   export type RetailBandListRelationFilter = {
     every?: RetailBandWhereInput
     some?: RetailBandWhereInput
@@ -35708,7 +35618,6 @@ export namespace Prisma {
     none?: WorkflowLogWhereInput
   }
 
->>>>>>> release-1
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
@@ -35742,8 +35651,6 @@ export namespace Prisma {
     _count?: SortOrder
   }
 
-<<<<<<< HEAD
-=======
   export type RetailBandOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
@@ -35760,7 +35667,6 @@ export namespace Prisma {
     _count?: SortOrder
   }
 
->>>>>>> release-1
   export type UserOrderByRelevanceInput = {
     fields: UserOrderByRelevanceFieldEnum | UserOrderByRelevanceFieldEnum[]
     sort: SortOrder
@@ -36416,7 +36322,6 @@ export namespace Prisma {
     postId?: SortOrder
   }
 
-<<<<<<< HEAD
   export type ProductVariantListRelationFilter = {
     every?: ProductVariantWhereInput
     some?: ProductVariantWhereInput
@@ -36427,13 +36332,6 @@ export namespace Prisma {
     every?: ProductOptionWhereInput
     some?: ProductOptionWhereInput
     none?: ProductOptionWhereInput
-=======
-  export type EnumProductStatusFilter<$PrismaModel = never> = {
-    equals?: $Enums.ProductStatus | EnumProductStatusFieldRefInput<$PrismaModel>
-    in?: $Enums.ProductStatus[]
-    notIn?: $Enums.ProductStatus[]
-    not?: NestedEnumProductStatusFilter<$PrismaModel> | $Enums.ProductStatus
->>>>>>> release-1
   }
 
   export type CartItemListRelationFilter = {
@@ -36442,27 +36340,35 @@ export namespace Prisma {
     none?: CartItemWhereInput
   }
 
-  export type CustomerOrderItemListRelationFilter = {
-    every?: CustomerOrderItemWhereInput
-    some?: CustomerOrderItemWhereInput
-    none?: CustomerOrderItemWhereInput
-  }
-
   export type SessionCartItemListRelationFilter = {
     every?: SessionCartItemWhereInput
     some?: SessionCartItemWhereInput
     none?: SessionCartItemWhereInput
   }
 
+  export type CustomerOrderItemListRelationFilter = {
+    every?: CustomerOrderItemWhereInput
+    some?: CustomerOrderItemWhereInput
+    none?: CustomerOrderItemWhereInput
+  }
+
+  export type ProductVariantOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type ProductOptionOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
   export type CartItemOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
-  export type CustomerOrderItemOrderByRelationAggregateInput = {
+  export type SessionCartItemOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
-  export type SessionCartItemOrderByRelationAggregateInput = {
+  export type CustomerOrderItemOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -36542,6 +36448,11 @@ export namespace Prisma {
     gt?: number | FloatFieldRefInput<$PrismaModel>
     gte?: number | FloatFieldRefInput<$PrismaModel>
     not?: NestedFloatNullableFilter<$PrismaModel> | number | null
+  }
+
+  export type ProductScalarRelationFilter = {
+    is?: ProductWhereInput
+    isNot?: ProductWhereInput
   }
 
   export type ProductVariantOrderByRelevanceInput = {
@@ -36909,11 +36820,6 @@ export namespace Prisma {
     not?: NestedEnumPublishStatusFilter<$PrismaModel> | $Enums.PublishStatus
   }
 
-  export type ProductScalarRelationFilter = {
-    is?: ProductWhereInput
-    isNot?: ProductWhereInput
-  }
-
   export type RetailBandScalarRelationFilter = {
     is?: RetailBandWhereInput
     isNot?: RetailBandWhereInput
@@ -37036,24 +36942,11 @@ export namespace Prisma {
     retailBandId?: SortOrder
   }
 
-<<<<<<< HEAD
-=======
-  export type EnumPublishStatusWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: $Enums.PublishStatus | EnumPublishStatusFieldRefInput<$PrismaModel>
-    in?: $Enums.PublishStatus[]
-    notIn?: $Enums.PublishStatus[]
-    not?: NestedEnumPublishStatusWithAggregatesFilter<$PrismaModel> | $Enums.PublishStatus
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedEnumPublishStatusFilter<$PrismaModel>
-    _max?: NestedEnumPublishStatusFilter<$PrismaModel>
-  }
-
   export type RetailBandNullableScalarRelationFilter = {
     is?: RetailBandWhereInput | null
     isNot?: RetailBandWhereInput | null
   }
 
->>>>>>> release-1
   export type PurchaseOrderOrderByRelevanceInput = {
     fields: PurchaseOrderOrderByRelevanceFieldEnum | PurchaseOrderOrderByRelevanceFieldEnum[]
     sort: SortOrder
@@ -37831,9 +37724,6 @@ export namespace Prisma {
     connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
   }
 
-<<<<<<< HEAD
-  export type SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput = {
-=======
   export type RetailBandCreateNestedManyWithoutUserInput = {
     create?: XOR<RetailBandCreateWithoutUserInput, RetailBandUncheckedCreateWithoutUserInput> | RetailBandCreateWithoutUserInput[] | RetailBandUncheckedCreateWithoutUserInput[]
     connectOrCreate?: RetailBandCreateOrConnectWithoutUserInput | RetailBandCreateOrConnectWithoutUserInput[]
@@ -37842,7 +37732,6 @@ export namespace Prisma {
   }
 
   export type SourcingApiConfigCreateNestedManyWithoutUserInput = {
->>>>>>> release-1
     create?: XOR<SourcingApiConfigCreateWithoutUserInput, SourcingApiConfigUncheckedCreateWithoutUserInput> | SourcingApiConfigCreateWithoutUserInput[] | SourcingApiConfigUncheckedCreateWithoutUserInput[]
     connectOrCreate?: SourcingApiConfigCreateOrConnectWithoutUserInput | SourcingApiConfigCreateOrConnectWithoutUserInput[]
     createMany?: SourcingApiConfigCreateManyUserInputEnvelope
@@ -37918,8 +37807,6 @@ export namespace Prisma {
     connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
   }
 
-<<<<<<< HEAD
-=======
   export type RetailBandUncheckedCreateNestedManyWithoutUserInput = {
     create?: XOR<RetailBandCreateWithoutUserInput, RetailBandUncheckedCreateWithoutUserInput> | RetailBandCreateWithoutUserInput[] | RetailBandUncheckedCreateWithoutUserInput[]
     connectOrCreate?: RetailBandCreateOrConnectWithoutUserInput | RetailBandCreateOrConnectWithoutUserInput[]
@@ -37948,7 +37835,6 @@ export namespace Prisma {
     connect?: WorkflowLogWhereUniqueInput | WorkflowLogWhereUniqueInput[]
   }
 
->>>>>>> release-1
   export type StringFieldUpdateOperationsInput = {
     set?: string
   }
@@ -38069,17 +37955,6 @@ export namespace Prisma {
     deleteMany?: PurchaseOrderScalarWhereInput | PurchaseOrderScalarWhereInput[]
   }
 
-<<<<<<< HEAD
-  export type IntFieldUpdateOperationsInput = {
-    set?: number
-    increment?: number
-    decrement?: number
-    multiply?: number
-    divide?: number
-  }
-
-  export type SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput = {
-=======
   export type RetailBandUpdateManyWithoutUserNestedInput = {
     create?: XOR<RetailBandCreateWithoutUserInput, RetailBandUncheckedCreateWithoutUserInput> | RetailBandCreateWithoutUserInput[] | RetailBandUncheckedCreateWithoutUserInput[]
     connectOrCreate?: RetailBandCreateOrConnectWithoutUserInput | RetailBandCreateOrConnectWithoutUserInput[]
@@ -38095,7 +37970,6 @@ export namespace Prisma {
   }
 
   export type SourcingApiConfigUpdateManyWithoutUserNestedInput = {
->>>>>>> release-1
     create?: XOR<SourcingApiConfigCreateWithoutUserInput, SourcingApiConfigUncheckedCreateWithoutUserInput> | SourcingApiConfigCreateWithoutUserInput[] | SourcingApiConfigUncheckedCreateWithoutUserInput[]
     connectOrCreate?: SourcingApiConfigCreateOrConnectWithoutUserInput | SourcingApiConfigCreateOrConnectWithoutUserInput[]
     upsert?: SourcingApiConfigUpsertWithWhereUniqueWithoutUserInput | SourcingApiConfigUpsertWithWhereUniqueWithoutUserInput[]
@@ -38253,8 +38127,6 @@ export namespace Prisma {
     deleteMany?: PurchaseOrderScalarWhereInput | PurchaseOrderScalarWhereInput[]
   }
 
-<<<<<<< HEAD
-=======
   export type RetailBandUncheckedUpdateManyWithoutUserNestedInput = {
     create?: XOR<RetailBandCreateWithoutUserInput, RetailBandUncheckedCreateWithoutUserInput> | RetailBandCreateWithoutUserInput[] | RetailBandUncheckedCreateWithoutUserInput[]
     connectOrCreate?: RetailBandCreateOrConnectWithoutUserInput | RetailBandCreateOrConnectWithoutUserInput[]
@@ -38318,7 +38190,6 @@ export namespace Prisma {
     connect?: RetailBandWhereUniqueInput | RetailBandWhereUniqueInput[]
   }
 
->>>>>>> release-1
   export type UserCreateNestedOneWithoutSourcingApiConfigsInput = {
     create?: XOR<UserCreateWithoutSourcingApiConfigsInput, UserUncheckedCreateWithoutSourcingApiConfigsInput>
     connectOrCreate?: UserCreateOrConnectWithoutSourcingApiConfigsInput
@@ -38530,7 +38401,6 @@ export namespace Prisma {
     connect?: SourcingApiConfigWhereUniqueInput
   }
 
-<<<<<<< HEAD
   export type ProductPublishCreateNestedManyWithoutRetailBandInput = {
     create?: XOR<ProductPublishCreateWithoutRetailBandInput, ProductPublishUncheckedCreateWithoutRetailBandInput> | ProductPublishCreateWithoutRetailBandInput[] | ProductPublishUncheckedCreateWithoutRetailBandInput[]
     connectOrCreate?: ProductPublishCreateOrConnectWithoutRetailBandInput | ProductPublishCreateOrConnectWithoutRetailBandInput[]
@@ -38538,24 +38408,10 @@ export namespace Prisma {
     connect?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
   }
 
-  export type PublishHistoryCreateNestedManyWithoutRetailBandInput = {
-    create?: XOR<PublishHistoryCreateWithoutRetailBandInput, PublishHistoryUncheckedCreateWithoutRetailBandInput> | PublishHistoryCreateWithoutRetailBandInput[] | PublishHistoryUncheckedCreateWithoutRetailBandInput[]
-    connectOrCreate?: PublishHistoryCreateOrConnectWithoutRetailBandInput | PublishHistoryCreateOrConnectWithoutRetailBandInput[]
-    createMany?: PublishHistoryCreateManyRetailBandInputEnvelope
-    connect?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
-=======
   export type UserCreateNestedOneWithoutRetailBandsInput = {
     create?: XOR<UserCreateWithoutRetailBandsInput, UserUncheckedCreateWithoutRetailBandsInput>
     connectOrCreate?: UserCreateOrConnectWithoutRetailBandsInput
     connect?: UserWhereUniqueInput
->>>>>>> release-1
-  }
-
-  export type ProductPublishUncheckedCreateNestedManyWithoutRetailBandInput = {
-    create?: XOR<ProductPublishCreateWithoutRetailBandInput, ProductPublishUncheckedCreateWithoutRetailBandInput> | ProductPublishCreateWithoutRetailBandInput[] | ProductPublishUncheckedCreateWithoutRetailBandInput[]
-    connectOrCreate?: ProductPublishCreateOrConnectWithoutRetailBandInput | ProductPublishCreateOrConnectWithoutRetailBandInput[]
-    createMany?: ProductPublishCreateManyRetailBandInputEnvelope
-    connect?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
   }
 
   export type PublishHistoryUncheckedCreateNestedManyWithoutRetailBandInput = {
@@ -38572,18 +38428,11 @@ export namespace Prisma {
     connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
   }
 
-  export type ProductPublishUpdateManyWithoutRetailBandNestedInput = {
+  export type ProductPublishUncheckedCreateNestedManyWithoutRetailBandInput = {
     create?: XOR<ProductPublishCreateWithoutRetailBandInput, ProductPublishUncheckedCreateWithoutRetailBandInput> | ProductPublishCreateWithoutRetailBandInput[] | ProductPublishUncheckedCreateWithoutRetailBandInput[]
     connectOrCreate?: ProductPublishCreateOrConnectWithoutRetailBandInput | ProductPublishCreateOrConnectWithoutRetailBandInput[]
-    upsert?: ProductPublishUpsertWithWhereUniqueWithoutRetailBandInput | ProductPublishUpsertWithWhereUniqueWithoutRetailBandInput[]
     createMany?: ProductPublishCreateManyRetailBandInputEnvelope
-    set?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
-    disconnect?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
-    delete?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
     connect?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
-    update?: ProductPublishUpdateWithWhereUniqueWithoutRetailBandInput | ProductPublishUpdateWithWhereUniqueWithoutRetailBandInput[]
-    updateMany?: ProductPublishUpdateManyWithWhereWithoutRetailBandInput | ProductPublishUpdateManyWithWhereWithoutRetailBandInput[]
-    deleteMany?: ProductPublishScalarWhereInput | ProductPublishScalarWhereInput[]
   }
 
   export type PublishHistoryUpdateManyWithoutRetailBandNestedInput = {
@@ -38600,20 +38449,6 @@ export namespace Prisma {
     deleteMany?: PublishHistoryScalarWhereInput | PublishHistoryScalarWhereInput[]
   }
 
-<<<<<<< HEAD
-  export type ProductPublishUncheckedUpdateManyWithoutRetailBandNestedInput = {
-    create?: XOR<ProductPublishCreateWithoutRetailBandInput, ProductPublishUncheckedCreateWithoutRetailBandInput> | ProductPublishCreateWithoutRetailBandInput[] | ProductPublishUncheckedCreateWithoutRetailBandInput[]
-    connectOrCreate?: ProductPublishCreateOrConnectWithoutRetailBandInput | ProductPublishCreateOrConnectWithoutRetailBandInput[]
-    upsert?: ProductPublishUpsertWithWhereUniqueWithoutRetailBandInput | ProductPublishUpsertWithWhereUniqueWithoutRetailBandInput[]
-    createMany?: ProductPublishCreateManyRetailBandInputEnvelope
-    set?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
-    disconnect?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
-    delete?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
-    connect?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
-    update?: ProductPublishUpdateWithWhereUniqueWithoutRetailBandInput | ProductPublishUpdateWithWhereUniqueWithoutRetailBandInput[]
-    updateMany?: ProductPublishUpdateManyWithWhereWithoutRetailBandInput | ProductPublishUpdateManyWithWhereWithoutRetailBandInput[]
-    deleteMany?: ProductPublishScalarWhereInput | ProductPublishScalarWhereInput[]
-=======
   export type PurchaseOrderUpdateManyWithoutRetailBandNestedInput = {
     create?: XOR<PurchaseOrderCreateWithoutRetailBandInput, PurchaseOrderUncheckedCreateWithoutRetailBandInput> | PurchaseOrderCreateWithoutRetailBandInput[] | PurchaseOrderUncheckedCreateWithoutRetailBandInput[]
     connectOrCreate?: PurchaseOrderCreateOrConnectWithoutRetailBandInput | PurchaseOrderCreateOrConnectWithoutRetailBandInput[]
@@ -38636,13 +38471,26 @@ export namespace Prisma {
     update?: XOR<XOR<SourcingApiConfigUpdateToOneWithWhereWithoutRetailBandsInput, SourcingApiConfigUpdateWithoutRetailBandsInput>, SourcingApiConfigUncheckedUpdateWithoutRetailBandsInput>
   }
 
+  export type ProductPublishUpdateManyWithoutRetailBandNestedInput = {
+    create?: XOR<ProductPublishCreateWithoutRetailBandInput, ProductPublishUncheckedCreateWithoutRetailBandInput> | ProductPublishCreateWithoutRetailBandInput[] | ProductPublishUncheckedCreateWithoutRetailBandInput[]
+    connectOrCreate?: ProductPublishCreateOrConnectWithoutRetailBandInput | ProductPublishCreateOrConnectWithoutRetailBandInput[]
+    upsert?: ProductPublishUpsertWithWhereUniqueWithoutRetailBandInput | ProductPublishUpsertWithWhereUniqueWithoutRetailBandInput[]
+    createMany?: ProductPublishCreateManyRetailBandInputEnvelope
+    set?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
+    disconnect?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
+    delete?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
+    connect?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
+    update?: ProductPublishUpdateWithWhereUniqueWithoutRetailBandInput | ProductPublishUpdateWithWhereUniqueWithoutRetailBandInput[]
+    updateMany?: ProductPublishUpdateManyWithWhereWithoutRetailBandInput | ProductPublishUpdateManyWithWhereWithoutRetailBandInput[]
+    deleteMany?: ProductPublishScalarWhereInput | ProductPublishScalarWhereInput[]
+  }
+
   export type UserUpdateOneRequiredWithoutRetailBandsNestedInput = {
     create?: XOR<UserCreateWithoutRetailBandsInput, UserUncheckedCreateWithoutRetailBandsInput>
     connectOrCreate?: UserCreateOrConnectWithoutRetailBandsInput
     upsert?: UserUpsertWithoutRetailBandsInput
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutRetailBandsInput, UserUpdateWithoutRetailBandsInput>, UserUncheckedUpdateWithoutRetailBandsInput>
->>>>>>> release-1
   }
 
   export type PublishHistoryUncheckedUpdateManyWithoutRetailBandNestedInput = {
@@ -38671,6 +38519,20 @@ export namespace Prisma {
     update?: PurchaseOrderUpdateWithWhereUniqueWithoutRetailBandInput | PurchaseOrderUpdateWithWhereUniqueWithoutRetailBandInput[]
     updateMany?: PurchaseOrderUpdateManyWithWhereWithoutRetailBandInput | PurchaseOrderUpdateManyWithWhereWithoutRetailBandInput[]
     deleteMany?: PurchaseOrderScalarWhereInput | PurchaseOrderScalarWhereInput[]
+  }
+
+  export type ProductPublishUncheckedUpdateManyWithoutRetailBandNestedInput = {
+    create?: XOR<ProductPublishCreateWithoutRetailBandInput, ProductPublishUncheckedCreateWithoutRetailBandInput> | ProductPublishCreateWithoutRetailBandInput[] | ProductPublishUncheckedCreateWithoutRetailBandInput[]
+    connectOrCreate?: ProductPublishCreateOrConnectWithoutRetailBandInput | ProductPublishCreateOrConnectWithoutRetailBandInput[]
+    upsert?: ProductPublishUpsertWithWhereUniqueWithoutRetailBandInput | ProductPublishUpsertWithWhereUniqueWithoutRetailBandInput[]
+    createMany?: ProductPublishCreateManyRetailBandInputEnvelope
+    set?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
+    disconnect?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
+    delete?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
+    connect?: ProductPublishWhereUniqueInput | ProductPublishWhereUniqueInput[]
+    update?: ProductPublishUpdateWithWhereUniqueWithoutRetailBandInput | ProductPublishUpdateWithWhereUniqueWithoutRetailBandInput[]
+    updateMany?: ProductPublishUpdateManyWithWhereWithoutRetailBandInput | ProductPublishUpdateManyWithWhereWithoutRetailBandInput[]
+    deleteMany?: ProductPublishScalarWhereInput | ProductPublishScalarWhereInput[]
   }
 
   export type UserCreateNestedOneWithoutPostsInput = {
@@ -38853,7 +38715,6 @@ export namespace Prisma {
     update?: XOR<XOR<PostUpdateToOneWithWhereWithoutCommentsInput, PostUpdateWithoutCommentsInput>, PostUncheckedUpdateWithoutCommentsInput>
   }
 
-<<<<<<< HEAD
   export type UserCreateNestedOneWithoutProductsInput = {
     create?: XOR<UserCreateWithoutProductsInput, UserUncheckedCreateWithoutProductsInput>
     connectOrCreate?: UserCreateOrConnectWithoutProductsInput
@@ -38901,13 +38762,18 @@ export namespace Prisma {
     connect?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
   }
 
-=======
->>>>>>> release-1
   export type CartItemCreateNestedManyWithoutProductInput = {
     create?: XOR<CartItemCreateWithoutProductInput, CartItemUncheckedCreateWithoutProductInput> | CartItemCreateWithoutProductInput[] | CartItemUncheckedCreateWithoutProductInput[]
     connectOrCreate?: CartItemCreateOrConnectWithoutProductInput | CartItemCreateOrConnectWithoutProductInput[]
     createMany?: CartItemCreateManyProductInputEnvelope
     connect?: CartItemWhereUniqueInput | CartItemWhereUniqueInput[]
+  }
+
+  export type SessionCartItemCreateNestedManyWithoutProductInput = {
+    create?: XOR<SessionCartItemCreateWithoutProductInput, SessionCartItemUncheckedCreateWithoutProductInput> | SessionCartItemCreateWithoutProductInput[] | SessionCartItemUncheckedCreateWithoutProductInput[]
+    connectOrCreate?: SessionCartItemCreateOrConnectWithoutProductInput | SessionCartItemCreateOrConnectWithoutProductInput[]
+    createMany?: SessionCartItemCreateManyProductInputEnvelope
+    connect?: SessionCartItemWhereUniqueInput | SessionCartItemWhereUniqueInput[]
   }
 
   export type CustomerOrderItemCreateNestedManyWithoutProductInput = {
@@ -38917,33 +38783,27 @@ export namespace Prisma {
     connect?: CustomerOrderItemWhereUniqueInput | CustomerOrderItemWhereUniqueInput[]
   }
 
-  export type PostCreateNestedOneWithoutProductInput = {
-    create?: XOR<PostCreateWithoutProductInput, PostUncheckedCreateWithoutProductInput>
-    connectOrCreate?: PostCreateOrConnectWithoutProductInput
-    connect?: PostWhereUniqueInput
+  export type ProductVariantUncheckedCreateNestedManyWithoutProductInput = {
+    create?: XOR<ProductVariantCreateWithoutProductInput, ProductVariantUncheckedCreateWithoutProductInput> | ProductVariantCreateWithoutProductInput[] | ProductVariantUncheckedCreateWithoutProductInput[]
+    connectOrCreate?: ProductVariantCreateOrConnectWithoutProductInput | ProductVariantCreateOrConnectWithoutProductInput[]
+    createMany?: ProductVariantCreateManyProductInputEnvelope
+    connect?: ProductVariantWhereUniqueInput | ProductVariantWhereUniqueInput[]
   }
 
-  export type UserCreateNestedOneWithoutProductsInput = {
-    create?: XOR<UserCreateWithoutProductsInput, UserUncheckedCreateWithoutProductsInput>
-    connectOrCreate?: UserCreateOrConnectWithoutProductsInput
-    connect?: UserWhereUniqueInput
+  export type ProductOptionUncheckedCreateNestedManyWithoutProductInput = {
+    create?: XOR<ProductOptionCreateWithoutProductInput, ProductOptionUncheckedCreateWithoutProductInput> | ProductOptionCreateWithoutProductInput[] | ProductOptionUncheckedCreateWithoutProductInput[]
+    connectOrCreate?: ProductOptionCreateOrConnectWithoutProductInput | ProductOptionCreateOrConnectWithoutProductInput[]
+    createMany?: ProductOptionCreateManyProductInputEnvelope
+    connect?: ProductOptionWhereUniqueInput | ProductOptionWhereUniqueInput[]
   }
 
-  export type PublishHistoryCreateNestedManyWithoutProductInput = {
-    create?: XOR<PublishHistoryCreateWithoutProductInput, PublishHistoryUncheckedCreateWithoutProductInput> | PublishHistoryCreateWithoutProductInput[] | PublishHistoryUncheckedCreateWithoutProductInput[]
-    connectOrCreate?: PublishHistoryCreateOrConnectWithoutProductInput | PublishHistoryCreateOrConnectWithoutProductInput[]
-    createMany?: PublishHistoryCreateManyProductInputEnvelope
-    connect?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
-  }
-
-  export type PurchaseOrderCreateNestedManyWithoutProductInput = {
+  export type PurchaseOrderUncheckedCreateNestedManyWithoutProductInput = {
     create?: XOR<PurchaseOrderCreateWithoutProductInput, PurchaseOrderUncheckedCreateWithoutProductInput> | PurchaseOrderCreateWithoutProductInput[] | PurchaseOrderUncheckedCreateWithoutProductInput[]
     connectOrCreate?: PurchaseOrderCreateOrConnectWithoutProductInput | PurchaseOrderCreateOrConnectWithoutProductInput[]
     createMany?: PurchaseOrderCreateManyProductInputEnvelope
     connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
   }
 
-<<<<<<< HEAD
   export type ProductPublishUncheckedCreateNestedManyWithoutProductInput = {
     create?: XOR<ProductPublishCreateWithoutProductInput, ProductPublishUncheckedCreateWithoutProductInput> | ProductPublishCreateWithoutProductInput[] | ProductPublishUncheckedCreateWithoutProductInput[]
     connectOrCreate?: ProductPublishCreateOrConnectWithoutProductInput | ProductPublishCreateOrConnectWithoutProductInput[]
@@ -38956,13 +38816,6 @@ export namespace Prisma {
     connectOrCreate?: PublishHistoryCreateOrConnectWithoutProductInput | PublishHistoryCreateOrConnectWithoutProductInput[]
     createMany?: PublishHistoryCreateManyProductInputEnvelope
     connect?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
-=======
-  export type SessionCartItemCreateNestedManyWithoutProductInput = {
-    create?: XOR<SessionCartItemCreateWithoutProductInput, SessionCartItemUncheckedCreateWithoutProductInput> | SessionCartItemCreateWithoutProductInput[] | SessionCartItemUncheckedCreateWithoutProductInput[]
-    connectOrCreate?: SessionCartItemCreateOrConnectWithoutProductInput | SessionCartItemCreateOrConnectWithoutProductInput[]
-    createMany?: SessionCartItemCreateManyProductInputEnvelope
-    connect?: SessionCartItemWhereUniqueInput | SessionCartItemWhereUniqueInput[]
->>>>>>> release-1
   }
 
   export type CartItemUncheckedCreateNestedManyWithoutProductInput = {
@@ -38972,6 +38825,13 @@ export namespace Prisma {
     connect?: CartItemWhereUniqueInput | CartItemWhereUniqueInput[]
   }
 
+  export type SessionCartItemUncheckedCreateNestedManyWithoutProductInput = {
+    create?: XOR<SessionCartItemCreateWithoutProductInput, SessionCartItemUncheckedCreateWithoutProductInput> | SessionCartItemCreateWithoutProductInput[] | SessionCartItemUncheckedCreateWithoutProductInput[]
+    connectOrCreate?: SessionCartItemCreateOrConnectWithoutProductInput | SessionCartItemCreateOrConnectWithoutProductInput[]
+    createMany?: SessionCartItemCreateManyProductInputEnvelope
+    connect?: SessionCartItemWhereUniqueInput | SessionCartItemWhereUniqueInput[]
+  }
+
   export type CustomerOrderItemUncheckedCreateNestedManyWithoutProductInput = {
     create?: XOR<CustomerOrderItemCreateWithoutProductInput, CustomerOrderItemUncheckedCreateWithoutProductInput> | CustomerOrderItemCreateWithoutProductInput[] | CustomerOrderItemUncheckedCreateWithoutProductInput[]
     connectOrCreate?: CustomerOrderItemCreateOrConnectWithoutProductInput | CustomerOrderItemCreateOrConnectWithoutProductInput[]
@@ -38979,7 +38839,6 @@ export namespace Prisma {
     connect?: CustomerOrderItemWhereUniqueInput | CustomerOrderItemWhereUniqueInput[]
   }
 
-<<<<<<< HEAD
   export type UserUpdateOneRequiredWithoutProductsNestedInput = {
     create?: XOR<UserCreateWithoutProductsInput, UserUncheckedCreateWithoutProductsInput>
     connectOrCreate?: UserCreateOrConnectWithoutProductsInput
@@ -39053,31 +38912,17 @@ export namespace Prisma {
   }
 
   export type PublishHistoryUpdateManyWithoutProductNestedInput = {
-=======
-  export type PublishHistoryUncheckedCreateNestedManyWithoutProductInput = {
->>>>>>> release-1
     create?: XOR<PublishHistoryCreateWithoutProductInput, PublishHistoryUncheckedCreateWithoutProductInput> | PublishHistoryCreateWithoutProductInput[] | PublishHistoryUncheckedCreateWithoutProductInput[]
     connectOrCreate?: PublishHistoryCreateOrConnectWithoutProductInput | PublishHistoryCreateOrConnectWithoutProductInput[]
+    upsert?: PublishHistoryUpsertWithWhereUniqueWithoutProductInput | PublishHistoryUpsertWithWhereUniqueWithoutProductInput[]
     createMany?: PublishHistoryCreateManyProductInputEnvelope
+    set?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
+    disconnect?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
+    delete?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
     connect?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
-  }
-
-  export type PurchaseOrderUncheckedCreateNestedManyWithoutProductInput = {
-    create?: XOR<PurchaseOrderCreateWithoutProductInput, PurchaseOrderUncheckedCreateWithoutProductInput> | PurchaseOrderCreateWithoutProductInput[] | PurchaseOrderUncheckedCreateWithoutProductInput[]
-    connectOrCreate?: PurchaseOrderCreateOrConnectWithoutProductInput | PurchaseOrderCreateOrConnectWithoutProductInput[]
-    createMany?: PurchaseOrderCreateManyProductInputEnvelope
-    connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
-  }
-
-  export type SessionCartItemUncheckedCreateNestedManyWithoutProductInput = {
-    create?: XOR<SessionCartItemCreateWithoutProductInput, SessionCartItemUncheckedCreateWithoutProductInput> | SessionCartItemCreateWithoutProductInput[] | SessionCartItemUncheckedCreateWithoutProductInput[]
-    connectOrCreate?: SessionCartItemCreateOrConnectWithoutProductInput | SessionCartItemCreateOrConnectWithoutProductInput[]
-    createMany?: SessionCartItemCreateManyProductInputEnvelope
-    connect?: SessionCartItemWhereUniqueInput | SessionCartItemWhereUniqueInput[]
-  }
-
-  export type EnumProductStatusFieldUpdateOperationsInput = {
-    set?: $Enums.ProductStatus
+    update?: PublishHistoryUpdateWithWhereUniqueWithoutProductInput | PublishHistoryUpdateWithWhereUniqueWithoutProductInput[]
+    updateMany?: PublishHistoryUpdateManyWithWhereWithoutProductInput | PublishHistoryUpdateManyWithWhereWithoutProductInput[]
+    deleteMany?: PublishHistoryScalarWhereInput | PublishHistoryScalarWhereInput[]
   }
 
   export type CartItemUpdateManyWithoutProductNestedInput = {
@@ -39094,6 +38939,20 @@ export namespace Prisma {
     deleteMany?: CartItemScalarWhereInput | CartItemScalarWhereInput[]
   }
 
+  export type SessionCartItemUpdateManyWithoutProductNestedInput = {
+    create?: XOR<SessionCartItemCreateWithoutProductInput, SessionCartItemUncheckedCreateWithoutProductInput> | SessionCartItemCreateWithoutProductInput[] | SessionCartItemUncheckedCreateWithoutProductInput[]
+    connectOrCreate?: SessionCartItemCreateOrConnectWithoutProductInput | SessionCartItemCreateOrConnectWithoutProductInput[]
+    upsert?: SessionCartItemUpsertWithWhereUniqueWithoutProductInput | SessionCartItemUpsertWithWhereUniqueWithoutProductInput[]
+    createMany?: SessionCartItemCreateManyProductInputEnvelope
+    set?: SessionCartItemWhereUniqueInput | SessionCartItemWhereUniqueInput[]
+    disconnect?: SessionCartItemWhereUniqueInput | SessionCartItemWhereUniqueInput[]
+    delete?: SessionCartItemWhereUniqueInput | SessionCartItemWhereUniqueInput[]
+    connect?: SessionCartItemWhereUniqueInput | SessionCartItemWhereUniqueInput[]
+    update?: SessionCartItemUpdateWithWhereUniqueWithoutProductInput | SessionCartItemUpdateWithWhereUniqueWithoutProductInput[]
+    updateMany?: SessionCartItemUpdateManyWithWhereWithoutProductInput | SessionCartItemUpdateManyWithWhereWithoutProductInput[]
+    deleteMany?: SessionCartItemScalarWhereInput | SessionCartItemScalarWhereInput[]
+  }
+
   export type CustomerOrderItemUpdateManyWithoutProductNestedInput = {
     create?: XOR<CustomerOrderItemCreateWithoutProductInput, CustomerOrderItemUncheckedCreateWithoutProductInput> | CustomerOrderItemCreateWithoutProductInput[] | CustomerOrderItemUncheckedCreateWithoutProductInput[]
     connectOrCreate?: CustomerOrderItemCreateOrConnectWithoutProductInput | CustomerOrderItemCreateOrConnectWithoutProductInput[]
@@ -39108,37 +38967,35 @@ export namespace Prisma {
     deleteMany?: CustomerOrderItemScalarWhereInput | CustomerOrderItemScalarWhereInput[]
   }
 
-  export type PostUpdateOneRequiredWithoutProductNestedInput = {
-    create?: XOR<PostCreateWithoutProductInput, PostUncheckedCreateWithoutProductInput>
-    connectOrCreate?: PostCreateOrConnectWithoutProductInput
-    upsert?: PostUpsertWithoutProductInput
-    connect?: PostWhereUniqueInput
-    update?: XOR<XOR<PostUpdateToOneWithWhereWithoutProductInput, PostUpdateWithoutProductInput>, PostUncheckedUpdateWithoutProductInput>
+  export type ProductVariantUncheckedUpdateManyWithoutProductNestedInput = {
+    create?: XOR<ProductVariantCreateWithoutProductInput, ProductVariantUncheckedCreateWithoutProductInput> | ProductVariantCreateWithoutProductInput[] | ProductVariantUncheckedCreateWithoutProductInput[]
+    connectOrCreate?: ProductVariantCreateOrConnectWithoutProductInput | ProductVariantCreateOrConnectWithoutProductInput[]
+    upsert?: ProductVariantUpsertWithWhereUniqueWithoutProductInput | ProductVariantUpsertWithWhereUniqueWithoutProductInput[]
+    createMany?: ProductVariantCreateManyProductInputEnvelope
+    set?: ProductVariantWhereUniqueInput | ProductVariantWhereUniqueInput[]
+    disconnect?: ProductVariantWhereUniqueInput | ProductVariantWhereUniqueInput[]
+    delete?: ProductVariantWhereUniqueInput | ProductVariantWhereUniqueInput[]
+    connect?: ProductVariantWhereUniqueInput | ProductVariantWhereUniqueInput[]
+    update?: ProductVariantUpdateWithWhereUniqueWithoutProductInput | ProductVariantUpdateWithWhereUniqueWithoutProductInput[]
+    updateMany?: ProductVariantUpdateManyWithWhereWithoutProductInput | ProductVariantUpdateManyWithWhereWithoutProductInput[]
+    deleteMany?: ProductVariantScalarWhereInput | ProductVariantScalarWhereInput[]
   }
 
-  export type UserUpdateOneRequiredWithoutProductsNestedInput = {
-    create?: XOR<UserCreateWithoutProductsInput, UserUncheckedCreateWithoutProductsInput>
-    connectOrCreate?: UserCreateOrConnectWithoutProductsInput
-    upsert?: UserUpsertWithoutProductsInput
-    connect?: UserWhereUniqueInput
-    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutProductsInput, UserUpdateWithoutProductsInput>, UserUncheckedUpdateWithoutProductsInput>
+  export type ProductOptionUncheckedUpdateManyWithoutProductNestedInput = {
+    create?: XOR<ProductOptionCreateWithoutProductInput, ProductOptionUncheckedCreateWithoutProductInput> | ProductOptionCreateWithoutProductInput[] | ProductOptionUncheckedCreateWithoutProductInput[]
+    connectOrCreate?: ProductOptionCreateOrConnectWithoutProductInput | ProductOptionCreateOrConnectWithoutProductInput[]
+    upsert?: ProductOptionUpsertWithWhereUniqueWithoutProductInput | ProductOptionUpsertWithWhereUniqueWithoutProductInput[]
+    createMany?: ProductOptionCreateManyProductInputEnvelope
+    set?: ProductOptionWhereUniqueInput | ProductOptionWhereUniqueInput[]
+    disconnect?: ProductOptionWhereUniqueInput | ProductOptionWhereUniqueInput[]
+    delete?: ProductOptionWhereUniqueInput | ProductOptionWhereUniqueInput[]
+    connect?: ProductOptionWhereUniqueInput | ProductOptionWhereUniqueInput[]
+    update?: ProductOptionUpdateWithWhereUniqueWithoutProductInput | ProductOptionUpdateWithWhereUniqueWithoutProductInput[]
+    updateMany?: ProductOptionUpdateManyWithWhereWithoutProductInput | ProductOptionUpdateManyWithWhereWithoutProductInput[]
+    deleteMany?: ProductOptionScalarWhereInput | ProductOptionScalarWhereInput[]
   }
 
-  export type PublishHistoryUpdateManyWithoutProductNestedInput = {
-    create?: XOR<PublishHistoryCreateWithoutProductInput, PublishHistoryUncheckedCreateWithoutProductInput> | PublishHistoryCreateWithoutProductInput[] | PublishHistoryUncheckedCreateWithoutProductInput[]
-    connectOrCreate?: PublishHistoryCreateOrConnectWithoutProductInput | PublishHistoryCreateOrConnectWithoutProductInput[]
-    upsert?: PublishHistoryUpsertWithWhereUniqueWithoutProductInput | PublishHistoryUpsertWithWhereUniqueWithoutProductInput[]
-    createMany?: PublishHistoryCreateManyProductInputEnvelope
-    set?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
-    disconnect?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
-    delete?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
-    connect?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
-    update?: PublishHistoryUpdateWithWhereUniqueWithoutProductInput | PublishHistoryUpdateWithWhereUniqueWithoutProductInput[]
-    updateMany?: PublishHistoryUpdateManyWithWhereWithoutProductInput | PublishHistoryUpdateManyWithWhereWithoutProductInput[]
-    deleteMany?: PublishHistoryScalarWhereInput | PublishHistoryScalarWhereInput[]
-  }
-
-  export type PurchaseOrderUpdateManyWithoutProductNestedInput = {
+  export type PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput = {
     create?: XOR<PurchaseOrderCreateWithoutProductInput, PurchaseOrderUncheckedCreateWithoutProductInput> | PurchaseOrderCreateWithoutProductInput[] | PurchaseOrderUncheckedCreateWithoutProductInput[]
     connectOrCreate?: PurchaseOrderCreateOrConnectWithoutProductInput | PurchaseOrderCreateOrConnectWithoutProductInput[]
     upsert?: PurchaseOrderUpsertWithWhereUniqueWithoutProductInput | PurchaseOrderUpsertWithWhereUniqueWithoutProductInput[]
@@ -39152,7 +39009,6 @@ export namespace Prisma {
     deleteMany?: PurchaseOrderScalarWhereInput | PurchaseOrderScalarWhereInput[]
   }
 
-<<<<<<< HEAD
   export type ProductPublishUncheckedUpdateManyWithoutProductNestedInput = {
     create?: XOR<ProductPublishCreateWithoutProductInput, ProductPublishUncheckedCreateWithoutProductInput> | ProductPublishCreateWithoutProductInput[] | ProductPublishUncheckedCreateWithoutProductInput[]
     connectOrCreate?: ProductPublishCreateOrConnectWithoutProductInput | ProductPublishCreateOrConnectWithoutProductInput[]
@@ -39179,20 +39035,6 @@ export namespace Prisma {
     update?: PublishHistoryUpdateWithWhereUniqueWithoutProductInput | PublishHistoryUpdateWithWhereUniqueWithoutProductInput[]
     updateMany?: PublishHistoryUpdateManyWithWhereWithoutProductInput | PublishHistoryUpdateManyWithWhereWithoutProductInput[]
     deleteMany?: PublishHistoryScalarWhereInput | PublishHistoryScalarWhereInput[]
-=======
-  export type SessionCartItemUpdateManyWithoutProductNestedInput = {
-    create?: XOR<SessionCartItemCreateWithoutProductInput, SessionCartItemUncheckedCreateWithoutProductInput> | SessionCartItemCreateWithoutProductInput[] | SessionCartItemUncheckedCreateWithoutProductInput[]
-    connectOrCreate?: SessionCartItemCreateOrConnectWithoutProductInput | SessionCartItemCreateOrConnectWithoutProductInput[]
-    upsert?: SessionCartItemUpsertWithWhereUniqueWithoutProductInput | SessionCartItemUpsertWithWhereUniqueWithoutProductInput[]
-    createMany?: SessionCartItemCreateManyProductInputEnvelope
-    set?: SessionCartItemWhereUniqueInput | SessionCartItemWhereUniqueInput[]
-    disconnect?: SessionCartItemWhereUniqueInput | SessionCartItemWhereUniqueInput[]
-    delete?: SessionCartItemWhereUniqueInput | SessionCartItemWhereUniqueInput[]
-    connect?: SessionCartItemWhereUniqueInput | SessionCartItemWhereUniqueInput[]
-    update?: SessionCartItemUpdateWithWhereUniqueWithoutProductInput | SessionCartItemUpdateWithWhereUniqueWithoutProductInput[]
-    updateMany?: SessionCartItemUpdateManyWithWhereWithoutProductInput | SessionCartItemUpdateManyWithWhereWithoutProductInput[]
-    deleteMany?: SessionCartItemScalarWhereInput | SessionCartItemScalarWhereInput[]
->>>>>>> release-1
   }
 
   export type CartItemUncheckedUpdateManyWithoutProductNestedInput = {
@@ -39209,48 +39051,6 @@ export namespace Prisma {
     deleteMany?: CartItemScalarWhereInput | CartItemScalarWhereInput[]
   }
 
-  export type CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput = {
-    create?: XOR<CustomerOrderItemCreateWithoutProductInput, CustomerOrderItemUncheckedCreateWithoutProductInput> | CustomerOrderItemCreateWithoutProductInput[] | CustomerOrderItemUncheckedCreateWithoutProductInput[]
-    connectOrCreate?: CustomerOrderItemCreateOrConnectWithoutProductInput | CustomerOrderItemCreateOrConnectWithoutProductInput[]
-    upsert?: CustomerOrderItemUpsertWithWhereUniqueWithoutProductInput | CustomerOrderItemUpsertWithWhereUniqueWithoutProductInput[]
-    createMany?: CustomerOrderItemCreateManyProductInputEnvelope
-    set?: CustomerOrderItemWhereUniqueInput | CustomerOrderItemWhereUniqueInput[]
-    disconnect?: CustomerOrderItemWhereUniqueInput | CustomerOrderItemWhereUniqueInput[]
-    delete?: CustomerOrderItemWhereUniqueInput | CustomerOrderItemWhereUniqueInput[]
-    connect?: CustomerOrderItemWhereUniqueInput | CustomerOrderItemWhereUniqueInput[]
-    update?: CustomerOrderItemUpdateWithWhereUniqueWithoutProductInput | CustomerOrderItemUpdateWithWhereUniqueWithoutProductInput[]
-    updateMany?: CustomerOrderItemUpdateManyWithWhereWithoutProductInput | CustomerOrderItemUpdateManyWithWhereWithoutProductInput[]
-    deleteMany?: CustomerOrderItemScalarWhereInput | CustomerOrderItemScalarWhereInput[]
-  }
-
-  export type PublishHistoryUncheckedUpdateManyWithoutProductNestedInput = {
-    create?: XOR<PublishHistoryCreateWithoutProductInput, PublishHistoryUncheckedCreateWithoutProductInput> | PublishHistoryCreateWithoutProductInput[] | PublishHistoryUncheckedCreateWithoutProductInput[]
-    connectOrCreate?: PublishHistoryCreateOrConnectWithoutProductInput | PublishHistoryCreateOrConnectWithoutProductInput[]
-    upsert?: PublishHistoryUpsertWithWhereUniqueWithoutProductInput | PublishHistoryUpsertWithWhereUniqueWithoutProductInput[]
-    createMany?: PublishHistoryCreateManyProductInputEnvelope
-    set?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
-    disconnect?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
-    delete?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
-    connect?: PublishHistoryWhereUniqueInput | PublishHistoryWhereUniqueInput[]
-    update?: PublishHistoryUpdateWithWhereUniqueWithoutProductInput | PublishHistoryUpdateWithWhereUniqueWithoutProductInput[]
-    updateMany?: PublishHistoryUpdateManyWithWhereWithoutProductInput | PublishHistoryUpdateManyWithWhereWithoutProductInput[]
-    deleteMany?: PublishHistoryScalarWhereInput | PublishHistoryScalarWhereInput[]
-  }
-
-  export type PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput = {
-    create?: XOR<PurchaseOrderCreateWithoutProductInput, PurchaseOrderUncheckedCreateWithoutProductInput> | PurchaseOrderCreateWithoutProductInput[] | PurchaseOrderUncheckedCreateWithoutProductInput[]
-    connectOrCreate?: PurchaseOrderCreateOrConnectWithoutProductInput | PurchaseOrderCreateOrConnectWithoutProductInput[]
-    upsert?: PurchaseOrderUpsertWithWhereUniqueWithoutProductInput | PurchaseOrderUpsertWithWhereUniqueWithoutProductInput[]
-    createMany?: PurchaseOrderCreateManyProductInputEnvelope
-    set?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
-    disconnect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
-    delete?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
-    connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
-    update?: PurchaseOrderUpdateWithWhereUniqueWithoutProductInput | PurchaseOrderUpdateWithWhereUniqueWithoutProductInput[]
-    updateMany?: PurchaseOrderUpdateManyWithWhereWithoutProductInput | PurchaseOrderUpdateManyWithWhereWithoutProductInput[]
-    deleteMany?: PurchaseOrderScalarWhereInput | PurchaseOrderScalarWhereInput[]
-  }
-
   export type SessionCartItemUncheckedUpdateManyWithoutProductNestedInput = {
     create?: XOR<SessionCartItemCreateWithoutProductInput, SessionCartItemUncheckedCreateWithoutProductInput> | SessionCartItemCreateWithoutProductInput[] | SessionCartItemUncheckedCreateWithoutProductInput[]
     connectOrCreate?: SessionCartItemCreateOrConnectWithoutProductInput | SessionCartItemCreateOrConnectWithoutProductInput[]
@@ -39265,12 +39065,54 @@ export namespace Prisma {
     deleteMany?: SessionCartItemScalarWhereInput | SessionCartItemScalarWhereInput[]
   }
 
+  export type CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput = {
+    create?: XOR<CustomerOrderItemCreateWithoutProductInput, CustomerOrderItemUncheckedCreateWithoutProductInput> | CustomerOrderItemCreateWithoutProductInput[] | CustomerOrderItemUncheckedCreateWithoutProductInput[]
+    connectOrCreate?: CustomerOrderItemCreateOrConnectWithoutProductInput | CustomerOrderItemCreateOrConnectWithoutProductInput[]
+    upsert?: CustomerOrderItemUpsertWithWhereUniqueWithoutProductInput | CustomerOrderItemUpsertWithWhereUniqueWithoutProductInput[]
+    createMany?: CustomerOrderItemCreateManyProductInputEnvelope
+    set?: CustomerOrderItemWhereUniqueInput | CustomerOrderItemWhereUniqueInput[]
+    disconnect?: CustomerOrderItemWhereUniqueInput | CustomerOrderItemWhereUniqueInput[]
+    delete?: CustomerOrderItemWhereUniqueInput | CustomerOrderItemWhereUniqueInput[]
+    connect?: CustomerOrderItemWhereUniqueInput | CustomerOrderItemWhereUniqueInput[]
+    update?: CustomerOrderItemUpdateWithWhereUniqueWithoutProductInput | CustomerOrderItemUpdateWithWhereUniqueWithoutProductInput[]
+    updateMany?: CustomerOrderItemUpdateManyWithWhereWithoutProductInput | CustomerOrderItemUpdateManyWithWhereWithoutProductInput[]
+    deleteMany?: CustomerOrderItemScalarWhereInput | CustomerOrderItemScalarWhereInput[]
+  }
+
+  export type ProductCreateNestedOneWithoutVariantsInput = {
+    create?: XOR<ProductCreateWithoutVariantsInput, ProductUncheckedCreateWithoutVariantsInput>
+    connectOrCreate?: ProductCreateOrConnectWithoutVariantsInput
+    connect?: ProductWhereUniqueInput
+  }
+
   export type NullableFloatFieldUpdateOperationsInput = {
     set?: number | null
     increment?: number
     decrement?: number
     multiply?: number
     divide?: number
+  }
+
+  export type ProductUpdateOneRequiredWithoutVariantsNestedInput = {
+    create?: XOR<ProductCreateWithoutVariantsInput, ProductUncheckedCreateWithoutVariantsInput>
+    connectOrCreate?: ProductCreateOrConnectWithoutVariantsInput
+    upsert?: ProductUpsertWithoutVariantsInput
+    connect?: ProductWhereUniqueInput
+    update?: XOR<XOR<ProductUpdateToOneWithWhereWithoutVariantsInput, ProductUpdateWithoutVariantsInput>, ProductUncheckedUpdateWithoutVariantsInput>
+  }
+
+  export type ProductCreateNestedOneWithoutOptionsInput = {
+    create?: XOR<ProductCreateWithoutOptionsInput, ProductUncheckedCreateWithoutOptionsInput>
+    connectOrCreate?: ProductCreateOrConnectWithoutOptionsInput
+    connect?: ProductWhereUniqueInput
+  }
+
+  export type ProductUpdateOneRequiredWithoutOptionsNestedInput = {
+    create?: XOR<ProductCreateWithoutOptionsInput, ProductUncheckedCreateWithoutOptionsInput>
+    connectOrCreate?: ProductCreateOrConnectWithoutOptionsInput
+    upsert?: ProductUpsertWithoutOptionsInput
+    connect?: ProductWhereUniqueInput
+    update?: XOR<XOR<ProductUpdateToOneWithWhereWithoutOptionsInput, ProductUpdateWithoutOptionsInput>, ProductUncheckedUpdateWithoutOptionsInput>
   }
 
   export type AutomationConfigCreateNestedManyWithoutPricingPolicyInput = {
@@ -39381,7 +39223,6 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutWorkflowLogsInput, UserUpdateWithoutWorkflowLogsInput>, UserUncheckedUpdateWithoutWorkflowLogsInput>
   }
 
-<<<<<<< HEAD
   export type UserCreateNestedOneWithoutProductPublishesInput = {
     create?: XOR<UserCreateWithoutProductPublishesInput, UserUncheckedCreateWithoutProductPublishesInput>
     connectOrCreate?: UserCreateOrConnectWithoutProductPublishesInput
@@ -39428,14 +39269,6 @@ export namespace Prisma {
     update?: XOR<XOR<RetailBandUpdateToOneWithWhereWithoutProductPublishesInput, RetailBandUpdateWithoutProductPublishesInput>, RetailBandUncheckedUpdateWithoutProductPublishesInput>
   }
 
-  export type UserCreateNestedOneWithoutPublishHistoriesInput = {
-    create?: XOR<UserCreateWithoutPublishHistoriesInput, UserUncheckedCreateWithoutPublishHistoriesInput>
-    connectOrCreate?: UserCreateOrConnectWithoutPublishHistoriesInput
-    connect?: UserWhereUniqueInput
-  }
-
-=======
->>>>>>> release-1
   export type ProductCreateNestedOneWithoutPublishHistoriesInput = {
     create?: XOR<ProductCreateWithoutPublishHistoriesInput, ProductUncheckedCreateWithoutPublishHistoriesInput>
     connectOrCreate?: ProductCreateOrConnectWithoutPublishHistoriesInput
@@ -39448,18 +39281,10 @@ export namespace Prisma {
     connect?: RetailBandWhereUniqueInput
   }
 
-<<<<<<< HEAD
-  export type UserUpdateOneRequiredWithoutPublishHistoriesNestedInput = {
-=======
   export type UserCreateNestedOneWithoutPublishHistoriesInput = {
->>>>>>> release-1
     create?: XOR<UserCreateWithoutPublishHistoriesInput, UserUncheckedCreateWithoutPublishHistoriesInput>
     connectOrCreate?: UserCreateOrConnectWithoutPublishHistoriesInput
     connect?: UserWhereUniqueInput
-  }
-
-  export type EnumPublishStatusFieldUpdateOperationsInput = {
-    set?: $Enums.PublishStatus
   }
 
   export type ProductUpdateOneRequiredWithoutPublishHistoriesNestedInput = {
@@ -39514,8 +39339,6 @@ export namespace Prisma {
     update?: XOR<XOR<ProductUpdateToOneWithWhereWithoutPurchaseOrdersInput, ProductUpdateWithoutPurchaseOrdersInput>, ProductUncheckedUpdateWithoutPurchaseOrdersInput>
   }
 
-<<<<<<< HEAD
-=======
   export type RetailBandUpdateOneWithoutPurchaseOrdersNestedInput = {
     create?: XOR<RetailBandCreateWithoutPurchaseOrdersInput, RetailBandUncheckedCreateWithoutPurchaseOrdersInput>
     connectOrCreate?: RetailBandCreateOrConnectWithoutPurchaseOrdersInput
@@ -39534,7 +39357,6 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutPurchaseOrdersInput, UserUpdateWithoutPurchaseOrdersInput>, UserUncheckedUpdateWithoutPurchaseOrdersInput>
   }
 
->>>>>>> release-1
   export type CustomerAddressCreateNestedManyWithoutCustomerInput = {
     create?: XOR<CustomerAddressCreateWithoutCustomerInput, CustomerAddressUncheckedCreateWithoutCustomerInput> | CustomerAddressCreateWithoutCustomerInput[] | CustomerAddressUncheckedCreateWithoutCustomerInput[]
     connectOrCreate?: CustomerAddressCreateOrConnectWithoutCustomerInput | CustomerAddressCreateOrConnectWithoutCustomerInput[]
@@ -40356,57 +40178,9 @@ export namespace Prisma {
     updatedAt?: Date | string
   }
 
-<<<<<<< HEAD
-  export type WholesaleBandCreateOrConnectWithoutUserInput = {
-    where: WholesaleBandWhereUniqueInput
-    create: XOR<WholesaleBandCreateWithoutUserInput, WholesaleBandUncheckedCreateWithoutUserInput>
-  }
-
-  export type WholesaleBandCreateManyUserInputEnvelope = {
-    data: WholesaleBandCreateManyUserInput | WholesaleBandCreateManyUserInput[]
-    skipDuplicates?: boolean
-  }
-
-  export type RetailBandCreateWithoutUserInput = {
-    bandKey: string
-    name: string
-    coverUrl?: string | null
-    formUrl?: string | null
-    isActive?: boolean
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    apiConfig: SourcingApiConfigCreateNestedOneWithoutRetailBandsInput
-    productPublishes?: ProductPublishCreateNestedManyWithoutRetailBandInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutRetailBandInput
-  }
-
-  export type RetailBandUncheckedCreateWithoutUserInput = {
-    id?: number
-    apiConfigId: number
-    bandKey: string
-    name: string
-    coverUrl?: string | null
-    formUrl?: string | null
-    isActive?: boolean
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutRetailBandInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutRetailBandInput
-  }
-
-  export type RetailBandCreateOrConnectWithoutUserInput = {
-    where: RetailBandWhereUniqueInput
-    create: XOR<RetailBandCreateWithoutUserInput, RetailBandUncheckedCreateWithoutUserInput>
-  }
-
-  export type RetailBandCreateManyUserInputEnvelope = {
-    data: RetailBandCreateManyUserInput | RetailBandCreateManyUserInput[]
-    skipDuplicates?: boolean
-=======
   export type AutomationConfigCreateOrConnectWithoutUserInput = {
     where: AutomationConfigWhereUniqueInput
     create: XOR<AutomationConfigCreateWithoutUserInput, AutomationConfigUncheckedCreateWithoutUserInput>
->>>>>>> release-1
   }
 
   export type PostCreateWithoutUserInput = {
@@ -40446,7 +40220,37 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
-<<<<<<< HEAD
+  export type PricingPolicyCreateWithoutUserInput = {
+    name: string
+    description?: string | null
+    content: string
+    isActive?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    automationConfigs?: AutomationConfigCreateNestedManyWithoutPricingPolicyInput
+  }
+
+  export type PricingPolicyUncheckedCreateWithoutUserInput = {
+    id?: number
+    name: string
+    description?: string | null
+    content: string
+    isActive?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    automationConfigs?: AutomationConfigUncheckedCreateNestedManyWithoutPricingPolicyInput
+  }
+
+  export type PricingPolicyCreateOrConnectWithoutUserInput = {
+    where: PricingPolicyWhereUniqueInput
+    create: XOR<PricingPolicyCreateWithoutUserInput, PricingPolicyUncheckedCreateWithoutUserInput>
+  }
+
+  export type PricingPolicyCreateManyUserInputEnvelope = {
+    data: PricingPolicyCreateManyUserInput | PricingPolicyCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
   export type ProductCreateWithoutUserInput = {
     name: string
     description?: string | null
@@ -40488,88 +40292,6 @@ export namespace Prisma {
     cartItems?: CartItemUncheckedCreateNestedManyWithoutProductInput
     sessionCartItems?: SessionCartItemUncheckedCreateNestedManyWithoutProductInput
     customerOrderItems?: CustomerOrderItemUncheckedCreateNestedManyWithoutProductInput
-  }
-
-  export type ProductCreateOrConnectWithoutUserInput = {
-    where: ProductWhereUniqueInput
-    create: XOR<ProductCreateWithoutUserInput, ProductUncheckedCreateWithoutUserInput>
-  }
-
-  export type ProductCreateManyUserInputEnvelope = {
-    data: ProductCreateManyUserInput | ProductCreateManyUserInput[]
-    skipDuplicates?: boolean
-  }
-
-=======
->>>>>>> release-1
-  export type PricingPolicyCreateWithoutUserInput = {
-    name: string
-    description?: string | null
-    content: string
-    isActive?: boolean
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    automationConfigs?: AutomationConfigCreateNestedManyWithoutPricingPolicyInput
-  }
-
-  export type PricingPolicyUncheckedCreateWithoutUserInput = {
-    id?: number
-    name: string
-    description?: string | null
-    content: string
-    isActive?: boolean
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    automationConfigs?: AutomationConfigUncheckedCreateNestedManyWithoutPricingPolicyInput
-  }
-
-  export type PricingPolicyCreateOrConnectWithoutUserInput = {
-    where: PricingPolicyWhereUniqueInput
-    create: XOR<PricingPolicyCreateWithoutUserInput, PricingPolicyUncheckedCreateWithoutUserInput>
-  }
-
-  export type PricingPolicyCreateManyUserInputEnvelope = {
-    data: PricingPolicyCreateManyUserInput | PricingPolicyCreateManyUserInput[]
-    skipDuplicates?: boolean
-  }
-
-  export type ProductCreateWithoutUserInput = {
-    name: string
-    description?: string | null
-    status?: $Enums.ProductStatus
-    thumbnailUrl?: string | null
-    categoryId?: string | null
-    currency?: string
-    price?: number | null
-    wholesalePrice?: number | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    cartItems?: CartItemCreateNestedManyWithoutProductInput
-    customerOrderItems?: CustomerOrderItemCreateNestedManyWithoutProductInput
-    post: PostCreateNestedOneWithoutProductInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutProductInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutProductInput
-    sessionCartItems?: SessionCartItemCreateNestedManyWithoutProductInput
-  }
-
-  export type ProductUncheckedCreateWithoutUserInput = {
-    id?: number
-    postId: number
-    name: string
-    description?: string | null
-    status?: $Enums.ProductStatus
-    thumbnailUrl?: string | null
-    categoryId?: string | null
-    currency?: string
-    price?: number | null
-    wholesalePrice?: number | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    cartItems?: CartItemUncheckedCreateNestedManyWithoutProductInput
-    customerOrderItems?: CustomerOrderItemUncheckedCreateNestedManyWithoutProductInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutProductInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutProductInput
-    sessionCartItems?: SessionCartItemUncheckedCreateNestedManyWithoutProductInput
   }
 
   export type ProductCreateOrConnectWithoutUserInput = {
@@ -40669,9 +40391,6 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
-<<<<<<< HEAD
-  export type SourcingApiConfigUpsertWithWhereUniqueWithoutUserInput = {
-=======
   export type RetailBandCreateWithoutUserInput = {
     bandKey: string
     name: string
@@ -40683,6 +40402,7 @@ export namespace Prisma {
     publishHistories?: PublishHistoryCreateNestedManyWithoutRetailBandInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutRetailBandInput
     apiConfig: SourcingApiConfigCreateNestedOneWithoutRetailBandsInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutRetailBandInput
   }
 
   export type RetailBandUncheckedCreateWithoutUserInput = {
@@ -40697,6 +40417,7 @@ export namespace Prisma {
     formUrl?: string | null
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutRetailBandInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutRetailBandInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutRetailBandInput
   }
 
   export type RetailBandCreateOrConnectWithoutUserInput = {
@@ -40741,7 +40462,6 @@ export namespace Prisma {
   }
 
   export type SourcingApiConfigCreateOrConnectWithoutUserInput = {
->>>>>>> release-1
     where: SourcingApiConfigWhereUniqueInput
     create: XOR<SourcingApiConfigCreateWithoutUserInput, SourcingApiConfigUncheckedCreateWithoutUserInput>
   }
@@ -40989,112 +40709,6 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"Product"> | Date | string
   }
 
-<<<<<<< HEAD
-  export type PricingPolicyUpsertWithWhereUniqueWithoutUserInput = {
-    where: PricingPolicyWhereUniqueInput
-    update: XOR<PricingPolicyUpdateWithoutUserInput, PricingPolicyUncheckedUpdateWithoutUserInput>
-    create: XOR<PricingPolicyCreateWithoutUserInput, PricingPolicyUncheckedCreateWithoutUserInput>
-  }
-
-  export type PricingPolicyUpdateWithWhereUniqueWithoutUserInput = {
-    where: PricingPolicyWhereUniqueInput
-    data: XOR<PricingPolicyUpdateWithoutUserInput, PricingPolicyUncheckedUpdateWithoutUserInput>
-  }
-
-  export type PricingPolicyUpdateManyWithWhereWithoutUserInput = {
-    where: PricingPolicyScalarWhereInput
-    data: XOR<PricingPolicyUpdateManyMutationInput, PricingPolicyUncheckedUpdateManyWithoutUserInput>
-  }
-
-  export type PricingPolicyScalarWhereInput = {
-    AND?: PricingPolicyScalarWhereInput | PricingPolicyScalarWhereInput[]
-    OR?: PricingPolicyScalarWhereInput[]
-    NOT?: PricingPolicyScalarWhereInput | PricingPolicyScalarWhereInput[]
-    id?: IntFilter<"PricingPolicy"> | number
-    userId?: IntFilter<"PricingPolicy"> | number
-    name?: StringFilter<"PricingPolicy"> | string
-    description?: StringNullableFilter<"PricingPolicy"> | string | null
-    content?: StringFilter<"PricingPolicy"> | string
-    isActive?: BoolFilter<"PricingPolicy"> | boolean
-    createdAt?: DateTimeFilter<"PricingPolicy"> | Date | string
-    updatedAt?: DateTimeFilter<"PricingPolicy"> | Date | string
-  }
-
-  export type AutomationConfigUpsertWithoutUserInput = {
-    update: XOR<AutomationConfigUpdateWithoutUserInput, AutomationConfigUncheckedUpdateWithoutUserInput>
-    create: XOR<AutomationConfigCreateWithoutUserInput, AutomationConfigUncheckedCreateWithoutUserInput>
-    where?: AutomationConfigWhereInput
-  }
-
-  export type AutomationConfigUpdateToOneWithWhereWithoutUserInput = {
-    where?: AutomationConfigWhereInput
-    data: XOR<AutomationConfigUpdateWithoutUserInput, AutomationConfigUncheckedUpdateWithoutUserInput>
-  }
-
-  export type AutomationConfigUpdateWithoutUserInput = {
-    isEnabled?: BoolFieldUpdateOperationsInput | boolean
-    cronExpression?: NullableStringFieldUpdateOperationsInput | string | null
-    collectFromAllBands?: BoolFieldUpdateOperationsInput | boolean
-    wholesaleBandIds?: NullableJsonNullValueInput | InputJsonValue
-    aiProvider?: EnumAiProviderFieldUpdateOperationsInput | $Enums.AiProvider
-    autoPublish?: BoolFieldUpdateOperationsInput | boolean
-    retailBandIds?: NullableJsonNullValueInput | InputJsonValue
-    lastRunAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    nextRunAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    pricingPolicy?: PricingPolicyUpdateOneWithoutAutomationConfigsNestedInput
-  }
-
-  export type AutomationConfigUncheckedUpdateWithoutUserInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    isEnabled?: BoolFieldUpdateOperationsInput | boolean
-    cronExpression?: NullableStringFieldUpdateOperationsInput | string | null
-    collectFromAllBands?: BoolFieldUpdateOperationsInput | boolean
-    wholesaleBandIds?: NullableJsonNullValueInput | InputJsonValue
-    aiProvider?: EnumAiProviderFieldUpdateOperationsInput | $Enums.AiProvider
-    pricingPolicyId?: NullableIntFieldUpdateOperationsInput | number | null
-    autoPublish?: BoolFieldUpdateOperationsInput | boolean
-    retailBandIds?: NullableJsonNullValueInput | InputJsonValue
-    lastRunAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    nextRunAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type WorkflowLogUpsertWithWhereUniqueWithoutUserInput = {
-    where: WorkflowLogWhereUniqueInput
-    update: XOR<WorkflowLogUpdateWithoutUserInput, WorkflowLogUncheckedUpdateWithoutUserInput>
-    create: XOR<WorkflowLogCreateWithoutUserInput, WorkflowLogUncheckedCreateWithoutUserInput>
-  }
-
-  export type WorkflowLogUpdateWithWhereUniqueWithoutUserInput = {
-    where: WorkflowLogWhereUniqueInput
-    data: XOR<WorkflowLogUpdateWithoutUserInput, WorkflowLogUncheckedUpdateWithoutUserInput>
-  }
-
-  export type WorkflowLogUpdateManyWithWhereWithoutUserInput = {
-    where: WorkflowLogScalarWhereInput
-    data: XOR<WorkflowLogUpdateManyMutationInput, WorkflowLogUncheckedUpdateManyWithoutUserInput>
-  }
-
-  export type WorkflowLogScalarWhereInput = {
-    AND?: WorkflowLogScalarWhereInput | WorkflowLogScalarWhereInput[]
-    OR?: WorkflowLogScalarWhereInput[]
-    NOT?: WorkflowLogScalarWhereInput | WorkflowLogScalarWhereInput[]
-    id?: IntFilter<"WorkflowLog"> | number
-    userId?: IntFilter<"WorkflowLog"> | number
-    workflowType?: EnumWorkflowTypeFilter<"WorkflowLog"> | $Enums.WorkflowType
-    status?: EnumWorkflowStatusFilter<"WorkflowLog"> | $Enums.WorkflowStatus
-    startedAt?: DateTimeFilter<"WorkflowLog"> | Date | string
-    completedAt?: DateTimeNullableFilter<"WorkflowLog"> | Date | string | null
-    totalItems?: IntFilter<"WorkflowLog"> | number
-    successCount?: IntFilter<"WorkflowLog"> | number
-    failedCount?: IntFilter<"WorkflowLog"> | number
-    details?: JsonNullableFilter<"WorkflowLog">
-    errorMessage?: StringNullableFilter<"WorkflowLog"> | string | null
-  }
-
   export type ProductPublishUpsertWithWhereUniqueWithoutUserInput = {
     where: ProductPublishWhereUniqueInput
     update: XOR<ProductPublishUpdateWithoutUserInput, ProductPublishUncheckedUpdateWithoutUserInput>
@@ -41124,8 +40738,6 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"ProductPublish"> | Date | string
   }
 
-=======
->>>>>>> release-1
   export type PublishHistoryUpsertWithWhereUniqueWithoutUserInput = {
     where: PublishHistoryWhereUniqueInput
     update: XOR<PublishHistoryUpdateWithoutUserInput, PublishHistoryUncheckedUpdateWithoutUserInput>
@@ -41187,8 +40799,6 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
   }
 
-<<<<<<< HEAD
-=======
   export type RetailBandUpsertWithWhereUniqueWithoutUserInput = {
     where: RetailBandWhereUniqueInput
     update: XOR<RetailBandUpdateWithoutUserInput, RetailBandUncheckedUpdateWithoutUserInput>
@@ -41329,6 +40939,7 @@ export namespace Prisma {
     formUrl?: string | null
     publishHistories?: PublishHistoryCreateNestedManyWithoutRetailBandInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutRetailBandInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutRetailBandInput
     user: UserCreateNestedOneWithoutRetailBandsInput
   }
 
@@ -41344,6 +40955,7 @@ export namespace Prisma {
     formUrl?: string | null
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutRetailBandInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutRetailBandInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutRetailBandInput
   }
 
   export type RetailBandCreateOrConnectWithoutApiConfigInput = {
@@ -41356,7 +40968,6 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
->>>>>>> release-1
   export type UserCreateWithoutSourcingApiConfigsInput = {
     email: string
     password: string
@@ -41365,21 +40976,15 @@ export namespace Prisma {
     updatedAt?: Date | string
     aiApiConfigs?: AiApiConfigCreateNestedManyWithoutUserInput
     automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
-=======
     posts?: PostCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
     products?: ProductCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
     retailBands?: RetailBandCreateNestedManyWithoutUserInput
     wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
     workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
->>>>>>> release-1
   }
 
   export type UserUncheckedCreateWithoutSourcingApiConfigsInput = {
@@ -41391,21 +40996,15 @@ export namespace Prisma {
     updatedAt?: Date | string
     aiApiConfigs?: AiApiConfigUncheckedCreateNestedManyWithoutUserInput
     automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
-=======
     posts?: PostUncheckedCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
     products?: ProductUncheckedCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
     retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
     wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
     workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
->>>>>>> release-1
   }
 
   export type UserCreateOrConnectWithoutSourcingApiConfigsInput = {
@@ -41446,38 +41045,7 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
-<<<<<<< HEAD
-  export type RetailBandCreateWithoutApiConfigInput = {
-    bandKey: string
-    name: string
-    coverUrl?: string | null
-    formUrl?: string | null
-    isActive?: boolean
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    user: UserCreateNestedOneWithoutRetailBandsInput
-    productPublishes?: ProductPublishCreateNestedManyWithoutRetailBandInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutRetailBandInput
-  }
-
-  export type RetailBandUncheckedCreateWithoutApiConfigInput = {
-    id?: number
-    userId: number
-    bandKey: string
-    name: string
-    coverUrl?: string | null
-    formUrl?: string | null
-    isActive?: boolean
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutRetailBandInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutRetailBandInput
-  }
-
-  export type RetailBandCreateOrConnectWithoutApiConfigInput = {
-=======
   export type RetailBandUpsertWithWhereUniqueWithoutApiConfigInput = {
->>>>>>> release-1
     where: RetailBandWhereUniqueInput
     update: XOR<RetailBandUpdateWithoutApiConfigInput, RetailBandUncheckedUpdateWithoutApiConfigInput>
     create: XOR<RetailBandCreateWithoutApiConfigInput, RetailBandUncheckedCreateWithoutApiConfigInput>
@@ -41512,21 +41080,15 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     aiApiConfigs?: AiApiConfigUpdateManyWithoutUserNestedInput
     automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
-=======
     posts?: PostUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
     products?: ProductUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUpdateManyWithoutUserNestedInput
     wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
     workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
->>>>>>> release-1
   }
 
   export type UserUncheckedUpdateWithoutSourcingApiConfigsInput = {
@@ -41538,21 +41100,15 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     aiApiConfigs?: AiApiConfigUncheckedUpdateManyWithoutUserNestedInput
     automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
-=======
     posts?: PostUncheckedUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
     products?: ProductUncheckedUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
     wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
     workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
->>>>>>> release-1
   }
 
   export type WholesaleBandUpsertWithWhereUniqueWithoutApiConfigInput = {
@@ -41578,22 +41134,16 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
-=======
     posts?: PostCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
     products?: ProductCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
     retailBands?: RetailBandCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
     wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
     workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
->>>>>>> release-1
   }
 
   export type UserUncheckedCreateWithoutAiApiConfigsInput = {
@@ -41604,22 +41154,16 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
-=======
     posts?: PostUncheckedCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
     products?: ProductUncheckedCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
     retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
     wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
     workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
->>>>>>> release-1
   }
 
   export type UserCreateOrConnectWithoutAiApiConfigsInput = {
@@ -41645,22 +41189,16 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
-=======
     posts?: PostUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
     products?: ProductUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
     wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
     workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
->>>>>>> release-1
   }
 
   export type UserUncheckedUpdateWithoutAiApiConfigsInput = {
@@ -41671,102 +41209,16 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
-  }
-
-  export type UserCreateWithoutWholesaleBandsInput = {
-    email: string
-    password: string
-    name?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
-    aiApiConfigs?: AiApiConfigCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandCreateNestedManyWithoutUserInput
-    posts?: PostCreateNestedManyWithoutUserInput
-    products?: ProductCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
-  }
-
-  export type UserUncheckedCreateWithoutWholesaleBandsInput = {
-    id?: number
-    email: string
-    password: string
-    name?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
-    aiApiConfigs?: AiApiConfigUncheckedCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
-    posts?: PostUncheckedCreateNestedManyWithoutUserInput
-    products?: ProductUncheckedCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
-  }
-
-  export type UserCreateOrConnectWithoutWholesaleBandsInput = {
-    where: UserWhereUniqueInput
-    create: XOR<UserCreateWithoutWholesaleBandsInput, UserUncheckedCreateWithoutWholesaleBandsInput>
-  }
-
-  export type SourcingApiConfigCreateWithoutWholesaleBandsInput = {
-    platform: $Enums.SourcingPlatform
-    apiKey?: string | null
-    accessToken?: string | null
-    refreshToken?: string | null
-    tokenExpiry?: Date | string | null
-    metadata?: NullableJsonNullValueInput | InputJsonValue
-    isActive?: boolean
-    lastSyncedAt?: Date | string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    user: UserCreateNestedOneWithoutSourcingApiConfigsInput
-    retailBands?: RetailBandCreateNestedManyWithoutApiConfigInput
-  }
-
-  export type SourcingApiConfigUncheckedCreateWithoutWholesaleBandsInput = {
-    id?: number
-    userId: number
-    platform: $Enums.SourcingPlatform
-    apiKey?: string | null
-    accessToken?: string | null
-    refreshToken?: string | null
-    tokenExpiry?: Date | string | null
-    metadata?: NullableJsonNullValueInput | InputJsonValue
-    isActive?: boolean
-    lastSyncedAt?: Date | string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    retailBands?: RetailBandUncheckedCreateNestedManyWithoutApiConfigInput
-  }
-
-  export type SourcingApiConfigCreateOrConnectWithoutWholesaleBandsInput = {
-    where: SourcingApiConfigWhereUniqueInput
-    create: XOR<SourcingApiConfigCreateWithoutWholesaleBandsInput, SourcingApiConfigUncheckedCreateWithoutWholesaleBandsInput>
-=======
     posts?: PostUncheckedUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
     products?: ProductUncheckedUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
     wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
     workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
->>>>>>> release-1
   }
 
   export type PostCreateWithoutWholesaleBandInput = {
@@ -41853,6 +41305,7 @@ export namespace Prisma {
     posts?: PostCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
     products?: ProductCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
     retailBands?: RetailBandCreateNestedManyWithoutUserInput
@@ -41872,6 +41325,7 @@ export namespace Prisma {
     posts?: PostUncheckedCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
     products?: ProductUncheckedCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
     retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
@@ -41890,45 +41344,6 @@ export namespace Prisma {
     create: XOR<PostCreateWithoutWholesaleBandInput, PostUncheckedCreateWithoutWholesaleBandInput>
   }
 
-<<<<<<< HEAD
-  export type UserUpdateWithoutWholesaleBandsInput = {
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
-    aiApiConfigs?: AiApiConfigUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUpdateManyWithoutUserNestedInput
-    posts?: PostUpdateManyWithoutUserNestedInput
-    products?: ProductUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
-  }
-
-  export type UserUncheckedUpdateWithoutWholesaleBandsInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    aiApiConfigs?: AiApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
-    posts?: PostUncheckedUpdateManyWithoutUserNestedInput
-    products?: ProductUncheckedUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
-=======
   export type PostUpdateWithWhereUniqueWithoutWholesaleBandInput = {
     where: PostWhereUniqueInput
     data: XOR<PostUpdateWithoutWholesaleBandInput, PostUncheckedUpdateWithoutWholesaleBandInput>
@@ -41937,7 +41352,6 @@ export namespace Prisma {
   export type PostUpdateManyWithWhereWithoutWholesaleBandInput = {
     where: PostScalarWhereInput
     data: XOR<PostUpdateManyMutationInput, PostUncheckedUpdateManyWithoutWholesaleBandInput>
->>>>>>> release-1
   }
 
   export type SourcingApiConfigUpsertWithoutWholesaleBandsInput = {
@@ -42004,6 +41418,7 @@ export namespace Prisma {
     posts?: PostUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
     products?: ProductUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUpdateManyWithoutUserNestedInput
@@ -42011,86 +41426,6 @@ export namespace Prisma {
     workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
   }
 
-<<<<<<< HEAD
-  export type UserCreateWithoutRetailBandsInput = {
-    email: string
-    password: string
-    name?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
-    aiApiConfigs?: AiApiConfigCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
-    posts?: PostCreateNestedManyWithoutUserInput
-    products?: ProductCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
-  }
-
-  export type UserUncheckedCreateWithoutRetailBandsInput = {
-    id?: number
-    email: string
-    password: string
-    name?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
-    aiApiConfigs?: AiApiConfigUncheckedCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
-    posts?: PostUncheckedCreateNestedManyWithoutUserInput
-    products?: ProductUncheckedCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
-  }
-
-  export type UserCreateOrConnectWithoutRetailBandsInput = {
-    where: UserWhereUniqueInput
-    create: XOR<UserCreateWithoutRetailBandsInput, UserUncheckedCreateWithoutRetailBandsInput>
-  }
-
-  export type SourcingApiConfigCreateWithoutRetailBandsInput = {
-    platform: $Enums.SourcingPlatform
-    apiKey?: string | null
-    accessToken?: string | null
-    refreshToken?: string | null
-    tokenExpiry?: Date | string | null
-    metadata?: NullableJsonNullValueInput | InputJsonValue
-    isActive?: boolean
-    lastSyncedAt?: Date | string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    user: UserCreateNestedOneWithoutSourcingApiConfigsInput
-    wholesaleBands?: WholesaleBandCreateNestedManyWithoutApiConfigInput
-  }
-
-  export type SourcingApiConfigUncheckedCreateWithoutRetailBandsInput = {
-    id?: number
-    userId: number
-    platform: $Enums.SourcingPlatform
-    apiKey?: string | null
-    accessToken?: string | null
-    refreshToken?: string | null
-    tokenExpiry?: Date | string | null
-    metadata?: NullableJsonNullValueInput | InputJsonValue
-    isActive?: boolean
-    lastSyncedAt?: Date | string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutApiConfigInput
-  }
-
-  export type SourcingApiConfigCreateOrConnectWithoutRetailBandsInput = {
-    where: SourcingApiConfigWhereUniqueInput
-    create: XOR<SourcingApiConfigCreateWithoutRetailBandsInput, SourcingApiConfigUncheckedCreateWithoutRetailBandsInput>
-=======
   export type UserUncheckedUpdateWithoutWholesaleBandsInput = {
     id?: IntFieldUpdateOperationsInput | number
     email?: StringFieldUpdateOperationsInput | string
@@ -42103,39 +41438,12 @@ export namespace Prisma {
     posts?: PostUncheckedUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
     products?: ProductUncheckedUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
     workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
->>>>>>> release-1
-  }
-
-  export type ProductPublishCreateWithoutRetailBandInput = {
-    status?: $Enums.PublishStatus
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    user: UserCreateNestedOneWithoutProductPublishesInput
-    product: ProductCreateNestedOneWithoutProductPublishesInput
-  }
-
-  export type ProductPublishUncheckedCreateWithoutRetailBandInput = {
-    id?: number
-    userId: number
-    productId: number
-    status?: $Enums.PublishStatus
-    createdAt?: Date | string
-    updatedAt?: Date | string
-  }
-
-  export type ProductPublishCreateOrConnectWithoutRetailBandInput = {
-    where: ProductPublishWhereUniqueInput
-    create: XOR<ProductPublishCreateWithoutRetailBandInput, ProductPublishUncheckedCreateWithoutRetailBandInput>
-  }
-
-  export type ProductPublishCreateManyRetailBandInputEnvelope = {
-    data: ProductPublishCreateManyRetailBandInput | ProductPublishCreateManyRetailBandInput[]
-    skipDuplicates?: boolean
   }
 
   export type PublishHistoryCreateWithoutRetailBandInput = {
@@ -42234,6 +41542,33 @@ export namespace Prisma {
     create: XOR<SourcingApiConfigCreateWithoutRetailBandsInput, SourcingApiConfigUncheckedCreateWithoutRetailBandsInput>
   }
 
+  export type ProductPublishCreateWithoutRetailBandInput = {
+    status?: $Enums.PublishStatus
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutProductPublishesInput
+    product: ProductCreateNestedOneWithoutProductPublishesInput
+  }
+
+  export type ProductPublishUncheckedCreateWithoutRetailBandInput = {
+    id?: number
+    userId: number
+    productId: number
+    status?: $Enums.PublishStatus
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ProductPublishCreateOrConnectWithoutRetailBandInput = {
+    where: ProductPublishWhereUniqueInput
+    create: XOR<ProductPublishCreateWithoutRetailBandInput, ProductPublishUncheckedCreateWithoutRetailBandInput>
+  }
+
+  export type ProductPublishCreateManyRetailBandInputEnvelope = {
+    data: ProductPublishCreateManyRetailBandInput | ProductPublishCreateManyRetailBandInput[]
+    skipDuplicates?: boolean
+  }
+
   export type UserCreateWithoutRetailBandsInput = {
     email: string
     password: string
@@ -42245,6 +41580,7 @@ export namespace Prisma {
     posts?: PostCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
     products?: ProductCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
@@ -42264,6 +41600,7 @@ export namespace Prisma {
     posts?: PostUncheckedCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
     products?: ProductUncheckedCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
@@ -42282,45 +41619,6 @@ export namespace Prisma {
     create: XOR<PublishHistoryCreateWithoutRetailBandInput, PublishHistoryUncheckedCreateWithoutRetailBandInput>
   }
 
-<<<<<<< HEAD
-  export type UserUpdateWithoutRetailBandsInput = {
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
-    aiApiConfigs?: AiApiConfigUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
-    posts?: PostUpdateManyWithoutUserNestedInput
-    products?: ProductUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
-  }
-
-  export type UserUncheckedUpdateWithoutRetailBandsInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    aiApiConfigs?: AiApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
-    posts?: PostUncheckedUpdateManyWithoutUserNestedInput
-    products?: ProductUncheckedUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
-=======
   export type PublishHistoryUpdateWithWhereUniqueWithoutRetailBandInput = {
     where: PublishHistoryWhereUniqueInput
     data: XOR<PublishHistoryUpdateWithoutRetailBandInput, PublishHistoryUncheckedUpdateWithoutRetailBandInput>
@@ -42345,7 +41643,6 @@ export namespace Prisma {
   export type PurchaseOrderUpdateManyWithWhereWithoutRetailBandInput = {
     where: PurchaseOrderScalarWhereInput
     data: XOR<PurchaseOrderUpdateManyMutationInput, PurchaseOrderUncheckedUpdateManyWithoutRetailBandInput>
->>>>>>> release-1
   }
 
   export type SourcingApiConfigUpsertWithoutRetailBandsInput = {
@@ -42390,7 +41687,6 @@ export namespace Prisma {
     wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutApiConfigNestedInput
   }
 
-<<<<<<< HEAD
   export type ProductPublishUpsertWithWhereUniqueWithoutRetailBandInput = {
     where: ProductPublishWhereUniqueInput
     update: XOR<ProductPublishUpdateWithoutRetailBandInput, ProductPublishUncheckedUpdateWithoutRetailBandInput>
@@ -42407,16 +41703,10 @@ export namespace Prisma {
     data: XOR<ProductPublishUpdateManyMutationInput, ProductPublishUncheckedUpdateManyWithoutRetailBandInput>
   }
 
-  export type PublishHistoryUpsertWithWhereUniqueWithoutRetailBandInput = {
-    where: PublishHistoryWhereUniqueInput
-    update: XOR<PublishHistoryUpdateWithoutRetailBandInput, PublishHistoryUncheckedUpdateWithoutRetailBandInput>
-    create: XOR<PublishHistoryCreateWithoutRetailBandInput, PublishHistoryUncheckedCreateWithoutRetailBandInput>
-=======
   export type UserUpsertWithoutRetailBandsInput = {
     update: XOR<UserUpdateWithoutRetailBandsInput, UserUncheckedUpdateWithoutRetailBandsInput>
     create: XOR<UserCreateWithoutRetailBandsInput, UserUncheckedCreateWithoutRetailBandsInput>
     where?: UserWhereInput
->>>>>>> release-1
   }
 
   export type UserUpdateToOneWithWhereWithoutRetailBandsInput = {
@@ -42435,6 +41725,7 @@ export namespace Prisma {
     posts?: PostUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
     products?: ProductUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
@@ -42454,6 +41745,7 @@ export namespace Prisma {
     posts?: PostUncheckedUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
     products?: ProductUncheckedUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
@@ -42469,21 +41761,15 @@ export namespace Prisma {
     updatedAt?: Date | string
     aiApiConfigs?: AiApiConfigCreateNestedManyWithoutUserInput
     automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
-=======
     pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
     products?: ProductCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
     retailBands?: RetailBandCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
     wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
     workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
->>>>>>> release-1
   }
 
   export type UserUncheckedCreateWithoutPostsInput = {
@@ -42495,21 +41781,15 @@ export namespace Prisma {
     updatedAt?: Date | string
     aiApiConfigs?: AiApiConfigUncheckedCreateNestedManyWithoutUserInput
     automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
-=======
     pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
     products?: ProductUncheckedCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
     retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
     wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
     workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
->>>>>>> release-1
   }
 
   export type UserCreateOrConnectWithoutPostsInput = {
@@ -42607,21 +41887,15 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     user: UserCreateNestedOneWithoutProductsInput
     variants?: ProductVariantCreateNestedManyWithoutProductInput
     options?: ProductOptionCreateNestedManyWithoutProductInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutProductInput
     productPublishes?: ProductPublishCreateNestedManyWithoutProductInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     cartItems?: CartItemCreateNestedManyWithoutProductInput
-    customerOrderItems?: CustomerOrderItemCreateNestedManyWithoutProductInput
-    user: UserCreateNestedOneWithoutProductsInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutProductInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutProductInput
     sessionCartItems?: SessionCartItemCreateNestedManyWithoutProductInput
+    customerOrderItems?: CustomerOrderItemCreateNestedManyWithoutProductInput
   }
 
   export type ProductUncheckedCreateWithoutPostInput = {
@@ -42636,19 +41910,14 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedCreateNestedManyWithoutProductInput
     options?: ProductOptionUncheckedCreateNestedManyWithoutProductInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutProductInput
     productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutProductInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUncheckedCreateNestedManyWithoutProductInput
-    customerOrderItems?: CustomerOrderItemUncheckedCreateNestedManyWithoutProductInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutProductInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutProductInput
     sessionCartItems?: SessionCartItemUncheckedCreateNestedManyWithoutProductInput
+    customerOrderItems?: CustomerOrderItemUncheckedCreateNestedManyWithoutProductInput
   }
 
   export type ProductCreateOrConnectWithoutPostInput = {
@@ -42675,21 +41944,15 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     aiApiConfigs?: AiApiConfigUpdateManyWithoutUserNestedInput
     automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
-=======
     pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
     products?: ProductUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
     wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
     workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
->>>>>>> release-1
   }
 
   export type UserUncheckedUpdateWithoutPostsInput = {
@@ -42701,21 +41964,15 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     aiApiConfigs?: AiApiConfigUncheckedUpdateManyWithoutUserNestedInput
     automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
-<<<<<<< HEAD
-    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
-=======
     pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
     products?: ProductUncheckedUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
     wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
     workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
->>>>>>> release-1
   }
 
   export type WholesaleBandUpsertWithoutPostsInput = {
@@ -42830,21 +42087,15 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     user?: UserUpdateOneRequiredWithoutProductsNestedInput
     variants?: ProductVariantUpdateManyWithoutProductNestedInput
     options?: ProductOptionUpdateManyWithoutProductNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutProductNestedInput
     productPublishes?: ProductPublishUpdateManyWithoutProductNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutProductNestedInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUpdateManyWithoutProductNestedInput
-    customerOrderItems?: CustomerOrderItemUpdateManyWithoutProductNestedInput
-    user?: UserUpdateOneRequiredWithoutProductsNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutProductNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUpdateManyWithoutProductNestedInput
+    customerOrderItems?: CustomerOrderItemUpdateManyWithoutProductNestedInput
   }
 
   export type ProductUncheckedUpdateWithoutPostInput = {
@@ -42859,19 +42110,14 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedUpdateManyWithoutProductNestedInput
     options?: ProductOptionUncheckedUpdateManyWithoutProductNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput
     productPublishes?: ProductPublishUncheckedUpdateManyWithoutProductNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutProductNestedInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUncheckedUpdateManyWithoutProductNestedInput
-    customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutProductNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUncheckedUpdateManyWithoutProductNestedInput
+    customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
   }
 
   export type PostCreateWithoutImagesInput = {
@@ -43014,94 +42260,48 @@ export namespace Prisma {
     product?: ProductUncheckedUpdateOneWithoutPostNestedInput
   }
 
-  export type CartItemCreateWithoutProductInput = {
-    customerId: number
-    quantity?: number
+  export type UserCreateWithoutProductsInput = {
+    email: string
+    password: string
+    name?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
-    sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
     aiApiConfigs?: AiApiConfigCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandCreateNestedManyWithoutUserInput
+    automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
     posts?: PostCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
     productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
-=======
-    variantId?: number | null
->>>>>>> release-1
+    retailBands?: RetailBandCreateNestedManyWithoutUserInput
+    sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
+    wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
+    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
   }
 
-  export type CartItemUncheckedCreateWithoutProductInput = {
+  export type UserUncheckedCreateWithoutProductsInput = {
     id?: number
-    customerId: number
-    quantity?: number
+    email: string
+    password: string
+    name?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
-    sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
     aiApiConfigs?: AiApiConfigUncheckedCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
+    automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
     posts?: PostUncheckedCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
     productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
-=======
-    variantId?: number | null
->>>>>>> release-1
+    retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
+    sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
+    wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
+    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
   }
 
-  export type CartItemCreateOrConnectWithoutProductInput = {
-    where: CartItemWhereUniqueInput
-    create: XOR<CartItemCreateWithoutProductInput, CartItemUncheckedCreateWithoutProductInput>
-  }
-
-  export type CartItemCreateManyProductInputEnvelope = {
-    data: CartItemCreateManyProductInput | CartItemCreateManyProductInput[]
-    skipDuplicates?: boolean
-  }
-
-  export type CustomerOrderItemCreateWithoutProductInput = {
-    productName: string
-    optionSummary?: string | null
-    thumbnailUrl?: string | null
-    quantity: number
-    unitPrice: Decimal | DecimalJsLike | number | string
-    totalPrice: Decimal | DecimalJsLike | number | string
-    createdAt?: Date | string
-    variantId?: number | null
-    order: CustomerOrderCreateNestedOneWithoutItemsInput
-  }
-
-  export type CustomerOrderItemUncheckedCreateWithoutProductInput = {
-    id?: number
-    orderId: number
-    productName: string
-    optionSummary?: string | null
-    thumbnailUrl?: string | null
-    quantity: number
-    unitPrice: Decimal | DecimalJsLike | number | string
-    totalPrice: Decimal | DecimalJsLike | number | string
-    createdAt?: Date | string
-    variantId?: number | null
-  }
-
-  export type CustomerOrderItemCreateOrConnectWithoutProductInput = {
-    where: CustomerOrderItemWhereUniqueInput
-    create: XOR<CustomerOrderItemCreateWithoutProductInput, CustomerOrderItemUncheckedCreateWithoutProductInput>
-  }
-
-  export type CustomerOrderItemCreateManyProductInputEnvelope = {
-    data: CustomerOrderItemCreateManyProductInput | CustomerOrderItemCreateManyProductInput[]
-    skipDuplicates?: boolean
+  export type UserCreateOrConnectWithoutProductsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutProductsInput, UserUncheckedCreateWithoutProductsInput>
   }
 
   export type PostCreateWithoutProductInput = {
@@ -43136,44 +42336,31 @@ export namespace Prisma {
     create: XOR<PostCreateWithoutProductInput, PostUncheckedCreateWithoutProductInput>
   }
 
-  export type UserCreateWithoutProductsInput = {
-    email: string
-    password: string
-    name?: string | null
+  export type ProductVariantCreateWithoutProductInput = {
+    sku?: string | null
+    optionSummary?: string | null
+    price: number
+    wholesalePrice?: number | null
+    stock?: number
+    weight?: number | null
+    barcode?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
-    aiApiConfigs?: AiApiConfigCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
-    posts?: PostCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandCreateNestedManyWithoutUserInput
-    sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
-    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
   }
 
-  export type UserUncheckedCreateWithoutProductsInput = {
+  export type ProductVariantUncheckedCreateWithoutProductInput = {
     id?: number
-    email: string
-    password: string
-    name?: string | null
+    sku?: string | null
+    optionSummary?: string | null
+    price: number
+    wholesalePrice?: number | null
+    stock?: number
+    weight?: number | null
+    barcode?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
-    aiApiConfigs?: AiApiConfigUncheckedCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
-    posts?: PostUncheckedCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
-    sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
-    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
   }
 
-<<<<<<< HEAD
   export type ProductVariantCreateOrConnectWithoutProductInput = {
     where: ProductVariantWhereUniqueInput
     create: XOR<ProductVariantCreateWithoutProductInput, ProductVariantUncheckedCreateWithoutProductInput>
@@ -43215,12 +42402,14 @@ export namespace Prisma {
     customerName: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    retailBand?: RetailBandCreateNestedOneWithoutPurchaseOrdersInput
     user: UserCreateNestedOneWithoutPurchaseOrdersInput
   }
 
   export type PurchaseOrderUncheckedCreateWithoutProductInput = {
     id?: number
     userId: number
+    retailBandId?: number | null
     productName: string
     totalPrice?: number | null
     customerName: string
@@ -43263,11 +42452,6 @@ export namespace Prisma {
   export type ProductPublishCreateManyProductInputEnvelope = {
     data: ProductPublishCreateManyProductInput | ProductPublishCreateManyProductInput[]
     skipDuplicates?: boolean
-=======
-  export type UserCreateOrConnectWithoutProductsInput = {
-    where: UserWhereUniqueInput
-    create: XOR<UserCreateWithoutProductsInput, UserUncheckedCreateWithoutProductsInput>
->>>>>>> release-1
   }
 
   export type PublishHistoryCreateWithoutProductInput = {
@@ -43299,34 +42483,30 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
-  export type PurchaseOrderCreateWithoutProductInput = {
-    productName: string
-    totalPrice?: number | null
-    customerName: string
+  export type CartItemCreateWithoutProductInput = {
+    customerId: number
+    quantity?: number
     createdAt?: Date | string
     updatedAt?: Date | string
-    retailBand?: RetailBandCreateNestedOneWithoutPurchaseOrdersInput
-    user: UserCreateNestedOneWithoutPurchaseOrdersInput
+    variantId?: number | null
   }
 
-  export type PurchaseOrderUncheckedCreateWithoutProductInput = {
+  export type CartItemUncheckedCreateWithoutProductInput = {
     id?: number
-    userId: number
-    retailBandId?: number | null
-    productName: string
-    totalPrice?: number | null
-    customerName: string
+    customerId: number
+    quantity?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    variantId?: number | null
   }
 
-  export type PurchaseOrderCreateOrConnectWithoutProductInput = {
-    where: PurchaseOrderWhereUniqueInput
-    create: XOR<PurchaseOrderCreateWithoutProductInput, PurchaseOrderUncheckedCreateWithoutProductInput>
+  export type CartItemCreateOrConnectWithoutProductInput = {
+    where: CartItemWhereUniqueInput
+    create: XOR<CartItemCreateWithoutProductInput, CartItemUncheckedCreateWithoutProductInput>
   }
 
-  export type PurchaseOrderCreateManyProductInputEnvelope = {
-    data: PurchaseOrderCreateManyProductInput | PurchaseOrderCreateManyProductInput[]
+  export type CartItemCreateManyProductInputEnvelope = {
+    data: CartItemCreateManyProductInput | CartItemCreateManyProductInput[]
     skipDuplicates?: boolean
   }
 
@@ -43359,7 +42539,6 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
-<<<<<<< HEAD
   export type CustomerOrderItemCreateWithoutProductInput = {
     productName: string
     optionSummary?: string | null
@@ -43368,14 +42547,13 @@ export namespace Prisma {
     unitPrice: Decimal | DecimalJsLike | number | string
     totalPrice: Decimal | DecimalJsLike | number | string
     createdAt?: Date | string
+    variantId?: number | null
     order: CustomerOrderCreateNestedOneWithoutItemsInput
-    variant?: ProductVariantCreateNestedOneWithoutCustomerOrderItemsInput
   }
 
   export type CustomerOrderItemUncheckedCreateWithoutProductInput = {
     id?: number
     orderId: number
-    variantId?: number | null
     productName: string
     optionSummary?: string | null
     thumbnailUrl?: string | null
@@ -43383,6 +42561,7 @@ export namespace Prisma {
     unitPrice: Decimal | DecimalJsLike | number | string
     totalPrice: Decimal | DecimalJsLike | number | string
     createdAt?: Date | string
+    variantId?: number | null
   }
 
   export type CustomerOrderItemCreateOrConnectWithoutProductInput = {
@@ -43412,17 +42591,17 @@ export namespace Prisma {
     name?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
     aiApiConfigs?: AiApiConfigUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUpdateManyWithoutUserNestedInput
+    automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
     posts?: PostUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
     productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
+    retailBands?: RetailBandUpdateManyWithoutUserNestedInput
+    sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
+    wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
+    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutProductsInput = {
@@ -43432,17 +42611,17 @@ export namespace Prisma {
     name?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
     aiApiConfigs?: AiApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
+    automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
     posts?: PostUncheckedUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
     productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
+    retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
+    sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
+    wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
+    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type PostUpsertWithoutProductInput = {
@@ -43465,8 +42644,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutPostsNestedInput
     wholesaleBand?: WholesaleBandUpdateOneRequiredWithoutPostsNestedInput
-    images?: PostImageUpdateManyWithoutPostNestedInput
     comments?: PostCommentUpdateManyWithoutPostNestedInput
+    images?: PostImageUpdateManyWithoutPostNestedInput
   }
 
   export type PostUncheckedUpdateWithoutProductInput = {
@@ -43479,8 +42658,8 @@ export namespace Prisma {
     author?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    images?: PostImageUncheckedUpdateManyWithoutPostNestedInput
     comments?: PostCommentUncheckedUpdateManyWithoutPostNestedInput
+    images?: PostImageUncheckedUpdateManyWithoutPostNestedInput
   }
 
   export type ProductVariantUpsertWithWhereUniqueWithoutProductInput = {
@@ -43592,8 +42771,6 @@ export namespace Prisma {
     data: XOR<PublishHistoryUpdateManyMutationInput, PublishHistoryUncheckedUpdateManyWithoutProductInput>
   }
 
-=======
->>>>>>> release-1
   export type CartItemUpsertWithWhereUniqueWithoutProductInput = {
     where: CartItemWhereUniqueInput
     update: XOR<CartItemUpdateWithoutProductInput, CartItemUncheckedUpdateWithoutProductInput>
@@ -43621,6 +42798,36 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"CartItem"> | Date | string
     updatedAt?: DateTimeFilter<"CartItem"> | Date | string
     variantId?: IntNullableFilter<"CartItem"> | number | null
+  }
+
+  export type SessionCartItemUpsertWithWhereUniqueWithoutProductInput = {
+    where: SessionCartItemWhereUniqueInput
+    update: XOR<SessionCartItemUpdateWithoutProductInput, SessionCartItemUncheckedUpdateWithoutProductInput>
+    create: XOR<SessionCartItemCreateWithoutProductInput, SessionCartItemUncheckedCreateWithoutProductInput>
+  }
+
+  export type SessionCartItemUpdateWithWhereUniqueWithoutProductInput = {
+    where: SessionCartItemWhereUniqueInput
+    data: XOR<SessionCartItemUpdateWithoutProductInput, SessionCartItemUncheckedUpdateWithoutProductInput>
+  }
+
+  export type SessionCartItemUpdateManyWithWhereWithoutProductInput = {
+    where: SessionCartItemScalarWhereInput
+    data: XOR<SessionCartItemUpdateManyMutationInput, SessionCartItemUncheckedUpdateManyWithoutProductInput>
+  }
+
+  export type SessionCartItemScalarWhereInput = {
+    AND?: SessionCartItemScalarWhereInput | SessionCartItemScalarWhereInput[]
+    OR?: SessionCartItemScalarWhereInput[]
+    NOT?: SessionCartItemScalarWhereInput | SessionCartItemScalarWhereInput[]
+    id?: IntFilter<"SessionCartItem"> | number
+    cartId?: IntFilter<"SessionCartItem"> | number
+    productId?: IntFilter<"SessionCartItem"> | number
+    quantity?: IntFilter<"SessionCartItem"> | number
+    priceAt?: IntFilter<"SessionCartItem"> | number
+    createdAt?: DateTimeFilter<"SessionCartItem"> | Date | string
+    updatedAt?: DateTimeFilter<"SessionCartItem"> | Date | string
+    variantId?: IntNullableFilter<"SessionCartItem"> | number | null
   }
 
   export type CustomerOrderItemUpsertWithWhereUniqueWithoutProductInput = {
@@ -43656,7 +42863,6 @@ export namespace Prisma {
     variantId?: IntNullableFilter<"CustomerOrderItem"> | number | null
   }
 
-<<<<<<< HEAD
   export type ProductCreateWithoutVariantsInput = {
     name: string
     description?: string | null
@@ -43705,97 +42911,6 @@ export namespace Prisma {
     create: XOR<ProductCreateWithoutVariantsInput, ProductUncheckedCreateWithoutVariantsInput>
   }
 
-  export type CartItemCreateWithoutVariantInput = {
-    quantity?: number
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    customer: CustomerCreateNestedOneWithoutCartItemsInput
-    product: ProductCreateNestedOneWithoutCartItemsInput
-  }
-
-  export type CartItemUncheckedCreateWithoutVariantInput = {
-    id?: number
-    customerId: number
-    productId: number
-    quantity?: number
-    createdAt?: Date | string
-    updatedAt?: Date | string
-  }
-
-  export type CartItemCreateOrConnectWithoutVariantInput = {
-    where: CartItemWhereUniqueInput
-    create: XOR<CartItemCreateWithoutVariantInput, CartItemUncheckedCreateWithoutVariantInput>
-  }
-
-  export type CartItemCreateManyVariantInputEnvelope = {
-    data: CartItemCreateManyVariantInput | CartItemCreateManyVariantInput[]
-    skipDuplicates?: boolean
-  }
-
-  export type SessionCartItemCreateWithoutVariantInput = {
-    quantity?: number
-    priceAt: number
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    cart: SessionCartCreateNestedOneWithoutItemsInput
-    product: ProductCreateNestedOneWithoutSessionCartItemsInput
-  }
-
-  export type SessionCartItemUncheckedCreateWithoutVariantInput = {
-    id?: number
-    cartId: number
-    productId: number
-    quantity?: number
-    priceAt: number
-    createdAt?: Date | string
-    updatedAt?: Date | string
-  }
-
-  export type SessionCartItemCreateOrConnectWithoutVariantInput = {
-    where: SessionCartItemWhereUniqueInput
-    create: XOR<SessionCartItemCreateWithoutVariantInput, SessionCartItemUncheckedCreateWithoutVariantInput>
-  }
-
-  export type SessionCartItemCreateManyVariantInputEnvelope = {
-    data: SessionCartItemCreateManyVariantInput | SessionCartItemCreateManyVariantInput[]
-    skipDuplicates?: boolean
-  }
-
-  export type CustomerOrderItemCreateWithoutVariantInput = {
-    productName: string
-    optionSummary?: string | null
-    thumbnailUrl?: string | null
-    quantity: number
-    unitPrice: Decimal | DecimalJsLike | number | string
-    totalPrice: Decimal | DecimalJsLike | number | string
-    createdAt?: Date | string
-    order: CustomerOrderCreateNestedOneWithoutItemsInput
-    product?: ProductCreateNestedOneWithoutCustomerOrderItemsInput
-  }
-
-  export type CustomerOrderItemUncheckedCreateWithoutVariantInput = {
-    id?: number
-    orderId: number
-    productId?: number | null
-    productName: string
-    optionSummary?: string | null
-    thumbnailUrl?: string | null
-    quantity: number
-    unitPrice: Decimal | DecimalJsLike | number | string
-    totalPrice: Decimal | DecimalJsLike | number | string
-    createdAt?: Date | string
-  }
-
-  export type CustomerOrderItemCreateOrConnectWithoutVariantInput = {
-    where: CustomerOrderItemWhereUniqueInput
-    create: XOR<CustomerOrderItemCreateWithoutVariantInput, CustomerOrderItemUncheckedCreateWithoutVariantInput>
-  }
-
-  export type CustomerOrderItemCreateManyVariantInputEnvelope = {
-    data: CustomerOrderItemCreateManyVariantInput | CustomerOrderItemCreateManyVariantInput[]
-    skipDuplicates?: boolean
-  }
-
   export type ProductUpsertWithoutVariantsInput = {
     update: XOR<ProductUpdateWithoutVariantsInput, ProductUncheckedUpdateWithoutVariantsInput>
     create: XOR<ProductCreateWithoutVariantsInput, ProductUncheckedCreateWithoutVariantsInput>
@@ -43826,36 +42941,11 @@ export namespace Prisma {
     cartItems?: CartItemUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUpdateManyWithoutProductNestedInput
     customerOrderItems?: CustomerOrderItemUpdateManyWithoutProductNestedInput
-=======
-  export type PostUpsertWithoutProductInput = {
-    update: XOR<PostUpdateWithoutProductInput, PostUncheckedUpdateWithoutProductInput>
-    create: XOR<PostCreateWithoutProductInput, PostUncheckedCreateWithoutProductInput>
-    where?: PostWhereInput
   }
 
-  export type PostUpdateToOneWithWhereWithoutProductInput = {
-    where?: PostWhereInput
-    data: XOR<PostUpdateWithoutProductInput, PostUncheckedUpdateWithoutProductInput>
-  }
-
-  export type PostUpdateWithoutProductInput = {
-    externalId?: StringFieldUpdateOperationsInput | string
-    title?: StringFieldUpdateOperationsInput | string
-    content?: StringFieldUpdateOperationsInput | string
-    author?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    user?: UserUpdateOneRequiredWithoutPostsNestedInput
-    wholesaleBand?: WholesaleBandUpdateOneRequiredWithoutPostsNestedInput
-    comments?: PostCommentUpdateManyWithoutPostNestedInput
-    images?: PostImageUpdateManyWithoutPostNestedInput
->>>>>>> release-1
-  }
-
-  export type PostUncheckedUpdateWithoutProductInput = {
+  export type ProductUncheckedUpdateWithoutVariantsInput = {
     id?: IntFieldUpdateOperationsInput | number
     userId?: IntFieldUpdateOperationsInput | number
-<<<<<<< HEAD
     postId?: IntFieldUpdateOperationsInput | number
     name?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
@@ -43873,130 +42963,6 @@ export namespace Prisma {
     cartItems?: CartItemUncheckedUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUncheckedUpdateManyWithoutProductNestedInput
     customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
-=======
-    wholesaleBandId?: IntFieldUpdateOperationsInput | number
-    externalId?: StringFieldUpdateOperationsInput | string
-    title?: StringFieldUpdateOperationsInput | string
-    content?: StringFieldUpdateOperationsInput | string
-    author?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    comments?: PostCommentUncheckedUpdateManyWithoutPostNestedInput
-    images?: PostImageUncheckedUpdateManyWithoutPostNestedInput
->>>>>>> release-1
-  }
-
-  export type UserUpsertWithoutProductsInput = {
-    update: XOR<UserUpdateWithoutProductsInput, UserUncheckedUpdateWithoutProductsInput>
-    create: XOR<UserCreateWithoutProductsInput, UserUncheckedCreateWithoutProductsInput>
-    where?: UserWhereInput
-  }
-
-  export type UserUpdateToOneWithWhereWithoutProductsInput = {
-    where?: UserWhereInput
-    data: XOR<UserUpdateWithoutProductsInput, UserUncheckedUpdateWithoutProductsInput>
-  }
-
-  export type UserUpdateWithoutProductsInput = {
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    aiApiConfigs?: AiApiConfigUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
-    posts?: PostUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUpdateManyWithoutUserNestedInput
-    sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
-  }
-
-  export type UserUncheckedUpdateWithoutProductsInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    aiApiConfigs?: AiApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
-    posts?: PostUncheckedUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
-    sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
-  }
-
-  export type PublishHistoryUpsertWithWhereUniqueWithoutProductInput = {
-    where: PublishHistoryWhereUniqueInput
-    update: XOR<PublishHistoryUpdateWithoutProductInput, PublishHistoryUncheckedUpdateWithoutProductInput>
-    create: XOR<PublishHistoryCreateWithoutProductInput, PublishHistoryUncheckedCreateWithoutProductInput>
-  }
-
-  export type PublishHistoryUpdateWithWhereUniqueWithoutProductInput = {
-    where: PublishHistoryWhereUniqueInput
-    data: XOR<PublishHistoryUpdateWithoutProductInput, PublishHistoryUncheckedUpdateWithoutProductInput>
-  }
-
-  export type PublishHistoryUpdateManyWithWhereWithoutProductInput = {
-    where: PublishHistoryScalarWhereInput
-    data: XOR<PublishHistoryUpdateManyMutationInput, PublishHistoryUncheckedUpdateManyWithoutProductInput>
-  }
-
-  export type PurchaseOrderUpsertWithWhereUniqueWithoutProductInput = {
-    where: PurchaseOrderWhereUniqueInput
-    update: XOR<PurchaseOrderUpdateWithoutProductInput, PurchaseOrderUncheckedUpdateWithoutProductInput>
-    create: XOR<PurchaseOrderCreateWithoutProductInput, PurchaseOrderUncheckedCreateWithoutProductInput>
-  }
-
-  export type PurchaseOrderUpdateWithWhereUniqueWithoutProductInput = {
-    where: PurchaseOrderWhereUniqueInput
-    data: XOR<PurchaseOrderUpdateWithoutProductInput, PurchaseOrderUncheckedUpdateWithoutProductInput>
-  }
-
-  export type PurchaseOrderUpdateManyWithWhereWithoutProductInput = {
-    where: PurchaseOrderScalarWhereInput
-    data: XOR<PurchaseOrderUpdateManyMutationInput, PurchaseOrderUncheckedUpdateManyWithoutProductInput>
-  }
-
-  export type SessionCartItemUpsertWithWhereUniqueWithoutProductInput = {
-    where: SessionCartItemWhereUniqueInput
-    update: XOR<SessionCartItemUpdateWithoutProductInput, SessionCartItemUncheckedUpdateWithoutProductInput>
-    create: XOR<SessionCartItemCreateWithoutProductInput, SessionCartItemUncheckedCreateWithoutProductInput>
-  }
-
-  export type SessionCartItemUpdateWithWhereUniqueWithoutProductInput = {
-    where: SessionCartItemWhereUniqueInput
-    data: XOR<SessionCartItemUpdateWithoutProductInput, SessionCartItemUncheckedUpdateWithoutProductInput>
-  }
-
-  export type SessionCartItemUpdateManyWithWhereWithoutProductInput = {
-    where: SessionCartItemScalarWhereInput
-    data: XOR<SessionCartItemUpdateManyMutationInput, SessionCartItemUncheckedUpdateManyWithoutProductInput>
-  }
-
-<<<<<<< HEAD
-  export type CustomerOrderItemUpsertWithWhereUniqueWithoutVariantInput = {
-    where: CustomerOrderItemWhereUniqueInput
-    update: XOR<CustomerOrderItemUpdateWithoutVariantInput, CustomerOrderItemUncheckedUpdateWithoutVariantInput>
-    create: XOR<CustomerOrderItemCreateWithoutVariantInput, CustomerOrderItemUncheckedCreateWithoutVariantInput>
-  }
-
-  export type CustomerOrderItemUpdateWithWhereUniqueWithoutVariantInput = {
-    where: CustomerOrderItemWhereUniqueInput
-    data: XOR<CustomerOrderItemUpdateWithoutVariantInput, CustomerOrderItemUncheckedUpdateWithoutVariantInput>
-  }
-
-  export type CustomerOrderItemUpdateManyWithWhereWithoutVariantInput = {
-    where: CustomerOrderItemScalarWhereInput
-    data: XOR<CustomerOrderItemUpdateManyMutationInput, CustomerOrderItemUncheckedUpdateManyWithoutVariantInput>
   }
 
   export type ProductCreateWithoutOptionsInput = {
@@ -44101,64 +43067,6 @@ export namespace Prisma {
     customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
   }
 
-  export type UserCreateWithoutPricingPoliciesInput = {
-    email: string
-    password: string
-    name?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
-    aiApiConfigs?: AiApiConfigCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandCreateNestedManyWithoutUserInput
-    posts?: PostCreateNestedManyWithoutUserInput
-    products?: ProductCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
-  }
-
-  export type UserUncheckedCreateWithoutPricingPoliciesInput = {
-    id?: number
-    email: string
-    password: string
-    name?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
-    aiApiConfigs?: AiApiConfigUncheckedCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
-    posts?: PostUncheckedCreateNestedManyWithoutUserInput
-    products?: ProductUncheckedCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
-  }
-
-  export type UserCreateOrConnectWithoutPricingPoliciesInput = {
-    where: UserWhereUniqueInput
-    create: XOR<UserCreateWithoutPricingPoliciesInput, UserUncheckedCreateWithoutPricingPoliciesInput>
-=======
-  export type SessionCartItemScalarWhereInput = {
-    AND?: SessionCartItemScalarWhereInput | SessionCartItemScalarWhereInput[]
-    OR?: SessionCartItemScalarWhereInput[]
-    NOT?: SessionCartItemScalarWhereInput | SessionCartItemScalarWhereInput[]
-    id?: IntFilter<"SessionCartItem"> | number
-    cartId?: IntFilter<"SessionCartItem"> | number
-    productId?: IntFilter<"SessionCartItem"> | number
-    quantity?: IntFilter<"SessionCartItem"> | number
-    priceAt?: IntFilter<"SessionCartItem"> | number
-    createdAt?: DateTimeFilter<"SessionCartItem"> | Date | string
-    updatedAt?: DateTimeFilter<"SessionCartItem"> | Date | string
-    variantId?: IntNullableFilter<"SessionCartItem"> | number | null
->>>>>>> release-1
-  }
-
   export type AutomationConfigCreateWithoutPricingPolicyInput = {
     isEnabled?: boolean
     cronExpression?: string | null
@@ -44210,6 +43118,7 @@ export namespace Prisma {
     automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
     posts?: PostCreateNestedManyWithoutUserInput
     products?: ProductCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
     retailBands?: RetailBandCreateNestedManyWithoutUserInput
@@ -44229,6 +43138,7 @@ export namespace Prisma {
     automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
     posts?: PostUncheckedCreateNestedManyWithoutUserInput
     products?: ProductUncheckedCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
     retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
@@ -44240,54 +43150,6 @@ export namespace Prisma {
   export type UserCreateOrConnectWithoutPricingPoliciesInput = {
     where: UserWhereUniqueInput
     create: XOR<UserCreateWithoutPricingPoliciesInput, UserUncheckedCreateWithoutPricingPoliciesInput>
-<<<<<<< HEAD
-    where?: UserWhereInput
-  }
-
-  export type UserUpdateToOneWithWhereWithoutPricingPoliciesInput = {
-    where?: UserWhereInput
-    data: XOR<UserUpdateWithoutPricingPoliciesInput, UserUncheckedUpdateWithoutPricingPoliciesInput>
-  }
-
-  export type UserUpdateWithoutPricingPoliciesInput = {
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
-    aiApiConfigs?: AiApiConfigUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUpdateManyWithoutUserNestedInput
-    posts?: PostUpdateManyWithoutUserNestedInput
-    products?: ProductUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
-  }
-
-  export type UserUncheckedUpdateWithoutPricingPoliciesInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    aiApiConfigs?: AiApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
-    posts?: PostUncheckedUpdateManyWithoutUserNestedInput
-    products?: ProductUncheckedUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
-=======
->>>>>>> release-1
   }
 
   export type AutomationConfigUpsertWithWhereUniqueWithoutPricingPolicyInput = {
@@ -44326,45 +43188,6 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"AutomationConfig"> | Date | string
   }
 
-<<<<<<< HEAD
-  export type UserCreateWithoutAutomationConfigInput = {
-    email: string
-    password: string
-    name?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
-    aiApiConfigs?: AiApiConfigCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandCreateNestedManyWithoutUserInput
-    posts?: PostCreateNestedManyWithoutUserInput
-    products?: ProductCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
-    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
-  }
-
-  export type UserUncheckedCreateWithoutAutomationConfigInput = {
-    id?: number
-    email: string
-    password: string
-    name?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
-    aiApiConfigs?: AiApiConfigUncheckedCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
-    posts?: PostUncheckedCreateNestedManyWithoutUserInput
-    products?: ProductUncheckedCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
-    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
-=======
   export type UserUpsertWithoutPricingPoliciesInput = {
     update: XOR<UserUpdateWithoutPricingPoliciesInput, UserUncheckedUpdateWithoutPricingPoliciesInput>
     create: XOR<UserCreateWithoutPricingPoliciesInput, UserUncheckedCreateWithoutPricingPoliciesInput>
@@ -44374,7 +43197,6 @@ export namespace Prisma {
   export type UserUpdateToOneWithWhereWithoutPricingPoliciesInput = {
     where?: UserWhereInput
     data: XOR<UserUpdateWithoutPricingPoliciesInput, UserUncheckedUpdateWithoutPricingPoliciesInput>
->>>>>>> release-1
   }
 
   export type UserUpdateWithoutPricingPoliciesInput = {
@@ -44387,6 +43209,7 @@ export namespace Prisma {
     automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
     posts?: PostUpdateManyWithoutUserNestedInput
     products?: ProductUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUpdateManyWithoutUserNestedInput
@@ -44406,6 +43229,7 @@ export namespace Prisma {
     automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
     posts?: PostUncheckedUpdateManyWithoutUserNestedInput
     products?: ProductUncheckedUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
@@ -44450,6 +43274,7 @@ export namespace Prisma {
     posts?: PostCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
     products?: ProductCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
     retailBands?: RetailBandCreateNestedManyWithoutUserInput
@@ -44469,6 +43294,7 @@ export namespace Prisma {
     posts?: PostUncheckedCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
     products?: ProductUncheckedCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
     retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
@@ -44480,54 +43306,6 @@ export namespace Prisma {
   export type UserCreateOrConnectWithoutAutomationConfigInput = {
     where: UserWhereUniqueInput
     create: XOR<UserCreateWithoutAutomationConfigInput, UserUncheckedCreateWithoutAutomationConfigInput>
-<<<<<<< HEAD
-    where?: UserWhereInput
-  }
-
-  export type UserUpdateToOneWithWhereWithoutAutomationConfigInput = {
-    where?: UserWhereInput
-    data: XOR<UserUpdateWithoutAutomationConfigInput, UserUncheckedUpdateWithoutAutomationConfigInput>
-  }
-
-  export type UserUpdateWithoutAutomationConfigInput = {
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
-    aiApiConfigs?: AiApiConfigUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUpdateManyWithoutUserNestedInput
-    posts?: PostUpdateManyWithoutUserNestedInput
-    products?: ProductUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
-  }
-
-  export type UserUncheckedUpdateWithoutAutomationConfigInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    aiApiConfigs?: AiApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
-    posts?: PostUncheckedUpdateManyWithoutUserNestedInput
-    products?: ProductUncheckedUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
-=======
->>>>>>> release-1
   }
 
   export type PricingPolicyUpsertWithoutAutomationConfigsInput = {
@@ -44583,6 +43361,7 @@ export namespace Prisma {
     posts?: PostUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
     products?: ProductUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUpdateManyWithoutUserNestedInput
@@ -44602,6 +43381,7 @@ export namespace Prisma {
     posts?: PostUncheckedUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
     products?: ProductUncheckedUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
@@ -44618,20 +43398,15 @@ export namespace Prisma {
     updatedAt?: Date | string
     aiApiConfigs?: AiApiConfigCreateNestedManyWithoutUserInput
     automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
-<<<<<<< HEAD
-    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
-=======
     posts?: PostCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
     products?: ProductCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
     retailBands?: RetailBandCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
     wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
->>>>>>> release-1
   }
 
   export type UserUncheckedCreateWithoutWorkflowLogsInput = {
@@ -44643,20 +43418,15 @@ export namespace Prisma {
     updatedAt?: Date | string
     aiApiConfigs?: AiApiConfigUncheckedCreateNestedManyWithoutUserInput
     automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
-<<<<<<< HEAD
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
-=======
     posts?: PostUncheckedCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
     products?: ProductUncheckedCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
     retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
     wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
->>>>>>> release-1
   }
 
   export type UserCreateOrConnectWithoutWorkflowLogsInput = {
@@ -44683,20 +43453,15 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     aiApiConfigs?: AiApiConfigUpdateManyWithoutUserNestedInput
     automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
-<<<<<<< HEAD
-    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
-=======
     posts?: PostUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
     products?: ProductUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
     wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
->>>>>>> release-1
   }
 
   export type UserUncheckedUpdateWithoutWorkflowLogsInput = {
@@ -44708,10 +43473,15 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     aiApiConfigs?: AiApiConfigUncheckedUpdateManyWithoutUserNestedInput
     automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
-<<<<<<< HEAD
+    posts?: PostUncheckedUpdateManyWithoutUserNestedInput
+    pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
+    products?: ProductUncheckedUpdateManyWithoutUserNestedInput
     productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
+    retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
+    sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
+    wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutProductPublishesInput = {
@@ -44720,17 +43490,17 @@ export namespace Prisma {
     name?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
     aiApiConfigs?: AiApiConfigCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandCreateNestedManyWithoutUserInput
-    posts?: PostCreateNestedManyWithoutUserInput
-    products?: ProductCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
     automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
+    posts?: PostCreateNestedManyWithoutUserInput
+    pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
+    products?: ProductCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
+    retailBands?: RetailBandCreateNestedManyWithoutUserInput
+    sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
+    wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
+    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutProductPublishesInput = {
@@ -44740,17 +43510,17 @@ export namespace Prisma {
     name?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
     aiApiConfigs?: AiApiConfigUncheckedCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
-    posts?: PostUncheckedCreateNestedManyWithoutUserInput
-    products?: ProductUncheckedCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
     automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
+    posts?: PostUncheckedCreateNestedManyWithoutUserInput
+    pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
+    products?: ProductUncheckedCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
+    retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
+    sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
+    wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
+    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutProductPublishesInput = {
@@ -44810,13 +43580,14 @@ export namespace Prisma {
     bandKey: string
     name: string
     coverUrl?: string | null
-    formUrl?: string | null
     isActive?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
-    user: UserCreateNestedOneWithoutRetailBandsInput
-    apiConfig: SourcingApiConfigCreateNestedOneWithoutRetailBandsInput
+    formUrl?: string | null
     publishHistories?: PublishHistoryCreateNestedManyWithoutRetailBandInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutRetailBandInput
+    apiConfig: SourcingApiConfigCreateNestedOneWithoutRetailBandsInput
+    user: UserCreateNestedOneWithoutRetailBandsInput
   }
 
   export type RetailBandUncheckedCreateWithoutProductPublishesInput = {
@@ -44826,11 +43597,12 @@ export namespace Prisma {
     bandKey: string
     name: string
     coverUrl?: string | null
-    formUrl?: string | null
     isActive?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
+    formUrl?: string | null
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutRetailBandInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutRetailBandInput
   }
 
   export type RetailBandCreateOrConnectWithoutProductPublishesInput = {
@@ -44855,17 +43627,17 @@ export namespace Prisma {
     name?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
     aiApiConfigs?: AiApiConfigUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUpdateManyWithoutUserNestedInput
-    posts?: PostUpdateManyWithoutUserNestedInput
-    products?: ProductUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
     automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
+    posts?: PostUpdateManyWithoutUserNestedInput
+    pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
+    products?: ProductUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
+    retailBands?: RetailBandUpdateManyWithoutUserNestedInput
+    sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
+    wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
+    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutProductPublishesInput = {
@@ -44875,17 +43647,17 @@ export namespace Prisma {
     name?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
     aiApiConfigs?: AiApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
-    posts?: PostUncheckedUpdateManyWithoutUserNestedInput
-    products?: ProductUncheckedUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
     automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
+    posts?: PostUncheckedUpdateManyWithoutUserNestedInput
+    pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
+    products?: ProductUncheckedUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
+    retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
+    sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
+    wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
+    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type ProductUpsertWithoutProductPublishesInput = {
@@ -44957,13 +43729,14 @@ export namespace Prisma {
     bandKey?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     coverUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    user?: UserUpdateOneRequiredWithoutRetailBandsNestedInput
-    apiConfig?: SourcingApiConfigUpdateOneRequiredWithoutRetailBandsNestedInput
+    formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     publishHistories?: PublishHistoryUpdateManyWithoutRetailBandNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutRetailBandNestedInput
+    apiConfig?: SourcingApiConfigUpdateOneRequiredWithoutRetailBandsNestedInput
+    user?: UserUpdateOneRequiredWithoutRetailBandsNestedInput
   }
 
   export type RetailBandUncheckedUpdateWithoutProductPublishesInput = {
@@ -44973,65 +43746,12 @@ export namespace Prisma {
     bandKey?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     coverUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutRetailBandNestedInput
-  }
-
-  export type UserCreateWithoutPublishHistoriesInput = {
-    email: string
-    password: string
-    name?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
-    aiApiConfigs?: AiApiConfigCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandCreateNestedManyWithoutUserInput
-    posts?: PostCreateNestedManyWithoutUserInput
-    products?: ProductCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
-  }
-
-  export type UserUncheckedCreateWithoutPublishHistoriesInput = {
-    id?: number
-    email: string
-    password: string
-    name?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
-    aiApiConfigs?: AiApiConfigUncheckedCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
-    posts?: PostUncheckedCreateNestedManyWithoutUserInput
-    products?: ProductUncheckedCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
-  }
-
-  export type UserCreateOrConnectWithoutPublishHistoriesInput = {
-    where: UserWhereUniqueInput
-    create: XOR<UserCreateWithoutPublishHistoriesInput, UserUncheckedCreateWithoutPublishHistoriesInput>
-=======
-    posts?: PostUncheckedUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
-    products?: ProductUncheckedUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
-    sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
->>>>>>> release-1
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutRetailBandNestedInput
   }
 
   export type ProductCreateWithoutPublishHistoriesInput = {
@@ -45044,21 +43764,15 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     user: UserCreateNestedOneWithoutProductsInput
     post: PostCreateNestedOneWithoutProductInput
     variants?: ProductVariantCreateNestedManyWithoutProductInput
     options?: ProductOptionCreateNestedManyWithoutProductInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutProductInput
     productPublishes?: ProductPublishCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     cartItems?: CartItemCreateNestedManyWithoutProductInput
-    customerOrderItems?: CustomerOrderItemCreateNestedManyWithoutProductInput
-    post: PostCreateNestedOneWithoutProductInput
-    user: UserCreateNestedOneWithoutProductsInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutProductInput
     sessionCartItems?: SessionCartItemCreateNestedManyWithoutProductInput
+    customerOrderItems?: CustomerOrderItemCreateNestedManyWithoutProductInput
   }
 
   export type ProductUncheckedCreateWithoutPublishHistoriesInput = {
@@ -45074,17 +43788,13 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedCreateNestedManyWithoutProductInput
     options?: ProductOptionUncheckedCreateNestedManyWithoutProductInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutProductInput
     productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUncheckedCreateNestedManyWithoutProductInput
-    customerOrderItems?: CustomerOrderItemUncheckedCreateNestedManyWithoutProductInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutProductInput
     sessionCartItems?: SessionCartItemUncheckedCreateNestedManyWithoutProductInput
+    customerOrderItems?: CustomerOrderItemUncheckedCreateNestedManyWithoutProductInput
   }
 
   export type ProductCreateOrConnectWithoutPublishHistoriesInput = {
@@ -45102,11 +43812,8 @@ export namespace Prisma {
     formUrl?: string | null
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutRetailBandInput
     apiConfig: SourcingApiConfigCreateNestedOneWithoutRetailBandsInput
-<<<<<<< HEAD
     productPublishes?: ProductPublishCreateNestedManyWithoutRetailBandInput
-=======
     user: UserCreateNestedOneWithoutRetailBandsInput
->>>>>>> release-1
   }
 
   export type RetailBandUncheckedCreateWithoutPublishHistoriesInput = {
@@ -45119,12 +43826,9 @@ export namespace Prisma {
     isActive?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutRetailBandInput
-=======
     formUrl?: string | null
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutRetailBandInput
->>>>>>> release-1
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutRetailBandInput
   }
 
   export type RetailBandCreateOrConnectWithoutPublishHistoriesInput = {
@@ -45143,6 +43847,7 @@ export namespace Prisma {
     posts?: PostCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
     products?: ProductCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutUserInput
     retailBands?: RetailBandCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
@@ -45162,6 +43867,7 @@ export namespace Prisma {
     posts?: PostUncheckedCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
     products?: ProductUncheckedCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutUserInput
     retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
@@ -45172,54 +43878,6 @@ export namespace Prisma {
   export type UserCreateOrConnectWithoutPublishHistoriesInput = {
     where: UserWhereUniqueInput
     create: XOR<UserCreateWithoutPublishHistoriesInput, UserUncheckedCreateWithoutPublishHistoriesInput>
-<<<<<<< HEAD
-    where?: UserWhereInput
-  }
-
-  export type UserUpdateToOneWithWhereWithoutPublishHistoriesInput = {
-    where?: UserWhereInput
-    data: XOR<UserUpdateWithoutPublishHistoriesInput, UserUncheckedUpdateWithoutPublishHistoriesInput>
-  }
-
-  export type UserUpdateWithoutPublishHistoriesInput = {
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
-    aiApiConfigs?: AiApiConfigUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUpdateManyWithoutUserNestedInput
-    posts?: PostUpdateManyWithoutUserNestedInput
-    products?: ProductUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
-  }
-
-  export type UserUncheckedUpdateWithoutPublishHistoriesInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    aiApiConfigs?: AiApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
-    posts?: PostUncheckedUpdateManyWithoutUserNestedInput
-    products?: ProductUncheckedUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
-=======
->>>>>>> release-1
   }
 
   export type ProductUpsertWithoutPublishHistoriesInput = {
@@ -45243,21 +43901,15 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     user?: UserUpdateOneRequiredWithoutProductsNestedInput
     post?: PostUpdateOneRequiredWithoutProductNestedInput
     variants?: ProductVariantUpdateManyWithoutProductNestedInput
     options?: ProductOptionUpdateManyWithoutProductNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutProductNestedInput
     productPublishes?: ProductPublishUpdateManyWithoutProductNestedInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUpdateManyWithoutProductNestedInput
-    customerOrderItems?: CustomerOrderItemUpdateManyWithoutProductNestedInput
-    post?: PostUpdateOneRequiredWithoutProductNestedInput
-    user?: UserUpdateOneRequiredWithoutProductsNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUpdateManyWithoutProductNestedInput
+    customerOrderItems?: CustomerOrderItemUpdateManyWithoutProductNestedInput
   }
 
   export type ProductUncheckedUpdateWithoutPublishHistoriesInput = {
@@ -45273,17 +43925,13 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedUpdateManyWithoutProductNestedInput
     options?: ProductOptionUncheckedUpdateManyWithoutProductNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput
     productPublishes?: ProductPublishUncheckedUpdateManyWithoutProductNestedInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUncheckedUpdateManyWithoutProductNestedInput
-    customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUncheckedUpdateManyWithoutProductNestedInput
+    customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
   }
 
   export type RetailBandUpsertWithoutPublishHistoriesInput = {
@@ -45307,11 +43955,8 @@ export namespace Prisma {
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     purchaseOrders?: PurchaseOrderUpdateManyWithoutRetailBandNestedInput
     apiConfig?: SourcingApiConfigUpdateOneRequiredWithoutRetailBandsNestedInput
-<<<<<<< HEAD
     productPublishes?: ProductPublishUpdateManyWithoutRetailBandNestedInput
-=======
     user?: UserUpdateOneRequiredWithoutRetailBandsNestedInput
->>>>>>> release-1
   }
 
   export type RetailBandUncheckedUpdateWithoutPublishHistoriesInput = {
@@ -45324,50 +43969,9 @@ export namespace Prisma {
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutRetailBandNestedInput
-  }
-
-  export type UserCreateWithoutPurchaseOrdersInput = {
-    email: string
-    password: string
-    name?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
-    aiApiConfigs?: AiApiConfigCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandCreateNestedManyWithoutUserInput
-    posts?: PostCreateNestedManyWithoutUserInput
-    products?: ProductCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
-  }
-
-  export type UserUncheckedCreateWithoutPurchaseOrdersInput = {
-    id?: number
-    email: string
-    password: string
-    name?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
-    aiApiConfigs?: AiApiConfigUncheckedCreateNestedManyWithoutUserInput
-    wholesaleBands?: WholesaleBandUncheckedCreateNestedManyWithoutUserInput
-    retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
-    posts?: PostUncheckedCreateNestedManyWithoutUserInput
-    products?: ProductUncheckedCreateNestedManyWithoutUserInput
-    pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
-    automationConfig?: AutomationConfigUncheckedCreateNestedOneWithoutUserInput
-    workflowLogs?: WorkflowLogUncheckedCreateNestedManyWithoutUserInput
-    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
-=======
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutRetailBandNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutRetailBandNestedInput
   }
 
   export type UserUpsertWithoutPublishHistoriesInput = {
@@ -45379,7 +43983,6 @@ export namespace Prisma {
   export type UserUpdateToOneWithWhereWithoutPublishHistoriesInput = {
     where?: UserWhereInput
     data: XOR<UserUpdateWithoutPublishHistoriesInput, UserUncheckedUpdateWithoutPublishHistoriesInput>
->>>>>>> release-1
   }
 
   export type UserUpdateWithoutPublishHistoriesInput = {
@@ -45393,6 +43996,7 @@ export namespace Prisma {
     posts?: PostUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
     products?: ProductUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
@@ -45412,6 +44016,7 @@ export namespace Prisma {
     posts?: PostUncheckedUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
     products?: ProductUncheckedUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
@@ -45429,21 +44034,15 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     user: UserCreateNestedOneWithoutProductsInput
     post: PostCreateNestedOneWithoutProductInput
     variants?: ProductVariantCreateNestedManyWithoutProductInput
     options?: ProductOptionCreateNestedManyWithoutProductInput
     productPublishes?: ProductPublishCreateNestedManyWithoutProductInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     cartItems?: CartItemCreateNestedManyWithoutProductInput
-    customerOrderItems?: CustomerOrderItemCreateNestedManyWithoutProductInput
-    post: PostCreateNestedOneWithoutProductInput
-    user: UserCreateNestedOneWithoutProductsInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutProductInput
     sessionCartItems?: SessionCartItemCreateNestedManyWithoutProductInput
+    customerOrderItems?: CustomerOrderItemCreateNestedManyWithoutProductInput
   }
 
   export type ProductUncheckedCreateWithoutPurchaseOrdersInput = {
@@ -45459,17 +44058,13 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedCreateNestedManyWithoutProductInput
     options?: ProductOptionUncheckedCreateNestedManyWithoutProductInput
     productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutProductInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUncheckedCreateNestedManyWithoutProductInput
-    customerOrderItems?: CustomerOrderItemUncheckedCreateNestedManyWithoutProductInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutProductInput
     sessionCartItems?: SessionCartItemUncheckedCreateNestedManyWithoutProductInput
+    customerOrderItems?: CustomerOrderItemUncheckedCreateNestedManyWithoutProductInput
   }
 
   export type ProductCreateOrConnectWithoutPurchaseOrdersInput = {
@@ -45487,6 +44082,7 @@ export namespace Prisma {
     formUrl?: string | null
     publishHistories?: PublishHistoryCreateNestedManyWithoutRetailBandInput
     apiConfig: SourcingApiConfigCreateNestedOneWithoutRetailBandsInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutRetailBandInput
     user: UserCreateNestedOneWithoutRetailBandsInput
   }
 
@@ -45502,6 +44098,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     formUrl?: string | null
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutRetailBandInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutRetailBandInput
   }
 
   export type RetailBandCreateOrConnectWithoutPurchaseOrdersInput = {
@@ -45520,6 +44117,7 @@ export namespace Prisma {
     posts?: PostCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyCreateNestedManyWithoutUserInput
     products?: ProductCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutUserInput
     retailBands?: RetailBandCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigCreateNestedManyWithoutUserInput
@@ -45539,6 +44137,7 @@ export namespace Prisma {
     posts?: PostUncheckedCreateNestedManyWithoutUserInput
     pricingPolicies?: PricingPolicyUncheckedCreateNestedManyWithoutUserInput
     products?: ProductUncheckedCreateNestedManyWithoutUserInput
+    productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutUserInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutUserInput
     retailBands?: RetailBandUncheckedCreateNestedManyWithoutUserInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedCreateNestedManyWithoutUserInput
@@ -45549,54 +44148,6 @@ export namespace Prisma {
   export type UserCreateOrConnectWithoutPurchaseOrdersInput = {
     where: UserWhereUniqueInput
     create: XOR<UserCreateWithoutPurchaseOrdersInput, UserUncheckedCreateWithoutPurchaseOrdersInput>
-<<<<<<< HEAD
-    where?: UserWhereInput
-  }
-
-  export type UserUpdateToOneWithWhereWithoutPurchaseOrdersInput = {
-    where?: UserWhereInput
-    data: XOR<UserUpdateWithoutPurchaseOrdersInput, UserUncheckedUpdateWithoutPurchaseOrdersInput>
-  }
-
-  export type UserUpdateWithoutPurchaseOrdersInput = {
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
-    aiApiConfigs?: AiApiConfigUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUpdateManyWithoutUserNestedInput
-    posts?: PostUpdateManyWithoutUserNestedInput
-    products?: ProductUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
-  }
-
-  export type UserUncheckedUpdateWithoutPurchaseOrdersInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    email?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    name?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    aiApiConfigs?: AiApiConfigUncheckedUpdateManyWithoutUserNestedInput
-    wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
-    retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
-    posts?: PostUncheckedUpdateManyWithoutUserNestedInput
-    products?: ProductUncheckedUpdateManyWithoutUserNestedInput
-    pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
-    automationConfig?: AutomationConfigUncheckedUpdateOneWithoutUserNestedInput
-    workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
-=======
->>>>>>> release-1
   }
 
   export type ProductUpsertWithoutPurchaseOrdersInput = {
@@ -45620,21 +44171,15 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     user?: UserUpdateOneRequiredWithoutProductsNestedInput
     post?: PostUpdateOneRequiredWithoutProductNestedInput
     variants?: ProductVariantUpdateManyWithoutProductNestedInput
     options?: ProductOptionUpdateManyWithoutProductNestedInput
     productPublishes?: ProductPublishUpdateManyWithoutProductNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutProductNestedInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUpdateManyWithoutProductNestedInput
-    customerOrderItems?: CustomerOrderItemUpdateManyWithoutProductNestedInput
-    post?: PostUpdateOneRequiredWithoutProductNestedInput
-    user?: UserUpdateOneRequiredWithoutProductsNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUpdateManyWithoutProductNestedInput
+    customerOrderItems?: CustomerOrderItemUpdateManyWithoutProductNestedInput
   }
 
   export type ProductUncheckedUpdateWithoutPurchaseOrdersInput = {
@@ -45650,7 +44195,6 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedUpdateManyWithoutProductNestedInput
     options?: ProductOptionUncheckedUpdateManyWithoutProductNestedInput
     productPublishes?: ProductPublishUncheckedUpdateManyWithoutProductNestedInput
@@ -45658,11 +44202,6 @@ export namespace Prisma {
     cartItems?: CartItemUncheckedUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUncheckedUpdateManyWithoutProductNestedInput
     customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
-=======
-    cartItems?: CartItemUncheckedUpdateManyWithoutProductNestedInput
-    customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutProductNestedInput
-    sessionCartItems?: SessionCartItemUncheckedUpdateManyWithoutProductNestedInput
   }
 
   export type RetailBandUpsertWithoutPurchaseOrdersInput = {
@@ -45686,6 +44225,7 @@ export namespace Prisma {
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     publishHistories?: PublishHistoryUpdateManyWithoutRetailBandNestedInput
     apiConfig?: SourcingApiConfigUpdateOneRequiredWithoutRetailBandsNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutRetailBandNestedInput
     user?: UserUpdateOneRequiredWithoutRetailBandsNestedInput
   }
 
@@ -45701,6 +44241,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutRetailBandNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutRetailBandNestedInput
   }
 
   export type UserUpsertWithoutPurchaseOrdersInput = {
@@ -45725,6 +44266,7 @@ export namespace Prisma {
     posts?: PostUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUpdateManyWithoutUserNestedInput
     products?: ProductUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUpdateManyWithoutUserNestedInput
@@ -45744,12 +44286,12 @@ export namespace Prisma {
     posts?: PostUncheckedUpdateManyWithoutUserNestedInput
     pricingPolicies?: PricingPolicyUncheckedUpdateManyWithoutUserNestedInput
     products?: ProductUncheckedUpdateManyWithoutUserNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutUserNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutUserNestedInput
     retailBands?: RetailBandUncheckedUpdateManyWithoutUserNestedInput
     sourcingApiConfigs?: SourcingApiConfigUncheckedUpdateManyWithoutUserNestedInput
     wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutUserNestedInput
     workflowLogs?: WorkflowLogUncheckedUpdateManyWithoutUserNestedInput
->>>>>>> release-1
   }
 
   export type CustomerAddressCreateWithoutCustomerInput = {
@@ -46109,7 +44651,6 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     user: UserCreateNestedOneWithoutProductsInput
     post: PostCreateNestedOneWithoutProductInput
     variants?: ProductVariantCreateNestedManyWithoutProductInput
@@ -46117,14 +44658,8 @@ export namespace Prisma {
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutProductInput
     productPublishes?: ProductPublishCreateNestedManyWithoutProductInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     cartItems?: CartItemCreateNestedManyWithoutProductInput
     customerOrderItems?: CustomerOrderItemCreateNestedManyWithoutProductInput
-    post: PostCreateNestedOneWithoutProductInput
-    user: UserCreateNestedOneWithoutProductsInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutProductInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutProductInput
   }
 
   export type ProductUncheckedCreateWithoutSessionCartItemsInput = {
@@ -46140,18 +44675,13 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedCreateNestedManyWithoutProductInput
     options?: ProductOptionUncheckedCreateNestedManyWithoutProductInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutProductInput
     productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutProductInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUncheckedCreateNestedManyWithoutProductInput
     customerOrderItems?: CustomerOrderItemUncheckedCreateNestedManyWithoutProductInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutProductInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutProductInput
   }
 
   export type ProductCreateOrConnectWithoutSessionCartItemsInput = {
@@ -46180,7 +44710,6 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     user?: UserUpdateOneRequiredWithoutProductsNestedInput
     post?: PostUpdateOneRequiredWithoutProductNestedInput
     variants?: ProductVariantUpdateManyWithoutProductNestedInput
@@ -46188,14 +44717,8 @@ export namespace Prisma {
     purchaseOrders?: PurchaseOrderUpdateManyWithoutProductNestedInput
     productPublishes?: ProductPublishUpdateManyWithoutProductNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutProductNestedInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUpdateManyWithoutProductNestedInput
     customerOrderItems?: CustomerOrderItemUpdateManyWithoutProductNestedInput
-    post?: PostUpdateOneRequiredWithoutProductNestedInput
-    user?: UserUpdateOneRequiredWithoutProductsNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutProductNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutProductNestedInput
   }
 
   export type ProductUncheckedUpdateWithoutSessionCartItemsInput = {
@@ -46211,18 +44734,13 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedUpdateManyWithoutProductNestedInput
     options?: ProductOptionUncheckedUpdateManyWithoutProductNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput
     productPublishes?: ProductPublishUncheckedUpdateManyWithoutProductNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutProductNestedInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUncheckedUpdateManyWithoutProductNestedInput
     customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutProductNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput
   }
 
   export type ProductCreateWithoutCartItemsInput = {
@@ -46235,7 +44753,6 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     user: UserCreateNestedOneWithoutProductsInput
     post: PostCreateNestedOneWithoutProductInput
     variants?: ProductVariantCreateNestedManyWithoutProductInput
@@ -46244,14 +44761,7 @@ export namespace Prisma {
     productPublishes?: ProductPublishCreateNestedManyWithoutProductInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutProductInput
     sessionCartItems?: SessionCartItemCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     customerOrderItems?: CustomerOrderItemCreateNestedManyWithoutProductInput
-    post: PostCreateNestedOneWithoutProductInput
-    user: UserCreateNestedOneWithoutProductsInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutProductInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutProductInput
-    sessionCartItems?: SessionCartItemCreateNestedManyWithoutProductInput
   }
 
   export type ProductUncheckedCreateWithoutCartItemsInput = {
@@ -46267,19 +44777,13 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedCreateNestedManyWithoutProductInput
     options?: ProductOptionUncheckedCreateNestedManyWithoutProductInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutProductInput
     productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutProductInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutProductInput
     sessionCartItems?: SessionCartItemUncheckedCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     customerOrderItems?: CustomerOrderItemUncheckedCreateNestedManyWithoutProductInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutProductInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutProductInput
-    sessionCartItems?: SessionCartItemUncheckedCreateNestedManyWithoutProductInput
   }
 
   export type ProductCreateOrConnectWithoutCartItemsInput = {
@@ -46308,7 +44812,6 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     user?: UserUpdateOneRequiredWithoutProductsNestedInput
     post?: PostUpdateOneRequiredWithoutProductNestedInput
     variants?: ProductVariantUpdateManyWithoutProductNestedInput
@@ -46317,14 +44820,7 @@ export namespace Prisma {
     productPublishes?: ProductPublishUpdateManyWithoutProductNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUpdateManyWithoutProductNestedInput
-=======
->>>>>>> release-1
     customerOrderItems?: CustomerOrderItemUpdateManyWithoutProductNestedInput
-    post?: PostUpdateOneRequiredWithoutProductNestedInput
-    user?: UserUpdateOneRequiredWithoutProductsNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutProductNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutProductNestedInput
-    sessionCartItems?: SessionCartItemUpdateManyWithoutProductNestedInput
   }
 
   export type ProductUncheckedUpdateWithoutCartItemsInput = {
@@ -46340,19 +44836,13 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedUpdateManyWithoutProductNestedInput
     options?: ProductOptionUncheckedUpdateManyWithoutProductNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput
     productPublishes?: ProductPublishUncheckedUpdateManyWithoutProductNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUncheckedUpdateManyWithoutProductNestedInput
-=======
->>>>>>> release-1
     customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutProductNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput
-    sessionCartItems?: SessionCartItemUncheckedUpdateManyWithoutProductNestedInput
   }
 
   export type CustomerCreateWithoutOrdersInput = {
@@ -46634,7 +45124,6 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     user: UserCreateNestedOneWithoutProductsInput
     post: PostCreateNestedOneWithoutProductInput
     variants?: ProductVariantCreateNestedManyWithoutProductInput
@@ -46642,13 +45131,7 @@ export namespace Prisma {
     purchaseOrders?: PurchaseOrderCreateNestedManyWithoutProductInput
     productPublishes?: ProductPublishCreateNestedManyWithoutProductInput
     publishHistories?: PublishHistoryCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     cartItems?: CartItemCreateNestedManyWithoutProductInput
-    post: PostCreateNestedOneWithoutProductInput
-    user: UserCreateNestedOneWithoutProductsInput
-    publishHistories?: PublishHistoryCreateNestedManyWithoutProductInput
-    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutProductInput
     sessionCartItems?: SessionCartItemCreateNestedManyWithoutProductInput
   }
 
@@ -46665,17 +45148,12 @@ export namespace Prisma {
     wholesalePrice?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedCreateNestedManyWithoutProductInput
     options?: ProductOptionUncheckedCreateNestedManyWithoutProductInput
     purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutProductInput
     productPublishes?: ProductPublishUncheckedCreateNestedManyWithoutProductInput
     publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutProductInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUncheckedCreateNestedManyWithoutProductInput
-    publishHistories?: PublishHistoryUncheckedCreateNestedManyWithoutProductInput
-    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutProductInput
     sessionCartItems?: SessionCartItemUncheckedCreateNestedManyWithoutProductInput
   }
 
@@ -46765,7 +45243,6 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     user?: UserUpdateOneRequiredWithoutProductsNestedInput
     post?: PostUpdateOneRequiredWithoutProductNestedInput
     variants?: ProductVariantUpdateManyWithoutProductNestedInput
@@ -46773,13 +45250,7 @@ export namespace Prisma {
     purchaseOrders?: PurchaseOrderUpdateManyWithoutProductNestedInput
     productPublishes?: ProductPublishUpdateManyWithoutProductNestedInput
     publishHistories?: PublishHistoryUpdateManyWithoutProductNestedInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUpdateManyWithoutProductNestedInput
-    post?: PostUpdateOneRequiredWithoutProductNestedInput
-    user?: UserUpdateOneRequiredWithoutProductsNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutProductNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUpdateManyWithoutProductNestedInput
   }
 
@@ -46796,17 +45267,12 @@ export namespace Prisma {
     wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-<<<<<<< HEAD
     variants?: ProductVariantUncheckedUpdateManyWithoutProductNestedInput
     options?: ProductOptionUncheckedUpdateManyWithoutProductNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput
     productPublishes?: ProductPublishUncheckedUpdateManyWithoutProductNestedInput
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutProductNestedInput
-=======
->>>>>>> release-1
     cartItems?: CartItemUncheckedUpdateManyWithoutProductNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutProductNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput
     sessionCartItems?: SessionCartItemUncheckedUpdateManyWithoutProductNestedInput
   }
 
@@ -46972,6 +45438,15 @@ export namespace Prisma {
     updatedAt?: Date | string
   }
 
+  export type ProductPublishCreateManyUserInput = {
+    id?: number
+    productId: number
+    retailBandId: number
+    status?: $Enums.PublishStatus
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type PublishHistoryCreateManyUserInput = {
     id?: number
     productId: number
@@ -47043,83 +45518,6 @@ export namespace Prisma {
     errorMessage?: string | null
   }
 
-<<<<<<< HEAD
-  export type ProductPublishCreateManyUserInput = {
-    id?: number
-    productId: number
-    retailBandId: number
-    status?: $Enums.PublishStatus
-    createdAt?: Date | string
-    updatedAt?: Date | string
-  }
-
-  export type PublishHistoryCreateManyUserInput = {
-    id?: number
-    productId: number
-    retailBandId: number
-    postKey?: string | null
-    status?: $Enums.PublishStatus
-    errorMessage?: string | null
-    publishedAt?: Date | string
-  }
-
-  export type PurchaseOrderCreateManyUserInput = {
-    id?: number
-    productId?: number | null
-    productName: string
-    totalPrice?: number | null
-    customerName: string
-    createdAt?: Date | string
-    updatedAt?: Date | string
-  }
-
-  export type SourcingApiConfigUpdateWithoutUserInput = {
-    platform?: EnumSourcingPlatformFieldUpdateOperationsInput | $Enums.SourcingPlatform
-    apiKey?: NullableStringFieldUpdateOperationsInput | string | null
-    accessToken?: NullableStringFieldUpdateOperationsInput | string | null
-    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
-    tokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    metadata?: NullableJsonNullValueInput | InputJsonValue
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    wholesaleBands?: WholesaleBandUpdateManyWithoutApiConfigNestedInput
-    retailBands?: RetailBandUpdateManyWithoutApiConfigNestedInput
-  }
-
-  export type SourcingApiConfigUncheckedUpdateWithoutUserInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    platform?: EnumSourcingPlatformFieldUpdateOperationsInput | $Enums.SourcingPlatform
-    apiKey?: NullableStringFieldUpdateOperationsInput | string | null
-    accessToken?: NullableStringFieldUpdateOperationsInput | string | null
-    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
-    tokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    metadata?: NullableJsonNullValueInput | InputJsonValue
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    wholesaleBands?: WholesaleBandUncheckedUpdateManyWithoutApiConfigNestedInput
-    retailBands?: RetailBandUncheckedUpdateManyWithoutApiConfigNestedInput
-  }
-
-  export type SourcingApiConfigUncheckedUpdateManyWithoutUserInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    platform?: EnumSourcingPlatformFieldUpdateOperationsInput | $Enums.SourcingPlatform
-    apiKey?: NullableStringFieldUpdateOperationsInput | string | null
-    accessToken?: NullableStringFieldUpdateOperationsInput | string | null
-    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
-    tokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    metadata?: NullableJsonNullValueInput | InputJsonValue
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-=======
->>>>>>> release-1
   export type AiApiConfigUpdateWithoutUserInput = {
     provider?: EnumAiProviderFieldUpdateOperationsInput | $Enums.AiProvider
     apiKey?: StringFieldUpdateOperationsInput | string
@@ -47158,82 +45556,6 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
-<<<<<<< HEAD
-  export type WholesaleBandUpdateWithoutUserInput = {
-    bandKey?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    coverUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    apiConfig?: SourcingApiConfigUpdateOneRequiredWithoutWholesaleBandsNestedInput
-    posts?: PostUpdateManyWithoutWholesaleBandNestedInput
-  }
-
-  export type WholesaleBandUncheckedUpdateWithoutUserInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    apiConfigId?: IntFieldUpdateOperationsInput | number
-    bandKey?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    coverUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    posts?: PostUncheckedUpdateManyWithoutWholesaleBandNestedInput
-  }
-
-  export type WholesaleBandUncheckedUpdateManyWithoutUserInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    apiConfigId?: IntFieldUpdateOperationsInput | number
-    bandKey?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    coverUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type RetailBandUpdateWithoutUserInput = {
-    bandKey?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    coverUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    formUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    apiConfig?: SourcingApiConfigUpdateOneRequiredWithoutRetailBandsNestedInput
-    productPublishes?: ProductPublishUpdateManyWithoutRetailBandNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutRetailBandNestedInput
-  }
-
-  export type RetailBandUncheckedUpdateWithoutUserInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    apiConfigId?: IntFieldUpdateOperationsInput | number
-    bandKey?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    coverUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    formUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutRetailBandNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutRetailBandNestedInput
-  }
-
-  export type RetailBandUncheckedUpdateManyWithoutUserInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    apiConfigId?: IntFieldUpdateOperationsInput | number
-    bandKey?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    coverUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    formUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-=======
->>>>>>> release-1
   export type PostUpdateWithoutUserInput = {
     externalId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
@@ -47272,7 +45594,37 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
-<<<<<<< HEAD
+  export type PricingPolicyUpdateWithoutUserInput = {
+    name?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    content?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    automationConfigs?: AutomationConfigUpdateManyWithoutPricingPolicyNestedInput
+  }
+
+  export type PricingPolicyUncheckedUpdateWithoutUserInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    name?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    content?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    automationConfigs?: AutomationConfigUncheckedUpdateManyWithoutPricingPolicyNestedInput
+  }
+
+  export type PricingPolicyUncheckedUpdateManyWithoutUserInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    name?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    content?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type ProductUpdateWithoutUserInput = {
     name?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
@@ -47321,93 +45673,6 @@ export namespace Prisma {
     postId?: IntFieldUpdateOperationsInput | number
     name?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
-    thumbnailUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
-    currency?: StringFieldUpdateOperationsInput | string
-    price?: NullableIntFieldUpdateOperationsInput | number | null
-    wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-=======
->>>>>>> release-1
-  export type PricingPolicyUpdateWithoutUserInput = {
-    name?: StringFieldUpdateOperationsInput | string
-    description?: NullableStringFieldUpdateOperationsInput | string | null
-    content?: StringFieldUpdateOperationsInput | string
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    automationConfigs?: AutomationConfigUpdateManyWithoutPricingPolicyNestedInput
-  }
-
-  export type PricingPolicyUncheckedUpdateWithoutUserInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    name?: StringFieldUpdateOperationsInput | string
-    description?: NullableStringFieldUpdateOperationsInput | string | null
-    content?: StringFieldUpdateOperationsInput | string
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    automationConfigs?: AutomationConfigUncheckedUpdateManyWithoutPricingPolicyNestedInput
-  }
-
-  export type PricingPolicyUncheckedUpdateManyWithoutUserInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    name?: StringFieldUpdateOperationsInput | string
-    description?: NullableStringFieldUpdateOperationsInput | string | null
-    content?: StringFieldUpdateOperationsInput | string
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type ProductUpdateWithoutUserInput = {
-    name?: StringFieldUpdateOperationsInput | string
-    description?: NullableStringFieldUpdateOperationsInput | string | null
-    status?: EnumProductStatusFieldUpdateOperationsInput | $Enums.ProductStatus
-    thumbnailUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
-    currency?: StringFieldUpdateOperationsInput | string
-    price?: NullableIntFieldUpdateOperationsInput | number | null
-    wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    cartItems?: CartItemUpdateManyWithoutProductNestedInput
-    customerOrderItems?: CustomerOrderItemUpdateManyWithoutProductNestedInput
-    post?: PostUpdateOneRequiredWithoutProductNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutProductNestedInput
-    purchaseOrders?: PurchaseOrderUpdateManyWithoutProductNestedInput
-    sessionCartItems?: SessionCartItemUpdateManyWithoutProductNestedInput
-  }
-
-  export type ProductUncheckedUpdateWithoutUserInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    postId?: IntFieldUpdateOperationsInput | number
-    name?: StringFieldUpdateOperationsInput | string
-    description?: NullableStringFieldUpdateOperationsInput | string | null
-    status?: EnumProductStatusFieldUpdateOperationsInput | $Enums.ProductStatus
-    thumbnailUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
-    currency?: StringFieldUpdateOperationsInput | string
-    price?: NullableIntFieldUpdateOperationsInput | number | null
-    wholesalePrice?: NullableIntFieldUpdateOperationsInput | number | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    cartItems?: CartItemUncheckedUpdateManyWithoutProductNestedInput
-    customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutProductNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutProductNestedInput
-    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutProductNestedInput
-    sessionCartItems?: SessionCartItemUncheckedUpdateManyWithoutProductNestedInput
-  }
-
-  export type ProductUncheckedUpdateManyWithoutUserInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    postId?: IntFieldUpdateOperationsInput | number
-    name?: StringFieldUpdateOperationsInput | string
-    description?: NullableStringFieldUpdateOperationsInput | string | null
-    status?: EnumProductStatusFieldUpdateOperationsInput | $Enums.ProductStatus
     thumbnailUrl?: NullableStringFieldUpdateOperationsInput | string | null
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
     currency?: StringFieldUpdateOperationsInput | string
@@ -47504,8 +45769,6 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
-<<<<<<< HEAD
-=======
   export type RetailBandUpdateWithoutUserInput = {
     bandKey?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
@@ -47517,6 +45780,7 @@ export namespace Prisma {
     publishHistories?: PublishHistoryUpdateManyWithoutRetailBandNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutRetailBandNestedInput
     apiConfig?: SourcingApiConfigUpdateOneRequiredWithoutRetailBandsNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutRetailBandNestedInput
   }
 
   export type RetailBandUncheckedUpdateWithoutUserInput = {
@@ -47531,6 +45795,7 @@ export namespace Prisma {
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutRetailBandNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutRetailBandNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutRetailBandNestedInput
   }
 
   export type RetailBandUncheckedUpdateManyWithoutUserInput = {
@@ -47674,7 +45939,6 @@ export namespace Prisma {
     formUrl?: string | null
   }
 
->>>>>>> release-1
   export type WholesaleBandCreateManyApiConfigInput = {
     id?: number
     userId: number
@@ -47696,6 +45960,7 @@ export namespace Prisma {
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     publishHistories?: PublishHistoryUpdateManyWithoutRetailBandNestedInput
     purchaseOrders?: PurchaseOrderUpdateManyWithoutRetailBandNestedInput
+    productPublishes?: ProductPublishUpdateManyWithoutRetailBandNestedInput
     user?: UserUpdateOneRequiredWithoutRetailBandsNestedInput
   }
 
@@ -47711,6 +45976,7 @@ export namespace Prisma {
     formUrl?: NullableStringFieldUpdateOperationsInput | string | null
     publishHistories?: PublishHistoryUncheckedUpdateManyWithoutRetailBandNestedInput
     purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutRetailBandNestedInput
+    productPublishes?: ProductPublishUncheckedUpdateManyWithoutRetailBandNestedInput
   }
 
   export type RetailBandUncheckedUpdateManyWithoutApiConfigInput = {
@@ -47759,48 +46025,6 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
-<<<<<<< HEAD
-  export type RetailBandUpdateWithoutApiConfigInput = {
-    bandKey?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    coverUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    formUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    user?: UserUpdateOneRequiredWithoutRetailBandsNestedInput
-    productPublishes?: ProductPublishUpdateManyWithoutRetailBandNestedInput
-    publishHistories?: PublishHistoryUpdateManyWithoutRetailBandNestedInput
-  }
-
-  export type RetailBandUncheckedUpdateWithoutApiConfigInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    userId?: IntFieldUpdateOperationsInput | number
-    bandKey?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    coverUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    formUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    productPublishes?: ProductPublishUncheckedUpdateManyWithoutRetailBandNestedInput
-    publishHistories?: PublishHistoryUncheckedUpdateManyWithoutRetailBandNestedInput
-  }
-
-  export type RetailBandUncheckedUpdateManyWithoutApiConfigInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    userId?: IntFieldUpdateOperationsInput | number
-    bandKey?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    coverUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    formUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    isActive?: BoolFieldUpdateOperationsInput | boolean
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-=======
->>>>>>> release-1
   export type PostCreateManyWholesaleBandInput = {
     id?: number
     userId: number
@@ -47850,15 +46074,6 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
-  export type ProductPublishCreateManyRetailBandInput = {
-    id?: number
-    userId: number
-    productId: number
-    status?: $Enums.PublishStatus
-    createdAt?: Date | string
-    updatedAt?: Date | string
-  }
-
   export type PublishHistoryCreateManyRetailBandInput = {
     id?: number
     userId: number
@@ -47869,32 +46084,6 @@ export namespace Prisma {
     publishedAt?: Date | string
   }
 
-<<<<<<< HEAD
-  export type ProductPublishUpdateWithoutRetailBandInput = {
-    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    user?: UserUpdateOneRequiredWithoutProductPublishesNestedInput
-    product?: ProductUpdateOneRequiredWithoutProductPublishesNestedInput
-  }
-
-  export type ProductPublishUncheckedUpdateWithoutRetailBandInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    userId?: IntFieldUpdateOperationsInput | number
-    productId?: IntFieldUpdateOperationsInput | number
-    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type ProductPublishUncheckedUpdateManyWithoutRetailBandInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    userId?: IntFieldUpdateOperationsInput | number
-    productId?: IntFieldUpdateOperationsInput | number
-    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-=======
   export type PurchaseOrderCreateManyRetailBandInput = {
     id?: number
     userId: number
@@ -47904,7 +46093,15 @@ export namespace Prisma {
     customerName: string
     createdAt?: Date | string
     updatedAt?: Date | string
->>>>>>> release-1
+  }
+
+  export type ProductPublishCreateManyRetailBandInput = {
+    id?: number
+    userId: number
+    productId: number
+    status?: $Enums.PublishStatus
+    createdAt?: Date | string
+    updatedAt?: Date | string
   }
 
   export type PublishHistoryUpdateWithoutRetailBandInput = {
@@ -47964,6 +46161,32 @@ export namespace Prisma {
     productName?: StringFieldUpdateOperationsInput | string
     totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
     customerName?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProductPublishUpdateWithoutRetailBandInput = {
+    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutProductPublishesNestedInput
+    product?: ProductUpdateOneRequiredWithoutProductPublishesNestedInput
+  }
+
+  export type ProductPublishUncheckedUpdateWithoutRetailBandInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    productId?: IntFieldUpdateOperationsInput | number
+    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProductPublishUncheckedUpdateManyWithoutRetailBandInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    productId?: IntFieldUpdateOperationsInput | number
+    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -48034,9 +46257,8 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
-  export type CartItemCreateManyProductInput = {
+  export type ProductVariantCreateManyProductInput = {
     id?: number
-<<<<<<< HEAD
     sku?: string | null
     optionSummary?: string | null
     price: number
@@ -48059,6 +46281,7 @@ export namespace Prisma {
   export type PurchaseOrderCreateManyProductInput = {
     id?: number
     userId: number
+    retailBandId?: number | null
     productName: string
     totalPrice?: number | null
     customerName: string
@@ -48071,10 +46294,34 @@ export namespace Prisma {
     userId: number
     retailBandId: number
     status?: $Enums.PublishStatus
-=======
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PublishHistoryCreateManyProductInput = {
+    id?: number
+    userId: number
+    retailBandId: number
+    postKey?: string | null
+    status?: $Enums.PublishStatus
+    errorMessage?: string | null
+    publishedAt?: Date | string
+  }
+
+  export type CartItemCreateManyProductInput = {
+    id?: number
     customerId: number
     quantity?: number
->>>>>>> release-1
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    variantId?: number | null
+  }
+
+  export type SessionCartItemCreateManyProductInput = {
+    id?: number
+    cartId: number
+    quantity?: number
+    priceAt: number
     createdAt?: Date | string
     updatedAt?: Date | string
     variantId?: number | null
@@ -48093,38 +46340,6 @@ export namespace Prisma {
     variantId?: number | null
   }
 
-  export type PublishHistoryCreateManyProductInput = {
-    id?: number
-    userId: number
-    retailBandId: number
-    postKey?: string | null
-    status?: $Enums.PublishStatus
-    errorMessage?: string | null
-    publishedAt?: Date | string
-  }
-
-  export type PurchaseOrderCreateManyProductInput = {
-    id?: number
-    userId: number
-    retailBandId?: number | null
-    productName: string
-    totalPrice?: number | null
-    customerName: string
-    createdAt?: Date | string
-    updatedAt?: Date | string
-  }
-
-  export type SessionCartItemCreateManyProductInput = {
-    id?: number
-    cartId: number
-    quantity?: number
-    priceAt: number
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    variantId?: number | null
-  }
-
-<<<<<<< HEAD
   export type ProductVariantUpdateWithoutProductInput = {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     optionSummary?: NullableStringFieldUpdateOperationsInput | string | null
@@ -48135,9 +46350,6 @@ export namespace Prisma {
     barcode?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    cartItems?: CartItemUpdateManyWithoutVariantNestedInput
-    sessionCartItems?: SessionCartItemUpdateManyWithoutVariantNestedInput
-    customerOrderItems?: CustomerOrderItemUpdateManyWithoutVariantNestedInput
   }
 
   export type ProductVariantUncheckedUpdateWithoutProductInput = {
@@ -48151,9 +46363,6 @@ export namespace Prisma {
     barcode?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    cartItems?: CartItemUncheckedUpdateManyWithoutVariantNestedInput
-    sessionCartItems?: SessionCartItemUncheckedUpdateManyWithoutVariantNestedInput
-    customerOrderItems?: CustomerOrderItemUncheckedUpdateManyWithoutVariantNestedInput
   }
 
   export type ProductVariantUncheckedUpdateManyWithoutProductInput = {
@@ -48198,12 +46407,14 @@ export namespace Prisma {
     customerName?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    retailBand?: RetailBandUpdateOneWithoutPurchaseOrdersNestedInput
     user?: UserUpdateOneRequiredWithoutPurchaseOrdersNestedInput
   }
 
   export type PurchaseOrderUncheckedUpdateWithoutProductInput = {
     id?: IntFieldUpdateOperationsInput | number
     userId?: IntFieldUpdateOperationsInput | number
+    retailBandId?: NullableIntFieldUpdateOperationsInput | number | null
     productName?: StringFieldUpdateOperationsInput | string
     totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
     customerName?: StringFieldUpdateOperationsInput | string
@@ -48214,6 +46425,7 @@ export namespace Prisma {
   export type PurchaseOrderUncheckedUpdateManyWithoutProductInput = {
     id?: IntFieldUpdateOperationsInput | number
     userId?: IntFieldUpdateOperationsInput | number
+    retailBandId?: NullableIntFieldUpdateOperationsInput | number | null
     productName?: StringFieldUpdateOperationsInput | string
     totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
     customerName?: StringFieldUpdateOperationsInput | string
@@ -48234,7 +46446,48 @@ export namespace Prisma {
     userId?: IntFieldUpdateOperationsInput | number
     retailBandId?: IntFieldUpdateOperationsInput | number
     status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
-=======
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProductPublishUncheckedUpdateManyWithoutProductInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    retailBandId?: IntFieldUpdateOperationsInput | number
+    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PublishHistoryUpdateWithoutProductInput = {
+    postKey?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
+    errorMessage?: NullableStringFieldUpdateOperationsInput | string | null
+    publishedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    retailBand?: RetailBandUpdateOneRequiredWithoutPublishHistoriesNestedInput
+    user?: UserUpdateOneRequiredWithoutPublishHistoriesNestedInput
+  }
+
+  export type PublishHistoryUncheckedUpdateWithoutProductInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    retailBandId?: IntFieldUpdateOperationsInput | number
+    postKey?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
+    errorMessage?: NullableStringFieldUpdateOperationsInput | string | null
+    publishedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PublishHistoryUncheckedUpdateManyWithoutProductInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    retailBandId?: IntFieldUpdateOperationsInput | number
+    postKey?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
+    errorMessage?: NullableStringFieldUpdateOperationsInput | string | null
+    publishedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type CartItemUpdateWithoutProductInput = {
     customerId?: IntFieldUpdateOperationsInput | number
     quantity?: IntFieldUpdateOperationsInput | number
@@ -48247,24 +46500,44 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     customerId?: IntFieldUpdateOperationsInput | number
     quantity?: IntFieldUpdateOperationsInput | number
->>>>>>> release-1
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     variantId?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
-<<<<<<< HEAD
-  export type ProductPublishUncheckedUpdateManyWithoutProductInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    userId?: IntFieldUpdateOperationsInput | number
-    retailBandId?: IntFieldUpdateOperationsInput | number
-    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
-=======
   export type CartItemUncheckedUpdateManyWithoutProductInput = {
     id?: IntFieldUpdateOperationsInput | number
     customerId?: IntFieldUpdateOperationsInput | number
     quantity?: IntFieldUpdateOperationsInput | number
->>>>>>> release-1
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    variantId?: NullableIntFieldUpdateOperationsInput | number | null
+  }
+
+  export type SessionCartItemUpdateWithoutProductInput = {
+    cartId?: IntFieldUpdateOperationsInput | number
+    quantity?: IntFieldUpdateOperationsInput | number
+    priceAt?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    variantId?: NullableIntFieldUpdateOperationsInput | number | null
+  }
+
+  export type SessionCartItemUncheckedUpdateWithoutProductInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    cartId?: IntFieldUpdateOperationsInput | number
+    quantity?: IntFieldUpdateOperationsInput | number
+    priceAt?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    variantId?: NullableIntFieldUpdateOperationsInput | number | null
+  }
+
+  export type SessionCartItemUncheckedUpdateManyWithoutProductInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    cartId?: IntFieldUpdateOperationsInput | number
+    quantity?: IntFieldUpdateOperationsInput | number
+    priceAt?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     variantId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -48305,96 +46578,6 @@ export namespace Prisma {
     unitPrice?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     totalPrice?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    variantId?: NullableIntFieldUpdateOperationsInput | number | null
-  }
-
-  export type PublishHistoryUpdateWithoutProductInput = {
-    postKey?: NullableStringFieldUpdateOperationsInput | string | null
-    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
-    errorMessage?: NullableStringFieldUpdateOperationsInput | string | null
-    publishedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    retailBand?: RetailBandUpdateOneRequiredWithoutPublishHistoriesNestedInput
-    user?: UserUpdateOneRequiredWithoutPublishHistoriesNestedInput
-  }
-
-  export type PublishHistoryUncheckedUpdateWithoutProductInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    userId?: IntFieldUpdateOperationsInput | number
-    retailBandId?: IntFieldUpdateOperationsInput | number
-    postKey?: NullableStringFieldUpdateOperationsInput | string | null
-    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
-    errorMessage?: NullableStringFieldUpdateOperationsInput | string | null
-    publishedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type PublishHistoryUncheckedUpdateManyWithoutProductInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    userId?: IntFieldUpdateOperationsInput | number
-    retailBandId?: IntFieldUpdateOperationsInput | number
-    postKey?: NullableStringFieldUpdateOperationsInput | string | null
-    status?: EnumPublishStatusFieldUpdateOperationsInput | $Enums.PublishStatus
-    errorMessage?: NullableStringFieldUpdateOperationsInput | string | null
-    publishedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type PurchaseOrderUpdateWithoutProductInput = {
-    productName?: StringFieldUpdateOperationsInput | string
-    totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
-    customerName?: StringFieldUpdateOperationsInput | string
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    retailBand?: RetailBandUpdateOneWithoutPurchaseOrdersNestedInput
-    user?: UserUpdateOneRequiredWithoutPurchaseOrdersNestedInput
-  }
-
-  export type PurchaseOrderUncheckedUpdateWithoutProductInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    userId?: IntFieldUpdateOperationsInput | number
-    retailBandId?: NullableIntFieldUpdateOperationsInput | number | null
-    productName?: StringFieldUpdateOperationsInput | string
-    totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
-    customerName?: StringFieldUpdateOperationsInput | string
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type PurchaseOrderUncheckedUpdateManyWithoutProductInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    userId?: IntFieldUpdateOperationsInput | number
-    retailBandId?: NullableIntFieldUpdateOperationsInput | number | null
-    productName?: StringFieldUpdateOperationsInput | string
-    totalPrice?: NullableIntFieldUpdateOperationsInput | number | null
-    customerName?: StringFieldUpdateOperationsInput | string
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type SessionCartItemUpdateWithoutProductInput = {
-    cartId?: IntFieldUpdateOperationsInput | number
-    quantity?: IntFieldUpdateOperationsInput | number
-    priceAt?: IntFieldUpdateOperationsInput | number
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    variantId?: NullableIntFieldUpdateOperationsInput | number | null
-  }
-
-  export type SessionCartItemUncheckedUpdateWithoutProductInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    cartId?: IntFieldUpdateOperationsInput | number
-    quantity?: IntFieldUpdateOperationsInput | number
-    priceAt?: IntFieldUpdateOperationsInput | number
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    variantId?: NullableIntFieldUpdateOperationsInput | number | null
-  }
-
-  export type SessionCartItemUncheckedUpdateManyWithoutProductInput = {
-    id?: IntFieldUpdateOperationsInput | number
-    cartId?: IntFieldUpdateOperationsInput | number
-    quantity?: IntFieldUpdateOperationsInput | number
-    priceAt?: IntFieldUpdateOperationsInput | number
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     variantId?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
