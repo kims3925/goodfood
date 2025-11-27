@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
         const productPublishes = await prisma.productPublish.findMany({
           where: {
             retailBandId: band.id,
-            status: PublishStatus.SUCCESS,
+            status: 'SUCCESS',
           },
           include: {
             product: {

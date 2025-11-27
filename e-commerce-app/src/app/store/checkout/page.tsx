@@ -81,7 +81,7 @@ export default function CheckoutPage() {
     deliveryMemo: '',
     sameAsCustomer: true
   })
-  const [order, setOrder] = useState<any>(null)
+  const [tempOrderId, setTempOrderId] = useState<string>('') // 주문번호
   const [showPaymentWidget, setShowPaymentWidget] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -219,17 +219,31 @@ export default function CheckoutPage() {
   const loadProduct = async () => {
     try {
       setIsLoading(true)
-      // productPublishId로 상품 조회 - API는 product ID를 받지만 productPublish 정보를 포함해서 반환
-      // 실제로는 productPublishId를 통해 product를 찾아야 하지만,
-      // 현재 API 구조상 product.id를 통해 조회하고 productPublishId 정보를 함께 반환받음
-      const response = await fetch(`/api/shop/products/${productPublishId}`)
+      // productPublishId를 통해 상품 조회
+      const response = await fetch(`/api/shop/product-publish/${productPublishId}`)
       const data = await response.json()
 
-      if (data.success) {
-        setProduct(data.product)
+      if (data.success && data.productPublish) {
+        const pp = data.productPublish
+        const product = pp.product
+        const mainVariant = product.variants?.[0]
+        const images = product.post?.images?.map((img: any) => img.imageUrl) || []
+
+        setProduct({
+          id: product.id,
+          productPublishId: pp.id,
+          title: product.name,
+          description: product.description || '',
+          images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
+          originalPrice: mainVariant?.wholesalePrice || product.wholesalePrice || mainVariant?.price || product.price || 0,
+          salePrice: mainVariant?.price || product.price || 0,
+          category: product.categoryId || '',
+          stock: mainVariant?.stock || 100
+        })
       } else {
         setProduct({
           id: productPublishId,
+          productPublishId: productPublishId,
           title: '상품',
           images: ['/placeholder.jpg'],
           originalPrice: 0,
@@ -239,6 +253,15 @@ export default function CheckoutPage() {
       }
     } catch (error) {
       console.error('상품 로딩 실패:', error)
+      setProduct({
+        id: productPublishId,
+        productPublishId: productPublishId,
+        title: '상품',
+        images: ['/placeholder.jpg'],
+        originalPrice: 0,
+        salePrice: 0,
+        category: ''
+      })
     } finally {
       setIsLoading(false)
     }
@@ -295,8 +318,8 @@ export default function CheckoutPage() {
     try {
       setIsSubmitting(true)
 
-      // 주문 생성 API 호출
-      const orderData: any = {
+      // 주문 생성 API 호출 (DB에 PENDING 상태로 저장)
+      const orderRequestData: any = {
         customerInfo: {
           name: formData.customerName,
           phone: formData.customerPhone,
@@ -313,10 +336,10 @@ export default function CheckoutPage() {
       }
 
       if (fromCart) {
-        orderData.fromCart = true
+        orderRequestData.fromCart = true
       } else {
-        orderData.fromCart = false
-        orderData.items = [{
+        orderRequestData.fromCart = false
+        orderRequestData.items = [{
           productPublishId: parseInt(productPublishId!),
           quantity
         }]
@@ -327,13 +350,14 @@ export default function CheckoutPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(orderData)
+        body: JSON.stringify(orderRequestData)
       })
 
       const data = await response.json()
 
       if (data.success) {
-        setOrder(data.order)
+        // 주문번호 저장
+        setTempOrderId(data.order.orderNumber)
         setShowPaymentWidget(true)
       } else {
         alert(data.error || '주문 생성에 실패했습니다.')
@@ -385,7 +409,7 @@ export default function CheckoutPage() {
     )
   }
 
-  if (showPaymentWidget && order) {
+  if (showPaymentWidget && tempOrderId) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-8">
@@ -402,14 +426,11 @@ export default function CheckoutPage() {
             </div>
 
             <TossPaymentWidget
-              orderId={order.orderNumber}
+              orderId={tempOrderId}
               orderName={orderName}
               customerName={formData.customerName}
               customerEmail={formData.customerEmail || undefined}
               amount={totalAmount}
-              onPaymentSuccess={(payment) => {
-                console.log('결제 성공:', payment)
-              }}
               onPaymentFail={(error) => {
                 console.error('결제 실패:', error)
                 alert('결제에 실패했습니다.')

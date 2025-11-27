@@ -1,15 +1,67 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { CheckCircle, Package, Clock, ArrowLeft } from 'lucide-react'
+import {
+  CheckCircle,
+  Package,
+  Clock,
+  ArrowLeft,
+  CreditCard,
+  MapPin,
+  Truck,
+  FileText,
+  Copy,
+  Check
+} from 'lucide-react'
 
-export default function PaymentSuccessPage() {
+interface PaymentInfo {
+  paymentKey: string
+  orderId: string
+  amount: number
+  method: string
+  methodLabel: string
+  status: string
+  approvedAt: string
+  card?: {
+    company: string
+    number: string
+    installmentPlanMonths: number
+  }
+  virtualAccount?: {
+    accountNumber: string
+    bank: string
+    dueDate: string
+  }
+}
+
+interface OrderInfo {
+  id: number
+  orderNumber: string
+  status: string
+  customer: {
+    name: string
+    email: string
+    phone: string
+  }
+  quantity: number
+  subtotal: number
+  shippingFee: number
+  discountAmount: number
+  totalAmount: number
+}
+
+type PageStatus = 'loading' | 'success' | 'error'
+
+function PaymentSuccessContent() {
   const searchParams = useSearchParams()
-  const [isLoading, setIsLoading] = useState(true)
-  const [paymentInfo, setPaymentInfo] = useState<any>(null)
+  const router = useRouter()
+  const [status, setStatus] = useState<PageStatus>('loading')
+  const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null)
+  const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const paymentKey = searchParams.get('paymentKey')
   const orderId = searchParams.get('orderId')
@@ -20,15 +72,14 @@ export default function PaymentSuccessPage() {
       confirmPayment()
     } else {
       setError('결제 정보가 누락되었습니다.')
-      setIsLoading(false)
+      setStatus('error')
     }
   }, [paymentKey, orderId, amount])
 
   const confirmPayment = async () => {
     try {
-      setIsLoading(true)
+      setStatus('loading')
 
-      // 토스페이먼츠 결제 승인 API 호출
       const response = await fetch('/api/payments/confirm', {
         method: 'POST',
         headers: {
@@ -45,25 +96,16 @@ export default function PaymentSuccessPage() {
 
       if (data.success) {
         setPaymentInfo(data.payment)
-
-        // 주문 정보 추가 조회
-        const orderResponse = await fetch(`/api/orders?orderNumber=${orderId}`)
-        const orderData = await orderResponse.json()
-
-        if (orderData.success) {
-          setPaymentInfo({
-            ...data.payment,
-            order: orderData.order
-          })
-        }
+        setOrderInfo(data.order)
+        setStatus('success')
       } else {
-        setError(data.error || '결제 승인에 실패했습니다.')
+        setError(data.error?.message || '결제 승인에 실패했습니다.')
+        setStatus('error')
       }
     } catch (error: any) {
       console.error('결제 승인 오류:', error)
       setError('결제 승인 중 오류가 발생했습니다.')
-    } finally {
-      setIsLoading(false)
+      setStatus('error')
     }
   }
 
@@ -81,42 +123,62 @@ export default function PaymentSuccessPage() {
     })
   }
 
-  if (isLoading) {
+  const copyOrderNumber = async () => {
+    if (paymentInfo?.orderId) {
+      await navigator.clipboard.writeText(paymentInfo.orderId)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  // 로딩 화면
+  if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">결제를 확인하고 있습니다...</p>
-            <p className="text-sm text-gray-500 mt-2">잠시만 기다려 주세요.</p>
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
+          <div className="flex flex-col items-center">
+            <div className="relative mb-6">
+              <div className="w-20 h-20 border-4 border-blue-100 rounded-full"></div>
+              <div className="absolute top-0 left-0 w-20 h-20 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">결제 확인 중</h2>
+            <p className="text-gray-500 text-center">
+              결제 승인을 처리하고 있습니다.<br />
+              잠시만 기다려 주세요.
+            </p>
+            <div className="mt-6 flex items-center gap-2 text-sm text-gray-400">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+              <span>토스페이먼츠 연동 중...</span>
+            </div>
           </div>
         </div>
       </div>
     )
   }
 
-  if (error) {
+  // 에러 화면
+  if (status === 'error') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
+          <div className="flex flex-col items-center">
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+              <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
               </svg>
             </div>
-            <h1 className="text-xl font-bold text-gray-900 mb-2">결제 확인 실패</h1>
-            <p className="text-gray-600 mb-6">{error}</p>
-            <div className="space-y-3">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">결제 확인 실패</h2>
+            <p className="text-gray-500 text-center mb-6">{error}</p>
+            <div className="w-full space-y-3">
               <Link
                 href="/store"
-                className="block w-full bg-gray-600 text-white py-3 rounded-lg hover:bg-gray-700 transition-colors"
+                className="block w-full bg-gray-900 text-white text-center py-3.5 rounded-xl font-semibold hover:bg-gray-800 transition-colors"
               >
                 쇼핑몰 홈으로
               </Link>
               <button
                 onClick={() => window.location.reload()}
-                className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-full border-2 border-gray-200 text-gray-700 py-3.5 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
               >
                 다시 시도
               </button>
@@ -127,150 +189,250 @@ export default function PaymentSuccessPage() {
     )
   }
 
+  // 성공 화면
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto">
-          {/* 성공 메시지 */}
-          <div className="bg-white rounded-lg shadow-lg p-8 mb-6">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-12 h-12 text-green-600" />
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">결제가 완료되었습니다!</h1>
-              <p className="text-gray-600 mb-6">주문해 주셔서 감사합니다.</p>
-
-              {paymentInfo?.order && (
-                <div className="bg-blue-50 rounded-lg p-4 mb-4">
-                  <p className="text-blue-800 font-medium">
-                    {paymentInfo.order.customer?.name}님의 주문이 접수되었습니다.
-                  </p>
-                  <p className="text-blue-600 text-sm mt-1">
-                    주문 확인 후 2-3일 내에 배송 시작됩니다.
-                  </p>
-                </div>
-              )}
+    <div className="min-h-screen bg-gradient-to-b from-green-50 to-gray-50">
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        {/* 성공 헤더 */}
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-8 text-center">
+            <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-12 h-12 text-white" />
             </div>
+            <h1 className="text-2xl font-bold text-white mb-2">결제가 완료되었습니다!</h1>
+            <p className="text-green-100">주문해 주셔서 감사합니다.</p>
           </div>
 
-          {/* 주문 정보 */}
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">주문 정보</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">주문번호</span>
-                <span className="font-mono text-gray-900">{paymentInfo?.orderId}</span>
+          {/* 고객 환영 메시지 */}
+          <div className="p-6 bg-green-50 border-b border-green-100">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Package className="w-6 h-6 text-green-600" />
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">상품명</span>
-                <span className="text-gray-900">{paymentInfo?.orderName}</span>
-              </div>
-              {paymentInfo?.order && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">수량</span>
-                    <span className="text-gray-900">{paymentInfo.order.quantity}개</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">상품금액</span>
-                    <span className="text-gray-900">{formatPrice(paymentInfo.order.subtotal)}원</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">배송비</span>
-                    <span className="text-gray-900">
-                      {paymentInfo.order.shippingFee > 0 ? `${formatPrice(paymentInfo.order.shippingFee)}원` : '무료'}
-                    </span>
-                  </div>
-                </>
-              )}
-              <div className="border-t pt-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-900 font-semibold">총 결제금액</span>
-                  <span className="text-blue-600 font-bold text-lg">{formatPrice(paymentInfo?.totalAmount)}원</span>
-                </div>
+              <div>
+                <p className="font-semibold text-green-900">
+                  {orderInfo?.customer?.name}님의 주문이 접수되었습니다
+                </p>
+                <p className="text-sm text-green-700 mt-0.5">
+                  주문 확인 후 2~3일 내에 배송이 시작됩니다
+                </p>
               </div>
             </div>
           </div>
 
-          {/* 결제 정보 */}
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">결제 정보</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">결제방법</span>
-                <span className="text-gray-900">{paymentInfo?.method || '토스페이먼츠'}</span>
+          {/* 주문번호 */}
+          <div className="p-6">
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+              <div>
+                <p className="text-sm text-gray-500 mb-1">주문번호</p>
+                <p className="font-mono font-bold text-gray-900 text-lg">{paymentInfo?.orderId}</p>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">결제일시</span>
-                <span className="text-gray-900">
-                  {paymentInfo?.approvedAt ? formatDate(paymentInfo.approvedAt) : '처리중'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">결제상태</span>
-                <span className="text-green-600 font-medium">완료</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 배송 안내 */}
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Package className="w-5 h-5 text-gray-600" />
-              배송 안내
-            </h2>
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-blue-600 text-sm font-bold">1</span>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">주문 확인</p>
-                  <p className="text-sm text-gray-600">주문이 접수되어 확인 중입니다.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-gray-600 text-sm font-bold">2</span>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">상품 준비</p>
-                  <p className="text-sm text-gray-600">도매업체에서 상품을 준비합니다.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-gray-600 text-sm font-bold">3</span>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">배송 시작</p>
-                  <p className="text-sm text-gray-600">2-3일 내 배송 시작 예정입니다.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 액션 버튼 */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Link
-              href="/store"
-              className="flex-1 bg-gray-600 text-white text-center py-3 rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              계속 쇼핑하기
-            </Link>
-            {paymentInfo?.order && (
-              <Link
-                href={`/store/orders/${paymentInfo.order.id}`}
-                className="flex-1 border border-gray-300 text-gray-700 text-center py-3 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+              <button
+                onClick={copyOrderNumber}
+                className="p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                title="주문번호 복사"
               >
-                <Clock className="w-4 h-4" />
-                주문 상세보기
-              </Link>
-            )}
+                {copied ? (
+                  <Check className="w-5 h-5 text-green-600" />
+                ) : (
+                  <Copy className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
+            </div>
           </div>
+        </div>
+
+        {/* 주문 상세 */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+              <FileText className="w-5 h-5 text-blue-600" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900">주문 상세</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex justify-between items-center py-3 border-b border-gray-100">
+              <span className="text-gray-600">상품 수량</span>
+              <span className="font-semibold text-gray-900">{orderInfo?.quantity}개</span>
+            </div>
+            <div className="flex justify-between items-center py-3 border-b border-gray-100">
+              <span className="text-gray-600">상품 금액</span>
+              <span className="text-gray-900">{formatPrice(orderInfo?.subtotal || 0)}원</span>
+            </div>
+            <div className="flex justify-between items-center py-3 border-b border-gray-100">
+              <span className="text-gray-600">배송비</span>
+              <span className={orderInfo?.shippingFee === 0 ? 'text-green-600 font-medium' : 'text-gray-900'}>
+                {orderInfo?.shippingFee === 0 ? '무료' : `${formatPrice(orderInfo?.shippingFee || 0)}원`}
+              </span>
+            </div>
+            {(orderInfo?.discountAmount || 0) > 0 && (
+              <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                <span className="text-gray-600">할인 금액</span>
+                <span className="text-red-600">-{formatPrice(orderInfo?.discountAmount || 0)}원</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center pt-3">
+              <span className="text-lg font-bold text-gray-900">총 결제금액</span>
+              <span className="text-2xl font-bold text-blue-600">{formatPrice(paymentInfo?.amount || 0)}원</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 결제 정보 */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+              <CreditCard className="w-5 h-5 text-purple-600" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900">결제 정보</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex justify-between items-center py-3 border-b border-gray-100">
+              <span className="text-gray-600">결제 수단</span>
+              <span className="font-semibold text-gray-900">{paymentInfo?.methodLabel}</span>
+            </div>
+
+            {/* 카드 결제인 경우 */}
+            {paymentInfo?.card && (
+              <>
+                <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                  <span className="text-gray-600">카드사</span>
+                  <span className="text-gray-900">{paymentInfo.card.company}</span>
+                </div>
+                <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                  <span className="text-gray-600">카드번호</span>
+                  <span className="font-mono text-gray-900">{paymentInfo.card.number}</span>
+                </div>
+                {paymentInfo.card.installmentPlanMonths > 0 && (
+                  <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                    <span className="text-gray-600">할부</span>
+                    <span className="text-gray-900">{paymentInfo.card.installmentPlanMonths}개월</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* 가상계좌인 경우 */}
+            {paymentInfo?.virtualAccount && (
+              <>
+                <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                  <span className="text-gray-600">은행</span>
+                  <span className="text-gray-900">{paymentInfo.virtualAccount.bank}</span>
+                </div>
+                <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                  <span className="text-gray-600">계좌번호</span>
+                  <span className="font-mono text-gray-900">{paymentInfo.virtualAccount.accountNumber}</span>
+                </div>
+                <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                  <span className="text-gray-600">입금 기한</span>
+                  <span className="text-red-600 font-medium">
+                    {formatDate(paymentInfo.virtualAccount.dueDate)}
+                  </span>
+                </div>
+              </>
+            )}
+
+            <div className="flex justify-between items-center py-3 border-b border-gray-100">
+              <span className="text-gray-600">결제일시</span>
+              <span className="text-gray-900">
+                {paymentInfo?.approvedAt ? formatDate(paymentInfo.approvedAt) : '처리중'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-3">
+              <span className="text-gray-600">결제상태</span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                완료
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 배송 진행 상태 */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+              <Truck className="w-5 h-5 text-orange-600" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900">배송 안내</h2>
+          </div>
+
+          <div className="relative">
+            {/* Progress Line */}
+            <div className="absolute left-6 top-8 bottom-8 w-0.5 bg-gray-200"></div>
+            <div className="absolute left-6 top-8 h-8 w-0.5 bg-blue-500"></div>
+
+            <div className="space-y-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 z-10 shadow-lg shadow-blue-200">
+                  <Check className="w-6 h-6 text-white" />
+                </div>
+                <div className="pt-2">
+                  <p className="font-bold text-gray-900">주문 접수</p>
+                  <p className="text-sm text-gray-500 mt-0.5">결제가 완료되어 주문이 접수되었습니다</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 z-10">
+                  <span className="text-gray-500 font-bold">2</span>
+                </div>
+                <div className="pt-2">
+                  <p className="font-medium text-gray-900">상품 준비</p>
+                  <p className="text-sm text-gray-500 mt-0.5">판매자가 상품을 준비합니다</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 z-10">
+                  <span className="text-gray-500 font-bold">3</span>
+                </div>
+                <div className="pt-2">
+                  <p className="font-medium text-gray-900">배송 시작</p>
+                  <p className="text-sm text-gray-500 mt-0.5">2~3일 내 배송이 시작됩니다</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 액션 버튼 */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link
+            href="/store"
+            className="flex-1 bg-gray-900 text-white text-center py-4 rounded-xl font-semibold hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            계속 쇼핑하기
+          </Link>
+          <Link
+            href="/store/mypage/orders"
+            className="flex-1 border-2 border-gray-200 text-gray-700 text-center py-4 rounded-xl font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <Clock className="w-5 h-5" />
+            주문 내역 보기
+          </Link>
+        </div>
+
+        {/* 고객센터 안내 */}
+        <div className="mt-6 p-4 bg-gray-100 rounded-xl">
+          <p className="text-sm text-gray-600 text-center">
+            문의사항이 있으시면 고객센터 <span className="font-bold text-gray-900">1588-1234</span>로 연락해 주세요
+          </p>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <PaymentSuccessContent />
+    </Suspense>
   )
 }

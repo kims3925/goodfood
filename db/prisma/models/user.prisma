@@ -9,6 +9,12 @@ model User {
   name               String?             @db.VarChar(100)
   phone              String?             @db.VarChar(20)
   role               UserRole            @default(USER)
+
+  // OAuth fields
+  oauthProvider      String?             @map("oauth_provider") @db.VarChar(50) // "kakao", "naver", "google"
+  oauthProviderId    String?             @map("oauth_provider_id") @db.VarChar(100)
+  profileImage       String?             @map("profile_image") @db.VarChar(500)
+
   createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
@@ -36,15 +42,14 @@ model User {
   inquiries          Inquiry[]
   returnRequests     ReturnRequest[]
 
-  // OAuth relations
-  oauthAccounts      OAuthAccount[]
-
   // Settlement relations
   settlements        Settlement[]
 
+  @@unique([oauthProvider, oauthProviderId])
   @@index([email])
   @@index([phone])
   @@index([role])
+  @@index([oauthProvider])
   @@map("user")
 }
 

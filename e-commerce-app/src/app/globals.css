@@ -298,6 +298,52 @@
   }
 }
 
+/* ============================================
+   Toss Payment Widget - 완전한 스타일 격리
+   Tailwind Preflight CSS와의 충돌 방지
+   ============================================ */
+
+/* 위젯 컨테이너 기본 스타일 */
+#payment-method,
+#agreement {
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  /* 위젯이 렌더링될 공간 확보 */
+  min-height: 50px;
+}
+
+/* Toss SDK 위젯 내부 모든 요소의 Tailwind 스타일 무효화 */
+#payment-method *,
+#payment-method *::before,
+#payment-method *::after,
+#agreement *,
+#agreement *::before,
+#agreement *::after {
+  /* Tailwind Preflight 리셋 무효화 - 브라우저 기본값으로 복원 */
+  box-sizing: revert !important;
+  border-width: revert !important;
+  border-style: revert !important;
+  border-color: revert !important;
+  line-height: revert !important;
+  /* 폼 요소 스타일 복원 */
+  -webkit-appearance: revert !important;
+  appearance: revert !important;
+  background-color: revert !important;
+  margin: revert !important;
+  padding: revert !important;
+  font-size: revert !important;
+  font-family: revert !important;
+}
+
+/* iframe이 있을 경우 크기 보장 */
+#payment-method iframe,
+#agreement iframe {
+  display: block !important;
+  width: 100% !important;
+  border: none !important;
+}
+
 @layer utilities {
   /* Hide scrollbar */
   .scrollbar-hide {

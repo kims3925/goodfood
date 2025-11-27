@@ -65,71 +65,56 @@ export const authOptions: NextAuthOptions = {
         const kakaoProfile = profile as any
 
         try {
-          // 기존 OAuth 계정 확인
-          let oauthAccount = await prisma.oAuthAccount.findUnique({
+          // 기존 사용자 확인 (oauthProvider + oauthProviderId로 조회)
+          let existingUser = await prisma.user.findFirst({
             where: {
-              provider_providerId: {
-                provider: 'kakao',
-                providerId: kakaoProfile.id.toString(),
-              },
+              oauthProvider: 'kakao',
+              oauthProviderId: kakaoProfile.id.toString(),
             },
-            include: { user: true },
           })
 
-          if (oauthAccount) {
-            // 기존 계정 - 토큰 업데이트
-            await prisma.oAuthAccount.update({
-              where: { id: oauthAccount.id },
-              data: {
-                accessToken: account.access_token,
-                refreshToken: account.refresh_token,
-                expiresAt: account.expires_at
-                  ? new Date(account.expires_at * 1000)
-                  : null,
-              },
-            })
-            user.id = oauthAccount.user.id.toString()
+          if (existingUser) {
+            // 기존 사용자로 로그인
+            user.id = existingUser.id.toString()
           } else {
-            // 새 계정 생성
+            // 새 사용자 생성
             const kakaoEmail =
               kakaoProfile.kakao_account?.email ||
               `kakao_${kakaoProfile.id}@kakao.local`
 
             // 동일 이메일의 기존 사용자 확인
-            let existingUser = await prisma.user.findUnique({
+            const emailUser = await prisma.user.findUnique({
               where: { email: kakaoEmail },
             })
 
-            if (!existingUser) {
-              // 새 사용자 생성
-              existingUser = await prisma.user.create({
+            if (emailUser && !emailUser.oauthProvider) {
+              // 기존 이메일 계정에 OAuth 정보 추가
+              await prisma.user.update({
+                where: { id: emailUser.id },
                 data: {
-                  email: kakaoEmail,
-                  name: kakaoProfile.kakao_account?.profile?.nickname || null,
-                  role: 'CUSTOMER',
+                  oauthProvider: 'kakao',
+                  oauthProviderId: kakaoProfile.id.toString(),
+                  profileImage:
+                    kakaoProfile.kakao_account?.profile?.profile_image_url,
                 },
               })
+              user.id = emailUser.id.toString()
+            } else {
+              // 완전히 새로운 사용자 생성
+              const newUser = await prisma.user.create({
+                data: {
+                  email: kakaoEmail,
+                  name:
+                    kakaoProfile.kakao_account?.profile?.nickname || null,
+                  role: 'CUSTOMER',
+                  oauthProvider: 'kakao',
+                  oauthProviderId: kakaoProfile.id.toString(),
+                  profileImage:
+                    kakaoProfile.kakao_account?.profile?.profile_image_url,
+                },
+              })
+              user.id = newUser.id.toString()
             }
-
-            // OAuth 계정 연결
-            await prisma.oAuthAccount.create({
-              data: {
-                userId: existingUser.id,
-                provider: 'kakao',
-                providerId: kakaoProfile.id.toString(),
-                email: kakaoProfile.kakao_account?.email,
-                nickname: kakaoProfile.kakao_account?.profile?.nickname,
-                profileImage:
-                  kakaoProfile.kakao_account?.profile?.profile_image_url,
-                accessToken: account.access_token,
-                refreshToken: account.refresh_token,
-                expiresAt: account.expires_at
-                  ? new Date(account.expires_at * 1000)
-                  : null,
-              },
-            })
-
-            user.id = existingUser.id.toString()
           }
 
           return true
@@ -144,70 +129,56 @@ export const authOptions: NextAuthOptions = {
         const naverProfile = profile as any
 
         try {
-          // 기존 OAuth 계정 확인
-          let oauthAccount = await prisma.oAuthAccount.findUnique({
+          // 기존 사용자 확인 (oauthProvider + oauthProviderId로 조회)
+          let existingUser = await prisma.user.findFirst({
             where: {
-              provider_providerId: {
-                provider: 'naver',
-                providerId: naverProfile.response.id,
-              },
+              oauthProvider: 'naver',
+              oauthProviderId: naverProfile.response.id,
             },
-            include: { user: true },
           })
 
-          if (oauthAccount) {
-            // 기존 계정 - 토큰 업데이트
-            await prisma.oAuthAccount.update({
-              where: { id: oauthAccount.id },
-              data: {
-                accessToken: account.access_token,
-                refreshToken: account.refresh_token,
-                expiresAt: account.expires_at
-                  ? new Date(account.expires_at * 1000)
-                  : null,
-              },
-            })
-            user.id = oauthAccount.user.id.toString()
+          if (existingUser) {
+            // 기존 사용자로 로그인
+            user.id = existingUser.id.toString()
           } else {
-            // 새 계정 생성
+            // 새 사용자 생성
             const naverEmail =
               naverProfile.response.email ||
               `naver_${naverProfile.response.id}@naver.local`
 
             // 동일 이메일의 기존 사용자 확인
-            let existingUser = await prisma.user.findUnique({
+            const emailUser = await prisma.user.findUnique({
               where: { email: naverEmail },
             })
 
-            if (!existingUser) {
-              // 새 사용자 생성
-              existingUser = await prisma.user.create({
+            if (emailUser && !emailUser.oauthProvider) {
+              // 기존 이메일 계정에 OAuth 정보 추가
+              await prisma.user.update({
+                where: { id: emailUser.id },
                 data: {
-                  email: naverEmail,
-                  name: naverProfile.response.name || naverProfile.response.nickname || null,
-                  role: 'CUSTOMER',
+                  oauthProvider: 'naver',
+                  oauthProviderId: naverProfile.response.id,
+                  profileImage: naverProfile.response.profile_image,
                 },
               })
+              user.id = emailUser.id.toString()
+            } else {
+              // 완전히 새로운 사용자 생성
+              const newUser = await prisma.user.create({
+                data: {
+                  email: naverEmail,
+                  name:
+                    naverProfile.response.name ||
+                    naverProfile.response.nickname ||
+                    null,
+                  role: 'CUSTOMER',
+                  oauthProvider: 'naver',
+                  oauthProviderId: naverProfile.response.id,
+                  profileImage: naverProfile.response.profile_image,
+                },
+              })
+              user.id = newUser.id.toString()
             }
-
-            // OAuth 계정 연결
-            await prisma.oAuthAccount.create({
-              data: {
-                userId: existingUser.id,
-                provider: 'naver',
-                providerId: naverProfile.response.id,
-                email: naverProfile.response.email,
-                nickname: naverProfile.response.nickname,
-                profileImage: naverProfile.response.profile_image,
-                accessToken: account.access_token,
-                refreshToken: account.refresh_token,
-                expiresAt: account.expires_at
-                  ? new Date(account.expires_at * 1000)
-                  : null,
-              },
-            })
-
-            user.id = existingUser.id.toString()
           }
 
           return true
