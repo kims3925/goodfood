@@ -53,6 +53,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   useEffect(() => {
     const pathToMenuMap: Record<string, string> = {
       '/band': '밴드관리',
+      '/product': '상품 관리',
       '/publish': '발행',
       '/order': '주문서 관리',
       '/automation': '자동화 관리',
@@ -109,8 +110,19 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     },
     {
       label: '상품 관리',
-      href: '/product/list',
       icon: <Package size={20} />,
+      children: [
+        {
+          label: '수집 상품 관리',
+          href: '/product/list',
+          icon: <Database size={16} />,
+        },
+        {
+          label: '발행 상품 관리',
+          href: '/product/publish',
+          icon: <Send size={16} />,
+        },
+      ],
     },
     {
       label: '발행',

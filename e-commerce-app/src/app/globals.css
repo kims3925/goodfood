@@ -219,7 +219,7 @@
 
   /* Kurly Footer */
   .kurly-footer {
-    @apply bg-gray-100 py-10 mt-10;
+    @apply bg-gray-100 py-10;
   }
 
   /* Button Styles */

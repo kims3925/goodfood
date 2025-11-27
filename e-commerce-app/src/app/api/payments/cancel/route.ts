@@ -6,8 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTossPaymentsService } from '@/modules/payments/domain/src/payments/services/toss-payments.service'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import prisma from '@/lib/database/client'
+import { authOptions } from '@/modules/auth/auth.config'
+import prisma from '@/modules/common/utils/src/database/client'
 
 /**
  * POST /api/payments/cancel

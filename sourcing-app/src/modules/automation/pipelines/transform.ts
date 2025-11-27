@@ -3,7 +3,7 @@
  * AI를 사용하여 게시물을 상품으로 변환
  */
 
-import { PrismaClient, AiProvider, ProductStatus } from '@bandauto/db'
+import { PrismaClient, AiProvider } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { transformPostToProduct } from '@/modules/transformation'
@@ -148,7 +148,6 @@ export async function runTransformPipeline(
           postId: post.id,
           name: draft.name,
           description: draft.description || null,
-          status: ProductStatus.DRAFT,
           categoryId: draft.categoryId || null,
           currency: draft.currency || 'KRW',
           price: draft.price || null,

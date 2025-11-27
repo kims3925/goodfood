@@ -294,9 +294,9 @@ export default function ProductListPage() {
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">상품 관리</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">수집 상품 관리</h1>
           <p className="text-gray-600">
-            게시물에서 AI로 생성한 상품을 관리합니다. 상품 정보를 수정하고 판매 상태를 관리할 수 있습니다.
+            도매밴드에서 수집한 게시물을 AI로 변환한 상품을 관리합니다. 상품 정보를 수정하고 판매 상태를 관리할 수 있습니다.
           </p>
         </div>
 

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Package, User, MapPin, CreditCard, Truck } from 'lucide-react'
-import TossPaymentWidget from '@/domain/payments/components/payments/TossPaymentWidget'
+import TossPaymentWidget from '@/modules/payments/domain/src/payments/components/payments/TossPaymentWidget'
 
 interface CartItem {
   id: number

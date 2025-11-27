@@ -20,6 +20,7 @@ model User {
   posts              Post[]
   pricingPolicies    PricingPolicy[]
   products           Product[]
+  productPublishes   ProductPublish[]
   publishHistories   PublishHistory[]
   purchaseOrders     PurchaseOrder[]
   retailBands        RetailBand[]
@@ -111,6 +112,7 @@ model RetailBand {
   publishHistories PublishHistory[]
   purchaseOrders   PurchaseOrder[]
   apiConfig        SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
+  productPublishes ProductPublish[]
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, bandKey])
@@ -173,31 +175,48 @@ model PostComment {
   @@map("post_comment")
 }
 
+// =============================================
+// PRODUCT MANAGEMENT (상품 관리)
+// =============================================
+
 model Product {
-  id                 Int                 @id @default(autoincrement())
-  userId             Int                 @map("user_id")
-  postId             Int                 @unique @map("post_id")
-  name               String              @db.VarChar(500)
-  description        String?             @db.Text
-  status             ProductStatus       @default(DRAFT)
-  thumbnailUrl       String?             @map("thumbnail_url") @db.VarChar(1000)
-  categoryId         String?             @map("category_id") @db.VarChar(100)
-  currency           String              @default("KRW") @db.VarChar(10)
-  price              Int?
-  wholesalePrice     Int?                @map("wholesale_price")
-  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamp(0)
-  cartItems          CartItem[]
-  customerOrderItems CustomerOrderItem[]
-  post               Post                @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  publishHistories   PublishHistory[]
-  purchaseOrders     PurchaseOrder[]
-  sessionCartItems   SessionCartItem[]
+  id           Int           @id @default(autoincrement())
+  userId       Int           @map("user_id") // 생성한 사용자
+  postId       Int           @unique @map("post_id") // 게시물 ID (1:1 관계)
+
+  // Basic Info
+  name         String        @db.VarChar(500)
+  description  String?       @db.Text
+
+  // Images (post_image 재사용)
+  thumbnailUrl String?       @map("thumbnail_url") @db.VarChar(1000) // 첫번째 post_image URL 캐싱
+
+  // Category
+  categoryId   String?       @map("category_id") @db.VarChar(100)
+
+  // Pricing
+  currency       String  @default("KRW") @db.VarChar(10)
+  price          Int?    // 판매가
+  wholesalePrice Int?    @map("wholesale_price") // 도매가
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  user                   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post                   Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  variants               ProductVariant[]
+  options                ProductOption[]
+  purchaseOrders         PurchaseOrder[]
+  productPublishes       ProductPublish[]
+  publishHistories       PublishHistory[]
+  // E-Commerce Relations
+  cartItems              CartItem[]
+  sessionCartItems       SessionCartItem[]
+  customerOrderItems     CustomerOrderItem[]
 
   @@index([userId])
   @@index([postId])
-  @@index([status])
   @@index([categoryId])
   @@index([createdAt])
   @@map("product")
@@ -292,6 +311,45 @@ model WorkflowLog {
   @@map("workflow_log")
 }
 
+// =============================================
+// PRODUCT PUBLISH (상품 발행 - 쇼핑몰 표시용)
+// =============================================
+
+model ProductPublish {
+  id            Int           @id @default(autoincrement())
+  userId        Int           @map("user_id")
+  productId     Int           @map("product_id")
+  retailBandId  Int           @map("retail_band_id")
+
+  // Status
+  status        PublishStatus @default(PENDING)
+
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  retailBand RetailBand @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, retailBandId]) // 같은 상품을 같은 밴드에 중복 발행 방지
+  @@index([userId])
+  @@index([productId])
+  @@index([retailBandId])
+  @@index([status])
+  @@map("product_publish")
+}
+
+// =============================================
+// PUBLISH HISTORY (발행 이력 로그)
+// =============================================
+
+enum PublishStatus {
+  SUCCESS
+  FAILED
+  PENDING
+}
+
 model PublishHistory {
   id           Int           @id @default(autoincrement())
   userId       Int           @map("user_id")
@@ -310,6 +368,7 @@ model PublishHistory {
   @@index([productId])
   @@index([retailBandId])
   @@index([status])
+  @@index([publishedAt])
   @@map("publish_history")
 }
 

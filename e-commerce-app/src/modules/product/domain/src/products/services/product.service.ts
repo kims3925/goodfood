@@ -3,8 +3,8 @@
  * 상품 비즈니스 로직 레이어
  */
 
-import { Product, ProductStatus } from '@bandauto/db'
-import { productRepository, ProductRepository } from '@/domain/products/repository/product.repository'
+import { Product } from '@bandauto/db'
+import { productRepository, ProductRepository } from '@/modules/product/domain/src/products/repository/product.repository'
 import {
   CreateProductDTO,
   UpdateProductDTO,
@@ -16,7 +16,7 @@ import {
   ValidationError,
   NotFoundError,
   UnauthorizedError
-} from '@/lib/errors/handlers'
+} from '@/modules/common/utils/src/errors/handlers'
 
 export class ProductService {
   constructor(private repository: ProductRepository = productRepository) {}
@@ -32,10 +32,10 @@ export class ProductService {
 
     const products = await this.repository.findAllByUserId(userId)
 
-    // 쇼핑몰 등록 상태 정보 추가
+    // 쇼핑몰 등록 상태 정보 추가 (product_publish 기반으로 판단)
     return products.map(product => ({
       ...product,
-      isRegisteredToShop: product.status === 'ACTIVE'
+      isRegisteredToShop: (product as any).productPublishes?.length > 0
     }))
   }
 
@@ -72,7 +72,7 @@ export class ProductService {
 
     return products.map(product => ({
       ...product,
-      isRegisteredToShop: product.status === 'ACTIVE'
+      isRegisteredToShop: (product as any).productPublishes?.length > 0
     }))
   }
 

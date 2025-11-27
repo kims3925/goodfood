@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import prisma from '@/lib/database/client'
+import prisma from '@/modules/common/utils/src/database/client'
 
 // 토스페이먼츠 API 응답 타입 정의
 export interface TossPaymentResponse {

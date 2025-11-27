@@ -21,7 +21,6 @@ interface Product {
   price: number | null
   wholesalePrice: number | null
   thumbnailUrl: string | null
-  status: string
   post: {
     id: number
     title: string
@@ -40,6 +39,12 @@ export default function RetailBandPublishPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isPublishing, setIsPublishing] = useState(false)
   const [expandedProductIds, setExpandedProductIds] = useState<number[]>([])
+
+  // 페이징 상태
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalProducts, setTotalProducts] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const pageSize = 20
 
   // 발행 결과
   const [publishResults, setPublishResults] = useState<Array<{
@@ -76,12 +81,15 @@ export default function RetailBandPublishPage() {
     }
   }
 
-  const loadProducts = async () => {
+  const loadProducts = async (page: number = 1) => {
     try {
-      const res = await fetch('/api/product?status=ACTIVE')
+      const res = await fetch(`/api/product?page=${page}&limit=${pageSize}`)
       const data = await res.json()
       if (data.success) {
         setProducts(data.data)
+        setTotalProducts(data.total || 0)
+        setTotalPages(Math.ceil((data.total || 0) / pageSize))
+        setCurrentPage(page)
       }
     } catch (error) {
       console.error('상품 목록 조회 실패:', error)
@@ -182,7 +190,7 @@ export default function RetailBandPublishPage() {
         setPublishResults(data.results)
         setShowResultModal(true)
         setSelectedProductIds([])
-        loadProducts()
+        loadProducts(currentPage)
       }
     } catch (error) {
       console.error('발행 실패:', error)
@@ -291,14 +299,14 @@ export default function RetailBandPublishPage() {
               <div className="flex items-center gap-4">
                 <h2 className="text-lg font-semibold text-gray-900">발행할 상품 선택</h2>
                 <span className="text-sm text-gray-500">
-                  (판매중 상태의 상품만 표시됩니다)
+                  (전체 {totalProducts}개)
                 </span>
               </div>
               <div className="flex items-center gap-3">
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={loadProducts}
+                  onClick={() => loadProducts(currentPage)}
                 >
                   <RefreshCw size={16} />
                   새로고침
@@ -328,7 +336,7 @@ export default function RetailBandPublishPage() {
             <div className="text-center py-12">
               <AlertCircle className="mx-auto text-yellow-500 mb-2" size={48} />
               <p className="text-gray-600">발행 가능한 상품이 없습니다.</p>
-              <p className="text-sm text-gray-500 mt-1">상품 관리에서 상품 상태를 '판매중'으로 변경해주세요.</p>
+              <p className="text-sm text-gray-500 mt-1">상품 관리에서 상품을 먼저 생성해주세요.</p>
             </div>
           ) : (
             <div className="p-4">
@@ -469,6 +477,31 @@ export default function RetailBandPublishPage() {
                   )
                 })}
               </div>
+
+              {/* 페이징 */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t border-gray-200">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => loadProducts(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                  >
+                    이전
+                  </Button>
+                  <span className="text-sm text-gray-600">
+                    {currentPage} / {totalPages} 페이지
+                  </span>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => loadProducts(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                  >
+                    다음
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>

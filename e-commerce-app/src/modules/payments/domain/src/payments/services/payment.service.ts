@@ -4,11 +4,11 @@
  */
 
 import { Payment } from '@bandauto/db'
-import { getTossPaymentsService } from '@/domain/payments'
-import { paymentRepository, PaymentRepository } from '@/domain/payments/repository/payment.repository'
-import { refundRepository, RefundRepository } from '@/domain/payments/repository/refund.repository'
-import { getOrderRepository } from '@/domain/orders/repository/order.repository'
-import prisma from '@/lib/database/client'
+import { getTossPaymentsService } from '@/modules/payments/domain/src/payments'
+import { paymentRepository, PaymentRepository } from '@/modules/payments/domain/src/payments/repository/payment.repository'
+import { refundRepository, RefundRepository } from '@/modules/payments/domain/src/payments/repository/refund.repository'
+import { getOrderRepository } from '@/modules/order/domain/src/orders/repository/order.repository'
+import prisma from '@/modules/common/utils/src/database/client'
 import {
   ConfirmPaymentDTO,
   CancelPaymentDTO,
@@ -21,7 +21,7 @@ import {
   ValidationError,
   NotFoundError,
   BusinessLogicError
-} from '@/lib/errors/handlers'
+} from '@/modules/common/utils/src/errors/handlers'
 
 export class PaymentService {
   private orderRepository = getOrderRepository()

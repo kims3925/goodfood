@@ -3,7 +3,7 @@
  * 고객 데이터 접근 레이어
  */
 
-import prisma from '@/lib/database/client'
+import prisma from '@/modules/common/utils/src/database/client'
 import { Customer, Prisma } from '@bandauto/db'
 import { CustomerFilter } from '@/types/services/customer'
 

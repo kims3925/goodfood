@@ -221,7 +221,6 @@ exports.Prisma.ProductScalarFieldEnum = {
   postId: 'postId',
   name: 'name',
   description: 'description',
-  status: 'status',
   thumbnailUrl: 'thumbnailUrl',
   categoryId: 'categoryId',
   currency: 'currency',
@@ -294,6 +293,16 @@ exports.Prisma.WorkflowLogScalarFieldEnum = {
   failedCount: 'failedCount',
   details: 'details',
   errorMessage: 'errorMessage'
+};
+
+exports.Prisma.ProductPublishScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  productId: 'productId',
+  retailBandId: 'retailBandId',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.PublishHistoryScalarFieldEnum = {
@@ -595,13 +604,6 @@ exports.AiProvider = exports.$Enums.AiProvider = {
   OPENAI: 'OPENAI'
 };
 
-exports.ProductStatus = exports.$Enums.ProductStatus = {
-  DRAFT: 'DRAFT',
-  ACTIVE: 'ACTIVE',
-  INACTIVE: 'INACTIVE',
-  SOLDOUT: 'SOLDOUT'
-};
-
 exports.WorkflowType = exports.$Enums.WorkflowType = {
   COLLECT: 'COLLECT',
   TRANSFORM: 'TRANSFORM',
@@ -668,6 +670,7 @@ exports.Prisma.ModelName = {
   PricingPolicy: 'PricingPolicy',
   AutomationConfig: 'AutomationConfig',
   WorkflowLog: 'WorkflowLog',
+  ProductPublish: 'ProductPublish',
   PublishHistory: 'PublishHistory',
   PurchaseOrder: 'PurchaseOrder',
   Customer: 'Customer',

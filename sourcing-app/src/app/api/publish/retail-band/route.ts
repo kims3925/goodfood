@@ -2,7 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PublishStatus } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { NaverBandClient } from '@/modules/config/domain/src/band/services/band-client.service'
-import prisma from '@/lib/prisma'
+
+// API 라우트 타임아웃 설정 (10분 = 600초)
+// 상품 10개 × 밴드 5개 = 50개 발행 × 10초 = 500초 예상
+export const maxDuration = 600
+
+const prisma = new PrismaClient()
+
+// 지연 함수
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+// 발행 간격 (10초)
+const PUBLISH_DELAY_MS = 10000
 
 interface PublishResult {
   bandId: number
@@ -99,6 +110,9 @@ export async function POST(request: NextRequest) {
     // 발행 결과 저장
     const results: PublishResult[] = []
 
+    // 발행 카운터 (지연 로직용)
+    let publishCount = 0
+
     // 각 밴드에 대해 상품 발행
     for (const retailBand of retailBands) {
       // Band API 클라이언트 초기화
@@ -107,6 +121,12 @@ export async function POST(request: NextRequest) {
       // 각 상품 발행
       for (const product of products) {
         try {
+          // 첫 번째 발행이 아니면 10초 지연
+          if (publishCount > 0) {
+            console.log(`⏳ ${PUBLISH_DELAY_MS / 1000}초 대기 중... (${publishCount}번째 발행 완료)`)
+            await delay(PUBLISH_DELAY_MS)
+          }
+          publishCount++
           // 게시글 내용 생성
           const postContent = buildPostContent(product)
 
@@ -143,6 +163,25 @@ export async function POST(request: NextRequest) {
               status: PublishStatus.SUCCESS,
               errorMessage: null,
               publishedAt: new Date(),
+            },
+          })
+
+          // ProductPublish 레코드 생성/업데이트 (쇼핑몰 표시용)
+          await prisma.productPublish.upsert({
+            where: {
+              productId_retailBandId: {
+                productId: product.id,
+                retailBandId: retailBand.id,
+              },
+            },
+            create: {
+              userId: user.userId,
+              productId: product.id,
+              retailBandId: retailBand.id,
+              status: PublishStatus.SUCCESS,
+            },
+            update: {
+              status: PublishStatus.SUCCESS,
             },
           })
 

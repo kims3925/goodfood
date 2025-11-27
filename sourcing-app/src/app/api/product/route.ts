@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ProductStatus } from '@bandauto/db'
+import { PrismaClient } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import prisma from '@/lib/prisma'
 
@@ -9,7 +9,6 @@ import prisma from '@/lib/prisma'
  * Get products list with filtering and pagination
  *
  * Query Parameters:
- * - status?: 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'SOLDOUT'
  * - postId?: number
  * - search?: string (searches in name, description)
  * - page?: number (default: 1)
@@ -34,7 +33,6 @@ export async function GET(request: NextRequest) {
     const userId = currentUser.userId
 
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status') as ProductStatus | null
     const postId = searchParams.get('postId')
     const search = searchParams.get('search')
     const page = parseInt(searchParams.get('page') || '1')
@@ -43,10 +41,6 @@ export async function GET(request: NextRequest) {
     // Build where clause
     const where: any = {
       userId,
-    }
-
-    if (status) {
-      where.status = status
     }
 
     if (postId) {
@@ -114,7 +108,6 @@ export async function GET(request: NextRequest) {
  * - postId: number
  * - name: string
  * - description?: string
- * - status?: ProductStatus
  * - categoryId?: string
  * - currency?: string
  * - price?: number
@@ -143,7 +136,6 @@ export async function POST(request: NextRequest) {
       postId,
       name,
       description,
-      status,
       categoryId,
       currency,
       price,
@@ -205,7 +197,6 @@ export async function POST(request: NextRequest) {
         postId,
         name,
         description: description || null,
-        status: status || ProductStatus.DRAFT,
         categoryId: categoryId || null,
         currency: currency || 'KRW',
         price: price || null,
@@ -242,7 +233,6 @@ export async function POST(request: NextRequest) {
  * - id: string
  * - name?: string
  * - description?: string
- * - status?: ProductStatus
  * - categoryId?: string
  * - price?: number
  * - wholesalePrice?: number
@@ -293,7 +283,6 @@ export async function PUT(request: NextRequest) {
     const data: any = {}
     if (updateData.name !== undefined) data.name = updateData.name
     if (updateData.description !== undefined) data.description = updateData.description
-    if (updateData.status !== undefined) data.status = updateData.status
     if (updateData.categoryId !== undefined) data.categoryId = updateData.categoryId
     if (updateData.price !== undefined) data.price = updateData.price
     if (updateData.wholesalePrice !== undefined) data.wholesalePrice = updateData.wholesalePrice

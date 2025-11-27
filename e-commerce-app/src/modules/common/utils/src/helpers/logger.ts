@@ -1,4 +1,4 @@
-import { AppError, isAppError, getErrorLevel } from '@/lib/errors/types'
+import { AppError, isAppError, getErrorLevel } from '@/modules/common/utils/src/errors/types'
 
 /**
  * 에러 로깅 유틸리티

@@ -2,16 +2,20 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Search, ShoppingCart, User, MapPin, Menu, ChevronDown, X } from 'lucide-react'
+import { useSession, signOut } from 'next-auth/react'
+import { Search, ShoppingCart, User, MapPin, Menu, ChevronDown, X, Phone, HelpCircle, MessageSquare, LogOut } from 'lucide-react'
 
 export default function StoreLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const { data: session, status } = useSession()
   const [cartCount, setCartCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
+  const [isCustomerServiceOpen, setIsCustomerServiceOpen] = useState(false)
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
 
   useEffect(() => {
     // Load cart count from localStorage
@@ -51,12 +55,136 @@ export default function StoreLayout({
   ]
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
       <header className="kurly-header border-b border-gray-200">
         {/* Top Banner */}
         <div className="bg-gradient-to-r from-[#FF6B6B] to-[#FF8C42] text-white text-center py-2 text-sm">
           <span>ABC마켓 오픈 기념! 전 상품 무료배송</span>
+        </div>
+
+        {/* Top Utility Bar */}
+        <div className="border-b border-gray-100 bg-white">
+          <div className="kurly-container">
+            <div className="flex justify-end items-center h-8 text-xs text-gray-600 gap-1">
+              {status === 'loading' ? (
+                <span className="px-2 text-gray-400">로딩중...</span>
+              ) : session ? (
+                <>
+                  {/* Logged In State */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                      className="flex items-center gap-1 hover:text-[#FF6B6B] px-2"
+                    >
+                      <span className="font-medium text-[#FF6B6B]">{session.user?.name || '회원'}</span>님
+                      <ChevronDown className={`w-3 h-3 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isUserMenuOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        />
+                        <div className="absolute top-full right-0 w-[160px] bg-white border border-gray-200 shadow-lg z-50 py-2 mt-1 rounded-md">
+                          <Link
+                            href="/store/mypage"
+                            className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
+                            onClick={() => setIsUserMenuOpen(false)}
+                          >
+                            <User className="w-4 h-4" />
+                            마이페이지
+                          </Link>
+                          <Link
+                            href="/store/orders"
+                            className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
+                            onClick={() => setIsUserMenuOpen(false)}
+                          >
+                            <ShoppingCart className="w-4 h-4" />
+                            주문내역
+                          </Link>
+                          <hr className="my-1" />
+                          <button
+                            onClick={() => {
+                              setIsUserMenuOpen(false)
+                              signOut({ callbackUrl: '/store' })
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700 w-full"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            로그아웃
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Logged Out State */}
+                  <Link href="/store/auth/signup" className="hover:text-[#FF6B6B] px-2">
+                    회원가입
+                  </Link>
+                  <span className="text-gray-300">|</span>
+                  <Link href="/store/auth/login" className="hover:text-[#FF6B6B] px-2">
+                    로그인
+                  </Link>
+                </>
+              )}
+              <span className="text-gray-300">|</span>
+
+              {/* Customer Service Accordion */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsCustomerServiceOpen(!isCustomerServiceOpen)}
+                  className="flex items-center gap-1 hover:text-[#FF6B6B] px-2"
+                >
+                  고객센터
+                  <ChevronDown className={`w-3 h-3 transition-transform ${isCustomerServiceOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isCustomerServiceOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setIsCustomerServiceOpen(false)}
+                    />
+                    <div className="absolute top-full right-0 w-[200px] bg-white border border-gray-200 shadow-lg z-50 py-2 mt-1 rounded-md">
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <p className="font-bold text-[#FF6B6B] text-lg">1234-5678</p>
+                        <p className="text-gray-500 text-xs mt-1">월~토 오전 7시 ~ 오후 6시</p>
+                      </div>
+                      <Link
+                        href="/store/faq"
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
+                        onClick={() => setIsCustomerServiceOpen(false)}
+                      >
+                        <HelpCircle className="w-4 h-4" />
+                        자주묻는질문
+                      </Link>
+                      <Link
+                        href="/store/inquiry"
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
+                        onClick={() => setIsCustomerServiceOpen(false)}
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        1:1 문의
+                      </Link>
+                      <Link
+                        href="/store/bulk"
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
+                        onClick={() => setIsCustomerServiceOpen(false)}
+                      >
+                        <Phone className="w-4 h-4" />
+                        대량주문문의
+                      </Link>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Main Header */}
@@ -164,7 +292,7 @@ export default function StoreLayout({
       </header>
 
       {/* Main Content */}
-      <main className="min-h-screen">
+      <main className="flex-1">
         {children}
       </main>
 

@@ -1,4 +1,4 @@
-import prisma from '@/lib/database/client'
+import prisma from '@/modules/common/utils/src/database/client'
 
 export interface ProductMonitoringResult {
   id: string

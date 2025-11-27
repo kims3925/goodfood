@@ -3,7 +3,7 @@
  * 결제 데이터 접근 레이어
  */
 
-import prisma from '@/lib/database/client'
+import prisma from '@/modules/common/utils/src/database/client'
 import { Payment, Refund, Prisma } from '@bandauto/db'
 import { PaymentFilter } from '@/types/services/payment'
 
