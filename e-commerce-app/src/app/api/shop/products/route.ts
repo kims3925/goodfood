@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@bandauto/db'
+import { prisma, PublishStatus } from '@bandauto/db'
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,10 +14,16 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = parseInt(searchParams.get('offset') || '0')
     const search = searchParams.get('search')
+    const bandId = searchParams.get('bandId')
 
-    // 기본 조건: 활성화된 상품만
+    // 기본 조건: 발행된 상품만 (product_publish 테이블을 통해)
     const where: any = {
-      status: 'ACTIVE',
+      productPublishes: {
+        some: {
+          status: PublishStatus.SUCCESS,
+          ...(bandId ? { retailBandId: parseInt(bandId) } : {}),
+        },
+      },
     }
 
     // 카테고리 필터
