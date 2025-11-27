@@ -39,9 +39,6 @@ model User {
   // OAuth relations
   oauthAccounts      OAuthAccount[]
 
-  // Settlement relations
-  settlements        Settlement[]
-
   @@index([email])
   @@index([phone])
   @@index([role])

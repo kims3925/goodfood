@@ -5,14 +5,13 @@ import prisma from '@/lib/prisma'
 /**
  * GET /api/settlement
  *
- * 소싱처별/소매밴드별 주문 정산 데이터 조회
+ * 소매밴드별 주문 정산 데이터 조회 (OrderItem + OrderTest 통합)
  *
  * Query Parameters:
  * - platform?: string - 소싱처 필터 (BAND, ALIEXPRESS)
  * - retailBandId?: number - 특정 소매밴드 필터
  * - startDate?: string - 시작 날짜 (YYYY-MM-DD)
  * - endDate?: string - 종료 날짜 (YYYY-MM-DD)
- * - dataSource?: string - 데이터 소스 ('order' | 'orderTest')
  */
 export async function GET(request: NextRequest) {
   try {
@@ -30,7 +29,6 @@ export async function GET(request: NextRequest) {
     const retailBandId = searchParams.get('retailBandId')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
-    const dataSource = searchParams.get('dataSource') || 'order' // 기본값: order
 
     // 사용자의 소매밴드 목록 조회 (소싱처 정보 포함)
     const retailBands = await prisma.retailBand.findMany({
@@ -59,70 +57,148 @@ export async function GET(request: NextRequest) {
       dateFilter.lte = end
     }
 
-    // 데이터 소스에 따라 다른 테이블 조회
-    let orders: any[] = []
+    // === 1. 쇼핑몰 주문 (OrderItem) 조회 ===
+    // ProductPublish.userId로 필터 (판매자 기준)
+    console.log('[Settlement] userId:', userId, 'retailBands:', retailBands.map(b => ({ id: b.id, name: b.name })))
 
-    if (dataSource === 'orderTest') {
-      // OrderTest 테이블 (웹훅 주문)
-      const orderTestData = await prisma.orderTest.findMany({
-        where: {
-          userId,
-          retailBandId: retailBandId ? parseInt(retailBandId) : { not: null },
-          ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
+    const orderItems = await prisma.orderItem.findMany({
+      where: {
+        productPublish: {
+          userId, // 판매자 기준으로 필터
+          ...(retailBandId ? { retailBandId: parseInt(retailBandId) } : {}),
         },
-        include: {
-          retailBand: true,
-          product: true,
+        ...(Object.keys(dateFilter).length > 0 ? { order: { orderedAt: dateFilter } } : {}),
+      },
+      include: {
+        order: {
+          select: {
+            id: true,
+            orderNumber: true,
+            recipientName: true,
+            status: true,
+            orderedAt: true,
+          },
         },
-        orderBy: { createdAt: 'desc' },
-      })
-
-      // OrderTest를 Order 형식으로 변환
-      orders = orderTestData.map(ot => ({
-        id: ot.id,
-        retailBandId: ot.retailBandId,
-        orderNumber: `WH-${ot.id.toString().padStart(6, '0')}`, // 웹훅 주문 번호
-        recipientName: ot.customerName,
-        totalAmount: ot.totalPrice || 0,
-        status: 'WEBHOOK', // 웹훅 주문 상태
-        orderedAt: ot.createdAt,
-        items: [{
-          productName: ot.productName,
-          quantity: 1,
-          totalPrice: ot.totalPrice || 0,
-        }],
-        retailBand: ot.retailBand,
-      }))
-    } else {
-      // Order 테이블 (더미/실제 주문)
-      const orderData = await prisma.order.findMany({
-        where: {
-          userId,
-          retailBandId: retailBandId ? parseInt(retailBandId) : { not: null },
-          ...(Object.keys(dateFilter).length > 0 ? { orderedAt: dateFilter } : {}),
-        },
-        include: {
-          retailBand: true,
-          items: {
-            include: {
-              product: true,
+        productPublish: {
+          include: {
+            retailBand: true,
+            product: {
+              select: { id: true, name: true, thumbnailUrl: true },
             },
           },
         },
-        orderBy: { orderedAt: 'desc' },
-      })
+      },
+      orderBy: { createdAt: 'desc' },
+    })
 
-      orders = orderData
+    console.log('[Settlement] orderItems found:', orderItems.length, orderItems.map(oi => ({
+      id: oi.id,
+      productPublishId: oi.productPublishId,
+      retailBandId: oi.productPublish?.retailBandId,
+      productName: oi.productName,
+    })))
+
+    // === 2. 웹훅 주문 (OrderTest) 조회 ===
+    const orderTests = await prisma.orderTest.findMany({
+      where: {
+        userId,
+        ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
+        ...(retailBandId ? {
+          productPublish: {
+            retailBandId: parseInt(retailBandId),
+          },
+        } : {}),
+      },
+      include: {
+        productPublish: {
+          include: {
+            retailBand: true,
+            product: {
+              select: { id: true, name: true, thumbnailUrl: true },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    // === 통합 데이터 구조 생성 ===
+    type UnifiedOrderItem = {
+      id: number
+      orderId: number | null  // Order ID (쇼핑몰 주문만 있음)
+      channel: 'SHOP' | 'WEBHOOK'  // 채널 구분
+      orderNumber: string
+      customerName: string
+      productName: string
+      thumbnailUrl: string | null
+      quantity: number
+      unitPrice: number
+      totalPrice: number
+      status: string
+      orderedAt: Date
+      retailBandId: number | null
+      retailBandName: string | null
     }
 
-    // 소매밴드별로 주문 그룹화 (소싱처 정보 포함)
+    const allItems: UnifiedOrderItem[] = []
+
+    // 쇼핑몰 주문 변환
+    orderItems.forEach(item => {
+      const retailBandId = item.productPublish?.retailBandId || null
+      const retailBandName = item.productPublish?.retailBand?.name || null
+
+      allItems.push({
+        id: item.id,
+        orderId: item.order.id,  // Order ID 추가
+        channel: 'SHOP',
+        orderNumber: item.order.orderNumber,
+        customerName: item.order.recipientName,
+        productName: item.productName,
+        thumbnailUrl: item.thumbnailUrl || item.productPublish?.product?.thumbnailUrl || null,
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+        totalPrice: Number(item.totalPrice),
+        status: item.order.status,
+        orderedAt: item.order.orderedAt,
+        retailBandId,
+        retailBandName,
+      })
+    })
+
+    // 웹훅 주문 변환
+    orderTests.forEach(ot => {
+      const retailBandId = ot.productPublish?.retailBandId || null
+      const retailBandName = ot.productPublish?.retailBand?.name || null
+
+      allItems.push({
+        id: ot.id,
+        orderId: null,  // 웹훅 주문은 Order가 없음
+        channel: 'WEBHOOK',
+        orderNumber: `WH-${ot.id.toString().padStart(6, '0')}`,
+        customerName: ot.customerName,
+        productName: ot.productName,
+        thumbnailUrl: ot.productPublish?.product?.thumbnailUrl || null,
+        quantity: ot.quantity || 1,
+        unitPrice: ot.unitPrice || 0,
+        totalPrice: ot.totalPrice || 0,
+        status: 'WEBHOOK',
+        orderedAt: ot.createdAt,
+        retailBandId,
+        retailBandName,
+      })
+    })
+
+    // === 소매밴드별로 그룹화 ===
     const retailBandMap = new Map<number, {
       id: number
       name: string
       coverUrl: string | null
       platform: string
-      orders: any[]
-      orderCount: number
+      items: UnifiedOrderItem[]
+      itemCount: number
+      shopCount: number      // 쇼핑몰 주문 수
+      webhookCount: number   // 웹훅 주문 수
+      totalQuantity: number
       totalAmount: number
     }>()
 
@@ -133,84 +209,47 @@ export async function GET(request: NextRequest) {
         name: band.name,
         coverUrl: band.coverUrl,
         platform: band.apiConfig?.platform || 'UNKNOWN',
-        orders: [],
-        orderCount: 0,
+        items: [],
+        itemCount: 0,
+        shopCount: 0,
+        webhookCount: 0,
+        totalQuantity: 0,
         totalAmount: 0,
       })
     })
 
-    // 주문 분류
-    orders.forEach(order => {
-      if (!order.retailBandId) return
+    console.log('[Settlement] allItems:', allItems.length, allItems.map(i => ({
+      id: i.id,
+      channel: i.channel,
+      retailBandId: i.retailBandId,
+      productName: i.productName,
+    })))
 
-      const bandData = retailBandMap.get(order.retailBandId)
+    // 아이템 분류
+    allItems.forEach(item => {
+      if (!item.retailBandId) return
+
+      const bandData = retailBandMap.get(item.retailBandId)
       if (bandData) {
-        const totalAmount = Number(order.totalAmount) || 0
-        bandData.orders.push({
-          id: order.id,
-          orderNumber: order.orderNumber,
-          recipientName: order.recipientName,
-          totalAmount,
-          status: order.status,
-          orderedAt: order.orderedAt,
-          items: order.items.map(item => ({
-            productName: item.productName,
-            quantity: item.quantity,
-            totalPrice: Number(item.totalPrice),
-          })),
-        })
-        bandData.orderCount++
-        bandData.totalAmount += totalAmount
+        bandData.items.push(item)
+        bandData.itemCount++
+        bandData.totalQuantity += item.quantity
+        bandData.totalAmount += item.totalPrice
+
+        if (item.channel === 'SHOP') {
+          bandData.shopCount++
+        } else {
+          bandData.webhookCount++
+        }
       }
     })
 
-    // 미분류 주문 (소매밴드 없는 주문)
-    let unclassifiedOrders: any[] = []
-
-    if (dataSource === 'orderTest') {
-      const unclassifiedTestOrders = await prisma.orderTest.findMany({
-        where: {
-          userId,
-          retailBandId: null,
-          ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
-        },
-        orderBy: { createdAt: 'desc' },
-      })
-
-      unclassifiedOrders = unclassifiedTestOrders.map(ot => ({
-        id: ot.id,
-        orderNumber: `WH-${ot.id.toString().padStart(6, '0')}`,
-        recipientName: ot.customerName,
-        totalAmount: ot.totalPrice || 0,
-        status: 'WEBHOOK',
-        orderedAt: ot.createdAt,
-      }))
-    } else {
-      const unclassifiedOrderData = await prisma.order.findMany({
-        where: {
-          userId,
-          retailBandId: null,
-          ...(Object.keys(dateFilter).length > 0 ? { orderedAt: dateFilter } : {}),
-        },
-        include: {
-          items: true,
-        },
-        orderBy: { orderedAt: 'desc' },
-      })
-
-      unclassifiedOrders = unclassifiedOrderData.map(order => ({
-        id: order.id,
-        orderNumber: order.orderNumber,
-        recipientName: order.recipientName,
-        totalAmount: Number(order.totalAmount),
-        status: order.status,
-        orderedAt: order.orderedAt,
-      }))
-    }
+    // 미분류 아이템 (productPublishId가 없는 것들)
+    const unclassifiedItems = allItems.filter(item => !item.retailBandId)
 
     // 결과 정리
     const retailBandResults = Array.from(retailBandMap.values())
-      .filter(band => band.orderCount > 0 || retailBandId)
+      .filter(band => band.itemCount > 0 || retailBandId)
       .sort((a, b) => b.totalAmount - a.totalAmount)
 
     // 소싱처별로 그룹화
@@ -218,7 +257,8 @@ export async function GET(request: NextRequest) {
       platform: string
       platformName: string
       retailBands: typeof retailBandResults
-      orderCount: number
+      itemCount: number
+      totalQuantity: number
       totalAmount: number
     }> = {}
 
@@ -235,18 +275,23 @@ export async function GET(request: NextRequest) {
           platform,
           platformName: platformNames[platform] || platform,
           retailBands: [],
-          orderCount: 0,
+          itemCount: 0,
+          totalQuantity: 0,
           totalAmount: 0,
         }
       }
       platformGroups[platform].retailBands.push(band)
-      platformGroups[platform].orderCount += band.orderCount
+      platformGroups[platform].itemCount += band.itemCount
+      platformGroups[platform].totalQuantity += band.totalQuantity
       platformGroups[platform].totalAmount += band.totalAmount
     })
 
     // 전체 통계
-    const totalOrders = retailBandResults.reduce((sum, b) => sum + b.orderCount, 0)
+    const totalItems = retailBandResults.reduce((sum, b) => sum + b.itemCount, 0)
+    const totalQuantity = retailBandResults.reduce((sum, b) => sum + b.totalQuantity, 0)
     const totalAmount = retailBandResults.reduce((sum, b) => sum + b.totalAmount, 0)
+    const totalShopCount = retailBandResults.reduce((sum, b) => sum + b.shopCount, 0)
+    const totalWebhookCount = retailBandResults.reduce((sum, b) => sum + b.webhookCount, 0)
 
     return NextResponse.json({
       success: true,
@@ -254,16 +299,19 @@ export async function GET(request: NextRequest) {
         platforms: Object.values(platformGroups).sort((a, b) => b.totalAmount - a.totalAmount),
         retailBands: retailBandResults,
         unclassified: {
-          orders: unclassifiedOrders,
-          orderCount: unclassifiedOrders.length,
-          totalAmount: unclassifiedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0),
+          items: unclassifiedItems,
+          itemCount: unclassifiedItems.length,
+          totalQuantity: unclassifiedItems.reduce((sum, i) => sum + i.quantity, 0),
+          totalAmount: unclassifiedItems.reduce((sum, i) => sum + i.totalPrice, 0),
         },
-        dataSource, // 현재 데이터 소스 반환
         summary: {
-          totalOrders: totalOrders + unclassifiedOrders.length,
-          totalAmount: totalAmount + unclassifiedOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0),
-          classifiedOrders: totalOrders,
+          totalItems: totalItems + unclassifiedItems.length,
+          totalQuantity: totalQuantity + unclassifiedItems.reduce((sum, i) => sum + i.quantity, 0),
+          totalAmount: totalAmount + unclassifiedItems.reduce((sum, i) => sum + i.totalPrice, 0),
+          classifiedItems: totalItems,
           classifiedAmount: totalAmount,
+          shopCount: totalShopCount,       // 쇼핑몰 주문 수
+          webhookCount: totalWebhookCount, // 웹훅 주문 수
         },
       },
     })
@@ -271,138 +319,6 @@ export async function GET(request: NextRequest) {
     console.error('정산 데이터 조회 실패:', error)
     return NextResponse.json(
       { success: false, error: '정산 데이터를 불러오는데 실패했습니다.' },
-      { status: 500 }
-    )
-  }
-}
-
-/**
- * POST /api/settlement
- *
- * 정산 생성
- *
- * Body:
- * - retailBandId: number - 소매밴드 ID
- * - periodStart: string - 정산 시작일 (YYYY-MM-DD)
- * - periodEnd: string - 정산 종료일 (YYYY-MM-DD)
- * - memo?: string - 메모
- */
-export async function POST(request: NextRequest) {
-  try {
-    const currentUser = await getCurrentUser()
-    if (!currentUser) {
-      return NextResponse.json(
-        { success: false, error: '로그인이 필요합니다.' },
-        { status: 401 }
-      )
-    }
-    const userId = currentUser.userId
-
-    const body = await request.json()
-    const { retailBandId, periodStart, periodEnd, memo } = body
-
-    if (!retailBandId || !periodStart || !periodEnd) {
-      return NextResponse.json(
-        { success: false, error: '소매밴드, 시작일, 종료일은 필수입니다.' },
-        { status: 400 }
-      )
-    }
-
-    const startDate = new Date(periodStart)
-    const endDate = new Date(periodEnd)
-    endDate.setHours(23, 59, 59, 999)
-
-    // 소매밴드 확인
-    const retailBand = await prisma.retailBand.findFirst({
-      where: { id: retailBandId, userId },
-    })
-
-    if (!retailBand) {
-      return NextResponse.json(
-        { success: false, error: '소매밴드를 찾을 수 없습니다.' },
-        { status: 404 }
-      )
-    }
-
-    // 중복 정산 확인
-    const existingSettlement = await prisma.settlement.findFirst({
-      where: {
-        userId,
-        retailBandId,
-        periodStart: startDate,
-        periodEnd: endDate,
-      },
-    })
-
-    if (existingSettlement) {
-      return NextResponse.json(
-        { success: false, error: '동일 기간의 정산이 이미 존재합니다.' },
-        { status: 400 }
-      )
-    }
-
-    // 해당 기간의 미정산 주문 조회 (Order 테이블 사용)
-    const orders = await prisma.order.findMany({
-      where: {
-        userId,
-        retailBandId,
-        orderedAt: {
-          gte: startDate,
-          lte: endDate,
-        },
-        // 이미 정산된 주문 제외
-        settlementOrders: {
-          none: {},
-        },
-      },
-    })
-
-    if (orders.length === 0) {
-      return NextResponse.json(
-        { success: false, error: '해당 기간에 정산할 주문이 없습니다.' },
-        { status: 400 }
-      )
-    }
-
-    // 정산 생성
-    const totalAmount = orders.reduce((sum, o) => sum + Number(o.totalAmount), 0)
-
-    const settlement = await prisma.settlement.create({
-      data: {
-        userId,
-        retailBandId,
-        periodStart: startDate,
-        periodEnd: endDate,
-        totalOrders: orders.length,
-        totalAmount: Math.round(totalAmount),
-        status: 'PENDING',
-        memo: memo || null,
-        orders: {
-          create: orders.map(order => ({
-            orderId: order.id,
-            amount: Math.round(Number(order.totalAmount)),
-          })),
-        },
-      },
-      include: {
-        retailBand: {
-          select: { id: true, name: true },
-        },
-        _count: {
-          select: { orders: true },
-        },
-      },
-    })
-
-    return NextResponse.json({
-      success: true,
-      message: `정산이 생성되었습니다. (${orders.length}건, ${totalAmount.toLocaleString()}원)`,
-      data: settlement,
-    })
-  } catch (error) {
-    console.error('정산 생성 실패:', error)
-    return NextResponse.json(
-      { success: false, error: '정산 생성에 실패했습니다.' },
       { status: 500 }
     )
   }

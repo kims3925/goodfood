@@ -35,10 +35,6 @@ model RetailBand {
   updatedAt        DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   formUrl          String?            @map("form_url") @db.VarChar(500)
   publishHistories PublishHistory[]
-  orderTests       OrderTest[]
-  settlements      Settlement[]
-  // orderItems는 제거 (productPublish를 통해 관계)
-  // cartItems는 제거 (productPublish를 통해 관계)
   apiConfig        SourcingApiConfig  @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
   productPublishes ProductPublish[]
   user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)

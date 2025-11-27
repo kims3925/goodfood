@@ -128,12 +128,3 @@ enum RefundMethod {
   POINTS
 }
 
-// =============================================
-// 정산 관리
-// =============================================
-
-enum SettlementStatus {
-  PENDING
-  COMPLETED
-  CANCELLED
-}

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@bandauto/db'
+import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-
-const prisma = new PrismaClient()
 
 // GET: 주문 상세 조회
 export async function GET(
@@ -21,10 +19,52 @@ export async function GET(
     const { id } = await params
     const orderId = parseInt(id)
 
-    const order = await prisma.purchaseOrder.findFirst({
+    // Order 조회 (OrderItem, ProductPublish, RetailBand, User 포함)
+    const order = await prisma.order.findFirst({
       where: {
         id: orderId,
-        userId: user.userId,
+        // 판매자 기준: 주문 아이템의 ProductPublish가 내 것인지 확인
+        items: {
+          some: {
+            productPublish: {
+              userId: user.userId,
+            },
+          },
+        },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        items: {
+          include: {
+            productPublish: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    thumbnailUrl: true,
+                    price: true,
+                  },
+                },
+                retailBand: {
+                  select: {
+                    id: true,
+                    name: true,
+                    coverUrl: true,
+                  },
+                },
+              },
+            },
+            variant: true,
+          },
+        },
+        payment: true,
       },
     })
 
@@ -48,7 +88,7 @@ export async function GET(
   }
 }
 
-// PATCH: 주문 수정
+// PATCH: 주문 상태 수정
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -67,10 +107,16 @@ export async function PATCH(
     const body = await request.json()
 
     // 기존 주문 확인
-    const existingOrder = await prisma.purchaseOrder.findFirst({
+    const existingOrder = await prisma.order.findFirst({
       where: {
         id: orderId,
-        userId: user.userId,
+        items: {
+          some: {
+            productPublish: {
+              userId: user.userId,
+            },
+          },
+        },
       },
     })
 
@@ -84,18 +130,25 @@ export async function PATCH(
     // 업데이트 데이터 구성
     const updateData: any = {}
 
-    if (body.productName !== undefined) {
-      updateData.productName = body.productName
+    if (body.status !== undefined) {
+      updateData.status = body.status
+
+      // 상태에 따른 타임스탬프 업데이트
+      if (body.status === 'SHIPPED') {
+        updateData.shippedAt = new Date()
+      } else if (body.status === 'DELIVERED') {
+        updateData.deliveredAt = new Date()
+      } else if (body.status === 'CANCELLED') {
+        updateData.cancelledAt = new Date()
+      }
     }
-    if (body.totalPrice !== undefined) {
-      updateData.totalPrice = body.totalPrice
-    }
-    if (body.customerName !== undefined) {
-      updateData.customerName = body.customerName
+
+    if (body.deliveryMemo !== undefined) {
+      updateData.deliveryMemo = body.deliveryMemo
     }
 
     // 주문 업데이트
-    const order = await prisma.purchaseOrder.update({
+    const order = await prisma.order.update({
       where: { id: orderId },
       data: updateData,
     })
@@ -109,56 +162,6 @@ export async function PATCH(
     console.error('주문 수정 실패:', error)
     return NextResponse.json(
       { success: false, error: '주문 수정에 실패했습니다.' },
-      { status: 500 }
-    )
-  }
-}
-
-// DELETE: 주문 삭제
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser()
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '인증이 필요합니다.' },
-        { status: 401 }
-      )
-    }
-
-    const { id } = await params
-    const orderId = parseInt(id)
-
-    // 기존 주문 확인
-    const existingOrder = await prisma.purchaseOrder.findFirst({
-      where: {
-        id: orderId,
-        userId: user.userId,
-      },
-    })
-
-    if (!existingOrder) {
-      return NextResponse.json(
-        { success: false, error: '주문을 찾을 수 없습니다.' },
-        { status: 404 }
-      )
-    }
-
-    // 주문 삭제
-    await prisma.purchaseOrder.delete({
-      where: { id: orderId },
-    })
-
-    return NextResponse.json({
-      success: true,
-      message: '주문이 삭제되었습니다.',
-    })
-  } catch (error) {
-    console.error('주문 삭제 실패:', error)
-    return NextResponse.json(
-      { success: false, error: '주문 삭제에 실패했습니다.' },
       { status: 500 }
     )
   }
