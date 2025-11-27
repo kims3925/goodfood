@@ -32,12 +32,13 @@ export async function POST(req: NextRequest) {
       customerInfo,
       shippingAddress,
       fromCart = true, // 장바구니에서 주문 생성 여부
+      retailBandId, // 소매밴드 ID (optional)
     } = body
 
-    // 고객 정보 검증
-    if (!customerInfo?.name || !customerInfo?.phone || !customerInfo?.email) {
+    // 고객 정보 검증 (이메일은 선택)
+    if (!customerInfo?.name || !customerInfo?.phone) {
       return NextResponse.json(
-        { success: false, error: '고객 정보(이름, 전화번호, 이메일)는 필수입니다' },
+        { success: false, error: '고객 정보(이름, 전화번호)는 필수입니다' },
         { status: 400 }
       )
     }
@@ -145,14 +146,19 @@ export async function POST(req: NextRequest) {
     const totalAmount = subtotal + shippingFee - discountAmount
 
     // 고객 생성 또는 조회
-    let customer = await prisma.customer.findUnique({
-      where: { email: customerInfo.email },
-    })
+    let customer = null
+    const customerEmail = customerInfo.email || `guest_${Date.now()}@guest.local`
+
+    if (customerInfo.email) {
+      customer = await prisma.customer.findUnique({
+        where: { email: customerInfo.email },
+      })
+    }
 
     if (!customer) {
       customer = await prisma.customer.create({
         data: {
-          email: customerInfo.email,
+          email: customerEmail,
           name: customerInfo.name,
           phone: customerInfo.phone,
           passwordHash: '', // 비회원 주문
@@ -161,9 +167,10 @@ export async function POST(req: NextRequest) {
     }
 
     // 주문 생성
-    const order = await prisma.customerOrder.create({
+    const order = await prisma.order.create({
       data: {
         customerId: customer.id,
+        retailBandId: retailBandId ? parseInt(retailBandId) : null,
         orderNumber: generateOrderNumber(),
         status: 'PENDING',
         recipientName: shippingAddress.recipientName || customerInfo.name,
@@ -260,13 +267,16 @@ export async function GET(req: NextRequest) {
 
     if (orderNumber) {
       // 주문번호로 단건 조회
-      const order = await prisma.customerOrder.findUnique({
+      const order = await prisma.order.findUnique({
         where: { orderNumber },
         include: {
           items: true,
           payment: true,
           customer: {
             select: { name: true, email: true, phone: true },
+          },
+          retailBand: {
+            select: { id: true, name: true },
           },
         },
       })
@@ -285,6 +295,7 @@ export async function GET(req: NextRequest) {
           orderNumber: order.orderNumber,
           status: order.status,
           customer: order.customer,
+          retailBand: order.retailBand,
           recipientName: order.recipientName,
           recipientPhone: order.recipientPhone,
           address: `${order.address} ${order.addressDetail || ''}`.trim(),
@@ -334,11 +345,14 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    const orders = await prisma.customerOrder.findMany({
+    const orders = await prisma.order.findMany({
       where: { customerId: customer.id },
       include: {
         items: true,
         payment: true,
+        retailBand: {
+          select: { id: true, name: true },
+        },
       },
       orderBy: { orderedAt: 'desc' },
     })
@@ -349,6 +363,7 @@ export async function GET(req: NextRequest) {
         id: order.id,
         orderNumber: order.orderNumber,
         status: order.status,
+        retailBand: order.retailBand,
         totalAmount: Number(order.totalAmount),
         itemCount: order.items.length,
         firstItemName: order.items[0]?.productName,

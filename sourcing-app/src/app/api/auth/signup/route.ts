@@ -62,19 +62,21 @@ export async function POST(request: NextRequest) {
     // 비밀번호 해싱
     const hashedPassword = await hashPassword(password)
 
-    // 사용자 생성
+    // 사용자 생성 (기본 역할: USER)
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         name: name || null,
+        role: 'USER',
       },
     })
 
     // JWT 토큰 생성
-    const token = createToken({
+    const token = await createToken({
       userId: user.id,
       email: user.email,
+      role: user.role,
     })
 
     // 쿠키에 토큰 설정
@@ -86,6 +88,7 @@ export async function POST(request: NextRequest) {
         id: user.id,
         email: user.email,
         name: user.name,
+        role: user.role,
       },
     })
   } catch (error) {

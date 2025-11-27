@@ -1,0 +1,56 @@
+// =============================================
+// POST (게시물)
+// =============================================
+
+model Post {
+  id              Int           @id @default(autoincrement())
+  userId          Int           @map("user_id")
+  wholesaleBandId Int           @map("wholesale_band_id")
+  externalId      String        @map("external_id") @db.VarChar(255)
+  title           String        @db.VarChar(500)
+  content         String        @db.Text
+  author          String?       @db.VarChar(100)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wholesaleBand   WholesaleBand @relation("WholesaleBand", fields: [wholesaleBandId], references: [id], onDelete: Cascade)
+  comments        PostComment[]
+  images          PostImage[]
+  product         Product?
+
+  @@unique([wholesaleBandId, externalId])
+  @@index([userId])
+  @@index([wholesaleBandId])
+  @@index([createdAt])
+  @@index([externalId])
+  @@map("post")
+}
+
+model PostImage {
+  id        Int      @id @default(autoincrement())
+  postId    Int      @map("post_id")
+  name      String   @db.VarChar(255)
+  imageUrl  String   @map("image_url") @db.VarChar(1000)
+  fileSize  Int?     @map("file_size")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([sortOrder])
+  @@map("post_image")
+}
+
+model PostComment {
+  id        Int      @id @default(autoincrement())
+  postId    Int      @map("post_id")
+  author    String   @db.VarChar(100)
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([createdAt])
+  @@map("post_comment")
+}

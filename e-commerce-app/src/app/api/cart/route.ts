@@ -166,7 +166,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { productId, variantId, quantity = 1 } = body
+    const { productId, variantId, quantity = 1, sessionId: bodySessionId } = body
 
     if (!productId) {
       return NextResponse.json(
@@ -188,9 +188,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 세션 ID 가져오기 또는 생성
-    let sessionId = getSessionId(req)
-    const isNewSession = !sessionId
+    // 세션 ID 가져오기 또는 생성 (쿠키 우선, 없으면 body, 둘 다 없으면 새로 생성)
+    let sessionId = getSessionId(req) || bodySessionId
+    const isNewSession = !getSessionId(req)
 
     if (!sessionId) {
       sessionId = uuidv4()

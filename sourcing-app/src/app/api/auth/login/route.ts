@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
     const token = await createToken({
       userId: user.id,
       email: user.email,
+      role: user.role,
     })
 
     // 쿠키에 토큰 설정
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
         id: user.id,
         email: user.email,
         name: user.name,
+        role: user.role,
       },
     })
   } catch (error) {
