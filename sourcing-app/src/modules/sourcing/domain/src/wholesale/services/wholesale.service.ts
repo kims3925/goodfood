@@ -210,7 +210,6 @@ export class WholesaleService {
         post.detailedContent ||
         post.content ||
         '',
-      status: 'DRAFT',
       sourceType: 'COLLECTED_POST',
       sourceId: String(post.id),
 

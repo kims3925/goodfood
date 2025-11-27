@@ -134,11 +134,13 @@ export async function getAutomationStats(userId: number): Promise<AutomationStat
     }
   })
 
-  // 발행 준비된 상품 수 (DRAFT 상태)
+  // 발행 준비된 상품 수 (미발행 상품)
   const readyToPublish = await prisma.product.count({
     where: {
       userId,
-      status: 'DRAFT'
+      productPublishes: {
+        none: {}
+      }
     }
   })
 

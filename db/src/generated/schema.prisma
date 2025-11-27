@@ -1,7 +1,7 @@
 // =============================================
-// BANDAUTO SHOP-DB DATABASE SCHEMA
+// BANDAUTO SOURCING-APP DATABASE SCHEMA
 // =============================================
-// Purpose: 도매밴드 게시물 수집 → AI 가공 → 소매밴드 발행 + 쇼핑몰
+// Purpose: 도매밴드 게시물 수집 → AI 가공 → 소매밴드 발행
 // Tech Stack: MySQL 8.0+, Prisma, TypeScript
 // Design Principles:
 // - 3NF Normalization
@@ -43,9 +43,9 @@ model User {
   pricingPolicies    PricingPolicy[]
   automationConfig   AutomationConfig?
   workflowLogs       WorkflowLog[]
+  productPublishes   ProductPublish[]
   publishHistories   PublishHistory[]
   purchaseOrders     PurchaseOrder[]
-  internalOrders     InternalOrder[]
 
   @@index([email])
   @@map("user")
@@ -195,6 +195,7 @@ model RetailBand {
   // Relationships
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   apiConfig        SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
+  productPublishes ProductPublish[]
   publishHistories PublishHistory[]
 
   @@unique([userId, bandKey])
@@ -292,22 +293,14 @@ model PostComment {
 // PRODUCT MANAGEMENT (상품 관리)
 // =============================================
 
-enum ProductStatus {
-  DRAFT // 임시저장
-  ACTIVE // 판매중
-  INACTIVE // 판매중지
-  SOLDOUT // 품절
-}
-
 model Product {
   id     Int @id @default(autoincrement())
   userId Int @map("user_id") // 생성한 사용자
   postId Int @unique @map("post_id") // 게시물 ID (1:1 관계)
 
   // Basic Info
-  name        String        @db.VarChar(500)
-  description String?       @db.Text
-  status      ProductStatus @default(DRAFT)
+  name        String  @db.VarChar(500)
+  description String? @db.Text
 
   // Images (post_image 재사용)
   thumbnailUrl String? @map("thumbnail_url") @db.VarChar(1000) // 첫번째 post_image URL 캐싱
@@ -324,14 +317,13 @@ model Product {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 
   // Relationships
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post             Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
-  variants         ProductVariant[]
-  options          ProductOption[]
-  purchaseOrders   PurchaseOrder[]
-  internalOrders   InternalOrder[]
-  publishHistories PublishHistory[]
-
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post               Post                @relation(fields: [postId], references: [id], onDelete: Cascade)
+  variants           ProductVariant[]
+  options            ProductOption[]
+  purchaseOrders     PurchaseOrder[]
+  productPublishes   ProductPublish[]
+  publishHistories   PublishHistory[]
   // E-Commerce Relations
   cartItems          CartItem[]
   sessionCartItems   SessionCartItem[]
@@ -339,7 +331,6 @@ model Product {
 
   @@index([userId])
   @@index([postId])
-  @@index([status])
   @@index([categoryId])
   @@index([createdAt])
   @@map("product")
@@ -509,7 +500,36 @@ model WorkflowLog {
 }
 
 // =============================================
-// PUBLISH HISTORY (발행 이력)
+// PRODUCT PUBLISH (상품 발행 - 쇼핑몰 표시용)
+// =============================================
+
+model ProductPublish {
+  id           Int @id @default(autoincrement())
+  userId       Int @map("user_id")
+  productId    Int @map("product_id")
+  retailBandId Int @map("retail_band_id")
+
+  // Status
+  status PublishStatus @default(PENDING)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  retailBand RetailBand @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, retailBandId]) // 같은 상품을 같은 밴드에 중복 발행 방지
+  @@index([userId])
+  @@index([productId])
+  @@index([retailBandId])
+  @@index([status])
+  @@map("product_publish")
+}
+
+// =============================================
+// PUBLISH HISTORY (발행 이력 로그)
 // =============================================
 
 enum PublishStatus {
@@ -536,11 +556,12 @@ model PublishHistory {
   product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
   retailBand RetailBand @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
 
-  @@unique([productId, retailBandId]) // 같은 상품을 같은 밴드에 중복 발행 방지
+  @@unique([productId, retailBandId])
   @@index([userId])
   @@index([productId])
   @@index([retailBandId])
   @@index([status])
+  @@index([publishedAt])
   @@map("publish_history")
 }
 
@@ -571,80 +592,6 @@ model PurchaseOrder {
   @@index([productName])
   @@index([customerName])
   @@map("purchase_order")
-}
-
-// =============================================
-// INTERNAL ORDER MANAGEMENT (내부 주문서 - 테스트용)
-// =============================================
-
-enum PaymentMethod {
-  CARD // 카드
-  BANK_TRANSFER // 계좌이체
-  VIRTUAL_ACCOUNT // 가상계좌
-}
-
-enum CashReceiptType {
-  NONE // 미발행
-  INCOME // 소득공제용
-  EXPENSE // 지출증빙용
-}
-
-enum OrderStatus {
-  PENDING // 주문대기
-  PAID // 결제완료
-  PREPARING // 상품준비중
-  SHIPPING // 배송중
-  DELIVERED // 배송완료
-  CANCELLED // 주문취소
-}
-
-model InternalOrder {
-  id        Int  @id @default(autoincrement())
-  userId    Int  @map("user_id")
-  productId Int? @map("product_id")
-
-  // 주문자 정보
-  customerName  String @map("customer_name") @db.VarChar(100)
-  customerPhone String @map("customer_phone") @db.VarChar(20)
-
-  // 배송지 정보
-  recipientName  String  @map("recipient_name") @db.VarChar(100)
-  recipientPhone String  @map("recipient_phone") @db.VarChar(20)
-  postalCode     String  @map("postal_code") @db.VarChar(10)
-  address        String  @db.VarChar(500)
-  addressDetail  String? @map("address_detail") @db.VarChar(500)
-  deliveryMemo   String? @map("delivery_memo") @db.VarChar(500)
-
-  // 상품 정보
-  productName String @map("product_name") @db.VarChar(500)
-  quantity    Int    @default(1)
-  unitPrice   Int    @map("unit_price") // 단가
-  shippingFee Int    @default(0) @map("shipping_fee") // 배송비
-  totalPrice  Int    @map("total_price") // 총 결제금액
-
-  // 결제 정보
-  paymentMethod PaymentMethod @map("payment_method")
-
-  // 현금영수증
-  cashReceiptType   CashReceiptType @default(NONE) @map("cash_receipt_type")
-  cashReceiptNumber String?         @map("cash_receipt_number") @db.VarChar(50)
-
-  // 주문 상태
-  status OrderStatus @default(PENDING)
-
-  // Timestamps
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([productId])
-  @@index([status])
-  @@index([createdAt])
-  @@map("internal_order")
 }
 
 // =============================================

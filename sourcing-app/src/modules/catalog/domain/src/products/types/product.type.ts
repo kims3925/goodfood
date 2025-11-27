@@ -2,7 +2,7 @@
  * Product Service DTO 타입 정의
  */
 
-import { Product, ProductStatus } from '@bandauto/db'
+import { Product } from '@bandauto/db'
 import { BaseFilter } from './common'
 
 /**
@@ -21,7 +21,6 @@ export interface CreateProductDTO {
   priceInfo?: string
   specialNotes?: string
   productCategory?: string
-  status?: ProductStatus
   images?: string
   originUrl?: string
   wholesaleBandId?: number
@@ -43,7 +42,6 @@ export interface UpdateProductDTO {
   priceInfo?: string
   specialNotes?: string
   productCategory?: string
-  status?: ProductStatus
   images?: string
 }
 
@@ -52,7 +50,6 @@ export interface UpdateProductDTO {
  */
 export interface ProductFilter extends BaseFilter {
   userId: number
-  status?: ProductStatus
   category?: string
   minPrice?: number
   maxPrice?: number
@@ -75,12 +72,4 @@ export interface DeleteProductsResult {
   deletedCount: number
   deactivatedCount: number
   hasOrderedProducts: boolean
-}
-
-/**
- * 상품 상태 업데이트 DTO
- */
-export interface UpdateProductStatusDTO {
-  id: number
-  status: ProductStatus
 }

@@ -7,7 +7,7 @@ import { Customer } from '@bandauto/db'
 import {
   customerRepository,
   CustomerRepository
-} from '@/domain/customers/repository/customer.repository'
+} from '@/modules/user/domain/src/customers/repository/customer.repository'
 import {
   CreateCustomerDTO,
   UpdateCustomerDTO,
@@ -18,7 +18,7 @@ import {
   ValidationError,
   NotFoundError,
   DuplicateError
-} from '@/lib/errors/handlers'
+} from '@/modules/common/utils/src/errors/handlers'
 
 export class CustomerService {
   constructor(

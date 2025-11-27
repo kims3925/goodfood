@@ -3,7 +3,7 @@
  * 환불 데이터 접근 레이어
  */
 
-import prisma from '@/lib/database/client'
+import prisma from '@/modules/common/utils/src/database/client'
 import { Refund, Prisma } from '@bandauto/db'
 
 export class RefundRepository {

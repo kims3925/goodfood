@@ -3,7 +3,7 @@
  * 상품을 소매밴드에 발행
  */
 
-import { PrismaClient, ProductStatus, PublishStatus } from '@bandauto/db'
+import { PrismaClient, PublishStatus } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { NaverBandClient } from '@/modules/config/domain/src/band/services/band-client.service'
@@ -45,10 +45,9 @@ export async function runPublishPipeline(
 
   console.log(`[Publish] Starting for user ${userId}`)
 
-  // 발행할 상품 조회 (판매중 상태의 상품만)
+  // 발행할 상품 조회 (선택된 상품만)
   const whereClause: any = {
     userId,
-    status: ProductStatus.ACTIVE, // 판매중 상태 상품만 발행
   }
 
   if (config.productIds?.length) {
@@ -201,6 +200,25 @@ export async function runPublishPipeline(
             status: PublishStatus.SUCCESS,
             errorMessage: null,
             publishedAt: new Date(),
+          },
+        })
+
+        // ProductPublish 레코드 생성/업데이트 (쇼핑몰 표시용)
+        await prisma.productPublish.upsert({
+          where: {
+            productId_retailBandId: {
+              productId: product.id,
+              retailBandId: band.id,
+            },
+          },
+          create: {
+            userId,
+            productId: product.id,
+            retailBandId: band.id,
+            status: PublishStatus.SUCCESS,
+          },
+          update: {
+            status: PublishStatus.SUCCESS,
           },
         })
 

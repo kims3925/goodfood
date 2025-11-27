@@ -188,13 +188,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (product.status !== 'ACTIVE') {
-      return NextResponse.json(
-        { success: false, error: '현재 구매할 수 없는 상품입니다' },
-        { status: 400 }
-      )
-    }
-
     // 세션 ID 가져오기 또는 생성
     let sessionId = getSessionId(req)
     const isNewSession = !sessionId

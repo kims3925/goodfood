@@ -3,7 +3,7 @@
  * 상품 비즈니스 로직 레이어
  */
 
-import { Product, ProductStatus } from '@bandauto/db'
+import { Product } from '@bandauto/db'
 import { productRepository, ProductRepository } from '@/domain/products/repository/product.repository'
 import {
   CreateProductDTO,
@@ -32,10 +32,10 @@ export class ProductService {
 
     const products = await this.repository.findAllByUserId(userId)
 
-    // 쇼핑몰 등록 상태 정보 추가
+    // 쇼핑몰 등록 상태 정보 추가 (product_publish 테이블 기반으로 판단)
     return products.map(product => ({
       ...product,
-      isRegisteredToShop: product.status === 'ACTIVE'
+      isRegisteredToShop: (product as any).productPublishes?.length > 0
     }))
   }
 
@@ -72,7 +72,7 @@ export class ProductService {
 
     return products.map(product => ({
       ...product,
-      isRegisteredToShop: product.status === 'ACTIVE'
+      isRegisteredToShop: (product as any).productPublishes?.length > 0
     }))
   }
 
@@ -113,7 +113,6 @@ export class ProductService {
       priceInfo: data.priceInfo,
       specialNotes: data.specialNotes,
       productCategory: data.productCategory,
-      status: data.status || 'DRAFT',
       images: data.images,
       originUrl: data.originUrl,
       wholesaleBand: data.wholesaleBandId
@@ -163,7 +162,6 @@ export class ProductService {
     if (data.productCategory !== undefined)
       updateData.productCategory = data.productCategory
     if (data.priceInfo !== undefined) updateData.priceInfo = data.priceInfo
-    if (data.status !== undefined) updateData.status = data.status
     if (data.images !== undefined) updateData.images = data.images
 
     // 숫자 필드 검증 및 추가
@@ -264,35 +262,6 @@ export class ProductService {
       deactivatedCount: result.deactivatedCount,
       hasOrderedProducts
     }
-  }
-
-  /**
-   * 상품 상태 업데이트
-   */
-  async updateProductStatus(
-    id: number,
-    userId: number,
-    status: ProductStatus
-  ): Promise<Product> {
-    if (!id) {
-      throw new ValidationError('상품 ID는 필수입니다')
-    }
-
-    if (!userId) {
-      throw new ValidationError('사용자 ID는 필수입니다')
-    }
-
-    if (!status) {
-      throw new ValidationError('상태 값은 필수입니다')
-    }
-
-    // 상품 존재 및 권한 확인
-    const existingProduct = await this.repository.findByIdAndUserId(id, userId)
-    if (!existingProduct) {
-      throw new NotFoundError('상품', id)
-    }
-
-    return this.repository.updateStatus(id, status)
   }
 
   /**

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import prisma from '@/lib/database/client'
+import prisma from '@/modules/common/utils/src/database/client'
 import { getTossPaymentsService, TossPaymentResponse, PAYMENT_STATUS } from './toss-payments.service'
 
 export interface WebhookEvent {

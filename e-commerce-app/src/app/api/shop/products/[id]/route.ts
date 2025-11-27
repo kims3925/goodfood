@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@bandauto/db'
+import { prisma, PublishStatus } from '@bandauto/db'
 
 export async function GET(
   req: NextRequest,
@@ -12,6 +12,8 @@ export async function GET(
 ) {
   try {
     const productId = parseInt(params.id)
+    const { searchParams } = new URL(req.url)
+    const bandId = searchParams.get('bandId')
 
     if (isNaN(productId)) {
       return NextResponse.json(
@@ -34,7 +36,17 @@ export async function GET(
             images: {
               orderBy: { sortOrder: 'asc' },
             },
+            wholesaleBand: true, // 판매자(도매밴드) 정보
           },
+        },
+        productPublishes: {
+          where: bandId
+            ? { retailBandId: parseInt(bandId), status: PublishStatus.SUCCESS }
+            : { status: PublishStatus.SUCCESS },
+          include: {
+            retailBand: true,
+          },
+          take: 1,
         },
       },
     })
@@ -72,6 +84,12 @@ export async function GET(
       sku: variant.sku,
     }))
 
+    // 밴드 이름 가져오기 (product_publish -> retail_band)
+    const bandName = product.productPublishes[0]?.retailBand?.name || null
+
+    // 판매자 정보 가져오기 (post -> wholesaleBand)
+    const sellerName = product.post?.wholesaleBand?.name || null
+
     const formattedProduct = {
       id: product.id.toString(),
       title: product.name,
@@ -85,6 +103,8 @@ export async function GET(
       stock: mainVariant?.stock || 100,
       rating: 4.5,
       reviews: 100,
+      bandName,
+      sellerName,
       shippingInfo: {
         defaultShippingFee: 3000,
         freeShippingAmount: 30000,

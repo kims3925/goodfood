@@ -1,7 +1,7 @@
-import prisma from '@/lib/database/client'
+import prisma from '@/modules/common/utils/src/database/client'
 import { Cart, CartItem, Product } from '@bandauto/db'
-import { RepositoryError, NotFoundError } from '@/lib/errors/types'
-import { logError } from '@/lib/helpers/logger'
+import { RepositoryError, NotFoundError } from '@/modules/common/utils/src/errors/types'
+import { logError } from '@/modules/common/utils/src/helpers/logger'
 
 export interface CartWithItems extends Cart {
   items: (CartItem & { product: Product })[]

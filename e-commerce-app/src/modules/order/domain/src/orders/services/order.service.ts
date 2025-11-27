@@ -4,11 +4,11 @@
  */
 
 import { Order } from '@bandauto/db'
-import { getOrderRepository } from '@/domain/orders/repository/order.repository'
-import { customerService, CustomerService } from '@/domain/customers/services/customer.service'
-import { cartService, CartService } from '@/domain/cart/services/cart.service'
-import { getTossPaymentsService } from '@/domain/payments'
-import prisma from '@/lib/database/client'
+import { getOrderRepository } from '@/modules/order/domain/src/orders/repository/order.repository'
+import { customerService, CustomerService } from '@/modules/user/domain/src/customers/services/customer.service'
+import { cartService, CartService } from '@/modules/cart/domain/src/cart/services/cart.service'
+import { getTossPaymentsService } from '@/modules/payments/domain/src/payments'
+import prisma from '@/modules/common/utils/src/database/client'
 import {
   CreateOrderDTO,
   UpdateOrderDTO,
@@ -22,7 +22,7 @@ import {
   ValidationError,
   NotFoundError,
   BusinessLogicError
-} from '@/lib/errors/handlers'
+} from '@/modules/common/utils/src/errors/handlers'
 
 export class OrderService {
   private orderRepository = getOrderRepository()

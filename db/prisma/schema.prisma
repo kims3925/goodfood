@@ -43,6 +43,7 @@ model User {
   pricingPolicies    PricingPolicy[]
   automationConfig   AutomationConfig?
   workflowLogs       WorkflowLog[]
+  productPublishes   ProductPublish[]
   publishHistories   PublishHistory[]
   purchaseOrders     PurchaseOrder[]
 
@@ -194,6 +195,7 @@ model RetailBand {
   // Relationships
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   apiConfig        SourcingApiConfig @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
+  productPublishes ProductPublish[]
   publishHistories PublishHistory[]
 
   @@unique([userId, bandKey])
@@ -291,13 +293,6 @@ model PostComment {
 // PRODUCT MANAGEMENT (상품 관리)
 // =============================================
 
-enum ProductStatus {
-  DRAFT      // 임시저장
-  ACTIVE     // 판매중
-  INACTIVE   // 판매중지
-  SOLDOUT    // 품절
-}
-
 model Product {
   id           Int           @id @default(autoincrement())
   userId       Int           @map("user_id") // 생성한 사용자
@@ -306,7 +301,6 @@ model Product {
   // Basic Info
   name         String        @db.VarChar(500)
   description  String?       @db.Text
-  status       ProductStatus @default(DRAFT)
 
   // Images (post_image 재사용)
   thumbnailUrl String?       @map("thumbnail_url") @db.VarChar(1000) // 첫번째 post_image URL 캐싱
@@ -325,15 +319,18 @@ model Product {
   // Relationships
   user                   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   post                   Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
-  purchaseOrders PurchaseOrder[]
-  publishHistories PublishHistory[]
-// E-Commerce Relations
+  variants               ProductVariant[]
+  options                ProductOption[]
+  purchaseOrders         PurchaseOrder[]
+  productPublishes       ProductPublish[]
+  publishHistories       PublishHistory[]
+  // E-Commerce Relations
   cartItems              CartItem[]
   sessionCartItems       SessionCartItem[]
   customerOrderItems     CustomerOrderItem[]
+
   @@index([userId])
   @@index([postId])
-  @@index([status])
   @@index([categoryId])
   @@index([createdAt])
   @@map("product")
@@ -503,7 +500,36 @@ model WorkflowLog {
 }
 
 // =============================================
-// PUBLISH HISTORY (발행 이력)
+// PRODUCT PUBLISH (상품 발행 - 쇼핑몰 표시용)
+// =============================================
+
+model ProductPublish {
+  id            Int           @id @default(autoincrement())
+  userId        Int           @map("user_id")
+  productId     Int           @map("product_id")
+  retailBandId  Int           @map("retail_band_id")
+
+  // Status
+  status        PublishStatus @default(PENDING)
+
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  retailBand RetailBand @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, retailBandId]) // 같은 상품을 같은 밴드에 중복 발행 방지
+  @@index([userId])
+  @@index([productId])
+  @@index([retailBandId])
+  @@index([status])
+  @@map("product_publish")
+}
+
+// =============================================
+// PUBLISH HISTORY (발행 이력 로그)
 // =============================================
 
 enum PublishStatus {
@@ -530,11 +556,12 @@ model PublishHistory {
   product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
   retailBand RetailBand @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
 
-  @@unique([productId, retailBandId]) // 같은 상품을 같은 밴드에 중복 발행 방지
+  @@unique([productId, retailBandId])
   @@index([userId])
   @@index([productId])
   @@index([retailBandId])
   @@index([status])
+  @@index([publishedAt])
   @@map("publish_history")
 }
 
