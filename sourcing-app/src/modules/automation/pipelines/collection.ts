@@ -3,7 +3,7 @@
  * 도매밴드에서 게시물 수집
  */
 
-import { PrismaClient } from '@bandauto/db'
+import prisma from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import {
@@ -12,8 +12,6 @@ import {
   BandCollectionResult,
   PipelineError,
 } from '../types'
-
-const prisma = new PrismaClient()
 
 // =============================================
 // COLLECTION PIPELINE

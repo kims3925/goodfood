@@ -3,10 +3,8 @@
  * WorkflowLog 생성/업데이트 및 통계 조회
  */
 
-import { PrismaClient, WorkflowType, WorkflowStatus, TriggerType } from '@bandauto/db'
+import prisma, { WorkflowType, WorkflowStatus, TriggerType } from '@bandauto/db'
 import { WorkflowLogInput, WorkflowLogUpdate, AutomationStats } from './types'
-
-const prisma = new PrismaClient()
 
 // =============================================
 // WORKFLOW LOG MANAGEMENT

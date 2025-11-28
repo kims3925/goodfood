@@ -4,11 +4,9 @@
  */
 
 import cron from 'node-cron'
-import { PrismaClient, TriggerType } from '@bandauto/db'
+import prisma, { TriggerType } from '@bandauto/db'
 import { executeFullPipeline } from './executor'
 import { getRunningWorkflow } from './workflow-service'
-
-const prisma = new PrismaClient()
 
 // 활성 스케줄러 저장
 const activeSchedulers: Map<number, cron.ScheduledTask> = new Map()

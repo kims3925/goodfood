@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
-import { PrismaClient } from '@bandauto/db'
-
-const prisma = new PrismaClient()
+import prisma from '@modules/common/utils/src/database/client'
 
 // 찜한 상품 삭제
 export async function DELETE(

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@bandauto/db'
+import prisma from '@bandauto/db'
 import { verifyPassword, createToken } from '@/modules/auth/auth.service'
-
-const prisma = new PrismaClient()
 
 // POST: 로그인
 export async function POST(request: NextRequest) {

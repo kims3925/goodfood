@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-import { PrismaClient } from '@bandauto/db'
-
-const prisma = new PrismaClient()
+import prisma from '@bandauto/db'
 
 // GET: 현재 세션 정보 조회
 export async function GET() {

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import prisma from '@bandauto/db'
 

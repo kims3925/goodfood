@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
-import { PrismaClient } from '@bandauto/db'
+import prisma from '@modules/common/utils/src/database/client'
 import bcrypt from 'bcryptjs'
-
-const prisma = new PrismaClient()
 
 // 회원 정보 조회
 export async function GET(request: NextRequest) {

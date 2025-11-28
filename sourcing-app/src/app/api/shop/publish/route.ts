@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, PublishStatus, ProductStatus } from '@bandauto/db'
+import prisma, { PublishStatus, ProductStatus } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-
-const prisma = new PrismaClient()
 
 /**
  * GET /api/shop/publish

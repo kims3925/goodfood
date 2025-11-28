@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/modules/common/utils/src/database/client'
+import prisma from '@/modules/common/utils/src/database/client'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -31,12 +31,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 중복 이메일 검사
-    const existingCustomer = await prisma.customer.findUnique({
+    // 중복 이메일 검사 (User 테이블 기준)
+    const existingUser = await prisma.user.findUnique({
       where: { email },
     })
 
-    if (existingCustomer) {
+    if (existingUser) {
       return NextResponse.json(
         { success: false, error: '이미 가입된 이메일입니다.' },
         { status: 409 }
@@ -46,11 +46,11 @@ export async function POST(request: NextRequest) {
     // 비밀번호 해시화
     const passwordHash = await bcrypt.hash(password, 12)
 
-    // 회원 생성
-    const customer = await prisma.customer.create({
+    // 회원 생성 (User 테이블, 기본 role = USER)
+    const customer = await prisma.user.create({
       data: {
         email,
-        passwordHash,
+        password: passwordHash,
         name,
         phone: phone || null,
       },

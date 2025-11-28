@@ -3,7 +3,7 @@
  * 상품을 소매밴드에 발행
  */
 
-import { PrismaClient, PublishStatus } from '@bandauto/db'
+import prisma, { PublishStatus } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { NaverBandClient } from '@/modules/config/domain/src/band/services/band-client.service'
@@ -14,8 +14,6 @@ import {
   BandPublishResult,
   PipelineError,
 } from '../types'
-
-const prisma = new PrismaClient()
 
 // 지연 함수
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
