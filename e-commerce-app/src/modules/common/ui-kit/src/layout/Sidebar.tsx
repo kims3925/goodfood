@@ -300,7 +300,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         <div className="h-full overflow-y-auto">
           {/* Mobile header */}
           <div className="flex items-center justify-between p-4 border-b border-divider lg:hidden">
-            <h2 className="text-xl font-bold text-primary-color">BandAuto v1.4</h2>
+            <h2 className="text-xl font-bold text-primary-color">BandAuto release-1</h2>
             <button
               onClick={onClose}
               className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface"

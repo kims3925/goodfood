@@ -101,7 +101,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
             
             <a href="/admin/settings/api" className="flex items-center ml-2 lg:ml-0 cursor-pointer hover:opacity-80 transition-opacity">
               <h1 className="text-2xl font-bold text-primary-color">BandAuto</h1>
-              <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded">v1.4</span>
+              <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded">release-1</span>
             </a>
           </div>
 

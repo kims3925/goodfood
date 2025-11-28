@@ -107,11 +107,17 @@ export default function PostsManagePage() {
 
   const handleSearch = () => {
     setCurrentPage(1)
+    // 검색 시 선택 상태 초기화
+    setSelectedPostIds([])
+    setSelectAllPosts(false)
     loadPosts()
   }
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
+    // 페이지 이동 시 선택 상태 초기화
+    setSelectedPostIds([])
+    setSelectAllPosts(false)
   }
 
   const handleOpenAddModal = async () => {

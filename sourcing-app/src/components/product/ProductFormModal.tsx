@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Save, X, Plus, Trash2, AlertCircle, ExternalLink } from 'lucide-react'
+import { Save, X, Plus, Trash2, AlertCircle, ExternalLink, RefreshCw } from 'lucide-react'
 import Modal, { ModalFooter } from '../ui/Modal'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
@@ -22,6 +22,8 @@ interface ProductFormModalProps {
   initialData: ProductDraft
   initialDrafts?: DraftWithPostId[] // 다중 게시물 AI 결과
   onSaved: () => void
+  onAddMorePosts?: () => void // 추가 게시물 선택 콜백
+  onRetry?: (postId: number) => void // AI 재시도 콜백
 }
 
 type TabType = 'basic' | 'options' | 'variants'
@@ -59,6 +61,8 @@ export default function ProductFormModal({
   initialData,
   initialDrafts,
   onSaved,
+  onAddMorePosts,
+  onRetry,
 }: ProductFormModalProps) {
   const isEditMode = !!productId
   const [activeTab, setActiveTab] = useState<TabType>('basic')
@@ -122,16 +126,12 @@ export default function ProductFormModal({
     })
   }
 
-  // 새 상품 탭 추가
+  // 새 상품 탭 추가 - 추가 게시물 선택으로 변경
   const addProductTab = () => {
-    const newId = String(productTabs.length + 1)
-    const newProduct = createEmptyProductData(newId)
-    // 기본 정보 복사 옵션 (카테고리만 복사)
-    if (currentProduct) {
-      newProduct.categoryId = currentProduct.categoryId
+    if (onAddMorePosts) {
+      // 추가 게시물 선택 모달 열기
+      onAddMorePosts()
     }
-    setProductTabs(prev => [...prev, newProduct])
-    setActiveProductIndex(productTabs.length)
   }
 
   // 상품 탭 삭제
@@ -303,43 +303,55 @@ export default function ProductFormModal({
               <span className="text-xs text-gray-500">({productTabs.length}개)</span>
             </div>
             <div className="flex items-center gap-2 overflow-x-auto pb-2">
-              {productTabs.map((product, index) => (
-                <div
-                  key={product.id}
-                  className={`flex items-center gap-1 px-3 py-2 rounded-lg border-2 transition-all cursor-pointer min-w-fit ${
-                    activeProductIndex === index
-                      ? 'border-purple-500 bg-purple-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                  onClick={() => setActiveProductIndex(index)}
+              {productTabs.map((product, index) => {
+                const hasError = !!product.error
+                return (
+                  <div
+                    key={product.id}
+                    className={`flex items-center gap-1 px-3 py-2 rounded-lg border-2 transition-all cursor-pointer min-w-fit ${
+                      hasError
+                        ? activeProductIndex === index
+                          ? 'border-red-500 bg-red-50'
+                          : 'border-red-300 bg-red-50 hover:border-red-400'
+                        : activeProductIndex === index
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                    onClick={() => setActiveProductIndex(index)}
+                  >
+                    {hasError && <AlertCircle size={14} className="text-red-500 flex-shrink-0" />}
+                    <span className={`text-sm font-medium ${
+                      hasError
+                        ? 'text-red-700'
+                        : activeProductIndex === index ? 'text-purple-700' : 'text-gray-700'
+                    }`}>
+                      {product.name || `상품 ${index + 1}`}
+                    </span>
+                    {productTabs.length > 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeProductTab(index)
+                        }}
+                        className="ml-1 p-0.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500 transition-colors"
+                        title="상품 삭제"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+              {onAddMorePosts && (
+                <button
+                  onClick={addProductTab}
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg border-2 border-dashed border-gray-300 text-gray-500 hover:border-purple-400 hover:text-purple-600 hover:bg-purple-50 transition-all min-w-fit"
+                  title="게시물 선택하여 상품 추가"
                 >
-                  <span className={`text-sm font-medium ${
-                    activeProductIndex === index ? 'text-purple-700' : 'text-gray-700'
-                  }`}>
-                    {product.name || `상품 ${index + 1}`}
-                  </span>
-                  {productTabs.length > 1 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        removeProductTab(index)
-                      }}
-                      className="ml-1 p-0.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500 transition-colors"
-                      title="상품 삭제"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button
-                onClick={addProductTab}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg border-2 border-dashed border-gray-300 text-gray-500 hover:border-purple-400 hover:text-purple-600 hover:bg-purple-50 transition-all min-w-fit"
-                title="새 상품 추가"
-              >
-                <Plus size={16} />
-                <span className="text-sm">추가</span>
-              </button>
+                  <Plus size={16} />
+                  <span className="text-sm">추가</span>
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -349,7 +361,9 @@ export default function ProductFormModal({
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
             <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-red-800">
-              <p className="mb-2">AI 상품 생성에 실패했습니다. 게시물 내용을 확인하고 직접 상품 정보를 입력해주세요.</p>
+              <p className="font-medium mb-1">AI 상품 생성에 실패했습니다.</p>
+              <p className="mb-2 text-red-700">사유: {currentProduct.error}</p>
+              <p className="mb-2 text-red-600">게시물 내용을 확인하고 직접 상품 정보를 입력해주세요.</p>
               <Link
                 href={`/post/detail/${currentProduct.postId}`}
                 target="_blank"
@@ -364,10 +378,7 @@ export default function ProductFormModal({
           <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-start gap-2">
             <AlertCircle size={20} className="text-purple-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-purple-800">
-              {isEditMode
-                ? 'AI가 생성한 정보입니다. 내용을 확인하고 수정한 후 저장해주세요.'
-                : 'AI가 생성한 정보입니다. 내용을 확인하고 수정한 후 저장해주세요.'
-              }
+              AI가 생성한 정보입니다. 내용을 확인하고 수정한 후 저장해주세요.
             </p>
           </div>
         )}
@@ -648,20 +659,39 @@ export default function ProductFormModal({
 
         {/* Footer */}
         <ModalFooter className="mt-4">
-          <div className="flex items-center justify-end w-full">
-            <Button variant="primary" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  저장 중...
-                </>
-              ) : (
-                <>
+          <div className="flex items-center justify-end w-full gap-2">
+            {currentProduct.error ? (
+              <>
+                {onRetry && currentProduct.postId && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => onRetry(currentProduct.postId!)}
+                    className="bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100"
+                  >
+                    <RefreshCw size={16} />
+                    AI 다시 시도
+                  </Button>
+                )}
+                <Button variant="primary" disabled>
                   <Save size={16} />
-                  {isEditMode ? '상품 수정' : '상품 등록'}
-                </>
-              )}
-            </Button>
+                  상품 등록 불가
+                </Button>
+              </>
+            ) : (
+              <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    저장 중...
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    {isEditMode ? '상품 수정' : '상품 등록'}
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </ModalFooter>
       </div>

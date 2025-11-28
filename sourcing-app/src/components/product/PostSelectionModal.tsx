@@ -26,6 +26,7 @@ interface PostSelectionModalProps {
   onClose: () => void
   onPostSelected: (postId: number) => void
   onMultiplePostsSelected?: (postIds: number[]) => void // 다중 선택 콜백
+  excludePostIds?: number[] // 선택 불가능한 게시물 ID 목록 (이미 추가된 게시물)
 }
 
 export default function PostSelectionModal({
@@ -33,6 +34,7 @@ export default function PostSelectionModal({
   onClose,
   onPostSelected,
   onMultiplePostsSelected,
+  excludePostIds = [],
 }: PostSelectionModalProps) {
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -120,8 +122,14 @@ export default function PostSelectionModal({
     )
   }
 
+  // 게시물이 제외 대상인지 확인
+  const isExcluded = (postId: number) => excludePostIds.includes(postId)
+
   // 게시물 선택/해제 토글
   const handleToggleSelect = (postId: number) => {
+    // 제외 대상이면 선택 불가
+    if (isExcluded(postId)) return
+
     setSelectedPostIds(prev =>
       prev.includes(postId)
         ? prev.filter(id => id !== postId)
@@ -131,7 +139,12 @@ export default function PostSelectionModal({
 
   // 밴드 전체 선택/해제
   const handleToggleBandSelect = (bandPosts: Post[]) => {
-    const bandPostIds = bandPosts.map(p => p.id)
+    // 제외 대상이 아닌 게시물만 필터링
+    const selectablePosts = bandPosts.filter(p => !isExcluded(p.id))
+    const bandPostIds = selectablePosts.map(p => p.id)
+
+    if (bandPostIds.length === 0) return // 선택 가능한 게시물이 없으면 무시
+
     const allSelected = bandPostIds.every(id => selectedPostIds.includes(id))
 
     if (allSelected) {
@@ -216,9 +229,13 @@ export default function PostSelectionModal({
             <div className="space-y-3">
               {Object.entries(groupedPosts).map(([bandKey, group]) => {
                 const isBandExpanded = expandedBandKeys.includes(bandKey)
-                const bandPostIds = group.posts.map(p => p.id)
-                const selectedInBand = bandPostIds.filter(id => selectedPostIds.includes(id)).length
-                const allBandSelected = selectedInBand === group.posts.length
+                // 선택 가능한 게시물만 필터링 (제외된 게시물 제외)
+                const selectablePosts = group.posts.filter(p => !isExcluded(p.id))
+                const selectablePostIds = selectablePosts.map(p => p.id)
+                const selectedInBand = selectablePostIds.filter(id => selectedPostIds.includes(id)).length
+                const allBandSelected = selectablePosts.length > 0 && selectedInBand === selectablePosts.length
+                const allExcluded = selectablePosts.length === 0 // 모든 게시물이 제외됨
+                const excludedCount = group.posts.length - selectablePosts.length
                 return (
                   <div key={bandKey} className="border rounded-lg bg-white">
                     {/* 밴드 헤더 */}
@@ -231,13 +248,16 @@ export default function PostSelectionModal({
                           {/* 밴드 전체 선택 체크박스 */}
                           <input
                             type="checkbox"
-                            checked={allBandSelected && group.posts.length > 0}
+                            checked={allBandSelected}
+                            disabled={allExcluded}
                             onChange={(e) => {
                               e.stopPropagation()
                               handleToggleBandSelect(group.posts)
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            className="w-4 h-4 cursor-pointer rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            className={`w-4 h-4 rounded border-gray-300 focus:ring-purple-500 ${
+                              allExcluded ? 'cursor-not-allowed bg-gray-200' : 'cursor-pointer text-purple-600'
+                            }`}
                           />
                           {isBandExpanded ? (
                             <ChevronDown size={20} className="text-gray-600" />
@@ -246,7 +266,8 @@ export default function PostSelectionModal({
                           )}
                           <h3 className="font-semibold text-gray-900">{group.band.name}</h3>
                           <span className="text-sm text-gray-500">
-                            ({selectedInBand > 0 ? `${selectedInBand}/` : ''}{group.posts.length}개)
+                            ({selectedInBand > 0 ? `${selectedInBand}/` : ''}{selectablePosts.length}개
+                            {excludedCount > 0 && `, 제외 ${excludedCount}개`})
                           </span>
                         </div>
                       </div>
@@ -258,14 +279,19 @@ export default function PostSelectionModal({
                         {group.posts.map((post) => {
                           const isExpanded = expandedPostIds.includes(post.id)
                           const isSelected = selectedPostIds.includes(post.id)
+                          const postIsExcluded = isExcluded(post.id)
                           return (
                             <div
                               key={post.id}
                               className={`
-                                border rounded-lg transition-colors cursor-pointer
-                                ${isSelected ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}
+                                border rounded-lg transition-colors
+                                ${postIsExcluded
+                                  ? 'border-gray-200 bg-gray-100 cursor-not-allowed opacity-60'
+                                  : isSelected
+                                    ? 'border-purple-500 bg-purple-50 cursor-pointer'
+                                    : 'border-gray-200 hover:border-gray-300 cursor-pointer'}
                               `}
-                              onClick={() => handleToggleSelect(post.id)}
+                              onClick={() => !postIsExcluded && handleToggleSelect(post.id)}
                             >
                               {/* 간략 정보 */}
                               <div className="p-4">
@@ -273,14 +299,28 @@ export default function PostSelectionModal({
                                   <input
                                     type="checkbox"
                                     checked={isSelected}
+                                    disabled={postIsExcluded}
                                     onChange={() => handleToggleSelect(post.id)}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="mt-1 w-4 h-4 cursor-pointer rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                    className={`mt-1 w-4 h-4 rounded border-gray-300 focus:ring-purple-500 ${
+                                      postIsExcluded
+                                        ? 'cursor-not-allowed bg-gray-200'
+                                        : 'cursor-pointer text-purple-600'
+                                    }`}
                                   />
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-start justify-between gap-4">
                                       <div className="flex-1 min-w-0">
-                                        <h4 className="font-medium text-gray-900">{post.title}</h4>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <h4 className={`font-medium truncate ${postIsExcluded ? 'text-gray-500' : 'text-gray-900'}`}>
+                                            {post.title}
+                                          </h4>
+                                          {postIsExcluded && (
+                                            <span className="flex-shrink-0 whitespace-nowrap inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-600">
+                                              이미 추가됨
+                                            </span>
+                                          )}
+                                        </div>
                                         <p className="text-sm text-gray-500 mt-1">
                                           {new Date(post.createdAt).toLocaleDateString('ko-KR')}
                                         </p>

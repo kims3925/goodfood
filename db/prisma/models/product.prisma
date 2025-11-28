@@ -11,6 +11,9 @@ model Product {
   name         String        @db.VarChar(500)
   description  String?       @db.Text
 
+  // Status
+  status       ProductStatus @default(DRAFT) // 상품 상태 (DRAFT, ACTIVE, INACTIVE, SOLDOUT)
+
   // Images (post_image 재사용)
   thumbnailUrl String?       @map("thumbnail_url") @db.VarChar(1000) // 첫번째 post_image URL 캐싱
 
@@ -43,6 +46,7 @@ model Product {
   @@index([userId])
   @@index([postId])
   @@index([categoryId])
+  @@index([status])
   @@index([createdAt])
   @@map("product")
 }
