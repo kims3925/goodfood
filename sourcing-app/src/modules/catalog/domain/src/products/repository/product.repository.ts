@@ -3,7 +3,6 @@
  * 상품 데이터 접근 레이어
  */
 
-import prisma from '@/lib/database/client'
 import { Product, Prisma } from '@bandauto/db'
 import { ProductFilter } from '@/types/services/product'
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import prisma from '@bandauto/db'
 
 // GET: 특정 게시물 상세 조회
 export async function GET(

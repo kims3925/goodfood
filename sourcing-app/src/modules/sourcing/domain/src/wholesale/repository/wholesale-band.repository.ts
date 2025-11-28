@@ -3,7 +3,7 @@
  * 도매 밴드 데이터 접근 레이어
  */
 
-import prisma from '@/lib/database/client'
+import prisma from '@bandauto/db'
 import { WholesaleBand, Prisma } from '@bandauto/db'
 import { WholesaleBandFilter } from '@/domain/wholesale/types/wholesale-band.type'
 

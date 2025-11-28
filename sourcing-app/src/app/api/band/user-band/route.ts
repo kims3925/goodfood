@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@bandauto/db'
+import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-
-const prisma = new PrismaClient()
 
 // GET: 사용자의 Band 목록 조회 (Band API 연동)
 export async function GET(request: NextRequest) {

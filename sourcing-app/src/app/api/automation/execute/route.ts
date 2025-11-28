@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, WorkflowType } from '@bandauto/db'
+import prisma, { WorkflowType } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import {
   executeCollectionPipeline,
@@ -15,8 +15,6 @@ import {
   cancelWorkflow,
   cleanupStaleWorkflows,
 } from '@/modules/automation'
-
-const prisma = new PrismaClient()
 
 /**
  * POST /api/automation/execute

@@ -3,7 +3,7 @@
  * 수집된 게시물 데이터 접근 레이어
  */
 
-import prisma from '@/lib/database/client'
+import prisma from '@bandauto/db'
 import { CollectedPost, Prisma } from '@bandauto/db'
 import { CollectedPostFilter } from '@/types/services/wholesale'
 

@@ -1,4 +1,4 @@
-import prisma from '@/modules/common/utils/src/database/client'
+import prisma from '@bandauto/db'
 import { Cart, CartItem, Product } from '@bandauto/db'
 import { RepositoryError, NotFoundError } from '@/modules/common/utils/src/errors/types'
 import { logError } from '@/modules/common/utils/src/helpers/logger'

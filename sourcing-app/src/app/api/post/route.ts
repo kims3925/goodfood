@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { downloadAndSaveImages, deleteImageFiles } from '@/modules/utils/imageUtils'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-import prisma from '@/lib/prisma'
+import prisma from '@bandauto/db'
 
 // GET: 게시물 목록 조회
 export async function GET(request: NextRequest) {

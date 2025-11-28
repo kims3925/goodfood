@@ -3,7 +3,7 @@
  * AI를 사용하여 게시물을 상품으로 변환
  */
 
-import { PrismaClient, AiProvider } from '@bandauto/db'
+import prisma, { AiProvider } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { transformPostToProduct } from '@/modules/transformation'
@@ -13,8 +13,6 @@ import {
   TransformedPost,
   PipelineError,
 } from '../types'
-
-const prisma = new PrismaClient()
 
 // =============================================
 // TRANSFORM PIPELINE

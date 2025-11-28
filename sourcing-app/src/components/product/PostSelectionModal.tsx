@@ -227,10 +227,6 @@ export default function PostSelectionModal({
                             <ChevronRight size={20} className="text-gray-600" />
                           )}
                           <h3 className="font-semibold text-gray-900">{group.band.name}</h3>
-                          <span className="text-sm text-gray-500">
-                            ({selectedInBand > 0 ? `${selectedInBand}/` : ''}{selectablePosts.length}개
-                            {excludedCount > 0 && `, 제외 ${excludedCount}개`})
-                          </span>
                         </div>
                       </div>
                     </div>

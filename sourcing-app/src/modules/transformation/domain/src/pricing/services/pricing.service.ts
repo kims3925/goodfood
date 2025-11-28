@@ -8,7 +8,7 @@
  * 3. 나은 상품 공급방 & S D 푸드 & 폐쇄몰VIP도매: 공급가 기준 마진
  */
 
-import prisma from '@/lib/database/client'
+import prisma from '@bandauto/db'
 import {
   ParsedPrice,
   ApplyPricingPolicyDTO,
