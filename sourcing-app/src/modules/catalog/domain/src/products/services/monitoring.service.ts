@@ -1,4 +1,4 @@
-import prisma from '@/lib/database/client'
+import prisma from '@bandauto/db'
 
 export interface ProductMonitoringResult {
   id: string

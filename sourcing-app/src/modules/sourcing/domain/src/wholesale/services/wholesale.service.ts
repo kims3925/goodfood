@@ -3,7 +3,7 @@
  * 도매 소싱 비즈니스 로직 레이어
  */
 
-import prisma from '@/lib/database/client'
+import prisma from '@bandauto/db'
 import { pricingService, PricingService } from '@/domain/pricing/services/pricing.service'
 import { productRepository, ProductRepository } from '@/domain/products/repository/product.repository'
 import {

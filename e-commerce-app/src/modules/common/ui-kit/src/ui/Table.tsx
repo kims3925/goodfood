@@ -99,7 +99,7 @@ export const TableCell = forwardRef<HTMLTableCellElement, TdHTMLAttributes<HTMLT
 TableCell.displayName = 'TableCell'
 
 // Empty State Component
-export function TableEmpty({ message = '데이터가 없습니다.' }: { message?: string }) {
+export function TableEmpty({ message = '데이터가 없습니다.' }: { message?: string; colSpan?: number; }) {
   return (
     <TableRow>
       <TableCell colSpan={100} className="text-center py-8 text-text-muted">

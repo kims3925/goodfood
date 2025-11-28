@@ -5,7 +5,7 @@
 
 import { NaverBandClient, BandPost } from '@/domain/band'
 import { parallelBatchAnalyzeProducts } from '@/domain/wholesale/services/ai-analysis.service'
-import prisma from '@/lib/database/client'
+import prisma from '@bandauto/db'
 import {
   CollectPostsDTO,
   CollectPostsResult,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 // GET: 도매밴드에서 수집 가능한 게시물 목록 조회

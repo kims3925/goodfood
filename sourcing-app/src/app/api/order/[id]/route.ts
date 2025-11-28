@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 // GET: 주문 상세 조회

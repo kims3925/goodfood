@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { transformPostToProduct } from '@/modules/transformation'
-import prisma from '@/lib/prisma'
+import prisma from '@bandauto/db'
 
 /**
  * POST /api/product/ai-generate
