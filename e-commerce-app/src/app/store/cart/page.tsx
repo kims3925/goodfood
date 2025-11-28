@@ -240,12 +240,11 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-[#f4f4f4]">
       <div className="max-w-[1050px] mx-auto px-4 py-12">
+        {/* 타이틀 */}
+      <h1 className="text-[28px] font-bold text-gray-900 mb-6">장바구니</h1>
         <div className="flex flex-col lg:flex-row gap-6">
           {/* 좌측: 장바구니 상품 목록 */}
           <div className="flex-1">
-            {/* 타이틀 */}
-            <h1 className="text-[28px] font-bold text-gray-900 mb-6">장바구니</h1>
-
             {/* 전체 선택 */}
             <div className="bg-white rounded-md mb-4">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -368,9 +367,9 @@ export default function CartPage() {
           </div>
 
           {/* 우측: 결제 정보 (스티키) */}
-          <div className="lg:w-[284px] flex-shrink-0">
+            <div className="lg:w-[320px] flex-shrink-0">
             <div className="lg:sticky lg:top-[294px]">
-              <div className="bg-white rounded-md overflow-hidden">
+                <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                 {/* 결제 금액 */}
                 <div className="p-5 border-b border-gray-100">
                   <div className="space-y-3">
