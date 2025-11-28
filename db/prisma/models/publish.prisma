@@ -20,7 +20,7 @@ model ProductPublish {
   retailBand     RetailBand        @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
   orderItems     OrderItem[]       // 쇼핑몰 주문 아이템
   orderTests     OrderTest[]       // 웹훅 주문 (구글폼 등)
-  sessionCartItems SessionCartItem[] // 장바구니 아이템
+  cartItems        CartItem[] // 장바구니 아이템
 
   @@unique([productId, retailBandId]) // 같은 상품을 같은 밴드에 중복 발행 방지
   @@index([userId])

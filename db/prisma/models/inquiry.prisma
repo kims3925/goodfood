@@ -11,7 +11,7 @@ model Inquiry {
   content         String        @db.Text
   isPrivate       Boolean       @default(false) @map("is_private")
   status          InquiryStatus @default(PENDING)
-  adminReply      String?       @map("admin_reply") @db.Text
+  adminReply      String?       @map("admin_reply") @db.Text // 레거시, replies 사용 권장
   repliedAt       DateTime?     @map("replied_at") @db.Timestamp(0)
   repliedBy       Int?          @map("replied_by")
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
@@ -19,10 +19,29 @@ model Inquiry {
 
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   product         Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  replies         InquiryReply[]
 
   @@index([userId])
   @@index([productId])
   @@index([status])
   @@index([userId, status])
   @@map("inquiry")
+}
+
+// =============================================
+// INQUIRY REPLY (문의 답변)
+// =============================================
+
+model InquiryReply {
+  id              Int           @id @default(autoincrement())
+  inquiryId       Int           @map("inquiry_id")
+  content         String        @db.Text
+  isAdmin         Boolean       @default(true) @map("is_admin") // true: 관리자 답변, false: 고객 추가 문의
+  adminId         Int?          @map("admin_id") // 관리자 ID (추후 관리자 테이블 연결 가능)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+
+  inquiry         Inquiry       @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+
+  @@index([inquiryId])
+  @@map("inquiry_reply")
 }

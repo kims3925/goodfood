@@ -5,11 +5,13 @@ import { useParams, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { ArrowLeft, Heart, Share2, Minus, Plus } from 'lucide-react'
+import { useCartNotification } from '@/contexts/CartNotificationContext'
 
 export default function ProductDetailPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const { data: session } = useSession()
+  const { showNotification } = useCartNotification()
   const bandId = searchParams.get('bandId')
   const [product, setProduct] = useState<any>(null)
   const [quantity, setQuantity] = useState(1)
@@ -195,7 +197,13 @@ export default function ProductDetailPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert(`${product.title}\n수량: ${quantity}개\n장바구니에 추가되었습니다.`)
+        // 알림 버블 표시
+        showNotification({
+          title: product.title,
+          image: product.images?.[0] || '/images/placeholder.png',
+          quantity: quantity,
+          isExisting: data.isExisting // API에서 이미 담긴 상품인지 여부 반환
+        })
       } else {
         alert(`장바구니 추가 실패: ${data.error}`)
       }
@@ -206,6 +214,13 @@ export default function ProductDetailPage() {
   }
 
   const handleBuyNow = () => {
+    // 로그인 체크
+    if (!session) {
+      alert('로그인이 필요합니다')
+      window.location.href = '/store/auth/login'
+      return
+    }
+
     // productPublishId를 체크아웃 페이지로 전달
     if (!product?.productPublishId) {
       alert('상품 정보를 불러올 수 없습니다')
@@ -410,12 +425,15 @@ export default function ProductDetailPage() {
               >
                 장바구니 담기
               </button>
-              <button
-                onClick={handleBuyNow}
-                className="flex-1 h-12 bg-[#FF6B6B] text-white rounded-lg hover:bg-[#FF5252] font-medium"
-              >
-                구매하기
-              </button>
+              {/* 비로그인 시 구매하기 버튼 숨김 (컬리 스타일) */}
+              {session && (
+                <button
+                  onClick={handleBuyNow}
+                  className="flex-1 h-12 bg-[#FF6B6B] text-white rounded-lg hover:bg-[#FF5252] font-medium"
+                >
+                  구매하기
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -496,14 +514,17 @@ export default function ProductDetailPage() {
             onClick={handleAddToCart}
             className="flex-1 h-12 border-2 border-[#FF6B6B] text-[#FF6B6B] rounded-lg text-sm font-medium hover:bg-[#FFF5F5]"
           >
-            장바구니
+            장바구니 담기
           </button>
-          <button
-            onClick={handleBuyNow}
-            className="flex-1 h-12 bg-[#FF6B6B] text-white rounded-lg text-sm font-medium hover:bg-[#FF5252]"
-          >
-            구매하기
-          </button>
+          {/* 비로그인 시 구매하기 버튼 숨김 (컬리 스타일) */}
+          {session && (
+            <button
+              onClick={handleBuyNow}
+              className="flex-1 h-12 bg-[#FF6B6B] text-white rounded-lg text-sm font-medium hover:bg-[#FF5252]"
+            >
+              구매하기
+            </button>
+          )}
         </div>
       </div>
 

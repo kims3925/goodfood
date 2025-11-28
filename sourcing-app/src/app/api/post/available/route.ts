@@ -1,26 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { getCurrentUser } from '@/modules/auth/auth.service'
 
 // GET: 도매밴드에서 수집 가능한 게시물 목록 조회
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const userId = searchParams.get('userId')
-
-    if (!userId) {
+    // 세션에서 userId 가져오기
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'userId가 필요합니다.',
-        },
-        { status: 400 }
+        { success: false, error: '로그인이 필요합니다.' },
+        { status: 401 }
       )
     }
+    const userId = currentUser.userId
 
     // 사용자의 도매밴드 및 API 설정 조회
     const wholesaleBands = await prisma.wholesaleBand.findMany({
       where: {
-        userId: parseInt(userId),
+        userId: userId,
         isActive: true,
       },
       include: {
@@ -73,7 +71,7 @@ export async function GET(request: NextRequest) {
     // 사용자가 이미 등록한 게시물의 externalId 목록 조회
     const existingPosts = await prisma.post.findMany({
       where: {
-        userId: parseInt(userId),
+        userId: userId,
       },
       select: {
         externalId: true,

@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { LogIn, Mail, Lock } from 'lucide-react'
 
 export default function LoginPage() {
@@ -122,12 +121,9 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* 회원가입 링크 */}
-        <p className="text-center text-gray-600 mt-6">
-          계정이 없으신가요?{' '}
-          <Link href="/signup" className="text-blue-600 font-semibold hover:underline">
-            회원가입
-          </Link>
+        {/* 관리자 문의 안내 */}
+        <p className="text-center text-gray-500 text-sm mt-8">
+          계정 문의: 관리자에게 연락하세요
         </p>
       </div>
     </div>

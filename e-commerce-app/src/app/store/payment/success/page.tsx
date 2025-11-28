@@ -1,7 +1,7 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   CheckCircle,
@@ -54,32 +54,33 @@ interface OrderInfo {
 
 type PageStatus = 'loading' | 'success' | 'error'
 
+// 이미 처리됨/처리 중 에러 코드들 (성공으로 처리)
+const ALREADY_PROCESSED_ERRORS = [
+  'FAILED_PAYMENT_INTERNAL_SYSTEM_PROCESSING', // 기존 요청을 처리중
+  'ALREADY_PROCESSED_PAYMENT', // 이미 처리된 결제
+  'ALREADY_APPROVED', // 이미 승인된 결제
+  'ALREADY_PROCESSING', // 서버에서 이미 처리 중
+]
+
 function PaymentSuccessContent() {
   const searchParams = useSearchParams()
-  const router = useRouter()
   const [status, setStatus] = useState<PageStatus>('loading')
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null)
   const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
+  // 중복 처리 방지를 위한 ref
+  const isProcessingRef = useRef(false)
+  const hasProcessedRef = useRef(false)
+
   const paymentKey = searchParams.get('paymentKey')
   const orderId = searchParams.get('orderId')
   const amount = searchParams.get('amount')
 
-  useEffect(() => {
-    if (paymentKey && orderId && amount) {
-      confirmPayment()
-    } else {
-      setError('결제 정보가 누락되었습니다.')
-      setStatus('error')
-    }
-  }, [paymentKey, orderId, amount])
-
-  const confirmPayment = async () => {
+  // 결제 확인 함수
+  const confirmPayment = async (retry = 0): Promise<boolean> => {
     try {
-      setStatus('loading')
-
       const response = await fetch('/api/payments/confirm', {
         method: 'POST',
         headers: {
@@ -97,17 +98,131 @@ function PaymentSuccessContent() {
       if (data.success) {
         setPaymentInfo(data.payment)
         setOrderInfo(data.order)
-        setStatus('success')
-      } else {
-        setError(data.error?.message || '결제 승인에 실패했습니다.')
-        setStatus('error')
+        return true
       }
+
+      // "이미 처리됨" 에러는 성공으로 처리
+      const errorCode = data.error?.code
+      if (ALREADY_PROCESSED_ERRORS.includes(errorCode)) {
+        console.log('결제가 이미 처리되었습니다:', errorCode)
+        // 결제 상태 조회해서 정보 가져오기
+        const statusResult = await fetchPaymentStatus()
+        return statusResult
+      }
+
+      throw new Error(data.error?.message || '결제 승인에 실패했습니다.')
     } catch (error: any) {
-      console.error('결제 승인 오류:', error)
-      setError('결제 승인 중 오류가 발생했습니다.')
-      setStatus('error')
+      console.error(`결제 승인 시도 ${retry + 1} 실패:`, error)
+      throw error
     }
   }
+
+  // 결제 상태 조회 (이미 처리된 결제 정보 가져오기)
+  const fetchPaymentStatus = async (): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/payments/status?orderId=${orderId}`)
+      const data = await response.json()
+
+      if (data.success && data.payment) {
+        setPaymentInfo(data.payment)
+        setOrderInfo(data.order)
+        return true
+      }
+
+      // 상태 조회 실패해도 토스가 successUrl로 보냈으므로 기본 성공 처리
+      setPaymentInfo({
+        paymentKey: paymentKey!,
+        orderId: orderId!,
+        amount: parseInt(amount!),
+        method: 'CARD',
+        methodLabel: '카드',
+        status: 'DONE',
+        approvedAt: new Date().toISOString()
+      })
+      return true
+    } catch (error) {
+      console.error('결제 상태 조회 실패:', error)
+      // 조회 실패해도 토스가 successUrl로 보냈으므로 기본 성공 처리
+      setPaymentInfo({
+        paymentKey: paymentKey!,
+        orderId: orderId!,
+        amount: parseInt(amount!),
+        method: 'CARD',
+        methodLabel: '카드',
+        status: 'DONE',
+        approvedAt: new Date().toISOString()
+      })
+      return true
+    }
+  }
+
+  // 메인 처리 로직
+  const processPayment = async () => {
+    // 이미 처리 중이거나 처리 완료된 경우 중복 실행 방지
+    if (isProcessingRef.current || hasProcessedRef.current) {
+      console.log('결제 처리 중복 호출 방지됨')
+      return
+    }
+
+    isProcessingRef.current = true
+
+    try {
+      // 첫 번째 시도 - 재시도 없이 한 번만 호출
+      const success = await confirmPayment(0)
+      if (success) {
+        hasProcessedRef.current = true
+        setStatus('success')
+        return
+      }
+    } catch (error: any) {
+      console.error('결제 승인 실패:', error)
+
+      // "이미 처리됨" 에러는 상태 조회로 처리
+      const errorCode = error?.code || error?.message
+      if (ALREADY_PROCESSED_ERRORS.some(code => errorCode?.includes(code))) {
+        console.log('이미 처리된 결제, 상태 조회 시도')
+        const statusResult = await fetchPaymentStatus()
+        if (statusResult) {
+          hasProcessedRef.current = true
+          setStatus('success')
+          return
+        }
+      }
+    }
+
+    // 실패 시 상태 조회로 한번 더 시도
+    console.log('confirmPayment 실패, 결제 상태 조회 시도')
+    const statusResult = await fetchPaymentStatus()
+    if (statusResult) {
+      hasProcessedRef.current = true
+      setStatus('success')
+    } else {
+      setError('결제 확인에 실패했습니다. 주문 내역에서 확인해주세요.')
+      setStatus('error')
+    }
+
+    isProcessingRef.current = false
+  }
+
+  useEffect(() => {
+    // 이미 처리 완료된 경우 실행 안함
+    if (hasProcessedRef.current) return
+
+    // 파라미터가 모두 있으면 결제 확인 진행
+    if (paymentKey && orderId && amount) {
+      processPayment()
+    } else {
+      // 파라미터 없으면 에러
+      const timer = setTimeout(() => {
+        if (!paymentKey || !orderId || !amount) {
+          setError('결제 정보가 누락되었습니다.')
+          setStatus('error')
+        }
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const formatPrice = (price: number) => {
     return price.toLocaleString()

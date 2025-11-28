@@ -145,10 +145,28 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
         </ModalFooter>
       </form>
 
+      {/* 소셜 로그인 */}
+      <div className="mt-6 pt-4 border-t border-divider">
+        <p className="text-sm text-text-secondary text-center mb-4">간편 로그인</p>
+        <button
+          type="button"
+          onClick={() => {
+            window.location.href = '/api/auth/kakao'
+          }}
+          disabled={isLoading}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#FEE500] text-[#191919] rounded-lg font-medium hover:bg-[#FDD835] transition-colors disabled:opacity-50"
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path fillRule="evenodd" clipRule="evenodd" d="M9 0.5C4.02943 0.5 0 3.69129 0 7.62189C0 10.0638 1.55824 12.2056 3.93188 13.4756L2.93371 17.0352C2.84614 17.3584 3.21053 17.6138 3.49322 17.4276L7.87348 14.5347C8.24063 14.5772 8.61607 14.5993 9 14.5993C13.9706 14.5993 18 11.4081 18 7.4775C18 3.54687 13.9706 0.5 9 0.5Z" fill="#191919"/>
+          </svg>
+          카카오로 로그인
+        </button>
+      </div>
+
       <div className="mt-4 pt-4 border-t border-divider text-center">
         <p className="text-sm text-text-secondary">
           계정이 없으신가요?{' '}
-          <button 
+          <button
             onClick={() => {
               handleClose()
               // 회원가입 모달 또는 페이지로 이동

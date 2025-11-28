@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, ShoppingCart, Store, ArrowRight } from 'lucide-react'
+import { useCartNotification } from '@/contexts/CartNotificationContext'
 
 interface Product {
   id: string
@@ -31,6 +32,7 @@ interface BandSection {
 }
 
 export default function StorePage() {
+  const { showNotification } = useCartNotification()
   const [retailSections, setRetailSections] = useState<BandSection[]>([])
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([])
   const [currentSlide, setCurrentSlide] = useState(0)
@@ -97,7 +99,13 @@ export default function StorePage() {
 
       const data = await response.json()
       if (data.success) {
-        alert(`"${product.title}" 상품이 장바구니에 추가되었습니다.`)
+        // 알림 버블 표시
+        showNotification({
+          title: product.title,
+          image: product.images?.[0] || '/images/placeholder.png',
+          quantity: 1,
+          isExisting: data.isExisting,
+        })
       } else {
         alert(`장바구니 추가 실패: ${data.error}`)
       }

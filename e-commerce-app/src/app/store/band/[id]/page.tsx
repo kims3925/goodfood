@@ -11,6 +11,7 @@ import {
   X,
   ArrowUpDown,
 } from 'lucide-react'
+import { useCartNotification } from '@/contexts/CartNotificationContext'
 
 interface Product {
   id: string
@@ -57,6 +58,7 @@ export default function BandProductsPage() {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { showNotification } = useCartNotification()
   const bandId = params.id as string
 
   const [band, setBand] = useState<BandInfo | null>(null)
@@ -186,7 +188,13 @@ export default function BandProductsPage() {
 
       const data = await response.json()
       if (data.success) {
-        alert(`"${product.title}" 상품이 장바구니에 추가되었습니다.`)
+        // 알림 버블 표시
+        showNotification({
+          title: product.title,
+          image: product.images?.[0] || '/images/placeholder.png',
+          quantity: 1,
+          isExisting: data.isExisting,
+        })
       } else {
         alert(`장바구니 추가 실패: ${data.error}`)
       }

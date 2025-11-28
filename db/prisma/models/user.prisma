@@ -35,15 +35,15 @@ model User {
   addresses          UserAddress[]
   orders             Order[]
   orderTests         OrderTest[]
-  sessionCarts       SessionCart[]
+  carts              Cart[]
   userCoupons        UserCoupon[]
   wishlists          Wishlist[]
   reviews            Review[]
   inquiries          Inquiry[]
   returnRequests     ReturnRequest[]
 
-  // Settlement relations
-  settlements        Settlement[]
+  // Settlement relations (TODO: Settlement 모델 정의 필요)
+  // settlements        Settlement[]
 
   @@unique([oauthProvider, oauthProviderId])
   @@index([email])

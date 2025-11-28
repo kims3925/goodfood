@@ -1,10 +1,11 @@
 /**
  * Payment Confirm API
  * TossPayments 결제 승인 (완벽한 에러 핸들링 포함)
+ * 결제 성공 시 주문 생성
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { Prisma } from '@bandauto/db'
+import prisma, { Prisma, PublishStatus } from '@bandauto/db'
 import {
   TOSS_ERROR_CODES,
   getErrorMessage,
@@ -17,6 +18,30 @@ const Decimal = Prisma.Decimal
 
 const TOSS_SECRET_KEY = process.env.TOSS_PAYMENTS_SECRET_KEY || ''
 const TOSS_API_URL = 'https://api.tosspayments.com/v1/payments/confirm'
+
+// 진행 중인 결제 요청 추적 (메모리 기반 - 단일 서버 환경용)
+const processingOrders = new Set<string>()
+
+// 주문 준비 데이터 인터페이스
+interface OrderPrepareData {
+  orderId: string
+  userId: number
+  fromCart: boolean
+  items?: { productPublishId: number; variantId?: number; quantity: number }[]
+  customerInfo: {
+    name: string
+    phone: string
+    email?: string
+  }
+  shippingAddress: {
+    recipientName: string
+    recipientPhone: string
+    address: string
+    postalCode: string
+    addressDetail?: string
+    deliveryMemo?: string
+  }
+}
 
 interface TossConfirmRequest {
   paymentKey: string
@@ -57,8 +82,35 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 2. DB에 저장된 주문 확인 및 금액 검증
-    const order = await prisma.order.findUnique({
+    // 2. 중복 요청 방지 체크
+    if (processingOrders.has(orderId)) {
+      console.log(`중복 결제 요청 차단: ${orderId}`)
+      return createErrorResponse(
+        'ALREADY_PROCESSING',
+        '결제가 이미 처리 중입니다. 잠시 후 확인해주세요.',
+        409
+      )
+    }
+
+    // 처리 중 표시
+    processingOrders.add(orderId)
+
+    try {
+    // 3. 쿠키에서 주문 준비 데이터 확인
+    const orderPrepareCookie = req.cookies.get('order_prepare')?.value
+    let prepareData: OrderPrepareData | null = null
+
+    if (orderPrepareCookie) {
+      try {
+        const decodedData = Buffer.from(orderPrepareCookie, 'base64').toString('utf-8')
+        prepareData = JSON.parse(decodedData)
+      } catch (e) {
+        console.error('주문 준비 데이터 파싱 실패:', e)
+      }
+    }
+
+    // 4. DB에서 기존 주문 확인
+    let order = await prisma.order.findUnique({
       where: { orderNumber: orderId },
       include: {
         payment: true,
@@ -67,12 +119,166 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    // 주문이 없으면 쿠키 데이터로 주문 생성
     if (!order) {
-      return createErrorResponse(
-        TOSS_ERROR_CODES.INVALID_REQUEST,
-        '주문을 찾을 수 없습니다',
-        404
+      if (!prepareData || prepareData.orderId !== orderId) {
+        return createErrorResponse(
+          TOSS_ERROR_CODES.INVALID_REQUEST,
+          '주문 정보를 찾을 수 없습니다. 다시 결제를 시도해주세요.',
+          404
+        )
+      }
+
+      // 주문 아이템 데이터 준비
+      let orderItems: any[] = []
+
+      if (prepareData.fromCart) {
+        // 장바구니에서 주문 아이템 조회
+        const cart = await prisma.cart.findFirst({
+          where: { userId: prepareData.userId },
+          include: {
+            items: {
+              include: {
+                productPublish: {
+                  include: {
+                    product: {
+                      include: { variants: { take: 1 } },
+                    },
+                  },
+                },
+                variant: true,
+              },
+            },
+          },
+        })
+
+        if (!cart || cart.items.length === 0) {
+          return createErrorResponse(
+            TOSS_ERROR_CODES.INVALID_REQUEST,
+            '장바구니가 비어있습니다',
+            400
+          )
+        }
+
+        orderItems = cart.items.map((item) => {
+          const productPublish = item.productPublish
+          const product = productPublish.product
+          const variant = item.variant
+          const mainVariant = product.variants[0]
+          const unitPrice = variant?.price || mainVariant?.price || product.price || 0
+
+          return {
+            productPublishId: productPublish.id,
+            variantId: variant?.id || null,
+            productName: product.name,
+            optionSummary: variant?.optionSummary || null,
+            thumbnailUrl: product.thumbnailUrl,
+            quantity: item.quantity,
+            unitPrice: Number(unitPrice),
+          }
+        })
+      } else if (prepareData.items) {
+        // 직접 지정 상품
+        for (const item of prepareData.items) {
+          const productPublish = await prisma.productPublish.findFirst({
+            where: {
+              id: item.productPublishId,
+              status: PublishStatus.SUCCESS,
+            },
+            include: {
+              product: {
+                include: { variants: { take: 1 } },
+              },
+            },
+          })
+
+          if (!productPublish) {
+            return createErrorResponse(
+              TOSS_ERROR_CODES.INVALID_REQUEST,
+              '상품을 찾을 수 없습니다',
+              404
+            )
+          }
+
+          let variant = null
+          if (item.variantId) {
+            variant = await prisma.productVariant.findUnique({
+              where: { id: item.variantId },
+            })
+          }
+
+          const product = productPublish.product
+          const mainVariant = product.variants[0]
+          const unitPrice = variant?.price || mainVariant?.price || product.price || 0
+
+          orderItems.push({
+            productPublishId: productPublish.id,
+            variantId: variant?.id || null,
+            productName: product.name,
+            optionSummary: variant?.optionSummary || null,
+            thumbnailUrl: product.thumbnailUrl,
+            quantity: item.quantity || 1,
+            unitPrice: Number(unitPrice),
+          })
+        }
+      }
+
+      // 금액 계산
+      const subtotal = orderItems.reduce(
+        (sum, item) => sum + item.unitPrice * item.quantity,
+        0
       )
+      const shippingFee = subtotal >= 30000 ? 0 : 3000
+      const discountAmount = 0
+      const totalAmount = subtotal + shippingFee - discountAmount
+
+      // 결제 금액 검증
+      if (totalAmount !== amount) {
+        console.error('금액 불일치:', { calculatedAmount: totalAmount, requestAmount: amount })
+        return createErrorResponse(
+          TOSS_ERROR_CODES.INVALID_REQUEST,
+          `주문 금액(${totalAmount.toLocaleString()}원)과 결제 금액(${amount.toLocaleString()}원)이 일치하지 않습니다`,
+          400
+        )
+      }
+
+      // 주문 생성
+      order = await prisma.order.create({
+        data: {
+          userId: prepareData.userId,
+          orderNumber: prepareData.orderId,
+          status: 'PENDING', // 일단 PENDING으로 생성, 결제 완료 후 업데이트
+          recipientName: prepareData.shippingAddress.recipientName,
+          recipientPhone: prepareData.shippingAddress.recipientPhone,
+          postalCode: prepareData.shippingAddress.postalCode,
+          address: prepareData.shippingAddress.address,
+          addressDetail: prepareData.shippingAddress.addressDetail || null,
+          deliveryMemo: prepareData.shippingAddress.deliveryMemo || null,
+          subtotalAmount: new Decimal(subtotal),
+          shippingFee: new Decimal(shippingFee),
+          discountAmount: new Decimal(discountAmount),
+          totalAmount: new Decimal(totalAmount),
+          items: {
+            create: orderItems.map((item) => ({
+              productPublishId: item.productPublishId,
+              variantId: item.variantId,
+              productName: item.productName,
+              optionSummary: item.optionSummary,
+              thumbnailUrl: item.thumbnailUrl,
+              quantity: item.quantity,
+              unitPrice: new Decimal(item.unitPrice),
+              totalPrice: new Decimal(item.unitPrice * item.quantity),
+            })),
+          },
+        },
+        include: {
+          payment: true,
+          user: true,
+          items: true,
+        },
+      })
+
+      console.log(`주문 생성 완료: ${order.orderNumber}`)
     }
 
     // 이미 결제된 주문인지 확인
@@ -190,11 +396,16 @@ export async function POST(req: NextRequest) {
       })
 
       // 주문 상태 업데이트
+      // 가상계좌(WAITING_FOR_DEPOSIT)는 PENDING 유지, 나머지는 PAID
+      const isVirtualAccount = tossResult.status === 'WAITING_FOR_DEPOSIT'
+      const orderStatus = isVirtualAccount ? 'PENDING' : 'PAID'
+      const paidAt = isVirtualAccount ? null : new Date()
+
       const updatedOrder = await tx.order.update({
         where: { id: order.id },
         data: {
-          status: 'PAID',
-          paidAt: new Date(),
+          status: orderStatus,
+          paidAt,
         },
         include: {
           items: true,
@@ -203,16 +414,27 @@ export async function POST(req: NextRequest) {
       })
 
       // 장바구니 비우기 (장바구니에서 주문한 경우)
+      // 로그인 사용자: userId로 장바구니 찾기
+      // 비로그인 사용자: sessionId로 장바구니 찾기
+      const userId = updatedOrder.userId
       const sessionId = req.cookies.get('cart_session')?.value
-      if (sessionId) {
-        const cart = await tx.sessionCart.findUnique({
-          where: { sessionId },
+
+      let cartToClear = null
+      if (userId) {
+        cartToClear = await tx.cart.findFirst({
+          where: { userId },
         })
-        if (cart) {
-          await tx.sessionCartItem.deleteMany({
-            where: { cartId: cart.id },
-          })
-        }
+      }
+      if (!cartToClear && sessionId) {
+        cartToClear = await tx.cart.findFirst({
+          where: { sessionId, userId: null },
+        })
+      }
+
+      if (cartToClear) {
+        await tx.cartItem.deleteMany({
+          where: { cartId: cartToClear.id },
+        })
       }
 
       return { order: updatedOrder, payment }
@@ -222,7 +444,7 @@ export async function POST(req: NextRequest) {
     const processingTime = Date.now() - startTime
     console.log(`결제 승인 성공: ${orderId} (${processingTime}ms)`)
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       payment: {
         paymentKey: result.payment.paymentKey,
@@ -259,8 +481,20 @@ export async function POST(req: NextRequest) {
         totalAmount: Number(result.order.totalAmount),
       },
     })
+
+    // order_prepare 쿠키 삭제
+    response.cookies.delete('order_prepare')
+
+    return response
+    } finally {
+      // 처리 완료 후 Set에서 제거
+      processingOrders.delete(orderId)
+    }
   } catch (error: any) {
     console.error('Payment confirm error:', error)
+
+    // 처리 완료 후 Set에서 제거
+    processingOrders.delete(orderId)
 
     // Prisma 에러 처리
     if (error.code === 'P2002') {

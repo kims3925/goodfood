@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@bandauto/db'
+import { getCurrentUser } from '@/modules/auth/auth.service'
 
 const prisma = new PrismaClient()
 
@@ -66,11 +67,43 @@ export async function GET(request: NextRequest) {
 // POST: 소매밴드 등록
 export async function POST(request: NextRequest) {
   try {
+    // 세션에서 userId 가져오기
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '로그인이 필요합니다.',
+        },
+        { status: 401 }
+      )
+    }
+    const userId = currentUser.userId
+
+    // 사용자의 Band API 설정 조회
+    const apiConfig = await prisma.sourcingApiConfig.findFirst({
+      where: {
+        userId,
+        platform: 'BAND',
+        isActive: true,
+      },
+    })
+
+    if (!apiConfig) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Band API 설정을 먼저 등록해주세요.',
+        },
+        { status: 404 }
+      )
+    }
+
     const body = await request.json()
-    const { userId, apiConfigId, bandKey, name, coverUrl } = body
+    const { bandKey, name, coverUrl } = body
 
     // 필수 필드 검증
-    if (!userId || !apiConfigId || !bandKey || !name) {
+    if (!bandKey || !name) {
       return NextResponse.json(
         {
           success: false,
@@ -102,7 +135,7 @@ export async function POST(request: NextRequest) {
     const band = await prisma.retailBand.create({
       data: {
         userId: userId,
-        apiConfigId: apiConfigId,
+        apiConfigId: apiConfig.id,
         bandKey: bandKey,
         name,
         coverUrl: coverUrl,

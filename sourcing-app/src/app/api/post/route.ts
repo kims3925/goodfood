@@ -98,9 +98,18 @@ export async function GET(request: NextRequest) {
 // POST: 게시물 등록
 export async function POST(request: NextRequest) {
   try {
+    // 세션에서 userId 가져오기
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: '로그인이 필요합니다.' },
+        { status: 401 }
+      )
+    }
+    const userId = currentUser.userId
+
     const body = await request.json()
     const {
-      userId,
       wholesaleBandId,
       externalId,
       title,
@@ -111,7 +120,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     // 필수 필드 검증
-    if (!userId || !wholesaleBandId || !externalId || !title || !content) {
+    if (!wholesaleBandId || !externalId || !title || !content) {
       return NextResponse.json(
         {
           success: false,

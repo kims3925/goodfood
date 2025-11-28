@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@bandauto/db'
-import { verifyPassword, createToken, setAuthCookie } from '@/modules/auth/auth.service'
+import { verifyPassword, createToken } from '@/modules/auth/auth.service'
 
 const prisma = new PrismaClient()
 
@@ -56,10 +56,8 @@ export async function POST(request: NextRequest) {
       role: user.role,
     })
 
-    // 쿠키에 토큰 설정
-    await setAuthCookie(token)
-
-    return NextResponse.json({
+    // 응답 생성 후 쿠키 설정
+    const response = NextResponse.json({
       success: true,
       user: {
         id: user.id,
@@ -68,6 +66,17 @@ export async function POST(request: NextRequest) {
         role: user.role,
       },
     })
+
+    // 쿠키 설정 (응답 객체에 직접 설정)
+    response.cookies.set('auth-token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7일
+      path: '/',
+    })
+
+    return response
   } catch (error) {
     console.error('로그인 실패:', error)
     return NextResponse.json(

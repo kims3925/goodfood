@@ -125,8 +125,7 @@ export default function PostsManagePage() {
     setShowAddModal(true)
 
     try {
-      // TODO: 실제로는 userId를 세션에서 가져와야 함
-      const response = await fetch('/api/post/available?userId=1')
+      const response = await fetch('/api/post/available')
       const data = await response.json()
 
       if (data.success) {
@@ -223,7 +222,6 @@ export default function PostsManagePage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              userId: 1, // 임시 값
               wholesaleBandId: post.band.id, // 게시물의 출처 밴드 ID
               externalId: post.post_key,
               title: post.title,

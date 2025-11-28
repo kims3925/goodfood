@@ -129,20 +129,6 @@ export default function PostSelectionModal({
     )
   }
 
-  // 밴드 전체 선택/해제
-  const handleToggleBandSelect = (bandPosts: Post[]) => {
-    const bandPostIds = bandPosts.map(p => p.id)
-    const allSelected = bandPostIds.every(id => selectedPostIds.includes(id))
-
-    if (allSelected) {
-      // 모두 선택되어 있으면 해제
-      setSelectedPostIds(prev => prev.filter(id => !bandPostIds.includes(id)))
-    } else {
-      // 하나라도 선택 안 되어 있으면 모두 선택
-      setSelectedPostIds(prev => [...new Set([...prev, ...bandPostIds])])
-    }
-  }
-
   const handleConfirm = () => {
     if (selectedPostIds.length === 0) return
 
@@ -218,7 +204,6 @@ export default function PostSelectionModal({
                 const isBandExpanded = expandedBandKeys.includes(bandKey)
                 const bandPostIds = group.posts.map(p => p.id)
                 const selectedInBand = bandPostIds.filter(id => selectedPostIds.includes(id)).length
-                const allBandSelected = selectedInBand === group.posts.length
                 return (
                   <div key={bandKey} className="border rounded-lg bg-white">
                     {/* 밴드 헤더 */}
@@ -228,17 +213,6 @@ export default function PostSelectionModal({
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          {/* 밴드 전체 선택 체크박스 */}
-                          <input
-                            type="checkbox"
-                            checked={allBandSelected && group.posts.length > 0}
-                            onChange={(e) => {
-                              e.stopPropagation()
-                              handleToggleBandSelect(group.posts)
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-4 h-4 cursor-pointer rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                          />
                           {isBandExpanded ? (
                             <ChevronDown size={20} className="text-gray-600" />
                           ) : (
@@ -262,44 +236,39 @@ export default function PostSelectionModal({
                             <div
                               key={post.id}
                               className={`
-                                border rounded-lg transition-colors cursor-pointer
-                                ${isSelected ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}
+                                border rounded-lg transition-colors
+                                ${isSelected ? 'border-purple-500 bg-purple-50' : 'border-gray-200'}
                               `}
-                              onClick={() => handleToggleSelect(post.id)}
                             >
                               {/* 간략 정보 */}
-                              <div className="p-4">
-                                <div className="flex items-start gap-4">
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => handleToggleSelect(post.id)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="mt-1 w-4 h-4 cursor-pointer rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                                  />
+                              <div
+                                className={`p-4 cursor-pointer transition-colors ${
+                                  isSelected
+                                    ? 'hover:bg-purple-100'
+                                    : 'hover:bg-gray-50'
+                                }`}
+                                onClick={() => handleToggleSelect(post.id)}
+                              >
+                                <div className="flex items-start justify-between gap-4">
                                   <div className="flex-1 min-w-0">
-                                    <div className="flex items-start justify-between gap-4">
-                                      <div className="flex-1 min-w-0">
-                                        <h4 className="font-medium text-gray-900">{post.title}</h4>
-                                        <p className="text-sm text-gray-500 mt-1">
-                                          {new Date(post.createdAt).toLocaleDateString('ko-KR')}
-                                        </p>
-                                      </div>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleToggleExpand(post.id)
-                                        }}
-                                        className="flex-shrink-0"
-                                      >
-                                        {isExpanded ? (
-                                          <ChevronDown size={20} className="text-gray-400" />
-                                        ) : (
-                                          <ChevronRight size={20} className="text-gray-400" />
-                                        )}
-                                      </button>
-                                    </div>
+                                    <h4 className="font-medium text-gray-900 truncate">{post.title}</h4>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                      {new Date(post.createdAt).toLocaleDateString('ko-KR')}
+                                    </p>
                                   </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleToggleExpand(post.id)
+                                    }}
+                                    className="p-1 hover:bg-gray-200 rounded transition-colors"
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronDown size={20} className="text-gray-400" />
+                                    ) : (
+                                      <ChevronRight size={20} className="text-gray-400" />
+                                    )}
+                                  </button>
                                 </div>
                               </div>
 

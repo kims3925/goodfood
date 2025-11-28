@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
-import { Search, ShoppingCart, User, MapPin, Menu, ChevronDown, X, Phone, HelpCircle, MessageSquare, LogOut } from 'lucide-react'
+import { Search, ShoppingCart, User, MapPin, Menu, ChevronDown, Phone, HelpCircle, MessageSquare, LogOut } from 'lucide-react'
+import { CartNotificationProvider } from '@/contexts/CartNotificationContext'
+import CartNotificationBubble from '@/components/cart/CartNotificationBubble'
 
-export default function StoreLayout({
+function StoreLayoutContent({
   children,
 }: {
   children: React.ReactNode
@@ -156,7 +158,7 @@ export default function StoreLayout({
                         <p className="text-gray-500 text-xs mt-1">월~토 오전 7시 ~ 오후 6시</p>
                       </div>
                       <Link
-                        href="/store/faq"
+                        href="/store/cs/faq"
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
                         onClick={() => setIsCustomerServiceOpen(false)}
                       >
@@ -164,7 +166,7 @@ export default function StoreLayout({
                         자주묻는질문
                       </Link>
                       <Link
-                        href="/store/inquiry"
+                        href="/store/cs/inquiry"
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
                         onClick={() => setIsCustomerServiceOpen(false)}
                       >
@@ -172,12 +174,12 @@ export default function StoreLayout({
                         1:1 문의
                       </Link>
                       <Link
-                        href="/store/bulk"
+                        href="/store/cs"
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
                         onClick={() => setIsCustomerServiceOpen(false)}
                       >
                         <Phone className="w-4 h-4" />
-                        대량주문문의
+                        고객센터
                       </Link>
                     </div>
                   </>
@@ -226,15 +228,19 @@ export default function StoreLayout({
                 </svg>
                 <span className="text-xs mt-1">찜하기</span>
               </Link>
-              <Link href="/store/cart" className="kurly-header-icon relative">
-                <ShoppingCart className="w-6 h-6" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#FF6B6B] text-white text-xs rounded-full flex items-center justify-center">
-                    {cartCount > 99 ? '99+' : cartCount}
-                  </span>
-                )}
-                <span className="text-xs mt-1">장바구니</span>
-              </Link>
+              <div className="relative">
+                <Link href="/store/cart" className="kurly-header-icon relative">
+                  <ShoppingCart className="w-6 h-6" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#FF6B6B] text-white text-xs rounded-full flex items-center justify-center">
+                      {cartCount > 99 ? '99+' : cartCount}
+                    </span>
+                  )}
+                  <span className="text-xs mt-1">장바구니</span>
+                </Link>
+                {/* 장바구니 알림 버블 */}
+                <CartNotificationBubble />
+              </div>
             </div>
           </div>
         </div>
@@ -317,10 +323,9 @@ export default function StoreLayout({
             <div>
               <h4 className="font-bold text-gray-900 mb-4">고객센터</h4>
               <ul className="space-y-2 text-sm text-gray-600">
-                <li><Link href="/faq" className="hover:text-[#FF6B6B]">자주묻는질문</Link></li>
-                <li><Link href="/inquiry" className="hover:text-[#FF6B6B]">1:1문의</Link></li>
-                <li><Link href="/bulk" className="hover:text-[#FF6B6B]">대량주문문의</Link></li>
-                <li><Link href="/partnership" className="hover:text-[#FF6B6B]">제휴문의</Link></li>
+                <li><Link href="/store/cs" className="hover:text-[#FF6B6B]">고객센터</Link></li>
+                <li><Link href="/store/cs/faq" className="hover:text-[#FF6B6B]">자주묻는질문</Link></li>
+                <li><Link href="/store/cs/inquiry" className="hover:text-[#FF6B6B]">1:1문의</Link></li>
               </ul>
             </div>
             <div>
@@ -345,5 +350,18 @@ export default function StoreLayout({
         </div>
       </footer>
     </div>
+  )
+}
+
+// Provider로 감싸서 export
+export default function StoreLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <CartNotificationProvider>
+      <StoreLayoutContent>{children}</StoreLayoutContent>
+    </CartNotificationProvider>
   )
 }

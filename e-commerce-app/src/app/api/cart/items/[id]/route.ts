@@ -35,7 +35,7 @@ export async function DELETE(
       )
     }
 
-    const cart = await prisma.sessionCart.findUnique({
+    const cart = await prisma.cart.findUnique({
       where: { sessionId },
     })
 
@@ -46,7 +46,7 @@ export async function DELETE(
       )
     }
 
-    await prisma.sessionCartItem.delete({
+    await prisma.cartItem.delete({
       where: { id: itemId, cartId: cart.id },
     })
 
@@ -98,7 +98,7 @@ export async function PATCH(
       )
     }
 
-    const cart = await prisma.sessionCart.findUnique({
+    const cart = await prisma.cart.findUnique({
       where: { sessionId },
     })
 
@@ -109,7 +109,7 @@ export async function PATCH(
       )
     }
 
-    await prisma.sessionCartItem.update({
+    await prisma.cartItem.update({
       where: { id: itemId, cartId: cart.id },
       data: { quantity },
     })

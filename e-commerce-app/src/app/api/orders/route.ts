@@ -6,8 +6,21 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import prisma, { PublishStatus, Prisma } from '@bandauto/db'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/modules/auth/auth.config'
 
 const Decimal = Prisma.Decimal
+
+// 현재 로그인한 사용자 ID 가져오기
+async function getCurrentUserId(): Promise<number | null> {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) return null
+    return typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
+  } catch {
+    return null
+  }
+}
 
 // 주문번호 생성
 function generateOrderNumber(): string {
@@ -57,35 +70,68 @@ export async function POST(req: NextRequest) {
     if (fromCart) {
       // 장바구니에서 주문 생성
       const sessionId = getSessionId(req)
-      if (!sessionId) {
+      const currentUserId = await getCurrentUserId()
+
+      // 로그인 사용자는 userId로, 비로그인은 sessionId로 장바구니 조회
+      let cart = null
+
+      if (currentUserId) {
+        // 로그인 사용자: userId로 장바구니 찾기
+        cart = await prisma.cart.findFirst({
+          where: { userId: currentUserId },
+          include: {
+            items: {
+              include: {
+                productPublish: {
+                  include: {
+                    product: {
+                      include: {
+                        variants: { take: 1 },
+                      },
+                    },
+                    retailBand: true,
+                  },
+                },
+                variant: true,
+              },
+            },
+          },
+        })
+      } else if (sessionId) {
+        // 비로그인 사용자: sessionId + userId가 null인 카트만 조회
+        cart = await prisma.cart.findFirst({
+          where: {
+            sessionId,
+            userId: null,
+          },
+          include: {
+            items: {
+              include: {
+                productPublish: {
+                  include: {
+                    product: {
+                      include: {
+                        variants: { take: 1 },
+                      },
+                    },
+                    retailBand: true,
+                  },
+                },
+                variant: true,
+              },
+            },
+          },
+        })
+      }
+
+      if (!cart) {
         return NextResponse.json(
           { success: false, error: '장바구니가 없습니다' },
           { status: 400 }
         )
       }
 
-      const cart = await prisma.sessionCart.findUnique({
-        where: { sessionId },
-        include: {
-          items: {
-            include: {
-              productPublish: {
-                include: {
-                  product: {
-                    include: {
-                      variants: { take: 1 },
-                    },
-                  },
-                  retailBand: true,
-                },
-              },
-              variant: true,
-            },
-          },
-        },
-      })
-
-      if (!cart || cart.items.length === 0) {
+      if (cart.items.length === 0) {
         return NextResponse.json(
           { success: false, error: '장바구니가 비어있습니다' },
           { status: 400 }
@@ -171,26 +217,25 @@ export async function POST(req: NextRequest) {
     const discountAmount = 0
     const totalAmount = subtotal + shippingFee - discountAmount
 
-    // 사용자 생성 또는 조회
-    let user = null
-    const userEmail = customerInfo.email || `guest_${Date.now()}@guest.local`
+    // 로그인한 사용자만 주문 가능 (userId는 클라이언트에서 전달받음)
+    const { userId } = body
 
-    if (customerInfo.email) {
-      user = await prisma.user.findUnique({
-        where: { email: customerInfo.email },
-      })
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: '로그인이 필요합니다' },
+        { status: 401 }
+      )
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    })
+
     if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: userEmail,
-          name: customerInfo.name,
-          phone: customerInfo.phone || '',
-          password: '', // 비회원 주문
-          role: 'CUSTOMER',
-        },
-      })
+      return NextResponse.json(
+        { success: false, error: '사용자를 찾을 수 없습니다' },
+        { status: 404 }
+      )
     }
 
     // 주문 생성
@@ -230,15 +275,29 @@ export async function POST(req: NextRequest) {
     // 장바구니 비우기 (장바구니에서 주문한 경우)
     if (fromCart) {
       const sessionId = getSessionId(req)
-      if (sessionId) {
-        const cart = await prisma.sessionCart.findUnique({
-          where: { sessionId },
+      const currentUserId = await getCurrentUserId()
+
+      let cartToClear = null
+
+      if (currentUserId) {
+        // 로그인 사용자: userId로 장바구니 찾기
+        cartToClear = await prisma.cart.findFirst({
+          where: { userId: currentUserId },
         })
-        if (cart) {
-          await prisma.sessionCartItem.deleteMany({
-            where: { cartId: cart.id },
-          })
-        }
+      } else if (sessionId) {
+        // 비로그인 사용자: sessionId + userId가 null인 카트만
+        cartToClear = await prisma.cart.findFirst({
+          where: {
+            sessionId,
+            userId: null,
+          },
+        })
+      }
+
+      if (cartToClear) {
+        await prisma.cartItem.deleteMany({
+          where: { cartId: cartToClear.id },
+        })
       }
     }
 

@@ -1,9 +1,12 @@
+/**
+ * MyPage Orders API
+ * 마이페이지 주문 내역 조회
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
-import { PrismaClient } from '@bandauto/db'
-
-const prisma = new PrismaClient()
+import prisma from '@bandauto/db'
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,19 +41,36 @@ export async function GET(request: NextRequest) {
         include: {
           items: {
             include: {
-              product: {
+              productPublish: {
+                include: {
+                  product: {
+                    select: {
+                      id: true,
+                      name: true,
+                      thumbnailUrl: true,
+                    },
+                  },
+                },
+              },
+              variant: {
                 select: {
                   id: true,
-                  name: true,
-                  thumbnailUrl: true,
+                  optionSummary: true,
                 },
               },
             },
           },
-          payment: true,
+          payment: {
+            select: {
+              id: true,
+              status: true,
+              method: true,
+              approvedAt: true,
+            },
+          },
         },
         orderBy: {
-          createdAt: 'desc',
+          orderedAt: 'desc',
         },
         skip: offset,
         take: limit,
@@ -58,9 +78,43 @@ export async function GET(request: NextRequest) {
       prisma.order.count({ where }),
     ])
 
+    // 응답 형식 변환
+    const formattedOrders = orders.map(order => ({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      totalAmount: Number(order.totalAmount),
+      subtotalAmount: Number(order.subtotalAmount),
+      shippingFee: Number(order.shippingFee),
+      discountAmount: Number(order.discountAmount),
+      orderedAt: order.orderedAt.toISOString(),
+      paidAt: order.paidAt?.toISOString() || null,
+      shippedAt: order.shippedAt?.toISOString() || null,
+      deliveredAt: order.deliveredAt?.toISOString() || null,
+      items: order.items.map(item => ({
+        id: item.id,
+        productName: item.productName,
+        optionSummary: item.optionSummary,
+        thumbnailUrl: item.thumbnailUrl || item.productPublish?.product?.thumbnailUrl,
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+        totalPrice: Number(item.totalPrice),
+        product: item.productPublish?.product ? {
+          id: item.productPublish.product.id,
+          name: item.productPublish.product.name,
+          thumbnailUrl: item.productPublish.product.thumbnailUrl,
+        } : null,
+      })),
+      payment: order.payment ? {
+        status: order.payment.status,
+        method: order.payment.method,
+        approvedAt: order.payment.approvedAt?.toISOString() || null,
+      } : null,
+    }))
+
     return NextResponse.json({
       success: true,
-      orders,
+      orders: formattedOrders,
       pagination: {
         page,
         limit,

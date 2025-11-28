@@ -144,7 +144,6 @@ export default function RetailBandsPage() {
     }
 
     try {
-      // TODO: 실제로는 userId와 apiConfigId를 세션에서 가져와야 함
       const selectedBands = availableBands.filter((band) =>
         selectedBandKeys.includes(band.band_key)
       )
@@ -154,8 +153,6 @@ export default function RetailBandsPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: 1, // 임시 값
-            apiConfigId: 1, // 임시 값
             bandKey: band.band_key,
             name: band.name,
             coverUrl: band.cover,
