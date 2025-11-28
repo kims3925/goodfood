@@ -4,8 +4,9 @@
  */
 
 import cron from 'node-cron'
-import { PrismaClient } from '@bandauto/db'
+import { PrismaClient, TriggerType } from '@bandauto/db'
 import { executeFullPipeline } from './executor'
+import { getRunningWorkflow } from './workflow-service'
 
 const prisma = new PrismaClient()
 
@@ -61,9 +62,18 @@ export function registerScheduler(userId: number, cronExpression: string): void 
   console.log(`[Scheduler] Registering scheduler for user ${userId}: ${cronExpression}`)
 
   const task = cron.schedule(cronExpression, async () => {
-    console.log(`[Scheduler] Running scheduled task for user ${userId}`)
+    console.log(`[Scheduler] Attempting scheduled task for user ${userId}`)
+
+    // 중복 실행 방지: 이미 실행 중인 워크플로우가 있는지 확인
+    const runningWorkflow = await getRunningWorkflow(userId)
+    if (runningWorkflow) {
+      const triggerLabel = runningWorkflow.triggerType === TriggerType.MANUAL ? '수동' : '자동'
+      console.log(`[Scheduler] Skipping - already running (${triggerLabel} 실행 중, workflow ID: ${runningWorkflow.id})`)
+      return
+    }
+
     try {
-      const result = await executeFullPipeline(userId)
+      const result = await executeFullPipeline(userId, undefined, TriggerType.SCHEDULED)
       console.log(`[Scheduler] Task completed for user ${userId}: ${result.overallStatus}`)
     } catch (error) {
       console.error(`[Scheduler] Task failed for user ${userId}:`, error)

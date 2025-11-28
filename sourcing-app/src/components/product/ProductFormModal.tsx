@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Save, X, Plus, Trash2, AlertCircle, ExternalLink, RefreshCw } from 'lucide-react'
+import { Save, X, Plus, Trash2, AlertCircle, ExternalLink, RefreshCw, ImageIcon } from 'lucide-react'
 import Modal, { ModalFooter } from '../ui/Modal'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 import { ProductDraft, OptionGroup, GeneratedVariant } from '@/modules/transformation'
+import ImageSortable, { SortableImage } from './ImageSortable'
 
 interface DraftWithPostId {
   postId: number
@@ -26,7 +27,7 @@ interface ProductFormModalProps {
   onRetry?: (postId: number) => void // AI 재시도 콜백
 }
 
-type TabType = 'basic' | 'options' | 'variants'
+type TabType = 'basic' | 'images' | 'options' | 'variants'
 
 // 개별 상품 데이터 타입
 interface ProductFormData {
@@ -38,6 +39,7 @@ interface ProductFormData {
   wholesalePrice: number | ''
   options: OptionGroup[]
   variants: GeneratedVariant[]
+  images: SortableImage[] // 이미지 목록
   error?: string // AI 생성 실패 여부
 }
 
@@ -51,6 +53,7 @@ const createEmptyProductData = (id: string): ProductFormData => ({
   wholesalePrice: '',
   options: [],
   variants: [],
+  images: [],
 })
 
 export default function ProductFormModal({
@@ -79,42 +82,78 @@ export default function ProductFormModal({
   const [newOptionGroup, setNewOptionGroup] = useState('')
   const [newOptionValues, setNewOptionValues] = useState('')
 
+  // 이미지 순서 변경 상태
+  const [isReorderingSaving, setIsReorderingSaving] = useState(false)
+  const [imageOrderChanged, setImageOrderChanged] = useState(false)
+
+  // 이미지 로드 함수
+  const loadImagesForPost = async (targetPostId: number): Promise<SortableImage[]> => {
+    try {
+      const response = await fetch(`/api/post/${targetPostId}`)
+      const data = await response.json()
+      if (data.success && data.data?.images) {
+        return data.data.images.map((img: any) => ({
+          id: img.id,
+          imageUrl: img.imageUrl,
+          name: img.name,
+          sortOrder: img.sortOrder,
+        }))
+      }
+    } catch (error) {
+      console.error('이미지 로드 실패:', error)
+    }
+    return []
+  }
+
   // Initialize form with AI-generated data (다중 게시물 지원)
   useEffect(() => {
     if (!isOpen) return
 
-    // 다중 게시물 AI 결과가 있으면 사용
-    if (initialDrafts && initialDrafts.length > 0) {
-      const tabs = initialDrafts.map((item, index) => ({
-        id: String(index + 1),
-        postId: item.postId,
-        name: item.draft?.name || '',
-        description: item.draft?.description || '',
-        categoryId: item.draft?.categoryId || '',
-        price: item.draft?.price || '',
-        wholesalePrice: item.draft?.wholesalePrice || '',
-        options: item.draft?.options || [],
-        variants: item.draft?.variants || [],
-        error: item.error, // AI 생성 실패 정보 저장
-      }))
-      setProductTabs(tabs)
-      setActiveProductIndex(0)
-    } else if (initialData) {
-      // 단일 게시물 (기존 로직)
-      const initialProduct: ProductFormData & { postId?: number } = {
-        id: '1',
-        postId: postId,
-        name: initialData.name || '',
-        description: initialData.description || '',
-        categoryId: initialData.categoryId || '',
-        price: initialData.price || '',
-        wholesalePrice: initialData.wholesalePrice || '',
-        options: initialData.options || [],
-        variants: initialData.variants || [],
+    const initializeForm = async () => {
+      // 다중 게시물 AI 결과가 있으면 사용
+      if (initialDrafts && initialDrafts.length > 0) {
+        const tabs: (ProductFormData & { postId?: number })[] = await Promise.all(
+          initialDrafts.map(async (item, index) => {
+            const images = await loadImagesForPost(item.postId)
+            return {
+              id: String(index + 1),
+              postId: item.postId,
+              name: item.draft?.name || '',
+              description: item.draft?.description || '',
+              categoryId: item.draft?.categoryId || '',
+              price: item.draft?.price || '' as number | '',
+              wholesalePrice: item.draft?.wholesalePrice || '' as number | '',
+              options: item.draft?.options || [],
+              variants: item.draft?.variants || [],
+              images,
+              error: item.error,
+            }
+          })
+        )
+        setProductTabs(tabs)
+        setActiveProductIndex(0)
+      } else if (initialData) {
+        // 단일 게시물 (기존 로직)
+        const images = await loadImagesForPost(postId)
+        const initialProduct: ProductFormData & { postId?: number } = {
+          id: '1',
+          postId: postId,
+          name: initialData.name || '',
+          description: initialData.description || '',
+          categoryId: initialData.categoryId || '',
+          price: initialData.price || '',
+          wholesalePrice: initialData.wholesalePrice || '',
+          options: initialData.options || [],
+          variants: initialData.variants || [],
+          images,
+        }
+        setProductTabs([initialProduct])
+        setActiveProductIndex(0)
       }
-      setProductTabs([initialProduct])
-      setActiveProductIndex(0)
+      setImageOrderChanged(false)
     }
+
+    initializeForm()
   }, [initialData, initialDrafts, isOpen, postId])
 
   // 현재 상품 데이터 업데이트 함수
@@ -160,6 +199,42 @@ export default function ProductFormModal({
   const setOptions = (value: OptionGroup[]) => updateCurrentProduct({ options: value })
   const variants = currentProduct.variants
   const setVariants = (value: GeneratedVariant[]) => updateCurrentProduct({ variants: value })
+  const images = currentProduct.images || []
+
+  // 이미지 순서 변경 핸들러
+  const handleImageReorder = (newOrder: SortableImage[]) => {
+    updateCurrentProduct({ images: newOrder })
+    setImageOrderChanged(true)
+  }
+
+  // 이미지 순서 저장
+  const handleSaveImageOrder = async () => {
+    const targetPostId = currentProduct.postId || postId
+    if (!targetPostId || images.length === 0) return
+
+    try {
+      setIsReorderingSaving(true)
+      const response = await fetch('/api/post-image/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId: targetPostId,
+          imageIds: images.map((img) => img.id),
+        }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setImageOrderChanged(false)
+      } else {
+        console.error('이미지 순서 저장 실패:', data.error)
+      }
+    } catch (error) {
+      console.error('이미지 순서 저장 실패:', error)
+    } finally {
+      setIsReorderingSaving(false)
+    }
+  }
 
   const handleAddOption = () => {
     if (!newOptionGroup.trim() || !newOptionValues.trim()) {
@@ -395,6 +470,20 @@ export default function ProductFormModal({
           >
             기본 정보
           </button>
+          <button
+            onClick={() => setActiveTab('images')}
+            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors flex items-center gap-1 ${
+              activeTab === 'images'
+                ? 'border-purple-500 text-purple-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <ImageIcon size={16} />
+            이미지 {images.length > 0 && `(${images.length})`}
+            {imageOrderChanged && (
+              <span className="w-2 h-2 bg-orange-500 rounded-full" title="저장되지 않은 변경사항" />
+            )}
+          </button>
           {/* 옵션 설정 탭 - 나중에 사용 */}
           {/* <button
             onClick={() => setActiveTab('options')}
@@ -490,6 +579,53 @@ export default function ProductFormModal({
                   </p>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Images Tab */}
+          {activeTab === 'images' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">이미지 순서 변경</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    드래그하여 이미지 순서를 변경하세요. 첫 번째 이미지가 대표 이미지가 됩니다.
+                  </p>
+                </div>
+                {imageOrderChanged && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSaveImageOrder}
+                    disabled={isReorderingSaving}
+                  >
+                    {isReorderingSaving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        저장 중...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} />
+                        순서 저장
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+
+              <ImageSortable
+                images={images}
+                onReorder={handleImageReorder}
+              />
+
+              {imageOrderChanged && (
+                <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <p className="text-sm text-orange-800">
+                    이미지 순서가 변경되었습니다. &quot;순서 저장&quot; 버튼을 눌러 변경사항을 저장하세요.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

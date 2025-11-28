@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, GripVertical } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import Link from 'next/link'
+import ImageSortable, { SortableImage } from '@/components/product/ImageSortable'
 
 interface Product {
   id: number
@@ -31,7 +32,10 @@ interface Product {
       coverUrl: string | null
     }
     images: Array<{
+      id: number
       imageUrl: string
+      name?: string
+      sortOrder: number
     }>
   }
   options: Array<{
@@ -70,6 +74,13 @@ export default function ProductDetailPage() {
     wholesalePrice: '',
   })
 
+  // 이미지 순서 변경 상태
+  const [images, setImages] = useState<SortableImage[]>([])
+  const [isImageReordering, setIsImageReordering] = useState(false)
+  const [imageOrderChanged, setImageOrderChanged] = useState(false)
+  const [isReorderingSaving, setIsReorderingSaving] = useState(false)
+  const [deletingImageId, setDeletingImageId] = useState<number | null>(null)
+
   useEffect(() => {
     if (productId) {
       loadProduct()
@@ -93,6 +104,16 @@ export default function ProductDetailPage() {
           price: data.data.price?.toString() || '',
           wholesalePrice: data.data.wholesalePrice?.toString() || '',
         })
+        // 이미지 상태 초기화
+        if (data.data.post?.images) {
+          setImages(data.data.post.images.map((img: any) => ({
+            id: img.id,
+            imageUrl: img.imageUrl,
+            name: img.name,
+            sortOrder: img.sortOrder,
+          })))
+        }
+        setImageOrderChanged(false)
       } else {
         setError(data.error || '상품을 불러오는데 실패했습니다.')
       }
@@ -193,6 +214,91 @@ export default function ProductDetailPage() {
       }
     } catch (error) {
       console.error('상품 삭제 실패:', error)
+    }
+  }
+
+  // 이미지 순서 변경 핸들러
+  const handleImageReorder = (newOrder: SortableImage[]) => {
+    setImages(newOrder)
+    setImageOrderChanged(true)
+  }
+
+  // 이미지 순서 저장
+  const handleSaveImageOrder = async () => {
+    if (!product || images.length === 0) return
+
+    try {
+      setIsReorderingSaving(true)
+      const response = await fetch('/api/post-image/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId: product.postId,
+          imageIds: images.map((img) => img.id),
+        }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setImageOrderChanged(false)
+        setIsImageReordering(false)
+        // 상품 정보 다시 로드하여 thumbnailUrl 갱신
+        loadProduct()
+      } else {
+        console.error('이미지 순서 저장 실패:', data.error)
+      }
+    } catch (error) {
+      console.error('이미지 순서 저장 실패:', error)
+    } finally {
+      setIsReorderingSaving(false)
+    }
+  }
+
+  // 이미지 순서 변경 취소
+  const handleCancelImageReorder = () => {
+    if (product?.post?.images) {
+      setImages(product.post.images.map((img) => ({
+        id: img.id,
+        imageUrl: img.imageUrl,
+        name: img.name,
+        sortOrder: img.sortOrder,
+      })))
+    }
+    setImageOrderChanged(false)
+    setIsImageReordering(false)
+  }
+
+  // 이미지 삭제
+  const handleDeleteImage = async (imageId: number) => {
+    try {
+      setDeletingImageId(imageId)
+      const response = await fetch(`/api/post-image/${imageId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        // 로컬 상태에서 이미지 제거
+        setImages(prev => prev.filter(img => img.id !== imageId).map((img, index) => ({
+          ...img,
+          sortOrder: index,
+        })))
+        // product 상태의 thumbnailUrl 업데이트
+        if (product) {
+          setProduct({
+            ...product,
+            thumbnailUrl: data.data.newThumbnailUrl,
+          })
+        }
+      } else {
+        console.error('이미지 삭제 실패:', data.error)
+        alert(data.error || '이미지 삭제에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('이미지 삭제 실패:', error)
+      alert('이미지 삭제에 실패했습니다.')
+    } finally {
+      setDeletingImageId(null)
     }
   }
 
@@ -449,27 +555,100 @@ export default function ProductDetailPage() {
           </div>
 
           {/* 이미지 갤러리 카드 */}
-          {product.post.images.length > 0 && (
+          {images.length > 0 && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  상품 이미지
-                  <span className="text-sm font-normal text-gray-500 ml-2">
-                    ({product.post.images.length}개)
-                  </span>
-                </h2>
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    상품 이미지
+                    <span className="text-sm font-normal text-gray-500 ml-2">
+                      ({images.length}개)
+                    </span>
+                  </h2>
+                  {isImageReordering && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      드래그하여 이미지 순서를 변경하세요. 첫 번째 이미지가 대표 이미지가 됩니다.
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {isImageReordering ? (
+                    <>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleCancelImageReorder}
+                        disabled={isReorderingSaving}
+                      >
+                        <X size={16} />
+                        취소
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handleSaveImageOrder}
+                        disabled={isReorderingSaving || !imageOrderChanged}
+                      >
+                        {isReorderingSaving ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            저장 중...
+                          </>
+                        ) : (
+                          <>
+                            <Save size={16} />
+                            순서 저장
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setIsImageReordering(true)}
+                    >
+                      <GripVertical size={16} />
+                      순서 변경
+                    </Button>
+                  )}
+                </div>
               </div>
               <div className="p-6">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {product.post.images.map((image, index) => (
-                    <img
-                      key={index}
-                      src={image.imageUrl}
-                      alt={`상품 이미지 ${index + 1}`}
-                      className="w-full aspect-square object-cover rounded-lg border border-gray-200"
+                {isImageReordering ? (
+                  <>
+                    <ImageSortable
+                      images={images}
+                      onReorder={handleImageReorder}
+                      onDelete={handleDeleteImage}
+                      deletingImageId={deletingImageId}
                     />
-                  ))}
-                </div>
+                    {imageOrderChanged && (
+                      <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                        <p className="text-sm text-orange-800">
+                          이미지 순서가 변경되었습니다. &quot;순서 저장&quot; 버튼을 눌러 변경사항을 저장하세요.
+                        </p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {images.map((image, index) => (
+                      <div key={image.id} className="relative">
+                        {index === 0 && (
+                          <div className="absolute top-2 left-2 z-10 px-2 py-1 bg-purple-600 text-white text-xs rounded-full">
+                            대표
+                          </div>
+                        )}
+                        <img
+                          src={image.imageUrl}
+                          alt={`상품 이미지 ${index + 1}`}
+                          className="w-full aspect-square object-cover rounded-lg border border-gray-200"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -3,7 +3,7 @@
  * 전체 자동화 파이프라인 실행
  */
 
-import { PrismaClient, WorkflowType, WorkflowStatus } from '@bandauto/db'
+import { PrismaClient, WorkflowType, WorkflowStatus, TriggerType } from '@bandauto/db'
 import { setBatchContext, clearBatchContext, createBatchContextFromUserId } from './context'
 import { runCollectionPipeline } from './pipelines/collection'
 import { runTransformPipeline } from './pipelines/transform'
@@ -32,13 +32,15 @@ const prisma = new PrismaClient()
  */
 export async function executeCollectionPipeline(
   userId: number,
-  config?: Partial<FullPipelineConfig['collection']>
+  config?: Partial<FullPipelineConfig['collection']>,
+  triggerType: TriggerType = TriggerType.MANUAL
 ): Promise<CollectionResult> {
   const context = await createBatchContextFromUserId(userId)
 
   const logId = await createWorkflowLog({
     userId,
     workflowType: WorkflowType.COLLECT,
+    triggerType,
   })
 
   // context에 workflowLogId 설정
@@ -82,13 +84,15 @@ export async function executeCollectionPipeline(
  */
 export async function executeTransformPipeline(
   userId: number,
-  config?: Partial<FullPipelineConfig['transform']>
+  config?: Partial<FullPipelineConfig['transform']>,
+  triggerType: TriggerType = TriggerType.MANUAL
 ): Promise<TransformResult> {
   const context = await createBatchContextFromUserId(userId)
 
   const logId = await createWorkflowLog({
     userId,
     workflowType: WorkflowType.TRANSFORM,
+    triggerType,
   })
 
   // context에 workflowLogId 설정
@@ -137,13 +141,15 @@ export async function executeTransformPipeline(
  */
 export async function executePublishPipeline(
   userId: number,
-  config?: Partial<FullPipelineConfig['publish']>
+  config?: Partial<FullPipelineConfig['publish']>,
+  triggerType: TriggerType = TriggerType.MANUAL
 ): Promise<PublishResult> {
   const context = await createBatchContextFromUserId(userId)
 
   const logId = await createWorkflowLog({
     userId,
     workflowType: WorkflowType.PUBLISH,
+    triggerType,
   })
 
   // context에 workflowLogId 설정
@@ -200,7 +206,8 @@ export async function executeFullPipeline(
     skipCollection?: boolean
     skipTransform?: boolean
     skipPublish?: boolean
-  }
+  },
+  triggerType: TriggerType = TriggerType.MANUAL
 ): Promise<FullPipelineResult> {
   const context = await createBatchContextFromUserId(userId)
   setBatchContext(context)
@@ -209,6 +216,7 @@ export async function executeFullPipeline(
   const logId = await createWorkflowLog({
     userId,
     workflowType: WorkflowType.FULL_PIPELINE,
+    triggerType,
   })
 
   let collectionResult: CollectionResult | undefined
