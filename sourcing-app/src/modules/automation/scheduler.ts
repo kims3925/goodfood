@@ -18,8 +18,6 @@ const activeSchedulers: Map<number, cron.ScheduledTask> = new Map()
  * 애플리케이션 시작 시 호출
  */
 export async function initializeScheduler(): Promise<void> {
-  console.log('[Scheduler] Initializing automation scheduler...')
-
   try {
     // 활성화된 모든 자동화 설정 조회
     const configs = await prisma.automationConfig.findMany({
@@ -31,23 +29,64 @@ export async function initializeScheduler(): Promise<void> {
       },
     })
 
-    console.log(`[Scheduler] Found ${configs.length} active automation configs`)
-
-    // 각 설정에 대해 스케줄러 등록
+    // 각 설정에 대해 스케줄러 등록 (로그 없이)
     for (const config of configs) {
       if (config.cronExpression) {
-        registerScheduler(config.user.id, config.cronExpression)
+        registerSchedulerSilent(config.user.id, config.cronExpression)
       }
     }
 
-    console.log('[Scheduler] Initialization complete')
+    // 활성 스케줄러가 있을 때만 로그 출력
+    if (configs.length > 0) {
+      console.log(`[Scheduler] ${configs.length}개의 자동화 스케줄러 시작됨`)
+    }
   } catch (error) {
-    console.error('[Scheduler] Initialization failed:', error)
+    console.error('[Scheduler] 초기화 실패:', error)
   }
 }
 
 /**
- * 스케줄러 등록
+ * 스케줄러 등록 (내부용, 로그 없음)
+ */
+function registerSchedulerSilent(userId: number, cronExpression: string): void {
+  // 기존 스케줄러가 있으면 제거
+  const existing = activeSchedulers.get(userId)
+  if (existing) {
+    existing.stop()
+    activeSchedulers.delete(userId)
+  }
+
+  // cron 표현식 유효성 검사
+  if (!cron.validate(cronExpression)) {
+    return
+  }
+
+  const task = cron.schedule(cronExpression, async () => {
+    console.log(`[Scheduler] 자동화 실행 시작 (user: ${userId})`)
+
+    // 중복 실행 방지
+    const runningWorkflow = await getRunningWorkflow(userId)
+    if (runningWorkflow) {
+      console.log(`[Scheduler] 이미 실행 중인 작업이 있어 건너뜀`)
+      return
+    }
+
+    try {
+      const result = await executeFullPipeline(userId, undefined, TriggerType.SCHEDULED)
+      console.log(`[Scheduler] 자동화 완료: ${result.overallStatus}`)
+    } catch (error) {
+      console.error(`[Scheduler] 자동화 실패:`, error)
+    }
+  }, {
+    scheduled: true,
+    timezone: 'Asia/Seoul',
+  })
+
+  activeSchedulers.set(userId, task)
+}
+
+/**
+ * 스케줄러 등록 (외부 호출용)
  */
 export function registerScheduler(userId: number, cronExpression: string): void {
   // 기존 스케줄러가 있으면 제거
@@ -55,28 +94,27 @@ export function registerScheduler(userId: number, cronExpression: string): void 
 
   // cron 표현식 유효성 검사
   if (!cron.validate(cronExpression)) {
-    console.error(`[Scheduler] Invalid cron expression for user ${userId}: ${cronExpression}`)
+    console.error(`[Scheduler] 잘못된 cron 표현식: ${cronExpression}`)
     return
   }
 
-  console.log(`[Scheduler] Registering scheduler for user ${userId}: ${cronExpression}`)
+  console.log(`[Scheduler] 스케줄러 등록 (user: ${userId})`)
 
   const task = cron.schedule(cronExpression, async () => {
-    console.log(`[Scheduler] Attempting scheduled task for user ${userId}`)
+    console.log(`[Scheduler] 자동화 실행 시작 (user: ${userId})`)
 
-    // 중복 실행 방지: 이미 실행 중인 워크플로우가 있는지 확인
+    // 중복 실행 방지
     const runningWorkflow = await getRunningWorkflow(userId)
     if (runningWorkflow) {
-      const triggerLabel = runningWorkflow.triggerType === TriggerType.MANUAL ? '수동' : '자동'
-      console.log(`[Scheduler] Skipping - already running (${triggerLabel} 실행 중, workflow ID: ${runningWorkflow.id})`)
+      console.log(`[Scheduler] 이미 실행 중인 작업이 있어 건너뜀`)
       return
     }
 
     try {
       const result = await executeFullPipeline(userId, undefined, TriggerType.SCHEDULED)
-      console.log(`[Scheduler] Task completed for user ${userId}: ${result.overallStatus}`)
+      console.log(`[Scheduler] 자동화 완료: ${result.overallStatus}`)
     } catch (error) {
-      console.error(`[Scheduler] Task failed for user ${userId}:`, error)
+      console.error(`[Scheduler] 자동화 실패:`, error)
     }
   }, {
     scheduled: true,

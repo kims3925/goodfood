@@ -137,28 +137,6 @@ export default function RetailBandPublishPage() {
     }
   }
 
-  const handleOpenSettingModal = () => {
-    setTempSetting({ ...publishSetting })
-    setShowSettingModal(true)
-  }
-
-  const handleSaveSetting = async () => {
-    try {
-      const res = await fetch('/api/settings/publish', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tempSetting),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setPublishSetting(tempSetting)
-        setShowSettingModal(false)
-      }
-    } catch (error) {
-      console.error('설정 저장 실패:', error)
-    }
-  }
-
   const handlePublish = async () => {
     if (selectedBandIds.length === 0 || selectedProductIds.length === 0) {
       return

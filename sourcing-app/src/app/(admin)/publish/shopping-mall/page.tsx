@@ -442,7 +442,6 @@ export default function ShoppingMallPublishPage() {
                             ? '발행된 상품이 없습니다.'
                             : '판매중인 상품이 없습니다.'
                         }
-                        colSpan={6}
                       />
                     ) : (
                       products.map((product) => (

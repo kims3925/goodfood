@@ -83,7 +83,8 @@ export async function POST(request: NextRequest) {
           const automationConfig = await prisma.automationConfig.findUnique({
             where: { userId: currentUser.userId },
           })
-          if (!automationConfig?.retailBandIds || (automationConfig.retailBandIds as number[]).length === 0) {
+          const retailBandIds = automationConfig?.retailBandIds as number[] | undefined
+          if (!retailBandIds || retailBandIds.length === 0) {
             return NextResponse.json(
               { success: false, error: '발행할 소매밴드가 설정되지 않았습니다.' },
               { status: 400 }

@@ -296,7 +296,7 @@ export default function WholesaleBandsPage() {
               </TableHeader>
               <TableBody>
                 {bands.length === 0 ? (
-                  <TableEmpty message="등록된 도매밴드가 없습니다." colSpan={5} />
+                  <TableEmpty message="등록된 도매밴드가 없습니다." />
                 ) : (
                   bands.map((band) => (
                     <TableRow

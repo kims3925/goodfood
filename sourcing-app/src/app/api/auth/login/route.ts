@@ -37,6 +37,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 비밀번호 검증
+    if (!user.password) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '이메일 또는 비밀번호가 올바르지 않습니다.',
+        },
+        { status: 401 }
+      )
+    }
     const isPasswordValid = await verifyPassword(password, user.password)
 
     if (!isPasswordValid) {

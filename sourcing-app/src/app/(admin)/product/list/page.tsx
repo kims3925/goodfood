@@ -824,7 +824,7 @@ export default function ProductListPage() {
               </TableHeader>
               <TableBody>
                 {products.length === 0 ? (
-                  <TableEmpty message="등록된 상품이 없습니다." colSpan={7} />
+                  <TableEmpty message="등록된 상품이 없습니다." />
                 ) : (
                   products.map((product) => (
                     <TableRow

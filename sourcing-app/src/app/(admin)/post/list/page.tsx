@@ -443,7 +443,7 @@ export default function PostsManagePage() {
               </TableHeader>
               <TableBody>
                 {posts.length === 0 ? (
-                  <TableEmpty message="수집된 게시물이 없습니다." colSpan={5} />
+                  <TableEmpty message="수집된 게시물이 없습니다." />
                 ) : (
                   posts.map((post) => (
                     <TableRow
