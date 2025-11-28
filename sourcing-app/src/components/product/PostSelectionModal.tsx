@@ -26,6 +26,7 @@ interface PostSelectionModalProps {
   onClose: () => void
   onPostSelected: (postId: number) => void
   onMultiplePostsSelected?: (postIds: number[]) => void // 다중 선택 콜백
+  excludePostIds?: number[] // 선택 불가능한 게시물 ID 목록 (이미 추가된 게시물)
 }
 
 export default function PostSelectionModal({
@@ -33,6 +34,7 @@ export default function PostSelectionModal({
   onClose,
   onPostSelected,
   onMultiplePostsSelected,
+  excludePostIds = [],
 }: PostSelectionModalProps) {
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -120,8 +122,14 @@ export default function PostSelectionModal({
     )
   }
 
+  // 게시물이 제외 대상인지 확인
+  const isExcluded = (postId: number) => excludePostIds.includes(postId)
+
   // 게시물 선택/해제 토글
   const handleToggleSelect = (postId: number) => {
+    // 제외 대상이면 선택 불가
+    if (isExcluded(postId)) return
+
     setSelectedPostIds(prev =>
       prev.includes(postId)
         ? prev.filter(id => id !== postId)
@@ -220,7 +228,8 @@ export default function PostSelectionModal({
                           )}
                           <h3 className="font-semibold text-gray-900">{group.band.name}</h3>
                           <span className="text-sm text-gray-500">
-                            ({selectedInBand > 0 ? `${selectedInBand}/` : ''}{group.posts.length}개)
+                            ({selectedInBand > 0 ? `${selectedInBand}/` : ''}{selectablePosts.length}개
+                            {excludedCount > 0 && `, 제외 ${excludedCount}개`})
                           </span>
                         </div>
                       </div>
@@ -232,6 +241,7 @@ export default function PostSelectionModal({
                         {group.posts.map((post) => {
                           const isExpanded = expandedPostIds.includes(post.id)
                           const isSelected = selectedPostIds.includes(post.id)
+                          const postIsExcluded = isExcluded(post.id)
                           return (
                             <div
                               key={post.id}

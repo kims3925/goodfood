@@ -42,9 +42,6 @@ model User {
   inquiries          Inquiry[]
   returnRequests     ReturnRequest[]
 
-  // Settlement relations (TODO: Settlement 모델 정의 필요)
-  // settlements        Settlement[]
-
   @@unique([oauthProvider, oauthProviderId])
   @@index([email])
   @@index([phone])

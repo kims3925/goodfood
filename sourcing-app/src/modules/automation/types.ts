@@ -3,7 +3,9 @@
  * 자동화 워크플로우 타입 정의
  */
 
-import { WorkflowType, WorkflowStatus, AiProvider, PublishStatus } from '@bandauto/db'
+import { WorkflowType, WorkflowStatus, AiProvider, PublishStatus, TriggerType } from '@bandauto/db'
+
+export { TriggerType }
 
 // =============================================
 // CONTEXT TYPES
@@ -152,6 +154,7 @@ export interface FullPipelineResult {
 export interface WorkflowLogInput {
   userId: number
   workflowType: WorkflowType
+  triggerType?: TriggerType
 }
 
 export interface WorkflowLogUpdate {

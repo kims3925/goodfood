@@ -78,10 +78,26 @@ export class GeminiClient extends BaseAiClient {
       // Check for empty response
       if (!text || text.trim() === '') {
         console.error('[GeminiClient] Empty response received. Candidates:', JSON.stringify(response.candidates, null, 2))
+
+        // 빈 응답 원인 분석
+        const candidate = response.candidates?.[0]
+        const finishReason = candidate?.finishReason
+
+        let errorMessage = 'AI가 응답을 생성하지 못했습니다.'
+        if (finishReason === 'SAFETY') {
+          errorMessage = '게시물 내용이 안전 정책에 의해 차단되었습니다. 민감한 내용이 포함되어 있을 수 있습니다.'
+        } else if (finishReason === 'MAX_TOKENS') {
+          errorMessage = '게시물 내용이 너무 길어 처리할 수 없습니다. 내용을 줄여주세요.'
+        } else if (finishReason === 'RECITATION') {
+          errorMessage = '게시물 내용이 저작권 문제로 처리할 수 없습니다.'
+        } else {
+          errorMessage = '게시물 내용을 분석할 수 없습니다. 상품 정보가 포함되어 있는지 확인해주세요.'
+        }
+
         throw new ProductTransformationError(
-          'Gemini가 빈 응답을 반환했습니다. 게시물 내용을 확인하거나 다시 시도해주세요.',
+          errorMessage,
           TransformationErrorCode.AI_API_ERROR,
-          { candidates: response.candidates }
+          { candidates: response.candidates, finishReason }
         )
       }
 
@@ -96,8 +112,24 @@ export class GeminiClient extends BaseAiClient {
       if (error instanceof ProductTransformationError) {
         throw error
       }
+      // 토큰 관련 에러 처리
+      const errorMsg = error.message || ''
+      if (errorMsg.includes('quota') || errorMsg.includes('limit') || errorMsg.includes('token')) {
+        throw new ProductTransformationError(
+          'API 할당량이 초과되었습니다. 잠시 후 다시 시도하거나 AI 설정을 확인해주세요.',
+          TransformationErrorCode.AI_API_ERROR,
+          { originalError: error }
+        )
+      }
+      if (errorMsg.includes('API key') || errorMsg.includes('authentication') || errorMsg.includes('401')) {
+        throw new ProductTransformationError(
+          'AI API 키가 유효하지 않습니다. 환경 설정에서 API 키를 확인해주세요.',
+          TransformationErrorCode.AI_API_ERROR,
+          { originalError: error }
+        )
+      }
       throw new ProductTransformationError(
-        `Gemini API Error: ${error.message}`,
+        `Gemini API 오류: ${error.message}`,
         TransformationErrorCode.AI_API_ERROR,
         { originalError: error }
       )
@@ -143,8 +175,31 @@ export class OpenAiClient extends BaseAiClient {
         provider: AiProvider.OPENAI,
       }
     } catch (error: any) {
+      // 사용자 친화적 에러 메시지 처리
+      const errorMsg = error.message || ''
+      if (errorMsg.includes('quota') || errorMsg.includes('limit') || errorMsg.includes('rate')) {
+        throw new ProductTransformationError(
+          'API 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.',
+          TransformationErrorCode.AI_API_ERROR,
+          { originalError: error }
+        )
+      }
+      if (errorMsg.includes('API key') || errorMsg.includes('401') || errorMsg.includes('Incorrect')) {
+        throw new ProductTransformationError(
+          'AI API 키가 유효하지 않습니다. 환경 설정에서 확인해주세요.',
+          TransformationErrorCode.AI_API_ERROR,
+          { originalError: error }
+        )
+      }
+      if (errorMsg.includes('insufficient_quota') || errorMsg.includes('billing')) {
+        throw new ProductTransformationError(
+          'API 크레딧이 부족합니다. 결제 정보를 확인해주세요.',
+          TransformationErrorCode.AI_API_ERROR,
+          { originalError: error }
+        )
+      }
       throw new ProductTransformationError(
-        `OpenAI API Error: ${error.message}`,
+        `OpenAI API 오류: ${error.message}`,
         TransformationErrorCode.AI_API_ERROR,
         { originalError: error }
       )

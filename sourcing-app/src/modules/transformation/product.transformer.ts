@@ -239,7 +239,7 @@ function parseAiResponse(aiResponse: AiResponse): AiProductAnalysis {
     return analysis
   } catch (error: any) {
     throw new ProductTransformationError(
-      `Failed to parse AI response: ${error.message}`,
+      'AI 응답을 분석할 수 없습니다. 게시물 내용이 상품 정보로 변환하기 어려운 형식일 수 있습니다.',
       TransformationErrorCode.PARSING_ERROR,
       {
         originalError: error,

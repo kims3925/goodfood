@@ -51,6 +51,11 @@ enum WorkflowStatus {
   PARTIAL_SUCCESS
 }
 
+enum TriggerType {
+  MANUAL
+  SCHEDULED
+}
+
 enum PublishStatus {
   SUCCESS
   FAILED

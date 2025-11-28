@@ -3,7 +3,7 @@
  * WorkflowLog 생성/업데이트 및 통계 조회
  */
 
-import { PrismaClient, WorkflowType, WorkflowStatus } from '@bandauto/db'
+import { PrismaClient, WorkflowType, WorkflowStatus, TriggerType } from '@bandauto/db'
 import { WorkflowLogInput, WorkflowLogUpdate, AutomationStats } from './types'
 
 const prisma = new PrismaClient()
@@ -20,6 +20,7 @@ export async function createWorkflowLog(input: WorkflowLogInput): Promise<number
     data: {
       userId: input.userId,
       workflowType: input.workflowType,
+      triggerType: input.triggerType ?? TriggerType.MANUAL,
       status: WorkflowStatus.RUNNING,
       startedAt: new Date(),
     }

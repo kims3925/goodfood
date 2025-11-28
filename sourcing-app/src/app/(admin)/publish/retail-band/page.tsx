@@ -83,7 +83,8 @@ export default function RetailBandPublishPage() {
 
   const loadProducts = async (page: number = 1) => {
     try {
-      const res = await fetch(`/api/product?page=${page}&limit=${pageSize}`)
+      // 판매중(ACTIVE) 상품만 조회
+      const res = await fetch(`/api/product?page=${page}&limit=${pageSize}&status=ACTIVE`)
       const data = await res.json()
       if (data.success) {
         setProducts(data.data)
@@ -133,28 +134,6 @@ export default function RetailBandPublishPage() {
       setSelectedBandIds([])
     } else {
       setSelectedBandIds(retailBands.map(b => b.id))
-    }
-  }
-
-  const handleOpenSettingModal = () => {
-    setTempSetting({ ...publishSetting })
-    setShowSettingModal(true)
-  }
-
-  const handleSaveSetting = async () => {
-    try {
-      const res = await fetch('/api/settings/publish', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tempSetting),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setPublishSetting(tempSetting)
-        setShowSettingModal(false)
-      }
-    } catch (error) {
-      console.error('설정 저장 실패:', error)
     }
   }
 

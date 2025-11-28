@@ -228,7 +228,7 @@ export default function PolicyManagePage() {
               </TableHeader>
               <TableBody>
                 {policies.length === 0 ? (
-                  <TableEmpty message="등록된 정책이 없습니다." colSpan={6} />
+                  <TableEmpty message="등록된 정책이 없습니다." />
                 ) : (
                   policies.map((policy) => (
                     <TableRow

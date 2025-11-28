@@ -293,7 +293,7 @@ export default function RetailBandsPage() {
               </TableHeader>
               <TableBody>
                 {bands.length === 0 ? (
-                  <TableEmpty message="등록된 소매밴드가 없습니다." colSpan={5} />
+                  <TableEmpty message="등록된 소매밴드가 없습니다." />
                 ) : (
                   bands.map((band) => (
                     <TableRow

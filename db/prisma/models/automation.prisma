@@ -45,6 +45,7 @@ model WorkflowLog {
   id           Int            @id @default(autoincrement())
   userId       Int            @map("user_id")
   workflowType WorkflowType   @map("workflow_type")
+  triggerType  TriggerType    @default(MANUAL) @map("trigger_type")
   status       WorkflowStatus @default(PENDING)
   startedAt    DateTime       @default(now()) @map("started_at") @db.Timestamp(0)
   completedAt  DateTime?      @map("completed_at") @db.Timestamp(0)
@@ -57,5 +58,6 @@ model WorkflowLog {
 
   @@index([userId, workflowType, startedAt])
   @@index([status])
+  @@index([triggerType])
   @@map("workflow_log")
 }

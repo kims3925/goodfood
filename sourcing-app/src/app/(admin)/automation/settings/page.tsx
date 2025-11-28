@@ -41,12 +41,113 @@ interface AutomationConfig {
 }
 
 const INTERVAL_OPTIONS = [
-  { value: '1h', label: '1시간마다' },
-  { value: '3h', label: '3시간마다' },
-  { value: '6h', label: '6시간마다' },
-  { value: '12h', label: '12시간마다' },
-  { value: '24h', label: '24시간마다 (자정)' },
+  { value: '1h', label: '1시간마다', description: '매 정각 실행 (0분)', examples: '1:00, 2:00, 3:00...' },
+  { value: '3h', label: '3시간마다', description: '매 3시간 정각', examples: '0:00, 3:00, 6:00, 9:00...' },
+  { value: '6h', label: '6시간마다', description: '매 6시간 정각', examples: '0:00, 6:00, 12:00, 18:00' },
+  { value: '12h', label: '12시간마다', description: '매 12시간 정각', examples: '0:00, 12:00' },
+  { value: '24h', label: '24시간마다', description: '매일 자정', examples: '0:00 (자정)' },
 ]
+
+// 다음 실행 시간 계산 함수
+const getNextExecutionTimes = (interval: string): string[] => {
+  const now = new Date()
+  const times: string[] = []
+
+  const intervalHours: { [key: string]: number } = {
+    '1h': 1,
+    '3h': 3,
+    '6h': 6,
+    '12h': 12,
+    '24h': 24,
+  }
+
+  const hours = intervalHours[interval] || 1
+
+  // 다음 실행 시간들 계산 (최대 3개)
+  for (let i = 0; i < 24 && times.length < 3; i++) {
+    const checkHour = (Math.floor(now.getHours() / hours) * hours + hours * (times.length === 0 ? 0 : 1) + i) % 24
+    if (checkHour % hours === 0) {
+      const nextTime = new Date(now)
+      nextTime.setHours(checkHour, 0, 0, 0)
+
+      // 이미 지난 시간이면 다음 날로
+      if (nextTime <= now) {
+        if (times.length === 0) continue
+      }
+
+      if (times.length === 0 || !times.includes(nextTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }))) {
+        times.push(nextTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }))
+      }
+
+      if (times.length >= 3) break
+    }
+  }
+
+  // 간단한 방식으로 재계산
+  const result: string[] = []
+  const currentHour = now.getHours()
+
+  for (let h = 0; h < 24 && result.length < 3; h++) {
+    if (h % hours === 0) {
+      if (h > currentHour || (h === currentHour && now.getMinutes() === 0)) {
+        result.push(`${h.toString().padStart(2, '0')}:00`)
+      } else if (result.length === 0 && h <= currentHour) {
+        // 오늘 남은 시간 중 가장 가까운 것
+        const nextH = Math.ceil((currentHour + 1) / hours) * hours
+        if (nextH < 24) {
+          result.push(`${nextH.toString().padStart(2, '0')}:00`)
+        } else {
+          result.push(`내일 00:00`)
+        }
+      }
+    }
+  }
+
+  // 결과가 비어있으면 기본값
+  if (result.length === 0) {
+    const nextH = Math.ceil((currentHour + 1) / hours) * hours
+    if (nextH >= 24) {
+      result.push('내일 00:00')
+    } else {
+      result.push(`${nextH.toString().padStart(2, '0')}:00`)
+    }
+  }
+
+  return result
+}
+
+// 가장 가까운 다음 실행 시간
+const getNextExecution = (interval: string): string => {
+  const now = new Date()
+  const currentHour = now.getHours()
+  const currentMinute = now.getMinutes()
+
+  const intervalHours: { [key: string]: number } = {
+    '1h': 1,
+    '3h': 3,
+    '6h': 6,
+    '12h': 12,
+    '24h': 24,
+  }
+
+  const hours = intervalHours[interval] || 1
+
+  // 다음 실행 시간 계산
+  let nextHour = Math.ceil((currentHour + (currentMinute > 0 ? 1 : 0)) / hours) * hours
+
+  if (nextHour >= 24) {
+    return '내일 00:00'
+  }
+
+  if (nextHour === currentHour && currentMinute > 0) {
+    nextHour += hours
+    if (nextHour >= 24) {
+      return '내일 00:00'
+    }
+  }
+
+  return `오늘 ${nextHour.toString().padStart(2, '0')}:00`
+}
 
 const defaultConfig: AutomationConfig = {
   isEnabled: false,
@@ -72,12 +173,13 @@ export default function AutomationSettingsPage() {
   const [retailStartIndex, setRetailStartIndex] = useState(0)
   const [showAllWholesale, setShowAllWholesale] = useState(false)
   const [showAllRetail, setShowAllRetail] = useState(false)
+  const [warningSections, setWarningSections] = useState<string[]>([])
+  const [warningPhase, setWarningPhase] = useState<'idle' | 'shake' | 'fading'>('idle')
 
   const BANDS_PER_PAGE = 6
 
-  // 섹션별 변경 여부 확인
-  const hasScheduleChanges = config.isEnabled !== initialConfig.isEnabled ||
-    config.cronInterval !== initialConfig.cronInterval
+  // 섹션별 변경 여부 확인 (isEnabled는 버튼으로 변경하므로 제외)
+  const hasScheduleChanges = config.cronInterval !== initialConfig.cronInterval
 
   const hasCollectionChanges = JSON.stringify(config.wholesaleBandIds.slice().sort()) !==
     JSON.stringify(initialConfig.wholesaleBandIds.slice().sort())
@@ -87,6 +189,65 @@ export default function AutomationSettingsPage() {
 
   const hasPublishChanges = JSON.stringify(config.retailBandIds.slice().sort()) !==
     JSON.stringify(initialConfig.retailBandIds.slice().sort())
+
+  // 저장되지 않은 변경사항이 있는지 확인
+  const hasUnsavedChanges = hasScheduleChanges || hasCollectionChanges || hasAiChanges || hasPublishChanges
+
+  // 자동화 활성화 상태 저장
+  const saveAutomationState = async (enabled: boolean) => {
+    try {
+      const newConfig = { ...config, isEnabled: enabled }
+      const response = await fetch('/api/automation/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfig),
+      })
+      const data = await response.json()
+      if (data.success) {
+        setConfig(newConfig)
+        setInitialConfig(newConfig)
+      }
+    } catch (error) {
+      console.error('자동화 상태 저장 실패:', error)
+    }
+  }
+
+  // 자동화 시작 핸들러
+  const handleStartAutomation = () => {
+    const unsavedSections: string[] = []
+
+    if (hasScheduleChanges) unsavedSections.push('schedule')
+    if (hasCollectionChanges) unsavedSections.push('collection')
+    if (hasAiChanges) unsavedSections.push('ai')
+    if (hasPublishChanges) unsavedSections.push('publish')
+
+    if (unsavedSections.length > 0) {
+      // 1단계: 빨간색 + 진동
+      setWarningSections(unsavedSections)
+      setWarningPhase('shake')
+
+      // 2단계: 0.6초 후 진동 끝, 페이딩 시작
+      setTimeout(() => {
+        setWarningPhase('fading')
+      }, 600)
+
+      // 3단계: 2.5초 후 완전히 원래 상태로
+      setTimeout(() => {
+        setWarningSections([])
+        setWarningPhase('idle')
+      }, 3000)
+
+      return
+    }
+
+    // 저장된 상태에서만 자동화 시작 (서버에도 저장)
+    saveAutomationState(true)
+  }
+
+  // 자동화 중지 핸들러
+  const handleStopAutomation = () => {
+    saveAutomationState(false)
+  }
 
   useEffect(() => {
     loadData()
@@ -201,45 +362,127 @@ export default function AutomationSettingsPage() {
         <p className="text-gray-600 mt-1">자동화 워크플로우 스케줄 및 설정</p>
       </div>
 
-      {/* Enable/Disable & Schedule */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">자동화 활성화</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              활성화하면 설정된 주기에 따라 자동으로 워크플로우가 실행됩니다.
-            </p>
+      {/* CSS for shake animation */}
+      <style jsx global>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+          20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake {
+          animation: shake 0.5s ease-in-out;
+        }
+      `}</style>
+
+      {/* 자동화 상태 배너 */}
+      {config.isEnabled ? (
+        <div className="p-5 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+              </div>
+              <div className="text-white">
+                <h2 className="text-xl font-bold">자동화 실행 중</h2>
+                <p className="text-green-100 text-sm mt-1">
+                  다음 실행: <span className="font-semibold text-white">{getNextExecution(config.cronInterval)}</span>
+                  <span className="mx-2">•</span>
+                  {INTERVAL_OPTIONS.find(o => o.value === config.cronInterval)?.label}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              onClick={handleStopAutomation}
+              className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+            >
+              자동화 중지
+            </Button>
           </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={config.isEnabled}
-              onChange={(e) => setConfig(prev => ({ ...prev, isEnabled: e.target.checked }))}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-          </label>
+        </div>
+      ) : (
+        <div
+          className={`p-5 rounded-xl border-2 transition-all ease-out ${
+            warningPhase === 'shake' ? 'duration-0' : 'duration-[2000ms]'
+          } ${
+            warningPhase === 'shake'
+              ? 'bg-red-100 border-red-500 animate-shake'
+              : warningPhase === 'fading'
+              ? 'bg-gray-100 border-gray-300'
+              : 'bg-gray-100 border-gray-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ease-out ${
+                warningPhase === 'shake' ? 'duration-0 bg-red-300' : 'duration-[2000ms] bg-gray-300'
+              }`}>
+                <div className={`w-3 h-3 rounded-full transition-all ease-out ${
+                  warningPhase === 'shake' ? 'duration-0 bg-red-600' : 'duration-[2000ms] bg-gray-500'
+                }`} />
+              </div>
+              <div>
+                <h2 className={`text-xl font-bold transition-all ease-out ${
+                  warningPhase === 'shake' ? 'duration-0 text-red-700' : 'duration-[2000ms] text-gray-700'
+                }`}>
+                  {warningSections.length > 0 ? '저장되지 않은 설정이 있습니다' : '자동화 비활성화'}
+                </h2>
+                <p className={`text-sm mt-1 transition-all ease-out ${
+                  warningPhase === 'shake' ? 'duration-0 text-red-600' : 'duration-[2000ms] text-gray-500'
+                }`}>
+                  {warningSections.length > 0
+                    ? '아래 빨간색으로 표시된 섹션을 저장해주세요'
+                    : '아래 설정을 완료하고 자동화를 시작하세요'
+                  }
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="primary"
+              onClick={handleStartAutomation}
+              className={`transition-all ease-out ${
+                warningPhase === 'shake'
+                  ? 'duration-0 bg-red-500 hover:bg-red-600'
+                  : 'duration-[2000ms] bg-green-600 hover:bg-green-700'
+              }`}
+            >
+              자동화 시작
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Settings */}
+      <Card className="p-6">
+        <div className="mb-6">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-gray-900">실행 주기</h2>
+            {hasScheduleChanges && (
+              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-600">저장 필요</span>
+            )}
+          </div>
+          <p className="text-sm text-gray-500 mt-1">모든 실행은 정각(0분)에 시작됩니다.</p>
         </div>
 
-        <div className="border-t border-gray-200 pt-6">
-          <h3 className="text-md font-medium text-gray-900 mb-4">실행 주기</h3>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {INTERVAL_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => setConfig(prev => ({ ...prev, cronInterval: option.value }))}
-                className={`
-                  px-4 py-3 rounded-lg border-2 text-sm font-medium transition-colors
-                  ${config.cronInterval === option.value
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                  }
-                `}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {INTERVAL_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => setConfig(prev => ({ ...prev, cronInterval: option.value }))}
+              className={`
+                px-4 py-3 rounded-lg border-2 text-sm font-medium transition-colors text-left
+                ${config.cronInterval === option.value
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                }
+              `}
+            >
+              <div className="font-semibold">{option.label}</div>
+              <div className={`text-xs mt-1 ${config.cronInterval === option.value ? 'text-blue-600' : 'text-gray-500'}`}>
+                {option.examples}
+              </div>
+            </button>
+          ))}
         </div>
 
         <div className="flex justify-end mt-6 pt-4 border-t border-gray-200">
@@ -258,7 +501,12 @@ export default function AutomationSettingsPage() {
       {/* Collection Settings - Wholesale Band Cards */}
       <Card className="p-6">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold text-gray-900">수집 설정</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-gray-900">수집 설정</h2>
+            {hasCollectionChanges && (
+              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-600">저장 필요</span>
+            )}
+          </div>
           {wholesaleBands.length > BANDS_PER_PAGE && (
             <button
               onClick={() => setShowAllWholesale(!showAllWholesale)}
@@ -422,7 +670,12 @@ export default function AutomationSettingsPage() {
 
       {/* AI Settings */}
       <Card className="p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">AI 변환 설정</h2>
+        <div className="flex items-center gap-2 mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">AI 변환 설정</h2>
+          {hasAiChanges && (
+            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-600">저장 필요</span>
+          )}
+        </div>
 
         <div className="space-y-6">
           {/* AI Provider Cards */}
@@ -551,7 +804,12 @@ export default function AutomationSettingsPage() {
       {/* Publish Settings - Retail Band Cards */}
       <Card className="p-6">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold text-gray-900">발행 설정</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-gray-900">발행 설정</h2>
+            {hasPublishChanges && (
+              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-600">저장 필요</span>
+            )}
+          </div>
           {retailBands.length > BANDS_PER_PAGE && (
             <button
               onClick={() => setShowAllRetail(!showAllRetail)}

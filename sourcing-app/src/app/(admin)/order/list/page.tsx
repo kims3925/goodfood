@@ -266,7 +266,7 @@ export default function OrderListPage() {
               </TableHeader>
               <TableBody>
                 {orders.length === 0 ? (
-                  <TableEmpty message="등록된 주문이 없습니다." colSpan={9} />
+                  <TableEmpty message="등록된 주문이 없습니다." />
                 ) : (
                   orders.map((order) => (
                     <TableRow key={order.id} className="hover:bg-gray-50">

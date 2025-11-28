@@ -229,28 +229,36 @@ export default function AutomationDashboardPage() {
 
       {/* Running Workflow */}
       {runningWorkflow && (
-        <Card className="p-4 border-l-4 border-yellow-500">
+        <Card className="p-4 border-l-4 border-yellow-500 bg-yellow-50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <RefreshCw className="w-5 h-5 animate-spin text-yellow-600" />
+              <div className="relative">
+                <RefreshCw className="w-6 h-6 animate-spin text-yellow-600" />
+              </div>
               <div>
-                <p className="font-medium text-gray-900">
+                <p className="font-semibold text-gray-900">
                   {getTypeName(runningWorkflow.type)} 실행 중
                 </p>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-500">
                   시작: {formatDate(runningWorkflow.startedAt)}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-sm text-gray-600">
-                  진행: {runningWorkflow.successCount} / {runningWorkflow.totalItems}
-                </p>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-4">
+                <div className="text-center px-3 py-1 bg-white rounded-lg shadow-sm">
+                  <p className="text-xs text-gray-500">처리</p>
+                  <p className="text-lg font-bold text-gray-900">{runningWorkflow.totalItems}</p>
+                </div>
+                <div className="text-center px-3 py-1 bg-white rounded-lg shadow-sm">
+                  <p className="text-xs text-gray-500">성공</p>
+                  <p className="text-lg font-bold text-green-600">{runningWorkflow.successCount}</p>
+                </div>
                 {runningWorkflow.failedCount > 0 && (
-                  <p className="text-sm text-red-600">
-                    실패: {runningWorkflow.failedCount}
-                  </p>
+                  <div className="text-center px-3 py-1 bg-white rounded-lg shadow-sm">
+                    <p className="text-xs text-gray-500">실패</p>
+                    <p className="text-lg font-bold text-red-600">{runningWorkflow.failedCount}</p>
+                  </div>
                 )}
               </div>
               <Button

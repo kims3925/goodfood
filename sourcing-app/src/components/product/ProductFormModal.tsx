@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Save, X, Plus, Trash2, AlertCircle, ExternalLink } from 'lucide-react'
+import { Save, X, Plus, Trash2, AlertCircle, ExternalLink, RefreshCw, ImageIcon } from 'lucide-react'
 import Modal, { ModalFooter } from '../ui/Modal'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 import { ProductDraft, OptionGroup, GeneratedVariant } from '@/modules/transformation'
+import ImageSortable, { SortableImage } from './ImageSortable'
 
 interface DraftWithPostId {
   postId: number
@@ -22,9 +23,11 @@ interface ProductFormModalProps {
   initialData: ProductDraft
   initialDrafts?: DraftWithPostId[] // 다중 게시물 AI 결과
   onSaved: () => void
+  onAddMorePosts?: () => void // 추가 게시물 선택 콜백
+  onRetry?: (postId: number) => void // AI 재시도 콜백
 }
 
-type TabType = 'basic' | 'options' | 'variants'
+type TabType = 'basic' | 'images' | 'options' | 'variants'
 
 // 개별 상품 데이터 타입
 interface ProductFormData {
@@ -36,6 +39,7 @@ interface ProductFormData {
   wholesalePrice: number | ''
   options: OptionGroup[]
   variants: GeneratedVariant[]
+  images: SortableImage[] // 이미지 목록
   error?: string // AI 생성 실패 여부
 }
 
@@ -49,6 +53,7 @@ const createEmptyProductData = (id: string): ProductFormData => ({
   wholesalePrice: '',
   options: [],
   variants: [],
+  images: [],
 })
 
 export default function ProductFormModal({
@@ -59,6 +64,8 @@ export default function ProductFormModal({
   initialData,
   initialDrafts,
   onSaved,
+  onAddMorePosts,
+  onRetry,
 }: ProductFormModalProps) {
   const isEditMode = !!productId
   const [activeTab, setActiveTab] = useState<TabType>('basic')
@@ -75,42 +82,78 @@ export default function ProductFormModal({
   const [newOptionGroup, setNewOptionGroup] = useState('')
   const [newOptionValues, setNewOptionValues] = useState('')
 
+  // 이미지 순서 변경 상태
+  const [isReorderingSaving, setIsReorderingSaving] = useState(false)
+  const [imageOrderChanged, setImageOrderChanged] = useState(false)
+
+  // 이미지 로드 함수
+  const loadImagesForPost = async (targetPostId: number): Promise<SortableImage[]> => {
+    try {
+      const response = await fetch(`/api/post/${targetPostId}`)
+      const data = await response.json()
+      if (data.success && data.data?.images) {
+        return data.data.images.map((img: any) => ({
+          id: img.id,
+          imageUrl: img.imageUrl,
+          name: img.name,
+          sortOrder: img.sortOrder,
+        }))
+      }
+    } catch (error) {
+      console.error('이미지 로드 실패:', error)
+    }
+    return []
+  }
+
   // Initialize form with AI-generated data (다중 게시물 지원)
   useEffect(() => {
     if (!isOpen) return
 
-    // 다중 게시물 AI 결과가 있으면 사용
-    if (initialDrafts && initialDrafts.length > 0) {
-      const tabs = initialDrafts.map((item, index) => ({
-        id: String(index + 1),
-        postId: item.postId,
-        name: item.draft?.name || '',
-        description: item.draft?.description || '',
-        categoryId: item.draft?.categoryId || '',
-        price: item.draft?.price || '',
-        wholesalePrice: item.draft?.wholesalePrice || '',
-        options: item.draft?.options || [],
-        variants: item.draft?.variants || [],
-        error: item.error, // AI 생성 실패 정보 저장
-      }))
-      setProductTabs(tabs)
-      setActiveProductIndex(0)
-    } else if (initialData) {
-      // 단일 게시물 (기존 로직)
-      const initialProduct: ProductFormData & { postId?: number } = {
-        id: '1',
-        postId: postId,
-        name: initialData.name || '',
-        description: initialData.description || '',
-        categoryId: initialData.categoryId || '',
-        price: initialData.price || '',
-        wholesalePrice: initialData.wholesalePrice || '',
-        options: initialData.options || [],
-        variants: initialData.variants || [],
+    const initializeForm = async () => {
+      // 다중 게시물 AI 결과가 있으면 사용
+      if (initialDrafts && initialDrafts.length > 0) {
+        const tabs: (ProductFormData & { postId?: number })[] = await Promise.all(
+          initialDrafts.map(async (item, index) => {
+            const images = await loadImagesForPost(item.postId)
+            return {
+              id: String(index + 1),
+              postId: item.postId,
+              name: item.draft?.name || '',
+              description: item.draft?.description || '',
+              categoryId: item.draft?.categoryId || '',
+              price: item.draft?.price || '' as number | '',
+              wholesalePrice: item.draft?.wholesalePrice || '' as number | '',
+              options: item.draft?.options || [],
+              variants: item.draft?.variants || [],
+              images,
+              error: item.error,
+            }
+          })
+        )
+        setProductTabs(tabs)
+        setActiveProductIndex(0)
+      } else if (initialData) {
+        // 단일 게시물 (기존 로직)
+        const images = await loadImagesForPost(postId)
+        const initialProduct: ProductFormData & { postId?: number } = {
+          id: '1',
+          postId: postId,
+          name: initialData.name || '',
+          description: initialData.description || '',
+          categoryId: initialData.categoryId || '',
+          price: initialData.price || '',
+          wholesalePrice: initialData.wholesalePrice || '',
+          options: initialData.options || [],
+          variants: initialData.variants || [],
+          images,
+        }
+        setProductTabs([initialProduct])
+        setActiveProductIndex(0)
       }
-      setProductTabs([initialProduct])
-      setActiveProductIndex(0)
+      setImageOrderChanged(false)
     }
+
+    initializeForm()
   }, [initialData, initialDrafts, isOpen, postId])
 
   // 현재 상품 데이터 업데이트 함수
@@ -122,16 +165,12 @@ export default function ProductFormModal({
     })
   }
 
-  // 새 상품 탭 추가
+  // 새 상품 탭 추가 - 추가 게시물 선택으로 변경
   const addProductTab = () => {
-    const newId = String(productTabs.length + 1)
-    const newProduct = createEmptyProductData(newId)
-    // 기본 정보 복사 옵션 (카테고리만 복사)
-    if (currentProduct) {
-      newProduct.categoryId = currentProduct.categoryId
+    if (onAddMorePosts) {
+      // 추가 게시물 선택 모달 열기
+      onAddMorePosts()
     }
-    setProductTabs(prev => [...prev, newProduct])
-    setActiveProductIndex(productTabs.length)
   }
 
   // 상품 탭 삭제
@@ -160,6 +199,42 @@ export default function ProductFormModal({
   const setOptions = (value: OptionGroup[]) => updateCurrentProduct({ options: value })
   const variants = currentProduct.variants
   const setVariants = (value: GeneratedVariant[]) => updateCurrentProduct({ variants: value })
+  const images = currentProduct.images || []
+
+  // 이미지 순서 변경 핸들러
+  const handleImageReorder = (newOrder: SortableImage[]) => {
+    updateCurrentProduct({ images: newOrder })
+    setImageOrderChanged(true)
+  }
+
+  // 이미지 순서 저장
+  const handleSaveImageOrder = async () => {
+    const targetPostId = currentProduct.postId || postId
+    if (!targetPostId || images.length === 0) return
+
+    try {
+      setIsReorderingSaving(true)
+      const response = await fetch('/api/post-image/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId: targetPostId,
+          imageIds: images.map((img) => img.id),
+        }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setImageOrderChanged(false)
+      } else {
+        console.error('이미지 순서 저장 실패:', data.error)
+      }
+    } catch (error) {
+      console.error('이미지 순서 저장 실패:', error)
+    } finally {
+      setIsReorderingSaving(false)
+    }
+  }
 
   const handleAddOption = () => {
     if (!newOptionGroup.trim() || !newOptionValues.trim()) {
@@ -303,43 +378,55 @@ export default function ProductFormModal({
               <span className="text-xs text-gray-500">({productTabs.length}개)</span>
             </div>
             <div className="flex items-center gap-2 overflow-x-auto pb-2">
-              {productTabs.map((product, index) => (
-                <div
-                  key={product.id}
-                  className={`flex items-center gap-1 px-3 py-2 rounded-lg border-2 transition-all cursor-pointer min-w-fit ${
-                    activeProductIndex === index
-                      ? 'border-purple-500 bg-purple-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                  onClick={() => setActiveProductIndex(index)}
+              {productTabs.map((product, index) => {
+                const hasError = !!product.error
+                return (
+                  <div
+                    key={product.id}
+                    className={`flex items-center gap-1 px-3 py-2 rounded-lg border-2 transition-all cursor-pointer min-w-fit ${
+                      hasError
+                        ? activeProductIndex === index
+                          ? 'border-red-500 bg-red-50'
+                          : 'border-red-300 bg-red-50 hover:border-red-400'
+                        : activeProductIndex === index
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                    onClick={() => setActiveProductIndex(index)}
+                  >
+                    {hasError && <AlertCircle size={14} className="text-red-500 flex-shrink-0" />}
+                    <span className={`text-sm font-medium ${
+                      hasError
+                        ? 'text-red-700'
+                        : activeProductIndex === index ? 'text-purple-700' : 'text-gray-700'
+                    }`}>
+                      {product.name || `상품 ${index + 1}`}
+                    </span>
+                    {productTabs.length > 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeProductTab(index)
+                        }}
+                        className="ml-1 p-0.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500 transition-colors"
+                        title="상품 삭제"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+              {onAddMorePosts && (
+                <button
+                  onClick={addProductTab}
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg border-2 border-dashed border-gray-300 text-gray-500 hover:border-purple-400 hover:text-purple-600 hover:bg-purple-50 transition-all min-w-fit"
+                  title="게시물 선택하여 상품 추가"
                 >
-                  <span className={`text-sm font-medium ${
-                    activeProductIndex === index ? 'text-purple-700' : 'text-gray-700'
-                  }`}>
-                    {product.name || `상품 ${index + 1}`}
-                  </span>
-                  {productTabs.length > 1 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        removeProductTab(index)
-                      }}
-                      className="ml-1 p-0.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500 transition-colors"
-                      title="상품 삭제"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button
-                onClick={addProductTab}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg border-2 border-dashed border-gray-300 text-gray-500 hover:border-purple-400 hover:text-purple-600 hover:bg-purple-50 transition-all min-w-fit"
-                title="새 상품 추가"
-              >
-                <Plus size={16} />
-                <span className="text-sm">추가</span>
-              </button>
+                  <Plus size={16} />
+                  <span className="text-sm">추가</span>
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -349,7 +436,9 @@ export default function ProductFormModal({
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
             <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-red-800">
-              <p className="mb-2">AI 상품 생성에 실패했습니다. 게시물 내용을 확인하고 직접 상품 정보를 입력해주세요.</p>
+              <p className="font-medium mb-1">AI 상품 생성에 실패했습니다.</p>
+              <p className="mb-2 text-red-700">사유: {currentProduct.error}</p>
+              <p className="mb-2 text-red-600">게시물 내용을 확인하고 직접 상품 정보를 입력해주세요.</p>
               <Link
                 href={`/post/detail/${currentProduct.postId}`}
                 target="_blank"
@@ -364,10 +453,7 @@ export default function ProductFormModal({
           <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-start gap-2">
             <AlertCircle size={20} className="text-purple-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-purple-800">
-              {isEditMode
-                ? 'AI가 생성한 정보입니다. 내용을 확인하고 수정한 후 저장해주세요.'
-                : 'AI가 생성한 정보입니다. 내용을 확인하고 수정한 후 저장해주세요.'
-              }
+              AI가 생성한 정보입니다. 내용을 확인하고 수정한 후 저장해주세요.
             </p>
           </div>
         )}
@@ -383,6 +469,20 @@ export default function ProductFormModal({
             }`}
           >
             기본 정보
+          </button>
+          <button
+            onClick={() => setActiveTab('images')}
+            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors flex items-center gap-1 ${
+              activeTab === 'images'
+                ? 'border-purple-500 text-purple-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <ImageIcon size={16} />
+            이미지 {images.length > 0 && `(${images.length})`}
+            {imageOrderChanged && (
+              <span className="w-2 h-2 bg-orange-500 rounded-full" title="저장되지 않은 변경사항" />
+            )}
           </button>
           {/* 옵션 설정 탭 - 나중에 사용 */}
           {/* <button
@@ -479,6 +579,53 @@ export default function ProductFormModal({
                   </p>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Images Tab */}
+          {activeTab === 'images' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">이미지 순서 변경</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    드래그하여 이미지 순서를 변경하세요. 첫 번째 이미지가 대표 이미지가 됩니다.
+                  </p>
+                </div>
+                {imageOrderChanged && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSaveImageOrder}
+                    disabled={isReorderingSaving}
+                  >
+                    {isReorderingSaving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        저장 중...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} />
+                        순서 저장
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+
+              <ImageSortable
+                images={images}
+                onReorder={handleImageReorder}
+              />
+
+              {imageOrderChanged && (
+                <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <p className="text-sm text-orange-800">
+                    이미지 순서가 변경되었습니다. &quot;순서 저장&quot; 버튼을 눌러 변경사항을 저장하세요.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -648,20 +795,39 @@ export default function ProductFormModal({
 
         {/* Footer */}
         <ModalFooter className="mt-4">
-          <div className="flex items-center justify-end w-full">
-            <Button variant="primary" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  저장 중...
-                </>
-              ) : (
-                <>
+          <div className="flex items-center justify-end w-full gap-2">
+            {currentProduct.error ? (
+              <>
+                {onRetry && currentProduct.postId && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => onRetry(currentProduct.postId!)}
+                    className="bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100"
+                  >
+                    <RefreshCw size={16} />
+                    AI 다시 시도
+                  </Button>
+                )}
+                <Button variant="primary" disabled>
                   <Save size={16} />
-                  {isEditMode ? '상품 수정' : '상품 등록'}
-                </>
-              )}
-            </Button>
+                  상품 등록 불가
+                </Button>
+              </>
+            ) : (
+              <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    저장 중...
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    {isEditMode ? '상품 수정' : '상품 등록'}
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </ModalFooter>
       </div>

@@ -3,7 +3,7 @@
  * 전체 자동화 파이프라인 실행
  */
 
-import { PrismaClient, WorkflowType, WorkflowStatus } from '@bandauto/db'
+import { PrismaClient, WorkflowType, WorkflowStatus, TriggerType } from '@bandauto/db'
 import { setBatchContext, clearBatchContext, createBatchContextFromUserId } from './context'
 import { runCollectionPipeline } from './pipelines/collection'
 import { runTransformPipeline } from './pipelines/transform'
@@ -12,6 +12,7 @@ import {
   createWorkflowLog,
   completeWorkflowLog,
   failWorkflowLog,
+  updateWorkflowProgress,
 } from './workflow-service'
 import {
   FullPipelineConfig,
@@ -32,13 +33,15 @@ const prisma = new PrismaClient()
  */
 export async function executeCollectionPipeline(
   userId: number,
-  config?: Partial<FullPipelineConfig['collection']>
+  config?: Partial<FullPipelineConfig['collection']>,
+  triggerType: TriggerType = TriggerType.MANUAL
 ): Promise<CollectionResult> {
   const context = await createBatchContextFromUserId(userId)
 
   const logId = await createWorkflowLog({
     userId,
     workflowType: WorkflowType.COLLECT,
+    triggerType,
   })
 
   // context에 workflowLogId 설정
@@ -82,13 +85,15 @@ export async function executeCollectionPipeline(
  */
 export async function executeTransformPipeline(
   userId: number,
-  config?: Partial<FullPipelineConfig['transform']>
+  config?: Partial<FullPipelineConfig['transform']>,
+  triggerType: TriggerType = TriggerType.MANUAL
 ): Promise<TransformResult> {
   const context = await createBatchContextFromUserId(userId)
 
   const logId = await createWorkflowLog({
     userId,
     workflowType: WorkflowType.TRANSFORM,
+    triggerType,
   })
 
   // context에 workflowLogId 설정
@@ -137,13 +142,15 @@ export async function executeTransformPipeline(
  */
 export async function executePublishPipeline(
   userId: number,
-  config?: Partial<FullPipelineConfig['publish']>
+  config?: Partial<FullPipelineConfig['publish']>,
+  triggerType: TriggerType = TriggerType.MANUAL
 ): Promise<PublishResult> {
   const context = await createBatchContextFromUserId(userId)
 
   const logId = await createWorkflowLog({
     userId,
     workflowType: WorkflowType.PUBLISH,
+    triggerType,
   })
 
   // context에 workflowLogId 설정
@@ -200,7 +207,8 @@ export async function executeFullPipeline(
     skipCollection?: boolean
     skipTransform?: boolean
     skipPublish?: boolean
-  }
+  },
+  triggerType: TriggerType = TriggerType.MANUAL
 ): Promise<FullPipelineResult> {
   const context = await createBatchContextFromUserId(userId)
   setBatchContext(context)
@@ -209,6 +217,7 @@ export async function executeFullPipeline(
   const logId = await createWorkflowLog({
     userId,
     workflowType: WorkflowType.FULL_PIPELINE,
+    triggerType,
   })
 
   let collectionResult: CollectionResult | undefined
@@ -230,6 +239,11 @@ export async function executeFullPipeline(
       throw new Error('자동화 설정이 없습니다')
     }
 
+    // 누적 카운터
+    let totalItems = 0
+    let successCount = 0
+    let failedCount = 0
+
     // 1. 수집 단계
     if (!options?.skipCollection) {
       console.log('[FullPipeline] Step 1: Collection')
@@ -237,6 +251,13 @@ export async function executeFullPipeline(
         collectFromAllBands: automationConfig.collectFromAllBands,
         wholesaleBandIds: automationConfig.wholesaleBandIds as number[] | undefined,
       })
+
+      // 진행 상황 업데이트
+      totalItems += collectionResult.totalItems
+      successCount += collectionResult.successCount
+      failedCount += collectionResult.failedCount
+      await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+
       console.log(`[FullPipeline] Collection completed: ${collectionResult.successCount} new posts`)
     }
 
@@ -249,6 +270,13 @@ export async function executeFullPipeline(
         pricingPolicyContent: automationConfig.pricingPolicy?.content,
         transformPendingOnly: true,
       })
+
+      // 진행 상황 업데이트
+      totalItems += transformResult.totalItems
+      successCount += transformResult.successCount
+      failedCount += transformResult.failedCount
+      await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+
       console.log(`[FullPipeline] Transform completed: ${transformResult.successCount} products created`)
     }
 
@@ -261,25 +289,18 @@ export async function executeFullPipeline(
           retailBandIds,
           publishReadyOnly: true,
         })
+
+        // 진행 상황 업데이트
+        totalItems += publishResult.totalItems
+        successCount += publishResult.successCount
+        failedCount += publishResult.failedCount
+        await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+
         console.log(`[FullPipeline] Publish completed: ${publishResult.successCount} published`)
       }
     }
 
     const completedAt = new Date()
-
-    // 전체 결과 집계
-    const totalItems =
-      (collectionResult?.totalItems || 0) +
-      (transformResult?.totalItems || 0) +
-      (publishResult?.totalItems || 0)
-    const successCount =
-      (collectionResult?.successCount || 0) +
-      (transformResult?.successCount || 0) +
-      (publishResult?.successCount || 0)
-    const failedCount =
-      (collectionResult?.failedCount || 0) +
-      (transformResult?.failedCount || 0) +
-      (publishResult?.failedCount || 0)
 
     // 상태 결정
     let overallStatus: WorkflowStatus

@@ -11,6 +11,10 @@ import prisma from '@/lib/prisma'
  * Query Parameters:
  * - postId?: number
  * - search?: string (searches in name, description)
+ * - wholesaleBandId?: number (filter by source band)
+ * - status?: string (filter by status: DRAFT, ACTIVE, INACTIVE, SOLDOUT)
+ * - startDate?: string (filter by created date, ISO format)
+ * - endDate?: string (filter by created date, ISO format)
  * - page?: number (default: 1)
  * - limit?: number (default: 20)
  *
@@ -35,6 +39,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const postId = searchParams.get('postId')
     const search = searchParams.get('search')
+    const wholesaleBandId = searchParams.get('wholesaleBandId')
+    const status = searchParams.get('status')
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
 
@@ -54,6 +62,32 @@ export async function GET(request: NextRequest) {
       ]
     }
 
+    // Filter by wholesale band
+    if (wholesaleBandId) {
+      where.post = {
+        wholesaleBandId: parseInt(wholesaleBandId),
+      }
+    }
+
+    // Filter by status
+    if (status) {
+      where.status = status
+    }
+
+    // Filter by date range
+    if (startDate || endDate) {
+      where.createdAt = {}
+      if (startDate) {
+        where.createdAt.gte = new Date(startDate)
+      }
+      if (endDate) {
+        // endDate를 해당 날짜의 끝으로 설정
+        const end = new Date(endDate)
+        end.setHours(23, 59, 59, 999)
+        where.createdAt.lte = end
+      }
+    }
+
     // Get total count
     const total = await prisma.product.count({ where })
 
@@ -65,6 +99,7 @@ export async function GET(request: NextRequest) {
           include: {
             wholesaleBand: {
               select: {
+                id: true,
                 name: true,
                 coverUrl: true,
               },
@@ -286,6 +321,7 @@ export async function PUT(request: NextRequest) {
     if (updateData.categoryId !== undefined) data.categoryId = updateData.categoryId
     if (updateData.price !== undefined) data.price = updateData.price
     if (updateData.wholesalePrice !== undefined) data.wholesalePrice = updateData.wholesalePrice
+    if (updateData.status !== undefined) data.status = updateData.status
 
     // Update product
     const product = await prisma.product.update({
