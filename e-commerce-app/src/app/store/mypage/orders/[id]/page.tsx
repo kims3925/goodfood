@@ -608,12 +608,7 @@ export default function OrderDetailPage() {
                 주문 취소
               </button>
             )}
-            <Link
-              href="/store"
-              className="block w-full px-4 py-3 border border-gray-300 text-gray-700 text-center rounded-lg font-medium hover:bg-gray-50 transition-colors"
-            >
-              계속 쇼핑하기
-            </Link>
+
           </div>
         </div>
       </div>
