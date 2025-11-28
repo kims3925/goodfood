@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-import prisma from '@bandauto/db'
+import { policyService } from '@/modules/config/domain/src/policy'
 
 // GET: 정책 목록 조회
 export async function GET(request: NextRequest) {
@@ -12,51 +12,28 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       )
     }
-    const userId = currentUser.userId
 
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || ''
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
 
-    const where = {
-      userId: userId,
-      ...(search && {
-        OR: [
-          { name: { contains: search } },
-          { description: { contains: search } },
-        ],
-      }),
-    }
-
-    const total = await prisma.pricingPolicy.count({ where })
-
-    const policies = await prisma.pricingPolicy.findMany({
-      where,
-      orderBy: {
-        createdAt: 'desc',
-      },
-      skip: (page - 1) * limit,
-      take: limit,
+    const result = await policyService.getList({
+      userId: currentUser.userId,
+      search,
+      page,
+      limit,
     })
 
     return NextResponse.json({
       success: true,
-      data: policies,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      data: result.data,
+      pagination: result.pagination,
     })
   } catch (error) {
     console.error('정책 조회 실패:', error)
     return NextResponse.json(
-      {
-        success: false,
-        error: '정책 조회에 실패했습니다.',
-      },
+      { success: false, error: '정책 조회에 실패했습니다.' },
       { status: 500 }
     )
   }
@@ -72,44 +49,30 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       )
     }
-    const userId = currentUser.userId
 
     const body = await request.json()
     const { name, description, content, isActive = true } = body
 
-    // 필수 필드 검증
     if (!name || !content) {
       return NextResponse.json(
-        {
-          success: false,
-          error: '정책 이름과 내용은 필수입니다.',
-        },
+        { success: false, error: '정책 이름과 내용은 필수입니다.' },
         { status: 400 }
       )
     }
 
-    // 정책 생성
-    const policy = await prisma.pricingPolicy.create({
-      data: {
-        userId,
-        name,
-        description,
-        content,
-        isActive,
-      },
+    const policy = await policyService.create({
+      userId: currentUser.userId,
+      name,
+      description,
+      content,
+      isActive,
     })
 
-    return NextResponse.json({
-      success: true,
-      data: policy,
-    })
+    return NextResponse.json({ success: true, data: policy })
   } catch (error) {
     console.error('정책 등록 실패:', error)
     return NextResponse.json(
-      {
-        success: false,
-        error: '정책 등록에 실패했습니다.',
-      },
+      { success: false, error: '정책 등록에 실패했습니다.' },
       { status: 500 }
     )
   }
@@ -131,51 +94,26 @@ export async function PUT(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'ID가 필요합니다.',
-        },
+        { success: false, error: 'ID가 필요합니다.' },
         { status: 400 }
       )
     }
 
-    // 정책 존재 확인
-    const existing = await prisma.pricingPolicy.findFirst({
-      where: { id },
-    })
+    const policy = await policyService.update(id, { name, description, content, isActive })
 
-    if (!existing) {
+    return NextResponse.json({ success: true, data: policy })
+  } catch (error: any) {
+    console.error('정책 수정 실패:', error)
+
+    if (error.message === '정책을 찾을 수 없습니다.') {
       return NextResponse.json(
-        {
-          success: false,
-          error: '정책을 찾을 수 없습니다.',
-        },
+        { success: false, error: error.message },
         { status: 404 }
       )
     }
 
-    // 정책 수정
-    const policy = await prisma.pricingPolicy.update({
-      where: { id },
-      data: {
-        ...(name && { name }),
-        ...(description !== undefined && { description }),
-        ...(content && { content }),
-        ...(isActive !== undefined && { isActive }),
-      },
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: policy,
-    })
-  } catch (error) {
-    console.error('정책 수정 실패:', error)
     return NextResponse.json(
-      {
-        success: false,
-        error: '정책 수정에 실패했습니다.',
-      },
+      { success: false, error: '정책 수정에 실패했습니다.' },
       { status: 500 }
     )
   }
@@ -197,45 +135,29 @@ export async function DELETE(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'ID가 필요합니다.',
-        },
+        { success: false, error: 'ID가 필요합니다.' },
         { status: 400 }
       )
     }
 
-    // 정책 존재 확인
-    const policy = await prisma.pricingPolicy.findFirst({
-      where: { id: parseInt(id) },
-    })
-
-    if (!policy) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: '정책을 찾을 수 없습니다.',
-        },
-        { status: 404 }
-      )
-    }
-
-    // 정책 삭제
-    await prisma.pricingPolicy.delete({
-      where: { id: parseInt(id) },
-    })
+    await policyService.delete(parseInt(id))
 
     return NextResponse.json({
       success: true,
       message: '정책이 삭제되었습니다.',
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('정책 삭제 실패:', error)
+
+    if (error.message === '정책을 찾을 수 없습니다.') {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 404 }
+      )
+    }
+
     return NextResponse.json(
-      {
-        success: false,
-        error: '정책 삭제에 실패했습니다.',
-      },
+      { success: false, error: '정책 삭제에 실패했습니다.' },
       { status: 500 }
     )
   }

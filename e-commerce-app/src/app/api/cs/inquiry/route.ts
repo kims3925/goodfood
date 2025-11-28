@@ -1,9 +1,20 @@
+/**
+ * Inquiry API
+ * 고객 문의 등록 및 조회
+ * InquiryService 사용
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
-import prisma, { InquiryType } from '@bandauto/db'
+import { getInquiryService } from '@/modules/cs/services/inquiry.service'
 
-// GET: 로그인한 사용자의 문의 목록 조회
+const inquiryService = getInquiryService()
+
+/**
+ * GET /api/cs/inquiry
+ * 로그인한 사용자의 문의 목록 조회
+ */
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
@@ -15,40 +26,24 @@ export async function GET() {
       )
     }
 
-    const inquiries = await prisma.inquiry.findMany({
-      where: {
-        userId: Number(session.user.id),
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      select: {
-        id: true,
-        inquiryType: true,
-        title: true,
-        content: true,
-        status: true,
-        adminReply: true,
-        repliedAt: true,
-        createdAt: true,
-        replies: {
-          orderBy: { createdAt: 'asc' },
-          select: {
-            id: true,
-            content: true,
-            isAdmin: true,
-            createdAt: true,
-          },
-        },
-      },
-    })
+    const userId = Number(session.user.id)
+    const inquiries = await inquiryService.findByUserId(userId)
 
     return NextResponse.json({
       success: true,
       inquiries,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to fetch inquiries:', error)
+
+    // ValidationError
+    if (error.name === 'ValidationError') {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      )
+    }
+
     return NextResponse.json(
       { success: false, error: '문의 목록을 불러오는데 실패했습니다' },
       { status: 500 }
@@ -56,7 +51,10 @@ export async function GET() {
   }
 }
 
-// POST: 새 문의 등록
+/**
+ * POST /api/cs/inquiry
+ * 새 문의 등록
+ */
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -71,39 +69,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { inquiryType, title, content, productId } = body
 
-    // 유효성 검사
-    if (!title?.trim()) {
-      return NextResponse.json(
-        { success: false, error: '제목을 입력해 주세요' },
-        { status: 400 }
-      )
-    }
-
-    if (!content?.trim()) {
-      return NextResponse.json(
-        { success: false, error: '내용을 입력해 주세요' },
-        { status: 400 }
-      )
-    }
-
-    // InquiryType 유효성 검사
-    const validTypes: InquiryType[] = ['PRODUCT', 'DELIVERY', 'ORDER', 'PAYMENT', 'RETURN', 'EXCHANGE', 'GENERAL']
-    if (!validTypes.includes(inquiryType as InquiryType)) {
-      return NextResponse.json(
-        { success: false, error: '유효하지 않은 문의 유형입니다' },
-        { status: 400 }
-      )
-    }
-
-    const inquiry = await prisma.inquiry.create({
-      data: {
-        userId: Number(session.user.id),
-        productId: productId ? Number(productId) : null,
-        inquiryType: inquiryType as InquiryType,
-        title: title.trim(),
-        content: content.trim(),
-        isPrivate: true,
-      },
+    const userId = Number(session.user.id)
+    const inquiry = await inquiryService.createInquiry({
+      userId,
+      inquiryType,
+      title,
+      content,
+      productId: productId ? Number(productId) : undefined,
     })
 
     return NextResponse.json({
@@ -116,8 +88,17 @@ export async function POST(request: NextRequest) {
         createdAt: inquiry.createdAt,
       },
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to create inquiry:', error)
+
+    // ValidationError
+    if (error.name === 'ValidationError') {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      )
+    }
+
     return NextResponse.json(
       { success: false, error: '문의 등록에 실패했습니다' },
       { status: 500 }

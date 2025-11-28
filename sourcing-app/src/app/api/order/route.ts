@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
+import { orderService } from '@/modules/sourcing/domain/src/order'
 
 // GET: 주문서 목록 조회
 export async function GET(request: NextRequest) {
@@ -18,49 +19,16 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20')
     const search = searchParams.get('search') || ''
 
-    // 필터 조건
-    const where: any = {
+    const result = await orderService.getList({
       userId: user.userId,
-    }
-
-    if (search) {
-      where.OR = [
-        { customerName: { contains: search } },
-        { productName: { contains: search } },
-      ]
-    }
-
-    // 총 개수 조회
-    const total = await prisma.orderTest.count({ where })
-
-    // 주문 목록 조회 (상품 정보 포함)
-    const orders = await prisma.orderTest.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        product: {
-          select: {
-            id: true,
-            name: true,
-            thumbnailUrl: true,
-          },
-        },
-      },
+      search,
+      page,
+      limit,
     })
 
     return NextResponse.json({
       success: true,
-      data: {
-        orders,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
-      },
+      data: result,
     })
   } catch (error) {
     console.error('주문서 목록 조회 실패:', error)
@@ -87,20 +55,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 사용자 확인
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    })
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '사용자를 찾을 수 없습니다.' },
-        { status: 404 }
-      )
-    }
-
     // 필수 필드 검증
-    const { customerName, productName } = body
+    const { customerName, productName, totalPrice } = body
     if (!customerName || !productName) {
       return NextResponse.json(
         { success: false, error: '필수 필드가 누락되었습니다. (이름, 상품명)' },
@@ -108,52 +64,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 상품명으로 Product 매칭 시도 (정확히 일치하거나 포함하는 경우)
-    let productId: number | null = null
-    const matchedProduct = await prisma.product.findFirst({
-      where: {
-        userId,
-        OR: [
-          { name: productName }, // 정확히 일치
-          { name: { contains: productName } }, // 포함
-        ],
-      },
-      select: { id: true },
-    })
-
-    if (matchedProduct) {
-      productId = matchedProduct.id
-    }
-
-    // 테스트 주문 생성
-    const order = await prisma.orderTest.create({
-      data: {
-        userId,
-        productId,
-        productName,
-        totalPrice: body.totalPrice || null,
-        customerName,
-      },
-      include: {
-        product: {
-          select: {
-            id: true,
-            name: true,
-            thumbnailUrl: true,
-          },
-        },
-      },
+    const result = await orderService.create(userId, {
+      customerName,
+      productName,
+      totalPrice,
     })
 
     return NextResponse.json({
       success: true,
-      message: productId
+      message: result.isMatched
         ? '주문이 등록되었습니다. (상품 매칭됨)'
         : '주문이 등록되었습니다. (매칭되는 상품 없음)',
-      data: order,
+      data: result.order,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('주문 생성 실패:', error)
+
+    if (error.message === '사용자를 찾을 수 없습니다.') {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 404 }
+      )
+    }
+
     return NextResponse.json(
       { success: false, error: '주문 생성에 실패했습니다.' },
       { status: 500 }

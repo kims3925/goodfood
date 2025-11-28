@@ -15,7 +15,7 @@ const TOSS_CANCEL_URL = 'https://api.tosspayments.com/v1/payments'
 const CANCELLABLE_STATUSES = ['PENDING', 'PAID']
 
 // 취소 사유 목록
-export const CANCEL_REASONS = [
+const CANCEL_REASONS = [
   { value: 'CHANGE_MIND', label: '단순 변심' },
   { value: 'WRONG_ORDER', label: '주문 실수' },
   { value: 'FOUND_CHEAPER', label: '다른 곳에서 더 저렴하게 구매' },

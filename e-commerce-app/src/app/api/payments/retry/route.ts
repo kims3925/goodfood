@@ -14,7 +14,7 @@ import {
   TOSS_ERROR_CODES,
   isRetryableError,
   getErrorDetails
-} from '@/modules/payments/domain/src/payments/constants/toss-error-codes'
+} from '@/modules/payments/constants/toss-error-codes'
 
 const Decimal = Prisma.Decimal
 const MAX_RETRY_COUNT = 3
@@ -204,19 +204,25 @@ export async function POST(req: NextRequest) {
             orderNumber: newOrderNumber,
             userId: existingOrder.userId,
             status: 'PENDING',
+            recipientName: existingOrder.recipientName,
+            recipientPhone: existingOrder.recipientPhone,
+            postalCode: existingOrder.postalCode,
+            address: existingOrder.address,
+            addressDetail: existingOrder.addressDetail,
+            deliveryMemo: existingOrder.deliveryMemo,
             subtotalAmount: existingOrder.subtotalAmount,
             shippingFee: existingOrder.shippingFee,
             discountAmount: existingOrder.discountAmount,
             totalAmount: existingOrder.totalAmount,
-            shippingAddress: existingOrder.shippingAddress,
-            shippingPhone: existingOrder.shippingPhone,
-            shippingMemo: existingOrder.shippingMemo,
             items: {
               create: existingOrder.items.map(item => ({
                 productPublishId: item.productPublishId,
+                productName: item.productName,
+                thumbnailUrl: item.thumbnailUrl,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
-                totalPrice: item.totalPrice
+                totalPrice: item.totalPrice,
+                optionSummary: item.optionSummary
               }))
             }
           },
@@ -275,7 +281,6 @@ export async function POST(req: NextRequest) {
           where: { id: existingOrder.payment.id },
           data: {
             status: 'READY',
-            paymentKey: null,
             approvedAt: null,
             cancelReason: null,
             rawResponse: JSON.stringify({

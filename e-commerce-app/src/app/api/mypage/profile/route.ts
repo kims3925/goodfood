@@ -86,6 +86,13 @@ export async function PUT(request: NextRequest) {
         )
       }
 
+      if (!user.password) {
+        return NextResponse.json(
+          { success: false, error: '비밀번호가 설정되지 않은 계정입니다' },
+          { status: 400 }
+        )
+      }
+
       const isPasswordValid = await bcrypt.compare(currentPassword, user.password)
 
       if (!isPasswordValid) {

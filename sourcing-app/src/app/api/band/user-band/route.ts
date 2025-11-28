@@ -60,14 +60,26 @@ export async function GET(request: NextRequest) {
       const data = await response.json()
 
       if (data.result_code === 1 && data.result_data?.bands) {
-        return NextResponse.json({
-          success: true,
-          data: data.result_data.bands.map((band: any) => ({
+        // 이미 등록된 도매밴드의 bandKey 목록 조회
+        const registeredBands = await prisma.wholesaleBand.findMany({
+          where: { userId },
+          select: { bandKey: true },
+        })
+        const registeredBandKeys = new Set(registeredBands.map(b => b.bandKey))
+
+        // 이미 등록된 밴드 제외
+        const availableBands = data.result_data.bands
+          .filter((band: any) => !registeredBandKeys.has(band.band_key))
+          .map((band: any) => ({
             band_key: band.band_key,
             name: band.name,
             description: band.description || '',
             cover: band.cover || '',
-          })),
+          }))
+
+        return NextResponse.json({
+          success: true,
+          data: availableBands,
         })
       } else {
         return NextResponse.json(

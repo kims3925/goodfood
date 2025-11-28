@@ -82,7 +82,8 @@ export default function ProductDetailPage() {
     if (wishlistLoading) return
 
     // productId를 숫자로 확실하게 변환
-    const productIdNum = typeof params.id === 'string' ? parseInt(params.id) : params.id
+    const idParam = Array.isArray(params.id) ? params.id[0] : params.id
+    const productIdNum = typeof idParam === 'string' ? parseInt(idParam) : idParam
     if (isNaN(productIdNum)) {
       alert('잘못된 상품 ID입니다')
       return

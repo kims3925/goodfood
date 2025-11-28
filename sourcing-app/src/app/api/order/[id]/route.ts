@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
+const TOSS_SECRET_KEY = process.env.TOSS_PAYMENTS_SECRET_KEY || ''
+const TOSS_API_URL = 'https://api.tosspayments.com/v1/payments'
+
 // GET: 주문 상세 조회
 export async function GET(
   request: NextRequest,
@@ -106,7 +109,7 @@ export async function PATCH(
     const orderId = parseInt(id)
     const body = await request.json()
 
-    // 기존 주문 확인
+    // 기존 주문 확인 (결제 정보 포함)
     const existingOrder = await prisma.order.findFirst({
       where: {
         id: orderId,
@@ -117,6 +120,9 @@ export async function PATCH(
             },
           },
         },
+      },
+      include: {
+        payment: true,
       },
     })
 
@@ -140,6 +146,63 @@ export async function PATCH(
         updateData.deliveredAt = new Date()
       } else if (body.status === 'CANCELLED') {
         updateData.cancelledAt = new Date()
+        updateData.cancelledBy = 'ADMIN'
+        updateData.cancelReason = body.cancelReason || '관리자에 의한 취소'
+
+        // 결제 완료 상태인 경우 토스페이먼츠 결제 취소
+        if (existingOrder.status === 'PAID' && existingOrder.payment?.paymentKey) {
+          try {
+            const authHeader = Buffer.from(`${TOSS_SECRET_KEY}:`).toString('base64')
+            const cancelReason = body.cancelReason || '관리자에 의한 주문 취소'
+
+            const tossResponse = await fetch(
+              `${TOSS_API_URL}/${existingOrder.payment.paymentKey}/cancel`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Basic ${authHeader}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  cancelReason: cancelReason,
+                }),
+              }
+            )
+
+            const tossResult = await tossResponse.json()
+
+            if (!tossResponse.ok) {
+              console.error('토스 결제 취소 실패:', tossResult)
+              return NextResponse.json(
+                {
+                  success: false,
+                  error: tossResult.message || '토스 결제 취소에 실패했습니다',
+                  code: tossResult.code
+                },
+                { status: 400 }
+              )
+            }
+
+            // Payment 상태 업데이트
+            await prisma.payment.update({
+              where: { id: existingOrder.payment.id },
+              data: {
+                status: 'CANCELED',
+                cancelReason: cancelReason,
+                cancelledAt: new Date(),
+                rawResponse: JSON.stringify(tossResult),
+              },
+            })
+
+            console.log(`토스 결제 취소 완료: ${existingOrder.payment.paymentKey}`)
+          } catch (error: any) {
+            console.error('토스 결제 취소 API 오류:', error)
+            return NextResponse.json(
+              { success: false, error: '결제 취소 처리 중 오류가 발생했습니다' },
+              { status: 500 }
+            )
+          }
+        }
       }
     }
 

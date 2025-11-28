@@ -6,7 +6,7 @@
 import prisma, { PublishStatus } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
-import { NaverBandClient } from '@/modules/config/domain/src/band/services/band-client.service'
+import { NaverBandClient } from '@/modules/sourcing/domain/src/band'
 import {
   PublishConfig,
   PublishResult,

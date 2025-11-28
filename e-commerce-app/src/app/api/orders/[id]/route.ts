@@ -4,7 +4,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { orderService } from '@/modules/order/domain/src/orders/services/order.service'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
 import prisma from '@bandauto/db'
@@ -56,7 +55,7 @@ export async function GET(
     const orderId = params.id
 
     // 주문 조회
-    const order = await orderService.getOrderById(orderId)
+    const order = await findOrder(orderId)
 
     if (!order) {
       return NextResponse.json(
@@ -67,7 +66,7 @@ export async function GET(
 
     // 권한 확인 (본인 주문이거나 관리자인 경우만)
     const userId = parseInt(session.user.id)
-    if (order.customer.id !== userId && session.user.role !== 'ADMIN') {
+    if (order.userId !== userId && session.user.role !== 'ADMIN') {
       return NextResponse.json(
         { error: '접근 권한이 없습니다' },
         { status: 403 }
@@ -120,7 +119,19 @@ export async function PATCH(
     }
 
     // 주문 상태 업데이트
-    const order = await orderService.updateOrder(orderId, { status })
+    const numericId = parseInt(orderId)
+    if (isNaN(numericId)) {
+      return NextResponse.json(
+        { error: '유효하지 않은 주문 ID입니다' },
+        { status: 400 }
+      )
+    }
+
+    const order = await prisma.order.update({
+      where: { id: numericId },
+      data: { status },
+      include: { items: true, payment: true }
+    })
 
     return NextResponse.json({
       success: true,

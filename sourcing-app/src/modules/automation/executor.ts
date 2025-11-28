@@ -214,7 +214,7 @@ export async function executeFullPipeline(
   const startedAt = new Date()
   const logId = await createWorkflowLog({
     userId,
-    workflowType: WorkflowType.FULL_PIPELINE,
+    workflowType: WorkflowType.FULL_PIPELINE1,
     triggerType,
   })
 

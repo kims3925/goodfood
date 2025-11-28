@@ -6,11 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
-import prisma from '@bandauto/db'
+import prisma, { TossPaymentStatus } from '@bandauto/db'
 import {
   TOSS_ERROR_CODES,
   getErrorDetails
-} from '@/modules/payments/domain/src/payments/constants/toss-error-codes'
+} from '@/modules/payments/constants/toss-error-codes'
 
 const TOSS_SECRET_KEY = process.env.TOSS_PAYMENTS_SECRET_KEY || ''
 const TOSS_API_URL = 'https://api.tosspayments.com/v1/payments'
@@ -389,8 +389,8 @@ export async function POST(req: NextRequest) {
 /**
  * 결제 상태 매핑
  */
-function mapPaymentStatus(status: string): string {
-  const statusMap: Record<string, string> = {
+function mapPaymentStatus(status: string): TossPaymentStatus {
+  const statusMap: Record<string, TossPaymentStatus> = {
     'READY': 'READY',
     'IN_PROGRESS': 'IN_PROGRESS',
     'WAITING_FOR_DEPOSIT': 'WAITING_FOR_DEPOSIT',

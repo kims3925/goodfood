@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getWebhookHandler } from '@/modules/payments/domain/src/payments/services/webhook-handler.service'
+import { getWebhookHandler } from '@/modules/payments/services/webhook-handler.service'
 
 /**
  * POST /api/payments/webhook

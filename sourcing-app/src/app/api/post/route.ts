@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { downloadAndSaveImages, deleteImageFiles } from '@/modules/utils/imageUtils'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-import prisma from '@bandauto/db'
+import { postService } from '@/modules/sourcing/domain/src/post'
 
 // GET: 게시물 목록 조회
 export async function GET(request: NextRequest) {
@@ -13,83 +12,28 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       )
     }
-    const userId = currentUser.userId
 
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || ''
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
 
-    const where = {
-      userId: userId,
-      ...(search && {
-        OR: [
-          { title: { contains: search } },
-          { content: { contains: search } },
-          { author: { contains: search } },
-        ],
-      }),
-    }
-
-    const total = await prisma.post.count({ where })
-
-    // limit=0이면 전체 조회, 그렇지 않으면 페이지네이션
-    const paginationOptions = limit > 0 ? {
-      skip: (page - 1) * limit,
-      take: limit,
-    } : {}
-
-    const posts = await prisma.post.findMany({
-      where,
-      include: {
-        wholesaleBand: {
-          select: {
-            id: true,
-            name: true,
-            bandKey: true,
-            coverUrl: true,
-          },
-        },
-        images: {
-          orderBy: {
-            sortOrder: 'asc',
-          },
-        },
-        user: {
-          select: {
-            email: true,
-            name: true,
-          },
-        },
-        comments: {
-          orderBy: {
-            createdAt: 'asc',
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      ...paginationOptions,
+    const result = await postService.getList({
+      userId: currentUser.userId,
+      search,
+      page,
+      limit,
     })
 
     return NextResponse.json({
       success: true,
-      data: posts,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      data: result.data,
+      pagination: result.pagination,
     })
   } catch (error) {
     console.error('게시물 조회 실패:', error)
     return NextResponse.json(
-      {
-        success: false,
-        error: '게시물 조회에 실패했습니다.',
-      },
+      { success: false, error: '게시물 조회에 실패했습니다.' },
       { status: 500 }
     )
   }
@@ -98,7 +42,6 @@ export async function GET(request: NextRequest) {
 // POST: 게시물 등록
 export async function POST(request: NextRequest) {
   try {
-    // 세션에서 userId 가져오기
     const currentUser = await getCurrentUser()
     if (!currentUser) {
       return NextResponse.json(
@@ -106,10 +49,19 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       )
     }
-    const userId = currentUser.userId
 
     const body = await request.json()
-    const {
+    const { wholesaleBandId, externalId, title, content, author, comments, images } = body
+
+    if (!wholesaleBandId || !externalId || !title || !content) {
+      return NextResponse.json(
+        { success: false, error: '필수 필드가 누락되었습니다.' },
+        { status: 400 }
+      )
+    }
+
+    const post = await postService.create({
+      userId: currentUser.userId,
       wholesaleBandId,
       externalId,
       title,
@@ -117,101 +69,21 @@ export async function POST(request: NextRequest) {
       author,
       comments,
       images,
-    } = body
-
-    // 필수 필드 검증
-    if (!wholesaleBandId || !externalId || !title || !content) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: '필수 필드가 누락되었습니다.',
-        },
-        { status: 400 }
-      )
-    }
-
-    // 중복 체크 (같은 도매밴드의 같은 externalId)
-    const existing = await prisma.post.findFirst({
-      where: {
-        wholesaleBandId: wholesaleBandId,
-        externalId: externalId,
-      },
     })
 
-    if (existing) {
+    return NextResponse.json({ success: true, data: post })
+  } catch (error: any) {
+    console.error('게시물 등록 실패:', error)
+
+    if (error.message === '이미 등록된 게시물입니다.') {
       return NextResponse.json(
-        {
-          success: false,
-          error: '이미 등록된 게시물입니다.',
-        },
+        { success: false, error: error.message },
         { status: 409 }
       )
     }
 
-    // 이미지가 있으면 다운로드 및 저장
-    let savedImages: Array<{ name: string; relativePath: string; fileSize: number }> = []
-    if (images && images.length > 0) {
-      try {
-        savedImages = await downloadAndSaveImages(images)
-      } catch (error) {
-        console.error('이미지 저장 실패:', error)
-        // 이미지 저장 실패해도 게시물은 생성 (이미지 없이)
-      }
-    }
-
-    // 게시물 생성 (댓글 + 이미지 포함)
-    const post = await prisma.post.create({
-      data: {
-        userId: userId,
-        wholesaleBandId: wholesaleBandId,
-        externalId: externalId,
-        title,
-        content,
-        author,
-        // 댓글이 있으면 함께 생성
-        ...(comments && comments.length > 0 && {
-          comments: {
-            create: comments.map((comment: any) => ({
-              author: comment.author,
-              content: comment.content,
-            })),
-          },
-        }),
-        // 이미지가 있으면 함께 생성
-        ...(savedImages.length > 0 && {
-          images: {
-            create: savedImages.map((img, index) => ({
-              name: img.name,
-              imageUrl: img.relativePath,
-              fileSize: img.fileSize,
-              sortOrder: index,
-            })),
-          },
-        }),
-      },
-      include: {
-        wholesaleBand: {
-          select: {
-            name: true,
-            bandKey: true,
-          },
-        },
-        comments: true,
-        images: true,
-      },
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: post,
-    })
-  } catch (error) {
-    console.error('게시물 등록 실패:', error)
     return NextResponse.json(
-      {
-        success: false,
-        error: '게시물 등록에 실패했습니다.',
-      },
+      { success: false, error: '게시물 등록에 실패했습니다.' },
       { status: 500 }
     )
   }
@@ -225,60 +97,26 @@ export async function PUT(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'ID가 필요합니다.',
-        },
+        { success: false, error: 'ID가 필요합니다.' },
         { status: 400 }
       )
     }
 
-    // 게시물 존재 확인
-    const existing = await prisma.post.findFirst({
-      where: {
-        id,
-      },
-    })
+    const post = await postService.update(id, { title, content, author })
 
-    if (!existing) {
+    return NextResponse.json({ success: true, data: post })
+  } catch (error: any) {
+    console.error('게시물 수정 실패:', error)
+
+    if (error.message === '게시물을 찾을 수 없습니다.') {
       return NextResponse.json(
-        {
-          success: false,
-          error: '게시물을 찾을 수 없습니다.',
-        },
+        { success: false, error: error.message },
         { status: 404 }
       )
     }
 
-    // 게시물 수정
-    const post = await prisma.post.update({
-      where: { id },
-      data: {
-        ...(title && { title }),
-        ...(content && { content }),
-        ...(author !== undefined && { author }),
-      },
-      include: {
-        wholesaleBand: {
-          select: {
-            name: true,
-            bandKey: true,
-          },
-        },
-      },
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: post,
-    })
-  } catch (error) {
-    console.error('게시물 수정 실패:', error)
     return NextResponse.json(
-      {
-        success: false,
-        error: '게시물 수정에 실패했습니다.',
-      },
+      { success: false, error: '게시물 수정에 실패했습니다.' },
       { status: 500 }
     )
   }
@@ -292,56 +130,29 @@ export async function DELETE(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'ID가 필요합니다.',
-        },
+        { success: false, error: 'ID가 필요합니다.' },
         { status: 400 }
       )
     }
 
-    // 게시물 존재 확인 및 이미지 정보 조회
-    const post = await prisma.post.findFirst({
-      where: {
-        id: parseInt(id),
-      },
-      include: {
-        images: true, // 이미지 정보 포함
-      },
-    })
-
-    if (!post) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: '게시물을 찾을 수 없습니다.',
-        },
-        { status: 404 }
-      )
-    }
-
-    // 서버에서 실제 이미지 파일 삭제
-    if (post.images && post.images.length > 0) {
-      const fileNames = post.images.map((img) => img.name)
-      deleteImageFiles(fileNames)
-    }
-
-    // DB에서 게시물 삭제 (CASCADE로 댓글과 이미지 레코드도 자동 삭제됨)
-    await prisma.post.delete({
-      where: { id: parseInt(id) },
-    })
+    await postService.delete(parseInt(id))
 
     return NextResponse.json({
       success: true,
       message: '게시물이 삭제되었습니다.',
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('게시물 삭제 실패:', error)
+
+    if (error.message === '게시물을 찾을 수 없습니다.') {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 404 }
+      )
+    }
+
     return NextResponse.json(
-      {
-        success: false,
-        error: '게시물 삭제에 실패했습니다.',
-      },
+      { success: false, error: '게시물 삭제에 실패했습니다.' },
       { status: 500 }
     )
   }

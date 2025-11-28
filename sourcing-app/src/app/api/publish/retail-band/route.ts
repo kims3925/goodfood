@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma, PublishStatus } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-import { NaverBandClient } from '@/modules/config/domain/src/band/services/band-client.service'
+import { NaverBandClient } from '@/modules/sourcing/domain/src/band'
 
 // API 라우트 타임아웃 설정 (10분 = 600초)
 // 상품 10개 × 밴드 5개 = 50개 발행 × 10초 = 500초 예상
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
     // 각 밴드에 대해 상품 발행
     for (const retailBand of retailBands) {
       // Band API 클라이언트 초기화
-      const bandClient = new NaverBandClient(retailBand.apiConfig!.accessToken)
+      const bandClient = new NaverBandClient(retailBand.apiConfig!.accessToken as string)
 
       // 각 상품 발행
       for (const product of products) {

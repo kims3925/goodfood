@@ -32,7 +32,7 @@ import {
   isCardError,
   isBalanceError,
   getErrorDetails
-} from '@/modules/payments/domain/src/payments/constants/toss-error-codes'
+} from '@/modules/payments/constants/toss-error-codes'
 
 function PaymentFailContent() {
   const searchParams = useSearchParams()

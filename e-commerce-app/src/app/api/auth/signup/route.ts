@@ -1,72 +1,44 @@
+/**
+ * Signup API
+ * 회원가입 처리
+ * AuthService 사용
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/modules/common/utils/src/database/client'
-import bcrypt from 'bcryptjs'
+import { getAuthService } from '@/modules/auth/services/auth.service'
+
+const authService = getAuthService()
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password, name, phone } = await request.json()
 
-    // 유효성 검사
-    if (!email || !password || !name) {
-      return NextResponse.json(
-        { success: false, error: '필수 정보를 입력해주세요.' },
-        { status: 400 }
-      )
-    }
-
-    // 이메일 형식 검사
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { success: false, error: '올바른 이메일 형식이 아닙니다.' },
-        { status: 400 }
-      )
-    }
-
-    // 비밀번호 길이 검사
-    if (password.length < 8) {
-      return NextResponse.json(
-        { success: false, error: '비밀번호는 8자 이상이어야 합니다.' },
-        { status: 400 }
-      )
-    }
-
-    // 중복 이메일 검사 (User 테이블 기준)
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    })
-
-    if (existingUser) {
-      return NextResponse.json(
-        { success: false, error: '이미 가입된 이메일입니다.' },
-        { status: 409 }
-      )
-    }
-
-    // 비밀번호 해시화
-    const passwordHash = await bcrypt.hash(password, 12)
-
-    // 회원 생성 (User 테이블, 기본 role = USER)
-    const customer = await prisma.user.create({
-      data: {
-        email,
-        password: passwordHash,
-        name,
-        phone: phone || null,
-      },
-    })
+    const user = await authService.signup({ email, password, name, phone })
 
     return NextResponse.json({
       success: true,
       message: '회원가입이 완료되었습니다.',
-      user: {
-        id: customer.id.toString(),
-        email: customer.email,
-        name: customer.name,
-      },
+      user,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Signup error:', error)
+
+    // ValidationError
+    if (error.name === 'ValidationError') {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      )
+    }
+
+    // BusinessLogicError (중복 이메일 등)
+    if (error.name === 'BusinessLogicError') {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 409 }
+      )
+    }
+
     return NextResponse.json(
       { success: false, error: '회원가입 중 오류가 발생했습니다.' },
       { status: 500 }
