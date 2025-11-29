@@ -10,7 +10,7 @@ import prisma, { Prisma } from '@bandauto/db'
 import {
   TOSS_ERROR_CODES,
   getErrorDetails
-} from '@/modules/payments/domain/src/payments/constants/toss-error-codes'
+} from '@/modules/payments/constants/toss-error-codes'
 
 const Decimal = Prisma.Decimal
 const TOSS_SECRET_KEY = process.env.TOSS_PAYMENTS_SECRET_KEY || ''
@@ -183,14 +183,16 @@ export async function POST(req: NextRequest) {
         }
       })
 
-      // 주문 상태 업데이트
-      await tx.order.update({
-        where: { id: payment.orderId },
-        data: {
-          status: isFullCancel ? 'CANCELLED' : 'PARTIAL_CANCELLED',
-          cancelledAt: isFullCancel ? new Date() : undefined
-        }
-      })
+      // 주문 상태 업데이트 (전액 취소 시에만 CANCELLED로 변경)
+      if (isFullCancel) {
+        await tx.order.update({
+          where: { id: payment.orderId },
+          data: {
+            status: 'CANCELLED',
+            cancelledAt: new Date()
+          }
+        })
+      }
 
       return updated
     })

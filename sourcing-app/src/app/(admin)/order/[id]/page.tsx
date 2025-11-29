@@ -132,7 +132,7 @@ export default function OrderDetailPage() {
 
   const updateStatus = async (newStatus: string) => {
     if (!order) return
-    if (!confirm(`주문 상태를 "${statusConfig[newStatus]?.label}"로 변경하시겠습니까?`)) return
+    if (!confirm(`주문을 취소 하시겠습니까?`)) return
 
     setIsUpdating(true)
     try {

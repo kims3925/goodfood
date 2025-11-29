@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { ArrowLeft, Package, User, MapPin, CreditCard, Truck, Plus, Check } from 'lucide-react'
-import TossPaymentWidget from '@/modules/payments/domain/src/payments/components/payments/TossPaymentWidget'
+import TossPaymentWidget from '@/modules/payments/components/TossPaymentWidget'
 
 declare global {
   interface Window {
@@ -50,7 +50,7 @@ interface CheckoutFormData {
   sameAsCustomer: boolean
 }
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: session, status } = useSession()
@@ -893,5 +893,17 @@ export default function CheckoutPage() {
         </div>
       </div>
     </>
+  )
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-4 border-[#FF6B6B] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <CheckoutContent />
+    </Suspense>
   )
 }

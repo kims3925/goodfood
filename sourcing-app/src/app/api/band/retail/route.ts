@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
+import { retailBandService } from '@/modules/sourcing/domain/src/band'
 
 // GET: 소매밴드 목록 조회
 export async function GET(request: NextRequest) {
@@ -10,53 +10,17 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
 
-    const where = {
-      ...(search && {
-        name: { contains: search },
-      }),
-    }
-
-    const total = await prisma.retailBand.count({ where })
-
-    const bands = await prisma.retailBand.findMany({
-      where,
-      include: {
-        apiConfig: {
-          select: {
-            platform: true,
-          },
-        },
-        user: {
-          select: {
-            email: true,
-            name: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    })
+    const result = await retailBandService.getList({ search, page, limit })
 
     return NextResponse.json({
       success: true,
-      data: bands,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      data: result.data,
+      pagination: result.pagination,
     })
   } catch (error) {
     console.error('소매밴드 조회 실패:', error)
     return NextResponse.json(
-      {
-        success: false,
-        error: '소매밴드 조회에 실패했습니다.',
-      },
+      { success: false, error: '소매밴드 조회에 실패했습니다.' },
       { status: 500 }
     )
   }
@@ -65,99 +29,49 @@ export async function GET(request: NextRequest) {
 // POST: 소매밴드 등록
 export async function POST(request: NextRequest) {
   try {
-    // 세션에서 userId 가져오기
     const currentUser = await getCurrentUser()
     if (!currentUser) {
       return NextResponse.json(
-        {
-          success: false,
-          error: '로그인이 필요합니다.',
-        },
+        { success: false, error: '로그인이 필요합니다.' },
         { status: 401 }
-      )
-    }
-    const userId = currentUser.userId
-
-    // 사용자의 Band API 설정 조회
-    const apiConfig = await prisma.sourcingApiConfig.findFirst({
-      where: {
-        userId,
-        platform: 'BAND',
-        isActive: true,
-      },
-    })
-
-    if (!apiConfig) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Band API 설정을 먼저 등록해주세요.',
-        },
-        { status: 404 }
       )
     }
 
     const body = await request.json()
     const { bandKey, name, coverUrl } = body
 
-    // 필수 필드 검증
     if (!bandKey || !name) {
       return NextResponse.json(
-        {
-          success: false,
-          error: '필수 필드가 누락되었습니다.',
-        },
+        { success: false, error: '필수 필드가 누락되었습니다.' },
         { status: 400 }
       )
     }
 
-    // 중복 체크 (같은 사용자의 같은 bandKey)
-    const existing = await prisma.retailBand.findFirst({
-      where: {
-        userId: userId,
-        bandKey: bandKey,
-      },
+    const band = await retailBandService.create(currentUser.userId, {
+      bandKey,
+      name,
+      coverUrl,
     })
 
-    if (existing) {
+    return NextResponse.json({ success: true, data: band })
+  } catch (error: any) {
+    console.error('소매밴드 등록 실패:', error)
+
+    if (error.message === 'Band API 설정을 먼저 등록해주세요.') {
       return NextResponse.json(
-        {
-          success: false,
-          error: '이미 등록된 밴드입니다.',
-        },
+        { success: false, error: error.message },
+        { status: 404 }
+      )
+    }
+    if (error.message === '이미 등록된 밴드입니다.') {
+      return NextResponse.json(
+        { success: false, error: error.message },
         { status: 409 }
       )
     }
 
-    // 소매밴드 생성
-    const band = await prisma.retailBand.create({
-      data: {
-        userId: userId,
-        apiConfigId: apiConfig.id,
-        bandKey: bandKey,
-        name,
-        coverUrl: coverUrl,
-      },
-      include: {
-        apiConfig: {
-          select: {
-            platform: true,
-          },
-        },
-      },
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: band,
-    })
-  } catch (error) {
-    console.error('소매밴드 등록 실패:', error)
     return NextResponse.json(
-      {
-        success: false,
-        error: '소매밴드 등록에 실패했습니다.',
-      },
+      { success: false, error: '소매밴드 등록에 실패했습니다.' },
       { status: 500 }
     )
   }
@@ -171,58 +85,26 @@ export async function PUT(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'ID가 필요합니다.',
-        },
+        { success: false, error: 'ID가 필요합니다.' },
         { status: 400 }
       )
     }
 
-    // 밴드 존재 확인
-    const existing = await prisma.retailBand.findFirst({
-      where: {
-        id,
-      },
-    })
+    const band = await retailBandService.update(id, { name, isActive })
 
-    if (!existing) {
+    return NextResponse.json({ success: true, data: band })
+  } catch (error: any) {
+    console.error('소매밴드 수정 실패:', error)
+
+    if (error.message === '밴드를 찾을 수 없습니다.') {
       return NextResponse.json(
-        {
-          success: false,
-          error: '밴드를 찾을 수 없습니다.',
-        },
+        { success: false, error: error.message },
         { status: 404 }
       )
     }
 
-    // 소매밴드 수정
-    const band = await prisma.retailBand.update({
-      where: { id },
-      data: {
-        ...(name && { name }),
-        ...(isActive !== undefined && { isActive: isActive }),
-      },
-      include: {
-        apiConfig: {
-          select: {
-            platform: true,
-          },
-        },
-      },
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: band,
-    })
-  } catch (error) {
-    console.error('소매밴드 수정 실패:', error)
     return NextResponse.json(
-      {
-        success: false,
-        error: '소매밴드 수정에 실패했습니다.',
-      },
+      { success: false, error: '소매밴드 수정에 실패했습니다.' },
       { status: 500 }
     )
   }
@@ -236,47 +118,29 @@ export async function DELETE(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'ID가 필요합니다.',
-        },
+        { success: false, error: 'ID가 필요합니다.' },
         { status: 400 }
       )
     }
 
-    // 밴드 존재 확인
-    const existing = await prisma.retailBand.findFirst({
-      where: {
-        id: parseInt(id),
-      },
-    })
-
-    if (!existing) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: '밴드를 찾을 수 없습니다.',
-        },
-        { status: 404 }
-      )
-    }
-
-    // 밴드 삭제
-    await prisma.retailBand.delete({
-      where: { id: parseInt(id) },
-    })
+    await retailBandService.delete(parseInt(id))
 
     return NextResponse.json({
       success: true,
       message: '소매밴드가 삭제되었습니다.',
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('소매밴드 삭제 실패:', error)
+
+    if (error.message === '밴드를 찾을 수 없습니다.') {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 404 }
+      )
+    }
+
     return NextResponse.json(
-      {
-        success: false,
-        error: '소매밴드 삭제에 실패했습니다.',
-      },
+      { success: false, error: '소매밴드 삭제에 실패했습니다.' },
       { status: 500 }
     )
   }

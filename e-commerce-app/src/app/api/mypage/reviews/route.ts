@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 해당 상품이 주문에 포함되어 있는지 확인
-    const orderItem = order.items.find((item) => item.productId === productId)
+    const orderItem = order.items.find((item) => item.productPublishId === productId)
     if (!orderItem) {
       return NextResponse.json(
         { success: false, error: '해당 주문에 포함되지 않은 상품입니다' },

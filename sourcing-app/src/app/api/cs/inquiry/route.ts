@@ -1,63 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { InquiryType, InquiryStatus } from '@bandauto/db'
+import { inquiryService } from '@/modules/sourcing/domain/src/cs'
 
 // GET: 모든 문의 목록 조회 (관리자용)
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const type = searchParams.get('type')
-    const status = searchParams.get('status')
+    const type = searchParams.get('type') as any
+    const status = searchParams.get('status') as any
 
-    const where: {
-      inquiryType?: InquiryType
-      status?: InquiryStatus
-    } = {}
-
-    // 필터 적용
-    if (type && type !== 'ALL') {
-      where.inquiryType = type as InquiryType
-    }
-    if (status && status !== 'ALL') {
-      where.status = status as InquiryStatus
-    }
-
-    const inquiries = await prisma.inquiry.findMany({
-      where,
-      orderBy: [
-        { status: 'asc' }, // PENDING first
-        { createdAt: 'desc' },
-      ],
-      select: {
-        id: true,
-        inquiryType: true,
-        title: true,
-        content: true,
-        status: true,
-        adminReply: true,
-        repliedAt: true,
-        createdAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        replies: {
-          select: { id: true },
-        },
-      },
-    })
-
-    // 응답 형식 변환 (replyCount 추가)
-    const formattedInquiries = inquiries.map(({ replies, ...inquiry }) => ({
-      ...inquiry,
-      replyCount: replies?.length || 0,
-    }))
+    const inquiries = await inquiryService.getList({ type, status })
 
     return NextResponse.json({
       success: true,
-      inquiries: formattedInquiries,
+      inquiries,
     })
   } catch (error) {
     console.error('Failed to fetch inquiries:', error)
