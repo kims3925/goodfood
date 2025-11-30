@@ -12,7 +12,7 @@ model Product {
   description  String?       @db.Text
 
   // Status
-  status       ProductStatus @default(DRAFT) // 상품 상태 (DRAFT, ACTIVE, INACTIVE, SOLDOUT)
+  status       ProductStatus @default(COLLECTED) // 상품 상태 (COLLECTED: 수집, PUBLISHED: 발행)
 
   // Images (post_image 재사용)
   thumbnailUrl String?       @map("thumbnail_url") @db.VarChar(1000) // 첫번째 post_image URL 캐싱

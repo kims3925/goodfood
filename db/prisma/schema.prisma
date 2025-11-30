@@ -30,10 +30,8 @@ enum AiProvider {
 }
 
 enum ProductStatus {
-  DRAFT
-  ACTIVE
-  INACTIVE
-  SOLDOUT
+  COLLECTED
+  PUBLISHED
 }
 
 enum WorkflowType {

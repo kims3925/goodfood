@@ -14,7 +14,7 @@ interface Product {
   postId: number
   name: string
   description: string | null
-  status: 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'SOLDOUT'
+  status: 'COLLECTED' | 'PUBLISHED'
   thumbnailUrl: string | null
   price: number | null
   wholesalePrice: number | null
@@ -175,29 +175,6 @@ export default function ProductDetailPage() {
     }
   }
 
-  const handleUpdateStatus = async (newStatus: Product['status']) => {
-    if (!product) return
-
-    try {
-      const response = await fetch('/api/product', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: product.id,
-          status: newStatus,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setProduct({ ...product, status: newStatus })
-      }
-    } catch (error) {
-      console.error('상태 변경 실패:', error)
-    }
-  }
-
   const handleDelete = async () => {
     if (!product) return
     if (!confirm('정말 삭제하시겠습니까?')) return
@@ -304,10 +281,8 @@ export default function ProductDetailPage() {
 
   const getStatusBadge = (status: string) => {
     const statusMap: { [key: string]: { label: string; color: string } } = {
-      DRAFT: { label: '임시저장', color: 'bg-gray-100 text-gray-800' },
-      ACTIVE: { label: '판매중', color: 'bg-green-100 text-green-800' },
-      INACTIVE: { label: '판매중지', color: 'bg-yellow-100 text-yellow-800' },
-      SOLDOUT: { label: '품절', color: 'bg-red-100 text-red-800' },
+      COLLECTED: { label: '수집', color: 'bg-gray-100 text-gray-800' },
+      PUBLISHED: { label: '발행', color: 'bg-green-100 text-green-800' },
     }
 
     const statusInfo = statusMap[status] || { label: status, color: 'bg-gray-100 text-gray-800' }
@@ -376,7 +351,10 @@ export default function ProductDetailPage() {
               <ArrowLeft size={20} />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">상품 상세</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-gray-900">상품 상세</h1>
+                {getStatusBadge(product.status)}
+              </div>
               <p className="text-gray-600 mt-1">상품 정보를 확인하고 수정할 수 있습니다.</p>
             </div>
           </div>
@@ -408,10 +386,10 @@ export default function ProductDetailPage() {
         </div>
 
         <div className="space-y-6">
-          {/* Row 1: 기본정보 + 상태관리 */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          {/* Row 1: 기본정보 */}
+          <div className="grid grid-cols-1 gap-6">
             {/* Basic Info Card */}
-            <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-xl font-semibold text-gray-900">기본 정보</h2>
               </div>
@@ -505,49 +483,6 @@ export default function ProductDetailPage() {
                     ) : (
                       <p className="text-lg font-semibold text-gray-900">{formatPrice(product.wholesalePrice)}</p>
                     )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Status Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">상태 관리</h2>
-              </div>
-              <div className="p-6 space-y-4 flex-1">
-                <div>
-                  <label className="text-sm font-medium text-gray-500 mb-2 block">현재 상태</label>
-                  {getStatusBadge(product.status)}
-                </div>
-
-                <div className="pt-4 border-t border-gray-200">
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">상태 변경</label>
-                  <div className="space-y-2">
-                    <Button
-                      variant={product.status === 'ACTIVE' ? 'primary' : 'secondary'}
-                      onClick={() => handleUpdateStatus('ACTIVE')}
-                      disabled={product.status === 'ACTIVE'}
-                      className="w-full"
-                    >
-                      판매중으로 변경
-                    </Button>
-                    <Button
-                      variant={product.status === 'INACTIVE' ? 'primary' : 'secondary'}
-                      onClick={() => handleUpdateStatus('INACTIVE')}
-                      disabled={product.status === 'INACTIVE'}
-                      className="w-full"
-                    >
-                      판매중지로 변경
-                    </Button>
-                    <Button
-                      variant={product.status === 'SOLDOUT' ? 'primary' : 'secondary'}
-                      onClick={() => handleUpdateStatus('SOLDOUT')}
-                      disabled={product.status === 'SOLDOUT'}
-                      className="w-full"
-                    >
-                      품절로 변경
-                    </Button>
                   </div>
                 </div>
               </div>

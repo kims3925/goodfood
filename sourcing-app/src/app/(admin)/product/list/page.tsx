@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2, RefreshCw, Package, Sparkles, Filter, X, ChevronDown } from 'lucide-react'
+import { Plus, Search, Trash2, RefreshCw, Package, Sparkles, Filter, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
@@ -23,7 +23,7 @@ interface Product {
   postId: number
   name: string
   description: string | null
-  status: 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'SOLDOUT'
+  status: 'COLLECTED' | 'PUBLISHED'
   thumbnailUrl: string | null
   price: number | null
   wholesalePrice: number | null
@@ -49,10 +49,8 @@ interface Product {
 
 const STATUS_OPTIONS = [
   { value: '', label: '전체 상태' },
-  { value: 'DRAFT', label: '임시저장' },
-  { value: 'ACTIVE', label: '판매중' },
-  { value: 'INACTIVE', label: '판매중지' },
-  { value: 'SOLDOUT', label: '품절' },
+  { value: 'COLLECTED', label: '수집' },
+  { value: 'PUBLISHED', label: '발행' },
 ]
 
 export default function ProductListPage() {
@@ -92,9 +90,6 @@ export default function ProductListPage() {
   // Selection states
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
-
-  // 일괄 상태 변경
-  const [showBulkStatusDropdown, setShowBulkStatusDropdown] = useState(false)
 
   useEffect(() => {
     loadWholesaleBands()
@@ -470,49 +465,10 @@ export default function ProductListPage() {
     }
   }
 
-  // 일괄 상태 변경
-  const handleBulkStatusChange = async (newStatus: string) => {
-    if (selectedProductIds.length === 0) return
-
-    const statusLabel = STATUS_OPTIONS.find(s => s.value === newStatus)?.label || newStatus
-    if (!confirm(`선택한 ${selectedProductIds.length}개의 상품을 "${statusLabel}" 상태로 변경하시겠습니까?`)) {
-      return
-    }
-
-    try {
-      const response = await fetch('/api/product/bulk-status', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productIds: selectedProductIds,
-          status: newStatus,
-        }),
-      })
-
-      const data = await response.json()
-      console.log('일괄 상태 변경 응답:', data, 'HTTP 상태:', response.status)
-
-      if (data.success) {
-        setSelectedProductIds([])
-        setSelectAll(false)
-        setShowBulkStatusDropdown(false)
-        loadProducts()
-        alert(`${data.updatedCount}개의 상품 상태가 변경되었습니다.`)
-      } else {
-        alert(`상태 변경 실패: ${data.error || '알 수 없는 오류'}\n(HTTP ${response.status})`)
-      }
-    } catch (error) {
-      console.error('일괄 상태 변경 실패:', error)
-      alert(`상태 변경에 실패했습니다.\n${error instanceof Error ? error.message : '네트워크 오류'}`)
-    }
-  }
-
   const getStatusBadge = (status: string) => {
     const statusMap: { [key: string]: { label: string; color: string } } = {
-      DRAFT: { label: '임시저장', color: 'bg-gray-100 text-gray-800' },
-      ACTIVE: { label: '판매중', color: 'bg-green-100 text-green-800' },
-      INACTIVE: { label: '판매중지', color: 'bg-yellow-100 text-yellow-800' },
-      SOLDOUT: { label: '품절', color: 'bg-red-100 text-red-800' },
+      COLLECTED: { label: '수집', color: 'bg-gray-100 text-gray-800' },
+      PUBLISHED: { label: '발행', color: 'bg-green-100 text-green-800' },
     }
 
     const statusInfo = statusMap[status] || { label: status, color: 'bg-gray-100 text-gray-800' }
@@ -586,44 +542,6 @@ export default function ProductListPage() {
                   <Sparkles size={16} />
                   상품 등록
                 </Button>
-
-                {/* 일괄 상태 변경 드롭다운 - 항상 표시, 조건 미충족 시 비활성화 */}
-                <div className="relative">
-                  <Button
-                    variant="secondary"
-                    onClick={() => selectedStatus && selectedProductIds.length > 0 && setShowBulkStatusDropdown(!showBulkStatusDropdown)}
-                    disabled={selectedProductIds.length === 0 || !selectedStatus}
-                    title={
-                      selectedProductIds.length === 0
-                        ? '상품을 선택해주세요'
-                        : !selectedStatus
-                          ? '상태 필터를 선택하면 일괄 변경이 가능합니다'
-                          : ''
-                    }
-                  >
-                    일괄 상태 변경
-                    <ChevronDown size={16} />
-                  </Button>
-                  {showBulkStatusDropdown && selectedStatus && selectedProductIds.length > 0 && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setShowBulkStatusDropdown(false)}
-                      />
-                      <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                        {STATUS_OPTIONS.filter(s => s.value && s.value !== selectedStatus).map((status) => (
-                          <button
-                            key={status.value}
-                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors"
-                            onClick={() => handleBulkStatusChange(status.value)}
-                          >
-                            {status.label}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
 
                 <Button
                   variant="danger"
