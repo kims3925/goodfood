@@ -30,8 +30,24 @@ enum AiProvider {
 }
 
 enum ProductStatus {
-  COLLECTED
-  PUBLISHED
+  COLLECTED  // 수집됨 - 활성 상태
+  ARCHIVED   // 보관됨 - 비활성 상태
+}
+
+// 도매처 타입
+enum SourceChannelType {
+  WHOLESALE_BAND  // 도매밴드
+  ALI             // 알리바바
+  TAOBAO          // 타오바오
+  DIRECT          // 직접 등록
+}
+
+// 발행처 타입
+enum PublishChannelType {
+  RETAIL_BAND    // 소매밴드
+  SHOPPING_MALL  // 자체 쇼핑몰
+  SMART_STORE    // 네이버 스마트스토어
+  COUPANG        // 쿠팡
 }
 
 enum WorkflowType {

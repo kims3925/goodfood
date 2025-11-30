@@ -23,7 +23,7 @@ interface Product {
   postId: number
   name: string
   description: string | null
-  status: 'COLLECTED' | 'PUBLISHED'
+  status: 'COLLECTED' | 'ARCHIVED'
   thumbnailUrl: string | null
   price: number | null
   wholesalePrice: number | null
@@ -45,12 +45,18 @@ interface Product {
     price: number
     stock: number
   }>
+  // 발행 상태 (새로 추가)
+  publishStatus?: {
+    retailBand: boolean
+    shoppingMall: boolean
+  }
+  publishSummary?: string
 }
 
 const STATUS_OPTIONS = [
   { value: '', label: '전체 상태' },
   { value: 'COLLECTED', label: '수집' },
-  { value: 'PUBLISHED', label: '발행' },
+  { value: 'ARCHIVED', label: '보관' },
 ]
 
 export default function ProductListPage() {
@@ -468,7 +474,7 @@ export default function ProductListPage() {
   const getStatusBadge = (status: string) => {
     const statusMap: { [key: string]: { label: string; color: string } } = {
       COLLECTED: { label: '수집', color: 'bg-gray-100 text-gray-800' },
-      PUBLISHED: { label: '발행', color: 'bg-green-100 text-green-800' },
+      ARCHIVED: { label: '보관', color: 'bg-yellow-100 text-yellow-800' },
     }
 
     const statusInfo = statusMap[status] || { label: status, color: 'bg-gray-100 text-gray-800' }
@@ -476,6 +482,47 @@ export default function ProductListPage() {
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
         {statusInfo.label}
+      </span>
+    )
+  }
+
+  // 발행현황 배지
+  const getPublishStatusBadge = (product: Product) => {
+    if (!product.publishStatus) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+          미발행
+        </span>
+      )
+    }
+
+    const { retailBand, shoppingMall } = product.publishStatus
+
+    if (retailBand && shoppingMall) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          발행완료
+        </span>
+      )
+    }
+
+    if (retailBand || shoppingMall) {
+      return (
+        <div className="flex flex-col gap-1">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            부분발행
+          </span>
+          <div className="flex gap-1">
+            <span className={`inline-block w-2 h-2 rounded-full ${retailBand ? 'bg-green-500' : 'bg-gray-300'}`} title="소매밴드" />
+            <span className={`inline-block w-2 h-2 rounded-full ${shoppingMall ? 'bg-green-500' : 'bg-gray-300'}`} title="쇼핑몰" />
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+        미발행
       </span>
     )
   }
@@ -707,7 +754,7 @@ export default function ProductListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[5%]">
+                  <TableHead className="w-[4%]">
                     <input
                       type="checkbox"
                       checked={selectAll}
@@ -715,11 +762,12 @@ export default function ProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[35%]">상품명</TableHead>
-                  <TableHead className="w-[13%]">출처 밴드</TableHead>
-                  <TableHead className="w-[10%]">도매가</TableHead>
-                  <TableHead className="w-[10%]">판매가</TableHead>
-                  <TableHead className="w-[15%]">
+                  <TableHead className="w-[30%]">상품명</TableHead>
+                  <TableHead className="w-[12%]">출처 밴드</TableHead>
+                  <TableHead className="w-[9%]">도매가</TableHead>
+                  <TableHead className="w-[9%]">판매가</TableHead>
+                  <TableHead className="w-[12%]">발행현황</TableHead>
+                  <TableHead className="w-[12%]">
                     <select
                       value={selectedStatus}
                       onChange={(e) => {
@@ -798,6 +846,7 @@ export default function ProductListPage() {
                           {formatPrice(product.price)}
                         </div>
                       </TableCell>
+                      <TableCell>{getPublishStatusBadge(product)}</TableCell>
                       <TableCell>{getStatusBadge(product.status)}</TableCell>
                       <TableCell>
                         <span className="text-sm text-gray-600 whitespace-nowrap">

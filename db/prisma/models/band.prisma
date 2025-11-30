@@ -37,7 +37,6 @@ model RetailBand {
   accountHolder    String?            @map("account_holder") @db.VarChar(100)
   bankAccount      String?            @map("bank_account") @db.VarChar(50)
   bankName         String?            @map("bank_name") @db.VarChar(50)
-  publishHistories PublishHistory[]
   apiConfig        SourcingApiConfig  @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
   productPublishes ProductPublish[]
   user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -83,8 +83,8 @@ export default function RetailBandPublishPage() {
 
   const loadProducts = async (page: number = 1) => {
     try {
-      // 판매중(ACTIVE) 상품만 조회
-      const res = await fetch(`/api/product?page=${page}&limit=${pageSize}&status=ACTIVE`)
+      // 수집(COLLECTED) 상태의 상품 조회
+      const res = await fetch(`/api/product?page=${page}&limit=${pageSize}&status=COLLECTED`)
       const data = await res.json()
       if (data.success) {
         setProducts(data.data)

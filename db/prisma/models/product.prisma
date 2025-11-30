@@ -3,16 +3,17 @@
 // =============================================
 
 model Product {
-  id           Int           @id @default(autoincrement())
-  userId       Int           @map("user_id") // 생성한 사용자
-  postId       Int           @unique @map("post_id") // 게시물 ID (1:1 관계)
+  id              Int           @id @default(autoincrement())
+  userId          Int           @map("user_id") // 생성한 사용자
+  postId          Int           @unique @map("post_id") // 게시물 ID (1:1 관계)
+  sourceChannelId Int?          @map("source_channel_id") // 도매처 채널 ID
 
   // Basic Info
   name         String        @db.VarChar(500)
   description  String?       @db.Text
 
   // Status
-  status       ProductStatus @default(COLLECTED) // 상품 상태 (COLLECTED: 수집, PUBLISHED: 발행)
+  status       ProductStatus @default(COLLECTED) // 상품 상태 (COLLECTED: 수집, ARCHIVED: 보관)
 
   // Images (post_image 재사용)
   thumbnailUrl String?       @map("thumbnail_url") @db.VarChar(1000) // 첫번째 post_image URL 캐싱
@@ -31,10 +32,10 @@ model Product {
   // Relationships
   user                   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   post                   Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  sourceChannel          SourceChannel?   @relation(fields: [sourceChannelId], references: [id], onDelete: SetNull)
   variants               ProductVariant[]
   options                ProductOption[]
   productPublishes       ProductPublish[]
-  publishHistories       PublishHistory[]
   // E-Commerce Relations
   // cartItems는 productPublish를 통해 관계
   // orderItems는 productPublish를 통해 관계
@@ -44,6 +45,7 @@ model Product {
 
   @@index([userId])
   @@index([postId])
+  @@index([sourceChannelId])
   @@index([categoryId])
   @@index([status])
   @@index([createdAt])

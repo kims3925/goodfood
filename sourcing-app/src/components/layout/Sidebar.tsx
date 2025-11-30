@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Package,
-  ShoppingCart,
   Zap,
   Settings,
   ChevronDown,
@@ -16,15 +15,11 @@ import {
   X,
   Upload,
   Send,
-  List,
   Database,
-  FileSpreadsheet,
   Link2,
   Globe,
   ScrollText,
   ClipboardList,
-  PlusCircle,
-  Play,
   LayoutDashboard,
   History,
   Cog,
@@ -143,20 +138,9 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       ],
     },
     {
-      label: '주문서 관리',
+      label: '주문 목록',
+      href: '/order/list',
       icon: <ClipboardList size={20} />,
-      children: [
-        {
-          label: '주문 목록',
-          href: '/order/list',
-          icon: <List size={16} />,
-        },
-        {
-          label: '주문서 작성',
-          href: '/order/new',
-          icon: <PlusCircle size={16} />,
-        },
-      ],
     },
     {
       label: '정책 관리',

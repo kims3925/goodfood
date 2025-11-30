@@ -44,7 +44,7 @@ export async function createToken(payload: TokenPayload): Promise<string> {
 export async function verifyToken(token: string): Promise<TokenPayload | null> {
   try {
     const { payload } = await jwtVerify(token, secret)
-    return payload as TokenPayload
+    return payload as unknown as TokenPayload
   } catch (error) {
     return null
   }

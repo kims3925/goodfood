@@ -32,7 +32,6 @@ export default function CartPage() {
   const [cart, setCart] = useState<Cart | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedItems, setSelectedItems] = useState<number[]>([])
-  const [isUpdating, setIsUpdating] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
 
   const loadCart = useCallback(async () => {
@@ -90,12 +89,33 @@ export default function CartPage() {
     return price?.toLocaleString('ko-KR') || '0'
   }
 
+  // Optimistic Update: UI 즉시 업데이트, 백그라운드에서 API 호출
   const handleQuantityChange = async (itemId: number, newQuantity: number) => {
-    if (newQuantity < 1) return
-    if (isUpdating) return
+    if (newQuantity < 1 || !cart) return
 
+    // 이전 상태 저장 (롤백용)
+    const prevCart = cart
+
+    // UI 즉시 업데이트 (로딩 없이)
+    setCart(prev => {
+      if (!prev) return prev
+      const newItems = prev.items.map(item =>
+        item.id === itemId ? { ...item, quantity: newQuantity } : item
+      )
+      const newSubtotal = newItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+      const newShippingFee = newSubtotal >= 30000 ? 0 : 3000
+      return {
+        ...prev,
+        items: newItems,
+        totalItems: newItems.reduce((sum, item) => sum + item.quantity, 0),
+        subtotal: newSubtotal,
+        shippingFee: newShippingFee,
+        total: newSubtotal + newShippingFee,
+      }
+    })
+
+    // 백그라운드에서 API 호출
     try {
-      setIsUpdating(true)
       const response = await fetch(`/api/cart/items/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -103,33 +123,57 @@ export default function CartPage() {
         credentials: 'include',
       })
 
-      if (response.ok) {
-        await loadCart()
+      if (!response.ok) {
+        // 실패 시 롤백
+        setCart(prevCart)
       }
     } catch (error) {
+      // 에러 시 롤백
+      setCart(prevCart)
       console.error('수량 변경 실패:', error)
-      alert('수량 변경에 실패했습니다.')
-    } finally {
-      setIsUpdating(false)
     }
   }
 
+  // Optimistic Update: 삭제도 UI 즉시 반영
   const handleRemoveItem = async (itemId: number) => {
-    if (!confirm('이 상품을 장바구니에서 삭제하시겠습니까?')) return
+    if (!confirm('이 상품을 장바구니에서 삭제하시겠습니까?') || !cart) return
 
+    // 이전 상태 저장 (롤백용)
+    const prevCart = cart
+    const prevSelectedItems = selectedItems
+
+    // UI 즉시 업데이트
+    const newItems = cart.items.filter(item => item.id !== itemId)
+    const newSubtotal = newItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const newShippingFee = newSubtotal >= 30000 ? 0 : (newSubtotal > 0 ? 3000 : 0)
+
+    setCart({
+      ...cart,
+      items: newItems,
+      totalItems: newItems.reduce((sum, item) => sum + item.quantity, 0),
+      subtotal: newSubtotal,
+      shippingFee: newShippingFee,
+      total: newSubtotal + newShippingFee,
+    })
+    setSelectedItems(prev => prev.filter(id => id !== itemId))
+
+    // 백그라운드에서 API 호출
     try {
       const response = await fetch(`/api/cart/items/${itemId}`, {
         method: 'DELETE',
         credentials: 'include',
       })
 
-      if (response.ok) {
-        await loadCart()
-        setSelectedItems(prev => prev.filter(id => id !== itemId))
+      if (!response.ok) {
+        // 실패 시 롤백
+        setCart(prevCart)
+        setSelectedItems(prevSelectedItems)
       }
     } catch (error) {
+      // 에러 시 롤백
+      setCart(prevCart)
+      setSelectedItems(prevSelectedItems)
       console.error('상품 삭제 실패:', error)
-      alert('상품 삭제에 실패했습니다.')
     }
   }
 
@@ -316,7 +360,7 @@ export default function CartPage() {
                           <div className="inline-flex items-center border border-gray-300 rounded">
                             <button
                               onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                              disabled={item.quantity <= 1 || isUpdating}
+                              disabled={item.quantity <= 1}
                               className="w-8 h-8 flex items-center justify-center hover:bg-gray-50 disabled:opacity-30"
                             >
                               <Minus className="w-3 h-3 text-gray-600" />
@@ -324,8 +368,7 @@ export default function CartPage() {
                             <span className="w-10 text-center text-sm text-gray-900 font-medium">{item.quantity}</span>
                             <button
                               onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                              disabled={isUpdating}
-                              className="w-8 h-8 flex items-center justify-center hover:bg-gray-50 disabled:opacity-30"
+                              className="w-8 h-8 flex items-center justify-center hover:bg-gray-50"
                             >
                               <Plus className="w-3 h-3 text-gray-600" />
                             </button>

@@ -3,7 +3,7 @@
  * node-cron을 사용한 자동화 스케줄러
  */
 
-import cron from 'node-cron'
+import * as cron from 'node-cron'
 import prisma, { TriggerType } from '@bandauto/db'
 import { executeFullPipeline } from './executor'
 import { getRunningWorkflow } from './workflow-service'
@@ -76,9 +76,8 @@ function registerSchedulerSilent(userId: number, cronExpression: string): void {
       console.error(`[Scheduler] 자동화 실패:`, error)
     }
   }, {
-    scheduled: true,
     timezone: 'Asia/Seoul',
-  })
+  } as any)
 
   activeSchedulers.set(userId, task)
 }
@@ -115,9 +114,8 @@ export function registerScheduler(userId: number, cronExpression: string): void 
       console.error(`[Scheduler] 자동화 실패:`, error)
     }
   }, {
-    scheduled: true,
     timezone: 'Asia/Seoul',
-  })
+  } as any)
 
   activeSchedulers.set(userId, task)
 }

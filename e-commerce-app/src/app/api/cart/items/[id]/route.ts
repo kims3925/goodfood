@@ -4,10 +4,41 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/modules/auth/auth.config'
 import prisma from '@bandauto/db'
 
 function getSessionId(req: NextRequest): string | null {
   return req.cookies.get('cart_session')?.value || null
+}
+
+async function getCurrentUserId(): Promise<number | null> {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) return null
+    return typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 사용자 또는 세션으로 장바구니 조회
+ */
+async function findCart(sessionId: string | null, userId: number | null) {
+  // 로그인한 경우 userId로 찾기
+  if (userId) {
+    return prisma.cart.findFirst({
+      where: { userId },
+    })
+  }
+  // 비로그인은 sessionId로 찾기
+  if (sessionId) {
+    return prisma.cart.findUnique({
+      where: { sessionId },
+    })
+  }
+  return null
 }
 
 /**
@@ -16,18 +47,21 @@ function getSessionId(req: NextRequest): string | null {
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const sessionId = getSessionId(req)
-    if (!sessionId) {
+    const userId = await getCurrentUserId()
+
+    if (!sessionId && !userId) {
       return NextResponse.json(
         { success: false, error: '장바구니가 없습니다' },
         { status: 400 }
       )
     }
 
-    const itemId = parseInt(params.id)
+    const itemId = parseInt(id)
     if (isNaN(itemId)) {
       return NextResponse.json(
         { success: false, error: '유효하지 않은 아이템 ID' },
@@ -35,9 +69,7 @@ export async function DELETE(
       )
     }
 
-    const cart = await prisma.cart.findUnique({
-      where: { sessionId },
-    })
+    const cart = await findCart(sessionId, userId)
 
     if (!cart) {
       return NextResponse.json(
@@ -69,18 +101,21 @@ export async function DELETE(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const sessionId = getSessionId(req)
-    if (!sessionId) {
+    const userId = await getCurrentUserId()
+
+    if (!sessionId && !userId) {
       return NextResponse.json(
         { success: false, error: '장바구니가 없습니다' },
         { status: 400 }
       )
     }
 
-    const itemId = parseInt(params.id)
+    const itemId = parseInt(id)
     if (isNaN(itemId)) {
       return NextResponse.json(
         { success: false, error: '유효하지 않은 아이템 ID' },
@@ -98,9 +133,7 @@ export async function PATCH(
       )
     }
 
-    const cart = await prisma.cart.findUnique({
-      where: { sessionId },
-    })
+    const cart = await findCart(sessionId, userId)
 
     if (!cart) {
       return NextResponse.json(

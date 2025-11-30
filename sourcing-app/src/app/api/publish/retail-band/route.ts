@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma, PublishStatus } from '@bandauto/db'
+import { prisma, PublishStatus, PublishChannelType } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { NaverBandClient } from '@/modules/sourcing/domain/src/band'
 
@@ -141,45 +141,48 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // 발행 이력 저장 (자동화와 중복 방지)
-          await prisma.publishHistory.upsert({
+          // PublishChannel 조회 또는 생성 (소매밴드용)
+          let publishChannel = await prisma.publishChannel.findFirst({
             where: {
-              productId_retailBandId: {
-                productId: product.id,
-                retailBandId: retailBand.id,
-              },
-            },
-            create: {
               userId: user.userId,
-              productId: product.id,
-              retailBandId: retailBand.id,
-              postKey,
-              status: PublishStatus.SUCCESS,
-            },
-            update: {
-              postKey,
-              status: PublishStatus.SUCCESS,
-              errorMessage: null,
-              publishedAt: new Date(),
+              type: PublishChannelType.RETAIL_BAND,
+              refId: retailBand.id,
             },
           })
 
-          // ProductPublish 레코드 생성/업데이트 (쇼핑몰 표시용)
+          if (!publishChannel) {
+            publishChannel = await prisma.publishChannel.create({
+              data: {
+                userId: user.userId,
+                type: PublishChannelType.RETAIL_BAND,
+                name: retailBand.name,
+                refId: retailBand.id,
+              },
+            })
+          }
+
+          // ProductPublish 레코드 생성/업데이트 (발행 이력 통합)
           await prisma.productPublish.upsert({
             where: {
-              productId_retailBandId: {
+              productId_publishChannelId: {
                 productId: product.id,
-                retailBandId: retailBand.id,
+                publishChannelId: publishChannel.id,
               },
             },
             create: {
               userId: user.userId,
               productId: product.id,
               retailBandId: retailBand.id,
+              publishChannelId: publishChannel.id,
               status: PublishStatus.SUCCESS,
+              externalId: postKey,
+              publishedAt: new Date(),
             },
             update: {
               status: PublishStatus.SUCCESS,
+              externalId: postKey,
+              errorMessage: null,
+              publishedAt: new Date(),
             },
           })
 

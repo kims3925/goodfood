@@ -19,10 +19,10 @@ function expandHomePath(filepath: string): string {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { filename: string } }
+  { params }: { params: Promise<{ filename: string }> }
 ) {
   try {
-    const { filename } = params
+    const { filename } = await params
 
     // 환경 변수에서 저장 경로 가져오기
     const storagePath = process.env.IMAGE_STORAGE_PATH || '~/assets/images'

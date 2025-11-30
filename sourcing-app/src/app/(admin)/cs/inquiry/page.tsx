@@ -308,7 +308,7 @@ export default function InquiryManagementPage() {
               </TableHeader>
               <TableBody>
                 {sortedInquiries.length === 0 ? (
-                  <TableEmpty message="문의 내역이 없습니다." colSpan={7} />
+                  <TableEmpty message="문의 내역이 없습니다." />
                 ) : (
                   sortedInquiries.map((inquiry, index) => (
                     <TableRow

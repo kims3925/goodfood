@@ -125,18 +125,13 @@ export async function runTransformPipeline(
 
       // AI 변환 실행
       const draft = await transformPostToProduct({
-        post: {
-          id: post.id,
-          title: post.title,
-          content: post.content,
-          images: post.images,
-        },
+        post: post as any,
         aiProvider: config.aiProvider,
         aiConfig: {
           apiKey: aiConfig.apiKey,
           model: aiConfig.model,
         },
-        policyContent: pricingPolicyContent,
+        policyContent: pricingPolicyContent || undefined,
       })
 
       // 상품 생성

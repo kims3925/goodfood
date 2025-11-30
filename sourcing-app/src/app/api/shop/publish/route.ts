@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { PublishStatus, ProductStatus } from '@bandauto/db'
+import prisma, { PublishStatus, ProductStatus, PublishChannelType } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 /**
@@ -23,16 +23,19 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
-    const status = searchParams.get('status') || 'ACTIVE' // 기본: ACTIVE 상품만
+    const status = searchParams.get('status') || 'COLLECTED' // 기본: COLLECTED 상품만
 
     // Build where clause
     const where: any = {
       userId,
     }
 
-    // 상태 필터
+    // 상태 필터 (COLLECTED가 기본, ARCHIVED 제외)
     if (status !== 'ALL') {
       where.status = status as ProductStatus
+    } else {
+      // ALL이어도 ARCHIVED는 제외
+      where.status = ProductStatus.COLLECTED
     }
 
     // 검색
@@ -73,6 +76,13 @@ export async function GET(request: NextRequest) {
                 name: true,
               },
             },
+            publishChannel: {
+              select: {
+                id: true,
+                type: true,
+                name: true,
+              },
+            },
           },
         },
       },
@@ -86,6 +96,21 @@ export async function GET(request: NextRequest) {
       const mainImage = product.post?.images?.[0]?.imageUrl || product.thumbnailUrl
       const mainVariant = product.variants?.[0]
 
+      // 발행처별 상태 계산
+      const successPublishes = product.productPublishes.filter((pp) => pp.status === PublishStatus.SUCCESS)
+      const retailBandPublishes = successPublishes.filter((pp) => pp.publishChannel?.type === PublishChannelType.RETAIL_BAND)
+      const shoppingMallPublishes = successPublishes.filter((pp) => pp.publishChannel?.type === PublishChannelType.SHOPPING_MALL)
+
+      // 발행 현황 계산
+      const hasRetailBand = retailBandPublishes.length > 0
+      const hasShoppingMall = shoppingMallPublishes.length > 0
+      let publishSummary = '미발행'
+      if (hasRetailBand && hasShoppingMall) {
+        publishSummary = '발행완료'
+      } else if (hasRetailBand || hasShoppingMall) {
+        publishSummary = '부분발행'
+      }
+
       return {
         id: product.id,
         name: product.name,
@@ -96,15 +121,29 @@ export async function GET(request: NextRequest) {
         stock: mainVariant?.stock || 0,
         status: product.status,
         wholesaleBand: product.post?.wholesaleBand,
-        publishedBands: product.productPublishes
-          .filter((pp) => pp.status === PublishStatus.SUCCESS)
-          .map((pp) => ({
-            publishId: pp.id,
-            retailBandId: pp.retailBand.id,
-            retailBandName: pp.retailBand.name,
-            status: pp.status,
-            createdAt: pp.createdAt,
-          })),
+        // 발행 상태 (채널별)
+        publishStatus: {
+          retailBand: hasRetailBand,
+          shoppingMall: hasShoppingMall,
+        },
+        publishSummary,
+        // 기존 호환용
+        publishedBands: retailBandPublishes.map((pp) => ({
+          publishId: pp.id,
+          retailBandId: pp.retailBand?.id,
+          retailBandName: pp.retailBand?.name,
+          channelType: pp.publishChannel?.type,
+          channelName: pp.publishChannel?.name,
+          status: pp.status,
+          createdAt: pp.createdAt,
+        })),
+        // 쇼핑몰 발행 상태
+        shoppingMallPublish: shoppingMallPublishes[0] ? {
+          publishId: shoppingMallPublishes[0].id,
+          channelName: shoppingMallPublishes[0].publishChannel?.name,
+          status: shoppingMallPublishes[0].status,
+          createdAt: shoppingMallPublishes[0].createdAt,
+        } : null,
         createdAt: product.createdAt,
       }
     })
@@ -146,7 +185,7 @@ export async function POST(request: NextRequest) {
     const userId = currentUser.userId
 
     const body = await request.json()
-    const { productIds, retailBandIds } = body
+    const { productIds } = body
 
     if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
       return NextResponse.json(
@@ -155,129 +194,102 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!retailBandIds || !Array.isArray(retailBandIds) || retailBandIds.length === 0) {
-      return NextResponse.json(
-        { success: false, error: '발행할 소매밴드를 선택해주세요.' },
-        { status: 400 }
-      )
-    }
-
-    // Validate products belong to user and are ACTIVE
+    // Validate products belong to user and are COLLECTED
     const products = await prisma.product.findMany({
       where: {
         id: { in: productIds },
         userId,
-        status: ProductStatus.ACTIVE,
+        status: ProductStatus.COLLECTED,
       },
     })
 
     if (products.length !== productIds.length) {
       return NextResponse.json(
-        { success: false, error: '일부 상품을 찾을 수 없거나 판매중 상태가 아닙니다.' },
+        { success: false, error: '일부 상품을 찾을 수 없거나 수집 상태가 아닙니다.' },
         { status: 400 }
       )
     }
 
-    // Validate retail bands exist
-    const retailBands = await prisma.retailBand.findMany({
+    // 쇼핑몰 발행 채널 조회 또는 생성
+    let shoppingMallChannel = await prisma.publishChannel.findFirst({
       where: {
-        id: { in: retailBandIds },
-        isActive: true,
+        userId,
+        type: PublishChannelType.SHOPPING_MALL,
       },
     })
 
-    if (retailBands.length !== retailBandIds.length) {
-      return NextResponse.json(
-        { success: false, error: '일부 소매밴드를 찾을 수 없거나 비활성 상태입니다.' },
-        { status: 400 }
-      )
+    if (!shoppingMallChannel) {
+      shoppingMallChannel = await prisma.publishChannel.create({
+        data: {
+          userId,
+          type: PublishChannelType.SHOPPING_MALL,
+          name: '쇼핑몰',
+        },
+      })
     }
 
     // Check existing publishes to avoid duplicates
     const existingPublishes = await prisma.productPublish.findMany({
       where: {
         productId: { in: productIds },
-        retailBandId: { in: retailBandIds },
+        publishChannelId: shoppingMallChannel.id,
       },
       select: {
         productId: true,
-        retailBandId: true,
+        publishChannelId: true,
       },
     })
 
     const existingSet = new Set(
-      existingPublishes.map((p) => `${p.productId}-${p.retailBandId}`)
+      existingPublishes.map((p) => `${p.productId}-${p.publishChannelId}`)
     )
 
     // Create publish records
     const results: {
       productId: number
-      retailBandId: number
+      publishChannelId: number
       status: 'SUCCESS' | 'SKIPPED' | 'FAILED'
       publishId?: number
       message?: string
     }[] = []
 
     for (const productId of productIds) {
-      for (const retailBandId of retailBandIds) {
-        const key = `${productId}-${retailBandId}`
+      const key = `${productId}-${shoppingMallChannel.id}`
 
-        if (existingSet.has(key)) {
-          results.push({
+      if (existingSet.has(key)) {
+        results.push({
+          productId,
+          publishChannelId: shoppingMallChannel.id,
+          status: 'SKIPPED',
+          message: '이미 쇼핑몰에 발행된 상품입니다.',
+        })
+        continue
+      }
+
+      try {
+        const publish = await prisma.productPublish.create({
+          data: {
+            userId,
             productId,
-            retailBandId,
-            status: 'SKIPPED',
-            message: '이미 발행된 상품입니다.',
-          })
-          continue
-        }
+            publishChannelId: shoppingMallChannel.id,
+            status: PublishStatus.SUCCESS,
+          },
+        })
 
-        try {
-          const publish = await prisma.productPublish.create({
-            data: {
-              userId,
-              productId,
-              retailBandId,
-              status: PublishStatus.SUCCESS,
-            },
-          })
-
-          // Create publish history
-          await prisma.publishHistory.upsert({
-            where: {
-              productId_retailBandId: {
-                productId,
-                retailBandId,
-              },
-            },
-            update: {
-              status: PublishStatus.SUCCESS,
-              publishedAt: new Date(),
-              errorMessage: null,
-            },
-            create: {
-              userId,
-              productId,
-              retailBandId,
-              status: PublishStatus.SUCCESS,
-            },
-          })
-
-          results.push({
-            productId,
-            retailBandId,
-            status: 'SUCCESS',
-            publishId: publish.id,
-          })
-        } catch (error: any) {
-          console.error(`발행 실패 (product: ${productId}, band: ${retailBandId}):`, error)
-          results.push({
-            productId,
-            retailBandId,
-            status: 'FAILED',
-            message: error.message || '발행에 실패했습니다.',
-          })
-        }
+        results.push({
+          productId,
+          publishChannelId: shoppingMallChannel.id,
+          status: 'SUCCESS',
+          publishId: publish.id,
+        })
+      } catch (error: any) {
+        console.error(`쇼핑몰 발행 실패 (product: ${productId}):`, error)
+        results.push({
+          productId,
+          publishChannelId: shoppingMallChannel.id,
+          status: 'FAILED',
+          message: error.message || '발행에 실패했습니다.',
+        })
       }
     }
 

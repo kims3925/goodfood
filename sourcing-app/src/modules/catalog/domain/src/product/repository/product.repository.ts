@@ -1,4 +1,4 @@
-import prisma from '@bandauto/db'
+import prisma, { PublishStatus, PublishChannelType } from '@bandauto/db'
 import type { ProductListParams, ProductCreateInput, ProductUpdateInput } from '../types/product.types'
 
 export class ProductRepository {
@@ -70,6 +70,18 @@ export class ProductRepository {
             },
           },
         },
+        productPublishes: {
+          where: { status: PublishStatus.SUCCESS },
+          include: {
+            publishChannel: {
+              select: {
+                id: true,
+                type: true,
+                name: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -78,8 +90,37 @@ export class ProductRepository {
       take: limit,
     })
 
+    // 발행 상태 계산해서 추가
+    const productsWithPublishStatus = products.map((product) => {
+      const retailBandPublishes = product.productPublishes.filter(
+        (pp) => pp.publishChannel?.type === PublishChannelType.RETAIL_BAND
+      )
+      const shoppingMallPublishes = product.productPublishes.filter(
+        (pp) => pp.publishChannel?.type === PublishChannelType.SHOPPING_MALL
+      )
+
+      const hasRetailBand = retailBandPublishes.length > 0
+      const hasShoppingMall = shoppingMallPublishes.length > 0
+
+      let publishSummary = '미발행'
+      if (hasRetailBand && hasShoppingMall) {
+        publishSummary = '발행완료'
+      } else if (hasRetailBand || hasShoppingMall) {
+        publishSummary = '부분발행'
+      }
+
+      return {
+        ...product,
+        publishStatus: {
+          retailBand: hasRetailBand,
+          shoppingMall: hasShoppingMall,
+        },
+        publishSummary,
+      }
+    })
+
     return {
-      data: products,
+      data: productsWithPublishStatus,
       total,
       page,
       limit,

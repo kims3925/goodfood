@@ -25,11 +25,12 @@ model User {
   pricingPolicies    PricingPolicy[]
   products           Product[]
   productPublishes   ProductPublish[]
-  publishHistories   PublishHistory[]
   retailBands        RetailBand[]
   sourcingApiConfigs SourcingApiConfig[]
   wholesaleBands     WholesaleBand[]
   workflowLogs       WorkflowLog[]
+  sourceChannels     SourceChannel[]
+  publishChannels    PublishChannel[]
 
   // Customer relations (e-commerce-app)
   addresses          UserAddress[]
