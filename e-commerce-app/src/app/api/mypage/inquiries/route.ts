@@ -22,11 +22,16 @@ export async function GET(request: NextRequest) {
         userId,
       },
       include: {
-        product: {
+        publishedProduct: {
           select: {
             id: true,
-            name: true,
-            thumbnailUrl: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+                thumbnailUrl: true,
+              },
+            },
           },
         },
       },
@@ -62,7 +67,8 @@ export async function POST(request: NextRequest) {
 
     const userId = typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
 
-    const { productId, inquiryType, title, content, isPrivate } = await request.json()
+    const { publishedProductId, productId, inquiryType, title, content, isPrivate } =
+      await request.json()
 
     if (!inquiryType || !title || !content) {
       return NextResponse.json(
@@ -74,14 +80,29 @@ export async function POST(request: NextRequest) {
     const inquiry = await prisma.inquiry.create({
       data: {
         userId,
-        productId: productId || null,
+        publishedProductId: publishedProductId
+          ? Number(publishedProductId)
+          : productId
+            ? Number(productId)
+            : null,
         inquiryType,
         title,
         content,
         isPrivate: isPrivate || false,
       },
       include: {
-        product: true,
+        publishedProduct: {
+          select: {
+            id: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+                thumbnailUrl: true,
+              },
+            },
+          },
+        },
       },
     })
 

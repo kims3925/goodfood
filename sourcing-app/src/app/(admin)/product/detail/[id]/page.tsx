@@ -11,10 +11,10 @@ import ImageSortable, { SortableImage } from '@/components/product/ImageSortable
 
 interface Product {
   id: number
-  postId: number
+  collectedProductId: number | null
   name: string
   description: string | null
-  status: 'COLLECTED' | 'PUBLISHED'
+  status: 'COLLECTED' | 'ARCHIVED'
   thumbnailUrl: string | null
   price: number | null
   wholesalePrice: number | null
@@ -22,22 +22,25 @@ interface Product {
   currency: string
   createdAt: string
   updatedAt: string
-  post: {
+  collectedProduct: {
     id: number
-    title: string
-    content: string
-    wholesaleBand: {
-      name: string
-      bandKey: string
-      coverUrl: string | null
-    }
-    images: Array<{
+    post: {
       id: number
-      imageUrl: string
-      name?: string
-      sortOrder: number
-    }>
-  }
+      title: string
+      content: string
+      channel: {
+        id: number
+        name: string
+        coverUrl: string | null
+      } | null
+      images: Array<{
+        id: number
+        imageUrl: string
+        name?: string
+        sortOrder: number
+      }>
+    } | null
+  } | null
   options: Array<{
     id: number
     groupName: string
@@ -105,8 +108,8 @@ export default function ProductDetailPage() {
           wholesalePrice: data.data.wholesalePrice?.toString() || '',
         })
         // 이미지 상태 초기화
-        if (data.data.post?.images) {
-          setImages(data.data.post.images.map((img: any) => ({
+        if (data.data.collectedProduct?.post?.images) {
+          setImages(data.data.collectedProduct.post.images.map((img: any) => ({
             id: img.id,
             imageUrl: img.imageUrl,
             name: img.name,
@@ -203,6 +206,8 @@ export default function ProductDetailPage() {
   // 이미지 순서 저장
   const handleSaveImageOrder = async () => {
     if (!product || images.length === 0) return
+    const postId = product.collectedProduct?.post?.id
+    if (!postId) return
 
     try {
       setIsReorderingSaving(true)
@@ -210,7 +215,7 @@ export default function ProductDetailPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          postId: product.postId,
+          postId,
           imageIds: images.map((img) => img.id),
         }),
       })
@@ -233,8 +238,8 @@ export default function ProductDetailPage() {
 
   // 이미지 순서 변경 취소
   const handleCancelImageReorder = () => {
-    if (product?.post?.images) {
-      setImages(product.post.images.map((img) => ({
+    if (product?.collectedProduct?.post?.images) {
+      setImages(product.collectedProduct.post.images.map((img) => ({
         id: img.id,
         imageUrl: img.imageUrl,
         name: img.name,
@@ -622,31 +627,37 @@ export default function ProductDetailPage() {
             <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
               <div className="p-6 border-b border-gray-200 flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">출처 게시물</h2>
-                <Link
-                  href={`/post/detail/${product.post.id}`}
-                  className="inline-flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
-                >
-                  <FileText size={14} />
-                  게시물 보기
-                </Link>
+                {product.collectedProduct?.post && (
+                  <Link
+                    href={`/post/detail/${product.collectedProduct.post.id}`}
+                    className="inline-flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
+                  >
+                    <FileText size={14} />
+                    게시물 보기
+                  </Link>
+                )}
               </div>
               <div className="p-6 flex-1">
                 <div className="flex items-start gap-4">
-                  {product.post.images[0]?.imageUrl && (
+                  {product.collectedProduct?.post?.images[0]?.imageUrl && (
                     <img
-                      src={product.post.images[0].imageUrl}
-                      alt={product.post.title}
+                      src={product.collectedProduct.post.images[0].imageUrl}
+                      alt={product.collectedProduct.post.title}
                       className="w-24 h-24 rounded-lg object-cover flex-shrink-0"
                     />
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-sm font-medium text-purple-600">
-                        {product.post.wholesaleBand.name}
+                        {product.collectedProduct?.post?.channel?.name || '출처 미확인'}
                       </span>
                     </div>
-                    <h4 className="font-medium text-gray-900 mb-1">{product.post.title}</h4>
-                    <p className="text-sm text-gray-600 line-clamp-2">{product.post.content}</p>
+                    <h4 className="font-medium text-gray-900 mb-1">
+                      {product.collectedProduct?.post?.title || '게시물 없음'}
+                    </h4>
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {product.collectedProduct?.post?.content || '원본 게시물 내용을 찾을 수 없습니다.'}
+                    </p>
                   </div>
                 </div>
               </div>

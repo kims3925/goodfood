@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
       result = await orderService.createOrderFromItems({
         userId,
         items: items.map((item: any) => ({
-          productPublishId: parseInt(item.productPublishId),
+          publishedProductId: parseInt(item.publishedProductId),
           variantId: item.variantId ? parseInt(item.variantId) : undefined,
           quantity: item.quantity || 1,
         })),

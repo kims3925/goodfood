@@ -37,13 +37,17 @@ export async function PUT(request: NextRequest) {
     }
 
     // Verify post belongs to user
-    const post = await prisma.post.findFirst({
+    const post = await prisma.collectedPost.findFirst({
       where: {
         id: postId,
         userId,
       },
       include: {
-        product: true,
+        collectedProducts: {
+          include: {
+            products: true,
+          },
+        },
       },
     })
 
@@ -56,7 +60,7 @@ export async function PUT(request: NextRequest) {
 
     // Update sortOrder for each image
     const updatePromises = imageIds.map((imageId, index) =>
-      prisma.postImage.updateMany({
+      prisma.collectedPostImage.updateMany({
         where: {
           id: imageId,
           postId, // Ensure image belongs to this post
@@ -70,7 +74,7 @@ export async function PUT(request: NextRequest) {
     await Promise.all(updatePromises)
 
     // Get the first image (new thumbnail)
-    const firstImage = await prisma.postImage.findFirst({
+    const firstImage = await prisma.collectedPostImage.findFirst({
       where: { postId },
       orderBy: { sortOrder: 'asc' },
     })
@@ -78,9 +82,13 @@ export async function PUT(request: NextRequest) {
     const thumbnailUrl = firstImage?.imageUrl || null
 
     // Update product's thumbnailUrl if product exists
-    if (post.product) {
-      await prisma.product.update({
-        where: { id: post.product.id },
+    const productIds = post.collectedProducts.flatMap((cp) =>
+      cp.products.map((p) => p.id)
+    )
+
+    if (productIds.length > 0) {
+      await prisma.product.updateMany({
+        where: { id: { in: productIds } },
         data: { thumbnailUrl },
       })
     }

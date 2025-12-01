@@ -7,7 +7,7 @@ export interface PostListParams {
 
 export interface PostCreateInput {
   userId: number
-  wholesaleBandId: number
+  channelId: number
   externalId: string
   title: string
   content: string

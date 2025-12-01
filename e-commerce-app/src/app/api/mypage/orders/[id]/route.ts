@@ -45,7 +45,7 @@ export async function GET(
         },
         items: {
           include: {
-            productPublish: {
+            publishedProduct: {
               include: {
                 product: {
                   select: {
@@ -54,7 +54,7 @@ export async function GET(
                     thumbnailUrl: true,
                   },
                 },
-                retailBand: {
+                channel: {
                   select: {
                     id: true,
                     name: true,
@@ -128,19 +128,24 @@ export async function GET(
         id: item.id,
         productName: item.productName,
         optionSummary: item.optionSummary,
-        thumbnailUrl: item.thumbnailUrl || item.productPublish?.product?.thumbnailUrl,
+        thumbnailUrl: item.thumbnailUrl || item.publishedProduct?.product?.thumbnailUrl,
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         totalPrice: Number(item.totalPrice),
         hasReview: !!item.review,
-        product: item.productPublish?.product ? {
-          id: item.productPublish.product.id,
-          name: item.productPublish.product.name,
-          thumbnailUrl: item.productPublish.product.thumbnailUrl,
+        product: item.publishedProduct?.product ? {
+          id: item.publishedProduct.product.id,
+          name: item.publishedProduct.product.name,
+          thumbnailUrl: item.publishedProduct.product.thumbnailUrl,
         } : null,
-        retailBand: item.productPublish?.retailBand ? {
-          id: item.productPublish.retailBand.id,
-          name: item.productPublish.retailBand.name,
+        channel: item.publishedProduct?.channel ? {
+          id: item.publishedProduct.channel.id,
+          name: item.publishedProduct.channel.name,
+        } : null,
+        // 하위 호환성
+        retailBand: item.publishedProduct?.channel ? {
+          id: item.publishedProduct.channel.id,
+          name: item.publishedProduct.channel.name,
         } : null,
       })),
       // 후기 작성 가능 여부 (배송완료 + 미작성 리뷰가 있는 경우)

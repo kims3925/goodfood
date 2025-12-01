@@ -9,17 +9,19 @@ export async function GET(
   try {
     const id = parseInt(params.id)
 
-    const post = await prisma.post.findFirst({
+    const post = await prisma.collectedPost.findFirst({
       where: {
         id,
       },
       include: {
-        wholesaleBand: {
+        channel: {
           select: {
             id: true,
             name: true,
-            bandKey: true,
+            channelKey: true,
             coverUrl: true,
+            kind: true,
+            platform: true,
           },
         },
         user: {

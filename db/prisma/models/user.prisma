@@ -10,8 +10,14 @@ model User {
   phone              String?             @db.VarChar(20)
   role               UserRole            @default(USER)
 
+  // Onboarding / 동의
+  signupCompletedAt  DateTime?           @map("signup_completed_at") @db.Timestamp(0)
+  tosAgreedAt        DateTime?           @map("tos_agreed_at") @db.Timestamp(0)
+  privacyAgreedAt    DateTime?           @map("privacy_agreed_at") @db.Timestamp(0)
+  marketingAgreedAt  DateTime?           @map("marketing_agreed_at") @db.Timestamp(0)
+
   // OAuth fields
-  oauthProvider      String?             @map("oauth_provider") @db.VarChar(50) // "kakao", "naver", "google"
+  oauthProvider      String?             @map("oauth_provider") @db.VarChar(50)
   oauthProviderId    String?             @map("oauth_provider_id") @db.VarChar(100)
   profileImage       String?             @map("profile_image") @db.VarChar(500)
 
@@ -21,13 +27,14 @@ model User {
   // Admin relations (sourcing-app)
   aiApiConfigs       AiApiConfig[]
   automationConfig   AutomationConfig?
-  posts              Post[]
+  channels           Channel[]
+  collectedPosts     CollectedPost[]
+  collectedProducts  CollectedProduct[]
   pricingPolicies    PricingPolicy[]
   products           Product[]
-  productPublishes   ProductPublish[]
-  retailBands        RetailBand[]
+  publishedProducts  PublishedProduct[]
+  publishHistories   PublishHistory[]
   sourcingApiConfigs SourcingApiConfig[]
-  wholesaleBands     WholesaleBand[]
   workflowLogs       WorkflowLog[]
 
   // Customer relations (e-commerce-app)
@@ -40,6 +47,7 @@ model User {
   reviews            Review[]
   inquiries          Inquiry[]
   returnRequests     ReturnRequest[]
+  loginLogs          UserLoginLog[]
 
   @@unique([oauthProvider, oauthProviderId])
   @@index([email])
@@ -47,6 +55,24 @@ model User {
   @@index([role])
   @@index([oauthProvider])
   @@map("user")
+}
+
+model UserLoginLog {
+  id         Int       @id @default(autoincrement())
+  userId     Int?      @map("user_id")
+  provider   String    @db.VarChar(50)
+  email      String?   @db.VarChar(255)
+  ip         String?   @db.VarChar(100)
+  userAgent  String?   @map("user_agent") @db.VarChar(500)
+  success    Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([provider])
+  @@index([createdAt])
+  @@map("user_login_log")
 }
 
 model SourcingApiConfig {
@@ -62,9 +88,8 @@ model SourcingApiConfig {
   lastSyncedAt   DateTime?        @map("last_synced_at") @db.Timestamp(0)
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  retailBands    RetailBand[]
+  channels       Channel[]
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wholesaleBands WholesaleBand[]
 
   @@unique([userId, platform])
   @@index([userId])

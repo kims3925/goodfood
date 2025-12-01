@@ -17,10 +17,10 @@ import Link from 'next/link'
 
 interface Product {
   id: number
-  postId: number
+  collectedProductId: number | null
   name: string
   description: string | null
-  status: 'COLLECTED' | 'PUBLISHED'
+  status: 'COLLECTED' | 'ARCHIVED'
   thumbnailUrl: string | null
   price: number | null
   wholesalePrice: number | null
@@ -28,22 +28,24 @@ interface Product {
   currency: string
   createdAt: string
   updatedAt: string
-  post: {
-    id: number
-    title: string
-    content: string
-    wholesaleBand: {
-      name: string
-      bandKey: string
-      coverUrl: string | null
-    }
-    images: Array<{
+  collectedProduct: {
+    post: {
       id: number
-      imageUrl: string
-      name?: string
-      sortOrder: number
-    }>
-  }
+      title: string
+      content: string
+      wholesaleBand: {
+        name: string
+        bandKey: string
+        coverUrl: string | null
+      }
+      images: Array<{
+        id: number
+        imageUrl: string
+        name?: string
+        sortOrder: number
+      }>
+    } | null
+  } | null
   options: Array<{
     id: number
     groupName: string
@@ -172,7 +174,7 @@ export default function ProductDetailTestB() {
     })
   }
 
-  const images = product?.post?.images || []
+  const images = product?.collectedProduct?.post?.images || []
 
   // Group options by groupName
   const groupedOptions = (product?.options || []).reduce((acc, option) => {
@@ -223,15 +225,15 @@ export default function ProductDetailTestB() {
                 <div className="flex items-center gap-3 mb-1">
                   <h1 className="text-2xl font-bold text-white">{product.name}</h1>
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    product.status === 'PUBLISHED'
-                      ? 'bg-green-400 text-green-900'
+                    product.status === 'ARCHIVED'
+                      ? 'bg-yellow-200 text-yellow-800'
                       : 'bg-white/30 text-white'
                   }`}>
-                    {product.status === 'PUBLISHED' ? '발행' : '수집'}
+                    {product.status === 'ARCHIVED' ? '보관' : '수집'}
                   </span>
                 </div>
                 <p className="text-purple-100 text-sm">
-                  {product.post.wholesaleBand.name} • 등록일 {formatDate(product.createdAt)}
+                  {product.collectedProduct?.post?.wholesaleBand.name || '출처 없음'} • 등록일 {formatDate(product.createdAt)}
                 </p>
               </div>
             </div>
@@ -421,27 +423,31 @@ export default function ProductDetailTestB() {
             <div className="bg-white rounded-2xl shadow-sm">
               <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">출처</h2>
-                <Link
-                  href={`/post/detail/${product.post.id}`}
-                  className="text-purple-600 hover:text-purple-700 text-sm font-medium flex items-center gap-1"
-                >
-                  <FileText size={14} /> 게시물 보기
-                </Link>
+                {product.collectedProduct?.post && (
+                  <Link
+                    href={`/post/detail/${product.collectedProduct.post.id}`}
+                    className="text-purple-600 hover:text-purple-700 text-sm font-medium flex items-center gap-1"
+                  >
+                    <FileText size={14} /> 게시물 보기
+                  </Link>
+                )}
               </div>
               <div className="p-4">
                 <div className="flex items-start gap-3">
-                  {product.post.images[0] && (
+                  {product.collectedProduct?.post?.images[0] && (
                     <img
-                      src={product.post.images[0].imageUrl}
+                      src={product.collectedProduct.post.images[0].imageUrl}
                       alt=""
                       className="w-16 h-16 rounded-lg object-cover"
                     />
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-purple-600 mb-1">
-                      {product.post.wholesaleBand.name}
+                      {product.collectedProduct?.post?.wholesaleBand.name || '출처 없음'}
                     </div>
-                    <p className="text-sm text-gray-600 line-clamp-2">{product.post.title}</p>
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {product.collectedProduct?.post?.title || '게시물 정보 없음'}
+                    </p>
                   </div>
                 </div>
               </div>

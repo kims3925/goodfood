@@ -48,8 +48,10 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   // 경로에 따라 해당 메뉴 그룹 자동 확장
   useEffect(() => {
     const pathToMenuMap: Record<string, string> = {
-      '/band': '밴드관리',
+      '/channel': '채널 관리',
+      '/collected-product': '상품 관리',
       '/product': '상품 관리',
+      '/published-product': '상품 관리',
       '/publish': '발행',
       '/order': '주문서 관리',
       '/automation': '자동화 관리',
@@ -85,8 +87,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       icon: <LayoutDashboard size={20} />,
     },
     {
-      label: '밴드 관리',
-      href: '/band',
+      label: '채널 관리',
+      href: '/channel',
       icon: <Store size={20} />,
     },
     {
@@ -99,13 +101,18 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       icon: <Package size={20} />,
       children: [
         {
-          label: '수집 상품 관리',
-          href: '/product/list',
+          label: '수집상품',
+          href: '/collected-product/list',
           icon: <Database size={16} />,
         },
         {
-          label: '발행 상품 관리',
-          href: '/product/publish',
+          label: '상품',
+          href: '/product/list',
+          icon: <Package size={16} />,
+        },
+        {
+          label: '발행상품',
+          href: '/published-product/list',
           icon: <Send size={16} />,
         },
       ],
@@ -188,8 +195,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
   const isActive = (href?: string) => {
     if (!href) return false
-    // /band 페이지는 /band?type=xxx 형태도 활성화
-    if (href === '/band' && pathname.startsWith('/band')) {
+    // /channel 페이지는 /channel?type=xxx 형태도 활성화
+    if (href === '/channel' && pathname.startsWith('/channel')) {
       return true
     }
     // 정확한 경로 매칭만 활성화 (하위 경로 제외)

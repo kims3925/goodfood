@@ -1,7 +1,7 @@
 /**
  * Cart Service
  * 장바구니 비즈니스 로직 레이어
- * ProductPublish 기반 스키마 지원
+ * PublishedProduct 기반 스키마 지원
  */
 
 import prisma, { PublishStatus } from '@bandauto/db'
@@ -23,9 +23,12 @@ const USER_CART_EXPIRY_DAYS = 30
 
 export interface CartItemResponse {
   id: number
-  productPublishId: number
+  publishedProductId: number
   productId: number
   variantId: number | null
+  channelId: number | null
+  channelName: string | null
+  // 하위 호환성
   retailBandId: number | null
   retailBandName: string | null
   name: string
@@ -39,6 +42,8 @@ export interface CartItemResponse {
 export interface CartResponse {
   id: number
   sessionId: string
+  channelId: number | null
+  // 하위 호환성
   retailBandId: number | null
   items: CartItemResponse[]
   totalItems: number
@@ -48,7 +53,7 @@ export interface CartResponse {
 }
 
 export interface AddToCartDTO {
-  productPublishId: number
+  publishedProductId: number
   variantId?: number
   quantity?: number
 }
@@ -57,15 +62,19 @@ export interface AddToCartDTO {
 const cartIncludeOptions = {
   items: {
     include: {
-      productPublish: {
+      publishedProduct: {
         include: {
           product: {
             include: {
-              post: {
+              collectedProduct: {
                 include: {
-                  images: {
-                    orderBy: { sortOrder: 'asc' as const },
-                    take: 1,
+                  post: {
+                    include: {
+                      images: {
+                        orderBy: { sortOrder: 'asc' as const },
+                        take: 1,
+                      },
+                    },
                   },
                 },
               },
@@ -74,7 +83,7 @@ const cartIncludeOptions = {
               },
             },
           },
-          retailBand: true,
+          channel: true,
         },
       },
       variant: true,
@@ -160,7 +169,7 @@ export class CartService {
       if (sessionCart && sessionCart.items.length > 0) {
         for (const item of sessionCart.items) {
           const existingItem = userCart.items.find(
-            (ui: any) => ui.productPublishId === item.productPublishId && ui.variantId === item.variantId
+            (ui: any) => ui.publishedProductId === item.publishedProductId && ui.variantId === item.variantId
           )
           if (existingItem) {
             await prisma.cartItem.update({
@@ -246,19 +255,22 @@ export class CartService {
    */
   formatCart(cart: any): CartResponse {
     const items: CartItemResponse[] = cart.items.map((item: any) => {
-      const productPublish = item.productPublish
-      const product = productPublish.product
+      const publishedProduct = item.publishedProduct
+      const product = publishedProduct.product
       const variant = item.variant
       const mainVariant = product.variants[0]
-      const image = product.post?.images?.[0]?.imageUrl || product.thumbnailUrl || '/placeholder.jpg'
+      const image = product.collectedProduct?.post?.images?.[0]?.imageUrl || product.thumbnailUrl || '/placeholder.jpg'
 
       return {
         id: item.id,
-        productPublishId: productPublish.id,
+        publishedProductId: publishedProduct.id,
         productId: product.id,
         variantId: variant?.id || null,
-        retailBandId: productPublish.retailBandId,
-        retailBandName: productPublish.retailBand?.name || null,
+        channelId: publishedProduct.channelId,
+        channelName: publishedProduct.channel?.name || null,
+        // 하위 호환성
+        retailBandId: publishedProduct.channelId,
+        retailBandName: publishedProduct.channel?.name || null,
         name: product.name,
         optionSummary: variant?.optionSummary || null,
         image,
@@ -268,9 +280,9 @@ export class CartService {
       }
     })
 
-    const retailBandIds = items.map((item) => item.retailBandId).filter(Boolean)
-    const uniqueRetailBandIds = [...new Set(retailBandIds)]
-    const retailBandId = uniqueRetailBandIds.length === 1 ? uniqueRetailBandIds[0] : null
+    const channelIds = items.map((item) => item.channelId).filter(Boolean)
+    const uniqueChannelIds = [...new Set(channelIds)]
+    const channelId = uniqueChannelIds.length === 1 ? uniqueChannelIds[0] : null
 
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -280,7 +292,9 @@ export class CartService {
     return {
       id: cart.id,
       sessionId: cart.sessionId,
-      retailBandId,
+      channelId,
+      // 하위 호환성
+      retailBandId: channelId,
       items,
       totalItems,
       subtotal,
@@ -297,16 +311,16 @@ export class CartService {
     data: AddToCartDTO,
     userId: number | null = null
   ): Promise<{ cart: CartResponse; isExisting: boolean; newSessionId?: string }> {
-    const { productPublishId, variantId, quantity = 1 } = data
+    const { publishedProductId, variantId, quantity = 1 } = data
 
-    if (!productPublishId) {
-      throw new ValidationError('productPublishId는 필수입니다')
+    if (!publishedProductId) {
+      throw new ValidationError('publishedProductId는 필수입니다')
     }
 
-    // productPublish 확인 (STATUS가 SUCCESS인 것만)
-    const productPublish = await prisma.productPublish.findFirst({
+    // publishedProduct 확인 (STATUS가 SUCCESS인 것만)
+    const publishedProduct = await prisma.publishedProduct.findFirst({
       where: {
-        id: productPublishId,
+        id: publishedProductId,
         status: PublishStatus.SUCCESS,
       },
       include: {
@@ -318,12 +332,12 @@ export class CartService {
       },
     })
 
-    if (!productPublish) {
-      throw new NotFoundError('상품', String(productPublishId))
+    if (!publishedProduct) {
+      throw new NotFoundError('상품', String(publishedProductId))
     }
 
     const cart = await this.getOrCreateCart(sessionId, userId)
-    const price = productPublish.product.variants[0]?.price || productPublish.product.price || 0
+    const price = publishedProduct.product.variants[0]?.price || publishedProduct.product.price || 0
 
     const newSessionId = (cart as any).__newSessionId
 
@@ -331,7 +345,7 @@ export class CartService {
     const existingItem = await prisma.cartItem.findFirst({
       where: {
         cartId: cart.id,
-        productPublishId,
+        publishedProductId,
         variantId: variantId || null,
       },
     })
@@ -347,7 +361,7 @@ export class CartService {
       await prisma.cartItem.create({
         data: {
           cartId: cart.id,
-          productPublishId,
+          publishedProductId,
           variantId: variantId || null,
           quantity,
           priceAt: price,
@@ -470,7 +484,7 @@ export class CartService {
       include: {
         items: {
           include: {
-            productPublish: {
+            publishedProduct: {
               include: {
                 product: {
                   include: { variants: { take: 1 } },
@@ -496,7 +510,7 @@ export class CartService {
       include: {
         items: {
           include: {
-            productPublish: {
+            publishedProduct: {
               include: {
                 product: {
                   include: { variants: { take: 1 } },

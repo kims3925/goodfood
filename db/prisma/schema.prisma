@@ -24,6 +24,21 @@ enum SourcingPlatform {
   ALIEXPRESS
 }
 
+enum ChannelKind {
+  WHOLESALE   // 소싱/도매 채널
+  RETAIL      // 판매/노출 채널
+}
+
+enum ChannelPlatform {
+  BAND
+  NAVER_CAFE
+  ALIEXPRESS
+  SMARTSTORE
+  COUPANG
+  SHOP        // 쇼핑몰 (자체 e-commerce)
+  CUSTOM      // 그 외 커스텀 채널
+}
+
 enum AiProvider {
   GEMINI
   OPENAI
@@ -63,10 +78,7 @@ enum PublishStatus {
   PENDING
 }
 
-enum PublishType {
-  RETAIL_BAND    // 소매밴드 발행
-  SHOPPING_MALL  // 쇼핑몰 발행
-}
+// PublishType enum 제거됨 - Channel.platform으로 대체
 
 enum CustomerOrderStatus {
   PENDING

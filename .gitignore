@@ -230,3 +230,8 @@ nul
 db/src/generated/libquery_engine-darwin-arm64.dylib.node
 db/src/generated/query_engine-windows.dll.node
 db/src/generated/libquery_engine-darwin-arm64.dylib.node
+AGENTS.md
+docs/refactoring/SOURCING_ANALYSIS.md
+.gitignore
+sourcing-app/nohup.out
+e-commerce-app/nohup.out

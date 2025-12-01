@@ -5,16 +5,11 @@ import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLe
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 
-interface WholesaleBand {
+interface Channel {
   id: number
   name: string
   coverUrl: string | null
-}
-
-interface RetailBand {
-  id: number
-  name: string
-  coverUrl: string | null
+  kind: 'WHOLESALE' | 'RETAIL'
 }
 
 interface PricingPolicy {
@@ -32,12 +27,12 @@ interface AiProviderInfo {
 interface AutomationConfig {
   isEnabled: boolean
   cronInterval: string
-  collectFromAllBands: boolean
-  wholesaleBandIds: number[]
+  collectFromAllChannels: boolean
+  wholesaleChannelIds: number[]
   aiProvider: string
   pricingPolicyId: number | null
   autoPublish: boolean
-  retailBandIds: number[]
+  retailChannelIds: number[]
 }
 
 const INTERVAL_OPTIONS = [
@@ -152,19 +147,19 @@ const getNextExecution = (interval: string): string => {
 const defaultConfig: AutomationConfig = {
   isEnabled: false,
   cronInterval: '1h',
-  collectFromAllBands: true,
-  wholesaleBandIds: [],
+  collectFromAllChannels: true,
+  wholesaleChannelIds: [],
   aiProvider: 'GEMINI',
   pricingPolicyId: null,
   autoPublish: false,
-  retailBandIds: [],
+  retailChannelIds: [],
 }
 
 export default function AutomationSettingsPage() {
   const [config, setConfig] = useState<AutomationConfig>(defaultConfig)
   const [initialConfig, setInitialConfig] = useState<AutomationConfig>(defaultConfig)
-  const [wholesaleBands, setWholesaleBands] = useState<WholesaleBand[]>([])
-  const [retailBands, setRetailBands] = useState<RetailBand[]>([])
+  const [wholesaleChannels, setWholesaleChannels] = useState<Channel[]>([])
+  const [retailChannels, setRetailChannels] = useState<Channel[]>([])
   const [pricingPolicies, setPricingPolicies] = useState<PricingPolicy[]>([])
   const [configuredAiProviders, setConfiguredAiProviders] = useState<AiProviderInfo[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -176,19 +171,19 @@ export default function AutomationSettingsPage() {
   const [warningSections, setWarningSections] = useState<string[]>([])
   const [warningPhase, setWarningPhase] = useState<'idle' | 'shake' | 'fading'>('idle')
 
-  const BANDS_PER_PAGE = 6
+  const CHANNELS_PER_PAGE = 6
 
   // 섹션별 변경 여부 확인 (isEnabled는 버튼으로 변경하므로 제외)
   const hasScheduleChanges = config.cronInterval !== initialConfig.cronInterval
 
-  const hasCollectionChanges = JSON.stringify(config.wholesaleBandIds.slice().sort()) !==
-    JSON.stringify(initialConfig.wholesaleBandIds.slice().sort())
+  const hasCollectionChanges = JSON.stringify(config.wholesaleChannelIds.slice().sort()) !==
+    JSON.stringify(initialConfig.wholesaleChannelIds.slice().sort())
 
   const hasAiChanges = config.aiProvider !== initialConfig.aiProvider ||
     config.pricingPolicyId !== initialConfig.pricingPolicyId
 
-  const hasPublishChanges = JSON.stringify(config.retailBandIds.slice().sort()) !==
-    JSON.stringify(initialConfig.retailBandIds.slice().sort())
+  const hasPublishChanges = JSON.stringify(config.retailChannelIds.slice().sort()) !==
+    JSON.stringify(initialConfig.retailChannelIds.slice().sort())
 
   // 저장되지 않은 변경사항이 있는지 확인
   const hasUnsavedChanges = hasScheduleChanges || hasCollectionChanges || hasAiChanges || hasPublishChanges
@@ -257,8 +252,8 @@ export default function AutomationSettingsPage() {
     try {
       const [configRes, wholesaleRes, retailRes, policyRes, aiSettingsRes] = await Promise.all([
         fetch('/api/automation/config'),
-        fetch('/api/band/wholesale'),
-        fetch('/api/band/retail'),
+        fetch('/api/channel?kind=WHOLESALE'),
+        fetch('/api/channel?kind=RETAIL'),
         fetch('/api/policy'),
         fetch('/api/settings/ai'),
       ])
@@ -274,10 +269,10 @@ export default function AutomationSettingsPage() {
         setInitialConfig(configData.data)
       }
       if (wholesaleData.success) {
-        setWholesaleBands(wholesaleData.data || [])
+        setWholesaleChannels(wholesaleData.data || [])
       }
       if (retailData.success) {
-        setRetailBands(retailData.data || [])
+        setRetailChannels(retailData.data || [])
       }
       if (policyData.success) {
         setPricingPolicies(policyData.data || [])
@@ -328,21 +323,21 @@ export default function AutomationSettingsPage() {
     }
   }
 
-  const handleWholesaleBandToggle = (bandId: number) => {
+  const handleWholesaleChannelToggle = (channelId: number) => {
     setConfig(prev => ({
       ...prev,
-      wholesaleBandIds: prev.wholesaleBandIds.includes(bandId)
-        ? prev.wholesaleBandIds.filter(id => id !== bandId)
-        : [...prev.wholesaleBandIds, bandId],
+      wholesaleChannelIds: prev.wholesaleChannelIds.includes(channelId)
+        ? prev.wholesaleChannelIds.filter(id => id !== channelId)
+        : [...prev.wholesaleChannelIds, channelId],
     }))
   }
 
-  const handleRetailBandToggle = (bandId: number) => {
+  const handleRetailChannelToggle = (channelId: number) => {
     setConfig(prev => ({
       ...prev,
-      retailBandIds: prev.retailBandIds.includes(bandId)
-        ? prev.retailBandIds.filter(id => id !== bandId)
-        : [...prev.retailBandIds, bandId],
+      retailChannelIds: prev.retailChannelIds.includes(channelId)
+        ? prev.retailChannelIds.filter(id => id !== channelId)
+        : [...prev.retailChannelIds, channelId],
     }))
   }
 
@@ -498,7 +493,7 @@ export default function AutomationSettingsPage() {
         </div>
       </Card>
 
-      {/* Collection Settings - Wholesale Band Cards */}
+      {/* Collection Settings - Wholesale Channel Cards */}
       <Card className="p-6">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -507,7 +502,7 @@ export default function AutomationSettingsPage() {
               <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-600">저장 필요</span>
             )}
           </div>
-          {wholesaleBands.length > BANDS_PER_PAGE && (
+          {wholesaleChannels.length > CHANNELS_PER_PAGE && (
             <button
               onClick={() => setShowAllWholesale(!showAllWholesale)}
               className="text-sm text-blue-600 hover:text-blue-800 font-medium"
@@ -518,16 +513,16 @@ export default function AutomationSettingsPage() {
         </div>
         <p className="text-sm text-gray-600 mb-4">게시물을 수집할 도매밴드를 선택하세요. 선택하지 않으면 모든 밴드에서 수집합니다.</p>
 
-        {wholesaleBands.length > 0 ? (
+        {wholesaleChannels.length > 0 ? (
           showAllWholesale ? (
             /* 전체보기 모드 */
             <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-              {wholesaleBands.map((band) => {
-                const isSelected = config.wholesaleBandIds.includes(band.id)
+              {wholesaleChannels.map((channel) => {
+                const isSelected = config.wholesaleChannelIds.includes(channel.id)
                 return (
                   <div
-                    key={band.id}
-                    onClick={() => handleWholesaleBandToggle(band.id)}
+                    key={channel.id}
+                    onClick={() => handleWholesaleChannelToggle(channel.id)}
                     className={`
                       relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all
                       ${isSelected
@@ -537,8 +532,8 @@ export default function AutomationSettingsPage() {
                     `}
                   >
                     <div className="h-60 bg-gray-100">
-                      {band.coverUrl ? (
-                        <img src={band.coverUrl} alt={band.name} className="w-full h-full object-cover" />
+                      {channel.coverUrl ? (
+                        <img src={channel.coverUrl} alt={channel.name} className="w-full h-full object-cover" />
                       ) : (
                         <div className="flex items-center justify-center h-full text-gray-400">
                           <Store size={40} />
@@ -546,7 +541,7 @@ export default function AutomationSettingsPage() {
                       )}
                     </div>
                     <div className="p-2 text-center bg-white">
-                      <span className="text-xs font-medium text-gray-800 line-clamp-1">{band.name}</span>
+                      <span className="text-xs font-medium text-gray-800 line-clamp-1">{channel.name}</span>
                     </div>
                     {isSelected && (
                       <div className="absolute top-1 right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
@@ -570,14 +565,14 @@ export default function AutomationSettingsPage() {
               </button>
             )}
 
-            {/* Band Cards */}
+            {/* Channel Cards */}
             <div className="grid grid-cols-3 md:grid-cols-6 gap-3 overflow-hidden">
-              {wholesaleBands.slice(wholesaleStartIndex, wholesaleStartIndex + BANDS_PER_PAGE).map((band) => {
-                const isSelected = config.wholesaleBandIds.includes(band.id)
+              {wholesaleChannels.slice(wholesaleStartIndex, wholesaleStartIndex + CHANNELS_PER_PAGE).map((channel) => {
+                const isSelected = config.wholesaleChannelIds.includes(channel.id)
                 return (
                   <div
-                    key={band.id}
-                    onClick={() => handleWholesaleBandToggle(band.id)}
+                    key={channel.id}
+                    onClick={() => handleWholesaleChannelToggle(channel.id)}
                     className={`
                       relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all
                       ${isSelected
@@ -588,10 +583,10 @@ export default function AutomationSettingsPage() {
                   >
                     {/* Image */}
                     <div className="h-60 bg-gray-100">
-                      {band.coverUrl ? (
+                      {channel.coverUrl ? (
                         <img
-                          src={band.coverUrl}
-                          alt={band.name}
+                          src={channel.coverUrl}
+                          alt={channel.name}
                           className="w-full h-full object-cover"
                         />
                       ) : (
@@ -600,9 +595,9 @@ export default function AutomationSettingsPage() {
                         </div>
                       )}
                     </div>
-                    {/* Band Name */}
+                    {/* Channel Name */}
                     <div className="p-2 text-center bg-white">
-                      <span className="text-xs font-medium text-gray-800 line-clamp-1">{band.name}</span>
+                      <span className="text-xs font-medium text-gray-800 line-clamp-1">{channel.name}</span>
                     </div>
                     {/* Selection Check */}
                     {isSelected && (
@@ -616,9 +611,9 @@ export default function AutomationSettingsPage() {
             </div>
 
             {/* Right Arrow */}
-            {wholesaleStartIndex + BANDS_PER_PAGE < wholesaleBands.length && (
+            {wholesaleStartIndex + CHANNELS_PER_PAGE < wholesaleChannels.length && (
               <button
-                onClick={() => setWholesaleStartIndex(prev => Math.min(wholesaleBands.length - BANDS_PER_PAGE, prev + 1))}
+                onClick={() => setWholesaleStartIndex(prev => Math.min(wholesaleChannels.length - CHANNELS_PER_PAGE, prev + 1))}
                 className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 w-10 h-10 bg-white border border-gray-300 rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
               >
                 <ChevronRight size={20} className="text-gray-600" />
@@ -626,14 +621,14 @@ export default function AutomationSettingsPage() {
             )}
 
             {/* Page Indicator */}
-            {wholesaleBands.length > BANDS_PER_PAGE && (
+            {wholesaleChannels.length > CHANNELS_PER_PAGE && (
               <div className="flex justify-center mt-4 gap-1">
-                {Array.from({ length: Math.ceil(wholesaleBands.length / BANDS_PER_PAGE) }).map((_, idx) => (
+                {Array.from({ length: Math.ceil(wholesaleChannels.length / CHANNELS_PER_PAGE) }).map((_, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setWholesaleStartIndex(idx * BANDS_PER_PAGE)}
+                    onClick={() => setWholesaleStartIndex(idx * CHANNELS_PER_PAGE)}
                     className={`w-2 h-2 rounded-full transition-colors ${
-                      Math.floor(wholesaleStartIndex / BANDS_PER_PAGE) === idx
+                      Math.floor(wholesaleStartIndex / CHANNELS_PER_PAGE) === idx
                         ? 'bg-blue-500'
                         : 'bg-gray-300 hover:bg-gray-400'
                     }`}
@@ -647,7 +642,7 @@ export default function AutomationSettingsPage() {
           <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
             <p className="text-gray-500 text-sm">
               등록된 도매밴드가 없습니다.
-              <a href="/band/wholesale" className="text-blue-600 hover:underline ml-1">
+              <a href="/channel" className="text-blue-600 hover:underline ml-1">
                 밴드관리 &gt; 도매밴드 관리
               </a>
               에서 추가해주세요.
@@ -801,7 +796,7 @@ export default function AutomationSettingsPage() {
         </div>
       </Card>
 
-      {/* Publish Settings - Retail Band Cards */}
+      {/* Publish Settings - Retail Channel Cards */}
       <Card className="p-6">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -810,7 +805,7 @@ export default function AutomationSettingsPage() {
               <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-600">저장 필요</span>
             )}
           </div>
-          {retailBands.length > BANDS_PER_PAGE && (
+          {retailChannels.length > CHANNELS_PER_PAGE && (
             <button
               onClick={() => setShowAllRetail(!showAllRetail)}
               className="text-sm text-green-600 hover:text-green-800 font-medium"
@@ -821,16 +816,16 @@ export default function AutomationSettingsPage() {
         </div>
         <p className="text-sm text-gray-600 mb-4">상품을 발행할 소매밴드를 선택하세요.</p>
 
-        {retailBands.length > 0 ? (
+        {retailChannels.length > 0 ? (
           showAllRetail ? (
             /* 전체보기 모드 */
             <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-              {retailBands.map((band) => {
-                const isSelected = config.retailBandIds.includes(band.id)
+              {retailChannels.map((channel) => {
+                const isSelected = config.retailChannelIds.includes(channel.id)
                 return (
                   <div
-                    key={band.id}
-                    onClick={() => handleRetailBandToggle(band.id)}
+                    key={channel.id}
+                    onClick={() => handleRetailChannelToggle(channel.id)}
                     className={`
                       relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all
                       ${isSelected
@@ -840,8 +835,8 @@ export default function AutomationSettingsPage() {
                     `}
                   >
                     <div className="h-60 bg-gray-100">
-                      {band.coverUrl ? (
-                        <img src={band.coverUrl} alt={band.name} className="w-full h-full object-cover" />
+                      {channel.coverUrl ? (
+                        <img src={channel.coverUrl} alt={channel.name} className="w-full h-full object-cover" />
                       ) : (
                         <div className="flex items-center justify-center h-full text-gray-400">
                           <Send size={40} />
@@ -849,7 +844,7 @@ export default function AutomationSettingsPage() {
                       )}
                     </div>
                     <div className="p-2 text-center bg-white">
-                      <span className="text-xs font-medium text-gray-800 line-clamp-1">{band.name}</span>
+                      <span className="text-xs font-medium text-gray-800 line-clamp-1">{channel.name}</span>
                     </div>
                     {isSelected && (
                       <div className="absolute top-1 right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
@@ -873,14 +868,14 @@ export default function AutomationSettingsPage() {
               </button>
             )}
 
-            {/* Band Cards */}
+            {/* Channel Cards */}
             <div className="grid grid-cols-3 md:grid-cols-6 gap-3 overflow-hidden">
-              {retailBands.slice(retailStartIndex, retailStartIndex + BANDS_PER_PAGE).map((band) => {
-                const isSelected = config.retailBandIds.includes(band.id)
+              {retailChannels.slice(retailStartIndex, retailStartIndex + CHANNELS_PER_PAGE).map((channel) => {
+                const isSelected = config.retailChannelIds.includes(channel.id)
                 return (
                   <div
-                    key={band.id}
-                    onClick={() => handleRetailBandToggle(band.id)}
+                    key={channel.id}
+                    onClick={() => handleRetailChannelToggle(channel.id)}
                     className={`
                       relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all
                       ${isSelected
@@ -891,10 +886,10 @@ export default function AutomationSettingsPage() {
                   >
                     {/* Image */}
                     <div className="h-60 bg-gray-100">
-                      {band.coverUrl ? (
+                      {channel.coverUrl ? (
                         <img
-                          src={band.coverUrl}
-                          alt={band.name}
+                          src={channel.coverUrl}
+                          alt={channel.name}
                           className="w-full h-full object-cover"
                         />
                       ) : (
@@ -903,9 +898,9 @@ export default function AutomationSettingsPage() {
                         </div>
                       )}
                     </div>
-                    {/* Band Name */}
+                    {/* Channel Name */}
                     <div className="p-2 text-center bg-white">
-                      <span className="text-xs font-medium text-gray-800 line-clamp-1">{band.name}</span>
+                      <span className="text-xs font-medium text-gray-800 line-clamp-1">{channel.name}</span>
                     </div>
                     {/* Selection Check */}
                     {isSelected && (
@@ -919,9 +914,9 @@ export default function AutomationSettingsPage() {
             </div>
 
             {/* Right Arrow */}
-            {retailStartIndex + BANDS_PER_PAGE < retailBands.length && (
+            {retailStartIndex + CHANNELS_PER_PAGE < retailChannels.length && (
               <button
-                onClick={() => setRetailStartIndex(prev => Math.min(retailBands.length - BANDS_PER_PAGE, prev + 1))}
+                onClick={() => setRetailStartIndex(prev => Math.min(retailChannels.length - CHANNELS_PER_PAGE, prev + 1))}
                 className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 w-10 h-10 bg-white border border-gray-300 rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
               >
                 <ChevronRight size={20} className="text-gray-600" />
@@ -929,14 +924,14 @@ export default function AutomationSettingsPage() {
             )}
 
             {/* Page Indicator */}
-            {retailBands.length > BANDS_PER_PAGE && (
+            {retailChannels.length > CHANNELS_PER_PAGE && (
               <div className="flex justify-center mt-4 gap-1">
-                {Array.from({ length: Math.ceil(retailBands.length / BANDS_PER_PAGE) }).map((_, idx) => (
+                {Array.from({ length: Math.ceil(retailChannels.length / CHANNELS_PER_PAGE) }).map((_, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setRetailStartIndex(idx * BANDS_PER_PAGE)}
+                    onClick={() => setRetailStartIndex(idx * CHANNELS_PER_PAGE)}
                     className={`w-2 h-2 rounded-full transition-colors ${
-                      Math.floor(retailStartIndex / BANDS_PER_PAGE) === idx
+                      Math.floor(retailStartIndex / CHANNELS_PER_PAGE) === idx
                         ? 'bg-green-500'
                         : 'bg-gray-300 hover:bg-gray-400'
                     }`}
@@ -950,14 +945,14 @@ export default function AutomationSettingsPage() {
           <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
             <p className="text-gray-500 text-sm">
               등록된 소매밴드가 없습니다.
-              <a href="/band/retail" className="text-blue-600 hover:underline ml-1">
+              <a href="/channel" className="text-blue-600 hover:underline ml-1">
                 밴드관리 &gt; 소매밴드 관리
               </a>
               에서 추가해주세요.
             </p>
           </div>
         )}
-        {config.retailBandIds.length === 0 && retailBands.length > 0 && (
+        {config.retailChannelIds.length === 0 && retailChannels.length > 0 && (
           <p className="text-sm text-amber-600 mt-3">
             발행할 소매밴드를 선택해주세요.
           </p>

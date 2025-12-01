@@ -29,7 +29,7 @@ export async function GET(
           id: parseInt(id),
           items: {
             some: {
-              productPublish: {
+              publishedProduct: {
                 userId: user.userId,
               },
             },
@@ -38,7 +38,7 @@ export async function GET(
         include: {
           items: {
             include: {
-              productPublish: {
+              publishedProduct: {
                 include: {
                   product: true,
                 },
@@ -67,7 +67,7 @@ export async function GET(
           userId: user.userId,
         },
         include: {
-          productPublish: {
+          publishedProduct: {
             include: {
               product: true,
             },
@@ -136,7 +136,7 @@ export async function PATCH(
           id: parseInt(id),
           items: {
             some: {
-              productPublish: {
+              publishedProduct: {
                 userId: user.userId,
               },
             },

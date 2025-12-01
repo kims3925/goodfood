@@ -22,14 +22,14 @@ export async function GET(
     const { id } = await params
     const orderId = parseInt(id)
 
-    // Order 조회 (OrderItem, ProductPublish, RetailBand, User 포함)
+    // Order 조회 (OrderItem, PublishedProduct, RetailChannel, User 포함)
     const order = await prisma.order.findFirst({
       where: {
         id: orderId,
-        // 판매자 기준: 주문 아이템의 ProductPublish가 내 것인지 확인
+        // 판매자 기준: 주문 아이템의 PublishedProduct가 내 것인지 확인
         items: {
           some: {
-            productPublish: {
+            publishedProduct: {
               userId: user.userId,
             },
           },
@@ -45,7 +45,7 @@ export async function GET(
         },
         items: {
           include: {
-            productPublish: {
+            publishedProduct: {
               include: {
                 product: {
                   select: {
@@ -55,7 +55,7 @@ export async function GET(
                     price: true,
                   },
                 },
-                retailBand: {
+                channel: {
                   select: {
                     id: true,
                     name: true,
@@ -115,7 +115,7 @@ export async function PATCH(
         id: orderId,
         items: {
           some: {
-            productPublish: {
+            publishedProduct: {
               userId: user.userId,
             },
           },

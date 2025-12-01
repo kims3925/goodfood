@@ -4,7 +4,7 @@
  * This file defines all TypeScript interfaces and types for product transformation
  */
 
-import { Post, PostImage, AiProvider } from '@bandauto/db'
+import { CollectedPost, CollectedPostImage, AiProvider } from '@bandauto/db'
 
 // =============================================
 // INPUT TYPES
@@ -14,8 +14,8 @@ import { Post, PostImage, AiProvider } from '@bandauto/db'
  * Input data for product transformation
  */
 export interface ProductTransformationInput {
-  post: Post & {
-    images: PostImage[]
+  post: CollectedPost & {
+    images: CollectedPostImage[]
   }
   aiProvider: AiProvider
   aiConfig: {

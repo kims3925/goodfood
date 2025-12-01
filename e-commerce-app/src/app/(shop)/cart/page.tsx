@@ -131,8 +131,6 @@ export default function CartPage() {
       // 에러 시 롤백
       setCart(prevCart)
       console.error('수량 변경 실패:', error)
-    } finally {
-      setIsUpdating(false)
     }
   }
 

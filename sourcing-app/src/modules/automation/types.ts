@@ -43,28 +43,33 @@ export interface PipelineError {
 // =============================================
 
 export interface CollectionConfig {
-  wholesaleBandIds?: number[]
-  collectFromAllBands: boolean
+  channelIds?: number[]
+  collectFromAllChannels?: boolean
+  /** @deprecated use collectFromAllChannels instead */
+  collectFromAllBands?: boolean
   limit?: number
 }
 
 export interface CollectionResult extends PipelineResult {
   details: {
-    bandResults: BandCollectionResult[]
+    channelResults: ChannelCollectionResult[]
     totalNewPosts: number
     totalDuplicates: number
   }
 }
 
-export interface BandCollectionResult {
-  bandId: number
-  bandName: string
+export interface ChannelCollectionResult {
+  channelId: number
+  channelName: string
   fetched: number
   newPosts: number
   duplicates: number
   failed: number
   errors: string[]
 }
+
+/** @deprecated use ChannelCollectionResult instead */
+export type BandCollectionResult = ChannelCollectionResult
 
 // =============================================
 // TRANSFORM PIPELINE TYPES
@@ -97,35 +102,38 @@ export interface TransformedPost {
 // =============================================
 
 export interface PublishConfig {
-  retailBandIds: number[]
+  channelIds?: number[]
   productIds?: number[]
   publishReadyOnly?: boolean
 }
 
 export interface PublishResult extends PipelineResult {
   details: {
-    publishedProducts: PublishedProduct[]
-    bandResults: BandPublishResult[]
+    publishedProducts: PublishedProductResult[]
+    channelResults: ChannelPublishResult[]
   }
 }
 
-export interface PublishedProduct {
+export interface PublishedProductResult {
   productId: number
-  retailBandId: number
+  channelId: number
   postKey?: string
   status: PublishStatus
   error?: string
 }
 
-export interface BandPublishResult {
-  bandId: number
-  bandName: string
+export interface ChannelPublishResult {
+  channelId: number
+  channelName: string
   attempted: number
   success: number
   failed: number
   skipped: number
   errors: string[]
 }
+
+/** @deprecated use ChannelPublishResult instead */
+export type BandPublishResult = ChannelPublishResult
 
 // =============================================
 // FULL PIPELINE TYPES

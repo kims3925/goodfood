@@ -38,12 +38,13 @@ export async function GET() {
         data: {
           isEnabled: false,
           cronInterval: '1h' as CronInterval,
+          collectFromAllChannels: true,
           collectFromAllBands: true,
-          wholesaleBandIds: [],
+          channelIds: [],
+          retailChannelIds: [],
           aiProvider: 'GEMINI',
           pricingPolicyId: null,
           autoPublish: false,
-          retailBandIds: [],
           lastRunAt: null,
           nextRunAt: null,
         },
@@ -54,22 +55,24 @@ export async function GET() {
     const cronInterval = getCronIntervalFromExpression(config.cronExpression)
 
     // Parse JSON strings back to arrays
-    let wholesaleBandIds: number[] = []
-    let retailBandIds: number[] = []
+    let channelIds: number[] = []
+    let retailChannelIds: number[] = []
     try {
-      wholesaleBandIds = config.wholesaleBandIds ? JSON.parse(config.wholesaleBandIds) : []
-    } catch { wholesaleBandIds = [] }
+      channelIds = config.channelIds ? JSON.parse(config.channelIds) : []
+    } catch { channelIds = [] }
     try {
-      retailBandIds = config.retailBandIds ? JSON.parse(config.retailBandIds) : []
-    } catch { retailBandIds = [] }
+      retailChannelIds = config.retailChannelIds ? JSON.parse(config.retailChannelIds) : []
+    } catch { retailChannelIds = [] }
 
     return NextResponse.json({
       success: true,
       data: {
         ...config,
         cronInterval,
-        wholesaleBandIds,
-        retailBandIds,
+        channelIds,
+        retailChannelIds,
+        collectFromAllChannels: config.collectFromAllBands,
+        collectFromAllBands: config.collectFromAllBands,
       },
     })
   } catch (error) {
@@ -100,12 +103,18 @@ export async function POST(request: NextRequest) {
       isEnabled,
       cronInterval,
       collectFromAllBands,
-      wholesaleBandIds,
+      collectFromAllChannels,
+      channelIds,
       aiProvider,
       pricingPolicyId,
       autoPublish,
-      retailBandIds,
+      retailChannelIds,
     } = body
+
+    // 새로운 필드명 우선, 없으면 이전 필드명 사용 (하위 호환성)
+    const finalChannelIds = channelIds || []
+    const finalRetailChannelIds = retailChannelIds || []
+    const finalCollectFromAll = collectFromAllChannels ?? collectFromAllBands ?? true
 
     // cronInterval을 cronExpression으로 변환
     const cronExpression = cronInterval ? CRON_EXPRESSIONS[cronInterval as CronInterval] : null
@@ -122,23 +131,23 @@ export async function POST(request: NextRequest) {
         userId: currentUser.userId,
         isEnabled: isEnabled ?? false,
         cronExpression,
-        collectFromAllBands: collectFromAllBands ?? true,
-        wholesaleBandIds: JSON.stringify(wholesaleBandIds || []),
+        collectFromAllBands: finalCollectFromAll,
+        channelIds: JSON.stringify(finalChannelIds),
         aiProvider: aiProvider || 'GEMINI',
         pricingPolicyId: pricingPolicyId || null,
         autoPublish: autoPublish ?? false,
-        retailBandIds: JSON.stringify(retailBandIds || []),
+        retailChannelIds: JSON.stringify(finalRetailChannelIds),
         nextRunAt,
       },
       update: {
         isEnabled: isEnabled ?? false,
         cronExpression,
-        collectFromAllBands: collectFromAllBands ?? true,
-        wholesaleBandIds: JSON.stringify(wholesaleBandIds || []),
+        collectFromAllBands: finalCollectFromAll,
+        channelIds: JSON.stringify(finalChannelIds),
         aiProvider: aiProvider || 'GEMINI',
         pricingPolicyId: pricingPolicyId || null,
         autoPublish: autoPublish ?? false,
-        retailBandIds: JSON.stringify(retailBandIds || []),
+        retailChannelIds: JSON.stringify(finalRetailChannelIds),
         nextRunAt,
       },
     })
