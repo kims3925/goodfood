@@ -6,8 +6,8 @@ model ProductPublish {
   id               Int           @id @default(autoincrement())
   userId           Int           @map("user_id")
   productId        Int           @map("product_id")
-  retailBandId     Int?          @map("retail_band_id")      // 기존 호환용 (nullable)
-  publishChannelId Int?          @map("publish_channel_id")  // 발행처 채널 ID
+  publishType      PublishType   @default(RETAIL_BAND) @map("publish_type")  // 발행 유형
+  retailBandId     Int?          @map("retail_band_id")  // 소매밴드 ID (RETAIL_BAND일 때만 필수)
 
   // Status
   status           PublishStatus @default(PENDING)
@@ -23,18 +23,15 @@ model ProductPublish {
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   product          Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
   retailBand       RetailBand?       @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
-  publishChannel   PublishChannel?   @relation(fields: [publishChannelId], references: [id], onDelete: Cascade)
   orderItems       OrderItem[]       // 쇼핑몰 주문 아이템
   orderTests       OrderTest[]       // 웹훅 주문 (구글폼 등)
   cartItems        CartItem[]        // 장바구니 아이템
 
-  @@unique([productId, publishChannelId]) // 같은 상품을 같은 채널에 중복 발행 방지
+  @@unique([productId, publishType, retailBandId]) // 같은 상품을 같은 발행처에 중복 발행 방지
   @@index([userId])
   @@index([productId])
   @@index([retailBandId])
-  @@index([publishChannelId])
   @@index([status])
+  @@index([publishType])
   @@map("product_publish")
 }
-
-

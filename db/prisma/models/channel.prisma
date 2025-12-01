@@ -1,49 +1,6 @@
 // =============================================
-// CHANNEL (도매처/발행처 추상화)
+// CHANNEL 모델 제거됨
 // =============================================
-
-// 도매처 채널 (WholesaleBand, Ali, Taobao 등을 추상화)
-model SourceChannel {
-  id        Int               @id @default(autoincrement())
-  userId    Int               @map("user_id")
-  type      SourceChannelType // 도매처 타입
-  name      String            @db.VarChar(200)  // "도매밴드 A", "알리바바" 등
-  refId     Int?              @map("ref_id")    // 원본 테이블 ID (WholesaleBand.id 등)
-  config    Json?             // 채널별 설정 (API key, 인증 정보 등)
-  isActive  Boolean           @default(true) @map("is_active")
-
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  products  Product[]
-
-  @@index([userId])
-  @@index([type])
-  @@index([isActive])
-  @@map("source_channel")
-}
-
-// 발행처 채널 (RetailBand, ShoppingMall, SmartStore 등을 추상화)
-model PublishChannel {
-  id        Int                @id @default(autoincrement())
-  userId    Int                @map("user_id")
-  type      PublishChannelType // 발행처 타입
-  name      String             @db.VarChar(200)  // "소매밴드 A", "내 쇼핑몰" 등
-  refId     Int?               @map("ref_id")    // 원본 테이블 ID (RetailBand.id 등)
-  config    Json?              // 채널별 설정 (API key, 인증 정보 등)
-  isActive  Boolean            @default(true) @map("is_active")
-
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  publishes ProductPublish[]
-
-  @@index([userId])
-  @@index([type])
-  @@index([isActive])
-  @@map("publish_channel")
-}
+// SourceChannel, PublishChannel은 불필요한 추상화 레이어로 판단되어 삭제
+// - 도매처: Product → Post → WholesaleBand 로 추적
+// - 발행처: ProductPublish → RetailBand 로 추적

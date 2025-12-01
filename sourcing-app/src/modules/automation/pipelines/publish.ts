@@ -3,7 +3,7 @@
  * 상품을 소매밴드에 발행
  */
 
-import prisma, { PublishStatus, PublishChannelType } from '@bandauto/db'
+import prisma, { PublishStatus, PublishType } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { NaverBandClient } from '@/modules/sourcing/domain/src/band'
@@ -129,26 +129,6 @@ export async function runPublishPipeline(
       continue
     }
 
-    // 발행 채널 조회 또는 생성 (소매밴드용)
-    let publishChannel = await prisma.publishChannel.findFirst({
-      where: {
-        userId,
-        type: PublishChannelType.RETAIL_BAND,
-        refId: band.id,
-      },
-    })
-
-    if (!publishChannel) {
-      publishChannel = await prisma.publishChannel.create({
-        data: {
-          userId,
-          type: PublishChannelType.RETAIL_BAND,
-          name: band.name,
-          refId: band.id,
-        },
-      })
-    }
-
     // Band API 클라이언트 초기화
     const bandClient = new NaverBandClient(band.apiConfig.accessToken)
 
@@ -156,12 +136,13 @@ export async function runPublishPipeline(
     for (const product of products) {
       bandResult.attempted++
 
-      // 이미 발행된 상품인지 확인 (ProductPublish로 통합)
+      // 이미 발행된 상품인지 확인
       const existingPublish = await prisma.productPublish.findUnique({
         where: {
-          productId_publishChannelId: {
+          productId_publishType_retailBandId: {
             productId: product.id,
-            publishChannelId: publishChannel.id,
+            publishType: PublishType.RETAIL_BAND,
+            retailBandId: band.id,
           },
         },
       })
@@ -198,19 +179,20 @@ export async function runPublishPipeline(
           await bandClient.createComment(band.bandKey, postKey, commentContent)
         }
 
-        // ProductPublish 레코드 생성/업데이트 (발행 이력 통합)
+        // ProductPublish 레코드 생성/업데이트
         await prisma.productPublish.upsert({
           where: {
-            productId_publishChannelId: {
+            productId_publishType_retailBandId: {
               productId: product.id,
-              publishChannelId: publishChannel.id,
+              publishType: PublishType.RETAIL_BAND,
+              retailBandId: band.id,
             },
           },
           create: {
             userId,
             productId: product.id,
+            publishType: PublishType.RETAIL_BAND,
             retailBandId: band.id,
-            publishChannelId: publishChannel.id,
             status: PublishStatus.SUCCESS,
             externalId: postKey,
             publishedAt: new Date(),
@@ -244,19 +226,20 @@ export async function runPublishPipeline(
           publishError
         )
 
-        // 실패 이력 저장 (ProductPublish로 통합)
+        // 실패 이력 저장
         await prisma.productPublish.upsert({
           where: {
-            productId_publishChannelId: {
+            productId_publishType_retailBandId: {
               productId: product.id,
-              publishChannelId: publishChannel.id,
+              publishType: PublishType.RETAIL_BAND,
+              retailBandId: band.id,
             },
           },
           create: {
             userId,
             productId: product.id,
+            publishType: PublishType.RETAIL_BAND,
             retailBandId: band.id,
-            publishChannelId: publishChannel.id,
             status: PublishStatus.FAILED,
             errorMessage: publishError.message,
             publishedAt: new Date(),

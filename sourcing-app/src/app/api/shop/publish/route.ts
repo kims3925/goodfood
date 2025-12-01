@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { PublishStatus, ProductStatus, PublishChannelType } from '@bandauto/db'
+import prisma, { PublishStatus, ProductStatus, PublishType } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 /**
@@ -69,17 +69,15 @@ export async function GET(request: NextRequest) {
           take: 1,
         },
         productPublishes: {
-          include: {
+          where: { status: PublishStatus.SUCCESS },
+          select: {
+            id: true,
+            publishType: true,
+            status: true,
+            createdAt: true,
             retailBand: {
               select: {
                 id: true,
-                name: true,
-              },
-            },
-            publishChannel: {
-              select: {
-                id: true,
-                type: true,
                 name: true,
               },
             },
@@ -96,14 +94,17 @@ export async function GET(request: NextRequest) {
       const mainImage = product.post?.images?.[0]?.imageUrl || product.thumbnailUrl
       const mainVariant = product.variants?.[0]
 
-      // 발행처별 상태 계산
-      const successPublishes = product.productPublishes.filter((pp) => pp.status === PublishStatus.SUCCESS)
-      const retailBandPublishes = successPublishes.filter((pp) => pp.publishChannel?.type === PublishChannelType.RETAIL_BAND)
-      const shoppingMallPublishes = successPublishes.filter((pp) => pp.publishChannel?.type === PublishChannelType.SHOPPING_MALL)
+      // 발행 유형별 분류
+      const retailBandPublishes = product.productPublishes.filter(
+        (pp) => pp.publishType === PublishType.RETAIL_BAND
+      )
+      const shoppingMallPublishes = product.productPublishes.filter(
+        (pp) => pp.publishType === PublishType.SHOPPING_MALL
+      )
 
-      // 발행 현황 계산
       const hasRetailBand = retailBandPublishes.length > 0
       const hasShoppingMall = shoppingMallPublishes.length > 0
+
       let publishSummary = '미발행'
       if (hasRetailBand && hasShoppingMall) {
         publishSummary = '발행완료'
@@ -121,29 +122,28 @@ export async function GET(request: NextRequest) {
         stock: mainVariant?.stock || 0,
         status: product.status,
         wholesaleBand: product.post?.wholesaleBand,
-        // 발행 상태 (채널별)
+        // 발행 상태 (유형별)
         publishStatus: {
           retailBand: hasRetailBand,
           shoppingMall: hasShoppingMall,
         },
         publishSummary,
-        // 기존 호환용
+        // 발행된 밴드 목록
         publishedBands: retailBandPublishes.map((pp) => ({
           publishId: pp.id,
           retailBandId: pp.retailBand?.id,
           retailBandName: pp.retailBand?.name,
-          channelType: pp.publishChannel?.type,
-          channelName: pp.publishChannel?.name,
           status: pp.status,
           createdAt: pp.createdAt,
         })),
         // 쇼핑몰 발행 상태
-        shoppingMallPublish: shoppingMallPublishes[0] ? {
-          publishId: shoppingMallPublishes[0].id,
-          channelName: shoppingMallPublishes[0].publishChannel?.name,
-          status: shoppingMallPublishes[0].status,
-          createdAt: shoppingMallPublishes[0].createdAt,
-        } : null,
+        shoppingMallPublish: shoppingMallPublishes[0]
+          ? {
+              publishId: shoppingMallPublishes[0].id,
+              status: shoppingMallPublishes[0].status,
+              createdAt: shoppingMallPublishes[0].createdAt,
+            }
+          : null,
         createdAt: product.createdAt,
       }
     })
@@ -170,8 +170,8 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/shop/publish
  *
- * Publish products to retail bands
- * Creates ProductPublish records for each product-band combination
+ * Publish products to shopping mall
+ * Creates ProductPublish records with publishType = SHOPPING_MALL
  */
 export async function POST(request: NextRequest) {
   try {
@@ -210,56 +210,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 쇼핑몰 발행 채널 조회 또는 생성
-    let shoppingMallChannel = await prisma.publishChannel.findFirst({
-      where: {
-        userId,
-        type: PublishChannelType.SHOPPING_MALL,
-      },
-    })
-
-    if (!shoppingMallChannel) {
-      shoppingMallChannel = await prisma.publishChannel.create({
-        data: {
-          userId,
-          type: PublishChannelType.SHOPPING_MALL,
-          name: '쇼핑몰',
-        },
-      })
-    }
-
-    // Check existing publishes to avoid duplicates
+    // Check existing shopping mall publishes to avoid duplicates
     const existingPublishes = await prisma.productPublish.findMany({
       where: {
         productId: { in: productIds },
-        publishChannelId: shoppingMallChannel.id,
+        publishType: PublishType.SHOPPING_MALL,
       },
       select: {
         productId: true,
-        publishChannelId: true,
       },
     })
 
-    const existingSet = new Set(
-      existingPublishes.map((p) => `${p.productId}-${p.publishChannelId}`)
-    )
+    const existingProductIds = new Set(existingPublishes.map((p) => p.productId))
 
     // Create publish records
     const results: {
       productId: number
-      publishChannelId: number
       status: 'SUCCESS' | 'SKIPPED' | 'FAILED'
       publishId?: number
       message?: string
     }[] = []
 
     for (const productId of productIds) {
-      const key = `${productId}-${shoppingMallChannel.id}`
-
-      if (existingSet.has(key)) {
+      if (existingProductIds.has(productId)) {
         results.push({
           productId,
-          publishChannelId: shoppingMallChannel.id,
           status: 'SKIPPED',
           message: '이미 쇼핑몰에 발행된 상품입니다.',
         })
@@ -271,14 +246,15 @@ export async function POST(request: NextRequest) {
           data: {
             userId,
             productId,
-            publishChannelId: shoppingMallChannel.id,
+            publishType: PublishType.SHOPPING_MALL,
+            // retailBandId is null for shopping mall
             status: PublishStatus.SUCCESS,
+            publishedAt: new Date(),
           },
         })
 
         results.push({
           productId,
-          publishChannelId: shoppingMallChannel.id,
           status: 'SUCCESS',
           publishId: publish.id,
         })
@@ -286,7 +262,6 @@ export async function POST(request: NextRequest) {
         console.error(`쇼핑몰 발행 실패 (product: ${productId}):`, error)
         results.push({
           productId,
-          publishChannelId: shoppingMallChannel.id,
           status: 'FAILED',
           message: error.message || '발행에 실패했습니다.',
         })

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { PublishChannelType } from '@bandauto/db'
+import prisma, { PublishType } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 /**
@@ -39,12 +39,10 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
 
-    // Build where clause - 소매밴드 발행만 조회 (RETAIL_BAND 채널 타입 필터)
+    // Build where clause - 소매밴드 발행 조회
     const where: any = {
       userId,
-      publishChannel: {
-        type: PublishChannelType.RETAIL_BAND,
-      },
+      publishType: PublishType.RETAIL_BAND,
     }
 
     if (status) {

@@ -29,8 +29,6 @@ model User {
   sourcingApiConfigs SourcingApiConfig[]
   wholesaleBands     WholesaleBand[]
   workflowLogs       WorkflowLog[]
-  sourceChannels     SourceChannel[]
-  publishChannels    PublishChannel[]
 
   // Customer relations (e-commerce-app)
   addresses          UserAddress[]
