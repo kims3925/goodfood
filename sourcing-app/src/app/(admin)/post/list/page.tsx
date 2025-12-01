@@ -21,15 +21,16 @@ interface PostImage {
 interface Post {
   id: number
   userId: number
-  wholesaleBandId: number
+  channelId: number
   externalId: string
   title: string
   content: string
   author: string | null
   createdAt: string
-  wholesaleBand: {
+  channel: {
+    id: number
     name: string
-    bandKey: string
+    channelKey: string
     coverUrl: string | null
   }
   images: PostImage[]
@@ -46,10 +47,10 @@ interface AvailablePost {
     author: string
     content: string
   }>
-  band: {
+  channel: {
     id: number
     name: string
-    bandKey: string
+    channelKey: string
   }
 }
 
@@ -83,7 +84,7 @@ export default function PostsManagePage() {
   const [apiError, setApiError] = useState<string | null>(null)
   const [selectAll, setSelectAll] = useState(false)
   const [expandedPostKeys, setExpandedPostKeys] = useState<string[]>([])
-  const [expandedBandKeys, setExpandedBandKeys] = useState<string[]>([])
+  const [expandedChannelKeys, setExpandedBandKeys] = useState<string[]>([])
 
   // 게시물 등록 진행 상태
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -186,7 +187,7 @@ export default function PostsManagePage() {
     )
   }
 
-  const handleToggleBandExpand = (bandKey: string) => {
+  const handleToggleChannelExpand = (bandKey: string) => {
     setExpandedBandKeys((prev) =>
       prev.includes(bandKey)
         ? prev.filter((key) => key !== bandKey)
@@ -194,18 +195,18 @@ export default function PostsManagePage() {
     )
   }
 
-  // 밴드별로 게시물 그룹화
+  // 채널별로 게시물 그룹화
   const groupedPosts = availablePosts.reduce((acc, post) => {
-    const bandKey = post.band.bandKey
-    if (!acc[bandKey]) {
-      acc[bandKey] = {
-        band: post.band,
+    const channelKey = post.channel.channelKey
+    if (!acc[channelKey]) {
+      acc[channelKey] = {
+        channel: post.channel,
         posts: [],
       }
     }
-    acc[bandKey].posts.push(post)
+    acc[channelKey].posts.push(post)
     return acc
-  }, {} as Record<string, { band: { id: number; name: string; bandKey: string }; posts: AvailablePost[] }>)
+  }, {} as Record<string, { channel: { id: number; name: string; channelKey: string }; posts: AvailablePost[] }>)
 
   const handleAddSelectedPosts = async () => {
     if (selectedPostKeys.length === 0) {
@@ -236,7 +237,7 @@ export default function PostsManagePage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              wholesaleBandId: post.band.id, // 게시물의 출처 밴드 ID
+              channelId: post.channel.id, // 게시물의 출처 채널 ID
               externalId: post.post_key,
               title: post.title,
               content: post.content,
@@ -499,10 +500,10 @@ export default function PostsManagePage() {
                         onClick={() => router.push(`/post/detail/${post.id}`)}
                       >
                         <div className="flex items-center gap-3">
-                          {post.wholesaleBand.coverUrl ? (
+                          {post.channel.coverUrl ? (
                             <img
-                              src={post.wholesaleBand.coverUrl}
-                              alt={post.wholesaleBand.name}
+                              src={post.channel.coverUrl}
+                              alt={post.channel.name}
                               className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
                             />
                           ) : (
@@ -511,8 +512,8 @@ export default function PostsManagePage() {
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-gray-900 truncate">{post.wholesaleBand.name}</div>
-                            <div className="text-gray-500 text-sm truncate mt-0.5">{post.wholesaleBand.bandKey}</div>
+                            <div className="font-semibold text-gray-900 truncate">{post.channel.name}</div>
+                            <div className="text-gray-500 text-sm truncate mt-0.5">{post.channel.channelKey}</div>
                           </div>
                         </div>
                       </TableCell>
@@ -629,32 +630,32 @@ export default function PostsManagePage() {
                 </p>
               </div>
 
-              {/* 밴드별 그룹 */}
+              {/* 채널별 그룹 */}
               <div className="space-y-3">
-                {Object.entries(groupedPosts).map(([bandKey, group]) => {
-                  const isBandExpanded = expandedBandKeys.includes(bandKey)
+                {Object.entries(groupedPosts).map(([channelKey, group]) => {
+                  const isChannelExpanded = expandedChannelKeys.includes(channelKey)
                   return (
-                    <div key={bandKey} className="border rounded-lg bg-white">
-                      {/* 밴드 헤더 */}
+                    <div key={channelKey} className="border rounded-lg bg-white">
+                      {/* 채널 헤더 */}
                       <div
                         className="p-3 bg-gray-50 border-b cursor-pointer hover:bg-gray-100 transition-colors"
-                        onClick={() => handleToggleBandExpand(bandKey)}
+                        onClick={() => handleToggleChannelExpand(channelKey)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            {isBandExpanded ? (
+                            {isChannelExpanded ? (
                               <ChevronDown size={20} className="text-gray-600" />
                             ) : (
                               <ChevronRight size={20} className="text-gray-600" />
                             )}
-                            <h3 className="font-semibold text-gray-900">{group.band.name}</h3>
+                            <h3 className="font-semibold text-gray-900">{group.channel.name}</h3>
                             <span className="text-sm text-gray-500">({group.posts.length}개)</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* 밴드별 게시물 목록 */}
-                      {isBandExpanded && (
+                      {/* 채널별 게시물 목록 */}
+                      {isChannelExpanded && (
                         <div className="p-2 space-y-2">
                           {group.posts.map((post) => {
                             const isExpanded = expandedPostKeys.includes(post.post_key)

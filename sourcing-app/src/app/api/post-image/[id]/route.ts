@@ -34,12 +34,16 @@ export async function DELETE(
     }
 
     // Get the image with its post to verify ownership
-    const image = await prisma.postImage.findUnique({
+    const image = await prisma.collectedPostImage.findUnique({
       where: { id: imageId },
       include: {
         post: {
           include: {
-            product: true,
+            collectedProducts: {
+              include: {
+                products: true,
+              },
+            },
           },
         },
       },
@@ -64,12 +68,12 @@ export async function DELETE(
     const deletedSortOrder = image.sortOrder
 
     // Delete the image
-    await prisma.postImage.delete({
+    await prisma.collectedPostImage.delete({
       where: { id: imageId },
     })
 
     // Update sortOrder for remaining images
-    await prisma.postImage.updateMany({
+    await prisma.collectedPostImage.updateMany({
       where: {
         postId,
         sortOrder: { gt: deletedSortOrder },
@@ -80,7 +84,7 @@ export async function DELETE(
     })
 
     // Get the new first image (new thumbnail)
-    const firstImage = await prisma.postImage.findFirst({
+    const firstImage = await prisma.collectedPostImage.findFirst({
       where: { postId },
       orderBy: { sortOrder: 'asc' },
     })
@@ -88,9 +92,13 @@ export async function DELETE(
     const newThumbnailUrl = firstImage?.imageUrl || null
 
     // Update product's thumbnailUrl if product exists
-    if (image.post.product) {
-      await prisma.product.update({
-        where: { id: image.post.product.id },
+    const productIds = image.post.collectedProducts.flatMap((cp) =>
+      cp.products.map((p) => p.id)
+    )
+
+    if (productIds.length > 0) {
+      await prisma.product.updateMany({
+        where: { id: { in: productIds } },
         data: { thumbnailUrl: newThumbnailUrl },
       })
     }

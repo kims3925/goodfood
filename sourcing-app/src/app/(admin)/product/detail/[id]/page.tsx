@@ -20,10 +20,10 @@ import { useToast } from '@/components/ui/Toast'
 
 interface Product {
   id: number
-  postId: number
+  collectedProductId: number | null
   name: string
   description: string | null
-  status: 'COLLECTED' | 'PUBLISHED'
+  status: 'COLLECTED' | 'ARCHIVED'
   thumbnailUrl: string | null
   price: number | null
   wholesalePrice: number | null
@@ -31,22 +31,25 @@ interface Product {
   currency: string
   createdAt: string
   updatedAt: string
-  post: {
+  collectedProduct: {
     id: number
-    title: string
-    content: string
-    wholesaleBand: {
-      name: string
-      bandKey: string
-      coverUrl: string | null
-    }
-    images: Array<{
+    post: {
       id: number
-      imageUrl: string
-      name?: string
-      sortOrder: number
-    }>
-  }
+      title: string
+      content: string
+      channel: {
+        id: number
+        name: string
+        coverUrl: string | null
+      } | null
+      images: Array<{
+        id: number
+        imageUrl: string
+        name?: string
+        sortOrder: number
+      }>
+    } | null
+  } | null
   options: Array<{
     id: number
     groupName: string
@@ -140,6 +143,16 @@ export default function ProductDetailPage() {
           price: data.data.price?.toString() || '',
           wholesalePrice: data.data.wholesalePrice?.toString() || '',
         })
+        // 이미지 상태 초기화
+        if (data.data.collectedProduct?.post?.images) {
+          setImages(data.data.collectedProduct.post.images.map((img: any) => ({
+            id: img.id,
+            imageUrl: img.imageUrl,
+            name: img.name,
+            sortOrder: img.sortOrder,
+          })))
+        }
+        setImageOrderChanged(false)
       } else {
         setError(data.error || '상품을 불러오는데 실패했습니다.')
       }
@@ -229,16 +242,24 @@ export default function ProductDetailPage() {
   }
 
   // 이미지 순서 변경 핸들러
-  const handleImageReorder = async (reorderedImages: SortableImage[]) => {
-    if (!product) return
+  const handleImageReorder = (newOrder: SortableImage[]) => {
+    setImages(newOrder)
+    setImageOrderChanged(true)
+  }
+
+  // 이미지 순서 저장
+  const handleSaveImageOrder = async () => {
+    if (!product || images.length === 0) return
+    const postId = product.collectedProduct?.post?.id
+    if (!postId) return
 
     try {
       const response = await fetch('/api/post/image/reorder', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          postId: product.postId,
-          imageIds: reorderedImages.map((img) => img.id),
+          postId,
+          imageIds: images.map((img) => img.id),
         }),
       })
 
@@ -250,9 +271,24 @@ export default function ProductDetailPage() {
         toast.error('이미지 순서 변경에 실패했습니다.')
       }
     } catch (error) {
-      console.error('이미지 순서 변경 실패:', error)
-      toast.error('이미지 순서 변경에 실패했습니다.')
+      console.error('이미지 순서 저장 실패:', error)
+    } finally {
+      setIsReorderingSaving(false)
     }
+  }
+
+  // 이미지 순서 변경 취소
+  const handleCancelImageReorder = () => {
+    if (product?.collectedProduct?.post?.images) {
+      setImages(product.collectedProduct.post.images.map((img) => ({
+        id: img.id,
+        imageUrl: img.imageUrl,
+        name: img.name,
+        sortOrder: img.sortOrder,
+      })))
+    }
+    setImageOrderChanged(false)
+    setIsImageReordering(false)
   }
 
   // 이미지 삭제 핸들러
@@ -637,20 +673,43 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
-              {/* 출처 정보 */}
-              <div className="bg-white rounded-2xl shadow-lg p-6">
-                <div className="flex items-center justify-between mb-4 pb-4 border-b">
-                  <h2 className="text-lg font-semibold text-gray-900">출처 게시물</h2>
+          {/* Row 2: 출처 게시물 + 메타데이터 */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+            {/* Source Post Card */}
+            <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">출처 게시물</h2>
+                {product.collectedProduct?.post && (
                   <Link
-                    href={`/post/detail/${product.post.id}`}
-                    className="text-purple-600 hover:text-purple-700 text-sm font-medium flex items-center gap-1"
+                    href={`/post/detail/${product.collectedProduct.post.id}`}
+                    className="inline-flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
                   >
-                    <FileText size={14} /> 보기
+                    <FileText size={14} />
+                    게시물 보기
                   </Link>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
-                    {product.post.wholesaleBand.name}
+                )}
+              </div>
+              <div className="p-6 flex-1">
+                <div className="flex items-start gap-4">
+                  {product.collectedProduct?.post?.images[0]?.imageUrl && (
+                    <img
+                      src={product.collectedProduct.post.images[0].imageUrl}
+                      alt={product.collectedProduct.post.title}
+                      className="w-24 h-24 rounded-lg object-cover flex-shrink-0"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-medium text-purple-600">
+                        {product.collectedProduct?.post?.channel?.name || '출처 미확인'}
+                      </span>
+                    </div>
+                    <h4 className="font-medium text-gray-900 mb-1">
+                      {product.collectedProduct?.post?.title || '게시물 없음'}
+                    </h4>
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {product.collectedProduct?.post?.content || '원본 게시물 내용을 찾을 수 없습니다.'}
+                    </p>
                   </div>
                   <span className="text-gray-600 text-sm truncate">{product.post.title}</span>
                 </div>

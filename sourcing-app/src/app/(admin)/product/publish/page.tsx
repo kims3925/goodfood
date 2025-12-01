@@ -15,7 +15,7 @@ interface PublishedProduct {
   id: number
   userId: number
   productId: number
-  retailBandId: number
+  channelId: number
   status: 'PENDING' | 'SUCCESS' | 'FAILED'
   createdAt: string
   updatedAt: string

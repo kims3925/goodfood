@@ -1,6 +1,45 @@
 // =============================================
-// CHANNEL 모델 제거됨
+// CHANNEL (통합 채널)
+// WholesaleBand / RetailBand를 추상화한 통합 채널 모델
+// 소싱처(도매밴드, 알리 등) + 판매처(소매밴드, 쇼핑몰 등) 통합
 // =============================================
-// SourceChannel, PublishChannel은 불필요한 추상화 레이어로 판단되어 삭제
-// - 도매처: Product → Post → WholesaleBand 로 추적
-// - 발행처: ProductPublish → RetailBand 로 추적
+
+model Channel {
+  id            Int             @id @default(autoincrement())
+  userId        Int             @map("user_id")
+  apiConfigId   Int?            @map("api_config_id") // SHOP 플랫폼은 null (외부 API 불필요)
+
+  kind          ChannelKind
+  platform      ChannelPlatform
+
+  channelKey    String          @map("channel_key") @db.VarChar(255)
+  name          String          @db.VarChar(255)
+  coverUrl      String?         @map("cover_url") @db.VarChar(500)
+  isActive      Boolean         @default(true) @map("is_active")
+
+  // Retail 전용 필드 (WHOLESALE인 경우 null)
+  formUrl       String?         @map("form_url") @db.VarChar(500)
+  accountHolder String?         @map("account_holder") @db.VarChar(100)
+  bankAccount   String?         @map("bank_account") @db.VarChar(50)
+  bankName      String?         @map("bank_name") @db.VarChar(50)
+
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  // Relationships
+  apiConfig         SourcingApiConfig?  @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // kind=WHOLESALE 일 때 사용
+  collectedPosts    CollectedPost[]
+
+  // kind=RETAIL 일 때 사용
+  publishedProducts PublishedProduct[]
+
+  @@unique([userId, channelKey])
+  @@index([userId])
+  @@index([apiConfigId])
+  @@index([isActive])
+  @@index([kind, platform])
+  @@map("channel")
+}

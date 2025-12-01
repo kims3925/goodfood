@@ -59,14 +59,14 @@ export async function GET(request: NextRequest) {
     const unifiedOrders: UnifiedOrder[] = []
 
     // 1. 쇼핑몰 주문 조회 (source가 ALL 또는 SHOPPING_MALL인 경우)
-    // Order.userId는 고객 ID이므로, ProductPublish를 통해 관리자의 상품이 포함된 주문을 조회
+    // Order.userId는 고객 ID이므로, PublishedProduct를 통해 관리자의 상품이 포함된 주문을 조회
     if (!source || source === 'ALL' || source === 'SHOPPING_MALL') {
       const shopOrders = await prisma.order.findMany({
         where: {
           // 관리자가 발행한 상품이 포함된 주문 조회
           items: {
             some: {
-              productPublish: {
+              publishedProduct: {
                 userId: user.userId,
               },
             },
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
           }),
         },
         include: {
-          productPublish: {
+          publishedProduct: {
             include: {
               product: {
                 select: {
@@ -148,7 +148,7 @@ export async function GET(request: NextRequest) {
           orderNumber: `BAND-${String(order.id).padStart(6, '0')}`,
           customerName: order.customerName,
           customerPhone: null,
-          productSummary: order.productPublish?.product?.name || order.productName,
+          productSummary: order.publishedProduct?.product?.name || order.productName,
           itemCount: 1,
           totalAmount: order.totalPrice || 0,
           status: 'RECEIVED',

@@ -13,7 +13,7 @@ export class PostService {
 
   async create(data: PostCreateInput) {
     // 중복 체크
-    const existing = await postRepository.findByExternalId(data.wholesaleBandId, data.externalId)
+    const existing = await postRepository.findByExternalId(data.channelId, data.externalId)
     if (existing) {
       throw new Error('이미 등록된 게시물입니다.')
     }
@@ -30,7 +30,7 @@ export class PostService {
 
     return postRepository.create({
       userId: data.userId,
-      wholesaleBandId: data.wholesaleBandId,
+      channelId: data.channelId,
       externalId: data.externalId,
       title: data.title,
       content: data.content,

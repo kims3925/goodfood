@@ -13,7 +13,7 @@ export async function GET(
   try {
     const productId = parseInt(params.id)
     const { searchParams } = new URL(req.url)
-    const bandId = searchParams.get('bandId')
+    const channelId = searchParams.get('channelId') || searchParams.get('bandId') // 하위 호환성
 
     if (isNaN(productId)) {
       return NextResponse.json(
@@ -31,20 +31,24 @@ export async function GET(
         options: {
           orderBy: { sortOrder: 'asc' },
         },
-        post: {
+        collectedProduct: {
           include: {
-            images: {
-              orderBy: { sortOrder: 'asc' },
+            post: {
+              include: {
+                images: {
+                  orderBy: { sortOrder: 'asc' },
+                },
+                channel: true, // 판매자(도매채널) 정보
+              },
             },
-            wholesaleBand: true, // 판매자(도매밴드) 정보
           },
         },
-        productPublishes: {
-          where: bandId
-            ? { retailBandId: parseInt(bandId), status: PublishStatus.SUCCESS }
+        publishedProducts: {
+          where: channelId
+            ? { channelId: parseInt(channelId), status: PublishStatus.SUCCESS }
             : { status: PublishStatus.SUCCESS },
           include: {
-            retailBand: true,
+            channel: true,
           },
           take: 1,
         },
@@ -59,7 +63,7 @@ export async function GET(
     }
 
     const mainVariant = product.variants[0]
-    const images = product.post?.images?.map((img) => img.imageUrl) || []
+    const images = product.collectedProduct?.post?.images?.map((img) => img.imageUrl) || []
 
     const salePrice = mainVariant?.price || product.price || 0
     const originalPrice = mainVariant?.wholesalePrice || product.wholesalePrice || salePrice
@@ -84,19 +88,19 @@ export async function GET(
       sku: variant.sku,
     }))
 
-    // 밴드 정보 가져오기 (product_publish -> retail_band)
-    const productPublish = product.productPublishes[0]
-    const retailBand = productPublish?.retailBand
-    const bandName = retailBand?.name || null
-    const retailBandId = retailBand?.id || null
-    const productPublishId = productPublish?.id || null
+    // 채널 정보 가져오기 (published_product -> channel)
+    const publishedProduct = product.publishedProducts[0]
+    const channel = publishedProduct?.channel
+    const channelName = channel?.name || null
+    const publishChannelId = channel?.id || null
+    const publishedProductId = publishedProduct?.id || null
 
-    // 판매자 정보 가져오기 (post -> wholesaleBand)
-    const sellerName = product.post?.wholesaleBand?.name || null
+    // 판매자 정보 가져오기 (collectedProduct -> post -> channel)
+    const sellerName = product.collectedProduct?.post?.channel?.name || null
 
     const formattedProduct = {
       id: product.id.toString(),
-      productPublishId: productPublishId?.toString() || null, // 추가: 장바구니/주문에 필요
+      publishedProductId: publishedProductId?.toString() || null, // 추가: 장바구니/주문에 필요
       title: product.name,
       description: product.description || '',
       originalPrice,
@@ -108,8 +112,11 @@ export async function GET(
       stock: mainVariant?.stock || 100,
       rating: 4.5,
       reviews: 100,
-      bandName,
-      retailBandId,
+      channelName,
+      channelId: publishChannelId,
+      // 하위 호환성
+      bandName: channelName,
+      retailBandId: publishChannelId,
       sellerName,
       shippingInfo: {
         defaultShippingFee: 3000,

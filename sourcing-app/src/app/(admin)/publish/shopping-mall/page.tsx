@@ -30,6 +30,14 @@ interface ShoppingMallPublish {
   createdAt: string
 }
 
+interface ShopChannel {
+  id: number
+  name: string
+  channelKey: string
+  coverUrl: string | null
+  isActive: boolean
+}
+
 interface Product {
   id: number
   name: string
@@ -64,6 +72,11 @@ export default function ShoppingMallPublishPage() {
   const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false)
   const [pendingUnpublishIds, setPendingUnpublishIds] = useState<number[]>([])
 
+  // Shop Channels
+  const [shopChannels, setShopChannels] = useState<ShopChannel[]>([])
+  const [selectedChannelId, setSelectedChannelId] = useState<number | null>(null)
+  const [isLoadingChannels, setIsLoadingChannels] = useState(true)
+
   // Selection
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([])
   const [selectAllProducts, setSelectAllProducts] = useState(false)
@@ -90,10 +103,36 @@ export default function ShoppingMallPublishPage() {
     message: string
   } | null>(null)
 
+  // Load shop channels on mount
+  useEffect(() => {
+    loadShopChannels()
+  }, [])
+
   // Load data
   useEffect(() => {
     loadProducts()
   }, [currentPage, activeTab])
+
+  const loadShopChannels = async () => {
+    try {
+      setIsLoadingChannels(true)
+      const response = await fetch('/api/channel?kind=RETAIL&platform=SHOP&limit=100')
+      const data = await response.json()
+
+      if (data.success) {
+        const activeChannels = data.data.filter((ch: ShopChannel) => ch.isActive)
+        setShopChannels(activeChannels)
+        // 첫 번째 채널을 기본 선택
+        if (activeChannels.length > 0 && !selectedChannelId) {
+          setSelectedChannelId(activeChannels[0].id)
+        }
+      }
+    } catch (error) {
+      console.error('쇼핑몰 채널 조회 실패:', error)
+    } finally {
+      setIsLoadingChannels(false)
+    }
+  }
 
   const loadProducts = async () => {
     try {
@@ -174,6 +213,11 @@ export default function ShoppingMallPublishPage() {
       return
     }
 
+    if (!selectedChannelId) {
+      alert('발행할 쇼핑몰을 선택해주세요.')
+      return
+    }
+
     setIsPublishing(true)
     setPublishResult(null)
 
@@ -183,6 +227,7 @@ export default function ShoppingMallPublishPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productIds: selectedProductIds,
+          channelId: selectedChannelId,
         }),
       })
 
@@ -511,13 +556,85 @@ export default function ShoppingMallPublishPage() {
 
           {/* Right: Publish Panel */}
           <div className="lg:col-span-1 space-y-6">
+            {/* Shop Channel Selection */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Store className="text-primary-color" size={20} />
+                <h3 className="font-semibold text-gray-900">쇼핑몰 선택</h3>
+              </div>
+
+              {isLoadingChannels ? (
+                <div className="py-4 text-center text-gray-500 text-sm">
+                  <RefreshCw size={16} className="animate-spin inline mr-2" />
+                  채널 로딩 중...
+                </div>
+              ) : shopChannels.length === 0 ? (
+                <div className="py-4 text-center">
+                  <p className="text-gray-500 text-sm mb-3">
+                    등록된 쇼핑몰이 없습니다.
+                  </p>
+                  <a
+                    href="/channel"
+                    className="text-primary-color text-sm font-medium hover:underline"
+                  >
+                    채널 관리에서 쇼핑몰 등록하기
+                  </a>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {shopChannels.map((channel) => (
+                    <button
+                      key={channel.id}
+                      onClick={() => setSelectedChannelId(channel.id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
+                        selectedChannelId === channel.id
+                          ? 'border-primary-color bg-purple-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      {channel.coverUrl ? (
+                        <img
+                          src={channel.coverUrl}
+                          alt={channel.name}
+                          className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                          <Store size={20} className="text-gray-400" />
+                        </div>
+                      )}
+                      <div className="flex-1 text-left">
+                        <div className="font-medium text-gray-900 text-sm">
+                          {channel.name}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {channel.channelKey}
+                        </div>
+                      </div>
+                      {selectedChannelId === channel.id && (
+                        <CheckCircle size={20} className="text-primary-color flex-shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Publish Summary */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center gap-2 mb-4">
                 <Globe className="text-primary-color" size={20} />
-                <h3 className="font-semibold text-gray-900">쇼핑몰 발행</h3>
+                <h3 className="font-semibold text-gray-900">발행 정보</h3>
               </div>
               <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">발행 대상</span>
+                  <span className="font-medium">
+                    {selectedChannelId
+                      ? shopChannels.find((c) => c.id === selectedChannelId)?.name || '-'
+                      : '미선택'}
+                  </span>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">선택한 상품</span>
                   <span className="font-medium">{selectedProductIds.length}개</span>
@@ -532,7 +649,7 @@ export default function ShoppingMallPublishPage() {
                 </div>
               </div>
               <p className="text-xs text-gray-500 mt-4">
-                선택한 상품이 e-commerce 쇼핑몰에 발행됩니다.
+                선택한 상품이 지정한 쇼핑몰에 발행됩니다.
               </p>
             </div>
 
@@ -541,7 +658,7 @@ export default function ShoppingMallPublishPage() {
               variant="primary"
               className="w-full py-3"
               onClick={handlePublish}
-              disabled={selectedProductIds.length === 0 || isPublishing}
+              disabled={selectedProductIds.length === 0 || !selectedChannelId || isPublishing}
             >
               {isPublishing ? (
                 <>

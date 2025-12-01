@@ -308,7 +308,7 @@ function buildProductDraft(
  * @example
  * ```typescript
  * const input = {
- *   post: await prisma.post.findUnique({
+ *   post: await prisma.collectedPost.findUnique({
  *     where: { id: postId },
  *     include: { images: true },
  *   }),

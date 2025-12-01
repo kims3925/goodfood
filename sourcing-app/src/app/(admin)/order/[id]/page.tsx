@@ -32,7 +32,7 @@ interface OrderItem {
   quantity: number
   unitPrice: string
   totalPrice: string
-  productPublish: {
+  publishedProduct: {
     id: number
     product: {
       id: number
@@ -290,9 +290,9 @@ export default function OrderDetailPage() {
                 {order.items.map((item) => (
                   <div key={item.id} className="p-4 flex gap-4">
                     {/* 상품 이미지 */}
-                    {item.thumbnailUrl || item.productPublish?.product?.thumbnailUrl ? (
+                    {item.thumbnailUrl || item.publishedProduct?.product?.thumbnailUrl ? (
                       <Image
-                        src={item.thumbnailUrl || item.productPublish?.product?.thumbnailUrl || ''}
+                        src={item.thumbnailUrl || item.publishedProduct?.product?.thumbnailUrl || ''}
                         alt={item.productName}
                         width={80}
                         height={80}
@@ -310,10 +310,10 @@ export default function OrderDetailPage() {
                       {item.optionSummary && (
                         <p className="text-sm text-gray-500 mb-1">{item.optionSummary}</p>
                       )}
-                      {item.productPublish?.retailBand && (
+                      {item.publishedProduct?.retailBand && (
                         <div className="flex items-center gap-1 text-xs text-gray-500">
                           <Store size={12} />
-                          <span>{item.productPublish.retailBand.name}</span>
+                          <span>{item.publishedProduct.retailBand.name}</span>
                         </div>
                       )}
                     </div>

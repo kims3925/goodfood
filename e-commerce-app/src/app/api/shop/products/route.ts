@@ -14,14 +14,14 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = parseInt(searchParams.get('offset') || '0')
     const search = searchParams.get('search')
-    const bandId = searchParams.get('bandId')
+    const channelId = searchParams.get('channelId') || searchParams.get('bandId') // 하위 호환성
 
-    // 기본 조건: 발행된 상품만 (product_publish 테이블을 통해)
+    // 기본 조건: 발행된 상품만 (published_product 테이블을 통해)
     const where: any = {
-      productPublishes: {
+      publishedProducts: {
         some: {
           status: PublishStatus.SUCCESS,
-          ...(bandId ? { retailBandId: parseInt(bandId) } : {}),
+          ...(channelId ? { channelId: parseInt(channelId) } : {}),
         },
       },
     }
@@ -53,10 +53,14 @@ export async function GET(req: NextRequest) {
             orderBy: { id: 'asc' },
             take: 1,
           },
-          post: {
+          collectedProduct: {
             include: {
-              images: {
-                orderBy: { sortOrder: 'asc' },
+              post: {
+                include: {
+                  images: {
+                    orderBy: { sortOrder: 'asc' },
+                  },
+                },
               },
             },
           },
@@ -71,7 +75,7 @@ export async function GET(req: NextRequest) {
     // 프론트엔드 형식으로 변환
     const formattedProducts = products.map((product) => {
       const mainVariant = product.variants[0]
-      const images = product.post?.images?.map((img) => img.imageUrl) || []
+      const images = product.collectedProduct?.post?.images?.map((img) => img.imageUrl) || []
 
       const salePrice = mainVariant?.price || product.price || 0
       const originalPrice = mainVariant?.wholesalePrice || product.wholesalePrice || salePrice

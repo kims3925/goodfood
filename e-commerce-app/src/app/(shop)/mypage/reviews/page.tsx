@@ -10,7 +10,7 @@ interface WritableItem {
   orderId: number
   orderNumber: string
   deliveredAt: string | null
-  productPublishId: number
+  publishedProductId: number
   productName: string
   optionSummary: string | null
   thumbnailUrl: string | null

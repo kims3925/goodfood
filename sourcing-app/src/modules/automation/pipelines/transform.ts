@@ -1,6 +1,6 @@
 /**
  * Transform Pipeline
- * AI를 사용하여 게시물을 상품으로 변환
+ * AI를 사용하여 수집된 게시물을 CollectedProduct로 변환 후 Product로 생성
  */
 
 import prisma, { AiProvider } from '@bandauto/db'
@@ -20,6 +20,8 @@ import {
 
 /**
  * AI 변환 파이프라인 실행
+ * 1. CollectedPost에서 CollectedProduct 생성
+ * 2. CollectedProduct에서 Product 생성
  */
 export async function runTransformPipeline(
   config: TransformConfig
@@ -49,17 +51,19 @@ export async function runTransformPipeline(
     throw new Error(`Active ${config.aiProvider} API config not found`)
   }
 
-  // 변환할 게시물 조회
+  // 변환할 게시물 조회 (아직 CollectedProduct가 없는 게시물)
   const whereClause: any = {
     userId,
-    product: null, // 상품이 없는 게시물만
+    collectedProducts: {
+      none: {}, // CollectedProduct가 없는 게시물만
+    },
   }
 
   if (config.postIds?.length) {
     whereClause.id = { in: config.postIds }
   }
 
-  const posts = await prisma.post.findMany({
+  const posts = await prisma.collectedPost.findMany({
     where: whereClause,
     include: {
       images: {
@@ -111,14 +115,15 @@ export async function runTransformPipeline(
     try {
       console.log(`[Transform] Processing post ${post.id}: ${post.title.substring(0, 50)}...`)
 
-      // 이미 상품이 있는지 다시 확인 (동시성 방지)
-      const existingProduct = await prisma.product.findUnique({
+      // 이미 CollectedProduct가 있는지 다시 확인 (동시성 방지)
+      const existingCollectedProduct = await prisma.collectedProduct.findFirst({
         where: { postId: post.id },
+        include: { products: true },
       })
 
-      if (existingProduct) {
+      if (existingCollectedProduct) {
         transformedPost.status = 'skipped'
-        transformedPost.productId = existingProduct.id
+        transformedPost.productId = existingCollectedProduct.products[0]?.id
         transformedPosts.push(transformedPost)
         continue
       }
@@ -134,11 +139,29 @@ export async function runTransformPipeline(
         policyContent: pricingPolicyContent || undefined,
       })
 
-      // 상품 생성
-      const product = await prisma.product.create({
+      // 1. CollectedProduct 생성 (원본 수집 상품)
+      const collectedProduct = await prisma.collectedProduct.create({
         data: {
           userId,
           postId: post.id,
+          name: draft.name,
+          description: draft.description || null,
+          currency: draft.currency || 'KRW',
+          price: draft.price || null,
+          wholesalePrice: draft.wholesalePrice || null,
+          rawMetadata: {
+            originalTitle: post.title,
+            originalContent: post.content,
+            aiGenerated: true,
+          },
+        },
+      })
+
+      // 2. Product 생성 (내부 기준 상품)
+      const product = await prisma.product.create({
+        data: {
+          userId,
+          collectedProductId: collectedProduct.id,
           name: draft.name,
           description: draft.description || null,
           categoryId: draft.categoryId || null,

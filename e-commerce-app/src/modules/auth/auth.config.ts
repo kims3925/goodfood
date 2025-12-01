@@ -4,6 +4,157 @@ import KakaoProvider from 'next-auth/providers/kakao'
 import NaverProvider from 'next-auth/providers/naver'
 import { prisma } from '@/modules/common/utils/src/database/client'
 import bcrypt from 'bcryptjs'
+import { User } from '@bandauto/db'
+import { headers } from 'next/headers'
+
+type OAuthProvider = 'kakao' | 'naver'
+
+type OAuthProfile = {
+  provider: OAuthProvider
+  providerId: string
+  email: string | null
+  name: string | null
+  profileImage: string | null
+}
+
+async function upsertOAuthUser(profile: OAuthProfile): Promise<User> {
+  // 1) provider id로 우선 탐색
+  const existingByProvider = await prisma.user.findFirst({
+    where: {
+      oauthProvider: profile.provider,
+      oauthProviderId: profile.providerId,
+    },
+  })
+  if (existingByProvider) {
+    return existingByProvider
+  }
+
+  // 2) 이메일 기반으로 기존 계정 연결 (기존 로컬 가입자도 OAuth로 전환)
+  if (profile.email) {
+    const existingByEmail = await prisma.user.findUnique({
+      where: { email: profile.email },
+    })
+    if (existingByEmail) {
+      return await prisma.user.update({
+        where: { id: existingByEmail.id },
+        data: {
+          oauthProvider: profile.provider,
+          oauthProviderId: profile.providerId,
+          profileImage: profile.profileImage ?? existingByEmail.profileImage,
+        },
+      })
+    }
+  }
+
+  // 3) 신규 가입 (JIT provisioning)
+  return prisma.user.create({
+    data: {
+      email:
+        profile.email ??
+        `${profile.provider}_${profile.providerId}@${profile.provider}.local`,
+      name: profile.name,
+      role: 'CUSTOMER',
+      oauthProvider: profile.provider,
+      oauthProviderId: profile.providerId,
+      profileImage: profile.profileImage,
+    },
+  })
+}
+
+function getCompleteUrl() {
+  const base = process.env.NEXTAUTH_URL?.replace(/\/$/, '') || ''
+  return `${base}/auth/complete`
+}
+
+// OAuth 프로필 매핑 함수들
+const profileMappers: Record<OAuthProvider, (raw: any) => OAuthProfile> = {
+  kakao: (raw) => ({
+    provider: 'kakao',
+    providerId: raw.id?.toString() ?? '',
+    email: raw.kakao_account?.email ?? null,
+    name: raw.kakao_account?.profile?.nickname ?? null,
+    profileImage: raw.kakao_account?.profile?.profile_image_url ?? null,
+  }),
+  naver: (raw) => ({
+    provider: 'naver',
+    providerId: raw.response?.id ?? '',
+    email: raw.response?.email ?? null,
+    name: raw.response?.name ?? raw.response?.nickname ?? null,
+    profileImage: raw.response?.profile_image ?? null,
+  }),
+}
+
+function getRequestMeta() {
+  try {
+    const h = headers()
+    const forwarded = h.get('x-forwarded-for')
+    const ip = forwarded?.split(',')[0]?.trim() || h.get('x-real-ip') || null
+    const userAgent = h.get('user-agent') || null
+    return { ip, userAgent }
+  } catch {
+    return { ip: null, userAgent: null }
+  }
+}
+
+async function logSignIn(opts: {
+  userId?: number
+  provider: string
+  email?: string | null
+  success: boolean
+}) {
+  const { ip, userAgent } = getRequestMeta()
+  await prisma.userLoginLog.create({
+    data: {
+      userId: opts.userId,
+      provider: opts.provider,
+      email: opts.email ?? null,
+      ip,
+      userAgent,
+      success: opts.success,
+    },
+  })
+}
+
+// 공통 OAuth 로그인 처리 함수
+async function handleOAuthSignIn(
+  provider: OAuthProvider,
+  profile: any,
+  user: any
+): Promise<string | boolean> {
+  const mapper = profileMappers[provider]
+  let oauthProfile: OAuthProfile | null = null
+
+  try {
+    oauthProfile = mapper(profile)
+    if (!oauthProfile.providerId) return false
+
+    const dbUser = await upsertOAuthUser(oauthProfile)
+    user.id = dbUser.id.toString()
+    user.email = dbUser.email
+    user.name = dbUser.name || dbUser.email
+
+    await logSignIn({
+      userId: dbUser.id,
+      provider,
+      email: dbUser.email,
+      success: true,
+    })
+
+    // 온보딩 미완료 시 동의 화면으로 이동
+    if (!dbUser.signupCompletedAt) {
+      return getCompleteUrl()
+    }
+    return true
+  } catch (error) {
+    console.error(`${provider} 로그인 처리 오류:`, error)
+    await logSignIn({
+      provider,
+      email: oauthProfile?.email,
+      success: false,
+    })
+    return false
+  }
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -26,7 +177,6 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        // User 테이블에서 사용자 조회
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         })
@@ -36,7 +186,6 @@ export const authOptions: NextAuthOptions = {
         }
 
         const isValid = await bcrypt.compare(credentials.password, user.password)
-
         if (!isValid) {
           return null
         }
@@ -60,149 +209,70 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user, account, profile }) {
-      // 카카오 로그인 처리
-      if (account?.provider === 'kakao') {
-        const kakaoProfile = profile as any
+      const provider = account?.provider ?? 'unknown'
 
-        try {
-          // 기존 사용자 확인 (oauthProvider + oauthProviderId로 조회)
-          let existingUser = await prisma.user.findFirst({
-            where: {
-              oauthProvider: 'kakao',
-              oauthProviderId: kakaoProfile.id.toString(),
-            },
-          })
-
-          if (existingUser) {
-            // 기존 사용자로 로그인
-            user.id = existingUser.id.toString()
-          } else {
-            // 새 사용자 생성
-            const kakaoEmail =
-              kakaoProfile.kakao_account?.email ||
-              `kakao_${kakaoProfile.id}@kakao.local`
-
-            // 동일 이메일의 기존 사용자 확인
-            const emailUser = await prisma.user.findUnique({
-              where: { email: kakaoEmail },
-            })
-
-            if (emailUser && !emailUser.oauthProvider) {
-              // 기존 이메일 계정에 OAuth 정보 추가
-              await prisma.user.update({
-                where: { id: emailUser.id },
-                data: {
-                  oauthProvider: 'kakao',
-                  oauthProviderId: kakaoProfile.id.toString(),
-                  profileImage:
-                    kakaoProfile.kakao_account?.profile?.profile_image_url,
-                },
-              })
-              user.id = emailUser.id.toString()
-            } else {
-              // 완전히 새로운 사용자 생성
-              const newUser = await prisma.user.create({
-                data: {
-                  email: kakaoEmail,
-                  name:
-                    kakaoProfile.kakao_account?.profile?.nickname || null,
-                  role: 'CUSTOMER',
-                  oauthProvider: 'kakao',
-                  oauthProviderId: kakaoProfile.id.toString(),
-                  profileImage:
-                    kakaoProfile.kakao_account?.profile?.profile_image_url,
-                },
-              })
-              user.id = newUser.id.toString()
-            }
-          }
-
-          return true
-        } catch (error) {
-          console.error('카카오 로그인 처리 오류:', error)
-          return false
-        }
+      // OAuth 로그인 처리 (Kakao, Naver)
+      if (provider === 'kakao' || provider === 'naver') {
+        return handleOAuthSignIn(provider, profile, user)
       }
 
-      // 네이버 로그인 처리
-      if (account?.provider === 'naver') {
-        const naverProfile = profile as any
-
-        try {
-          // 기존 사용자 확인 (oauthProvider + oauthProviderId로 조회)
-          let existingUser = await prisma.user.findFirst({
-            where: {
-              oauthProvider: 'naver',
-              oauthProviderId: naverProfile.response.id,
-            },
+      // Credentials 로그인
+      if (provider === 'credentials' && user?.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: Number(user.id) },
+        })
+        if (dbUser) {
+          await logSignIn({
+            userId: dbUser.id,
+            provider,
+            email: dbUser.email,
+            success: true,
           })
-
-          if (existingUser) {
-            // 기존 사용자로 로그인
-            user.id = existingUser.id.toString()
-          } else {
-            // 새 사용자 생성
-            const naverEmail =
-              naverProfile.response.email ||
-              `naver_${naverProfile.response.id}@naver.local`
-
-            // 동일 이메일의 기존 사용자 확인
-            const emailUser = await prisma.user.findUnique({
-              where: { email: naverEmail },
-            })
-
-            if (emailUser && !emailUser.oauthProvider) {
-              // 기존 이메일 계정에 OAuth 정보 추가
-              await prisma.user.update({
-                where: { id: emailUser.id },
-                data: {
-                  oauthProvider: 'naver',
-                  oauthProviderId: naverProfile.response.id,
-                  profileImage: naverProfile.response.profile_image,
-                },
-              })
-              user.id = emailUser.id.toString()
-            } else {
-              // 완전히 새로운 사용자 생성
-              const newUser = await prisma.user.create({
-                data: {
-                  email: naverEmail,
-                  name:
-                    naverProfile.response.name ||
-                    naverProfile.response.nickname ||
-                    null,
-                  role: 'CUSTOMER',
-                  oauthProvider: 'naver',
-                  oauthProviderId: naverProfile.response.id,
-                  profileImage: naverProfile.response.profile_image,
-                },
-              })
-              user.id = newUser.id.toString()
-            }
-          }
-
-          return true
-        } catch (error) {
-          console.error('네이버 로그인 처리 오류:', error)
-          return false
         }
       }
 
       return true
     },
-    async jwt({ token, user, account }) {
-      if (user) {
-        token.id = user.id
+
+    async jwt({ token, user, account, trigger }) {
+      // 최초 로그인 시 또는 세션 업데이트 시 DB에서 정보 가져오기
+      if (user || trigger === 'update') {
+        const userId = user?.id ?? token.id
+        const dbUser = await prisma.user.findUnique({
+          where: { id: Number(userId) },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            signupCompletedAt: true,
+            role: true,
+          },
+        })
+
+        if (dbUser) {
+          token.id = dbUser.id
+          token.email = dbUser.email
+          token.name = dbUser.name
+          token.pendingSignup = !dbUser.signupCompletedAt
+          token.role = dbUser.role
+        }
+
+        if (account) {
+          token.provider = account.provider
+        }
       }
-      if (account?.provider) {
-        token.provider = account.provider
-      }
+
       return token
     },
+
     async session({ session, token }) {
       if (session.user) {
         ;(session.user as any).id = token.id
         ;(session.user as any).provider = token.provider
+        ;(session.user as any).pendingSignup = token.pendingSignup
+        ;(session.user as any).role = token.role
+        session.user.email = token.email as string
+        session.user.name = (token.name as string) || session.user.email
       }
       return session
     },

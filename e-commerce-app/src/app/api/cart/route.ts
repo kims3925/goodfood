@@ -81,11 +81,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { productPublishId, variantId, quantity = 1, sessionId: bodySessionId } = body
+    const { publishedProductId, variantId, quantity = 1, sessionId: bodySessionId } = body
 
-    if (!productPublishId) {
+    if (!publishedProductId) {
       return NextResponse.json(
-        { success: false, error: 'productPublishId는 필수입니다' },
+        { success: false, error: 'publishedProductId는 필수입니다' },
         { status: 400 }
       )
     }
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
     const result = await cartService.addItem(
       sessionId,
       {
-        productPublishId: parseInt(productPublishId),
+        publishedProductId: parseInt(publishedProductId),
         variantId: variantId ? parseInt(variantId) : undefined,
         quantity: parseInt(quantity),
       },

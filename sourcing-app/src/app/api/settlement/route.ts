@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@bandauto/db'
+import { prisma, ChannelKind } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 // GET: 정산 데이터 조회 (Order 집계)
@@ -17,19 +17,20 @@ export async function GET(request: NextRequest) {
     const platform = searchParams.get('platform')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
-    const retailBandId = searchParams.get('retailBandId')
+    const channelId = searchParams.get('channelId')
 
-    // 소매밴드 조회
-    const retailBandWhere: any = {
+    // 소매 채널 조회 (RETAIL kind만)
+    const channelWhere: any = {
       userId: user.userId,
       isActive: true,
+      kind: ChannelKind.RETAIL,
     }
-    if (retailBandId) {
-      retailBandWhere.id = parseInt(retailBandId)
+    if (channelId) {
+      channelWhere.id = parseInt(channelId)
     }
 
-    const retailBands = await prisma.retailBand.findMany({
-      where: retailBandWhere,
+    const channels = await prisma.channel.findMany({
+      where: channelWhere,
       include: {
         apiConfig: true,
       },
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 결과 데이터 구성
-    const retailBandDataMap = new Map<number, {
+    const channelDataMap = new Map<number, {
       id: number
       name: string
       coverUrl: string | null
@@ -61,12 +62,12 @@ export async function GET(request: NextRequest) {
     }>()
 
     // 초기화
-    for (const band of retailBands) {
-      retailBandDataMap.set(band.id, {
-        id: band.id,
-        name: band.name,
-        coverUrl: band.coverUrl,
-        platform: band.apiConfig?.platform || 'BAND',
+    for (const channel of channels) {
+      channelDataMap.set(channel.id, {
+        id: channel.id,
+        name: channel.name,
+        coverUrl: channel.coverUrl,
+        platform: channel.platform || channel.apiConfig?.platform || 'BAND',
         items: [],
         itemCount: 0,
         shopCount: 0,
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // 쇼핑몰 주문 조회 (Order + OrderItem + ProductPublish)
+    // 쇼핑몰 주문 조회 (Order + OrderItem + PublishedProduct)
     const shopOrders = await prisma.order.findMany({
       where: {
         userId: user.userId,
@@ -86,14 +87,18 @@ export async function GET(request: NextRequest) {
       include: {
         items: {
           include: {
-            productPublish: {
+            publishedProduct: {
               include: {
-                retailBand: true,
+                channel: true,
                 product: {
                   include: {
-                    post: {
+                    collectedProduct: {
                       include: {
-                        images: { take: 1, orderBy: { sortOrder: 'asc' } },
+                        post: {
+                          include: {
+                            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+                          },
+                        },
                       },
                     },
                   },
@@ -106,15 +111,15 @@ export async function GET(request: NextRequest) {
       orderBy: { orderedAt: 'desc' },
     })
 
-    // 미분류 주문 (ProductPublish의 retailBandId가 없는 경우)
+    // 미분류 주문 (PublishedProduct의 channelId가 없는 경우)
     const unclassifiedItems: any[] = []
 
     // 쇼핑몰 주문 아이템 처리
     for (const order of shopOrders) {
       for (const item of order.items) {
-        const bandId = item.productPublish?.retailBandId
+        const itemChannelId = item.publishedProduct?.channelId
 
-        if (!bandId) {
+        if (!itemChannelId) {
           // 미분류
           unclassifiedItems.push({
             id: item.id,
@@ -129,22 +134,22 @@ export async function GET(request: NextRequest) {
             totalPrice: Number(item.totalPrice),
             status: order.status,
             orderedAt: order.orderedAt.toISOString(),
-            retailBandId: null,
-            retailBandName: null,
+            channelId: null,
+            channelName: null,
           })
           continue
         }
 
-        const bandData = retailBandDataMap.get(bandId)
-        if (!bandData) continue
+        const channelData = channelDataMap.get(itemChannelId)
+        if (!channelData) continue
 
         // 플랫폼 필터
-        if (platform && bandData.platform !== platform) continue
+        if (platform && channelData.platform !== platform) continue
 
         const thumbnailUrl = item.thumbnailUrl ||
-          item.productPublish?.product?.post?.images?.[0]?.imageUrl || null
+          item.publishedProduct?.product?.collectedProduct?.post?.images?.[0]?.imageUrl || null
 
-        bandData.items.push({
+        channelData.items.push({
           id: item.id,
           orderId: order.id,
           channel: 'SHOP' as const,
@@ -157,48 +162,49 @@ export async function GET(request: NextRequest) {
           totalPrice: Number(item.totalPrice),
           status: order.status,
           orderedAt: order.orderedAt.toISOString(),
-          retailBandId: bandId,
-          retailBandName: bandData.name,
+          channelId: itemChannelId,
+          channelName: channelData.name,
         })
 
-        bandData.itemCount++
-        bandData.shopCount++
-        bandData.totalQuantity += item.quantity
-        bandData.totalAmount += Number(item.totalPrice)
+        channelData.itemCount++
+        channelData.shopCount++
+        channelData.totalQuantity += item.quantity
+        channelData.totalAmount += Number(item.totalPrice)
       }
     }
 
     // 결과 정리
-    const retailBandData = Array.from(retailBandDataMap.values()).filter(b => b.itemCount > 0)
+    const channelDataArray = Array.from(channelDataMap.values()).filter(c => c.itemCount > 0)
 
     // 플랫폼별 그룹핑
     const platformGroups = new Map<string, {
       platform: string
       platformName: string
-      retailBands: typeof retailBandData
+      channels: typeof channelDataArray
       itemCount: number
       totalQuantity: number
       totalAmount: number
     }>()
 
-    for (const band of retailBandData) {
-      if (!platformGroups.has(band.platform)) {
-        platformGroups.set(band.platform, {
-          platform: band.platform,
-          platformName: band.platform === 'BAND' ? '네이버 밴드' :
-                        band.platform === 'ALIEXPRESS' ? '알리익스프레스' : band.platform,
-          retailBands: [],
+    for (const channel of channelDataArray) {
+      if (!platformGroups.has(channel.platform)) {
+        platformGroups.set(channel.platform, {
+          platform: channel.platform,
+          platformName: channel.platform === 'BAND' ? '네이버 밴드' :
+                        channel.platform === 'ALIEXPRESS' ? '알리익스프레스' :
+                        channel.platform === 'SHOP' ? '쇼핑몰' : channel.platform,
+          channels: [],
           itemCount: 0,
           totalQuantity: 0,
           totalAmount: 0,
         })
       }
 
-      const group = platformGroups.get(band.platform)!
-      group.retailBands.push(band)
-      group.itemCount += band.itemCount
-      group.totalQuantity += band.totalQuantity
-      group.totalAmount += band.totalAmount
+      const group = platformGroups.get(channel.platform)!
+      group.channels.push(channel)
+      group.itemCount += channel.itemCount
+      group.totalQuantity += channel.totalQuantity
+      group.totalAmount += channel.totalAmount
     }
 
     // 플랫폼 필터 적용
@@ -209,14 +215,14 @@ export async function GET(request: NextRequest) {
 
     // 통계 계산
     const summary = {
-      totalItems: retailBandData.reduce((sum, b) => sum + b.itemCount, 0) + unclassifiedItems.length,
-      totalQuantity: retailBandData.reduce((sum, b) => sum + b.totalQuantity, 0) +
+      totalItems: channelDataArray.reduce((sum, c) => sum + c.itemCount, 0) + unclassifiedItems.length,
+      totalQuantity: channelDataArray.reduce((sum, c) => sum + c.totalQuantity, 0) +
                      unclassifiedItems.reduce((sum, i) => sum + i.quantity, 0),
-      totalAmount: retailBandData.reduce((sum, b) => sum + b.totalAmount, 0) +
+      totalAmount: channelDataArray.reduce((sum, c) => sum + c.totalAmount, 0) +
                    unclassifiedItems.reduce((sum, i) => sum + i.totalPrice, 0),
-      classifiedItems: retailBandData.reduce((sum, b) => sum + b.itemCount, 0),
-      classifiedAmount: retailBandData.reduce((sum, b) => sum + b.totalAmount, 0),
-      shopCount: retailBandData.reduce((sum, b) => sum + b.shopCount, 0) + unclassifiedItems.length,
+      classifiedItems: channelDataArray.reduce((sum, c) => sum + c.itemCount, 0),
+      classifiedAmount: channelDataArray.reduce((sum, c) => sum + c.totalAmount, 0),
+      shopCount: channelDataArray.reduce((sum, c) => sum + c.shopCount, 0) + unclassifiedItems.length,
       webhookCount: 0,
     }
 
@@ -224,7 +230,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         platforms,
-        retailBands: retailBandData,
+        channels: channelDataArray,
         unclassified: {
           items: unclassifiedItems,
           itemCount: unclassifiedItems.length,
@@ -255,9 +261,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { retailBandId, periodStart, periodEnd, memo } = body
+    const { channelId, periodStart, periodEnd, memo } = body
 
-    if (!retailBandId || !periodStart || !periodEnd) {
+    if (!channelId || !periodStart || !periodEnd) {
       return NextResponse.json(
         { success: false, error: '필수 정보가 누락되었습니다.' },
         { status: 400 }
@@ -272,8 +278,8 @@ export async function POST(request: NextRequest) {
     // 쇼핑몰 주문
     const shopOrderItems = await prisma.orderItem.findMany({
       where: {
-        productPublish: {
-          retailBandId: parseInt(retailBandId),
+        publishedProduct: {
+          channelId: parseInt(channelId),
           userId: user.userId,
         },
         order: {
@@ -290,7 +296,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        retailBandId: parseInt(retailBandId),
+        channelId: parseInt(channelId),
         periodStart,
         periodEnd,
         totalOrders,

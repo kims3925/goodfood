@@ -5,15 +5,15 @@ import { X, Calendar, FileText, Loader2 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 
 interface SettlementModalProps {
-  retailBandId: number
-  retailBandName: string
+  channelId: number
+  channelName: string
   onClose: () => void
   onSuccess: () => void
 }
 
 export default function SettlementModal({
-  retailBandId,
-  retailBandName,
+  channelId,
+  channelName,
   onClose,
   onSuccess,
 }: SettlementModalProps) {
@@ -43,7 +43,7 @@ export default function SettlementModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          retailBandId,
+          channelId,
           periodStart,
           periodEnd,
           memo: memo || undefined,
@@ -111,7 +111,7 @@ export default function SettlementModal({
               소매밴드
             </label>
             <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700">
-              {retailBandName}
+              {channelName}
             </div>
           </div>
 

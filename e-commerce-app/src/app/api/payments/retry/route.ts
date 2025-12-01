@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
         payment: true,
         items: {
           include: {
-            productPublish: {
+            publishedProduct: {
               include: {
                 product: true
               }
@@ -216,7 +216,7 @@ export async function POST(req: NextRequest) {
             totalAmount: existingOrder.totalAmount,
             items: {
               create: existingOrder.items.map(item => ({
-                productPublishId: item.productPublishId,
+                publishedProductId: item.publishedProductId,
                 productName: item.productName,
                 thumbnailUrl: item.thumbnailUrl,
                 quantity: item.quantity,

@@ -38,11 +38,11 @@ interface OrderItem {
   totalPrice: number
   status: string
   orderedAt: string
-  retailBandId: number | null
-  retailBandName: string | null
+  channelId: number | null
+  channelName: string | null
 }
 
-interface RetailBandData {
+interface ChannelData {
   id: number
   name: string
   coverUrl: string | null
@@ -58,7 +58,7 @@ interface RetailBandData {
 interface PlatformGroup {
   platform: string
   platformName: string
-  retailBands: RetailBandData[]
+  channels: ChannelData[]
   itemCount: number
   totalQuantity: number
   totalAmount: number
@@ -66,7 +66,7 @@ interface PlatformGroup {
 
 interface SettlementData {
   platforms: PlatformGroup[]
-  retailBands: RetailBandData[]
+  channels: ChannelData[]
   unclassified: {
     items: OrderItem[]
     itemCount: number
@@ -97,13 +97,13 @@ export default function SettlementListPage() {
   const [selectedPlatform, setSelectedPlatform] = useState<string>('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [selectedBandId, setSelectedBandId] = useState<string>('')
+  const [selectedChannelId, setSelectedBandId] = useState<string>('')
 
   // 정산 모달 상태
   const [settlementModal, setSettlementModal] = useState<{
     isOpen: boolean
-    bandId: number
-    bandName: string
+    channelId: number
+    channelName: string
   } | null>(null)
 
   const fetchData = useCallback(async () => {
@@ -113,7 +113,7 @@ export default function SettlementListPage() {
       if (selectedPlatform) params.set('platform', selectedPlatform)
       if (startDate) params.set('startDate', startDate)
       if (endDate) params.set('endDate', endDate)
-      if (selectedBandId) params.set('retailBandId', selectedBandId)
+      if (selectedChannelId) params.set('channelId', selectedChannelId)
 
       const res = await fetch(`/api/settlement?${params}`)
       const result = await res.json()
@@ -126,19 +126,19 @@ export default function SettlementListPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedPlatform, startDate, endDate, selectedBandId])
+  }, [selectedPlatform, startDate, endDate, selectedChannelId])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
 
-  const toggleBandExpansion = (bandId: number) => {
+  const toggleChannelExpansion = (channelId: number) => {
     setExpandedBands(prev => {
       const newSet = new Set(prev)
-      if (newSet.has(bandId)) {
-        newSet.delete(bandId)
+      if (newSet.has(channelId)) {
+        newSet.delete(channelId)
       } else {
-        newSet.add(bandId)
+        newSet.add(channelId)
       }
       return newSet
     })
@@ -204,8 +204,8 @@ export default function SettlementListPage() {
     }
   }
 
-  const openSettlementModal = (bandId: number, bandName: string) => {
-    setSettlementModal({ isOpen: true, bandId, bandName })
+  const openSettlementModal = (channelId: number, channelName: string) => {
+    setSettlementModal({ isOpen: true, channelId, channelName })
   }
 
   const closeSettlementModal = () => {
@@ -238,7 +238,7 @@ export default function SettlementListPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">정산 관리</h1>
             <p className="text-gray-600">
-              소매밴드별로 주문된 상품을 확인하고 정산 내역을 관리합니다.
+              소매채널별로 주문된 상품을 확인하고 정산 내역을 관리합니다.
             </p>
           </div>
           <div className="flex gap-2">
@@ -415,13 +415,13 @@ export default function SettlementListPage() {
                 </div>
               </div>
 
-              {/* 소매밴드 썸네일 버튼 */}
-              {data && data.retailBands.length > 0 && (
+              {/* 소매채널 썸네일 버튼 */}
+              {data && data.channels.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
                   <button
                     onClick={() => setSelectedBandId('')}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                      selectedBandId === ''
+                      selectedChannelId === ''
                         ? 'border-blue-500 bg-blue-50 text-blue-700'
                         : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
                     }`}
@@ -431,12 +431,12 @@ export default function SettlementListPage() {
                     </div>
                     <span className="text-sm font-medium">전체</span>
                   </button>
-                  {data.retailBands.map((band) => (
+                  {data.channels.map((band) => (
                     <button
                       key={band.id}
                       onClick={() => setSelectedBandId(band.id.toString())}
                       className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                        selectedBandId === band.id.toString()
+                        selectedChannelId === band.id.toString()
                           ? 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200'
                           : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                       }`}
@@ -487,7 +487,7 @@ export default function SettlementListPage() {
                     <div className="text-left">
                       <h2 className="text-lg font-bold text-gray-900">{platformGroup.platformName}</h2>
                       <p className="text-sm text-gray-600">
-                        소매밴드 {platformGroup.retailBands.length}개 | 주문 {platformGroup.itemCount}건 | 매출 {formatPrice(platformGroup.totalAmount)}
+                        소매채널 {platformGroup.channels.length}개 | 주문 {platformGroup.itemCount}건 | 매출 {formatPrice(platformGroup.totalAmount)}
                       </p>
                     </div>
                   </div>
@@ -504,15 +504,15 @@ export default function SettlementListPage() {
                   </div>
                 </button>
 
-                {/* 소매밴드 목록 */}
-                {expandedPlatforms.has(platformGroup.platform) && platformGroup.retailBands.map((band) => (
+                {/* 소매채널 목록 */}
+                {expandedPlatforms.has(platformGroup.platform) && platformGroup.channels.map((band) => (
                   <div
                     key={band.id}
                     className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
                   >
                     {/* 밴드 헤더 */}
                     <button
-                      onClick={() => toggleBandExpansion(band.id)}
+                      onClick={() => toggleChannelExpansion(band.id)}
                       className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex items-center gap-4">
@@ -690,7 +690,7 @@ export default function SettlementListPage() {
                     <div className="text-left">
                       <h3 className="font-semibold text-gray-900">미분류 주문</h3>
                       <p className="text-sm text-gray-500">
-                        ProductPublish에 매칭되지 않은 주문입니다.
+                        PublishedProduct에 매칭되지 않은 주문입니다.
                       </p>
                     </div>
                   </div>
@@ -773,12 +773,12 @@ export default function SettlementListPage() {
             )}
 
             {/* 데이터 없음 */}
-            {data.retailBands.length === 0 && data.unclassified.itemCount === 0 && (
+            {data.channels.length === 0 && data.unclassified.itemCount === 0 && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
                 <Store size={48} className="mx-auto text-gray-300 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">정산 데이터가 없습니다</h3>
                 <p className="text-gray-500">
-                  소매밴드에 상품을 발행하고 주문이 들어오면 이곳에서 확인할 수 있습니다.
+                  소매채널에 상품을 발행하고 주문이 들어오면 이곳에서 확인할 수 있습니다.
                 </p>
               </div>
             )}
@@ -800,8 +800,8 @@ export default function SettlementListPage() {
       {/* 정산 모달 */}
       {settlementModal && (
         <SettlementModal
-          retailBandId={settlementModal.bandId}
-          retailBandName={settlementModal.bandName}
+          channelId={settlementModal.channelId}
+          channelName={settlementModal.channelName}
           onClose={closeSettlementModal}
           onSuccess={() => {
             fetchData()

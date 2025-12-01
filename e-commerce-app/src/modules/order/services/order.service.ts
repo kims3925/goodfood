@@ -1,7 +1,7 @@
 /**
  * Order Service
  * 주문 비즈니스 로직 레이어
- * ProductPublish 기반 스키마 지원
+ * PublishedProduct 기반 스키마 지원
  */
 
 import prisma, { PublishStatus } from '@bandauto/db'
@@ -39,7 +39,7 @@ export interface ShippingAddress {
 }
 
 export interface OrderItem {
-  productPublishId: number
+  publishedProductId: number
   variantId?: number
   quantity: number
 }
@@ -82,6 +82,8 @@ export interface OrderResponse {
     quantity: number
     unitPrice: number
     totalPrice: number
+    channel?: { id: number; name: string } | null
+    // 하위 호환성
     retailBand?: { id: number; name: string } | null
   }>
   payment: {
@@ -155,14 +157,14 @@ export class OrderService {
 
     // 주문 아이템 데이터 준비
     const orderItems: OrderItemInput[] = cart.items.map((item: any) => {
-      const productPublish = item.productPublish
-      const product = productPublish.product
+      const publishedProduct = item.publishedProduct
+      const product = publishedProduct.product
       const variant = item.variant
       const mainVariant = product.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || product.price || 0
 
       return {
-        productPublishId: productPublish.id,
+        publishedProductId: publishedProduct.id,
         variantId: variant?.id || null,
         productName: product.name,
         optionSummary: variant?.optionSummary || null,
@@ -250,9 +252,9 @@ export class OrderService {
     const orderItems: OrderItemInput[] = []
 
     for (const item of items) {
-      const productPublish = await prisma.productPublish.findFirst({
+      const publishedProduct = await prisma.publishedProduct.findFirst({
         where: {
-          id: item.productPublishId,
+          id: item.publishedProductId,
           status: PublishStatus.SUCCESS,
         },
         include: {
@@ -264,8 +266,8 @@ export class OrderService {
         },
       })
 
-      if (!productPublish) {
-        throw new NotFoundError('상품', String(item.productPublishId))
+      if (!publishedProduct) {
+        throw new NotFoundError('상품', String(item.publishedProductId))
       }
 
       let variant = null
@@ -275,12 +277,12 @@ export class OrderService {
         })
       }
 
-      const product = productPublish.product
+      const product = publishedProduct.product
       const mainVariant = product.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || product.price || 0
 
       orderItems.push({
-        productPublishId: productPublish.id,
+        publishedProductId: publishedProduct.id,
         variantId: variant?.id || null,
         productName: product.name,
         optionSummary: variant?.optionSummary || null,
@@ -499,7 +501,9 @@ export class OrderService {
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         totalPrice: Number(item.totalPrice),
-        retailBand: item.productPublish?.retailBand || null,
+        channel: item.publishedProduct?.channel || null,
+        // 하위 호환성
+        retailBand: item.publishedProduct?.channel || null,
       })),
       payment: order.payment
         ? {

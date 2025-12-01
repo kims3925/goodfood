@@ -5,7 +5,7 @@
 model Review {
   id          Int      @id @default(autoincrement())
   userId      Int      @map("user_id")
-  orderItemId Int      @unique @map("order_item_id") // 주문 상품당 하나의 리뷰만, OrderItem.productPublishId로 상품 조회
+  orderItemId Int      @unique @map("order_item_id") // 주문 상품당 하나의 리뷰만, OrderItem.publishedProductId로 상품 조회
   rating      Int      // 1-5
   title       String?  @db.VarChar(200)
   content     String   @db.Text

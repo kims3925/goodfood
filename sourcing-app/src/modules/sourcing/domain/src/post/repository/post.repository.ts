@@ -1,7 +1,7 @@
 import prisma from '@bandauto/db'
 import type { PostListParams, PostUpdateInput, SavedImage } from '../types/post.types'
 
-export class PostRepository {
+export class CollectedPostRepository {
   async findMany(params: PostListParams) {
     const { userId, search = '', page = 1, limit = 10 } = params
 
@@ -16,21 +16,23 @@ export class PostRepository {
       }),
     }
 
-    const total = await prisma.post.count({ where })
+    const total = await prisma.collectedPost.count({ where })
 
-    const posts = await prisma.post.findMany({
+    const posts = await prisma.collectedPost.findMany({
       where,
       ...(limit > 0 && {
         skip: (page - 1) * limit,
         take: limit,
       }),
       include: {
-        wholesaleBand: {
+        channel: {
           select: {
             id: true,
             name: true,
-            bandKey: true,
+            channelKey: true,
             coverUrl: true,
+            kind: true,
+            platform: true,
           },
         },
         images: {
@@ -67,13 +69,17 @@ export class PostRepository {
   }
 
   async findById(id: number) {
-    return prisma.post.findFirst({
+    return prisma.collectedPost.findFirst({
       where: { id },
       include: {
-        wholesaleBand: {
+        channel: {
           select: {
+            id: true,
             name: true,
-            bandKey: true,
+            channelKey: true,
+            coverUrl: true,
+            kind: true,
+            platform: true,
           },
         },
         images: true,
@@ -82,10 +88,10 @@ export class PostRepository {
     })
   }
 
-  async findByExternalId(wholesaleBandId: number, externalId: string) {
-    return prisma.post.findFirst({
+  async findByExternalId(channelId: number, externalId: string) {
+    return prisma.collectedPost.findFirst({
       where: {
-        wholesaleBandId,
+        channelId,
         externalId,
       },
     })
@@ -93,7 +99,7 @@ export class PostRepository {
 
   async create(data: {
     userId: number
-    wholesaleBandId: number
+    channelId: number
     externalId: string
     title: string
     content: string
@@ -101,10 +107,10 @@ export class PostRepository {
     comments?: Array<{ author: string; content: string }>
     savedImages?: SavedImage[]
   }) {
-    return prisma.post.create({
+    return prisma.collectedPost.create({
       data: {
         userId: data.userId,
-        wholesaleBandId: data.wholesaleBandId,
+        channelId: data.channelId,
         externalId: data.externalId,
         title: data.title,
         content: data.content,
@@ -129,10 +135,13 @@ export class PostRepository {
         }),
       },
       include: {
-        wholesaleBand: {
+        channel: {
           select: {
+            id: true,
             name: true,
-            bandKey: true,
+            channelKey: true,
+            kind: true,
+            platform: true,
           },
         },
         comments: true,
@@ -142,7 +151,7 @@ export class PostRepository {
   }
 
   async update(id: number, data: PostUpdateInput) {
-    return prisma.post.update({
+    return prisma.collectedPost.update({
       where: { id },
       data: {
         ...(data.title && { title: data.title }),
@@ -150,10 +159,13 @@ export class PostRepository {
         ...(data.author !== undefined && { author: data.author }),
       },
       include: {
-        wholesaleBand: {
+        channel: {
           select: {
+            id: true,
             name: true,
-            bandKey: true,
+            channelKey: true,
+            kind: true,
+            platform: true,
           },
         },
       },
@@ -161,13 +173,13 @@ export class PostRepository {
   }
 
   async delete(id: number) {
-    return prisma.post.delete({
+    return prisma.collectedPost.delete({
       where: { id },
     })
   }
 
   async getWithImages(id: number) {
-    return prisma.post.findFirst({
+    return prisma.collectedPost.findFirst({
       where: { id },
       include: {
         images: true,
@@ -176,4 +188,7 @@ export class PostRepository {
   }
 }
 
-export const postRepository = new PostRepository()
+// 하위 호환성을 위한 별칭 유지 (점진적 마이그레이션)
+export const PostRepository = CollectedPostRepository
+export const postRepository = new CollectedPostRepository()
+export const collectedPostRepository = new CollectedPostRepository()

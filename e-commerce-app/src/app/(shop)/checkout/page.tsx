@@ -26,7 +26,7 @@ interface Address {
 
 interface CartItem {
   id: number
-  productPublishId: number
+  publishedProductId: number
   variantId: number | null
   name: string
   optionSummary: string | null
@@ -55,12 +55,12 @@ function CheckoutContent() {
   const searchParams = useSearchParams()
   const { data: session, status } = useSession()
   const fromCart = searchParams.get('fromCart') === 'true'
-  const productPublishId = searchParams.get('productPublishId') // productId → productPublishId로 변경
+  const publishedProductId = searchParams.get('publishedProductId') // productId → publishedProductId로 변경
   const quantity = parseInt(searchParams.get('quantity') || '1')
 
   const [product, setProduct] = useState<any>(null)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
-  const [cartRetailBandId, setCartRetailBandId] = useState<number | null>(null)
+  const [cartChannelId, setCartChannelId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   // 회원 배송지 관련
@@ -124,7 +124,7 @@ function CheckoutContent() {
   useEffect(() => {
     loadCheckoutData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromCart, productPublishId, session, status])
+  }, [fromCart, publishedProductId, session, status])
 
   const loadCheckoutData = async () => {
     try {
@@ -133,7 +133,7 @@ function CheckoutContent() {
       // 장바구니 또는 상품 로드
       if (fromCart) {
         await loadCartItems()
-      } else if (productPublishId) {
+      } else if (publishedProductId) {
         await loadProduct()
       }
 
@@ -206,7 +206,7 @@ function CheckoutContent() {
 
       if (data.success && data.cart?.items?.length > 0) {
         setCartItems(data.cart.items)
-        setCartRetailBandId(data.cart.retailBandId || null)
+        setCartChannelId(data.cart.channelId || data.cart.retailBandId || null)
       } else {
         // 장바구니가 비어있으면 장바구니 페이지로 이동
         window.location.href = '/cart'
@@ -220,19 +220,19 @@ function CheckoutContent() {
   const loadProduct = async () => {
     try {
       setIsLoading(true)
-      // productPublishId를 통해 상품 조회
-      const response = await fetch(`/api/shop/product-publish/${productPublishId}`)
+      // publishedProductId를 통해 상품 조회
+      const response = await fetch(`/api/shop/product-publish/${publishedProductId}`)
       const data = await response.json()
 
-      if (data.success && data.productPublish) {
-        const pp = data.productPublish
+      if (data.success && data.publishedProduct) {
+        const pp = data.publishedProduct
         const product = pp.product
         const mainVariant = product.variants?.[0]
         const images = product.post?.images?.map((img: any) => img.imageUrl) || []
 
         setProduct({
           id: product.id,
-          productPublishId: pp.id,
+          publishedProductId: pp.id,
           title: product.name,
           description: product.description || '',
           images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
@@ -243,8 +243,8 @@ function CheckoutContent() {
         })
       } else {
         setProduct({
-          id: productPublishId,
-          productPublishId: productPublishId,
+          id: publishedProductId,
+          publishedProductId: publishedProductId,
           title: '상품',
           images: ['/placeholder.jpg'],
           originalPrice: 0,
@@ -255,8 +255,8 @@ function CheckoutContent() {
     } catch (error) {
       console.error('상품 로딩 실패:', error)
       setProduct({
-        id: productPublishId,
-        productPublishId: productPublishId,
+        id: publishedProductId,
+        publishedProductId: publishedProductId,
         title: '상품',
         images: ['/placeholder.jpg'],
         originalPrice: 0,
@@ -345,7 +345,7 @@ function CheckoutContent() {
       } else {
         orderRequestData.fromCart = false
         orderRequestData.items = [{
-          productPublishId: parseInt(productPublishId!),
+          publishedProductId: parseInt(publishedProductId!),
           quantity
         }]
       }
@@ -531,7 +531,7 @@ function CheckoutContent() {
             {/* Header */}
             <div className="flex items-center gap-4 mb-6">
               <Link
-                href={fromCart ? '/cart' : `/product/${product?.id || productPublishId}`}
+                href={fromCart ? '/cart' : `/product/${product?.id || publishedProductId}`}
                 className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
               >
                 <ArrowLeft className="w-5 h-5" />

@@ -30,17 +30,17 @@ interface PostComment {
 interface Post {
   id: number
   userId: number
-  wholesaleBandId: number
+  channelId: number
   externalId: string
   title: string
   content: string
   author: string | null
   status: string
   createdAt: string
-  wholesaleBand: {
+  channel: {
     id: number
     name: string
-    bandKey: string
+    channelKey: string
     coverUrl: string | null
   }
   user: {
@@ -262,10 +262,10 @@ export default function PostDetailPage() {
             <div>
               <label className="text-sm font-medium text-gray-500">출처 밴드</label>
               <div className="flex items-center gap-3 mt-1">
-                {post.wholesaleBand.coverUrl ? (
+                {post.channel?.coverUrl ? (
                   <img
-                    src={post.wholesaleBand.coverUrl}
-                    alt={post.wholesaleBand.name}
+                    src={post.channel.coverUrl}
+                    alt={post.channel.name}
                     className="w-12 h-12 rounded-lg object-cover"
                   />
                 ) : (
@@ -274,7 +274,7 @@ export default function PostDetailPage() {
                   </div>
                 )}
                 <div>
-                  <div className="font-medium text-gray-900">{post.wholesaleBand.name}</div>
+                  <div className="font-medium text-gray-900">{post.channel?.name || '-'}</div>
                 </div>
               </div>
             </div>
