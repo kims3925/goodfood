@@ -23,6 +23,7 @@ import {
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import SettlementModal from '@/components/settlement/SettlementModal'
+import { useToast } from '@/components/ui/Toast'
 
 interface OrderItem {
   id: number
@@ -85,6 +86,7 @@ interface SettlementData {
 
 export default function SettlementListPage() {
   const router = useRouter()
+  const toast = useToast()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<SettlementData | null>(null)
   const [expandedBands, setExpandedBands] = useState<Set<number>>(new Set())
@@ -803,7 +805,7 @@ export default function SettlementListPage() {
           onClose={closeSettlementModal}
           onSuccess={() => {
             fetchData()
-            alert('정산이 생성되었습니다.')
+            toast.success('정산이 생성되었습니다.')
           }}
         />
       )}

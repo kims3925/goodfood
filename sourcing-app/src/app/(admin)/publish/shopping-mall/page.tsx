@@ -18,6 +18,8 @@ import {
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
+import ConfirmModal from '@/components/ui/ConfirmModal'
+import { useToast } from '@/components/ui/Toast'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Pagination from '@/components/ui/Pagination'
 
@@ -53,10 +55,14 @@ interface Product {
 type TabType = 'unpublished' | 'published' | 'all'
 
 export default function ShoppingMallPublishPage() {
+  const toast = useToast()
+
   // State
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false)
+  const [pendingUnpublishIds, setPendingUnpublishIds] = useState<number[]>([])
 
   // Selection
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([])
@@ -71,6 +77,9 @@ export default function ShoppingMallPublishPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const itemsPerPage = 10
+
+  // Stats (탭과 무관하게 일정한 값)
+  const [stats, setStats] = useState({ total: 0, published: 0, unpublished: 0 })
 
   // Publish Modal
   const [showPublishModal, setShowPublishModal] = useState(false)
@@ -119,6 +128,11 @@ export default function ShoppingMallPublishPage() {
         setProducts(filteredProducts)
         setTotalItems(data.pagination.total)
         setTotalPages(data.pagination.totalPages)
+
+        // 전체 통계 업데이트 (탭과 무관하게 일정)
+        if (data.stats) {
+          setStats(data.stats)
+        }
       }
     } catch (error) {
       console.error('상품 목록 조회 실패:', error)
@@ -187,36 +201,42 @@ export default function ShoppingMallPublishPage() {
         setSelectAllProducts(false)
         loadProducts()
       } else {
-        alert(`발행 실패: ${data.error}`)
+        toast.error(`발행 실패: ${data.error}`)
       }
     } catch (error) {
       console.error('발행 실패:', error)
-      alert('발행 중 오류가 발생했습니다.')
+      toast.error('발행 중 오류가 발생했습니다.')
     } finally {
       setIsPublishing(false)
     }
   }
 
   // Unpublish handler
-  const handleUnpublish = async (publishIds: number[]) => {
-    if (!confirm('선택한 발행을 취소하시겠습니까?')) return
+  const handleUnpublish = (publishIds: number[]) => {
+    setPendingUnpublishIds(publishIds)
+    setShowUnpublishConfirm(true)
+  }
 
+  const confirmUnpublish = async () => {
     try {
-      const response = await fetch(`/api/shop/publish?ids=${publishIds.join(',')}`, {
+      const response = await fetch(`/api/shop/publish?ids=${pendingUnpublishIds.join(',')}`, {
         method: 'DELETE',
       })
 
       const data = await response.json()
 
       if (data.success) {
-        alert(`${data.deletedCount}개의 발행이 취소되었습니다.`)
+        toast.success(`${data.deletedCount}개의 발행이 취소되었습니다.`)
         loadProducts()
       } else {
-        alert(`발행 취소 실패: ${data.error}`)
+        toast.error(`발행 취소 실패: ${data.error}`)
       }
     } catch (error) {
       console.error('발행 취소 실패:', error)
-      alert('발행 취소 중 오류가 발생했습니다.')
+      toast.error('발행 취소 중 오류가 발생했습니다.')
+    } finally {
+      setShowUnpublishConfirm(false)
+      setPendingUnpublishIds([])
     }
   }
 
@@ -230,10 +250,6 @@ export default function ShoppingMallPublishPage() {
     const margin = ((price - wholesalePrice) / wholesalePrice) * 100
     return `${margin.toFixed(0)}%`
   }
-
-  // Count stats
-  const unpublishedCount = products.filter((p) => !p.publishStatus?.shoppingMall).length
-  const publishedCount = products.filter((p) => p.publishStatus?.shoppingMall).length
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -258,7 +274,7 @@ export default function ShoppingMallPublishPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-500">판매 가능 상품</p>
-                <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
               </div>
             </div>
           </div>
@@ -269,7 +285,7 @@ export default function ShoppingMallPublishPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-500">발행 완료</p>
-                <p className="text-2xl font-bold text-green-600">{publishedCount}</p>
+                <p className="text-2xl font-bold text-green-600">{stats.published}</p>
               </div>
             </div>
           </div>
@@ -280,7 +296,7 @@ export default function ShoppingMallPublishPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-500">미발행 상품</p>
-                <p className="text-2xl font-bold text-yellow-600">{unpublishedCount}</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.unpublished}</p>
               </div>
             </div>
           </div>
@@ -603,6 +619,20 @@ export default function ShoppingMallPublishPage() {
           </ul>
         </div>
       </div>
+
+      {/* 발행 취소 확인 모달 */}
+      <ConfirmModal
+        isOpen={showUnpublishConfirm}
+        onClose={() => {
+          setShowUnpublishConfirm(false)
+          setPendingUnpublishIds([])
+        }}
+        onConfirm={confirmUnpublish}
+        title="발행 취소"
+        message="선택한 발행을 취소하시겠습니까?"
+        confirmText="발행 취소"
+        variant="danger"
+      />
     </div>
   )
 }

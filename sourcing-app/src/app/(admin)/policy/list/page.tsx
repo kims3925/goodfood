@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Search, Trash2, RefreshCw } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -37,6 +38,8 @@ export default function PolicyManagePage() {
   // 선택 삭제 관련 상태
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     loadPolicies()
@@ -98,15 +101,15 @@ export default function PolicyManagePage() {
   }
 
   // 선택 삭제
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedIds.length === 0) {
       return
     }
+    setShowDeleteConfirm(true)
+  }
 
-    if (!confirm(`선택한 ${selectedIds.length}개의 정책을 삭제하시겠습니까?`)) {
-      return
-    }
-
+  const confirmDeleteSelected = async () => {
+    setIsDeleting(true)
     try {
       let successCount = 0
       for (const id of selectedIds) {
@@ -123,6 +126,7 @@ export default function PolicyManagePage() {
 
       setSelectedIds([])
       setSelectAll(false)
+      setShowDeleteConfirm(false)
       loadPolicies()
 
       if (successCount > 0) {
@@ -133,6 +137,8 @@ export default function PolicyManagePage() {
     } catch (error) {
       console.error('정책 일괄 삭제 실패:', error)
       toast.error('정책 삭제에 실패했습니다.')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -297,6 +303,18 @@ export default function PolicyManagePage() {
           />
         </div>
       </div>
+
+      {/* 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDeleteSelected}
+        title="정책 삭제"
+        message={`선택한 ${selectedIds.length}개의 정책을 삭제하시겠습니까?`}
+        confirmText="삭제"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   )
 }

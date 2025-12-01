@@ -33,10 +33,33 @@ interface PublishedProduct {
   }
 }
 
+interface GroupedPublishedProduct {
+  productId: number
+  product: {
+    id: number
+    name: string
+    thumbnailUrl: string | null
+    price: number | null
+    wholesalePrice: number | null
+  }
+  publishes: Array<{
+    id: number
+    retailBandId: number
+    status: 'PENDING' | 'SUCCESS' | 'FAILED'
+    createdAt: string
+    retailBand: {
+      id: number
+      name: string
+      bandKey: string
+    }
+  }>
+}
+
 export default function PublishedProductListPage() {
   const router = useRouter()
   const toast = useToast()
   const [products, setProducts] = useState<PublishedProduct[]>([])
+  const [groupedProducts, setGroupedProducts] = useState<GroupedPublishedProduct[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
@@ -47,13 +70,37 @@ export default function PublishedProductListPage() {
   const [totalItems, setTotalItems] = useState(0)
   const itemsPerPage = 10
 
-  // Selection states
-  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  // Selection states - productId 기준으로 변경
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
 
   // Delete confirm modal states
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // 상품별로 그룹화하는 함수
+  const groupByProduct = (items: PublishedProduct[]): GroupedPublishedProduct[] => {
+    const grouped = new Map<number, GroupedPublishedProduct>()
+
+    items.forEach((item) => {
+      if (!grouped.has(item.productId)) {
+        grouped.set(item.productId, {
+          productId: item.productId,
+          product: item.product,
+          publishes: [],
+        })
+      }
+      grouped.get(item.productId)!.publishes.push({
+        id: item.id,
+        retailBandId: item.retailBandId,
+        status: item.status,
+        createdAt: item.createdAt,
+        retailBand: item.retailBand,
+      })
+    })
+
+    return Array.from(grouped.values())
+  }
 
   useEffect(() => {
     loadProducts()
@@ -65,7 +112,7 @@ export default function PublishedProductListPage() {
       const params = new URLSearchParams({
         search: searchTerm,
         page: currentPage.toString(),
-        limit: itemsPerPage.toString(),
+        limit: '100', // 그룹화를 위해 더 많은 데이터 조회
       })
       if (statusFilter !== 'ALL') {
         params.append('status', statusFilter)
@@ -76,8 +123,10 @@ export default function PublishedProductListPage() {
 
       if (data.success) {
         setProducts(data.data)
-        setTotalItems(data.total || 0)
-        setTotalPages(Math.ceil((data.total || 0) / itemsPerPage))
+        const grouped = groupByProduct(data.data)
+        setGroupedProducts(grouped)
+        setTotalItems(grouped.length)
+        setTotalPages(Math.ceil(grouped.length / itemsPerPage))
       } else {
         toast.error('발행 상품 목록을 불러오는데 실패했습니다.')
       }
@@ -87,6 +136,13 @@ export default function PublishedProductListPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // 현재 페이지에 해당하는 그룹화된 상품 가져오기
+  const getCurrentPageProducts = () => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return groupedProducts.slice(startIndex, endIndex)
   }
 
   const handleSearch = () => {
@@ -99,38 +155,54 @@ export default function PublishedProductListPage() {
   }
 
   const handleToggleSelectAll = () => {
+    const currentProducts = getCurrentPageProducts()
     if (selectAll) {
-      setSelectedIds([])
+      setSelectedProductIds([])
       setSelectAll(false)
     } else {
-      const allIds = products.map((p) => p.id)
-      setSelectedIds(allIds)
+      const allProductIds = currentProducts.map((p) => p.productId)
+      setSelectedProductIds(allProductIds)
       setSelectAll(true)
     }
   }
 
-  const handleToggleSelection = (id: number) => {
-    setSelectedIds((prev) => {
-      const newSelection = prev.includes(id)
-        ? prev.filter((pid) => pid !== id)
-        : [...prev, id]
-      setSelectAll(newSelection.length === products.length)
+  const handleToggleSelection = (productId: number) => {
+    const currentProducts = getCurrentPageProducts()
+    setSelectedProductIds((prev) => {
+      const newSelection = prev.includes(productId)
+        ? prev.filter((pid) => pid !== productId)
+        : [...prev, productId]
+      setSelectAll(newSelection.length === currentProducts.length)
       return newSelection
     })
   }
 
   const handleDeleteSelected = () => {
-    if (selectedIds.length === 0) {
+    if (selectedProductIds.length === 0) {
       return
     }
     setShowDeleteConfirm(true)
   }
 
+  // 선택된 상품들의 모든 발행 ID 가져오기
+  const getSelectedPublishIds = (): number[] => {
+    const publishIds: number[] = []
+    selectedProductIds.forEach((productId) => {
+      const grouped = groupedProducts.find((g) => g.productId === productId)
+      if (grouped) {
+        grouped.publishes.forEach((p) => publishIds.push(p.id))
+      }
+    })
+    return publishIds
+  }
+
   const confirmDeleteSelected = async () => {
     setIsDeleting(true)
     try {
+      const publishIds = getSelectedPublishIds()
       let successCount = 0
-      for (const id of selectedIds) {
+
+      for (const id of publishIds) {
         try {
           const response = await fetch(`/api/product/publish?id=${id}`, {
             method: 'DELETE',
@@ -142,13 +214,13 @@ export default function PublishedProductListPage() {
         }
       }
 
-      setSelectedIds([])
+      setSelectedProductIds([])
       setSelectAll(false)
       setShowDeleteConfirm(false)
       loadProducts()
 
       if (successCount > 0) {
-        toast.success(`${successCount}개의 발행 상품이 삭제되었습니다.`)
+        toast.success(`${successCount}개의 발행이 삭제되었습니다.`)
       } else {
         toast.error('발행 상품 삭제에 실패했습니다.')
       }
@@ -158,6 +230,11 @@ export default function PublishedProductListPage() {
     } finally {
       setIsDeleting(false)
     }
+  }
+
+  // 선택된 상품의 총 발행 건수 계산
+  const getSelectedPublishCount = (): number => {
+    return getSelectedPublishIds().length
   }
 
   const getStatusBadge = (status: string) => {
@@ -238,10 +315,10 @@ export default function PublishedProductListPage() {
                 <Button
                   variant="danger"
                   onClick={handleDeleteSelected}
-                  disabled={selectedIds.length === 0}
+                  disabled={selectedProductIds.length === 0}
                 >
                   <Trash2 size={16} />
-                  선택 삭제 ({selectedIds.length})
+                  선택 삭제 ({selectedProductIds.length}상품 / {getSelectedPublishCount()}건)
                 </Button>
               </div>
             </div>
@@ -264,36 +341,35 @@ export default function PublishedProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[35%]">상품명</TableHead>
-                  <TableHead className="w-[20%]">소매밴드</TableHead>
+                  <TableHead className="w-[30%]">상품명</TableHead>
                   <TableHead className="w-[10%]">도매가</TableHead>
                   <TableHead className="w-[10%]">판매가</TableHead>
-                  <TableHead className="w-[10%]">발행상태</TableHead>
-                  <TableHead className="w-[10%]">발행일</TableHead>
+                  <TableHead className="w-[45%]">소매밴드 발행 현황</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.length === 0 ? (
+                {getCurrentPageProducts().length === 0 ? (
                   <TableEmpty message="발행된 상품이 없습니다." />
                 ) : (
-                  products.map((item) => (
+                  getCurrentPageProducts().map((item) => (
                     <TableRow
-                      key={item.id}
-                      className="hover:bg-gray-50 cursor-pointer"
+                      key={item.productId}
+                      className="hover:bg-gray-50 cursor-pointer align-top"
                       onClick={() => router.push(`/product/detail/${item.productId}`)}
                     >
                       <TableCell
                         onClick={(e) => e.stopPropagation()}
+                        className="align-top pt-4"
                       >
                         <input
                           type="checkbox"
-                          checked={selectedIds.includes(item.id)}
-                          onChange={() => handleToggleSelection(item.id)}
+                          checked={selectedProductIds.includes(item.productId)}
+                          onChange={() => handleToggleSelection(item.productId)}
                           className="w-4 h-4 cursor-pointer"
                         />
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
+                      <TableCell className="align-top">
+                        <div className="flex items-start gap-3">
                           {item.product?.thumbnailUrl ? (
                             <img
                               src={item.product.thumbnailUrl}
@@ -309,32 +385,44 @@ export default function PublishedProductListPage() {
                             <div className="font-semibold text-gray-900 text-base">
                               {item.product?.name || '상품 정보 없음'}
                             </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {item.publishes.length}개 밴드에 발행
+                            </div>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Store size={16} className="text-gray-400" />
-                          <span className="text-gray-600">
-                            {item.retailBand?.name || '-'}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top pt-4">
                         <div className="font-medium text-gray-900">
                           {formatPrice(item.product?.wholesalePrice)}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top pt-4">
                         <div className="font-medium text-gray-900">
                           {formatPrice(item.product?.price)}
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(item.status)}</TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {new Date(item.createdAt).toLocaleDateString('ko-KR')}
-                        </span>
+                      <TableCell className="align-top" onClick={(e) => e.stopPropagation()}>
+                        <div className="space-y-2">
+                          {item.publishes.map((publish) => (
+                            <div
+                              key={publish.id}
+                              className="flex items-center justify-between gap-4 py-1.5 px-3 bg-gray-50 rounded-lg"
+                            >
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <Store size={14} className="text-gray-400 flex-shrink-0" />
+                                <span className="text-sm text-gray-700 truncate">
+                                  {publish.retailBand?.name || '-'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0">
+                                {getStatusBadge(publish.status)}
+                                <span className="text-xs text-gray-500">
+                                  {new Date(publish.createdAt).toLocaleDateString('ko-KR')}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -360,7 +448,7 @@ export default function PublishedProductListPage() {
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={confirmDeleteSelected}
         title="발행 상품 삭제"
-        message={`선택한 ${selectedIds.length}개의 발행 상품을 삭제하시겠습니까?`}
+        message={`선택한 ${selectedProductIds.length}개 상품의 총 ${getSelectedPublishCount()}건의 발행을 삭제하시겠습니까?`}
         confirmText="삭제"
         variant="danger"
         isLoading={isDeleting}

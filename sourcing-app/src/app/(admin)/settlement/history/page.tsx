@@ -17,6 +17,8 @@ import {
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
+import ConfirmModal from '@/components/ui/ConfirmModal'
+import { useToast } from '@/components/ui/Toast'
 
 interface Settlement {
   id: number
@@ -44,6 +46,7 @@ interface Stats {
 
 export default function SettlementHistoryPage() {
   const router = useRouter()
+  const toast = useToast()
   const [loading, setLoading] = useState(true)
   const [settlements, setSettlements] = useState<Settlement[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
@@ -57,6 +60,12 @@ export default function SettlementHistoryPage() {
   // 필터
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [updating, setUpdating] = useState<number | null>(null)
+
+  // 확인 모달 상태
+  const [showStatusConfirm, setShowStatusConfirm] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [pendingSettlementId, setPendingSettlementId] = useState<number | null>(null)
+  const [pendingNewStatus, setPendingNewStatus] = useState<string>('')
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -128,51 +137,69 @@ export default function SettlementHistoryPage() {
     }
   }
 
-  const handleStatusChange = async (settlementId: number, newStatus: string) => {
-    if (!confirm(`정산 상태를 ${newStatus === 'COMPLETED' ? '완료' : '취소'}로 변경하시겠습니까?`)) return
+  const handleStatusChange = (settlementId: number, newStatus: string) => {
+    setPendingSettlementId(settlementId)
+    setPendingNewStatus(newStatus)
+    setShowStatusConfirm(true)
+  }
 
-    setUpdating(settlementId)
+  const confirmStatusChange = async () => {
+    if (!pendingSettlementId || !pendingNewStatus) return
+
+    setUpdating(pendingSettlementId)
     try {
-      const res = await fetch(`/api/settlement/${settlementId}`, {
+      const res = await fetch(`/api/settlement/${pendingSettlementId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: pendingNewStatus }),
       })
 
       const result = await res.json()
 
       if (result.success) {
+        toast.success(`정산이 ${pendingNewStatus === 'COMPLETED' ? '완료' : '취소'}되었습니다.`)
         fetchData()
       } else {
-        alert(result.error || '상태 변경에 실패했습니다.')
+        toast.error(result.error || '상태 변경에 실패했습니다.')
       }
     } catch (error) {
-      alert('상태 변경에 실패했습니다.')
+      toast.error('상태 변경에 실패했습니다.')
     } finally {
       setUpdating(null)
+      setShowStatusConfirm(false)
+      setPendingSettlementId(null)
+      setPendingNewStatus('')
     }
   }
 
-  const handleDelete = async (settlementId: number) => {
-    if (!confirm('이 정산을 삭제하시겠습니까?')) return
+  const handleDelete = (settlementId: number) => {
+    setPendingSettlementId(settlementId)
+    setShowDeleteConfirm(true)
+  }
 
-    setUpdating(settlementId)
+  const confirmDelete = async () => {
+    if (!pendingSettlementId) return
+
+    setUpdating(pendingSettlementId)
     try {
-      const res = await fetch(`/api/settlement/${settlementId}`, {
+      const res = await fetch(`/api/settlement/${pendingSettlementId}`, {
         method: 'DELETE',
       })
 
       const result = await res.json()
 
       if (result.success) {
+        toast.success('정산이 삭제되었습니다.')
         fetchData()
       } else {
-        alert(result.error || '삭제에 실패했습니다.')
+        toast.error(result.error || '삭제에 실패했습니다.')
       }
     } catch (error) {
-      alert('삭제에 실패했습니다.')
+      toast.error('삭제에 실패했습니다.')
     } finally {
       setUpdating(null)
+      setShowDeleteConfirm(false)
+      setPendingSettlementId(null)
     }
   }
 
@@ -412,6 +439,37 @@ export default function SettlementHistoryPage() {
           </div>
         )}
       </div>
+
+      {/* 상태 변경 확인 모달 */}
+      <ConfirmModal
+        isOpen={showStatusConfirm}
+        onClose={() => {
+          setShowStatusConfirm(false)
+          setPendingSettlementId(null)
+          setPendingNewStatus('')
+        }}
+        onConfirm={confirmStatusChange}
+        title="정산 상태 변경"
+        message={`정산 상태를 ${pendingNewStatus === 'COMPLETED' ? '완료' : '취소'}로 변경하시겠습니까?`}
+        confirmText={pendingNewStatus === 'COMPLETED' ? '완료' : '취소'}
+        variant={pendingNewStatus === 'COMPLETED' ? 'info' : 'warning'}
+        isLoading={updating !== null}
+      />
+
+      {/* 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false)
+          setPendingSettlementId(null)
+        }}
+        onConfirm={confirmDelete}
+        title="정산 삭제"
+        message="이 정산을 삭제하시겠습니까?"
+        confirmText="삭제"
+        variant="danger"
+        isLoading={updating !== null}
+      />
     </div>
   )
 }

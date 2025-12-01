@@ -7,6 +7,8 @@ import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
+import ConfirmModal from '@/components/ui/ConfirmModal'
+import { useToast } from '@/components/ui/Toast'
 
 interface Band {
   id: number
@@ -33,6 +35,7 @@ interface Band {
 export default function RetailBandDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const toast = useToast()
   const bandId = params.id as string
 
   const [band, setBand] = useState<Band | null>(null)
@@ -40,6 +43,7 @@ export default function RetailBandDetailPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // 폼 상태
   const [formData, setFormData] = useState({
@@ -143,9 +147,11 @@ export default function RetailBandDetailPage() {
     }
   }
 
-  const handleDelete = async () => {
-    if (!confirm('정말 이 밴드를 삭제하시겠습니까?')) return
+  const handleDelete = () => {
+    setShowDeleteConfirm(true)
+  }
 
+  const confirmDelete = async () => {
     setIsDeleting(true)
     try {
       const response = await fetch(`/api/band/retail/${bandId}`, {
@@ -155,12 +161,17 @@ export default function RetailBandDetailPage() {
       const data = await response.json()
 
       if (data.success) {
+        toast.success('밴드가 삭제되었습니다.')
         router.push('/band/retail')
+      } else {
+        toast.error('밴드 삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('삭제 실패:', error)
+      toast.error('밴드 삭제에 실패했습니다.')
     } finally {
       setIsDeleting(false)
+      setShowDeleteConfirm(false)
     }
   }
 
@@ -401,6 +412,18 @@ export default function RetailBandDetailPage() {
           </div>
         </Card>
       </div>
+
+      {/* 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title="밴드 삭제"
+        message="정말 이 밴드를 삭제하시겠습니까?"
+        confirmText="삭제"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   )
 }

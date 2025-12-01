@@ -21,6 +21,8 @@ import {
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
+import ConfirmModal from '@/components/ui/ConfirmModal'
+import { useToast } from '@/components/ui/Toast'
 
 interface OrderItem {
   id: number
@@ -96,12 +98,15 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.R
 export default function OrderDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const toast = useToast()
   const orderId = parseInt(params.id as string)
 
   const [order, setOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null)
 
   useEffect(() => {
     if (orderId) {
@@ -130,29 +135,47 @@ export default function OrderDetailPage() {
     }
   }
 
-  const updateStatus = async (newStatus: string) => {
+  const handleStatusChange = (newStatus: string) => {
     if (!order) return
-    if (!confirm(`주문을 취소 하시겠습니까?`)) return
+    if (newStatus === 'CANCELLED') {
+      setPendingStatus(newStatus)
+      setShowCancelConfirm(true)
+    } else {
+      confirmStatusChange(newStatus)
+    }
+  }
+
+  const confirmStatusChange = async (newStatus?: string) => {
+    const statusToUpdate = newStatus || pendingStatus
+    if (!order || !statusToUpdate) return
 
     setIsUpdating(true)
     try {
       const response = await fetch(`/api/order/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: statusToUpdate }),
       })
 
       const data = await response.json()
       if (data.success) {
+        const statusLabels: Record<string, string> = {
+          SHIPPED: '배송 시작',
+          DELIVERED: '배송 완료',
+          CANCELLED: '주문 취소',
+        }
+        toast.success(`${statusLabels[statusToUpdate] || '상태 변경'}되었습니다.`)
         loadOrder()
       } else {
-        alert(data.error || '상태 변경에 실패했습니다.')
+        toast.error(data.error || '상태 변경에 실패했습니다.')
       }
     } catch (error) {
       console.error('상태 변경 실패:', error)
-      alert('상태 변경에 실패했습니다.')
+      toast.error('상태 변경에 실패했습니다.')
     } finally {
       setIsUpdating(false)
+      setShowCancelConfirm(false)
+      setPendingStatus(null)
     }
   }
 
@@ -460,7 +483,7 @@ export default function OrderDetailPage() {
                 {order.status === 'PAID' && (
                   <Button
                     variant="primary"
-                    onClick={() => updateStatus('SHIPPED')}
+                    onClick={() => handleStatusChange('SHIPPED')}
                     disabled={isUpdating}
                     className="w-full"
                   >
@@ -471,7 +494,7 @@ export default function OrderDetailPage() {
                 {order.status === 'SHIPPED' && (
                   <Button
                     variant="primary"
-                    onClick={() => updateStatus('DELIVERED')}
+                    onClick={() => handleStatusChange('DELIVERED')}
                     disabled={isUpdating}
                     className="w-full"
                   >
@@ -482,7 +505,7 @@ export default function OrderDetailPage() {
                 {['PENDING', 'PAID'].includes(order.status) && (
                   <Button
                     variant="danger"
-                    onClick={() => updateStatus('CANCELLED')}
+                    onClick={() => handleStatusChange('CANCELLED')}
                     disabled={isUpdating}
                     className="w-full"
                   >
@@ -505,6 +528,21 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 주문 취소 확인 모달 */}
+      <ConfirmModal
+        isOpen={showCancelConfirm}
+        onClose={() => {
+          setShowCancelConfirm(false)
+          setPendingStatus(null)
+        }}
+        onConfirm={() => confirmStatusChange()}
+        title="주문 취소"
+        message="주문을 취소하시겠습니까?"
+        confirmText="취소"
+        variant="danger"
+        isLoading={isUpdating}
+      />
     </div>
   )
 }

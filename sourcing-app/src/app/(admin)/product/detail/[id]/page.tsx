@@ -6,6 +6,8 @@ import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, GripV
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
+import ConfirmModal from '@/components/ui/ConfirmModal'
+import { useToast } from '@/components/ui/Toast'
 import Link from 'next/link'
 import ImageSortable, { SortableImage } from '@/components/product/ImageSortable'
 
@@ -57,11 +59,14 @@ interface Product {
 export default function ProductDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const toast = useToast()
   const productId = parseInt(params.id as string)
 
   const [product, setProduct] = useState<Product | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // 편집 모드 상태
   const [isEditing, setIsEditing] = useState(false)
@@ -175,10 +180,15 @@ export default function ProductDetailPage() {
     }
   }
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!product) return
-    if (!confirm('정말 삭제하시겠습니까?')) return
+    setShowDeleteConfirm(true)
+  }
 
+  const confirmDelete = async () => {
+    if (!product) return
+
+    setIsDeleting(true)
     try {
       const response = await fetch(`/api/product?id=${product.id}`, {
         method: 'DELETE',
@@ -187,10 +197,17 @@ export default function ProductDetailPage() {
       const data = await response.json()
 
       if (data.success) {
+        toast.success('상품이 삭제되었습니다.')
         router.push('/product/list')
+      } else {
+        toast.error('상품 삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('상품 삭제 실패:', error)
+      toast.error('상품 삭제에 실패했습니다.')
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteConfirm(false)
     }
   }
 
@@ -269,11 +286,11 @@ export default function ProductDetailPage() {
         }
       } else {
         console.error('이미지 삭제 실패:', data.error)
-        alert(data.error || '이미지 삭제에 실패했습니다.')
+        toast.error(data.error || '이미지 삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('이미지 삭제 실패:', error)
-      alert('이미지 삭제에 실패했습니다.')
+      toast.error('이미지 삭제에 실패했습니다.')
     } finally {
       setDeletingImageId(null)
     }
@@ -671,6 +688,18 @@ export default function ProductDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title="상품 삭제"
+        message="정말 이 상품을 삭제하시겠습니까?"
+        confirmText="삭제"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   )
 }

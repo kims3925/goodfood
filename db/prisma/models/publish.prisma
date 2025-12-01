@@ -22,7 +22,7 @@ model ProductPublish {
   // Relationships
   user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   product        Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
-  retailBand     RetailBand        @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
+  retailBand     RetailBand?       @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
   orderItems     OrderItem[]       // 쇼핑몰 주문 아이템 (reviews는 OrderItem을 통해 조회)
   orderTests     OrderTest[]       // 웹훅 주문 (구글폼 등)
   cartItems      CartItem[]        // 장바구니 아이템

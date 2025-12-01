@@ -6,6 +6,8 @@ import { ArrowLeft, Edit, Trash2, AlertCircle, Save, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
+import ConfirmModal from '@/components/ui/ConfirmModal'
+import { useToast } from '@/components/ui/Toast'
 
 interface PricingPolicy {
   id: number
@@ -21,11 +23,14 @@ interface PricingPolicy {
 export default function PolicyDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const toast = useToast()
   const policyId = parseInt(params.id as string)
 
   const [policy, setPolicy] = useState<PricingPolicy | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // 편집 모드 상태
   const [isEditing, setIsEditing] = useState(false)
@@ -118,10 +123,15 @@ export default function PolicyDetailPage() {
     }
   }
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!policy) return
-    if (!confirm('정말 삭제하시겠습니까?')) return
+    setShowDeleteConfirm(true)
+  }
 
+  const confirmDelete = async () => {
+    if (!policy) return
+
+    setIsDeleting(true)
     try {
       const response = await fetch(`/api/policy?id=${policy.id}`, {
         method: 'DELETE',
@@ -130,10 +140,17 @@ export default function PolicyDetailPage() {
       const data = await response.json()
 
       if (data.success) {
+        toast.success('정책이 삭제되었습니다.')
         router.push('/policy/list')
+      } else {
+        toast.error('정책 삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('정책 삭제 실패:', error)
+      toast.error('정책 삭제에 실패했습니다.')
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteConfirm(false)
     }
   }
 
@@ -332,6 +349,18 @@ export default function PolicyDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title="정책 삭제"
+        message="이 정책을 삭제하시겠습니까?"
+        confirmText="삭제"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   )
 }

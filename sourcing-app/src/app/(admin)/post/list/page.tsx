@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import { Plus, Search, Trash2, RefreshCw, AlertCircle, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import Pagination from '@/components/ui/Pagination'
+import { useToast } from '@/components/ui/Toast'
 
 interface PostImage {
   id: number
@@ -53,6 +55,7 @@ interface AvailablePost {
 
 export default function PostsManagePage() {
   const router = useRouter()
+  const toast = useToast()
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -67,6 +70,11 @@ export default function PostsManagePage() {
   // 게시물 선택 삭제 관련 상태
   const [selectedPostIds, setSelectedPostIds] = useState<number[]>([])
   const [selectAllPosts, setSelectAllPosts] = useState(false)
+
+  // 삭제 확인 모달 상태
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // 게시물 추가 모달 관련 상태
   const [availablePosts, setAvailablePosts] = useState<AvailablePost[]>([])
@@ -268,21 +276,35 @@ export default function PostsManagePage() {
   }
 
 
-  const handleDeletePost = async (id: number) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return
+  const handleDeletePost = (id: number) => {
+    setDeleteTargetId(id)
+    setShowDeleteConfirm(true)
+  }
 
+  const confirmDeletePost = async () => {
+    if (deleteTargetId === null) return
+
+    setIsDeleting(true)
     try {
-      const response = await fetch(`/api/post?id=${id}`, {
+      const response = await fetch(`/api/post?id=${deleteTargetId}`, {
         method: 'DELETE',
       })
 
       const data = await response.json()
 
       if (data.success) {
+        toast.success('게시물이 삭제되었습니다.')
         loadPosts()
+      } else {
+        toast.error('게시물 삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('게시물 삭제 실패:', error)
+      toast.error('게시물 삭제에 실패했습니다.')
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteConfirm(false)
+      setDeleteTargetId(null)
     }
   }
 
@@ -311,15 +333,16 @@ export default function PostsManagePage() {
   }
 
   // 선택한 게시물 일괄 삭제
-  const handleDeleteSelectedPosts = async () => {
+  const handleDeleteSelectedPosts = () => {
     if (selectedPostIds.length === 0) {
       return
     }
+    setDeleteTargetId(null) // null means batch delete
+    setShowDeleteConfirm(true)
+  }
 
-    if (!confirm(`선택한 ${selectedPostIds.length}개의 게시물을 삭제하시겠습니까?`)) {
-      return
-    }
-
+  const confirmDeleteSelectedPosts = async () => {
+    setIsDeleting(true)
     try {
       let successCount = 0
       let failCount = 0
@@ -345,9 +368,20 @@ export default function PostsManagePage() {
 
       setSelectedPostIds([])
       setSelectAllPosts(false)
+      setShowDeleteConfirm(false)
       loadPosts()
+
+      if (successCount > 0) {
+        toast.success(`${successCount}개의 게시물이 삭제되었습니다.`)
+      }
+      if (failCount > 0) {
+        toast.error(`${failCount}개의 게시물 삭제에 실패했습니다.`)
+      }
     } catch (error) {
       console.error('게시물 일괄 삭제 실패:', error)
+      toast.error('게시물 삭제에 실패했습니다.')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -784,6 +818,25 @@ export default function PostsManagePage() {
           </div>
         </div>
       )}
+
+      {/* 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false)
+          setDeleteTargetId(null)
+        }}
+        onConfirm={deleteTargetId !== null ? confirmDeletePost : confirmDeleteSelectedPosts}
+        title="게시물 삭제"
+        message={
+          deleteTargetId !== null
+            ? '이 게시물을 삭제하시겠습니까?'
+            : `선택한 ${selectedPostIds.length}개의 게시물을 삭제하시겠습니까?`
+        }
+        confirmText="삭제"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   )
 }
