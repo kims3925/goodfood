@@ -4,7 +4,7 @@
  * PublishedProduct 기반 주문과 연동
  */
 
-import prisma, { Prisma, PublishStatus } from '@bandauto/db'
+import prisma, { Prisma } from '@bandauto/db'
 import { getTossPaymentsService, TossPaymentResponse } from '@/modules/payments/services/toss-payments.service'
 import {
   getOrderRepository,
@@ -340,7 +340,6 @@ export class PaymentService {
         const publishedProduct = await prisma.publishedProduct.findFirst({
           where: {
             id: item.publishedProductId,
-            status: PublishStatus.SUCCESS,
           },
           include: {
             product: {

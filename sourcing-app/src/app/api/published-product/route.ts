@@ -16,7 +16,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
     const channelId = searchParams.get('channelId')
-    const status = searchParams.get('status')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const page = parseInt(searchParams.get('page') || '1')
@@ -36,10 +35,6 @@ export async function GET(request: NextRequest) {
 
     if (channelId) {
       where.channelId = parseInt(channelId)
-    }
-
-    if (status && status !== 'ALL') {
-      where.status = status
     }
 
     if (startDate || endDate) {

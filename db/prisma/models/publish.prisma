@@ -9,11 +9,6 @@ model PublishedProduct {
   productId        Int           @map("product_id")
   channelId        Int?          @map("channel_id") // null = 쇼핑몰 직접 발행
 
-  // Status
-  status           PublishStatus @default(PENDING)
-  externalId       String?       @map("external_id") @db.VarChar(255)
-  externalUrl      String?       @map("external_url") @db.VarChar(1000)
-  errorMessage     String?       @map("error_message") @db.Text
   publishedAt      DateTime?     @map("published_at") @db.Timestamp(0)
 
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamp(0)
@@ -33,7 +28,6 @@ model PublishedProduct {
   @@index([userId])
   @@index([productId])
   @@index([channelId])
-  @@index([status])
   @@map("published_product")
 }
 

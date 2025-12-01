@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { PublishStatus, ChannelKind } from '@bandauto/db'
+import prisma, { ChannelKind } from '@bandauto/db'
 
 export async function GET(
   req: NextRequest,
@@ -40,7 +40,7 @@ export async function GET(
     const publishedProducts = await prisma.publishedProduct.findMany({
       where: {
         channelId: channelId,
-        status: PublishStatus.SUCCESS,
+        // status 제거: 발행 레코드 존재 여부로 판단
       },
       include: {
         product: {

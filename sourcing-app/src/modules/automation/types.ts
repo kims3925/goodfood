@@ -3,7 +3,7 @@
  * 자동화 워크플로우 타입 정의
  */
 
-import { WorkflowType, WorkflowStatus, AiProvider, PublishStatus, TriggerType } from '@bandauto/db'
+import { WorkflowType, WorkflowStatus, AiProvider, TriggerType } from '@bandauto/db'
 
 export { TriggerType }
 
@@ -118,7 +118,7 @@ export interface PublishedProductResult {
   productId: number
   channelId: number
   postKey?: string
-  status: PublishStatus
+  status: 'SUCCESS' | 'FAILED'
   error?: string
 }
 

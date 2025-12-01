@@ -1,4 +1,4 @@
-import prisma, { PublishStatus, ChannelKind } from '@bandauto/db'
+import prisma, { ChannelKind } from '@bandauto/db'
 import type { ProductListParams, ProductCreateInput, ProductUpdateInput } from '../types/product.types'
 
 export class ProductRepository {
@@ -87,7 +87,6 @@ export class ProductRepository {
         },
         publishedProducts: {
           where: {
-            status: PublishStatus.SUCCESS,
             channel: {
               kind: ChannelKind.RETAIL,
             },

@@ -4,7 +4,7 @@
  * PublishedProduct 기반 스키마 지원
  */
 
-import prisma, { PublishStatus } from '@bandauto/db'
+import prisma from '@bandauto/db'
 import {
   getOrderRepository,
   OrderRepository,
@@ -255,7 +255,6 @@ export class OrderService {
       const publishedProduct = await prisma.publishedProduct.findFirst({
         where: {
           id: item.publishedProductId,
-          status: PublishStatus.SUCCESS,
         },
         include: {
           product: {

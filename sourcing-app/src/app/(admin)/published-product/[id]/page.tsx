@@ -1,22 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Package, Store, ExternalLink, Trash2, RotateCcw, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { ArrowLeft, Store, Trash2 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
+import Image from 'next/image'
 
 interface PublishedProductDetail {
   id: number
   userId: number
   productId: number
   channelId: number | null
-  status: 'PENDING' | 'SUCCESS' | 'FAILED'
-  externalId: string | null
-  externalUrl: string | null
-  errorMessage: string | null
   publishedAt: string | null
   createdAt: string
   updatedAt: string
@@ -86,11 +83,7 @@ export default function PublishedProductDetailPage({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  useEffect(() => {
-    loadProduct()
-  }, [id])
-
-  const loadProduct = async () => {
+  const loadProduct = useCallback(async () => {
     try {
       setIsLoading(true)
       const response = await fetch(`/api/published-product/${id}`)
@@ -109,7 +102,11 @@ export default function PublishedProductDetailPage({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [id, router, toast])
+
+  useEffect(() => {
+    loadProduct()
+  }, [loadProduct])
 
   const handleDelete = async () => {
     setIsDeleting(true)
@@ -134,39 +131,9 @@ export default function PublishedProductDetailPage({
     }
   }
 
-  const handleRetryPublish = async () => {
-    toast.info('재발행 기능은 준비 중입니다.')
-  }
-
   const formatPrice = (price: number | null) => {
     if (!price) return '-'
     return `₩${price.toLocaleString()}`
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'SUCCESS':
-        return <CheckCircle size={20} className="text-green-500" />
-      case 'FAILED':
-        return <XCircle size={20} className="text-red-500" />
-      case 'PENDING':
-      default:
-        return <Clock size={20} className="text-yellow-500" />
-    }
-  }
-
-  const getStatusLabel = (status: string) => {
-    const statusMap: { [key: string]: { label: string; color: string } } = {
-      PENDING: { label: '대기중', color: 'text-yellow-600 bg-yellow-100' },
-      SUCCESS: { label: '발행완료', color: 'text-green-600 bg-green-100' },
-      FAILED: { label: '발행실패', color: 'text-red-600 bg-red-100' },
-    }
-    const info = statusMap[status] || { label: status, color: 'text-gray-600 bg-gray-100' }
-    return (
-      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${info.color}`}>
-        {info.label}
-      </span>
-    )
   }
 
   if (isLoading) {
@@ -181,8 +148,7 @@ export default function PublishedProductDetailPage({
     return null
   }
 
-  const thumbnailUrl = product.product.thumbnailUrl ||
-    product.product.collectedProduct?.post?.images?.[0]?.imageUrl
+  const galleryImages = product.product.collectedProduct?.post?.images ?? []
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -197,21 +163,6 @@ export default function PublishedProductDetailPage({
             <h1 className="text-2xl font-bold text-gray-900">발행상품 상세</h1>
           </div>
           <div className="flex gap-2">
-            {product.externalUrl && (
-              <Button
-                variant="secondary"
-                onClick={() => window.open(product.externalUrl!, '_blank')}
-              >
-                <ExternalLink size={16} />
-                외부 링크
-              </Button>
-            )}
-            {product.status === 'FAILED' && (
-              <Button variant="primary" onClick={handleRetryPublish}>
-                <RotateCcw size={16} />
-                재발행
-              </Button>
-            )}
             <Button variant="danger" onClick={() => setShowDeleteConfirm(true)}>
               <Trash2 size={16} />
               삭제
@@ -219,35 +170,10 @@ export default function PublishedProductDetailPage({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 이미지 섹션 */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">상품 이미지</h2>
-              {thumbnailUrl ? (
-                <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                  <img
-                    src={thumbnailUrl}
-                    alt={product.product.name}
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="aspect-square rounded-lg bg-gray-100 flex items-center justify-center">
-                  <Package size={48} className="text-gray-400" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 상품 정보 섹션 */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* 발행 상태 */}
+        <div className="space-y-6">
+            {/* 발행 정보 */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">발행 상태</h2>
-                {getStatusLabel(product.status)}
-              </div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">발행 정보</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-1">발행 채널</label>
@@ -272,19 +198,7 @@ export default function PublishedProductDetailPage({
                       : '-'}
                   </p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">외부 ID</label>
-                  <p className="text-gray-900 font-mono text-sm">
-                    {product.externalId || '-'}
-                  </p>
-                </div>
               </div>
-              {product.status === 'FAILED' && product.errorMessage && (
-                <div className="mt-4 p-3 bg-red-50 rounded-lg">
-                  <label className="block text-sm font-medium text-red-700 mb-1">오류 메시지</label>
-                  <p className="text-red-600 text-sm">{product.errorMessage}</p>
-                </div>
-              )}
             </div>
 
             {/* 상품 정보 */}
@@ -313,17 +227,29 @@ export default function PublishedProductDetailPage({
                   </p>
                 </div>
               )}
-              <div className="mt-4">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => router.push(`/product/detail/${product.productId}`)}
-                >
-                  상품 상세 보기
-                  <ExternalLink size={14} />
-                </Button>
-              </div>
             </div>
+
+            {galleryImages.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">사진</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {galleryImages.map((image) => (
+                    <div
+                      key={image.id}
+                      className="relative aspect-square rounded-lg overflow-hidden border border-dashed border-gray-200"
+                    >
+                      <Image
+                        src={image.imageUrl}
+                        alt={`상품 이미지 ${image.id}`}
+                        fill
+                        sizes="(max-width: 1024px) 100vw, 240px"
+                        className="object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* 발행 이력 */}
             {product.publishHistories.length > 0 && (
@@ -337,7 +263,6 @@ export default function PublishedProductDetailPage({
                       key={history.id}
                       className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg"
                     >
-                      {getStatusIcon(history.status)}
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-gray-900">

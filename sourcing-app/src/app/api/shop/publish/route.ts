@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { PublishStatus, ProductStatus, ChannelKind, ChannelPlatform } from '@bandauto/db'
+import prisma, { ProductStatus, ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 /**
@@ -56,7 +56,6 @@ export async function GET(request: NextRequest) {
         id: true,
         productPublishes: {
           where: {
-            status: PublishStatus.SUCCESS,
             publishType: PublishType.SHOPPING_MALL,
           },
           select: { id: true },
@@ -97,11 +96,9 @@ export async function GET(request: NextRequest) {
           take: 1,
         },
         publishedProducts: {
-          where: { status: PublishStatus.SUCCESS },
           select: {
             id: true,
             channelId: true,
-            status: true,
             createdAt: true,
             channel: {
               select: {
@@ -166,14 +163,14 @@ export async function GET(request: NextRequest) {
           publishId: pp.id,
           channelId: pp.channel?.id,
           channelName: pp.channel?.name,
-          status: pp.status,
+          status: 'SUCCESS',
           createdAt: pp.createdAt,
         })),
         // 쇼핑몰 발행 상태
         shoppingMallPublish: shoppingMallPublishes[0]
           ? {
               publishId: shoppingMallPublishes[0].id,
-              status: shoppingMallPublishes[0].status,
+              status: 'SUCCESS',
               createdAt: shoppingMallPublishes[0].createdAt,
             }
           : null,
@@ -310,7 +307,6 @@ export async function POST(request: NextRequest) {
             userId,
             productId,
             channelId: channel.id,
-            status: PublishStatus.SUCCESS,
             publishedAt: new Date(),
           },
         })

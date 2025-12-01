@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { PublishStatus } from '@bandauto/db'
+import prisma from '@bandauto/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
 
@@ -191,7 +191,6 @@ export async function POST(req: NextRequest) {
         const publishedProduct = await prisma.publishedProduct.findFirst({
           where: {
             id: parseInt(item.publishedProductId),
-            status: PublishStatus.SUCCESS,
           },
           include: {
             product: {

@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { PublishStatus, ChannelKind, ChannelPlatform } from '@bandauto/db'
+import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 
 export async function GET(req: NextRequest) {
   try {
@@ -28,7 +28,6 @@ export async function GET(req: NextRequest) {
         // 해당 채널에 발행된 상품 조회 (published_product 테이블 사용)
         const publishedProducts = await prisma.publishedProduct.findMany({
           where: {
-            status: PublishStatus.SUCCESS,
             ...(includeLegacyShopPublishes
               ? { OR: [{ channelId: channel.id }, { channelId: null }] } // 채널 도입 이전 null 데이터 호환
               : { channelId: channel.id }),
@@ -116,7 +115,6 @@ export async function GET(req: NextRequest) {
         // 해당 도매채널의 상품 중 발행된 것만 조회
         const publishedProducts = await prisma.publishedProduct.findMany({
           where: {
-            status: PublishStatus.SUCCESS,
             product: {
               collectedProduct: {
                 post: {

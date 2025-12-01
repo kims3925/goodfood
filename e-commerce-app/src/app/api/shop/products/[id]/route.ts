@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { PublishStatus } from '@bandauto/db'
+import prisma from '@bandauto/db'
 
 export async function GET(
   req: NextRequest,
@@ -45,8 +45,8 @@ export async function GET(
         },
         publishedProducts: {
           where: channelId
-            ? { channelId: parseInt(channelId), status: PublishStatus.SUCCESS }
-            : { status: PublishStatus.SUCCESS },
+            ? { channelId: parseInt(channelId) }
+            : {},
           include: {
             channel: true,
           },
