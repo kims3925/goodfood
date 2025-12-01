@@ -79,7 +79,17 @@ function StoreLayoutContent({
                       onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                       className="flex items-center gap-1 hover:text-[#FF6B6B] px-2"
                     >
-                      <span className="font-medium text-[#FF6B6B]">{session.user?.name || '회원'}</span>님
+                      <span className="flex items-center gap-0.5">
+                        <span className="font-medium text-[#FF6B6B]">{session.user?.name || '회원'}</span>
+                        <span className="text-gray-600">님</span>
+                        {(session.user as any)?.provider && (
+                          <img
+                            src={`/icons/${(session.user as any).provider}.png`}
+                            alt={(session.user as any).provider}
+                            className="w-3 h-3 ml-0.5"
+                          />
+                        )}
+                      </span>
                       <ChevronDown className={`w-3 h-3 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
 

@@ -31,7 +31,11 @@
       "mcp__excel__excel_write_to_sheet",
       "mcp__excel__excel_describe_sheets",
       "Bash(taskkill /F /PID 11048)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "mcp__playwright__playwright_screenshot",
+      "mcp__playwright__playwright_console_logs",
+      "mcp__playwright__playwright_evaluate",
+      "mcp__playwright__playwright_click"
     ],
     "deny": [],
     "ask": []

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Script from 'next/script'
+import dynamic from 'next/dynamic'
 import {
   Search,
   Minus,
@@ -18,7 +19,14 @@ import {
   MapPin,
   Receipt,
   Truck,
+  CreditCard,
 } from 'lucide-react'
+
+// TossPaymentWidget은 클라이언트 전용 (SSR 비활성화)
+const TossPaymentWidget = dynamic(
+  () => import('@/modules/payments/components/TossPaymentWidget'),
+  { ssr: false }
+)
 
 interface RetailBand {
   id: number
@@ -38,6 +46,18 @@ interface PublishedProduct {
 }
 
 type CashReceiptType = 'NONE' | 'INCOME' | 'EXPENSE'
+
+interface OrderData {
+  orderNumber: string
+  productName: string
+  quantity: number
+  unitPrice: number
+  subtotal: number
+  shippingFee: number
+  totalAmount: number
+  thumbnailUrl: string | null
+  retailBandName: string
+}
 
 export default function BandOrderPage() {
   const router = useRouter()
@@ -80,6 +100,12 @@ export default function BandOrderPage() {
   const FREE_SHIPPING_THRESHOLD = 50000
 
   const [submitting, setSubmitting] = useState(false)
+
+  // 결제 관련 상태
+  const [showPayment, setShowPayment] = useState(false)
+  const [orderData, setOrderData] = useState<OrderData | null>(null)
+  const [prepareError, setPrepareError] = useState<string | null>(null)
+  const [tossClientKey, setTossClientKey] = useState<string>('')
 
   // 소매밴드 목록 로드
   useEffect(() => {
@@ -186,9 +212,81 @@ export default function BandOrderPage() {
     }).open()
   }
 
-  // 주문 제출 - 현재 비활성화 (결제 연동 예정)
+  // 입력 검증
+  const validateInputs = (): string | null => {
+    if (!selectedBand) return '소매밴드를 선택해주세요.'
+    if (!selectedProduct) return '상품을 선택해주세요.'
+    if (!customerName.trim()) return '주문자 이름을 입력해주세요.'
+    if (!customerPhone.trim()) return '주문자 연락처를 입력해주세요.'
+    if (!recipientName.trim()) return '받는 분 이름을 입력해주세요.'
+    if (!address || !postalCode) return '배송 주소를 입력해주세요.'
+    return null
+  }
+
+  // 주문 제출 - 결제 준비
   const handleSubmit = async () => {
-    alert('주문 기능은 준비 중입니다.')
+    setPrepareError(null)
+
+    const validationError = validateInputs()
+    if (validationError) {
+      setPrepareError(validationError)
+      return
+    }
+
+    setSubmitting(true)
+
+    try {
+      const res = await fetch('/api/order/band/prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          retailBandId: selectedBand!.id,
+          productPublishId: selectedProduct!.id,
+          quantity,
+          customerInfo: {
+            name: customerName.trim(),
+            phone: customerPhone.trim(),
+          },
+          shippingAddress: {
+            recipientName: recipientName.trim(),
+            recipientPhone: recipientPhone.trim() || customerPhone.trim(),
+            address,
+            postalCode,
+            addressDetail: addressDetail.trim() || undefined,
+            deliveryMemo: deliveryMemo || undefined,
+          },
+          cashReceipt: {
+            type: cashReceiptType,
+            number: cashReceiptNumber.trim() || undefined,
+          },
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        setPrepareError(data.error || '주문 준비에 실패했습니다.')
+        return
+      }
+
+      // 주문 준비 성공 - 결제 위젯 표시
+      setOrderData(data.order)
+      if (data.tossClientKey) {
+        setTossClientKey(data.tossClientKey)
+      }
+      setShowPayment(true)
+    } catch (error) {
+      console.error('주문 준비 실패:', error)
+      setPrepareError('주문 준비 중 오류가 발생했습니다.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // 결제 취소 핸들러
+  const handlePaymentCancel = () => {
+    setShowPayment(false)
+    setOrderData(null)
   }
 
   const formatPrice = (price: number | null) => {
@@ -437,7 +535,7 @@ export default function BandOrderPage() {
                     <input
                       type="text"
                       value={postalCode}
-                      readOnly
+                      onChange={(e) => setPostalCode(e.target.value)}
                       placeholder="우편번호"
                       onClick={openPostcode}
                       className="w-32 px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-100 cursor-pointer focus:outline-none"
@@ -453,7 +551,7 @@ export default function BandOrderPage() {
                   <input
                     type="text"
                     value={address}
-                    readOnly
+                    onChange={(e) => setAddress(e.target.value)}
                     placeholder="주소 검색 버튼을 클릭하세요"
                     onClick={openPostcode}
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-100 cursor-pointer focus:outline-none mb-2"
@@ -604,17 +702,29 @@ export default function BandOrderPage() {
                   </div>
                 </div>
 
-                {/* 주문 버튼 - 비활성화 */}
+                {/* 에러 메시지 */}
+                {prepareError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-600">{prepareError}</p>
+                  </div>
+                )}
+
+                {/* 주문 버튼 */}
                 <button
                   onClick={handleSubmit}
-                  disabled={true}
-                  className="w-full py-4 bg-gray-400 text-white font-semibold rounded-lg cursor-not-allowed text-lg mt-4"
+                  disabled={submitting || !selectedBand || !selectedProduct || totalAmount <= 0}
+                  className={`
+                    w-full py-4 font-semibold rounded-lg text-lg mt-4 transition-colors
+                    ${submitting || !selectedBand || !selectedProduct || totalAmount <= 0
+                      ? 'bg-gray-400 text-white cursor-not-allowed'
+                      : 'bg-purple-600 text-white hover:bg-purple-700'}
+                  `}
                 >
-                  준비 중
+                  {submitting ? '주문 준비 중...' : `${totalAmount.toLocaleString()}원 결제하기`}
                 </button>
 
                 <p className="text-xs text-gray-500 text-center">
-                  결제 기능 준비 중입니다.
+                  주문 내용을 확인하고 결제를 진행해주세요.
                 </p>
               </div>
             </div>
@@ -767,6 +877,76 @@ export default function BandOrderPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Payment Widget Modal */}
+        {showPayment && orderData && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white rounded-lg max-w-2xl w-full my-8">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                <div className="flex items-center gap-2">
+                  <CreditCard size={20} className="text-purple-600" />
+                  <h3 className="text-lg font-bold">결제하기</h3>
+                </div>
+                <button
+                  onClick={handlePaymentCancel}
+                  className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="p-4">
+                {/* 주문 요약 */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3 mb-3">
+                    {orderData.thumbnailUrl ? (
+                      <Image
+                        src={orderData.thumbnailUrl}
+                        alt={orderData.productName}
+                        width={64}
+                        height={64}
+                        className="w-16 h-16 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center">
+                        <ImageOff size={24} className="text-gray-400" />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{orderData.productName}</p>
+                      <p className="text-sm text-gray-500">{orderData.quantity}개 · {orderData.retailBandName}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-1 text-sm border-t border-gray-200 pt-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">상품 금액</span>
+                      <span>{orderData.subtotal.toLocaleString()}원</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">배송비</span>
+                      <span>{orderData.shippingFee === 0 ? '무료' : `${orderData.shippingFee.toLocaleString()}원`}</span>
+                    </div>
+                    <div className="flex justify-between font-bold pt-2 border-t border-gray-200 mt-2">
+                      <span>총 결제금액</span>
+                      <span className="text-purple-600">{orderData.totalAmount.toLocaleString()}원</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 토스페이먼츠 위젯 */}
+                <TossPaymentWidget
+                  orderId={orderData.orderNumber}
+                  orderName={`${orderData.productName} x ${orderData.quantity}`}
+                  amount={orderData.totalAmount}
+                  customerName={customerName}
+                  customerPhone={customerPhone}
+                  tossClientKey={tossClientKey}
+                  onPaymentCancel={handlePaymentCancel}
+                />
               </div>
             </div>
           </div>

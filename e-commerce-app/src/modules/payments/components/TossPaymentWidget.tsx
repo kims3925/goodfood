@@ -10,6 +10,7 @@ interface PaymentWidgetProps {
   customerName?: string
   customerPhone?: string
   amount: number
+  tossClientKey?: string // 직접 전달 시 API 호출 스킵
   onPaymentSuccess?: (data: any) => void
   onPaymentFail?: (error: any) => void
   onPaymentCancel?: () => void
@@ -24,6 +25,7 @@ export default function TossPaymentWidget({
   customerName,
   customerPhone,
   amount,
+  tossClientKey: propClientKey,
   onPaymentFail,
   onPaymentCancel
 }: PaymentWidgetProps) {
@@ -33,25 +35,36 @@ export default function TossPaymentWidget({
   const [clientKey, setClientKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // 1. 클라이언트 키 가져오기
+  // 1. 클라이언트 키 가져오기 (prop으로 전달받으면 API 호출 스킵)
   useEffect(() => {
+    // prop으로 클라이언트 키가 전달된 경우 바로 사용
+    if (propClientKey) {
+      console.log('[TossWidget] prop으로 전달된 클라이언트 키 사용')
+      setClientKey(propClientKey)
+      return
+    }
+
     async function fetchClientKey() {
+      console.log('[TossWidget] 클라이언트 키 로딩 시작')
       try {
         const response = await fetch('/api/shop/settings')
         const data = await response.json()
 
         if (data.success && data.settings?.tossClientKey) {
+          console.log('[TossWidget] 클라이언트 키 로드 성공:', data.settings.tossClientKey.substring(0, 20) + '...')
           setClientKey(data.settings.tossClientKey)
         } else {
+          console.error('[TossWidget] 클라이언트 키 없음:', data)
           setError('토스 클라이언트 키가 설정되지 않았습니다')
         }
       } catch (err) {
+        console.error('[TossWidget] 설정 로드 실패:', err)
         setError('설정을 불러오는데 실패했습니다')
       }
     }
 
     fetchClientKey()
-  }, [])
+  }, [propClientKey])
 
   // 2. 결제위젯 초기화
   useEffect(() => {
@@ -59,18 +72,22 @@ export default function TossPaymentWidget({
 
     async function initWidgets() {
       if (!clientKey) return
+      console.log('[TossWidget] SDK 로딩 시작')
       try {
         const tossPayments = await loadTossPayments(clientKey)
+        console.log('[TossWidget] SDK 로드 완료')
 
         // customerKey 생성 (회원: 이메일 기반, 비회원: ANONYMOUS)
         const customerKey = customerEmail
           ? customerEmail.replace(/[^a-zA-Z0-9\-_]/g, '_').substring(0, 50)
           : ANONYMOUS
+        console.log('[TossWidget] customerKey:', customerKey)
 
         const widgetsInstance = tossPayments.widgets({ customerKey })
+        console.log('[TossWidget] 위젯 인스턴스 생성 완료')
         setWidgets(widgetsInstance)
       } catch (err) {
-        console.error('결제 위젯 초기화 실패:', err)
+        console.error('[TossWidget] 결제 위젯 초기화 실패:', err)
         setError('결제 위젯을 초기화하는데 실패했습니다')
       }
     }
@@ -84,12 +101,14 @@ export default function TossPaymentWidget({
 
     async function renderWidgets() {
       if (!widgets) return
+      console.log('[TossWidget] 위젯 렌더링 시작, amount:', amount)
       try {
         // 금액 설정
         await widgets.setAmount({
           currency: 'KRW',
           value: amount
         })
+        console.log('[TossWidget] 금액 설정 완료')
 
         // 결제수단 & 약관 위젯 렌더링
         await Promise.all([
@@ -102,10 +121,11 @@ export default function TossPaymentWidget({
             variantKey: 'AGREEMENT'
           })
         ])
+        console.log('[TossWidget] 위젯 렌더링 완료')
 
         setReady(true)
       } catch (err) {
-        console.error('위젯 렌더링 실패:', err)
+        console.error('[TossWidget] 위젯 렌더링 실패:', err)
         setError('결제 위젯을 표시하는데 실패했습니다')
       }
     }
@@ -125,12 +145,22 @@ export default function TossPaymentWidget({
 
   // 결제 요청
   const handlePayment = async () => {
-    if (!widgets) return
+    if (!widgets) {
+      console.error('결제 위젯이 초기화되지 않았습니다')
+      return
+    }
+
+    console.log('=== 결제 요청 시작 ===')
+    console.log('orderId:', orderId)
+    console.log('orderName:', orderName)
+    console.log('amount:', amount)
+    console.log('customerName:', customerName)
+    console.log('customerPhone:', customerPhone)
 
     try {
       setProcessing(true)
 
-      await widgets.requestPayment({
+      const paymentParams = {
         orderId,
         orderName,
         successUrl: `${window.location.origin}/payment/success`,
@@ -138,14 +168,22 @@ export default function TossPaymentWidget({
         customerEmail,
         customerName,
         customerMobilePhone: customerPhone
-      })
+      }
+      console.log('결제 파라미터:', paymentParams)
+
+      await widgets.requestPayment(paymentParams)
+      console.log('requestPayment 호출 완료 (리다이렉트 대기)')
 
       // 리다이렉트 방식이므로 여기까지 도달하지 않음
     } catch (err: any) {
-      console.error('결제 요청 실패:', err)
+      console.error('=== 결제 요청 실패 ===')
+      console.error('에러 코드:', err?.code)
+      console.error('에러 메시지:', err?.message)
+      console.error('전체 에러 객체:', err)
 
       // 사용자 취소 시에만 processing 해제하고 원래 화면으로
       if (err?.code === 'USER_CANCEL' || err?.code === 'PAY_PROCESS_CANCELED') {
+        console.log('사용자가 결제를 취소했습니다')
         setProcessing(false)
         onPaymentCancel?.()
         return
@@ -153,7 +191,9 @@ export default function TossPaymentWidget({
 
       // 다른 에러는 리다이렉트 중일 수 있으므로 processing 유지
       // 5초 후에도 리다이렉트되지 않으면 에러 처리
+      console.log('5초 대기 후 에러 처리 예정')
       setTimeout(() => {
+        console.log('5초 경과, 에러 처리 실행')
         setProcessing(false)
         onPaymentFail?.(err)
       }, 5000)
