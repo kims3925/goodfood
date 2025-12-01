@@ -521,6 +521,10 @@ Product.postId 및 Post.product 제거, 경로를 Post -> CollectedProduct -> Pr
 
 ProductPublish → PublishedProduct 이름 정리
 
+Post -> CollectedPost 로 이름 변경 및 테이블명 변경, 관련 코드 수정
+
+PostCommnet -> CollectedPost 로 이름 변경 및 테이블명 변경, 관련 코드 수정
+
 앱 코드에서 수집/내부/발행 단계별로 사용하는 모델을 명확히 분리
 
 이 문서의 순서대로 Prisma 스키마, 마이그레이션, 애플리케이션 코드를 단계적으로 수정하세요.
