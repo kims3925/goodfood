@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, RefreshCw, Package, Trash2, Send, Store } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import Pagination from '@/components/ui/Pagination'
+import { useToast } from '@/components/ui/Toast'
 
 interface PublishedProduct {
   id: number
@@ -33,6 +35,7 @@ interface PublishedProduct {
 
 export default function PublishedProductListPage() {
   const router = useRouter()
+  const toast = useToast()
   const [products, setProducts] = useState<PublishedProduct[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -47,6 +50,10 @@ export default function PublishedProductListPage() {
   // Selection states
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
+
+  // Delete confirm modal states
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     loadProducts()
@@ -71,9 +78,12 @@ export default function PublishedProductListPage() {
         setProducts(data.data)
         setTotalItems(data.total || 0)
         setTotalPages(Math.ceil((data.total || 0) / itemsPerPage))
+      } else {
+        toast.error('발행 상품 목록을 불러오는데 실패했습니다.')
       }
     } catch (error) {
       console.error('발행 상품 목록 조회 실패:', error)
+      toast.error('발행 상품 목록을 불러오는데 실패했습니다.')
     } finally {
       setIsLoading(false)
     }
@@ -109,15 +119,15 @@ export default function PublishedProductListPage() {
     })
   }
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedIds.length === 0) {
       return
     }
+    setShowDeleteConfirm(true)
+  }
 
-    if (!confirm(`선택한 ${selectedIds.length}개의 발행 상품을 삭제하시겠습니까?`)) {
-      return
-    }
-
+  const confirmDeleteSelected = async () => {
+    setIsDeleting(true)
     try {
       let successCount = 0
       for (const id of selectedIds) {
@@ -134,9 +144,19 @@ export default function PublishedProductListPage() {
 
       setSelectedIds([])
       setSelectAll(false)
+      setShowDeleteConfirm(false)
       loadProducts()
+
+      if (successCount > 0) {
+        toast.success(`${successCount}개의 발행 상품이 삭제되었습니다.`)
+      } else {
+        toast.error('발행 상품 삭제에 실패했습니다.')
+      }
     } catch (error) {
       console.error('발행 상품 일괄 삭제 실패:', error)
+      toast.error('발행 상품 삭제에 실패했습니다.')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -333,6 +353,18 @@ export default function PublishedProductListPage() {
           />
         </div>
       </div>
+
+      {/* 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDeleteSelected}
+        title="발행 상품 삭제"
+        message={`선택한 ${selectedIds.length}개의 발행 상품을 삭제하시겠습니까?`}
+        confirmText="삭제"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   )
 }

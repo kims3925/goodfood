@@ -17,6 +17,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Loading from '@/components/ui/Loading'
+import { useToast } from '@/components/ui/Toast'
 
 type OrderSource = 'SHOPPING_MALL' | 'GOOGLE_FORM'
 
@@ -39,6 +40,7 @@ interface UnifiedOrder {
 type SourceFilter = 'ALL' | 'SHOPPING_MALL' | 'GOOGLE_FORM'
 
 export default function UnifiedOrderListPage() {
+  const toast = useToast()
   const [orders, setOrders] = useState<UnifiedOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -70,13 +72,16 @@ export default function UnifiedOrderListPage() {
         setOrders(data.data.orders)
         setTotalPages(data.data.pagination.totalPages)
         setTotal(data.data.pagination.total)
+      } else {
+        toast.error('주문 목록을 불러오는데 실패했습니다.')
       }
     } catch (error) {
       console.error('주문 로드 실패:', error)
+      toast.error('주문 목록을 불러오는데 실패했습니다.')
     } finally {
       setLoading(false)
     }
-  }, [page, search, sourceFilter])
+  }, [page, search, sourceFilter, toast])
 
   useEffect(() => {
     fetchOrders()
@@ -377,6 +382,7 @@ export default function UnifiedOrderListPage() {
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onStatusChange={fetchOrders}
+          toast={toast}
         />
       )}
     </div>
@@ -398,9 +404,10 @@ interface OrderDetailModalProps {
   order: UnifiedOrder
   onClose: () => void
   onStatusChange?: () => void
+  toast: ReturnType<typeof useToast>
 }
 
-function OrderDetailModal({ order, onClose, onStatusChange }: OrderDetailModalProps) {
+function OrderDetailModal({ order, onClose, onStatusChange, toast }: OrderDetailModalProps) {
   const [currentStatus, setCurrentStatus] = useState(order.status)
   const [isChangingStatus, setIsChangingStatus] = useState(false)
   const [statusError, setStatusError] = useState<string | null>(null)
@@ -436,11 +443,14 @@ function OrderDetailModal({ order, onClose, onStatusChange }: OrderDetailModalPr
       if (data.success) {
         setCurrentStatus(newStatus)
         onStatusChange?.()
+        toast.success('주문 상태가 변경되었습니다.')
       } else {
         setStatusError(data.error || '상태 변경에 실패했습니다.')
+        toast.error(data.error || '상태 변경에 실패했습니다.')
       }
     } catch (error) {
       setStatusError('상태 변경 중 오류가 발생했습니다.')
+      toast.error('상태 변경 중 오류가 발생했습니다.')
     } finally {
       setIsChangingStatus(false)
     }

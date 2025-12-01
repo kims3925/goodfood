@@ -5,6 +5,7 @@ import { Send, RefreshCw, AlertCircle, CheckCircle2, ChevronDown, ChevronRight, 
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
+import { useToast } from '@/components/ui/Toast'
 
 interface RetailBand {
   id: number
@@ -32,6 +33,8 @@ interface Product {
 }
 
 export default function RetailBandPublishPage() {
+  const toast = useToast()
+
   // 상태 관리
   const [retailBands, setRetailBands] = useState<RetailBand[]>([])
   const [selectedBandIds, setSelectedBandIds] = useState<number[]>([])
@@ -92,6 +95,7 @@ export default function RetailBandPublishPage() {
       await loadProducts()
     } catch (error) {
       console.error('초기 데이터 로드 실패:', error)
+      toast.error('데이터를 불러오는데 실패했습니다.')
     } finally {
       setIsLoading(false)
     }
@@ -110,6 +114,7 @@ export default function RetailBandPublishPage() {
       }
     } catch (error) {
       console.error('상품 목록 조회 실패:', error)
+      toast.error('상품 목록을 불러오는데 실패했습니다.')
     }
   }
 
@@ -286,9 +291,17 @@ export default function RetailBandPublishPage() {
         setShowResultModal(true)
         setSelectedProductIds([])
         loadProducts(currentPage)
+
+        const successCount = data.results.filter((r: { success: boolean }) => r.success).length
+        if (successCount > 0) {
+          toast.success(`${successCount}건 발행 완료`)
+        }
+      } else {
+        toast.error('발행에 실패했습니다.')
       }
     } catch (error) {
       console.error('발행 실패:', error)
+      toast.error('발행 중 오류가 발생했습니다.')
     } finally {
       setIsPublishing(false)
     }

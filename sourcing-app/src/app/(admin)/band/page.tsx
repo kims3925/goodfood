@@ -5,10 +5,12 @@ import { Plus, Search, Trash2, RefreshCw, AlertCircle, ExternalLink, Download, U
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import Pagination from '@/components/ui/Pagination'
+import { useToast } from '@/components/ui/Toast'
 
 type BandType = 'wholesale' | 'retail'
 
@@ -61,6 +63,7 @@ const TAB_CONFIG = {
 export default function BandManagementPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const toast = useToast()
 
   // URL에서 탭 상태 읽기 (기본값: wholesale)
   const initialTab = (searchParams.get('type') as BandType) || 'wholesale'
@@ -87,6 +90,7 @@ export default function BandManagementPage() {
   // 선택 삭제 관련 상태
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const config = TAB_CONFIG[activeTab]
 
@@ -115,9 +119,12 @@ export default function BandManagementPage() {
         setBands(data.data)
         setTotalItems(data.pagination?.total || 0)
         setTotalPages(data.pagination?.totalPages || 1)
+      } else {
+        toast.error('밴드 목록을 불러오는데 실패했습니다.')
       }
     } catch (error) {
       console.error('밴드 목록 조회 실패:', error)
+      toast.error('밴드 목록을 불러오는데 실패했습니다.')
     } finally {
       setIsLoading(false)
     }
@@ -148,10 +155,12 @@ export default function BandManagementPage() {
         setAvailableBands(data.data)
       } else {
         setApiError(data.error || '밴드 목록을 불러오는데 실패했습니다.')
+        toast.error(data.error || '밴드 목록을 불러오는데 실패했습니다.')
       }
     } catch (error) {
       console.error('밴드 API 조회 실패:', error)
       setApiError('밴드 목록을 불러오는데 실패했습니다.')
+      toast.error('밴드 목록을 불러오는데 실패했습니다.')
     } finally {
       setIsLoadingBands(false)
     }
@@ -187,8 +196,9 @@ export default function BandManagementPage() {
         selectedBandKeys.includes(band.band_key)
       )
 
+      let successCount = 0
       for (const band of selectedBands) {
-        await fetch(`/api/band/${activeTab}`, {
+        const response = await fetch(`/api/band/${activeTab}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -197,13 +207,20 @@ export default function BandManagementPage() {
             coverUrl: band.cover,
           }),
         })
+        const data = await response.json()
+        if (data.success) successCount++
       }
 
       setShowAddModal(false)
       setSelectedBandKeys([])
       loadBands()
+
+      if (successCount > 0) {
+        toast.success(`${successCount}개의 밴드가 등록되었습니다.`)
+      }
     } catch (error) {
       console.error('밴드 등록 실패:', error)
+      toast.error('밴드 등록에 실패했습니다.')
     }
   }
 
@@ -222,21 +239,32 @@ export default function BandManagementPage() {
     )
   }
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedIds.length === 0) return
-    if (!confirm(`선택한 ${selectedIds.length}개의 밴드를 삭제하시겠습니까?`)) return
+    setShowDeleteConfirm(true)
+  }
 
+  const confirmDeleteSelected = async () => {
     setIsDeleting(true)
     try {
+      let successCount = 0
       for (const id of selectedIds) {
-        await fetch(`/api/band/${activeTab}?id=${id}`, {
+        const response = await fetch(`/api/band/${activeTab}?id=${id}`, {
           method: 'DELETE',
         })
+        const data = await response.json()
+        if (data.success) successCount++
       }
       setSelectedIds([])
+      setShowDeleteConfirm(false)
       loadBands()
+
+      if (successCount > 0) {
+        toast.success(`${successCount}개의 밴드가 삭제되었습니다.`)
+      }
     } catch (error) {
       console.error('밴드 삭제 실패:', error)
+      toast.error('밴드 삭제에 실패했습니다.')
     } finally {
       setIsDeleting(false)
     }
@@ -452,6 +480,18 @@ export default function BandManagementPage() {
           />
         </div>
       </div>
+
+      {/* 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDeleteSelected}
+        title="밴드 삭제"
+        message={`선택한 ${selectedIds.length}개의 밴드를 삭제하시겠습니까?`}
+        confirmText="삭제"
+        variant="danger"
+        isLoading={isDeleting}
+      />
 
       {/* 추가 모달 */}
       <Modal
