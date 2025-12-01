@@ -1,18 +1,23 @@
 // =============================================
-// PRODUCT PUBLISH (상품 발행 - 쇼핑몰 표시용)
+// PRODUCT PUBLISH (상품 발행 관리)
 // =============================================
 
 model ProductPublish {
-  id            Int           @id @default(autoincrement())
-  userId        Int           @map("user_id")
-  productId     Int           @map("product_id")
-  retailBandId  Int           @map("retail_band_id")
+  id               Int           @id @default(autoincrement())
+  userId           Int           @map("user_id")
+  productId        Int           @map("product_id")
+  publishType      PublishType   @default(RETAIL_BAND) @map("publish_type")  // 발행 유형
+  retailBandId     Int?          @map("retail_band_id")  // 소매밴드 ID (RETAIL_BAND일 때만 필수)
 
   // Status
-  status        PublishStatus @default(PENDING)
+  status           PublishStatus @default(PENDING)
+  externalId       String?       @map("external_id") @db.VarChar(255)     // 외부 시스템의 상품 ID (postKey 등)
+  externalUrl      String?       @map("external_url") @db.VarChar(1000)   // 발행된 URL
+  errorMessage     String?       @map("error_message") @db.Text           // 실패 시 에러 메시지
+  publishedAt      DateTime?     @map("published_at") @db.Timestamp(0)    // 발행 일시
 
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 
   // Relationships
   user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -22,37 +27,11 @@ model ProductPublish {
   orderTests     OrderTest[]       // 웹훅 주문 (구글폼 등)
   cartItems      CartItem[]        // 장바구니 아이템
 
-  @@unique([productId, retailBandId]) // 같은 상품을 같은 밴드에 중복 발행 방지
+  @@unique([productId, publishType, retailBandId]) // 같은 상품을 같은 발행처에 중복 발행 방지
   @@index([userId])
   @@index([productId])
   @@index([retailBandId])
   @@index([status])
+  @@index([publishType])
   @@map("product_publish")
 }
-
-// =============================================
-// PUBLISH HISTORY (발행 이력 로그)
-// =============================================
-
-model PublishHistory {
-  id           Int           @id @default(autoincrement())
-  userId       Int           @map("user_id")
-  productId    Int           @map("product_id")
-  retailBandId Int           @map("retail_band_id")
-  postKey      String?       @map("post_key") @db.VarChar(255)
-  status       PublishStatus @default(PENDING)
-  errorMessage String?       @map("error_message") @db.Text
-  publishedAt  DateTime      @default(now()) @map("published_at") @db.Timestamp(0)
-  product      Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  retailBand   RetailBand    @relation(fields: [retailBandId], references: [id], onDelete: Cascade)
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([productId, retailBandId])
-  @@index([userId])
-  @@index([productId])
-  @@index([retailBandId])
-  @@index([status])
-  @@index([publishedAt])
-  @@map("publish_history")
-}
-

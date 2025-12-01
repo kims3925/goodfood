@@ -8,6 +8,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmp
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import Pagination from '@/components/ui/Pagination'
+import { useToast } from '@/components/ui/Toast'
 
 interface PricingPolicy {
   id: number
@@ -22,6 +23,7 @@ interface PricingPolicy {
 
 export default function PolicyManagePage() {
   const router = useRouter()
+  const toast = useToast()
   const [policies, setPolicies] = useState<PricingPolicy[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -50,9 +52,12 @@ export default function PolicyManagePage() {
         setPolicies(data.data)
         setTotalItems(data.pagination?.total || 0)
         setTotalPages(data.pagination?.totalPages || 1)
+      } else {
+        toast.error('정책 목록을 불러오는데 실패했습니다.')
       }
     } catch (error) {
       console.error('정책 목록 조회 실패:', error)
+      toast.error('정책 목록을 불러오는데 실패했습니다.')
     } finally {
       setIsLoading(false)
     }
@@ -103,11 +108,14 @@ export default function PolicyManagePage() {
     }
 
     try {
+      let successCount = 0
       for (const id of selectedIds) {
         try {
-          await fetch(`/api/policy?id=${id}`, {
+          const response = await fetch(`/api/policy?id=${id}`, {
             method: 'DELETE',
           })
+          const data = await response.json()
+          if (data.success) successCount++
         } catch (error) {
           console.error(`정책 삭제 실패 (ID: ${id}):`, error)
         }
@@ -116,8 +124,15 @@ export default function PolicyManagePage() {
       setSelectedIds([])
       setSelectAll(false)
       loadPolicies()
+
+      if (successCount > 0) {
+        toast.success(`${successCount}개의 정책이 삭제되었습니다.`)
+      } else {
+        toast.error('정책 삭제에 실패했습니다.')
+      }
     } catch (error) {
       console.error('정책 일괄 삭제 실패:', error)
+      toast.error('정책 삭제에 실패했습니다.')
     }
   }
 

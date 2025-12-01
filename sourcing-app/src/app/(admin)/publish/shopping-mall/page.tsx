@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Store,
   Search,
@@ -9,16 +9,11 @@ import {
   Check,
   X,
   Send,
-  ChevronDown,
-  Filter,
   Globe,
   ShoppingBag,
-  Eye,
-  Trash2,
   ExternalLink,
   AlertCircle,
   CheckCircle,
-  ArrowRight,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -26,19 +21,9 @@ import Loading from '@/components/ui/Loading'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Pagination from '@/components/ui/Pagination'
 
-interface RetailBand {
-  id: number
-  name: string
-  bandKey: string
-  coverUrl: string | null
-  isActive: boolean
-  formUrl: string | null
-}
-
-interface PublishedBand {
+interface ShoppingMallPublish {
   publishId: number
-  retailBandId: number
-  retailBandName: string
+  channelName: string
   status: string
   createdAt: string
 }
@@ -56,7 +41,12 @@ interface Product {
     id: number
     name: string
   } | null
-  publishedBands: PublishedBand[]
+  publishStatus: {
+    retailBand: boolean
+    shoppingMall: boolean
+  }
+  publishSummary: string
+  shoppingMallPublish: ShoppingMallPublish | null
   createdAt: string
 }
 
@@ -65,13 +55,11 @@ type TabType = 'unpublished' | 'published' | 'all'
 export default function ShoppingMallPublishPage() {
   // State
   const [products, setProducts] = useState<Product[]>([])
-  const [retailBands, setRetailBands] = useState<RetailBand[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isPublishing, setIsPublishing] = useState(false)
 
   // Selection
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([])
-  const [selectedBandIds, setSelectedBandIds] = useState<number[]>([])
   const [selectAllProducts, setSelectAllProducts] = useState(false)
 
   // Filters
@@ -95,24 +83,8 @@ export default function ShoppingMallPublishPage() {
 
   // Load data
   useEffect(() => {
-    loadRetailBands()
-  }, [])
-
-  useEffect(() => {
     loadProducts()
   }, [currentPage, activeTab])
-
-  const loadRetailBands = async () => {
-    try {
-      const response = await fetch('/api/band/retail?limit=100')
-      const data = await response.json()
-      if (data.success) {
-        setRetailBands(data.data.filter((band: RetailBand) => band.isActive))
-      }
-    } catch (error) {
-      console.error('소매밴드 목록 조회 실패:', error)
-    }
-  }
 
   const loadProducts = async () => {
     try {
@@ -120,7 +92,7 @@ export default function ShoppingMallPublishPage() {
       const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: itemsPerPage.toString(),
-        status: 'ACTIVE', // ACTIVE 상태인 상품만 조회
+        status: 'COLLECTED', // COLLECTED 상태인 상품만 조회
       })
 
       if (searchTerm) {
@@ -133,14 +105,14 @@ export default function ShoppingMallPublishPage() {
       if (data.success) {
         let filteredProducts = data.data
 
-        // 탭에 따라 필터링
+        // 탭에 따라 필터링 (쇼핑몰 발행 상태 기준)
         if (activeTab === 'unpublished') {
           filteredProducts = filteredProducts.filter(
-            (p: Product) => p.publishedBands.length === 0
+            (p: any) => !p.publishStatus?.shoppingMall
           )
         } else if (activeTab === 'published') {
           filteredProducts = filteredProducts.filter(
-            (p: Product) => p.publishedBands.length > 0
+            (p: any) => p.publishStatus?.shoppingMall
           )
         }
 
@@ -182,23 +154,9 @@ export default function ShoppingMallPublishPage() {
     })
   }
 
-  const handleToggleBandSelection = (id: number) => {
-    setSelectedBandIds((prev) =>
-      prev.includes(id) ? prev.filter((bid) => bid !== id) : [...prev, id]
-    )
-  }
-
-  const handleSelectAllBands = () => {
-    if (selectedBandIds.length === retailBands.length) {
-      setSelectedBandIds([])
-    } else {
-      setSelectedBandIds(retailBands.map((b) => b.id))
-    }
-  }
-
   // Publish handler
   const handlePublish = async () => {
-    if (selectedProductIds.length === 0 || selectedBandIds.length === 0) {
+    if (selectedProductIds.length === 0) {
       return
     }
 
@@ -211,7 +169,6 @@ export default function ShoppingMallPublishPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productIds: selectedProductIds,
-          retailBandIds: selectedBandIds,
         }),
       })
 
@@ -275,8 +232,8 @@ export default function ShoppingMallPublishPage() {
   }
 
   // Count stats
-  const unpublishedCount = products.filter((p) => p.publishedBands.length === 0).length
-  const publishedCount = products.filter((p) => p.publishedBands.length > 0).length
+  const unpublishedCount = products.filter((p) => !p.publishStatus?.shoppingMall).length
+  const publishedCount = products.filter((p) => p.publishStatus?.shoppingMall).length
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -495,26 +452,24 @@ export default function ShoppingMallPublishPage() {
                             </span>
                           </TableCell>
                           <TableCell>
-                            {product.publishedBands.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {product.publishedBands.map((band) => (
-                                  <span
-                                    key={band.publishId}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs"
+                            {product.publishStatus?.shoppingMall ? (
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs">
+                                  <Globe size={12} />
+                                  발행완료
+                                </span>
+                                {product.shoppingMallPublish && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleUnpublish([product.shoppingMallPublish!.publishId])
+                                    }}
+                                    className="text-gray-400 hover:text-red-600"
+                                    title="발행 취소"
                                   >
-                                    <Store size={12} />
-                                    {band.retailBandName}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleUnpublish([band.publishId])
-                                      }}
-                                      className="ml-1 hover:text-red-600"
-                                    >
-                                      <X size={12} />
-                                    </button>
-                                  </span>
-                                ))}
+                                    <X size={14} />
+                                  </button>
+                                )}
                               </div>
                             ) : (
                               <span className="text-gray-400 text-sm">미발행</span>
@@ -538,85 +493,31 @@ export default function ShoppingMallPublishPage() {
             </div>
           </div>
 
-          {/* Right: Retail Band Selection & Publish */}
+          {/* Right: Publish Panel */}
           <div className="lg:col-span-1 space-y-6">
-            {/* Retail Band Selection */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-900">소매밴드 선택</h3>
-                  <button
-                    onClick={handleSelectAllBands}
-                    className="text-xs text-primary-color hover:underline"
-                  >
-                    {selectedBandIds.length === retailBands.length ? '전체 해제' : '전체 선택'}
-                  </button>
-                </div>
-              </div>
-              <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
-                {retailBands.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-4">
-                    등록된 소매밴드가 없습니다.
-                  </p>
-                ) : (
-                  retailBands.map((band) => (
-                    <label
-                      key={band.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                        selectedBandIds.includes(band.id)
-                          ? 'border-primary-color bg-primary-light'
-                          : 'border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedBandIds.includes(band.id)}
-                        onChange={() => handleToggleBandSelection(band.id)}
-                        className="w-4 h-4"
-                      />
-                      <div className="flex items-center gap-2 flex-1">
-                        {band.coverUrl ? (
-                          <img
-                            src={band.coverUrl}
-                            alt={band.name}
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                            <Store size={14} className="text-gray-400" />
-                          </div>
-                        )}
-                        <span className="text-sm font-medium text-gray-900 truncate">
-                          {band.name}
-                        </span>
-                      </div>
-                    </label>
-                  ))
-                )}
-              </div>
-            </div>
-
             {/* Publish Summary */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h3 className="font-semibold text-gray-900 mb-4">발행 요약</h3>
+              <div className="flex items-center gap-2 mb-4">
+                <Globe className="text-primary-color" size={20} />
+                <h3 className="font-semibold text-gray-900">쇼핑몰 발행</h3>
+              </div>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">선택한 상품</span>
                   <span className="font-medium">{selectedProductIds.length}개</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">선택한 밴드</span>
-                  <span className="font-medium">{selectedBandIds.length}개</span>
-                </div>
                 <div className="border-t pt-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-700 font-medium">총 발행 예정</span>
+                    <span className="text-gray-700 font-medium">발행 예정</span>
                     <span className="font-bold text-primary-color">
-                      {selectedProductIds.length * selectedBandIds.length}건
+                      {selectedProductIds.length}건
                     </span>
                   </div>
                 </div>
               </div>
+              <p className="text-xs text-gray-500 mt-4">
+                선택한 상품이 e-commerce 쇼핑몰에 발행됩니다.
+              </p>
             </div>
 
             {/* Publish Button */}
@@ -624,7 +525,7 @@ export default function ShoppingMallPublishPage() {
               variant="primary"
               className="w-full py-3"
               onClick={handlePublish}
-              disabled={selectedProductIds.length === 0 || selectedBandIds.length === 0 || isPublishing}
+              disabled={selectedProductIds.length === 0 || isPublishing}
             >
               {isPublishing ? (
                 <>
@@ -678,13 +579,13 @@ export default function ShoppingMallPublishPage() {
             <li className="flex items-start gap-2">
               <Check size={16} className="flex-shrink-0 mt-0.5" />
               <span>
-                <strong>상품 데이터 동기화:</strong> 발행된 상품의 이름, 설명, 이미지, 가격이 e-commerce 쇼핑몰에 표시됩니다.
+                <strong>독립적 발행:</strong> 쇼핑몰 발행은 소매밴드 발행과 독립적으로 관리됩니다.
               </span>
             </li>
             <li className="flex items-start gap-2">
               <Check size={16} className="flex-shrink-0 mt-0.5" />
               <span>
-                <strong>카테고리 매핑:</strong> 상품은 선택한 소매밴드 카테고리로 자동 분류됩니다.
+                <strong>상품 데이터 동기화:</strong> 발행된 상품의 이름, 설명, 이미지, 가격이 e-commerce 쇼핑몰에 표시됩니다.
               </span>
             </li>
             <li className="flex items-start gap-2">
@@ -696,7 +597,7 @@ export default function ShoppingMallPublishPage() {
             <li className="flex items-start gap-2">
               <Check size={16} className="flex-shrink-0 mt-0.5" />
               <span>
-                <strong>중복 발행 방지:</strong> 같은 상품을 같은 밴드에 중복 발행하면 자동으로 건너뜁니다.
+                <strong>중복 발행 방지:</strong> 이미 쇼핑몰에 발행된 상품은 자동으로 건너뜁니다.
               </span>
             </li>
           </ul>

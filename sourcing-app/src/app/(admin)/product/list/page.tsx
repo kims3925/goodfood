@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2, RefreshCw, Package, Sparkles, Filter, X, ChevronDown } from 'lucide-react'
+import { Plus, Search, Trash2, RefreshCw, Package, Sparkles, Filter, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -11,6 +12,7 @@ import PostSelectionModal from '@/components/product/PostSelectionModal'
 import PolicySelectionModal from '@/components/product/PolicySelectionModal'
 import ProductFormModal from '@/components/product/ProductFormModal'
 import Pagination from '@/components/ui/Pagination'
+import { useToast } from '@/components/ui/Toast'
 
 interface WholesaleBand {
   id: number
@@ -23,7 +25,7 @@ interface Product {
   postId: number
   name: string
   description: string | null
-  status: 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'SOLDOUT'
+  status: 'COLLECTED' | 'ARCHIVED'
   thumbnailUrl: string | null
   price: number | null
   wholesalePrice: number | null
@@ -45,18 +47,23 @@ interface Product {
     price: number
     stock: number
   }>
+  // 발행 상태 (새로 추가)
+  publishStatus?: {
+    retailBand: boolean
+    shoppingMall: boolean
+  }
+  publishSummary?: string
 }
 
 const STATUS_OPTIONS = [
   { value: '', label: '전체 상태' },
-  { value: 'DRAFT', label: '임시저장' },
-  { value: 'ACTIVE', label: '판매중' },
-  { value: 'INACTIVE', label: '판매중지' },
-  { value: 'SOLDOUT', label: '품절' },
+  { value: 'COLLECTED', label: '수집' },
+  { value: 'ARCHIVED', label: '보관' },
 ]
 
 export default function ProductListPage() {
   const router = useRouter()
+  const toast = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -93,8 +100,10 @@ export default function ProductListPage() {
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
 
-  // 일괄 상태 변경
-  const [showBulkStatusDropdown, setShowBulkStatusDropdown] = useState(false)
+  // Delete confirm modal states
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     loadWholesaleBands()
@@ -113,6 +122,7 @@ export default function ProductListPage() {
       }
     } catch (error) {
       console.error('도매밴드 목록 조회 실패:', error)
+      toast.error('도매밴드 목록을 불러오는데 실패했습니다.')
     }
   }
 
@@ -137,9 +147,12 @@ export default function ProductListPage() {
         setProducts(data.data)
         setTotalItems(data.total || 0)
         setTotalPages(Math.ceil((data.total || 0) / itemsPerPage))
+      } else {
+        toast.error('상품 목록을 불러오는데 실패했습니다.')
       }
     } catch (error) {
       console.error('상품 목록 조회 실패:', error)
+      toast.error('상품 목록을 불러오는데 실패했습니다.')
     } finally {
       setIsLoading(false)
     }
@@ -400,21 +413,61 @@ export default function ProductListPage() {
     }
   }
 
-  const handleDeleteProduct = async (id: number) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return
+  const handleDeleteProduct = (id: number) => {
+    setDeleteTargetId(id)
+    setShowDeleteConfirm(true)
+  }
 
+  const confirmDeleteProduct = async () => {
+    if (deleteTargetId === null && selectedProductIds.length === 0) return
+
+    setIsDeleting(true)
     try {
-      const response = await fetch(`/api/product?id=${id}`, {
-        method: 'DELETE',
-      })
+      // 단일 삭제
+      if (deleteTargetId !== null) {
+        const response = await fetch(`/api/product?id=${deleteTargetId}`, {
+          method: 'DELETE',
+        })
+        const data = await response.json()
 
-      const data = await response.json()
+        if (data.success) {
+          toast.success('상품이 삭제되었습니다.')
+          loadProducts()
+        } else {
+          toast.error('상품 삭제에 실패했습니다.')
+        }
+      } else {
+        // 일괄 삭제
+        let successCount = 0
+        for (const id of selectedProductIds) {
+          try {
+            const response = await fetch(`/api/product?id=${id}`, {
+              method: 'DELETE',
+            })
+            const data = await response.json()
+            if (data.success) successCount++
+          } catch (error) {
+            console.error(`상품 삭제 실패 (ID: ${id}):`, error)
+          }
+        }
 
-      if (data.success) {
+        setSelectedProductIds([])
+        setSelectAll(false)
         loadProducts()
+
+        if (successCount > 0) {
+          toast.success(`${successCount}개의 상품이 삭제되었습니다.`)
+        } else {
+          toast.error('상품 삭제에 실패했습니다.')
+        }
       }
     } catch (error) {
       console.error('상품 삭제 실패:', error)
+      toast.error('상품 삭제에 실패했습니다.')
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteConfirm(false)
+      setDeleteTargetId(null)
     }
   }
 
@@ -439,80 +492,18 @@ export default function ProductListPage() {
     })
   }
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedProductIds.length === 0) {
       return
     }
-
-    if (!confirm(`선택한 ${selectedProductIds.length}개의 상품을 삭제하시겠습니까?`)) {
-      return
-    }
-
-    try {
-      let successCount = 0
-      for (const id of selectedProductIds) {
-        try {
-          const response = await fetch(`/api/product?id=${id}`, {
-            method: 'DELETE',
-          })
-          const data = await response.json()
-          if (data.success) successCount++
-        } catch (error) {
-          console.error(`상품 삭제 실패 (ID: ${id}):`, error)
-        }
-      }
-
-      setSelectedProductIds([])
-      setSelectAll(false)
-      loadProducts()
-    } catch (error) {
-      console.error('상품 일괄 삭제 실패:', error)
-    }
-  }
-
-  // 일괄 상태 변경
-  const handleBulkStatusChange = async (newStatus: string) => {
-    if (selectedProductIds.length === 0) return
-
-    const statusLabel = STATUS_OPTIONS.find(s => s.value === newStatus)?.label || newStatus
-    if (!confirm(`선택한 ${selectedProductIds.length}개의 상품을 "${statusLabel}" 상태로 변경하시겠습니까?`)) {
-      return
-    }
-
-    try {
-      const response = await fetch('/api/product/bulk-status', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productIds: selectedProductIds,
-          status: newStatus,
-        }),
-      })
-
-      const data = await response.json()
-      console.log('일괄 상태 변경 응답:', data, 'HTTP 상태:', response.status)
-
-      if (data.success) {
-        setSelectedProductIds([])
-        setSelectAll(false)
-        setShowBulkStatusDropdown(false)
-        loadProducts()
-        alert(`${data.updatedCount}개의 상품 상태가 변경되었습니다.`)
-      } else {
-        alert(`상태 변경 실패: ${data.error || '알 수 없는 오류'}\n(HTTP ${response.status})`)
-      }
-    } catch (error) {
-      console.error('일괄 상태 변경 실패:', error)
-      alert(`상태 변경에 실패했습니다.\n${error instanceof Error ? error.message : '네트워크 오류'}`)
-    }
+    setDeleteTargetId(null) // 일괄 삭제 모드
+    setShowDeleteConfirm(true)
   }
 
   const getStatusBadge = (status: string) => {
     const statusMap: { [key: string]: { label: string; color: string } } = {
-      DRAFT: { label: '임시저장', color: 'bg-gray-100 text-gray-800' },
-      ACTIVE: { label: '판매중', color: 'bg-green-100 text-green-800' },
-      INACTIVE: { label: '판매중지', color: 'bg-yellow-100 text-yellow-800' },
-      SOLDOUT: { label: '품절', color: 'bg-red-100 text-red-800' },
+      COLLECTED: { label: '수집', color: 'bg-gray-100 text-gray-800' },
+      ARCHIVED: { label: '보관', color: 'bg-yellow-100 text-yellow-800' },
     }
 
     const statusInfo = statusMap[status] || { label: status, color: 'bg-gray-100 text-gray-800' }
@@ -520,6 +511,47 @@ export default function ProductListPage() {
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
         {statusInfo.label}
+      </span>
+    )
+  }
+
+  // 발행현황 배지
+  const getPublishStatusBadge = (product: Product) => {
+    if (!product.publishStatus) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+          미발행
+        </span>
+      )
+    }
+
+    const { retailBand, shoppingMall } = product.publishStatus
+
+    if (retailBand && shoppingMall) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          발행완료
+        </span>
+      )
+    }
+
+    if (retailBand || shoppingMall) {
+      return (
+        <div className="flex flex-col gap-1">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            부분발행
+          </span>
+          <div className="flex gap-1">
+            <span className={`inline-block w-2 h-2 rounded-full ${retailBand ? 'bg-green-500' : 'bg-gray-300'}`} title="소매밴드" />
+            <span className={`inline-block w-2 h-2 rounded-full ${shoppingMall ? 'bg-green-500' : 'bg-gray-300'}`} title="쇼핑몰" />
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+        미발행
       </span>
     )
   }
@@ -586,44 +618,6 @@ export default function ProductListPage() {
                   <Sparkles size={16} />
                   상품 등록
                 </Button>
-
-                {/* 일괄 상태 변경 드롭다운 - 항상 표시, 조건 미충족 시 비활성화 */}
-                <div className="relative">
-                  <Button
-                    variant="secondary"
-                    onClick={() => selectedStatus && selectedProductIds.length > 0 && setShowBulkStatusDropdown(!showBulkStatusDropdown)}
-                    disabled={selectedProductIds.length === 0 || !selectedStatus}
-                    title={
-                      selectedProductIds.length === 0
-                        ? '상품을 선택해주세요'
-                        : !selectedStatus
-                          ? '상태 필터를 선택하면 일괄 변경이 가능합니다'
-                          : ''
-                    }
-                  >
-                    일괄 상태 변경
-                    <ChevronDown size={16} />
-                  </Button>
-                  {showBulkStatusDropdown && selectedStatus && selectedProductIds.length > 0 && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setShowBulkStatusDropdown(false)}
-                      />
-                      <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                        {STATUS_OPTIONS.filter(s => s.value && s.value !== selectedStatus).map((status) => (
-                          <button
-                            key={status.value}
-                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors"
-                            onClick={() => handleBulkStatusChange(status.value)}
-                          >
-                            {status.label}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
 
                 <Button
                   variant="danger"
@@ -789,7 +783,7 @@ export default function ProductListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[5%]">
+                  <TableHead className="w-[4%]">
                     <input
                       type="checkbox"
                       checked={selectAll}
@@ -797,11 +791,12 @@ export default function ProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[35%]">상품명</TableHead>
-                  <TableHead className="w-[13%]">출처 밴드</TableHead>
-                  <TableHead className="w-[10%]">도매가</TableHead>
-                  <TableHead className="w-[10%]">판매가</TableHead>
-                  <TableHead className="w-[15%]">
+                  <TableHead className="w-[30%]">상품명</TableHead>
+                  <TableHead className="w-[12%]">출처 밴드</TableHead>
+                  <TableHead className="w-[9%]">도매가</TableHead>
+                  <TableHead className="w-[9%]">판매가</TableHead>
+                  <TableHead className="w-[12%]">발행현황</TableHead>
+                  <TableHead className="w-[12%]">
                     <select
                       value={selectedStatus}
                       onChange={(e) => {
@@ -880,6 +875,7 @@ export default function ProductListPage() {
                           {formatPrice(product.price)}
                         </div>
                       </TableCell>
+                      <TableCell>{getPublishStatusBadge(product)}</TableCell>
                       <TableCell>{getStatusBadge(product.status)}</TableCell>
                       <TableCell>
                         <span className="text-sm text-gray-600 whitespace-nowrap">
@@ -939,6 +935,25 @@ export default function ProductListPage() {
           </div>
         </div>
       )}
+
+      {/* 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false)
+          setDeleteTargetId(null)
+        }}
+        onConfirm={confirmDeleteProduct}
+        title="상품 삭제"
+        message={
+          deleteTargetId !== null
+            ? '이 상품을 삭제하시겠습니까?'
+            : `선택한 ${selectedProductIds.length}개의 상품을 삭제하시겠습니까?`
+        }
+        confirmText="삭제"
+        variant="danger"
+        isLoading={isDeleting}
+      />
 
       {/* 게시물 선택 모달 */}
       <PostSelectionModal

@@ -1,4 +1,4 @@
-import prisma from '@bandauto/db'
+import prisma, { PublishStatus, PublishType } from '@bandauto/db'
 import type { ProductListParams, ProductCreateInput, ProductUpdateInput } from '../types/product.types'
 
 export class ProductRepository {
@@ -70,6 +70,20 @@ export class ProductRepository {
             },
           },
         },
+        productPublishes: {
+          where: {
+            status: PublishStatus.SUCCESS,
+            publishType: PublishType.RETAIL_BAND,
+          },
+          include: {
+            retailBand: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -78,8 +92,34 @@ export class ProductRepository {
       take: limit,
     })
 
+    // 발행 상태 계산해서 추가
+    const productsWithPublishStatus = products.map((product) => {
+      const retailBandPublishes = product.productPublishes
+
+      const hasRetailBand = retailBandPublishes.length > 0
+
+      // 발행된 소매밴드 ID 목록
+      const publishedRetailBandIds = retailBandPublishes
+        .map((pp) => pp.retailBandId)
+        .filter((id): id is number => id !== null && id !== undefined)
+
+      let publishSummary = '미발행'
+      if (hasRetailBand) {
+        publishSummary = '발행됨'
+      }
+
+      return {
+        ...product,
+        publishStatus: {
+          retailBand: hasRetailBand,
+        },
+        publishedRetailBandIds, // 발행된 소매밴드 ID 목록
+        publishSummary,
+      }
+    })
+
     return {
-      data: products,
+      data: productsWithPublishStatus,
       total,
       page,
       limit,

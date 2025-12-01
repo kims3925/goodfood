@@ -1,0 +1,6 @@
+// =============================================
+// CHANNEL 모델 제거됨
+// =============================================
+// SourceChannel, PublishChannel은 불필요한 추상화 레이어로 판단되어 삭제
+// - 도매처: Product → Post → WholesaleBand 로 추적
+// - 발행처: ProductPublish → RetailBand 로 추적

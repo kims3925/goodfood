@@ -19,7 +19,8 @@ export class NaverBandClient {
   private accessToken: string
 
   constructor(accessToken: string) {
-    this.accessToken = accessToken
+    // 토큰에서 줄바꿈, 공백 등 불필요한 문자 제거
+    this.accessToken = accessToken.trim().replace(/[\r\n]/g, '')
   }
 
   /**
@@ -30,26 +31,25 @@ export class NaverBandClient {
     content: string,
     options: CreatePostOptions = {}
   ): Promise<{ postKey: string }> {
-    const url = new URL(`${BAND_API_BASE_URL}/v2/band/post/create`)
-
-    const formData = new URLSearchParams()
-    formData.append('access_token', this.accessToken)
-    formData.append('band_key', bandKey)
-    formData.append('content', content)
-    formData.append('do_push', options.doPush ? 'true' : 'false')
+    // v2.2 API 사용, 파라미터는 query string으로 전송 (공식 예제 방식)
+    const url = new URL(`${BAND_API_BASE_URL}/v2.2/band/post/create`)
+    url.searchParams.append('access_token', this.accessToken)
+    url.searchParams.append('band_key', bandKey)
+    url.searchParams.append('content', content)
+    url.searchParams.append('do_push', options.doPush ? 'true' : 'false')
 
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
       },
-      body: formData.toString(),
     })
 
     const data: BandApiResponse<{ post_key: string }> = await response.json()
 
     if (data.result_code !== 1) {
-      throw new Error(data.message || `Band API Error: ${data.result_code}`)
+      const errorData = data.result_data as any
+      throw new Error(errorData?.message || data.message || `Band API Error: ${data.result_code}`)
     }
 
     return { postKey: data.result_data!.post_key }
@@ -63,20 +63,18 @@ export class NaverBandClient {
     postKey: string,
     content: string
   ): Promise<{ commentKey: string }> {
+    // query string 방식으로 전송
     const url = new URL(`${BAND_API_BASE_URL}/v2/band/post/comment/create`)
-
-    const formData = new URLSearchParams()
-    formData.append('access_token', this.accessToken)
-    formData.append('band_key', bandKey)
-    formData.append('post_key', postKey)
-    formData.append('body', content)
+    url.searchParams.append('access_token', this.accessToken)
+    url.searchParams.append('band_key', bandKey)
+    url.searchParams.append('post_key', postKey)
+    url.searchParams.append('body', content)
 
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
       },
-      body: formData.toString(),
     })
 
     const data: BandApiResponse<{ comment_key: string }> = await response.json()

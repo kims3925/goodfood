@@ -23,6 +23,27 @@ import {
 } from './types'
 
 // =============================================
+// HELPER FUNCTIONS
+// =============================================
+
+/**
+ * JSON 문자열 또는 number[] 값을 number[]로 파싱
+ */
+function parseNumberArray(value: string | number[] | null | undefined): number[] {
+  if (!value) return []
+  if (Array.isArray(value)) return value
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+// =============================================
 // INDIVIDUAL PIPELINE EXECUTORS
 // =============================================
 
@@ -165,8 +186,11 @@ export async function executePublishPipeline(
       throw new Error('발행할 소매밴드가 설정되지 않았습니다')
     }
 
+    // retailBandIds 파싱
+    const retailBandIds = config?.retailBandIds ?? parseNumberArray(automationConfig?.retailBandIds)
+
     const publishConfig = {
-      retailBandIds: config?.retailBandIds ?? (automationConfig?.retailBandIds as number[]),
+      retailBandIds,
       productIds: config?.productIds,
       publishReadyOnly: config?.publishReadyOnly ?? true,
     }
@@ -247,7 +271,7 @@ export async function executeFullPipeline(
       console.log('[FullPipeline] Step 1: Collection')
       collectionResult = await runCollectionPipeline({
         collectFromAllBands: automationConfig.collectFromAllBands,
-        wholesaleBandIds: automationConfig.wholesaleBandIds as number[] | undefined,
+        wholesaleBandIds: parseNumberArray(automationConfig.wholesaleBandIds) || undefined,
       })
 
       // 진행 상황 업데이트
@@ -280,11 +304,11 @@ export async function executeFullPipeline(
 
     // 3. 발행 단계 (autoPublish가 true인 경우에만)
     if (!options?.skipPublish && automationConfig.autoPublish) {
-      const retailBandIds = automationConfig.retailBandIds as number[] | undefined
-      if (retailBandIds?.length) {
+      const retailBandIdsForPublish = parseNumberArray(automationConfig.retailBandIds)
+      if (retailBandIdsForPublish.length) {
         console.log('[FullPipeline] Step 3: Publish')
         publishResult = await runPublishPipeline({
-          retailBandIds,
+          retailBandIds: retailBandIdsForPublish,
           publishReadyOnly: true,
         })
 

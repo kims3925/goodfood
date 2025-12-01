@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma, PublishStatus } from '@bandauto/db'
+import { prisma, PublishStatus, PublishType } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { NaverBandClient } from '@/modules/sourcing/domain/src/band'
 
@@ -19,6 +19,7 @@ interface PublishResult {
   productId: number
   productName: string
   success: boolean
+  skipped?: boolean
   postKey?: string
   error?: string
 }
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { retailBandIds, productIds } = body
+    const { retailBandIds, productIds, skipDuplicates = false } = body
 
     // 유효성 검사
     if (!retailBandIds || retailBandIds.length === 0) {
@@ -119,6 +120,31 @@ export async function POST(request: NextRequest) {
       // 각 상품 발행
       for (const product of products) {
         try {
+          // skipDuplicates가 true면 이미 발행된 조합 스킵
+          if (skipDuplicates) {
+            const existingPublish = await prisma.productPublish.findFirst({
+              where: {
+                productId: product.id,
+                publishType: PublishType.RETAIL_BAND,
+                retailBandId: retailBand.id,
+                status: PublishStatus.SUCCESS,
+              },
+            })
+
+            if (existingPublish) {
+              console.log(`⏭️ 스킵: ${retailBand.name} / ${product.name} (이미 발행됨)`)
+              results.push({
+                bandId: retailBand.id,
+                bandName: retailBand.name,
+                productId: product.id,
+                productName: product.name,
+                success: false,
+                skipped: true,
+              })
+              continue
+            }
+          }
+
           // 첫 번째 발행이 아니면 10초 지연
           if (publishCount > 0) {
             console.log(`⏳ ${PUBLISH_DELAY_MS / 1000}초 대기 중... (${publishCount}번째 발행 완료)`)
@@ -141,45 +167,29 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // 발행 이력 저장 (자동화와 중복 방지)
-          await prisma.publishHistory.upsert({
-            where: {
-              productId_retailBandId: {
-                productId: product.id,
-                retailBandId: retailBand.id,
-              },
-            },
-            create: {
-              userId: user.userId,
-              productId: product.id,
-              retailBandId: retailBand.id,
-              postKey,
-              status: PublishStatus.SUCCESS,
-            },
-            update: {
-              postKey,
-              status: PublishStatus.SUCCESS,
-              errorMessage: null,
-              publishedAt: new Date(),
-            },
-          })
-
-          // ProductPublish 레코드 생성/업데이트 (쇼핑몰 표시용)
+          // ProductPublish 레코드 생성/업데이트
           await prisma.productPublish.upsert({
             where: {
-              productId_retailBandId: {
+              productId_publishType_retailBandId: {
                 productId: product.id,
+                publishType: PublishType.RETAIL_BAND,
                 retailBandId: retailBand.id,
               },
             },
             create: {
               userId: user.userId,
               productId: product.id,
+              publishType: PublishType.RETAIL_BAND,
               retailBandId: retailBand.id,
               status: PublishStatus.SUCCESS,
+              externalId: postKey,
+              publishedAt: new Date(),
             },
             update: {
               status: PublishStatus.SUCCESS,
+              externalId: postKey,
+              errorMessage: null,
+              publishedAt: new Date(),
             },
           })
 
@@ -209,13 +219,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 성공/실패 카운트
+    // 성공/실패/스킵 카운트
     const successCount = results.filter(r => r.success).length
-    const failCount = results.filter(r => !r.success).length
+    const skippedCount = results.filter(r => r.skipped).length
+    const failCount = results.filter(r => !r.success && !r.skipped).length
 
     return NextResponse.json({
       success: true,
-      message: `${successCount}개 성공, ${failCount}개 실패`,
+      message: `${successCount}개 성공, ${skippedCount}개 스킵, ${failCount}개 실패`,
       results,
     })
   } catch (error) {

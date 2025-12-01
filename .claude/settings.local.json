@@ -30,7 +30,8 @@
       "Bash(cat:*)",
       "mcp__excel__excel_write_to_sheet",
       "mcp__excel__excel_describe_sheets",
-      "Bash(taskkill /F /PID 11048)"
+      "Bash(taskkill /F /PID 11048)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

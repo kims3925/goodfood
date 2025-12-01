@@ -30,11 +30,12 @@ enum AiProvider {
 }
 
 enum ProductStatus {
-  DRAFT
-  ACTIVE
-  INACTIVE
-  SOLDOUT
+  COLLECTED  // 수집됨 - 활성 상태
+  ARCHIVED   // 보관됨 - 비활성 상태
 }
+
+// 도매처/발행처 채널 타입 enum 제거됨
+// - SourceChannel, PublishChannel 테이블 삭제로 인해 불필요
 
 enum WorkflowType {
   COLLECT
@@ -60,6 +61,11 @@ enum PublishStatus {
   SUCCESS
   FAILED
   PENDING
+}
+
+enum PublishType {
+  RETAIL_BAND    // 소매밴드 발행
+  SHOPPING_MALL  // 쇼핑몰 발행
 }
 
 enum CustomerOrderStatus {

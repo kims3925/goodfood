@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Package,
-  ShoppingCart,
   Zap,
   Settings,
   ChevronDown,
@@ -16,15 +15,11 @@ import {
   X,
   Upload,
   Send,
-  List,
   Database,
-  FileSpreadsheet,
   Link2,
   Globe,
   ScrollText,
   ClipboardList,
-  PlusCircle,
-  Play,
   LayoutDashboard,
   History,
   Cog,
@@ -90,20 +85,9 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       icon: <LayoutDashboard size={20} />,
     },
     {
-      label: '밴드관리',
+      label: '밴드 관리',
+      href: '/band',
       icon: <Store size={20} />,
-      children: [
-        {
-          label: '도매밴드 관리',
-          href: '/band/wholesale',
-          icon: <Store size={16} />,
-        },
-        {
-          label: '소매밴드 관리',
-          href: '/band/retail',
-          icon: <Send size={16} />,
-        },
-      ],
     },
     {
       label: '게시물 관리',
@@ -143,20 +127,9 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       ],
     },
     {
-      label: '주문서 관리',
+      label: '주문 목록',
+      href: '/order/list',
       icon: <ClipboardList size={20} />,
-      children: [
-        {
-          label: '주문 목록',
-          href: '/order/list',
-          icon: <List size={16} />,
-        },
-        {
-          label: '주문서 작성',
-          href: '/order/new',
-          icon: <PlusCircle size={16} />,
-        },
-      ],
     },
     {
       label: '정책 관리',
@@ -215,6 +188,10 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
   const isActive = (href?: string) => {
     if (!href) return false
+    // /band 페이지는 /band?type=xxx 형태도 활성화
+    if (href === '/band' && pathname.startsWith('/band')) {
+      return true
+    }
     // 정확한 경로 매칭만 활성화 (하위 경로 제외)
     return pathname === href
   }

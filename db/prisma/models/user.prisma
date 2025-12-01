@@ -25,7 +25,6 @@ model User {
   pricingPolicies    PricingPolicy[]
   products           Product[]
   productPublishes   ProductPublish[]
-  publishHistories   PublishHistory[]
   retailBands        RetailBand[]
   sourcingApiConfigs SourcingApiConfig[]
   wholesaleBands     WholesaleBand[]
