@@ -73,7 +73,7 @@ export class ProductRepository {
         productPublishes: {
           where: {
             status: PublishStatus.SUCCESS,
-            publishType: PublishType.RETAIL_BAND,
+            // RETAIL_BAND와 SHOPPING_MALL 모두 조회
           },
           include: {
             retailBand: {
@@ -94,24 +94,35 @@ export class ProductRepository {
 
     // 발행 상태 계산해서 추가
     const productsWithPublishStatus = products.map((product) => {
-      const retailBandPublishes = product.productPublishes
+      // 발행 유형별 분류
+      const retailBandPublishes = product.productPublishes.filter(
+        (pp) => pp.publishType === PublishType.RETAIL_BAND
+      )
+      const shoppingMallPublishes = product.productPublishes.filter(
+        (pp) => pp.publishType === PublishType.SHOPPING_MALL
+      )
 
       const hasRetailBand = retailBandPublishes.length > 0
+      const hasShoppingMall = shoppingMallPublishes.length > 0
 
       // 발행된 소매밴드 ID 목록
       const publishedRetailBandIds = retailBandPublishes
         .map((pp) => pp.retailBandId)
         .filter((id): id is number => id !== null && id !== undefined)
 
+      // 발행 요약 계산
       let publishSummary = '미발행'
-      if (hasRetailBand) {
-        publishSummary = '발행됨'
+      if (hasRetailBand && hasShoppingMall) {
+        publishSummary = '발행완료'
+      } else if (hasRetailBand || hasShoppingMall) {
+        publishSummary = '부분발행'
       }
 
       return {
         ...product,
         publishStatus: {
           retailBand: hasRetailBand,
+          shoppingMall: hasShoppingMall,
         },
         publishedRetailBandIds, // 발행된 소매밴드 ID 목록
         publishSummary,

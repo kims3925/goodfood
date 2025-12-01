@@ -9,11 +9,14 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, Calendar, Tag, Layers } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, Calendar, Tag, Layers, Send, CheckCircle, Clock, XCircle } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import Link from 'next/link'
+import ImageSortable, { SortableImage } from '@/components/product/ImageSortable'
+import ConfirmModal from '@/components/ui/ConfirmModal'
+import { useToast } from '@/components/ui/Toast'
 
 interface Product {
   id: number
@@ -60,9 +63,24 @@ interface Product {
   }>
 }
 
+interface PublishHistory {
+  id: number
+  status: 'PENDING' | 'SUCCESS' | 'FAILED'
+  publishType: 'RETAIL_BAND' | 'SHOPPING_MALL'
+  createdAt: string
+  retailBand?: {
+    id: number
+    name: string
+    bandKey: string
+  }
+}
+
+type TabType = 'info' | 'publish'
+
 export default function ProductDetailTestB() {
   const router = useRouter()
   const params = useParams()
+  const toast = useToast()
   const productId = parseInt(params.id as string)
 
   const [product, setProduct] = useState<Product | null>(null)
@@ -79,6 +97,17 @@ export default function ProductDetailTestB() {
     price: '',
     wholesalePrice: '',
   })
+
+  // 이미지 관련 상태
+  const [deletingImageId, setDeletingImageId] = useState<number | null>(null)
+
+  // 삭제 확인 모달 상태
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  // 탭 상태
+  const [activeTab, setActiveTab] = useState<TabType>('info')
+  const [publishHistory, setPublishHistory] = useState<PublishHistory[]>([])
+  const [isLoadingPublish, setIsLoadingPublish] = useState(false)
 
   useEffect(() => {
     if (productId) {
@@ -114,6 +143,28 @@ export default function ProductDetailTestB() {
     }
   }
 
+  const loadPublishHistory = async () => {
+    try {
+      setIsLoadingPublish(true)
+      const response = await fetch(`/api/product/publish?productId=${productId}`)
+      const data = await response.json()
+      if (data.success) {
+        setPublishHistory(data.data || [])
+      }
+    } catch (err) {
+      console.error('발행현황 로드 실패:', err)
+    } finally {
+      setIsLoadingPublish(false)
+    }
+  }
+
+  // 탭 변경 시 발행현황 로드
+  useEffect(() => {
+    if (activeTab === 'publish' && publishHistory.length === 0) {
+      loadPublishHistory()
+    }
+  }, [activeTab])
+
   const handleSave = async () => {
     if (!product || !formData.name.trim()) return
 
@@ -144,18 +195,80 @@ export default function ProductDetailTestB() {
     }
   }
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!product) return
-    if (!confirm('정말 삭제하시겠습니까?')) return
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!product) return
 
     try {
       const response = await fetch(`/api/product?id=${product.id}`, { method: 'DELETE' })
       const data = await response.json()
       if (data.success) {
+        toast.success('상품이 삭제되었습니다.')
         router.push('/product/list')
+      } else {
+        toast.error('상품 삭제에 실패했습니다.')
       }
     } catch (error) {
       console.error('상품 삭제 실패:', error)
+      toast.error('상품 삭제에 실패했습니다.')
+    } finally {
+      setShowDeleteConfirm(false)
+    }
+  }
+
+  // 이미지 순서 변경 핸들러
+  const handleImageReorder = async (reorderedImages: SortableImage[]) => {
+    if (!product) return
+
+    try {
+      const response = await fetch('/api/post/image/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId: product.postId,
+          imageIds: reorderedImages.map((img) => img.id),
+        }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        loadProduct()
+        toast.success('이미지 순서가 변경되었습니다.')
+      } else {
+        toast.error('이미지 순서 변경에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('이미지 순서 변경 실패:', error)
+      toast.error('이미지 순서 변경에 실패했습니다.')
+    }
+  }
+
+  // 이미지 삭제 핸들러
+  const handleDeleteImage = async (imageId: number) => {
+    if (!product) return
+
+    setDeletingImageId(imageId)
+    try {
+      const response = await fetch(`/api/post/image?id=${imageId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        loadProduct()
+        toast.success('이미지가 삭제되었습니다.')
+      } else {
+        toast.error(data.error || '이미지 삭제에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('이미지 삭제 실패:', error)
+      toast.error('이미지 삭제에 실패했습니다.')
+    } finally {
+      setDeletingImageId(null)
     }
   }
 
@@ -172,7 +285,65 @@ export default function ProductDetailTestB() {
     })
   }
 
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  const getStatusBadge = (status: PublishHistory['status']) => {
+    switch (status) {
+      case 'SUCCESS':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+            <CheckCircle size={12} />
+            성공
+          </span>
+        )
+      case 'PENDING':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
+            <Clock size={12} />
+            대기중
+          </span>
+        )
+      case 'FAILED':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+            <XCircle size={12} />
+            실패
+          </span>
+        )
+    }
+  }
+
+  const getPublishTypeBadge = (type: PublishHistory['publishType']) => {
+    if (type === 'RETAIL_BAND') {
+      return (
+        <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+          소매밴드
+        </span>
+      )
+    }
+    return (
+      <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+        쇼핑몰
+      </span>
+    )
+  }
+
   const images = product?.post?.images || []
+
+  // ImageSortable용 이미지 변환
+  const sortableImages: SortableImage[] = images.map((img) => ({
+    id: img.id,
+    imageUrl: img.imageUrl,
+    sortOrder: img.sortOrder,
+  }))
 
   // Group options by groupName
   const groupedOptions = (product?.options || []).reduce((acc, option) => {
@@ -280,39 +451,103 @@ export default function ProductDetailTestB() {
             </div>
           </div>
         </div>
+
+        {/* 탭 버튼 */}
+        <div className="max-w-7xl mx-auto px-6 pb-4">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab('info')}
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
+                activeTab === 'info'
+                  ? 'bg-white text-purple-600'
+                  : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
+            >
+              <Tag size={16} />
+              상품 정보
+            </button>
+            <button
+              onClick={() => setActiveTab('publish')}
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
+                activeTab === 'publish'
+                  ? 'bg-white text-purple-600'
+                  : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
+            >
+              <Send size={16} />
+              발행현황
+              {publishHistory.length > 0 && (
+                <span className={`ml-1 px-1.5 py-0.5 text-xs rounded-full ${
+                  activeTab === 'publish'
+                    ? 'bg-purple-100 text-purple-600'
+                    : 'bg-white/30 text-white'
+                }`}>
+                  {publishHistory.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-        {/* 이미지 갤러리 - 가로 스크롤 */}
-        {images.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Layers size={20} className="text-purple-500" />
-                상품 이미지
-                <span className="text-sm font-normal text-gray-400 ml-2">{images.length}개</span>
-              </h2>
-            </div>
-            <div className="p-4">
-              <div className="flex gap-4 overflow-x-auto pb-4">
-                {images.map((image, index) => (
-                  <div key={image.id} className="relative flex-shrink-0">
-                    {index === 0 && (
-                      <div className="absolute top-2 left-2 z-10 px-2 py-1 bg-purple-600 text-white text-xs rounded-full font-medium">
-                        대표
-                      </div>
-                    )}
-                    <img
-                      src={image.imageUrl}
-                      alt={`상품 이미지 ${index + 1}`}
-                      className="w-48 h-48 object-cover rounded-xl border border-gray-200"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
+        {/* 상품 정보 탭 */}
+        {activeTab === 'info' && (
+          <>
+        {/* 이미지 갤러리 */}
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Layers size={20} className="text-purple-500" />
+              상품 이미지
+              <span className="text-sm font-normal text-gray-400 ml-2">{images.length}개</span>
+            </h2>
           </div>
-        )}
+          <div className="p-4">
+            {isEditing ? (
+              /* 편집 모드: ImageSortable 사용 */
+              <>
+                <p className="text-sm text-gray-500 mb-4">드래그하여 순서를 변경하거나, 호버하여 삭제할 수 있습니다.</p>
+                {sortableImages.length > 0 ? (
+                  <ImageSortable
+                    images={sortableImages}
+                    onReorder={handleImageReorder}
+                    onDelete={handleDeleteImage}
+                    deletingImageId={deletingImageId ?? undefined}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-48 bg-gray-100 rounded-xl">
+                    <Package size={48} className="text-gray-300" />
+                  </div>
+                )}
+              </>
+            ) : (
+              /* 보기 모드: 가로 스크롤 갤러리 */
+              images.length > 0 ? (
+                <div className="flex gap-4 overflow-x-auto pb-4">
+                  {images.map((image, index) => (
+                    <div key={image.id} className="relative flex-shrink-0">
+                      {index === 0 && (
+                        <div className="absolute top-2 left-2 z-10 px-2 py-1 bg-purple-600 text-white text-xs rounded-full font-medium">
+                          대표
+                        </div>
+                      )}
+                      <img
+                        src={image.imageUrl}
+                        alt={`상품 이미지 ${index + 1}`}
+                        className="w-48 h-48 object-cover rounded-xl border border-gray-200"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-48 bg-gray-100 rounded-xl">
+                  <Package size={48} className="text-gray-300" />
+                </div>
+              )
+            )}
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 상품 정보 */}
@@ -468,12 +703,79 @@ export default function ProductDetailTestB() {
             </div>
           </div>
         </div>
+          </>
+        )}
+
+        {/* 발행현황 탭 */}
+        {activeTab === 'publish' && (
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Send size={20} className="text-purple-500" />
+                발행현황
+                <span className="text-sm font-normal text-gray-400 ml-2">{publishHistory.length}건</span>
+              </h2>
+            </div>
+            <div className="p-4">
+              {isLoadingPublish ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loading />
+                </div>
+              ) : publishHistory.length === 0 ? (
+                <div className="text-center py-12">
+                  <Send size={48} className="mx-auto text-gray-300 mb-4" />
+                  <p className="text-gray-500">아직 발행 이력이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {publishHistory.map((history) => (
+                    <div
+                      key={history.id}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col gap-1">
+                          {getPublishTypeBadge(history.publishType)}
+                          {getStatusBadge(history.status)}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {history.publishType === 'RETAIL_BAND' && history.retailBand
+                              ? history.retailBand.name
+                              : '쇼핑몰'}
+                          </p>
+                          {history.retailBand && (
+                            <p className="text-sm text-gray-500">{history.retailBand.bandKey}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-500">{formatDateTime(history.createdAt)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 테스트 페이지 안내 */}
       <div className="fixed bottom-4 right-4 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm">
         디자인 B: 대시보드 스타일
       </div>
+
+      {/* 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title="상품 삭제"
+        message="정말 이 상품을 삭제하시겠습니까?"
+        confirmText="삭제"
+        variant="danger"
+      />
     </div>
   )
 }

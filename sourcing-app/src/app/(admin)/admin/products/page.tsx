@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Package, Search, Edit3, Trash2, Plus, DollarSign, Calendar, Tag, Download, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 
 interface Product {
   id: string
@@ -56,6 +57,14 @@ export default function ProductsPage() {
   const [selectAll, setSelectAll] = useState(false)
   const [currentDetailIndex, setCurrentDetailIndex] = useState(0)
   const [isIndividualProcessing, setIsIndividualProcessing] = useState(false)
+
+  // ConfirmModal states
+  const [showOptionDeleteConfirm, setShowOptionDeleteConfirm] = useState(false)
+  const [pendingOptionIndex, setPendingOptionIndex] = useState<number | null>(null)
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false)
+  const [showSingleDeleteConfirm, setShowSingleDeleteConfirm] = useState(false)
+  const [pendingDeleteProductId, setPendingDeleteProductId] = useState<string | null>(null)
+  const [pendingDeleteProductTitle, setPendingDeleteProductTitle] = useState<string>('')
 
   useEffect(() => {
     loadProducts()
@@ -526,29 +535,34 @@ export default function ProductsPage() {
   // 옵션 삭제 핸들러
   const handleDeleteOption = (optionIndex: number) => {
     if (!editedProduct || !editedProduct.priceInfo) return
-    
-    if (!confirm('이 옵션을 삭제하시겠습니까?')) {
-      return
-    }
-    
+    setPendingOptionIndex(optionIndex)
+    setShowOptionDeleteConfirm(true)
+  }
+
+  const confirmDeleteOption = () => {
+    if (!editedProduct || !editedProduct.priceInfo || pendingOptionIndex === null) return
+
     try {
       const priceData = JSON.parse(editedProduct.priceInfo)
       if (!priceData.processedPriceOptions) return
-      
+
       const updatedOptions = [...priceData.processedPriceOptions]
-      updatedOptions.splice(optionIndex, 1) // 해당 인덱스의 옵션 삭제
-      
+      updatedOptions.splice(pendingOptionIndex, 1) // 해당 인덱스의 옵션 삭제
+
       const updatedPriceData = {
         ...priceData,
         processedPriceOptions: updatedOptions
       }
-      
+
       setEditedProduct({
         ...editedProduct,
         priceInfo: JSON.stringify(updatedPriceData)
       })
     } catch (error) {
       console.error('옵션 삭제 오류:', error)
+    } finally {
+      setShowOptionDeleteConfirm(false)
+      setPendingOptionIndex(null)
     }
   }
 
@@ -597,19 +611,14 @@ export default function ProductsPage() {
   }
 
   // 선택된 상품 일괄 삭제
-  const handleSelectedDelete = async () => {
+  const handleSelectedDelete = () => {
     if (selectedProducts.length === 0) {
       return
     }
+    setShowBatchDeleteConfirm(true)
+  }
 
-    const selectedProductTitles = products
-      .filter(p => selectedProducts.includes(p.id))
-      .map(p => p.hookingTitle || p.title)
-
-    if (!confirm(`정말로 선택된 ${selectedProducts.length}개 상품을 삭제하시겠습니까?\n\n${selectedProductTitles.slice(0, 3).join(', ')}${selectedProductTitles.length > 3 ? '...' : ''}`)) {
-      return
-    }
-
+  const confirmBatchDelete = async () => {
     try {
       // 병렬로 모든 선택된 상품 삭제 요청
       const deletePromises = selectedProducts.map(productId =>
@@ -619,7 +628,7 @@ export default function ProductsPage() {
       )
 
       const results = await Promise.all(deletePromises)
-      
+
       // 성공한 삭제들만 필터링
       const successfulDeletes = selectedProducts.filter((_, index) => results[index].success)
       const failedDeletes = selectedProducts.filter((_, index) => !results[index].success)
@@ -627,11 +636,11 @@ export default function ProductsPage() {
       if (successfulDeletes.length > 0) {
         // 로컬 상태에서 성공적으로 삭제된 상품들 제거
         setProducts(products.filter(p => !successfulDeletes.includes(p.id)))
-        
+
         // 선택된 상품 목록 초기화
         setSelectedProducts([])
         setSelectAll(false)
-        
+
         // 모달이 열려있고 삭제된 상품이면 모달 닫기
         if (selectedProduct && successfulDeletes.includes(selectedProduct.id)) {
           setShowDetailModal(false)
@@ -644,11 +653,13 @@ export default function ProductsPage() {
       }
 
       if (failedDeletes.length > 0) {
-      } else {
+        console.error(`${failedDeletes.length}개 상품 삭제 실패`)
       }
-      
+
     } catch (error) {
       console.error('일괄 삭제 오류:', error)
+    } finally {
+      setShowBatchDeleteConfirm(false)
     }
   }
 
@@ -711,13 +722,17 @@ export default function ProductsPage() {
     }
   }
 
-  const handleDeleteProduct = async (productId: string, productTitle: string) => {
-    if (!confirm(`정말로 "${productTitle}" 상품을 삭제하시겠습니까?`)) {
-      return
-    }
+  const handleDeleteProduct = (productId: string, productTitle: string) => {
+    setPendingDeleteProductId(productId)
+    setPendingDeleteProductTitle(productTitle)
+    setShowSingleDeleteConfirm(true)
+  }
+
+  const confirmSingleDelete = async () => {
+    if (!pendingDeleteProductId) return
 
     try {
-      const response = await fetch(`/api/product?id=${productId}`, {
+      const response = await fetch(`/api/product?id=${pendingDeleteProductId}`, {
         method: 'DELETE',
       })
 
@@ -725,11 +740,11 @@ export default function ProductsPage() {
 
       if (data.success) {
         // 로컬 상태에서 상품 제거
-        setProducts(products.filter(p => p.id !== productId))
+        setProducts(products.filter(p => p.id !== pendingDeleteProductId))
         console.log('상품 삭제 성공')
-        
+
         // 모달이 열려있고 삭제된 상품이면 모달 닫기
-        if (selectedProduct?.id === productId) {
+        if (selectedProduct?.id === pendingDeleteProductId) {
           setShowDetailModal(false)
           setSelectedProduct(null)
           setEditedProduct(null)
@@ -740,6 +755,10 @@ export default function ProductsPage() {
       }
     } catch (error) {
       console.error('상품 삭제 오류:', error)
+    } finally {
+      setShowSingleDeleteConfirm(false)
+      setPendingDeleteProductId(null)
+      setPendingDeleteProductTitle('')
     }
   }
 
@@ -1746,6 +1765,46 @@ export default function ProductsPage() {
             </div>
           </div>
         )}
+
+        {/* 옵션 삭제 확인 모달 */}
+        <ConfirmModal
+          isOpen={showOptionDeleteConfirm}
+          onClose={() => {
+            setShowOptionDeleteConfirm(false)
+            setPendingOptionIndex(null)
+          }}
+          onConfirm={confirmDeleteOption}
+          title="옵션 삭제"
+          message="이 옵션을 삭제하시겠습니까?"
+          confirmText="삭제"
+          variant="danger"
+        />
+
+        {/* 일괄 삭제 확인 모달 */}
+        <ConfirmModal
+          isOpen={showBatchDeleteConfirm}
+          onClose={() => setShowBatchDeleteConfirm(false)}
+          onConfirm={confirmBatchDelete}
+          title="상품 일괄 삭제"
+          message={`선택된 ${selectedProducts.length}개 상품을 삭제하시겠습니까?`}
+          confirmText="삭제"
+          variant="danger"
+        />
+
+        {/* 개별 삭제 확인 모달 */}
+        <ConfirmModal
+          isOpen={showSingleDeleteConfirm}
+          onClose={() => {
+            setShowSingleDeleteConfirm(false)
+            setPendingDeleteProductId(null)
+            setPendingDeleteProductTitle('')
+          }}
+          onConfirm={confirmSingleDelete}
+          title="상품 삭제"
+          message={`"${pendingDeleteProductTitle}" 상품을 삭제하시겠습니까?`}
+          confirmText="삭제"
+          variant="danger"
+        />
       </div>
     </div>
   )

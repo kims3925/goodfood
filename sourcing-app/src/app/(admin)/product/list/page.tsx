@@ -517,42 +517,38 @@ export default function ProductListPage() {
 
   // 발행현황 배지
   const getPublishStatusBadge = (product: Product) => {
-    if (!product.publishStatus) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-          미발행
-        </span>
-      )
-    }
+    const { retailBand = false, shoppingMall = false } = product.publishStatus || {}
 
-    const { retailBand, shoppingMall } = product.publishStatus
-
+    // 상태 배지 결정
+    let statusBadge: { label: string; color: string }
     if (retailBand && shoppingMall) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          발행완료
-        </span>
-      )
-    }
-
-    if (retailBand || shoppingMall) {
-      return (
-        <div className="flex flex-col gap-1">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-            부분발행
-          </span>
-          <div className="flex gap-1">
-            <span className={`inline-block w-2 h-2 rounded-full ${retailBand ? 'bg-green-500' : 'bg-gray-300'}`} title="소매밴드" />
-            <span className={`inline-block w-2 h-2 rounded-full ${shoppingMall ? 'bg-green-500' : 'bg-gray-300'}`} title="쇼핑몰" />
-          </div>
-        </div>
-      )
+      statusBadge = { label: '발행완료', color: 'bg-green-100 text-green-800' }
+    } else if (retailBand || shoppingMall) {
+      statusBadge = { label: '부분발행', color: 'bg-blue-100 text-blue-800' }
+    } else {
+      statusBadge = { label: '미발행', color: 'bg-gray-100 text-gray-600' }
     }
 
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-        미발행
-      </span>
+      <div className="flex flex-col items-start gap-1.5">
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.color}`}>
+          {statusBadge.label}
+        </span>
+        {(retailBand || shoppingMall) && (
+          <div className="flex items-center gap-1">
+            <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-medium min-w-[32px] ${
+              retailBand ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'
+            }`}>
+              밴드
+            </span>
+            <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-medium min-w-[40px] ${
+              shoppingMall ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'
+            }`}>
+              쇼핑몰
+            </span>
+          </div>
+        )}
+      </div>
     )
   }
 

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ChevronLeft, Clock, CheckCircle, Send, User, Mail, Phone } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
+import { useToast } from '@/components/ui/Toast'
 
 interface Reply {
   id: number
@@ -49,6 +50,7 @@ const inquiryTypes: Record<string, string> = {
 
 export default function InquiryDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
+  const toast = useToast()
   const [inquiry, setInquiry] = useState<InquiryDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [replyText, setReplyText] = useState('')
@@ -85,12 +87,12 @@ export default function InquiryDetailPage({ params }: { params: { id: string } }
       if (data.success) {
         setInquiry(data.inquiry)
       } else {
-        alert(data.error || '문의를 불러오는데 실패했습니다')
+        toast.error(data.error || '문의를 불러오는데 실패했습니다')
         router.push('/cs/inquiry')
       }
     } catch (error) {
       console.error('Failed to load inquiry:', error)
-      alert('문의를 불러오는데 실패했습니다')
+      toast.error('문의를 불러오는데 실패했습니다')
       router.push('/cs/inquiry')
     } finally {
       setIsLoading(false)
@@ -103,7 +105,7 @@ export default function InquiryDetailPage({ params }: { params: { id: string } }
 
   const handleSubmitReply = async () => {
     if (!replyText.trim()) {
-      alert('답변 내용을 입력해 주세요')
+      toast.warning('답변 내용을 입력해 주세요')
       return
     }
 
@@ -125,13 +127,13 @@ export default function InquiryDetailPage({ params }: { params: { id: string } }
           replies: [...prev.replies, data.reply],
         } : null)
         setReplyText('')
-        alert('답변이 등록되었습니다')
+        toast.success('답변이 등록되었습니다')
       } else {
-        alert(data.error || '답변 등록에 실패했습니다')
+        toast.error(data.error || '답변 등록에 실패했습니다')
       }
     } catch (error) {
       console.error('Failed to submit reply:', error)
-      alert('답변 등록 중 오류가 발생했습니다')
+      toast.error('답변 등록 중 오류가 발생했습니다')
     } finally {
       setIsSubmitting(false)
     }

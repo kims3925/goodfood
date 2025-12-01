@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Star, ImageIcon, Trash2 } from 'lucide-react'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 
 export interface SortableImage {
   id: number
@@ -30,11 +31,11 @@ export interface SortableImage {
 interface SortableImageItemProps {
   image: SortableImage
   index: number
-  onDelete?: (imageId: number) => void
+  onRequestDelete?: (imageId: number) => void
   isDeleting?: boolean
 }
 
-function SortableImageItem({ image, index, onDelete, isDeleting }: SortableImageItemProps) {
+function SortableImageItem({ image, index, onRequestDelete, isDeleting }: SortableImageItemProps) {
   const {
     attributes,
     listeners,
@@ -73,12 +74,12 @@ function SortableImageItem({ image, index, onDelete, isDeleting }: SortableImage
       </div>
 
       {/* Delete button */}
-      {onDelete && (
+      {onRequestDelete && (
         <button
           onClick={(e) => {
             e.stopPropagation()
-            if (!isDeleting && confirm('이 이미지를 삭제하시겠습니까?')) {
-              onDelete(image.id)
+            if (!isDeleting) {
+              onRequestDelete(image.id)
             }
           }}
           disabled={isDeleting}
@@ -132,6 +133,22 @@ export default function ImageSortable({
   deletingImageId,
   disabled = false,
 }: ImageSortableProps) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
+
+  const handleRequestDelete = (imageId: number) => {
+    setPendingDeleteId(imageId)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDelete = () => {
+    if (pendingDeleteId !== null && onDelete) {
+      onDelete(pendingDeleteId)
+    }
+    setShowDeleteConfirm(false)
+    setPendingDeleteId(null)
+  }
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -203,24 +220,39 @@ export default function ImageSortable({
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext items={images.map((img) => img.id)} strategy={rectSortingStrategy}>
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-          {images.map((image, index) => (
-            <SortableImageItem
-              key={image.id}
-              image={image}
-              index={index}
-              onDelete={onDelete}
-              isDeleting={deletingImageId === image.id}
-            />
-          ))}
-        </div>
-      </SortableContext>
-    </DndContext>
+    <>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={images.map((img) => img.id)} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+            {images.map((image, index) => (
+              <SortableImageItem
+                key={image.id}
+                image={image}
+                index={index}
+                onRequestDelete={onDelete ? handleRequestDelete : undefined}
+                isDeleting={deletingImageId === image.id}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false)
+          setPendingDeleteId(null)
+        }}
+        onConfirm={confirmDelete}
+        title="이미지 삭제"
+        message="이 이미지를 삭제하시겠습니까?"
+        confirmText="삭제"
+        variant="danger"
+      />
+    </>
   )
 }
