@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import {
   Search,
   RefreshCw,
@@ -12,6 +13,8 @@ import {
   Phone,
   MapPin,
   Package,
+  Plus,
+  Store,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -150,11 +153,19 @@ export default function UnifiedOrderListPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">주문 목록</h1>
-          <p className="text-gray-600">
-            쇼핑몰 주문과 밴드(구글폼) 주문을 통합하여 관리합니다.
-          </p>
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">주문 목록</h1>
+            <p className="text-gray-600">
+              쇼핑몰 주문과 밴드(구글폼) 주문을 통합하여 관리합니다.
+            </p>
+          </div>
+          <Link href="/order/retail-band/new">
+            <Button variant="primary" className="flex items-center gap-2">
+              <Store size={18} />
+              소매밴드 주문 등록
+            </Button>
+          </Link>
         </div>
 
         {/* 통계 카드 */}

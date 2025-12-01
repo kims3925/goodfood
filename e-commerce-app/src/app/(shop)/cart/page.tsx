@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { Minus, Plus, X, ShoppingBag, Check, Truck } from 'lucide-react'
+import { ConfirmModal } from '@/modules/common/ui-kit/src/ui'
 
 interface CartItem {
   id: number
@@ -33,6 +34,12 @@ export default function CartPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedItems, setSelectedItems] = useState<number[]>([])
   const [isMounted, setIsMounted] = useState(false)
+
+  // ConfirmModal 상태
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [showRemoveSelectedConfirm, setShowRemoveSelectedConfirm] = useState(false)
+  const [pendingRemoveItemId, setPendingRemoveItemId] = useState<number | null>(null)
 
   const loadCart = useCallback(async () => {
     try {
@@ -136,11 +143,18 @@ export default function CartPage() {
     }
   }
 
-  // Optimistic Update: 삭제도 UI 즉시 반영
-  const handleRemoveItem = async (itemId: number) => {
-    if (!confirm('이 상품을 장바구니에서 삭제하시겠습니까?') || !cart) return
+  // 삭제 모달 열기
+  const handleRemoveItem = (itemId: number) => {
+    if (!cart) return
+    setPendingRemoveItemId(itemId)
+    setShowRemoveConfirm(true)
+  }
 
-    // 이전 상태 저장 (롤백용)
+  // 실제 삭제 처리
+  const confirmRemoveItem = async () => {
+    if (!pendingRemoveItemId || !cart) return
+
+    const itemId = pendingRemoveItemId
     const prevCart = cart
     const prevSelectedItems = selectedItems
 
@@ -167,21 +181,25 @@ export default function CartPage() {
       })
 
       if (!response.ok) {
-        // 실패 시 롤백
         setCart(prevCart)
         setSelectedItems(prevSelectedItems)
       }
     } catch (error) {
-      // 에러 시 롤백
       setCart(prevCart)
       setSelectedItems(prevSelectedItems)
       console.error('상품 삭제 실패:', error)
     }
+
+    setPendingRemoveItemId(null)
   }
 
-  const handleClearCart = async () => {
-    if (!confirm('장바구니를 비우시겠습니까?')) return
+  // 장바구니 비우기 모달 열기
+  const handleClearCart = () => {
+    setShowClearConfirm(true)
+  }
 
+  // 실제 장바구니 비우기 처리
+  const confirmClearCart = async () => {
     try {
       await fetch('/api/cart', { method: 'DELETE', credentials: 'include' })
       setCart(null)
@@ -210,13 +228,14 @@ export default function CartPage() {
     }
   }
 
-  const handleRemoveSelected = async () => {
-    if (selectedItems.length === 0) {
-      return
-    }
+  // 선택 삭제 모달 열기
+  const handleRemoveSelected = () => {
+    if (selectedItems.length === 0) return
+    setShowRemoveSelectedConfirm(true)
+  }
 
-    if (!confirm(`선택한 ${selectedItems.length}개 상품을 삭제하시겠습니까?`)) return
-
+  // 실제 선택 삭제 처리
+  const confirmRemoveSelected = async () => {
     try {
       for (const itemId of selectedItems) {
         await fetch(`/api/cart/items/${itemId}`, { method: 'DELETE', credentials: 'include' })
@@ -492,6 +511,42 @@ export default function CartPage() {
           </div>
         </div>
       </div>
+
+      {/* 단일 상품 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showRemoveConfirm}
+        onClose={() => {
+          setShowRemoveConfirm(false)
+          setPendingRemoveItemId(null)
+        }}
+        onConfirm={confirmRemoveItem}
+        title="상품 삭제"
+        message="이 상품을 장바구니에서 삭제하시겠습니까?"
+        confirmText="삭제"
+        variant="danger"
+      />
+
+      {/* 장바구니 비우기 확인 모달 */}
+      <ConfirmModal
+        isOpen={showClearConfirm}
+        onClose={() => setShowClearConfirm(false)}
+        onConfirm={confirmClearCart}
+        title="장바구니 비우기"
+        message="장바구니의 모든 상품을 삭제하시겠습니까?"
+        confirmText="비우기"
+        variant="danger"
+      />
+
+      {/* 선택 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showRemoveSelectedConfirm}
+        onClose={() => setShowRemoveSelectedConfirm(false)}
+        onConfirm={confirmRemoveSelected}
+        title="선택 상품 삭제"
+        message={`선택한 ${selectedItems.length}개 상품을 삭제하시겠습니까?`}
+        confirmText="삭제"
+        variant="danger"
+      />
     </div>
   )
 }

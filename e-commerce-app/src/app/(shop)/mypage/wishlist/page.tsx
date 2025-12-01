@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Heart, ShoppingCart, Trash2 } from 'lucide-react'
+import { ConfirmModal } from '@/modules/common/ui-kit/src/ui'
 
 interface Wishlist {
   id: number
@@ -22,6 +23,8 @@ export default function WishlistPage() {
   const { data: session } = useSession()
   const [wishlists, setWishlists] = useState<Wishlist[]>([])
   const [loading, setLoading] = useState(true)
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
+  const [pendingRemoveId, setPendingRemoveId] = useState<number | null>(null)
 
   useEffect(() => {
     if (session) {
@@ -45,13 +48,16 @@ export default function WishlistPage() {
     }
   }
 
-  const handleRemove = async (wishlistId: number) => {
-    if (!confirm('찜한 상품에서 삭제하시겠습니까?')) {
-      return
-    }
+  const handleRemove = (wishlistId: number) => {
+    setPendingRemoveId(wishlistId)
+    setShowRemoveConfirm(true)
+  }
+
+  const confirmRemove = async () => {
+    if (!pendingRemoveId) return
 
     try {
-      const response = await fetch(`/api/mypage/wishlist/${wishlistId}`, {
+      const response = await fetch(`/api/mypage/wishlist/${pendingRemoveId}`, {
         method: 'DELETE',
       })
 
@@ -63,6 +69,8 @@ export default function WishlistPage() {
     } catch (error) {
       console.error('Failed to remove wishlist:', error)
     }
+
+    setPendingRemoveId(null)
   }
 
   const formatPrice = (price: number | null) => {
@@ -161,6 +169,20 @@ export default function WishlistPage() {
           ))}
         </div>
       )}
+
+      {/* 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showRemoveConfirm}
+        onClose={() => {
+          setShowRemoveConfirm(false)
+          setPendingRemoveId(null)
+        }}
+        onConfirm={confirmRemove}
+        title="찜 목록 삭제"
+        message="찜한 상품에서 삭제하시겠습니까?"
+        confirmText="삭제"
+        variant="danger"
+      />
     </div>
   )
 }

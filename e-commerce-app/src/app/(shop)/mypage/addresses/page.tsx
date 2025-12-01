@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { MapPin, Plus, Edit2, Trash2, Check } from 'lucide-react'
+import { ConfirmModal } from '@/modules/common/ui-kit/src/ui'
 
 declare global {
   interface Window {
@@ -29,6 +30,8 @@ export default function AddressesPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
   const [formData, setFormData] = useState({
     label: '',
     recipientName: '',
@@ -135,13 +138,16 @@ export default function AddressesPage() {
     setShowForm(true)
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('배송지를 삭제하시겠습니까?')) {
-      return
-    }
+  const handleDelete = (id: number) => {
+    setPendingDeleteId(id)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return
 
     try {
-      const response = await fetch(`/api/mypage/addresses/${id}`, {
+      const response = await fetch(`/api/mypage/addresses/${pendingDeleteId}`, {
         method: 'DELETE',
       })
 
@@ -153,6 +159,8 @@ export default function AddressesPage() {
     } catch (error) {
       console.error('Failed to delete address:', error)
     }
+
+    setPendingDeleteId(null)
   }
 
   const resetForm = () => {
@@ -465,6 +473,20 @@ export default function AddressesPage() {
         </div>
       )}
       </div>
+
+      {/* 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false)
+          setPendingDeleteId(null)
+        }}
+        onConfirm={confirmDelete}
+        title="배송지 삭제"
+        message="배송지를 삭제하시겠습니까?"
+        confirmText="삭제"
+        variant="danger"
+      />
     </>
   )
 }

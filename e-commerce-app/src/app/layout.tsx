@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import SessionProvider from '@/modules/common/providers/SessionProvider'
+import { ToastProvider } from '@/modules/common/ui-kit/src/ui'
 
 export const metadata: Metadata = {
   title: '쇼핑몰 | 최고의 상품을 최저가로',
@@ -17,7 +18,9 @@ export default function RootLayout({
     <html lang="ko">
       <body className="min-h-screen bg-gray-50">
         <SessionProvider>
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </SessionProvider>
       </body>
     </html>
