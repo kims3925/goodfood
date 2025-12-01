@@ -3,24 +3,21 @@
 // =============================================
 
 model Review {
-  id         Int      @id @default(autoincrement())
-  userId     Int      @map("user_id")
-  productId  Int      @map("product_id")
-  orderId    Int      @unique @map("order_id") // 한 주문당 하나의 리뷰만
-  rating     Int      // 1-5
-  title      String?  @db.VarChar(200)
-  content    String   @db.Text
-  images     String?  @db.LongText // JSON array of image URLs
-  isVisible  Boolean  @default(true) @map("is_visible")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  orderItemId Int      @unique @map("order_item_id") // 주문 상품당 하나의 리뷰만, OrderItem.productPublishId로 상품 조회
+  rating      Int      // 1-5
+  title       String?  @db.VarChar(200)
+  content     String   @db.Text
+  images      String?  @db.LongText // JSON array of image URLs
+  isVisible   Boolean  @default(true) @map("is_visible")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([productId])
   @@index([rating])
-  @@index([productId, isVisible])
   @@map("review")
 }

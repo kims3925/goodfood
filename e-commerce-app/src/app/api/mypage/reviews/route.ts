@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
-import prisma from '@modules/common/utils/src/database/client'
+import prisma from '@bandauto/db'
 
-// 내 리뷰 목록 조회
+// 내 리뷰 목록 조회 (탭별: writable - 작성 가능, written - 작성 완료)
+// order_item 기준으로 조회 (상품별 개별 후기)
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -17,28 +18,219 @@ export async function GET(request: NextRequest) {
 
     const userId = typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
 
-    const reviews = await prisma.review.findMany({
-      where: {
-        userId,
-      },
-      include: {
-        product: {
-          select: {
-            id: true,
-            name: true,
-            thumbnailUrl: true,
+    const { searchParams } = new URL(request.url)
+    const tab = searchParams.get('tab') || 'writable' // writable, written
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const offset = (page - 1) * limit
+
+    if (tab === 'writable') {
+      // 작성 가능한 후기: 배송 완료된 주문의 상품 중 리뷰를 작성하지 않은 상품
+      // order_item → order.user_id로 사용자 확인
+
+      // 디버그: 배송 완료된 주문 확인
+      const deliveredOrders = await prisma.order.findMany({
+        where: { userId, status: 'DELIVERED' },
+        select: { id: true, orderNumber: true, status: true }
+      })
+      console.log('DEBUG - userId:', userId)
+      console.log('DEBUG - Delivered orders:', deliveredOrders)
+
+      // 디버그: 해당 주문의 모든 order_item 확인
+      const allOrderItems = await prisma.orderItem.findMany({
+        where: {
+          order: {
+            userId,
+            status: 'DELIVERED',
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+        include: {
+          review: true,
+        },
+      })
+      console.log('DEBUG - All order items for delivered orders:', allOrderItems.map(i => ({
+        id: i.id,
+        orderId: i.orderId,
+        productName: i.productName,
+        hasReview: !!i.review,
+        reviewId: i.review?.id
+      })))
 
-    return NextResponse.json({
-      success: true,
-      reviews,
-    })
+      const [orderItems, total] = await Promise.all([
+        prisma.orderItem.findMany({
+          where: {
+            order: {
+              userId,
+              status: 'DELIVERED',
+            },
+            review: { is: null }, // 리뷰가 없는 상품만
+          },
+          include: {
+            order: {
+              select: {
+                id: true,
+                orderNumber: true,
+                deliveredAt: true,
+              },
+            },
+            productPublish: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    thumbnailUrl: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            order: {
+              deliveredAt: 'desc',
+            },
+          },
+          skip: offset,
+          take: limit,
+        }),
+        prisma.orderItem.count({
+          where: {
+            order: {
+              userId,
+              status: 'DELIVERED',
+            },
+            review: { is: null },
+          },
+        }),
+      ])
+
+      // 응답 형식 변환
+      const writableItems = orderItems.map(item => ({
+        orderItemId: item.id,
+        orderId: item.orderId,
+        orderNumber: item.order.orderNumber,
+        deliveredAt: item.order.deliveredAt?.toISOString() || null,
+        productPublishId: item.productPublishId,
+        productName: item.productName,
+        optionSummary: item.optionSummary,
+        thumbnailUrl: item.thumbnailUrl || item.productPublish?.product?.thumbnailUrl,
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+        totalPrice: Number(item.totalPrice),
+        product: item.productPublish?.product ? {
+          id: item.productPublish.product.id,
+          name: item.productPublish.product.name,
+          thumbnailUrl: item.productPublish.product.thumbnailUrl,
+        } : null,
+      }))
+
+      return NextResponse.json({
+        success: true,
+        tab: 'writable',
+        items: writableItems,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+        // 디버그 정보 (개발용)
+        debug: {
+          userId,
+          deliveredOrdersCount: deliveredOrders.length,
+          deliveredOrders: deliveredOrders,
+          allOrderItemsCount: allOrderItems.length,
+          allOrderItems: allOrderItems.map(i => ({
+            id: i.id,
+            orderId: i.orderId,
+            productName: i.productName,
+            hasReview: !!i.review,
+            reviewId: i.review?.id
+          }))
+        }
+      })
+    } else {
+      // 작성한 후기: order_item → order.user_id로 사용자의 리뷰 조회
+      const [reviews, total] = await Promise.all([
+        prisma.review.findMany({
+          where: {
+            orderItem: {
+              order: {
+                userId,
+              },
+            },
+          },
+          include: {
+            orderItem: {
+              include: {
+                order: {
+                  select: {
+                    id: true,
+                    orderNumber: true,
+                  },
+                },
+                productPublish: {
+                  include: {
+                    product: {
+                      select: {
+                        id: true,
+                        name: true,
+                        thumbnailUrl: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          skip: offset,
+          take: limit,
+        }),
+        prisma.review.count({
+          where: {
+            orderItem: {
+              order: {
+                userId,
+              },
+            },
+          },
+        }),
+      ])
+
+      // 응답 형식 변환
+      const formattedReviews = reviews.map(review => ({
+        id: review.id,
+        orderItemId: review.orderItemId,
+        orderId: review.orderItem?.orderId,
+        orderNumber: review.orderItem?.order?.orderNumber || null,
+        rating: review.rating,
+        title: review.title,
+        content: review.content,
+        images: review.images ? JSON.parse(review.images) : null,
+        createdAt: review.createdAt.toISOString(),
+        product: review.orderItem?.productPublish?.product || null,
+        orderItem: review.orderItem ? {
+          productName: review.orderItem.productName,
+          optionSummary: review.orderItem.optionSummary,
+          thumbnailUrl: review.orderItem.thumbnailUrl,
+        } : null,
+      }))
+
+      return NextResponse.json({
+        success: true,
+        tab: 'written',
+        reviews: formattedReviews,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      })
+    }
   } catch (error) {
     console.error('Failed to fetch reviews:', error)
     return NextResponse.json(
@@ -48,7 +240,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// 리뷰 작성
+// 리뷰 작성 (상품별 개별 후기)
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -62,9 +254,9 @@ export async function POST(request: NextRequest) {
 
     const userId = typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
 
-    const { orderId, productId, rating, title, content, images } = await request.json()
+    const { orderItemId, rating, title, content, images } = await request.json()
 
-    if (!orderId || !productId || !rating || !content) {
+    if (!orderItemId || !rating || !content) {
       return NextResponse.json(
         { success: false, error: '필수 정보를 입력해주세요' },
         { status: 400 }
@@ -78,50 +270,44 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 주문 확인 (본인의 주문인지, 완료된 주문인지)
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
+    // 주문 상품 확인 (order_item → order.user_id로 본인 확인)
+    const orderItem = await prisma.orderItem.findUnique({
+      where: { id: orderItemId },
       include: {
-        items: true,
+        order: true,
+        productPublish: {
+          include: {
+            product: true,
+          },
+        },
+        review: true,
       },
     })
 
-    if (!order) {
+    if (!orderItem) {
       return NextResponse.json(
-        { success: false, error: '주문을 찾을 수 없습니다' },
+        { success: false, error: '주문 상품을 찾을 수 없습니다' },
         { status: 404 }
       )
     }
 
-    if (order.userId !== userId) {
+    // 본인의 주문인지 확인 (order.user_id로 확인)
+    if (orderItem.order.userId !== userId) {
       return NextResponse.json(
         { success: false, error: '권한이 없습니다' },
         { status: 403 }
       )
     }
 
-    if (order.status !== 'DELIVERED') {
+    if (orderItem.order.status !== 'DELIVERED') {
       return NextResponse.json(
         { success: false, error: '배송 완료된 주문만 리뷰를 작성할 수 있습니다' },
         { status: 400 }
       )
     }
 
-    // 해당 상품이 주문에 포함되어 있는지 확인
-    const orderItem = order.items.find((item) => item.productPublishId === productId)
-    if (!orderItem) {
-      return NextResponse.json(
-        { success: false, error: '해당 주문에 포함되지 않은 상품입니다' },
-        { status: 400 }
-      )
-    }
-
     // 이미 리뷰를 작성했는지 확인
-    const existingReview = await prisma.review.findUnique({
-      where: { orderId },
-    })
-
-    if (existingReview) {
+    if (orderItem.review) {
       return NextResponse.json(
         { success: false, error: '이미 리뷰를 작성하셨습니다' },
         { status: 400 }
@@ -131,22 +317,50 @@ export async function POST(request: NextRequest) {
     const review = await prisma.review.create({
       data: {
         userId,
-        productId,
-        orderId,
+        orderItemId,
         rating,
-        title,
+        title: title || null,
         content,
-        images: images ? JSON.stringify(images) : null,
+        images: images && images.length > 0 ? JSON.stringify(images) : null,
       },
       include: {
-        product: true,
+        orderItem: {
+          include: {
+            productPublish: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    thumbnailUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     })
 
     return NextResponse.json({
       success: true,
       message: '리뷰가 작성되었습니다',
-      review,
+      review: {
+        id: review.id,
+        orderItemId: review.orderItemId,
+        rating: review.rating,
+        title: review.title,
+        content: review.content,
+        images: review.images ? JSON.parse(review.images) : null,
+        createdAt: review.createdAt.toISOString(),
+        product: review.orderItem?.productPublish?.product || null,
+        orderItem: review.orderItem ? {
+          productName: review.orderItem.productName,
+          optionSummary: review.orderItem.optionSummary,
+          thumbnailUrl: review.orderItem.thumbnailUrl,
+          orderId: review.orderItem.orderId,
+        } : null,
+      },
     })
   } catch (error) {
     console.error('Failed to create review:', error)

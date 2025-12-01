@@ -38,8 +38,8 @@ model Product {
   // E-Commerce Relations
   // cartItems는 productPublish를 통해 관계
   // orderItems는 productPublish를 통해 관계
+  // reviews는 productPublish를 통해 관계
   wishlists              Wishlist[]
-  reviews                Review[]
   inquiries              Inquiry[]
 
   @@index([userId])

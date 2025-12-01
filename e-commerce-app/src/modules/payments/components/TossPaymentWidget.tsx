@@ -133,8 +133,8 @@ export default function TossPaymentWidget({
       await widgets.requestPayment({
         orderId,
         orderName,
-        successUrl: `${window.location.origin}/store/payment/success`,
-        failUrl: `${window.location.origin}/store/payment/fail`,
+        successUrl: `${window.location.origin}/payment/success`,
+        failUrl: `${window.location.origin}/payment/fail`,
         customerEmail,
         customerName,
         customerMobilePhone: customerPhone

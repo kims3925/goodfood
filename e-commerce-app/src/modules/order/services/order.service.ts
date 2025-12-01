@@ -210,8 +210,8 @@ export class OrderService {
       amount: totalAmount,
       customerName: user.name || '고객',
       customerEmail: user.email || '',
-      successUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/store/payment/success`,
-      failUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/store/payment/fail`,
+      successUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/success`,
+      failUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/fail`,
     }
 
     return {
@@ -328,8 +328,8 @@ export class OrderService {
       amount: totalAmount,
       customerName: user.name || '고객',
       customerEmail: user.email || '',
-      successUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/store/payment/success`,
-      failUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/store/payment/fail`,
+      successUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/success`,
+      failUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/fail`,
     }
 
     return {

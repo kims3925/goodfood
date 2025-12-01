@@ -58,6 +58,11 @@ export async function GET(request: NextRequest) {
                   optionSummary: true,
                 },
               },
+              review: {
+                select: {
+                  id: true,
+                },
+              },
             },
           },
           payment: {
@@ -99,12 +104,15 @@ export async function GET(request: NextRequest) {
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         totalPrice: Number(item.totalPrice),
+        hasReview: !!item.review,
         product: item.productPublish?.product ? {
           id: item.productPublish.product.id,
           name: item.productPublish.product.name,
           thumbnailUrl: item.productPublish.product.thumbnailUrl,
         } : null,
       })),
+      // 후기 작성 가능 여부 (배송완료 + 미작성 리뷰가 있는 경우)
+      hasWritableReview: order.status === 'DELIVERED' && order.items.some(item => !item.review),
       payment: order.payment ? {
         status: order.payment.status,
         method: order.payment.method,

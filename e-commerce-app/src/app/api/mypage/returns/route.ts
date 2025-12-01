@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
-import prisma from '@modules/common/utils/src/database/client'
+import prisma from '@bandauto/db'
 
-// 취소/반품 내역 조회
+// 취소/반품 내역 조회 - Order 테이블에서 CANCELLED, REFUNDED 상태 주문 조회
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -17,18 +17,97 @@ export async function GET(request: NextRequest) {
 
     const userId = typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
 
-    const returnRequests = await prisma.returnRequest.findMany({
-      where: {
-        userId,
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const type = searchParams.get('type') // CANCELLED, REFUNDED
+    const offset = (page - 1) * limit
+
+    const where: any = {
+      userId,
+      status: {
+        in: ['CANCELLED', 'REFUNDED'],
       },
-      orderBy: {
-        requestedAt: 'desc',
-      },
-    })
+    }
+
+    // 특정 유형만 필터링
+    if (type === 'CANCELLED' || type === 'REFUNDED') {
+      where.status = type
+    }
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: {
+          items: {
+            include: {
+              productPublish: {
+                include: {
+                  product: {
+                    select: {
+                      id: true,
+                      name: true,
+                      thumbnailUrl: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          payment: {
+            select: {
+              id: true,
+              status: true,
+              method: true,
+            },
+          },
+        },
+        orderBy: {
+          cancelledAt: 'desc',
+        },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.order.count({ where }),
+    ])
+
+    // 응답 형식 변환
+    const formattedOrders = orders.map(order => ({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      totalAmount: Number(order.totalAmount),
+      subtotalAmount: Number(order.subtotalAmount),
+      shippingFee: Number(order.shippingFee),
+      discountAmount: Number(order.discountAmount),
+      cancelReason: order.cancelReason,
+      cancelledBy: order.cancelledBy,
+      orderedAt: order.orderedAt.toISOString(),
+      cancelledAt: order.cancelledAt?.toISOString() || null,
+      items: order.items.map(item => ({
+        id: item.id,
+        productName: item.productName,
+        optionSummary: item.optionSummary,
+        thumbnailUrl: item.thumbnailUrl || item.productPublish?.product?.thumbnailUrl,
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+        totalPrice: Number(item.totalPrice),
+      })),
+      payment: order.payment ? {
+        status: order.payment.status,
+        method: order.payment.method,
+      } : null,
+    }))
 
     return NextResponse.json({
       success: true,
-      returnRequests,
+      orders: formattedOrders,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     })
   } catch (error) {
     console.error('Failed to fetch return requests:', error)

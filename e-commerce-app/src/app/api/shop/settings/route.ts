@@ -17,19 +17,19 @@ export async function GET(req: NextRequest) {
         {
           id: 1,
           url: 'https://via.placeholder.com/800x400/FF6B6B/FFFFFF?text=오늘의+특가',
-          link: '/store?filter=sale',
+          link: '/main?filter=sale',
           title: '오늘의 특가',
         },
         {
           id: 2,
           url: 'https://via.placeholder.com/800x400/4ECDC4/FFFFFF?text=신상품+입고',
-          link: '/store?filter=new',
+          link: '/main?filter=new',
           title: '신상품 입고',
         },
         {
           id: 3,
           url: 'https://via.placeholder.com/800x400/F7B731/FFFFFF?text=베스트+상품',
-          link: '/store?filter=best',
+          link: '/main?filter=best',
           title: '베스트 상품',
         },
       ],
