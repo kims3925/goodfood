@@ -36,11 +36,16 @@ export async function GET(
             phone: true,
           },
         },
-        product: {
+        publishedProduct: {
           select: {
             id: true,
-            name: true,
-            thumbnailUrl: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+                thumbnailUrl: true,
+              },
+            },
           },
         },
         replies: {

@@ -1,0 +1,2 @@
+# This file is automatically created by Prisma Migrate.
+provider = "mysql"

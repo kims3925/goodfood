@@ -14,7 +14,7 @@ import ProductFormModal from '@/components/product/ProductFormModal'
 import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
 
-interface WholesaleBand {
+interface Channel {
   id: number
   name: string
   coverUrl: string | null
@@ -22,7 +22,7 @@ interface WholesaleBand {
 
 interface Product {
   id: number
-  postId: number
+  collectedProductId: number | null
   name: string
   description: string | null
   status: 'COLLECTED' | 'ARCHIVED'
@@ -31,25 +31,37 @@ interface Product {
   wholesalePrice: number | null
   currency: string
   createdAt: string
-  post: {
-    title: string
-    wholesaleBand: {
+  collectedProduct?: {
+    post?: {
+      title: string
+      channel: {
+        id: number
+        name: string
+        coverUrl: string | null
+      }
+      images: Array<{
+        imageUrl: string
+      }>
+    }
+  } | null
+  publishedChannelIds?: number[]
+  publishedProducts?: Array<{
+    id: number
+    channelId: number | null
+    channel?: {
       id: number
       name: string
-      coverUrl: string | null
-    }
-    images: Array<{
-      imageUrl: string
-    }>
-  }
+    } | null
+    status: 'PENDING' | 'SUCCESS' | 'FAILED'
+  }>
   variants: Array<{
     id: number
     price: number
     stock: number
   }>
-  // 발행 상태 (새로 추가)
+  // 발행 상태
   publishStatus?: {
-    retailBand: boolean
+    channel: boolean
     shoppingMall: boolean
   }
   publishSummary?: string
@@ -70,8 +82,8 @@ export default function ProductListPage() {
 
   // Filter states
   const [showFilters, setShowFilters] = useState(false)
-  const [wholesaleBands, setWholesaleBands] = useState<WholesaleBand[]>([])
-  const [selectedBandId, setSelectedBandId] = useState<string>('')
+  const [channels, setChannels] = useState<Channel[]>([])
+  const [selectedChannelId, setSelectedChannelId] = useState<string>('')
   const [selectedStatus, setSelectedStatus] = useState<string>('')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
@@ -106,23 +118,23 @@ export default function ProductListPage() {
   const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
-    loadWholesaleBands()
+    loadChannels()
   }, [])
 
   useEffect(() => {
     loadProducts()
-  }, [currentPage, selectedBandId, selectedStatus, startDate, endDate])
+  }, [currentPage, selectedChannelId, selectedStatus, startDate, endDate])
 
-  const loadWholesaleBands = async () => {
+  const loadChannels = async () => {
     try {
-      const response = await fetch('/api/band/wholesale?limit=100')
+      const response = await fetch('/api/channel?kind=WHOLESALE&limit=100')
       const data = await response.json()
       if (data.success) {
-        setWholesaleBands(data.data)
+        setChannels(data.data)
       }
     } catch (error) {
-      console.error('도매밴드 목록 조회 실패:', error)
-      toast.error('도매밴드 목록을 불러오는데 실패했습니다.')
+      console.error('채널 목록 조회 실패:', error)
+      toast.error('채널 목록을 불러오는데 실패했습니다.')
     }
   }
 
@@ -135,7 +147,7 @@ export default function ProductListPage() {
       })
 
       if (searchTerm) params.append('search', searchTerm)
-      if (selectedBandId) params.append('wholesaleBandId', selectedBandId)
+      if (selectedChannelId) params.append('channelId', selectedChannelId)
       if (selectedStatus) params.append('status', selectedStatus)
       if (startDate) params.append('startDate', startDate)
       if (endDate) params.append('endDate', endDate)
@@ -159,7 +171,7 @@ export default function ProductListPage() {
   }
 
   const handleClearFilters = () => {
-    setSelectedBandId('')
+    setSelectedChannelId('')
     setSelectedStatus('')
     setStartDate('')
     setEndDate('')
@@ -167,7 +179,7 @@ export default function ProductListPage() {
     setCurrentPage(1)
   }
 
-  const hasActiveFilters = selectedBandId || selectedStatus || startDate || endDate
+  const hasActiveFilters = selectedChannelId || selectedStatus || startDate || endDate
 
   const handleSearch = () => {
     setCurrentPage(1)
@@ -525,9 +537,9 @@ export default function ProductListPage() {
       )
     }
 
-    const { retailBand, shoppingMall } = product.publishStatus
+    const { channel, shoppingMall } = product.publishStatus
 
-    if (retailBand && shoppingMall) {
+    if (channel && shoppingMall) {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
           발행완료
@@ -535,14 +547,14 @@ export default function ProductListPage() {
       )
     }
 
-    if (retailBand || shoppingMall) {
+    if (channel || shoppingMall) {
       return (
         <div className="flex flex-col gap-1">
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
             부분발행
           </span>
           <div className="flex gap-1">
-            <span className={`inline-block w-2 h-2 rounded-full ${retailBand ? 'bg-green-500' : 'bg-gray-300'}`} title="소매밴드" />
+            <span className={`inline-block w-2 h-2 rounded-full ${channel ? 'bg-green-500' : 'bg-gray-300'}`} title="채널" />
             <span className={`inline-block w-2 h-2 rounded-full ${shoppingMall ? 'bg-green-500' : 'bg-gray-300'}`} title="쇼핑몰" />
           </div>
         </div>
@@ -566,9 +578,9 @@ export default function ProductListPage() {
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">수집 상품 관리</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">상품 관리</h1>
           <p className="text-gray-600">
-            도매밴드에서 수집한 게시물을 AI로 변환한 상품을 관리합니다. 상품 정보를 수정하고 판매 상태를 관리할 수 있습니다.
+            도매채널에서 수집한 게시물을 AI로 변환한 상품을 관리합니다. 상품 정보를 수정하고 판매 상태를 관리할 수 있습니다.
           </p>
         </div>
 
@@ -635,21 +647,21 @@ export default function ProductListPage() {
           {showFilters && (
             <div className="p-4 bg-gray-50 border-b border-gray-200">
               <div className="flex flex-wrap gap-4 items-end">
-                {/* 출처 밴드 필터 */}
+                {/* 출처 채널 필터 */}
                 <div className="w-48">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">출처 밴드</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">출처 채널</label>
                   <select
-                    value={selectedBandId}
+                    value={selectedChannelId}
                     onChange={(e) => {
-                      setSelectedBandId(e.target.value)
+                      setSelectedChannelId(e.target.value)
                       setCurrentPage(1)
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
                   >
-                    <option value="">전체 밴드</option>
-                    {wholesaleBands.map((band) => (
-                      <option key={band.id} value={band.id.toString()}>
-                        {band.name}
+                    <option value="">전체 채널</option>
+                    {channels.map((channel) => (
+                      <option key={channel.id} value={channel.id.toString()}>
+                        {channel.name}
                       </option>
                     ))}
                   </select>
@@ -713,12 +725,12 @@ export default function ProductListPage() {
               {/* 활성 필터 태그 */}
               {hasActiveFilters && (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {selectedBandId && (
+                  {selectedChannelId && (
                     <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                      밴드: {wholesaleBands.find(b => b.id.toString() === selectedBandId)?.name}
+                      채널: {channels.find(c => c.id.toString() === selectedChannelId)?.name}
                       <button
                         onClick={() => {
-                          setSelectedBandId('')
+                          setSelectedChannelId('')
                           setCurrentPage(1)
                         }}
                         className="hover:text-purple-600"
@@ -792,7 +804,7 @@ export default function ProductListPage() {
                     />
                   </TableHead>
                   <TableHead className="w-[30%]">상품명</TableHead>
-                  <TableHead className="w-[12%]">출처 밴드</TableHead>
+                  <TableHead className="w-[12%]">출처 채널</TableHead>
                   <TableHead className="w-[9%]">도매가</TableHead>
                   <TableHead className="w-[9%]">판매가</TableHead>
                   <TableHead className="w-[12%]">발행현황</TableHead>
@@ -862,7 +874,7 @@ export default function ProductListPage() {
                       </TableCell>
                       <TableCell>
                         <div className="text-gray-600 truncate">
-                          {product.post?.wholesaleBand?.name || '-'}
+                          {product.collectedProduct?.post?.channel?.name || '-'}
                         </div>
                       </TableCell>
                       <TableCell>

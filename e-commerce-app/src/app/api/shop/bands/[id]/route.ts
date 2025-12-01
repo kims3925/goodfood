@@ -1,17 +1,17 @@
 /**
- * Retail Band Products API
- * 소매밴드별 상품 목록 조회
+ * Retail Channel Products API
+ * 소매채널별 상품 목록 조회
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { PublishStatus } from '@bandauto/db'
+import prisma, { PublishStatus, ChannelKind } from '@bandauto/db'
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const bandId = parseInt(params.id)
+    const channelId = parseInt(params.id)
     const { searchParams } = new URL(req.url)
 
     // 필터 파라미터
@@ -21,22 +21,25 @@ export async function GET(
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
 
-    // 1. 소매밴드 정보 조회
-    const retailBand = await prisma.retailBand.findUnique({
-      where: { id: bandId },
+    // 1. 채널 정보 조회
+    const channel = await prisma.channel.findFirst({
+      where: {
+        id: channelId,
+        kind: ChannelKind.RETAIL,
+      },
     })
 
-    if (!retailBand) {
+    if (!channel) {
       return NextResponse.json(
-        { success: false, error: '소매밴드를 찾을 수 없습니다.' },
+        { success: false, error: '채널을 찾을 수 없습니다.' },
         { status: 404 }
       )
     }
 
-    // 2. 해당 소매밴드에 발행된 상품 조회 (product_publish 테이블 사용)
-    const productPublishes = await prisma.productPublish.findMany({
+    // 2. 해당 채널에 발행된 상품 조회 (published_product 테이블 사용)
+    const publishedProducts = await prisma.publishedProduct.findMany({
       where: {
-        retailBandId: bandId,
+        channelId: channelId,
         status: PublishStatus.SUCCESS,
       },
       include: {
@@ -46,10 +49,14 @@ export async function GET(
               orderBy: { id: 'asc' },
               take: 1,
             },
-            post: {
+            collectedProduct: {
               include: {
-                images: {
-                  orderBy: { sortOrder: 'asc' },
+                post: {
+                  include: {
+                    images: {
+                      orderBy: { sortOrder: 'asc' },
+                    },
+                  },
                 },
               },
             },
@@ -59,12 +66,12 @@ export async function GET(
     })
 
     // 3. 상품 포맷팅
-    const allProducts = productPublishes
+    const allProducts = publishedProducts
       .filter((pp) => pp.product)
       .map((pp) => {
         const product = pp.product
         const mainVariant = product.variants[0]
-        const images = product.post?.images?.map((img) => img.imageUrl) || []
+        const images = product.collectedProduct?.post?.images?.map((img) => img.imageUrl) || []
 
         const salePrice = mainVariant?.price || product.price || 0
         const originalPrice = mainVariant?.wholesalePrice || product.wholesalePrice || salePrice
@@ -74,7 +81,7 @@ export async function GET(
 
         return {
           id: product.id.toString(),
-          productPublishId: pp.id.toString(), // 추가: 장바구니/주문에 필요
+          publishedProductId: pp.id.toString(), // 추가: 장바구니/주문에 필요
           title: product.name,
           description: product.description,
           originalPrice,
@@ -131,10 +138,17 @@ export async function GET(
     return NextResponse.json({
       success: true,
       band: {
-        id: retailBand.id,
-        name: retailBand.name,
-        coverUrl: retailBand.coverUrl,
-        formUrl: retailBand.formUrl,
+        id: channel.id,
+        name: channel.name,
+        coverUrl: channel.coverUrl,
+        formUrl: channel.formUrl,
+      },
+      // 하위 호환성
+      channel: {
+        id: channel.id,
+        name: channel.name,
+        coverUrl: channel.coverUrl,
+        formUrl: channel.formUrl,
       },
       products: paginatedProducts,
       pagination: {
@@ -146,7 +160,7 @@ export async function GET(
       priceRange,
     })
   } catch (error: any) {
-    console.error('Retail band products GET error:', error)
+    console.error('Retail channel products GET error:', error)
     return NextResponse.json(
       { success: false, error: error.message || '상품 조회 실패' },
       { status: 500 }

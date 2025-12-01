@@ -10,10 +10,10 @@ interface Post {
   id: number
   title: string
   content: string
-  wholesaleBand: {
+  channel: {
     id: number
     name: string
-    bandKey: string
+    channelKey: string
   }
   images: Array<{
     imageUrl: string
@@ -41,7 +41,7 @@ export default function PostSelectionModal({
   const [error, setError] = useState<string | null>(null)
   const [selectedPostIds, setSelectedPostIds] = useState<number[]>([]) // 다중 선택으로 변경
   const [expandedPostIds, setExpandedPostIds] = useState<number[]>([])
-  const [expandedBandKeys, setExpandedBandKeys] = useState<string[]>([])
+  const [expandedChannelKeys, setExpandedChannelKeys] = useState<string[]>([])
 
   useEffect(() => {
     if (isOpen) {
@@ -114,11 +114,11 @@ export default function PostSelectionModal({
     )
   }
 
-  const handleToggleBandExpand = (bandKey: string) => {
-    setExpandedBandKeys((prev) =>
-      prev.includes(bandKey)
-        ? prev.filter((key) => key !== bandKey)
-        : [...prev, bandKey]
+  const handleToggleChannelExpand = (channelKey: string) => {
+    setExpandedChannelKeys((prev) =>
+      prev.includes(channelKey)
+        ? prev.filter((key) => key !== channelKey)
+        : [...prev, channelKey]
     )
   }
 
@@ -147,18 +147,18 @@ export default function PostSelectionModal({
     }
   }
 
-  // 밴드별로 게시물 그룹화
+  // 채널별로 게시물 그룹화
   const groupedPosts = posts.reduce((acc, post) => {
-    const bandKey = post.wholesaleBand.bandKey
-    if (!acc[bandKey]) {
-      acc[bandKey] = {
-        band: post.wholesaleBand,
+    const channelKey = post.channel.channelKey
+    if (!acc[channelKey]) {
+      acc[channelKey] = {
+        channel: post.channel,
         posts: [],
       }
     }
-    acc[bandKey].posts.push(post)
+    acc[channelKey].posts.push(post)
     return acc
-  }, {} as Record<string, { band: { id: number; name: string; bandKey: string }; posts: Post[] }>)
+  }, {} as Record<string, { channel: { id: number; name: string; channelKey: string }; posts: Post[] }>)
 
   return (
     <Modal
@@ -208,31 +208,31 @@ export default function PostSelectionModal({
 
           <div className="flex-1 overflow-y-auto">
             <div className="space-y-3">
-              {Object.entries(groupedPosts).map(([bandKey, group]) => {
-                const isBandExpanded = expandedBandKeys.includes(bandKey)
-                const bandPostIds = group.posts.map(p => p.id)
-                const selectedInBand = bandPostIds.filter(id => selectedPostIds.includes(id)).length
+              {Object.entries(groupedPosts).map(([channelKey, group]) => {
+                const isChannelExpanded = expandedChannelKeys.includes(channelKey)
+                const channelPostIds = group.posts.map(p => p.id)
+                const selectedInChannel = channelPostIds.filter(id => selectedPostIds.includes(id)).length
                 return (
-                  <div key={bandKey} className="border rounded-lg bg-white">
-                    {/* 밴드 헤더 */}
+                  <div key={channelKey} className="border rounded-lg bg-white">
+                    {/* 채널 헤더 */}
                     <div
                       className="p-3 bg-gray-50 border-b cursor-pointer hover:bg-gray-100 transition-colors"
-                      onClick={() => handleToggleBandExpand(bandKey)}
+                      onClick={() => handleToggleChannelExpand(channelKey)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          {isBandExpanded ? (
+                          {isChannelExpanded ? (
                             <ChevronDown size={20} className="text-gray-600" />
                           ) : (
                             <ChevronRight size={20} className="text-gray-600" />
                           )}
-                          <h3 className="font-semibold text-gray-900">{group.band.name}</h3>
+                          <h3 className="font-semibold text-gray-900">{group.channel.name}</h3>
                         </div>
                       </div>
                     </div>
 
-                    {/* 밴드별 게시물 목록 */}
-                    {isBandExpanded && (
+                    {/* 채널별 게시물 목록 */}
+                    {isChannelExpanded && (
                       <div className="p-2 space-y-2">
                         {group.posts.map((post) => {
                           const isExpanded = expandedPostIds.includes(post.id)

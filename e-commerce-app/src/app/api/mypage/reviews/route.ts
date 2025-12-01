@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
                 deliveredAt: true,
               },
             },
-            productPublish: {
+            publishedProduct: {
               include: {
                 product: {
                   select: {
@@ -110,17 +110,17 @@ export async function GET(request: NextRequest) {
         orderId: item.orderId,
         orderNumber: item.order.orderNumber,
         deliveredAt: item.order.deliveredAt?.toISOString() || null,
-        productPublishId: item.productPublishId,
+        publishedProductId: item.publishedProductId,
         productName: item.productName,
         optionSummary: item.optionSummary,
-        thumbnailUrl: item.thumbnailUrl || item.productPublish?.product?.thumbnailUrl,
+        thumbnailUrl: item.thumbnailUrl || item.publishedProduct?.product?.thumbnailUrl,
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         totalPrice: Number(item.totalPrice),
-        product: item.productPublish?.product ? {
-          id: item.productPublish.product.id,
-          name: item.productPublish.product.name,
-          thumbnailUrl: item.productPublish.product.thumbnailUrl,
+        product: item.publishedProduct?.product ? {
+          id: item.publishedProduct.product.id,
+          name: item.publishedProduct.product.name,
+          thumbnailUrl: item.publishedProduct.product.thumbnailUrl,
         } : null,
       }))
 
@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
                     orderNumber: true,
                   },
                 },
-                productPublish: {
+                publishedProduct: {
                   include: {
                     product: {
                       select: {
@@ -211,7 +211,7 @@ export async function GET(request: NextRequest) {
         content: review.content,
         images: review.images ? JSON.parse(review.images) : null,
         createdAt: review.createdAt.toISOString(),
-        product: review.orderItem?.productPublish?.product || null,
+        product: review.orderItem?.publishedProduct?.product || null,
         orderItem: review.orderItem ? {
           productName: review.orderItem.productName,
           optionSummary: review.orderItem.optionSummary,
@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
       where: { id: orderItemId },
       include: {
         order: true,
-        productPublish: {
+        publishedProduct: {
           include: {
             product: true,
           },
@@ -326,7 +326,7 @@ export async function POST(request: NextRequest) {
       include: {
         orderItem: {
           include: {
-            productPublish: {
+            publishedProduct: {
               include: {
                 product: {
                   select: {
@@ -353,7 +353,7 @@ export async function POST(request: NextRequest) {
         content: review.content,
         images: review.images ? JSON.parse(review.images) : null,
         createdAt: review.createdAt.toISOString(),
-        product: review.orderItem?.productPublish?.product || null,
+        product: review.orderItem?.publishedProduct?.product || null,
         orderItem: review.orderItem ? {
           productName: review.orderItem.productName,
           optionSummary: review.orderItem.optionSummary,

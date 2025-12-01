@@ -34,14 +34,20 @@ export async function GET(
         userId, // Ensure user owns the product
       },
       include: {
-        post: {
+        collectedProduct: {
           include: {
-            images: {
-              orderBy: { sortOrder: 'asc' },
+            post: {
+              include: {
+                images: {
+                  orderBy: { sortOrder: 'asc' },
+                },
+                channel: true,
+              },
             },
-            wholesaleBand: true,
           },
         },
+        options: true,
+        variants: true,
       },
     })
 

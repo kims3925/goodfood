@@ -7,7 +7,7 @@ import { useCartNotification } from '@/contexts/CartNotificationContext'
 
 interface Product {
   id: string
-  productPublishId?: string
+  publishedProductId?: string
   title: string
   description?: string
   originalPrice: number
@@ -82,7 +82,7 @@ export default function StorePage() {
     e.stopPropagation()
     e.preventDefault()
 
-    if (!product.productPublishId) {
+    if (!product.publishedProductId) {
       return
     }
 
@@ -91,7 +91,7 @@ export default function StorePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          productPublishId: product.productPublishId,
+          publishedProductId: product.publishedProductId,
           quantity: 1,
         }),
       })

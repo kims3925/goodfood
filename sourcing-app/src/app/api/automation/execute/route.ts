@@ -76,13 +76,13 @@ export async function POST(request: NextRequest) {
 
       case 'publish':
         console.log(`[Execute] Publish for user ${currentUser.userId}`)
-        if (!config?.retailBandIds?.length) {
-          // 자동화 설정에서 retailBandIds 가져오기
+        if (!config?.channelIds?.length) {
+          // 자동화 설정에서 channelIds 가져오기
           const automationConfig = await prisma.automationConfig.findUnique({
             where: { userId: currentUser.userId },
           })
-          const retailBandIds = automationConfig?.retailBandIds as number[] | undefined
-          if (!retailBandIds || retailBandIds.length === 0) {
+          const channelIds = automationConfig?.channelIds as number[] | undefined
+          if (!channelIds || channelIds.length === 0) {
             return NextResponse.json(
               { success: false, error: '발행할 소매밴드가 설정되지 않았습니다.' },
               { status: 400 }

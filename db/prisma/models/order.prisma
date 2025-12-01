@@ -23,12 +23,12 @@ model Order {
   deliveredAt    DateTime?           @map("delivered_at") @db.Timestamp(0)
   cancelledAt    DateTime?           @map("cancelled_at") @db.Timestamp(0)
   cancelReason   String?             @map("cancel_reason") @db.VarChar(500)
-  cancelledBy    String?             @map("cancelled_by") @db.VarChar(20) // USER, ADMIN
+  cancelledBy    String?             @map("cancelled_by") @db.VarChar(20)
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamp(0)
-  user             User                @relation(fields: [userId], references: [id])
-  items            OrderItem[]
-  payment          Payment?
+  user           User                @relation(fields: [userId], references: [id])
+  items          OrderItem[]
+  payment        Payment?
 
   @@index([userId])
   @@index([orderNumber])
@@ -39,24 +39,24 @@ model Order {
 }
 
 model OrderItem {
-  id               Int             @id @default(autoincrement())
-  orderId          Int             @map("order_id")
-  productPublishId Int             @map("product_publish_id") // product_publish 테이블 참조 (변경)
-  variantId        Int?            @map("variant_id")
-  productName      String          @map("product_name") @db.VarChar(500)
-  optionSummary    String?         @map("option_summary") @db.VarChar(500)
-  thumbnailUrl     String?         @map("thumbnail_url") @db.VarChar(1000)
-  quantity         Int
-  unitPrice        Decimal         @map("unit_price") @db.Decimal(10, 2)
-  totalPrice       Decimal         @map("total_price") @db.Decimal(12, 2)
-  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
-  order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productPublish   ProductPublish  @relation(fields: [productPublishId], references: [id]) // 변경
-  variant          ProductVariant? @relation(fields: [variantId], references: [id])
-  review           Review?
+  id                 Int              @id @default(autoincrement())
+  orderId            Int              @map("order_id")
+  publishedProductId Int              @map("published_product_id")
+  variantId          Int?             @map("variant_id")
+  productName        String           @map("product_name") @db.VarChar(500)
+  optionSummary      String?          @map("option_summary") @db.VarChar(500)
+  thumbnailUrl       String?          @map("thumbnail_url") @db.VarChar(1000)
+  quantity           Int
+  unitPrice          Decimal          @map("unit_price") @db.Decimal(10, 2)
+  totalPrice         Decimal          @map("total_price") @db.Decimal(12, 2)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  order              Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  publishedProduct   PublishedProduct @relation(fields: [publishedProductId], references: [id])
+  variant            ProductVariant?  @relation(fields: [variantId], references: [id])
+  review             Review?
 
   @@index([orderId])
-  @@index([productPublishId])
+  @@index([publishedProductId])
   @@index([variantId])
   @@map("order_item")
 }
@@ -66,21 +66,21 @@ model OrderItem {
 // =============================================
 
 model OrderTest {
-  id               Int             @id @default(autoincrement())
-  userId           Int             @map("user_id")
-  productPublishId Int?            @map("product_publish_id") // ProductPublish 참조
-  productName      String          @map("product_name") @db.VarChar(500) // 원본 상품명 (매칭 실패 시 표시용)
-  quantity         Int             @default(1)
-  unitPrice        Int?            @map("unit_price")   // 매칭된 상품의 단가
-  totalPrice       Int?            @map("total_price")  // unitPrice * quantity
-  customerName     String          @map("customer_name") @db.VarChar(100)
-  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamp(0)
-  productPublish   ProductPublish? @relation(fields: [productPublishId], references: [id])
-  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 Int               @id @default(autoincrement())
+  userId             Int               @map("user_id")
+  publishedProductId Int?              @map("published_product_id")
+  productName        String            @map("product_name") @db.VarChar(500)
+  quantity           Int               @default(1)
+  unitPrice          Int?              @map("unit_price")
+  totalPrice         Int?              @map("total_price")
+  customerName       String            @map("customer_name") @db.VarChar(100)
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamp(0)
+  publishedProduct   PublishedProduct? @relation(fields: [publishedProductId], references: [id])
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([productPublishId])
+  @@index([publishedProductId])
   @@index([productName])
   @@index([customerName])
   @@map("order_test")

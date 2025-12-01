@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { PublishType } from '@bandauto/db'
+import prisma, { ChannelKind } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 /**
@@ -8,15 +8,15 @@ import { getCurrentUser } from '@/modules/auth/auth.service'
  * Get published products list with filtering and pagination
  *
  * Query Parameters:
- * - search?: string (searches in product name, retail band name)
+ * - search?: string (searches in product name, channel name)
  * - status?: 'PENDING' | 'SUCCESS' | 'FAILED'
- * - retailBandId?: number
+ * - channelId?: number (하위 호환: channelId도 지원)
  * - page?: number (default: 1)
  * - limit?: number (default: 10)
  *
  * Response:
  * - success: boolean
- * - data?: ProductPublish[]
+ * - data?: PublishedProduct[]
  * - total?: number
  * - page?: number
  * - limit?: number
@@ -35,36 +35,39 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
     const status = searchParams.get('status')
-    const retailBandId = searchParams.get('retailBandId')
+    // 하위 호환성: channelId 또는 channelId 지원
+    const channelId = searchParams.get('channelId') || searchParams.get('channelId')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
 
-    // Build where clause - 소매밴드 발행 조회
+    // Build where clause - 채널 발행 조회 (RETAIL kind 채널만)
     const where: any = {
       userId,
-      publishType: PublishType.RETAIL_BAND,
+      channel: {
+        kind: ChannelKind.RETAIL,
+      },
     }
 
     if (status) {
       where.status = status
     }
 
-    if (retailBandId) {
-      where.retailBandId = parseInt(retailBandId)
+    if (channelId) {
+      where.channelId = parseInt(channelId)
     }
 
     if (search) {
       where.OR = [
         { product: { name: { contains: search } } },
-        { retailBand: { name: { contains: search } } },
+        { channel: { name: { contains: search } } },
       ]
     }
 
     // Get total count
-    const total = await prisma.productPublish.count({ where })
+    const total = await prisma.publishedProduct.count({ where })
 
     // Get published products with relations
-    const publishedProducts = await prisma.productPublish.findMany({
+    const publishedProducts = await prisma.publishedProduct.findMany({
       where,
       include: {
         product: {
@@ -76,11 +79,11 @@ export async function GET(request: NextRequest) {
             wholesalePrice: true,
           },
         },
-        retailBand: {
+        channel: {
           select: {
             id: true,
             name: true,
-            bandKey: true,
+            channelKey: true,
           },
         },
       },
@@ -148,7 +151,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Check published product exists and belongs to user
-    const publishedProduct = await prisma.productPublish.findFirst({
+    const publishedProduct = await prisma.publishedProduct.findFirst({
       where: {
         id,
         userId,
@@ -163,7 +166,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete published product
-    await prisma.productPublish.delete({
+    await prisma.publishedProduct.delete({
       where: { id },
     })
 

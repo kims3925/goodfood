@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { PublishStatus, ProductStatus, PublishType } from '@bandauto/db'
+import prisma, { PublishStatus, ProductStatus, ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 /**
@@ -50,16 +50,20 @@ export async function GET(request: NextRequest) {
     const products = await prisma.product.findMany({
       where,
       include: {
-        post: {
+        collectedProduct: {
           include: {
-            images: {
-              orderBy: { sortOrder: 'asc' },
-              take: 1,
-            },
-            wholesaleBand: {
-              select: {
-                id: true,
-                name: true,
+            post: {
+              include: {
+                images: {
+                  orderBy: { sortOrder: 'asc' },
+                  take: 1,
+                },
+                channel: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
               },
             },
           },
@@ -68,17 +72,19 @@ export async function GET(request: NextRequest) {
           orderBy: { id: 'asc' },
           take: 1,
         },
-        productPublishes: {
+        publishedProducts: {
           where: { status: PublishStatus.SUCCESS },
           select: {
             id: true,
-            publishType: true,
+            channelId: true,
             status: true,
             createdAt: true,
-            retailBand: {
+            channel: {
               select: {
                 id: true,
                 name: true,
+                kind: true,
+                platform: true,
               },
             },
           },
@@ -91,24 +97,26 @@ export async function GET(request: NextRequest) {
 
     // Format response
     const formattedProducts = products.map((product) => {
-      const mainImage = product.post?.images?.[0]?.imageUrl || product.thumbnailUrl
+      const mainImage = product.collectedProduct?.post?.images?.[0]?.imageUrl || product.thumbnailUrl
       const mainVariant = product.variants?.[0]
 
-      // 발행 유형별 분류
-      const retailBandPublishes = product.productPublishes.filter(
-        (pp) => pp.publishType === PublishType.RETAIL_BAND
+      // 발행 유형별 분류:
+      // - 채널 발행 (RETAIL kind, 비-SHOP): channelId가 있고 platform이 SHOP이 아닌 경우
+      // - 쇼핑몰 발행: platform이 SHOP인 경우 또는 channelId가 없는 경우 (하위 호환성)
+      const channelPublishes = product.publishedProducts.filter(
+        (pp) => pp.channelId && pp.channel?.kind === ChannelKind.RETAIL && pp.channel?.platform !== ChannelPlatform.SHOP
       )
-      const shoppingMallPublishes = product.productPublishes.filter(
-        (pp) => pp.publishType === PublishType.SHOPPING_MALL
+      const shoppingMallPublishes = product.publishedProducts.filter(
+        (pp) => !pp.channelId || pp.channel?.platform === ChannelPlatform.SHOP
       )
 
-      const hasRetailBand = retailBandPublishes.length > 0
+      const hasChannelPublish = channelPublishes.length > 0
       const hasShoppingMall = shoppingMallPublishes.length > 0
 
       let publishSummary = '미발행'
-      if (hasRetailBand && hasShoppingMall) {
+      if (hasChannelPublish && hasShoppingMall) {
         publishSummary = '발행완료'
-      } else if (hasRetailBand || hasShoppingMall) {
+      } else if (hasChannelPublish || hasShoppingMall) {
         publishSummary = '부분발행'
       }
 
@@ -121,18 +129,19 @@ export async function GET(request: NextRequest) {
         wholesalePrice: mainVariant?.wholesalePrice || product.wholesalePrice,
         stock: mainVariant?.stock || 0,
         status: product.status,
-        wholesaleBand: product.post?.wholesaleBand,
+        channel: product.collectedProduct?.post?.channel,
         // 발행 상태 (유형별)
         publishStatus: {
-          retailBand: hasRetailBand,
+          retailBand: hasChannelPublish, // 하위 호환성
+          channel: hasChannelPublish,
           shoppingMall: hasShoppingMall,
         },
         publishSummary,
-        // 발행된 밴드 목록
-        publishedBands: retailBandPublishes.map((pp) => ({
+        // 발행된 채널 목록
+        publishedChannels: channelPublishes.map((pp) => ({
           publishId: pp.id,
-          retailBandId: pp.retailBand?.id,
-          retailBandName: pp.retailBand?.name,
+          channelId: pp.channel?.id,
+          channelName: pp.channel?.name,
           status: pp.status,
           createdAt: pp.createdAt,
         })),
@@ -170,8 +179,8 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/shop/publish
  *
- * Publish products to shopping mall
- * Creates ProductPublish records with publishType = SHOPPING_MALL
+ * Publish products to a selected channel
+ * channelId is required - user must select an existing channel
  */
 export async function POST(request: NextRequest) {
   try {
@@ -185,11 +194,36 @@ export async function POST(request: NextRequest) {
     const userId = currentUser.userId
 
     const body = await request.json()
-    const { productIds } = body
+    const { productIds, channelId } = body
 
     if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
       return NextResponse.json(
         { success: false, error: '발행할 상품을 선택해주세요.' },
+        { status: 400 }
+      )
+    }
+
+    if (!channelId) {
+      return NextResponse.json(
+        { success: false, error: '발행할 채널을 선택해주세요.' },
+        { status: 400 }
+      )
+    }
+
+    // Validate channel belongs to user and is RETAIL kind
+    const channel = await prisma.channel.findFirst({
+      where: {
+        id: channelId,
+        userId,
+        kind: ChannelKind.RETAIL,
+        isActive: true,
+      },
+      select: { id: true, name: true, platform: true },
+    })
+
+    if (!channel) {
+      return NextResponse.json(
+        { success: false, error: '선택한 채널을 찾을 수 없거나 발행 권한이 없습니다.' },
         { status: 400 }
       )
     }
@@ -210,11 +244,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check existing shopping mall publishes to avoid duplicates
-    const existingPublishes = await prisma.productPublish.findMany({
+    // Check existing publishes for this channel
+    const existingPublishes = await prisma.publishedProduct.findMany({
       where: {
         productId: { in: productIds },
-        publishType: PublishType.SHOPPING_MALL,
+        channelId: channel.id,
       },
       select: {
         productId: true,
@@ -236,18 +270,17 @@ export async function POST(request: NextRequest) {
         results.push({
           productId,
           status: 'SKIPPED',
-          message: '이미 쇼핑몰에 발행된 상품입니다.',
+          message: `이미 ${channel.name} 채널에 발행된 상품입니다.`,
         })
         continue
       }
 
       try {
-        const publish = await prisma.productPublish.create({
+        const publish = await prisma.publishedProduct.create({
           data: {
             userId,
             productId,
-            publishType: PublishType.SHOPPING_MALL,
-            // retailBandId is null for shopping mall
+            channelId: channel.id,
             status: PublishStatus.SUCCESS,
             publishedAt: new Date(),
           },
@@ -259,7 +292,7 @@ export async function POST(request: NextRequest) {
           publishId: publish.id,
         })
       } catch (error: any) {
-        console.error(`쇼핑몰 발행 실패 (product: ${productId}):`, error)
+        console.error(`채널 발행 실패 (product: ${productId}, channel: ${channel.id}):`, error)
         results.push({
           productId,
           status: 'FAILED',
@@ -275,6 +308,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `${successCount}개 발행 완료, ${skippedCount}개 건너뜀, ${failedCount}개 실패`,
+      channel: {
+        id: channel.id,
+        name: channel.name,
+        platform: channel.platform,
+      },
       results,
       summary: {
         total: results.length,
@@ -295,7 +333,7 @@ export async function POST(request: NextRequest) {
 /**
  * DELETE /api/shop/publish
  *
- * Unpublish products from retail bands
+ * Unpublish products from channels
  */
 export async function DELETE(request: NextRequest) {
   try {
@@ -319,7 +357,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete publish records that belong to user
-    const deleteResult = await prisma.productPublish.deleteMany({
+    const deleteResult = await prisma.publishedProduct.deleteMany({
       where: {
         id: { in: publishIds },
         userId,

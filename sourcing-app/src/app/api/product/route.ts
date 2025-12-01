@@ -15,8 +15,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const postId = searchParams.get('postId')
+    const collectedProductId = searchParams.get('collectedProductId')
     const search = searchParams.get('search')
-    const wholesaleBandId = searchParams.get('wholesaleBandId')
+    const channelId = searchParams.get('channelId') || searchParams.get('channelId') // 하위 호환성
     const status = searchParams.get('status')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
@@ -26,8 +27,9 @@ export async function GET(request: NextRequest) {
     const result = await productService.getList({
       userId: currentUser.userId,
       postId: postId ? parseInt(postId) : undefined,
+      collectedProductId: collectedProductId ? parseInt(collectedProductId) : undefined,
       search: search || undefined,
-      wholesaleBandId: wholesaleBandId ? parseInt(wholesaleBandId) : undefined,
+      channelId: channelId ? parseInt(channelId) : undefined,
       status: status || undefined,
       startDate: startDate || undefined,
       endDate: endDate || undefined,
@@ -63,13 +65,29 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { postId, name, description, categoryId, currency, price, wholesalePrice } = body
+    const {
+      postId,
+      collectedProductId,
+      name,
+      description,
+      categoryId,
+      currency,
+      price,
+      wholesalePrice,
+    } = body
 
     console.log('[Product Create] Request:', { postId, name })
 
-    if (!postId || !name) {
+    if (!name) {
       return NextResponse.json(
-        { success: false, error: 'postId와 name이 필요합니다.' },
+        { success: false, error: 'name이 필요합니다.' },
+        { status: 400 }
+      )
+    }
+
+    if (!postId && !collectedProductId) {
+      return NextResponse.json(
+        { success: false, error: 'postId 또는 collectedProductId가 필요합니다.' },
         { status: 400 }
       )
     }
@@ -77,6 +95,7 @@ export async function POST(request: NextRequest) {
     const product = await productService.create({
       userId: currentUser.userId,
       postId,
+      collectedProductId,
       name,
       description,
       categoryId,

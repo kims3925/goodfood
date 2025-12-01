@@ -51,9 +51,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { wholesaleBandId, externalId, title, content, author, comments, images } = body
+    const { channelId, externalId, title, content, author, comments, images } = body
 
-    if (!wholesaleBandId || !externalId || !title || !content) {
+    const finalChannelId = parseInt(channelId)
+
+    if (!finalChannelId || !externalId || !title || !content) {
       return NextResponse.json(
         { success: false, error: '필수 필드가 누락되었습니다.' },
         { status: 400 }
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     const post = await postService.create({
       userId: currentUser.userId,
-      wholesaleBandId,
+      channelId: finalChannelId,
       externalId,
       title,
       content,

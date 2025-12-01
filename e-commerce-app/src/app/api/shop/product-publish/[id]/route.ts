@@ -1,6 +1,6 @@
 /**
- * Product Publish Detail API
- * productPublishId로 상품 정보 조회
+ * Published Product Detail API
+ * publishedProductId로 상품 정보 조회
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -11,29 +11,33 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const productPublishId = parseInt(params.id)
+    const publishedProductId = parseInt(params.id)
 
-    if (isNaN(productPublishId)) {
+    if (isNaN(publishedProductId)) {
       return NextResponse.json(
         { success: false, error: '유효하지 않은 상품 발행 ID' },
         { status: 400 }
       )
     }
 
-    const productPublish = await prisma.productPublish.findFirst({
+    const publishedProduct = await prisma.publishedProduct.findFirst({
       where: {
-        id: productPublishId,
+        id: publishedProductId,
         status: PublishStatus.SUCCESS,
       },
       include: {
         product: {
           include: {
-            post: {
+            collectedProduct: {
               include: {
-                images: {
-                  orderBy: { sortOrder: 'asc' },
+                post: {
+                  include: {
+                    images: {
+                      orderBy: { sortOrder: 'asc' },
+                    },
+                    channel: true,
+                  },
                 },
-                wholesaleBand: true,
               },
             },
             variants: {
@@ -44,11 +48,11 @@ export async function GET(
             },
           },
         },
-        retailBand: true,
+        channel: true,
       },
     })
 
-    if (!productPublish) {
+    if (!publishedProduct) {
       return NextResponse.json(
         { success: false, error: '상품을 찾을 수 없거나 판매 중인 상품이 아닙니다' },
         { status: 404 }
@@ -57,10 +61,10 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      productPublish,
+      publishedProduct,
     })
   } catch (error: any) {
-    console.error('Product publish detail error:', error)
+    console.error('Published product detail error:', error)
     return NextResponse.json(
       { success: false, error: error.message || '상품 조회 실패' },
       { status: 500 }

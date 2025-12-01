@@ -1,49 +1,46 @@
 // =============================================
-// PRODUCT MANAGEMENT (상품 관리)
+// PRODUCT (내부 기준 상품, 마스터 상품)
+// 쇼핑몰/소매 밴드에서 사용하는 정제된 상품
 // =============================================
 
 model Product {
-  id              Int           @id @default(autoincrement())
-  userId          Int           @map("user_id") // 생성한 사용자
-  postId          Int           @unique @map("post_id") // 게시물 ID (1:1 관계)
-  // 도매처는 Product → Post → WholesaleBand 로 추적
+  id                 Int           @id @default(autoincrement())
+  userId             Int           @map("user_id")
+
+  // 원본 CollectedProduct 참조 (source)
+  collectedProductId Int?          @map("collected_product_id")
 
   // Basic Info
-  name         String        @db.VarChar(500)
-  description  String?       @db.Text
+  name               String        @db.VarChar(500)
+  description        String?       @db.Text
 
   // Status
-  status       ProductStatus @default(COLLECTED) // 상품 상태 (COLLECTED: 수집, ARCHIVED: 보관)
+  status             ProductStatus @default(COLLECTED)
 
-  // Images (post_image 재사용)
-  thumbnailUrl String?       @map("thumbnail_url") @db.VarChar(1000) // 첫번째 post_image URL 캐싱
+  // Images
+  thumbnailUrl       String?       @map("thumbnail_url") @db.VarChar(1000)
 
   // Category
-  categoryId   String?       @map("category_id") @db.VarChar(100)
+  categoryId         String?       @map("category_id") @db.VarChar(100)
 
   // Pricing
-  currency       String  @default("KRW") @db.VarChar(10)
-  price          Int?    // 판매가
-  wholesalePrice Int?    @map("wholesale_price") // 도매가
+  currency           String        @default("KRW") @db.VarChar(10)
+  price              Int?
+  wholesalePrice     Int?          @map("wholesale_price")
 
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
 
   // Relationships
-  user                   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post                   Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
-  variants               ProductVariant[]
-  options                ProductOption[]
-  productPublishes       ProductPublish[]
-  // E-Commerce Relations
-  // cartItems는 productPublish를 통해 관계
-  // orderItems는 productPublish를 통해 관계
-  // reviews는 productPublish를 통해 관계
-  wishlists              Wishlist[]
-  inquiries              Inquiry[]
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectedProduct   CollectedProduct? @relation(fields: [collectedProductId], references: [id], onDelete: SetNull)
+  variants           ProductVariant[]
+  options            ProductOption[]
+  publishedProducts  PublishedProduct[]
+  wishlists          Wishlist[]
 
   @@index([userId])
-  @@index([postId])
+  @@index([collectedProductId])
   @@index([categoryId])
   @@index([status])
   @@index([createdAt])
@@ -64,9 +61,9 @@ model ProductVariant {
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 
   // Relationships
-  product          Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
-  cartItems        CartItem[]
-  orderItems       OrderItem[]
+  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
 
   @@index([productId])
   @@index([sku])

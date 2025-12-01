@@ -1,15 +1,15 @@
 /**
  * Collection Pipeline
- * 도매밴드에서 게시물 수집
+ * 도매채널(도매밴드 등)에서 게시물 수집
  */
 
-import prisma from '@bandauto/db'
+import prisma, { ChannelKind } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import {
   CollectionConfig,
   CollectionResult,
-  BandCollectionResult,
+  ChannelCollectionResult,
   PipelineError,
 } from '../types'
 
@@ -30,38 +30,41 @@ export async function runCollectionPipeline(
 
   const { userId } = context
   const errors: PipelineError[] = []
-  const bandResults: BandCollectionResult[] = []
+  const channelResults: ChannelCollectionResult[] = []
   let totalNewPosts = 0
   let totalDuplicates = 0
 
   console.log(`[Collection] Starting for user ${userId}`)
 
-  // 수집할 밴드 목록 조회
+  // 수집할 채널 목록 조회 (도매 채널만)
   const whereClause: any = {
     userId,
+    kind: ChannelKind.WHOLESALE,
     isActive: true,
   }
 
-  if (!config.collectFromAllBands && config.wholesaleBandIds?.length) {
-    whereClause.id = { in: config.wholesaleBandIds }
+  // 하위 호환성: channelIds도 channelIds로 처리
+  const channelIds = config.channelIds || config.channelIds
+  if (!config.collectFromAllBands && channelIds?.length) {
+    whereClause.id = { in: channelIds }
   }
 
-  const wholesaleBands = await prisma.wholesaleBand.findMany({
+  const wholesaleChannels = await prisma.channel.findMany({
     where: whereClause,
     include: {
       apiConfig: true,
     },
   })
 
-  if (wholesaleBands.length === 0) {
-    console.log('[Collection] No active wholesale bands found')
+  if (wholesaleChannels.length === 0) {
+    console.log('[Collection] No active wholesale channels found')
     return {
       success: true,
       totalItems: 0,
       successCount: 0,
       failedCount: 0,
       details: {
-        bandResults: [],
+        channelResults: [],
         totalNewPosts: 0,
         totalDuplicates: 0,
       },
@@ -69,23 +72,23 @@ export async function runCollectionPipeline(
     }
   }
 
-  console.log(`[Collection] Found ${wholesaleBands.length} bands to collect from`)
+  console.log(`[Collection] Found ${wholesaleChannels.length} channels to collect from`)
 
   // 진행 상황 초기화
   const { workflowLogId } = context
   if (workflowLogId) {
-    await updateWorkflowProgress(workflowLogId, wholesaleBands.length, 0, 0)
+    await updateWorkflowProgress(workflowLogId, wholesaleChannels.length, 0, 0)
   }
 
-  let processedBands = 0
-  let successBands = 0
-  let failedBands = 0
+  let processedChannels = 0
+  let successChannels = 0
+  let failedChannels = 0
 
-  // 각 밴드에서 게시물 수집
-  for (const band of wholesaleBands) {
-    const bandResult: BandCollectionResult = {
-      bandId: band.id,
-      bandName: band.name,
+  // 각 채널에서 게시물 수집
+  for (const channel of wholesaleChannels) {
+    const channelResult: ChannelCollectionResult = {
+      channelId: channel.id,
+      channelName: channel.name,
       fetched: 0,
       newPosts: 0,
       duplicates: 0,
@@ -94,46 +97,46 @@ export async function runCollectionPipeline(
     }
 
     try {
-      console.log(`[Collection] Collecting from band: ${band.name}`)
+      console.log(`[Collection] Collecting from channel: ${channel.name}`)
 
-      // Band API 토큰 확인
-      if (!band.apiConfig?.accessToken) {
-        throw new Error('Band API 토큰이 설정되지 않았습니다')
+      // API 토큰 확인
+      if (!channel.apiConfig?.accessToken) {
+        throw new Error('API 토큰이 설정되지 않았습니다')
       }
 
       // Band API 호출하여 게시물 가져오기
       const bandPosts = await fetchBandPosts(
-        band.apiConfig.accessToken,
-        band.bandKey,
+        channel.apiConfig.accessToken,
+        channel.channelKey,
         config.limit || 20
       )
 
-      bandResult.fetched = bandPosts.length
+      channelResult.fetched = bandPosts.length
 
       // 각 게시물 처리
       for (const post of bandPosts) {
         try {
           // 중복 체크
-          const existing = await prisma.post.findUnique({
+          const existing = await prisma.collectedPost.findUnique({
             where: {
-              wholesaleBandId_externalId: {
-                wholesaleBandId: band.id,
+              channelId_externalId: {
+                channelId: channel.id,
                 externalId: post.post_key,
               },
             },
           })
 
           if (existing) {
-            bandResult.duplicates++
+            channelResult.duplicates++
             continue
           }
 
-          // 새 게시물 저장
+          // 새 게시물 저장 (CollectedPost)
           // Note: Band API v2는 photos 필드 사용 (v2.1의 photo와 다름)
-          await prisma.post.create({
+          await prisma.collectedPost.create({
             data: {
               userId,
-              wholesaleBandId: band.id,
+              channelId: channel.id,
               externalId: post.post_key,
               title: extractTitle(post.content),
               content: post.content,
@@ -148,44 +151,44 @@ export async function runCollectionPipeline(
             },
           })
 
-          bandResult.newPosts++
+          channelResult.newPosts++
         } catch (postError: any) {
-          bandResult.failed++
-          bandResult.errors.push(postError.message)
+          channelResult.failed++
+          channelResult.errors.push(postError.message)
         }
       }
 
-      totalNewPosts += bandResult.newPosts
-      totalDuplicates += bandResult.duplicates
+      totalNewPosts += channelResult.newPosts
+      totalDuplicates += channelResult.duplicates
 
       console.log(
-        `[Collection] ${band.name}: ${bandResult.newPosts} new, ${bandResult.duplicates} duplicates`
+        `[Collection] ${channel.name}: ${channelResult.newPosts} new, ${channelResult.duplicates} duplicates`
       )
 
-      successBands++
-    } catch (bandError: any) {
-      console.error(`[Collection] Error collecting from ${band.name}:`, bandError)
+      successChannels++
+    } catch (channelError: any) {
+      console.error(`[Collection] Error collecting from ${channel.name}:`, channelError)
       errors.push({
-        itemId: band.id,
-        message: bandError.message,
+        itemId: channel.id,
+        message: channelError.message,
         timestamp: new Date(),
       })
-      bandResult.errors.push(bandError.message)
-      failedBands++
+      channelResult.errors.push(channelError.message)
+      failedChannels++
     }
 
-    bandResults.push(bandResult)
-    processedBands++
+    channelResults.push(channelResult)
+    processedChannels++
 
     // 진행 상황 업데이트
     if (workflowLogId) {
-      await updateWorkflowProgress(workflowLogId, wholesaleBands.length, successBands, failedBands)
+      await updateWorkflowProgress(workflowLogId, wholesaleChannels.length, successChannels, failedChannels)
     }
   }
 
-  const totalItems = bandResults.reduce((sum, r) => sum + r.fetched, 0)
+  const totalItems = channelResults.reduce((sum, r) => sum + r.fetched, 0)
   const successCount = totalNewPosts
-  const failedCount = bandResults.reduce((sum, r) => sum + r.failed, 0)
+  const failedCount = channelResults.reduce((sum, r) => sum + r.failed, 0)
 
   return {
     success: errors.length === 0,
@@ -193,7 +196,7 @@ export async function runCollectionPipeline(
     successCount,
     failedCount,
     details: {
-      bandResults,
+      channelResults,
       totalNewPosts,
       totalDuplicates,
     },

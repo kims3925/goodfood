@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@bandauto/db'
+import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
-// GET: 도매밴드에서 수집 가능한 게시물 목록 조회
+// GET: 도매채널에서 수집 가능한 게시물 목록 조회
 export async function GET(request: NextRequest) {
   try {
     // 세션에서 userId 가져오기
@@ -15,11 +15,13 @@ export async function GET(request: NextRequest) {
     }
     const userId = currentUser.userId
 
-    // 사용자의 도매밴드 및 API 설정 조회
-    const wholesaleBands = await prisma.wholesaleBand.findMany({
+    // 사용자의 도매채널 및 API 설정 조회 (Band 플랫폼만)
+    const wholesaleChannels = await prisma.channel.findMany({
       where: {
         userId: userId,
         isActive: true,
+        kind: ChannelKind.WHOLESALE,
+        platform: ChannelPlatform.BAND,
       },
       include: {
         apiConfig: {
@@ -33,17 +35,17 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    if (wholesaleBands.length === 0) {
+    if (wholesaleChannels.length === 0) {
       return NextResponse.json({
         success: true,
         data: [],
-        message: '등록된 도매밴드가 없습니다.',
+        message: '등록된 도매채널이 없습니다.',
       })
     }
 
     // 활성화된 API 설정이 있는지 확인
-    const activeApiConfig = wholesaleBands.find(
-      (band) => band.apiConfig.isActive && band.apiConfig.accessToken
+    const activeApiConfig = wholesaleChannels.find(
+      (channel) => channel.apiConfig?.isActive && channel.apiConfig?.accessToken
     )
 
     if (!activeApiConfig) {
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const accessToken = activeApiConfig.apiConfig.accessToken
+    const accessToken = activeApiConfig.apiConfig?.accessToken
 
     if (!accessToken) {
       return NextResponse.json(
@@ -69,7 +71,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 사용자가 이미 등록한 게시물의 externalId 목록 조회
-    const existingPosts = await prisma.post.findMany({
+    const existingPosts = await prisma.collectedPost.findMany({
       where: {
         userId: userId,
       },
@@ -79,15 +81,15 @@ export async function GET(request: NextRequest) {
     })
     const existingPostKeys = new Set(existingPosts.map((post) => post.externalId))
 
-    // 모든 도매밴드에서 게시물 조회
+    // 모든 도매채널에서 게시물 조회
     const allPosts: any[] = []
 
-    for (const band of wholesaleBands) {
+    for (const channel of wholesaleChannels) {
       try {
         // Band API 호출
         const bandApiUrl = `https://openapi.band.us/v2/band/posts`
         const response = await fetch(
-          `${bandApiUrl}?access_token=${accessToken}&band_key=${band.bandKey}&locale=ko_KR`,
+          `${bandApiUrl}?access_token=${accessToken}&band_key=${channel.channelKey}&locale=ko_KR`,
           {
             method: 'GET',
             headers: {
@@ -97,14 +99,14 @@ export async function GET(request: NextRequest) {
         )
 
         if (!response.ok) {
-          console.error(`Band API 오류 (${band.name}):`, await response.text())
+          console.error(`Band API 오류 (${channel.name}):`, await response.text())
           continue
         }
 
         const data = await response.json()
 
         if (data.result_data && data.result_data.items) {
-          // 게시물 데이터 변환 (밴드 정보 포함)
+          // 게시물 데이터 변환 (채널 정보 포함)
           const posts = await Promise.all(
             data.result_data.items.map(async (item: any) => {
               // 각 게시물의 댓글 조회
@@ -112,7 +114,7 @@ export async function GET(request: NextRequest) {
               try {
                 const commentsApiUrl = `https://openapi.band.us/v2/band/post/comments`
                 const commentsResponse = await fetch(
-                  `${commentsApiUrl}?access_token=${accessToken}&band_key=${band.bandKey}&post_key=${item.post_key}`,
+                  `${commentsApiUrl}?access_token=${accessToken}&band_key=${channel.channelKey}&post_key=${item.post_key}`,
                   {
                     method: 'GET',
                     headers: {
@@ -142,10 +144,10 @@ export async function GET(request: NextRequest) {
                 author: item.author?.name || '알 수 없음',
                 images: item.photos ? item.photos.map((photo: any) => photo.url) : [],
                 comments,
-                band: {
-                  id: band.id,
-                  name: band.name,
-                  bandKey: band.bandKey,
+                channel: {
+                  id: channel.id,
+                  name: channel.name,
+                  channelKey: channel.channelKey,
                 },
               }
             })
@@ -154,7 +156,7 @@ export async function GET(request: NextRequest) {
           allPosts.push(...posts)
         }
       } catch (error) {
-        console.error(`밴드 ${band.name}의 게시물 조회 실패:`, error)
+        console.error(`채널 ${channel.name}의 게시물 조회 실패:`, error)
         continue
       }
     }

@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 
 // 상품별 리뷰 목록 조회 (공개 API - 로그인 불필요)
-// [id]는 productPublishId를 의미함 (OrderItem.productPublishId를 통해 조회)
+// [id]는 publishedProductId를 의미함 (OrderItem.publishedProductId를 통해 조회)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
-    const productPublishId = parseInt(id)
+    const publishedProductId = parseInt(id)
 
-    if (isNaN(productPublishId)) {
+    if (isNaN(publishedProductId)) {
       return NextResponse.json(
         { success: false, error: '잘못된 상품 ID입니다' },
         { status: 400 }
@@ -32,12 +32,12 @@ export async function GET(
       orderBy = { rating: 'asc' }
     }
 
-    // 리뷰 목록 조회 (orderItem.productPublishId를 통해 조회)
+    // 리뷰 목록 조회 (orderItem.publishedProductId를 통해 조회)
     const [reviews, total, ratingStats] = await Promise.all([
       prisma.review.findMany({
         where: {
           orderItem: {
-            productPublishId,
+            publishedProductId,
           },
           isVisible: true,
         },
@@ -62,7 +62,7 @@ export async function GET(
       prisma.review.count({
         where: {
           orderItem: {
-            productPublishId,
+            publishedProductId,
           },
           isVisible: true,
         },
@@ -72,7 +72,7 @@ export async function GET(
         by: ['rating'],
         where: {
           orderItem: {
-            productPublishId,
+            publishedProductId,
           },
           isVisible: true,
         },
@@ -86,7 +86,7 @@ export async function GET(
     const avgRating = await prisma.review.aggregate({
       where: {
         orderItem: {
-          productPublishId,
+          publishedProductId,
         },
         isVisible: true,
       },

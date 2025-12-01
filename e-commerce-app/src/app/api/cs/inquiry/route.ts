@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { inquiryType, title, content, productId } = body
+    const { inquiryType, title, content, publishedProductId, productId } = body
 
     const userId = Number(session.user.id)
     const inquiry = await inquiryService.createInquiry({
@@ -75,7 +75,11 @@ export async function POST(request: NextRequest) {
       inquiryType,
       title,
       content,
-      productId: productId ? Number(productId) : undefined,
+      publishedProductId: publishedProductId
+        ? Number(publishedProductId)
+        : productId
+          ? Number(productId)
+          : undefined,
     })
 
     return NextResponse.json({

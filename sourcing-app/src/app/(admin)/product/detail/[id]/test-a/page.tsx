@@ -17,10 +17,10 @@ import Link from 'next/link'
 
 interface Product {
   id: number
-  postId: number
+  collectedProductId: number | null
   name: string
   description: string | null
-  status: 'COLLECTED' | 'PUBLISHED'
+  status: 'COLLECTED' | 'ARCHIVED'
   thumbnailUrl: string | null
   price: number | null
   wholesalePrice: number | null
@@ -28,22 +28,24 @@ interface Product {
   currency: string
   createdAt: string
   updatedAt: string
-  post: {
-    id: number
-    title: string
-    content: string
-    wholesaleBand: {
-      name: string
-      bandKey: string
-      coverUrl: string | null
-    }
-    images: Array<{
+  collectedProduct: {
+    post: {
       id: number
-      imageUrl: string
-      name?: string
-      sortOrder: number
-    }>
-  }
+      title: string
+      content: string
+      wholesaleBand: {
+        name: string
+        bandKey: string
+        coverUrl: string | null
+      }
+      images: Array<{
+        id: number
+        imageUrl: string
+        name?: string
+        sortOrder: number
+      }>
+    } | null
+  } | null
   options: Array<{
     id: number
     groupName: string
@@ -163,7 +165,7 @@ export default function ProductDetailTestA() {
   const getStatusBadge = (status: string) => {
     const statusMap: { [key: string]: { label: string; color: string } } = {
       COLLECTED: { label: '수집', color: 'bg-gray-100 text-gray-800 border-gray-300' },
-      PUBLISHED: { label: '발행', color: 'bg-green-100 text-green-800 border-green-300' },
+      ARCHIVED: { label: '보관', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
     }
     const statusInfo = statusMap[status] || { label: status, color: 'bg-gray-100 text-gray-800 border-gray-300' }
     return (
@@ -178,7 +180,7 @@ export default function ProductDetailTestA() {
     return `₩${price.toLocaleString()}`
   }
 
-  const images = product?.post?.images || []
+  const images = product?.collectedProduct?.post?.images || []
 
   const handlePrevImage = () => {
     setSelectedImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))
@@ -417,19 +419,25 @@ export default function ProductDetailTestA() {
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <div className="flex items-center justify-between mb-4 pb-4 border-b">
                 <h2 className="text-lg font-semibold text-gray-900">출처 게시물</h2>
-                <Link
-                  href={`/post/detail/${product.post.id}`}
-                  className="text-purple-600 hover:text-purple-700 text-sm font-medium flex items-center gap-1"
-                >
-                  <FileText size={14} /> 보기
-                </Link>
+                {product.collectedProduct?.post && (
+                  <Link
+                    href={`/post/detail/${product.collectedProduct.post.id}`}
+                    className="text-purple-600 hover:text-purple-700 text-sm font-medium flex items-center gap-1"
+                  >
+                    <FileText size={14} /> 보기
+                  </Link>
+                )}
               </div>
-              <div className="flex items-center gap-3">
-                <div className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
-                  {product.post.wholesaleBand.name}
+              {product.collectedProduct?.post ? (
+                <div className="flex items-center gap-3">
+                  <div className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+                    {product.collectedProduct.post.wholesaleBand.name}
+                  </div>
+                  <span className="text-gray-600 text-sm truncate">{product.collectedProduct.post.title}</span>
                 </div>
-                <span className="text-gray-600 text-sm truncate">{product.post.title}</span>
-              </div>
+              ) : (
+                <p className="text-sm text-gray-500">연결된 게시물이 없습니다.</p>
+              )}
             </div>
           </div>
         </div>

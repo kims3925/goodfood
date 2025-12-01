@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@bandauto/db'
+import prisma, { ChannelKind } from '@bandauto/db'
 
 // 환경변수에서 설정 (없으면 기본값 사용)
 const WEBHOOK_SECRET = process.env.ORDER_WEBHOOK_SECRET || 'your-webhook-secret'
@@ -15,12 +15,13 @@ const DEFAULT_USER_ID = parseInt(process.env.DEFAULT_USER_ID || '1')
  * 필수 필드:
  * - customerName: 고객 이름
  * - productName: 상품명
- * - retailBandId: 소매밴드 ID (권장 - 정확한 매칭을 위해)
+ * - channelId: 소매채널 ID (권장 - 정확한 매칭을 위해)
  *
  * 선택 필드:
  * - quantity: 수량 (기본값: 1)
  * - totalPrice: 총액 (없으면 자동 계산)
- * - formUrl: 폼 URL (retailBandId 없을 때 폴백)
+ * - formUrl: 폼 URL (channelId 없을 때 폴백)
+ * - channelId: 하위 호환성 (channelId로 대체됨)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -48,7 +49,8 @@ export async function POST(request: NextRequest) {
       productName,
       quantity: rawQuantity,
       totalPrice,
-      retailBandId: rawRetailBandId,
+      channelId: rawChannelId,
+      channelId: rawRetailChannelId, // 하위 호환성
       formUrl
     } = body
 
@@ -89,54 +91,57 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // === 소매밴드 ID 확정 ===
-    let retailBandId: number | null = null
+    // === 소매채널 ID 확정 ===
+    let channelId: number | null = null
 
-    // 1순위: retailBandId 직접 전달
-    if (rawRetailBandId) {
-      const parsedBandId = typeof rawRetailBandId === 'number'
-        ? rawRetailBandId
-        : parseInt(String(rawRetailBandId))
+    // 1순위: channelId 직접 전달
+    const rawId = rawChannelId || rawRetailChannelId // 하위 호환성
+    if (rawId) {
+      const parsedId = typeof rawId === 'number'
+        ? rawId
+        : parseInt(String(rawId))
 
-      if (!isNaN(parsedBandId)) {
-        const retailBand = await prisma.retailBand.findFirst({
+      if (!isNaN(parsedId)) {
+        const channel = await prisma.channel.findFirst({
           where: {
-            id: parsedBandId,
+            id: parsedId,
             userId: DEFAULT_USER_ID,
+            kind: ChannelKind.RETAIL,
           },
           select: { id: true },
         })
-        retailBandId = retailBand?.id || null
+        channelId = channel?.id || null
       }
     }
 
-    // 2순위: formUrl로 RetailBand 매칭
-    if (!retailBandId && formUrl) {
-      const retailBand = await prisma.retailBand.findFirst({
+    // 2순위: formUrl로 Channel 매칭
+    if (!channelId && formUrl) {
+      const channel = await prisma.channel.findFirst({
         where: {
           userId: DEFAULT_USER_ID,
+          kind: ChannelKind.RETAIL,
           formUrl: { contains: formUrl },
         },
         select: { id: true },
       })
-      retailBandId = retailBand?.id || null
+      channelId = channel?.id || null
     }
 
-    // === ProductPublish 매칭 (retailBandId + productName) ===
-    let productPublishId: number | null = null
+    // === PublishedProduct 매칭 (channelId + productName) ===
+    let publishedProductId: number | null = null
     let matchedPublish: {
       id: number
       product: { id: number; name: string; price: number | null }
     } | null = null
 
-    if (retailBandId) {
+    if (channelId) {
       const normalizedInput = productName.trim().toLowerCase().replace(/\s+/g, '')
 
       // 1단계: 정확한 이름 매칭
-      matchedPublish = await prisma.productPublish.findFirst({
+      matchedPublish = await prisma.publishedProduct.findFirst({
         where: {
           userId: DEFAULT_USER_ID,
-          retailBandId,
+          channelId,
           product: {
             name: productName,
           },
@@ -151,10 +156,10 @@ export async function POST(request: NextRequest) {
 
       // 2단계: 포함 매칭
       if (!matchedPublish) {
-        matchedPublish = await prisma.productPublish.findFirst({
+        matchedPublish = await prisma.publishedProduct.findFirst({
           where: {
             userId: DEFAULT_USER_ID,
-            retailBandId,
+            channelId,
             product: {
               name: { contains: productName },
             },
@@ -170,10 +175,10 @@ export async function POST(request: NextRequest) {
 
       // 3단계: 정규화 매칭
       if (!matchedPublish) {
-        const allPublishes = await prisma.productPublish.findMany({
+        const allPublishes = await prisma.publishedProduct.findMany({
           where: {
             userId: DEFAULT_USER_ID,
-            retailBandId,
+            channelId,
           },
           select: {
             id: true,
@@ -190,7 +195,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (matchedPublish) {
-        productPublishId = matchedPublish.id
+        publishedProductId = matchedPublish.id
       }
     }
 
@@ -221,7 +226,7 @@ export async function POST(request: NextRequest) {
     const order = await prisma.orderTest.create({
       data: {
         userId: DEFAULT_USER_ID,
-        productPublishId,
+        publishedProductId,
         productName,
         quantity,
         unitPrice,
@@ -229,10 +234,10 @@ export async function POST(request: NextRequest) {
         customerName,
       },
       include: {
-        productPublish: {
+        publishedProduct: {
           select: {
             id: true,
-            retailBand: {
+            channel: {
               select: { id: true, name: true },
             },
             product: {
@@ -243,28 +248,28 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const bandSource = rawRetailBandId ? '직접전달' : formUrl ? 'formUrl' : '미분류'
+    const channelSource = rawId ? '직접전달' : formUrl ? 'formUrl' : '미분류'
     const priceSource = matchedPublish?.product?.price ? '자동계산' : totalPrice ? '직접입력' : '없음'
-    console.log(`[Webhook] 주문 생성: ID=${order.id}, 고객=${customerName}, 상품=${productName}(${quantity}개), 단가=${unitPrice || '?'}원, 총액=${calculatedTotalPrice || '?'}원(${priceSource}), ProductPublish=${productPublishId || '없음'}, 밴드ID=${retailBandId || '없음'}(${bandSource})`)
+    console.log(`[Webhook] 주문 생성: ID=${order.id}, 고객=${customerName}, 상품=${productName}(${quantity}개), 단가=${unitPrice || '?'}원, 총액=${calculatedTotalPrice || '?'}원(${priceSource}), PublishedProduct=${publishedProductId || '없음'}, 채널ID=${channelId || '없음'}(${channelSource})`)
 
     return NextResponse.json(
       {
         success: true,
-        message: productPublishId
+        message: publishedProductId
           ? `주문이 등록되었습니다. (상품 "${matchedPublish?.product?.name}" 매칭됨, ${quantity}개 × ${unitPrice?.toLocaleString() || '?'}원 = ${calculatedTotalPrice?.toLocaleString() || '?'}원)`
           : `주문이 등록되었습니다. (매칭되는 발행 상품 없음, 수량: ${quantity}개)`,
         data: {
           orderId: order.id,
-          productPublishMatched: !!productPublishId,
-          productPublishId,
+          publishedProductMatched: !!publishedProductId,
+          publishedProductId,
           matchedProductName: matchedPublish?.product?.name || null,
-          retailBandId,
-          retailBandName: order.productPublish?.retailBand?.name || null,
+          channelId,
+          channelName: order.publishedProduct?.channel?.name || null,
           quantity,
           unitPrice,
           totalPrice: calculatedTotalPrice,
           priceSource,
-          bandSource,
+          channelSource,
         },
       },
       { headers }

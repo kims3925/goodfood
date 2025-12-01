@@ -42,8 +42,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fetch post with images
-    const post = await prisma.post.findUnique({
+    // Fetch collected post with images
+    const post = await prisma.collectedPost.findUnique({
       where: {
         id: postId,
         userId, // Ensure user owns the post
@@ -64,14 +64,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if product already exists for this post
-    const existingProduct = await prisma.product.findUnique({
-      where: {
-        postId: post.id,
-      },
+    // Check if product already exists for this post via collected product
+    const existingCollectedProduct = await prisma.collectedProduct.findFirst({
+      where: { postId: post.id },
+      include: { products: true },
     })
 
-    if (existingProduct) {
+    if (existingCollectedProduct?.products?.length) {
       return NextResponse.json(
         {
           success: false,

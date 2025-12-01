@@ -17,10 +17,10 @@ import Link from 'next/link'
 
 interface Product {
   id: number
-  postId: number
+  collectedProductId: number | null
   name: string
   description: string | null
-  status: 'COLLECTED' | 'PUBLISHED'
+  status: 'COLLECTED' | 'ARCHIVED'
   thumbnailUrl: string | null
   price: number | null
   wholesalePrice: number | null
@@ -28,22 +28,24 @@ interface Product {
   currency: string
   createdAt: string
   updatedAt: string
-  post: {
-    id: number
-    title: string
-    content: string
-    wholesaleBand: {
-      name: string
-      bandKey: string
-      coverUrl: string | null
-    }
-    images: Array<{
+  collectedProduct: {
+    post: {
       id: number
-      imageUrl: string
-      name?: string
-      sortOrder: number
-    }>
-  }
+      title: string
+      content: string
+      wholesaleBand: {
+        name: string
+        bandKey: string
+        coverUrl: string | null
+      }
+      images: Array<{
+        id: number
+        imageUrl: string
+        name?: string
+        sortOrder: number
+      }>
+    } | null
+  } | null
   options: Array<{
     id: number
     groupName: string
@@ -171,7 +173,7 @@ export default function ProductDetailTestC() {
     return new Date(dateString).toLocaleString('ko-KR')
   }
 
-  const images = product?.post?.images || []
+  const images = product?.collectedProduct?.post?.images || []
 
   // Group options by groupName
   const groupedOptions = (product?.options || []).reduce((acc, option) => {
@@ -241,14 +243,16 @@ export default function ProductDetailTestC() {
                   <div className="flex items-center gap-2">
                     <h1 className="text-lg font-bold text-gray-900">{product.name}</h1>
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      product.status === 'PUBLISHED'
-                        ? 'bg-green-100 text-green-700'
+                      product.status === 'ARCHIVED'
+                        ? 'bg-yellow-100 text-yellow-700'
                         : 'bg-gray-100 text-gray-600'
                     }`}>
-                      {product.status === 'PUBLISHED' ? '발행' : '수집'}
+                      {product.status === 'ARCHIVED' ? '보관' : '수집'}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500">{product.post.wholesaleBand.name}</p>
+                  <p className="text-sm text-gray-500">
+                    {product.collectedProduct?.post?.wholesaleBand.name || '출처 없음'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -476,9 +480,9 @@ export default function ProductDetailTestC() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="p-6">
               <div className="flex items-start gap-6">
-                {product.post.images[0] && (
+                {product.collectedProduct?.post?.images[0] && (
                   <img
-                    src={product.post.images[0].imageUrl}
+                    src={product.collectedProduct.post.images[0].imageUrl}
                     alt=""
                     className="w-32 h-32 rounded-xl object-cover flex-shrink-0"
                   />
@@ -486,18 +490,24 @@ export default function ProductDetailTestC() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
-                      {product.post.wholesaleBand.name}
+                      {product.collectedProduct?.post?.wholesaleBand.name || '출처 없음'}
                     </span>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{product.post.title}</h3>
-                  <p className="text-gray-600 mb-4 line-clamp-3">{product.post.content}</p>
-                  <Link
-                    href={`/post/detail/${product.post.id}`}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors text-sm font-medium"
-                  >
-                    <FileText size={16} />
-                    원본 게시물 보기
-                  </Link>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {product.collectedProduct?.post?.title || '게시물 정보 없음'}
+                  </h3>
+                  <p className="text-gray-600 mb-4 line-clamp-3">
+                    {product.collectedProduct?.post?.content || '원본 게시물 내용을 확인할 수 없습니다.'}
+                  </p>
+                  {product.collectedProduct?.post && (
+                    <Link
+                      href={`/post/detail/${product.collectedProduct.post.id}`}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors text-sm font-medium"
+                    >
+                      <FileText size={16} />
+                      원본 게시물 보기
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>

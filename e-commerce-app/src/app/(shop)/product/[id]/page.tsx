@@ -93,12 +93,12 @@ export default function ProductDetailPage() {
 
   // 리뷰 로드 함수
   const loadReviews = async () => {
-    if (!product?.productPublishId) return
+    if (!product?.publishedProductId) return
 
     try {
       setReviewsLoading(true)
       const response = await fetch(
-        `/api/shop/products/${product.productPublishId}/reviews?page=${reviewPage}&limit=5&sortBy=${reviewSortBy}`
+        `/api/shop/products/${product.publishedProductId}/reviews?page=${reviewPage}&limit=5&sortBy=${reviewSortBy}`
       )
       const data = await response.json()
 
@@ -222,7 +222,7 @@ export default function ProductDetailPage() {
   }
 
   const handleAddToCart = async () => {
-    if (!product?.productPublishId) {
+    if (!product?.publishedProductId) {
       return
     }
 
@@ -236,7 +236,7 @@ export default function ProductDetailPage() {
 
       const cartData = {
         sessionId,
-        productPublishId: product.productPublishId,
+        publishedProductId: product.publishedProductId,
         quantity
       }
 
@@ -271,11 +271,11 @@ export default function ProductDetailPage() {
       return
     }
 
-    // productPublishId를 체크아웃 페이지로 전달
-    if (!product?.productPublishId) {
+    // publishedProductId를 체크아웃 페이지로 전달
+    if (!product?.publishedProductId) {
       return
     }
-    const checkoutUrl = `/checkout?productPublishId=${product.productPublishId}&quantity=${quantity}`
+    const checkoutUrl = `/checkout?publishedProductId=${product.publishedProductId}&quantity=${quantity}`
     window.location.href = checkoutUrl
   }
 

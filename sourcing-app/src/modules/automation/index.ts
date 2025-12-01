@@ -33,7 +33,7 @@
  *
  * // 발행만 실행
  * const publishResult = await executePublishPipeline(userId, {
- *   retailBandIds: [1, 2, 3]
+ *   channelIds: [1, 2, 3]
  * })
  * ```
  */
@@ -51,7 +51,7 @@ export type {
   TransformedPost,
   PublishConfig,
   PublishResult,
-  PublishedProduct,
+  PublishedProductResult,
   BandPublishResult,
   FullPipelineConfig,
   FullPipelineResult,

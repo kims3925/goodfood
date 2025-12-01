@@ -118,18 +118,20 @@ export async function getAutomationStats(userId: number): Promise<AutomationStat
   today.setHours(0, 0, 0, 0)
 
   // 오늘 수집된 게시물 수
-  const todayCollected = await prisma.post.count({
+  const todayCollected = await prisma.collectedPost.count({
     where: {
       userId,
       createdAt: { gte: today }
     }
   })
 
-  // AI 변환 대기 중인 게시물 수 (상품이 없는 게시물)
-  const pendingTransform = await prisma.post.count({
+  // AI 변환 대기 중인 게시물 수 (CollectedProduct가 없는 게시물)
+  const pendingTransform = await prisma.collectedPost.count({
     where: {
       userId,
-      product: null
+      collectedProducts: {
+        none: {},
+      },
     }
   })
 
@@ -137,14 +139,14 @@ export async function getAutomationStats(userId: number): Promise<AutomationStat
   const readyToPublish = await prisma.product.count({
     where: {
       userId,
-      productPublishes: {
+      publishedProducts: {
         none: {}
       }
     }
   })
 
-  // 오늘 발행된 상품 수 (ProductPublish로 통합)
-  const todayPublished = await prisma.productPublish.count({
+  // 오늘 발행된 상품 수
+  const todayPublished = await prisma.publishedProduct.count({
     where: {
       userId,
       status: 'SUCCESS',

@@ -1,8 +1,9 @@
 export interface ProductListParams {
   userId: number
+  collectedProductId?: number
   postId?: number
   search?: string
-  wholesaleBandId?: number
+  channelId?: number
   status?: string
   startDate?: string
   endDate?: string
@@ -12,13 +13,15 @@ export interface ProductListParams {
 
 export interface ProductCreateInput {
   userId: number
-  postId: number
+  postId?: number
+  collectedProductId?: number
   name: string
   description?: string
   categoryId?: string
   currency?: string
   price?: number
   wholesalePrice?: number
+  thumbnailUrl?: string | null
 }
 
 export interface ProductUpdateInput {

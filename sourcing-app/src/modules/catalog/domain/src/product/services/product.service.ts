@@ -11,23 +11,46 @@ export class ProductService {
   }
 
   async create(data: ProductCreateInput) {
-    // 게시물 존재 확인
-    const post = await productRepository.getPostWithImages(data.postId, data.userId)
-    if (!post) {
-      throw new Error('게시물을 찾을 수 없습니다.')
+    let collectedProductId = data.collectedProductId || null
+    let thumbnailUrl: string | null = data.thumbnailUrl || null
+
+    // postId 기반 생성 (하위 호환)
+    if (!collectedProductId && data.postId) {
+      const post = await productRepository.getCollectedPostWithImages(data.postId, data.userId)
+      if (!post) {
+        throw new Error('게시물을 찾을 수 없습니다.')
+      }
+
+      const existingCollected = await productRepository.findCollectedProductByPostId(data.postId)
+      if (existingCollected?.products?.length) {
+        throw new Error('이미 이 게시물로 생성된 상품이 있습니다.')
+      }
+
+      if (existingCollected) {
+        collectedProductId = existingCollected.id
+        thumbnailUrl = thumbnailUrl || existingCollected.post?.images?.[0]?.imageUrl || null
+      } else {
+        const collected = await productRepository.createCollectedProductFromPost({
+          userId: data.userId,
+          postId: data.postId,
+          name: data.name,
+          description: data.description,
+          currency: data.currency,
+          price: data.price,
+          wholesalePrice: data.wholesalePrice,
+        })
+        collectedProductId = collected.id
+        thumbnailUrl = thumbnailUrl || post.images[0]?.imageUrl || null
+      }
     }
 
-    // 이미 해당 게시물로 생성된 상품이 있는지 확인
-    const existing = await productRepository.findByPostId(data.postId)
-    if (existing) {
-      throw new Error('이미 이 게시물로 생성된 상품이 있습니다.')
+    if (!collectedProductId) {
+      throw new Error('collectedProductId 또는 postId가 필요합니다.')
     }
-
-    // 게시물에서 썸네일 가져오기
-    const thumbnailUrl = post.images[0]?.imageUrl || null
 
     return productRepository.create({
       ...data,
+      collectedProductId,
       thumbnailUrl,
     })
   }

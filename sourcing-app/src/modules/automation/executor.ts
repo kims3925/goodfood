@@ -74,8 +74,8 @@ export async function executeCollectionPipeline(
     })
 
     const collectionConfig = {
-      collectFromAllBands: config?.collectFromAllBands ?? automationConfig?.collectFromAllBands ?? true,
-      wholesaleBandIds: config?.wholesaleBandIds ?? (automationConfig?.wholesaleBandIds as number[] | undefined),
+      collectFromAllChannels: config?.collectFromAllChannels ?? automationConfig?.collectFromAllBands ?? true,
+      channelIds: config?.channelIds ?? parseNumberArray(automationConfig?.channelIds || automationConfig?.channelIds),
       limit: config?.limit ?? 20,
     }
 
@@ -182,15 +182,15 @@ export async function executePublishPipeline(
       where: { userId },
     })
 
-    if (!config?.retailBandIds && !automationConfig?.retailBandIds) {
-      throw new Error('발행할 소매밴드가 설정되지 않았습니다')
+    // 새로운 필드명 우선, 없으면 이전 필드명 사용 (하위 호환성)
+    const channelIdsForPublish = config?.channelIds ?? parseNumberArray(automationConfig?.retailChannelIds || automationConfig?.channelIds)
+
+    if (!channelIdsForPublish || channelIdsForPublish.length === 0) {
+      throw new Error('발행할 채널이 설정되지 않았습니다')
     }
 
-    // retailBandIds 파싱
-    const retailBandIds = config?.retailBandIds ?? parseNumberArray(automationConfig?.retailBandIds)
-
     const publishConfig = {
-      retailBandIds,
+      channelIds: channelIdsForPublish,
       productIds: config?.productIds,
       publishReadyOnly: config?.publishReadyOnly ?? true,
     }
@@ -270,8 +270,8 @@ export async function executeFullPipeline(
     if (!options?.skipCollection) {
       console.log('[FullPipeline] Step 1: Collection')
       collectionResult = await runCollectionPipeline({
-        collectFromAllBands: automationConfig.collectFromAllBands,
-        wholesaleBandIds: parseNumberArray(automationConfig.wholesaleBandIds) || undefined,
+        collectFromAllChannels: automationConfig.collectFromAllBands,
+        channelIds: parseNumberArray(automationConfig.channelIds || automationConfig.channelIds) || undefined,
       })
 
       // 진행 상황 업데이트
@@ -304,11 +304,11 @@ export async function executeFullPipeline(
 
     // 3. 발행 단계 (autoPublish가 true인 경우에만)
     if (!options?.skipPublish && automationConfig.autoPublish) {
-      const retailBandIdsForPublish = parseNumberArray(automationConfig.retailBandIds)
-      if (retailBandIdsForPublish.length) {
+      const channelIdsForPublish = parseNumberArray(automationConfig.retailChannelIds || automationConfig.channelIds)
+      if (channelIdsForPublish.length) {
         console.log('[FullPipeline] Step 3: Publish')
         publishResult = await runPublishPipeline({
-          retailBandIds: retailBandIdsForPublish,
+          channelIds: channelIdsForPublish,
           publishReadyOnly: true,
         })
 

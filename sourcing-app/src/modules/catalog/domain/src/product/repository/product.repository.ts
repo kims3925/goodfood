@@ -1,13 +1,14 @@
-import prisma, { PublishStatus, PublishType } from '@bandauto/db'
+import prisma, { PublishStatus, ChannelKind } from '@bandauto/db'
 import type { ProductListParams, ProductCreateInput, ProductUpdateInput } from '../types/product.types'
 
 export class ProductRepository {
   async findMany(params: ProductListParams) {
     const {
       userId,
+      collectedProductId,
       postId,
       search,
-      wholesaleBandId,
+      channelId,
       status,
       startDate,
       endDate,
@@ -17,8 +18,14 @@ export class ProductRepository {
 
     const where: any = { userId }
 
+    if (collectedProductId) {
+      where.collectedProductId = collectedProductId
+    }
+
+    const collectedProductWhere: any = {}
+
     if (postId) {
-      where.postId = postId
+      collectedProductWhere.postId = postId
     }
 
     if (search) {
@@ -28,10 +35,14 @@ export class ProductRepository {
       ]
     }
 
-    if (wholesaleBandId) {
-      where.post = {
-        wholesaleBandId,
+    if (channelId) {
+      collectedProductWhere.post = {
+        channelId,
       }
+    }
+
+    if (Object.keys(collectedProductWhere).length > 0) {
+      where.collectedProduct = collectedProductWhere
     }
 
     if (status) {
@@ -55,28 +66,34 @@ export class ProductRepository {
     const products = await prisma.product.findMany({
       where,
       include: {
-        post: {
+        collectedProduct: {
           include: {
-            wholesaleBand: {
-              select: {
-                id: true,
-                name: true,
-                coverUrl: true,
+            post: {
+              include: {
+                channel: {
+                  select: {
+                    id: true,
+                    name: true,
+                    coverUrl: true,
+                  },
+                },
+                images: {
+                  orderBy: { sortOrder: 'asc' },
+                  take: 1,
+                },
               },
-            },
-            images: {
-              orderBy: { sortOrder: 'asc' },
-              take: 1,
             },
           },
         },
-        productPublishes: {
+        publishedProducts: {
           where: {
             status: PublishStatus.SUCCESS,
-            publishType: PublishType.RETAIL_BAND,
+            channel: {
+              kind: ChannelKind.RETAIL,
+            },
           },
           include: {
-            retailBand: {
+            channel: {
               select: {
                 id: true,
                 name: true,
@@ -94,26 +111,26 @@ export class ProductRepository {
 
     // 발행 상태 계산해서 추가
     const productsWithPublishStatus = products.map((product) => {
-      const retailBandPublishes = product.productPublishes
+      const channelPublishes = product.publishedProducts
 
-      const hasRetailBand = retailBandPublishes.length > 0
+      const hasChannelPublish = channelPublishes.length > 0
 
-      // 발행된 소매밴드 ID 목록
-      const publishedRetailBandIds = retailBandPublishes
-        .map((pp) => pp.retailBandId)
+      // 발행된 채널 ID 목록
+      const publishedChannelIds = channelPublishes
+        .map((pp) => pp.channelId)
         .filter((id): id is number => id !== null && id !== undefined)
 
       let publishSummary = '미발행'
-      if (hasRetailBand) {
+      if (hasChannelPublish) {
         publishSummary = '발행됨'
       }
 
       return {
         ...product,
         publishStatus: {
-          retailBand: hasRetailBand,
+          retailBand: hasChannelPublish,
         },
-        publishedRetailBandIds, // 발행된 소매밴드 ID 목록
+        publishedChannelIds, // 발행된 채널 ID 목록
         publishSummary,
       }
     })
@@ -138,9 +155,48 @@ export class ProductRepository {
     })
   }
 
-  async findByPostId(postId: number) {
-    return prisma.product.findUnique({
+  async findByCollectedProductId(collectedProductId: number) {
+    return prisma.product.findFirst({
+      where: { collectedProductId },
+    })
+  }
+
+  async findCollectedProductByPostId(postId: number) {
+    return prisma.collectedProduct.findFirst({
       where: { postId },
+      include: {
+        products: true,
+        post: {
+          include: {
+            images: {
+              orderBy: { sortOrder: 'asc' },
+              take: 1,
+            },
+          },
+        },
+      },
+    })
+  }
+
+  async createCollectedProductFromPost(params: {
+    userId: number
+    postId: number
+    name?: string
+    description?: string
+    currency?: string
+    price?: number
+    wholesalePrice?: number
+  }) {
+    return prisma.collectedProduct.create({
+      data: {
+        userId: params.userId,
+        postId: params.postId,
+        name: params.name || null,
+        description: params.description || null,
+        currency: params.currency || 'KRW',
+        price: params.price || null,
+        wholesalePrice: params.wholesalePrice || null,
+      },
     })
   }
 
@@ -148,7 +204,7 @@ export class ProductRepository {
     return prisma.product.create({
       data: {
         userId: data.userId,
-        postId: data.postId,
+        collectedProductId: data.collectedProductId || null,
         name: data.name,
         description: data.description || null,
         categoryId: data.categoryId || null,
@@ -181,8 +237,8 @@ export class ProductRepository {
     })
   }
 
-  async getPostWithImages(postId: number, userId: number) {
-    return prisma.post.findFirst({
+  async getCollectedPostWithImages(postId: number, userId: number) {
+    return prisma.collectedPost.findFirst({
       where: { id: postId, userId },
       include: {
         images: {

@@ -37,7 +37,7 @@ interface OrderPrepareData {
   orderId: string
   userId: number
   fromCart: boolean
-  items?: { productPublishId: number; variantId?: number; quantity: number }[]
+  items?: { publishedProductId: number; variantId?: number; quantity: number }[]
   customerInfo: {
     name: string
     phone: string
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
           include: {
             items: {
               include: {
-                productPublish: {
+                publishedProduct: {
                   include: {
                     product: {
                       include: { variants: { take: 1 } },
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
           include: {
             items: {
               include: {
-                productPublish: {
+                publishedProduct: {
                   include: {
                     product: {
                       include: { variants: { take: 1 } },
@@ -162,14 +162,14 @@ export async function POST(req: NextRequest) {
       }
 
       orderItems = cart.items.map((item) => {
-        const productPublish = item.productPublish
-        const product = productPublish.product
+        const publishedProduct = item.publishedProduct
+        const product = publishedProduct.product
         const variant = item.variant
         const mainVariant = product.variants[0]
         const unitPrice = variant?.price || mainVariant?.price || product.price || 0
 
         return {
-          productPublishId: productPublish.id,
+          publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
           productName: product.name,
           optionSummary: variant?.optionSummary || null,
@@ -188,9 +188,9 @@ export async function POST(req: NextRequest) {
       }
 
       for (const item of items) {
-        const productPublish = await prisma.productPublish.findFirst({
+        const publishedProduct = await prisma.publishedProduct.findFirst({
           where: {
-            id: parseInt(item.productPublishId),
+            id: parseInt(item.publishedProductId),
             status: PublishStatus.SUCCESS,
           },
           include: {
@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
           },
         })
 
-        if (!productPublish) {
+        if (!publishedProduct) {
           return NextResponse.json(
             { success: false, error: `상품을 찾을 수 없거나 판매 중인 상품이 아닙니다` },
             { status: 404 }
@@ -214,12 +214,12 @@ export async function POST(req: NextRequest) {
           })
         }
 
-        const product = productPublish.product
+        const product = publishedProduct.product
         const mainVariant = product.variants[0]
         const unitPrice = variant?.price || mainVariant?.price || product.price || 0
 
         orderItems.push({
-          productPublishId: productPublish.id,
+          publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
           productName: product.name,
           optionSummary: variant?.optionSummary || null,

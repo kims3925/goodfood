@@ -1,7 +1,7 @@
 /**
  * Payment Service
  * 결제 비즈니스 로직 레이어
- * ProductPublish 기반 주문과 연동
+ * PublishedProduct 기반 주문과 연동
  */
 
 import prisma, { Prisma, PublishStatus } from '@bandauto/db'
@@ -32,7 +32,7 @@ export interface OrderPrepareData {
   orderId: string
   userId: number
   fromCart: boolean
-  items?: { productPublishId: number; variantId?: number; quantity: number }[]
+  items?: { publishedProductId: number; variantId?: number; quantity: number }[]
   customerInfo: {
     name: string
     phone: string
@@ -318,14 +318,14 @@ export class PaymentService {
       }
 
       orderItems = cart.items.map((item: any) => {
-        const productPublish = item.productPublish
-        const product = productPublish.product
+        const publishedProduct = item.publishedProduct
+        const product = publishedProduct.product
         const variant = item.variant
         const mainVariant = product.variants[0]
         const unitPrice = variant?.price || mainVariant?.price || product.price || 0
 
         return {
-          productPublishId: productPublish.id,
+          publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
           productName: product.name,
           optionSummary: variant?.optionSummary || null,
@@ -337,9 +337,9 @@ export class PaymentService {
     } else if (prepareData.items) {
       // 직접 지정 상품
       for (const item of prepareData.items) {
-        const productPublish = await prisma.productPublish.findFirst({
+        const publishedProduct = await prisma.publishedProduct.findFirst({
           where: {
-            id: item.productPublishId,
+            id: item.publishedProductId,
             status: PublishStatus.SUCCESS,
           },
           include: {
@@ -349,8 +349,8 @@ export class PaymentService {
           },
         })
 
-        if (!productPublish) {
-          throw new NotFoundError('상품', String(item.productPublishId))
+        if (!publishedProduct) {
+          throw new NotFoundError('상품', String(item.publishedProductId))
         }
 
         let variant = null
@@ -360,12 +360,12 @@ export class PaymentService {
           })
         }
 
-        const product = productPublish.product
+        const product = publishedProduct.product
         const mainVariant = product.variants[0]
         const unitPrice = variant?.price || mainVariant?.price || product.price || 0
 
         orderItems.push({
-          productPublishId: productPublish.id,
+          publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
           productName: product.name,
           optionSummary: variant?.optionSummary || null,
@@ -400,7 +400,7 @@ export class PaymentService {
         totalAmount: new Decimal(totalAmount),
         items: {
           create: orderItems.map((item) => ({
-            productPublishId: item.productPublishId,
+            publishedProductId: item.publishedProductId,
             variantId: item.variantId,
             productName: item.productName,
             optionSummary: item.optionSummary,
