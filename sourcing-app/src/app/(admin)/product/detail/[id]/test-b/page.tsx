@@ -23,10 +23,8 @@ interface Product {
   collectedProductId: number | null
   name: string
   description: string | null
-  status: 'COLLECTED' | 'ARCHIVED'
   thumbnailUrl: string | null
   price: number | null
-  wholesalePrice: number | null
   categoryId: string | null
   currency: string
   createdAt: string
@@ -60,7 +58,6 @@ interface Product {
     sku: string | null
     optionSummary: string | null
     price: number
-    wholesalePrice: number | null
     stock: number
   }>
 }
@@ -388,13 +385,6 @@ export default function ProductDetailTestB() {
               <div>
                 <div className="flex items-center gap-3 mb-1">
                   <h1 className="text-2xl font-bold text-white">{product.name}</h1>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    product.status === 'ARCHIVED'
-                      ? 'bg-yellow-200 text-yellow-800'
-                      : 'bg-white/30 text-white'
-                  }`}>
-                    {product.status === 'ARCHIVED' ? '보관' : '수집'}
-                  </span>
                 </div>
                 <p className="text-purple-100 text-sm">
                   {product.collectedProduct?.post?.wholesaleBand.name || '출처 없음'} • 등록일 {formatDate(product.createdAt)}
@@ -427,14 +417,10 @@ export default function ProductDetailTestB() {
 
         {/* 통계 카드들 */}
         <div className="max-w-7xl mx-auto px-6 pb-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-white">
               <div className="text-purple-200 text-sm mb-1">판매가</div>
               <div className="text-2xl font-bold">{formatPrice(product.price)}</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-white">
-              <div className="text-purple-200 text-sm mb-1">도매가</div>
-              <div className="text-2xl font-bold">{formatPrice(product.wholesalePrice)}</div>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-white">
               <div className="text-purple-200 text-sm mb-1">이미지</div>

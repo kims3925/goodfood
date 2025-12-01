@@ -23,10 +23,8 @@ interface Product {
   collectedProductId: number | null
   name: string
   description: string | null
-  status: 'COLLECTED' | 'ARCHIVED'
   thumbnailUrl: string | null
   price: number | null
-  wholesalePrice: number | null
   categoryId: string | null
   currency: string
   createdAt: string
@@ -61,7 +59,6 @@ interface Product {
     sku: string | null
     optionSummary: string | null
     price: number
-    wholesalePrice: number | null
     stock: number
   }>
 }
@@ -100,10 +97,13 @@ export default function ProductDetailPage() {
     description: '',
     categoryId: '',
     price: '',
-    wholesalePrice: '',
   })
 
   // 이미지 관련 상태
+  const [images, setImages] = useState<SortableImage[]>([])
+  const [imageOrderChanged, setImageOrderChanged] = useState(false)
+  const [isImageReordering, setIsImageReordering] = useState(false)
+  const [isReorderingSaving, setIsReorderingSaving] = useState(false)
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null)
 
   // 삭제 확인 모달 상태
@@ -141,7 +141,6 @@ export default function ProductDetailPage() {
           description: data.data.description || '',
           categoryId: data.data.categoryId || '',
           price: data.data.price?.toString() || '',
-          wholesalePrice: data.data.wholesalePrice?.toString() || '',
         })
         // 이미지 상태 초기화
         if (data.data.collectedProduct?.post?.images) {
@@ -194,7 +193,6 @@ export default function ProductDetailPage() {
           description: formData.description.trim() || null,
           categoryId: formData.categoryId.trim() || null,
           price: formData.price ? parseInt(formData.price) : null,
-          wholesalePrice: formData.wholesalePrice ? parseInt(formData.wholesalePrice) : null,
         }),
       })
 
@@ -375,14 +373,8 @@ export default function ProductDetailPage() {
     })
   }
 
-  const images = product?.post?.images || []
-
-  // ImageSortable용 이미지 변환
-  const sortableImages: SortableImage[] = images.map((img) => ({
-    id: img.id,
-    imageUrl: img.imageUrl,
-    sortOrder: img.sortOrder,
-  }))
+  // ImageSortable용 이미지 변환 (images 상태 변수 사용)
+  const sortableImages: SortableImage[] = images
 
   const handlePrevImage = () => {
     setSelectedImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))
@@ -439,7 +431,6 @@ export default function ProductDetailPage() {
               </button>
               <div className="flex items-center gap-3">
                 <h1 className="text-xl font-bold text-gray-900">{product.name}</h1>
-                {getStatusBadge(product.status)}
               </div>
             </div>
             <div className="flex gap-2">
@@ -500,12 +491,13 @@ export default function ProductDetailPage() {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {activeTab === 'info' ? (
-          /* 상품 정보 탭 */
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <>
+            {/* 상품 정보 탭 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* 좌측: 이미지 갤러리 */}
             <div className="space-y-4">
               {isEditing ? (
-                /* 편집 모드: ImageSortable 사용 */
+                // 편집 모드: ImageSortable 사용
                 <div className="bg-white rounded-2xl shadow-lg p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">이미지 관리</h3>
                   <p className="text-sm text-gray-500 mb-4">드래그하여 순서를 변경하거나, 호버하여 삭제할 수 있습니다.</p>
@@ -523,7 +515,7 @@ export default function ProductDetailPage() {
                   )}
                 </div>
               ) : (
-                /* 보기 모드: 기존 갤러리 */
+                // 보기 모드: 기존 갤러리
                 <>
                   {/* 메인 이미지 */}
                   <div className="relative bg-white rounded-2xl overflow-hidden shadow-lg aspect-square">
@@ -605,23 +597,13 @@ export default function ProductDetailPage() {
                         rows={4}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">판매가</label>
-                        <Input
-                          type="number"
-                          value={formData.price}
-                          onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">도매가</label>
-                        <Input
-                          type="number"
-                          value={formData.wholesalePrice}
-                          onChange={(e) => setFormData({ ...formData, wholesalePrice: e.target.value })}
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">판매가</label>
+                      <Input
+                        type="number"
+                        value={formData.price}
+                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      />
                     </div>
                   </div>
                 ) : (
@@ -633,10 +615,6 @@ export default function ProductDetailPage() {
                       <div className="flex justify-between items-center py-3 border-b border-gray-100">
                         <span className="text-gray-500">판매가</span>
                         <span className="text-2xl font-bold text-gray-900">{formatPrice(product.price)}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                        <span className="text-gray-500">도매가</span>
-                        <span className="text-lg font-semibold text-gray-600">{formatPrice(product.wholesalePrice)}</span>
                       </div>
                       {product.categoryId && (
                         <div className="flex justify-between items-center py-3">
@@ -672,6 +650,8 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
 
           {/* Row 2: 출처 게시물 + 메타데이터 */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
@@ -711,13 +691,13 @@ export default function ProductDetailPage() {
                       {product.collectedProduct?.post?.content || '원본 게시물 내용을 찾을 수 없습니다.'}
                     </p>
                   </div>
-                  <span className="text-gray-600 text-sm truncate">{product.post.title}</span>
                 </div>
               </div>
             </div>
           </div>
+          </>
         ) : (
-          /* 발행현황 탭 */
+          // 발행현황 탭
           <div className="bg-white rounded-2xl shadow-lg">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900">발행 이력</h2>

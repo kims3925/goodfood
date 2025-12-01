@@ -176,14 +176,14 @@ export default function AutomationSettingsPage() {
   // 섹션별 변경 여부 확인 (isEnabled는 버튼으로 변경하므로 제외)
   const hasScheduleChanges = config.cronInterval !== initialConfig.cronInterval
 
-  const hasCollectionChanges = JSON.stringify(config.wholesaleChannelIds.slice().sort()) !==
-    JSON.stringify(initialConfig.wholesaleChannelIds.slice().sort())
+  const hasCollectionChanges = JSON.stringify((config.wholesaleChannelIds || []).slice().sort()) !==
+    JSON.stringify((initialConfig.wholesaleChannelIds || []).slice().sort())
 
   const hasAiChanges = config.aiProvider !== initialConfig.aiProvider ||
     config.pricingPolicyId !== initialConfig.pricingPolicyId
 
-  const hasPublishChanges = JSON.stringify(config.retailChannelIds.slice().sort()) !==
-    JSON.stringify(initialConfig.retailChannelIds.slice().sort())
+  const hasPublishChanges = JSON.stringify((config.retailChannelIds || []).slice().sort()) !==
+    JSON.stringify((initialConfig.retailChannelIds || []).slice().sort())
 
   // 저장되지 않은 변경사항이 있는지 확인
   const hasUnsavedChanges = hasScheduleChanges || hasCollectionChanges || hasAiChanges || hasPublishChanges
@@ -265,8 +265,14 @@ export default function AutomationSettingsPage() {
       const aiSettingsData = await aiSettingsRes.json()
 
       if (configData.success) {
-        setConfig(configData.data)
-        setInitialConfig(configData.data)
+        const loadedConfig = {
+          ...defaultConfig,
+          ...configData.data,
+          wholesaleChannelIds: configData.data?.wholesaleChannelIds || [],
+          retailChannelIds: configData.data?.retailChannelIds || [],
+        }
+        setConfig(loadedConfig)
+        setInitialConfig(loadedConfig)
       }
       if (wholesaleData.success) {
         setWholesaleChannels(wholesaleData.data || [])

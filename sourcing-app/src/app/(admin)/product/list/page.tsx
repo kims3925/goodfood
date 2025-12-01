@@ -25,10 +25,8 @@ interface Product {
   collectedProductId: number | null
   name: string
   description: string | null
-  status: 'COLLECTED' | 'ARCHIVED'
   thumbnailUrl: string | null
   price: number | null
-  wholesalePrice: number | null
   currency: string
   createdAt: string
   collectedProduct?: {
@@ -67,12 +65,6 @@ interface Product {
   publishSummary?: string
 }
 
-const STATUS_OPTIONS = [
-  { value: '', label: '전체 상태' },
-  { value: 'COLLECTED', label: '수집' },
-  { value: 'ARCHIVED', label: '보관' },
-]
-
 export default function ProductListPage() {
   const router = useRouter()
   const toast = useToast()
@@ -84,7 +76,6 @@ export default function ProductListPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
-  const [selectedStatus, setSelectedStatus] = useState<string>('')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
 
@@ -123,7 +114,7 @@ export default function ProductListPage() {
 
   useEffect(() => {
     loadProducts()
-  }, [currentPage, selectedChannelId, selectedStatus, startDate, endDate])
+  }, [currentPage, selectedChannelId, startDate, endDate])
 
   const loadChannels = async () => {
     try {
@@ -148,7 +139,6 @@ export default function ProductListPage() {
 
       if (searchTerm) params.append('search', searchTerm)
       if (selectedChannelId) params.append('channelId', selectedChannelId)
-      if (selectedStatus) params.append('status', selectedStatus)
       if (startDate) params.append('startDate', startDate)
       if (endDate) params.append('endDate', endDate)
 
@@ -179,7 +169,7 @@ export default function ProductListPage() {
     setCurrentPage(1)
   }
 
-  const hasActiveFilters = selectedChannelId || selectedStatus || startDate || endDate
+  const hasActiveFilters = selectedChannelId || startDate || endDate
 
   const handleSearch = () => {
     setCurrentPage(1)
@@ -248,7 +238,6 @@ export default function ProductListPage() {
                 description: '',
                 categoryId: '',
                 price: '',
-                wholesalePrice: '',
                 options: [],
                 variants: [],
               },
@@ -337,7 +326,6 @@ export default function ProductListPage() {
                 description: '',
                 categoryId: '',
                 price: '',
-                wholesalePrice: '',
                 options: [],
                 variants: [],
               },
@@ -557,9 +545,9 @@ export default function ProductListPage() {
             <span className={`inline-block w-2 h-2 rounded-full ${channel ? 'bg-green-500' : 'bg-gray-300'}`} title="채널" />
             <span className={`inline-block w-2 h-2 rounded-full ${shoppingMall ? 'bg-green-500' : 'bg-gray-300'}`} title="쇼핑몰" />
           </div>
-        )}
-      </div>
-    )
+        </div>
+      )
+    }
   }
 
   const formatPrice = (price: number | null) => {
@@ -656,25 +644,6 @@ export default function ProductListPage() {
                     {channels.map((channel) => (
                       <option key={channel.id} value={channel.id.toString()}>
                         {channel.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 상태 필터 */}
-                <div className="w-40">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">상태</label>
-                  <select
-                    value={selectedStatus}
-                    onChange={(e) => {
-                      setSelectedStatus(e.target.value)
-                      setCurrentPage(1)
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
-                  >
-                    {STATUS_OPTIONS.map((status) => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
                       </option>
                     ))}
                   </select>
@@ -797,29 +766,10 @@ export default function ProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[30%]">상품명</TableHead>
-                  <TableHead className="w-[12%]">출처 채널</TableHead>
-                  <TableHead className="w-[9%]">도매가</TableHead>
-                  <TableHead className="w-[9%]">판매가</TableHead>
-                  <TableHead className="w-[12%]">발행현황</TableHead>
-                  <TableHead className="w-[12%]">
-                    <select
-                      value={selectedStatus}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        setSelectedStatus(e.target.value)
-                        setCurrentPage(1)
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 bg-white cursor-pointer"
-                    >
-                      {STATUS_OPTIONS.map((status) => (
-                        <option key={status.value} value={status.value}>
-                          {status.label}
-                        </option>
-                      ))}
-                    </select>
-                  </TableHead>
+                  <TableHead className="w-[35%]">상품명</TableHead>
+                  <TableHead className="w-[15%]">출처 채널</TableHead>
+                  <TableHead className="w-[12%]">판매가</TableHead>
+                  <TableHead className="w-[18%]">발행현황</TableHead>
                   <TableHead className="w-[12%] whitespace-nowrap">생성일</TableHead>
                 </TableRow>
               </TableHeader>
@@ -873,16 +823,10 @@ export default function ProductListPage() {
                       </TableCell>
                       <TableCell>
                         <div className="font-medium text-gray-900">
-                          {formatPrice(product.wholesalePrice)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium text-gray-900">
                           {formatPrice(product.price)}
                         </div>
                       </TableCell>
                       <TableCell>{getPublishStatusBadge(product)}</TableCell>
-                      <TableCell>{getStatusBadge(product.status)}</TableCell>
                       <TableCell>
                         <span className="text-sm text-gray-600 whitespace-nowrap">
                           {new Date(product.createdAt).toLocaleDateString('ko-KR', {

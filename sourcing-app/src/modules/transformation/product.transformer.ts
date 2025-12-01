@@ -38,21 +38,12 @@ ${policyContent}
   // 가격 추출 규칙 (정책 유무에 따라 다름)
   const pricingRule = policyContent
     ? `5. **가격**:
-   - wholesalePrice: 게시물에서 추출한 가격 (도매가/원가)
-   - price: 위의 가격 정책을 적용하여 계산한 판매가`
-    : `5. **가격**: 가격 정보가 있다면 추출합니다 (숫자만, 원화 기준).
-   - 추출된 가격은 도매가(원가)로 간주합니다
-   - wholesalePrice: 도매가 (원가)`
+   - price: 가격 정책을 적용하여 계산한 판매가`
+    : `5. **가격**: 가격 정보가 있다면 추출합니다 (숫자만, 원화 기준).`
 
   // 응답 형식 (정책 유무에 따라 다름)
-  const pricingResponse = policyContent
-    ? `"pricing": {
-    "wholesalePrice": 도매가_숫자,
+  const pricingResponse = `"pricing": {
     "price": 판매가_숫자,
-    "currency": "KRW"
-  }`
-    : `"pricing": {
-    "wholesalePrice": 숫자,
     "currency": "KRW"
   }`
 
@@ -274,7 +265,6 @@ function buildProductDraft(
   if (variants.length > 0) {
     variants.forEach((variant) => {
       variant.price = analysis.pricing.price // 정책 적용 시 AI가 계산한 판매가
-      variant.wholesalePrice = analysis.pricing.wholesalePrice
       variant.stock = 0 // Default stock
     })
   }
@@ -287,7 +277,6 @@ function buildProductDraft(
     thumbnailUrl: thumbnailUrl || undefined,
     currency: analysis.pricing.currency || 'KRW',
     price: analysis.pricing.price, // 정책 적용 시 AI가 계산한 판매가
-    wholesalePrice: analysis.pricing.wholesalePrice,
     options: analysis.options,
     variants,
   }

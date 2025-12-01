@@ -14,9 +14,6 @@ model Product {
   name               String        @db.VarChar(500)
   description        String?       @db.Text
 
-  // Status
-  status             ProductStatus @default(COLLECTED)
-
   // Images
   thumbnailUrl       String?       @map("thumbnail_url") @db.VarChar(1000)
 
@@ -26,7 +23,6 @@ model Product {
   // Pricing
   currency           String        @default("KRW") @db.VarChar(10)
   price              Int?
-  wholesalePrice     Int?          @map("wholesale_price")
 
   createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
@@ -42,7 +38,6 @@ model Product {
   @@index([userId])
   @@index([collectedProductId])
   @@index([categoryId])
-  @@index([status])
   @@index([createdAt])
   @@map("product")
 }

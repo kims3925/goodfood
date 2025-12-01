@@ -236,7 +236,7 @@ function CheckoutContent() {
           title: product.name,
           description: product.description || '',
           images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
-          originalPrice: mainVariant?.wholesalePrice || product.wholesalePrice || mainVariant?.price || product.price || 0,
+          originalPrice: mainVariant?.price || product.price || 0,
           salePrice: mainVariant?.price || product.price || 0,
           category: product.categoryId || '',
           stock: mainVariant?.stock || 100

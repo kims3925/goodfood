@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { PublishStatus, ProductStatus, ChannelKind, ChannelPlatform } from '@bandauto/db'
+import prisma, { PublishStatus, ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 /**
@@ -23,19 +23,10 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
-    const status = searchParams.get('status') || 'COLLECTED' // 기본: COLLECTED 상품만
 
     // Build where clause
     const where: any = {
       userId,
-    }
-
-    // 상태 필터 (COLLECTED가 기본, ARCHIVED 제외)
-    if (status !== 'ALL') {
-      where.status = status as ProductStatus
-    } else {
-      // ALL이어도 ARCHIVED는 제외
-      where.status = ProductStatus.COLLECTED
     }
 
     // 검색
@@ -50,7 +41,6 @@ export async function GET(request: NextRequest) {
     const allProductsWithPublish = await prisma.product.findMany({
       where: {
         userId,
-        status: ProductStatus.COLLECTED,
       },
       select: {
         id: true,
@@ -150,9 +140,8 @@ export async function GET(request: NextRequest) {
         description: product.description,
         thumbnailUrl: mainImage,
         price: mainVariant?.price || product.price,
-        wholesalePrice: mainVariant?.wholesalePrice || product.wholesalePrice,
+        wholesalePrice: mainVariant?.wholesalePrice || null,
         stock: mainVariant?.stock || 0,
-        status: product.status,
         channel: product.collectedProduct?.post?.channel,
         // 발행 상태 (유형별)
         publishStatus: {
@@ -257,18 +246,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate products belong to user and are COLLECTED
+    // Validate products belong to user
     const products = await prisma.product.findMany({
       where: {
         id: { in: productIds },
         userId,
-        status: ProductStatus.COLLECTED,
       },
     })
 
     if (products.length !== productIds.length) {
       return NextResponse.json(
-        { success: false, error: '일부 상품을 찾을 수 없거나 수집 상태가 아닙니다.' },
+        { success: false, error: '일부 상품을 찾을 수 없습니다.' },
         { status: 400 }
       )
     }

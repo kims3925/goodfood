@@ -67,10 +67,8 @@ export async function GET(req: NextRequest) {
             const images = product.collectedProduct?.post?.images?.map((img) => img.imageUrl) || []
 
             const salePrice = mainVariant?.price || product.price || 0
-            const originalPrice = mainVariant?.wholesalePrice || product.wholesalePrice || salePrice
-            const discount = originalPrice > salePrice
-              ? Math.round(((originalPrice - salePrice) / originalPrice) * 100)
-              : 0
+            const originalPrice = salePrice
+            const discount = 0
 
             return {
               id: product.id.toString(),
@@ -158,10 +156,8 @@ export async function GET(req: NextRequest) {
             const images = product.collectedProduct?.post?.images?.map((img) => img.imageUrl) || []
 
             const salePrice = mainVariant?.price || product.price || 0
-            const originalPrice = mainVariant?.wholesalePrice || product.wholesalePrice || salePrice
-            const discount = originalPrice > salePrice
-              ? Math.round(((originalPrice - salePrice) / originalPrice) * 100)
-              : 0
+            const originalPrice = salePrice
+            const discount = 0
 
             return {
               id: product.id.toString(),

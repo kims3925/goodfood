@@ -36,7 +36,6 @@ interface ProductFormData {
   description: string
   categoryId: string
   price: number | ''
-  wholesalePrice: number | ''
   options: OptionGroup[]
   variants: GeneratedVariant[]
   images: SortableImage[] // 이미지 목록
@@ -50,7 +49,6 @@ const createEmptyProductData = (id: string): ProductFormData => ({
   description: '',
   categoryId: '',
   price: '',
-  wholesalePrice: '',
   options: [],
   variants: [],
   images: [],
@@ -122,7 +120,6 @@ export default function ProductFormModal({
               description: item.draft?.description || '',
               categoryId: item.draft?.categoryId || '',
               price: item.draft?.price || '' as number | '',
-              wholesalePrice: item.draft?.wholesalePrice || '' as number | '',
               options: item.draft?.options || [],
               variants: item.draft?.variants || [],
               images,
@@ -142,7 +139,6 @@ export default function ProductFormModal({
           description: initialData.description || '',
           categoryId: initialData.categoryId || '',
           price: initialData.price || '',
-          wholesalePrice: initialData.wholesalePrice || '',
           options: initialData.options || [],
           variants: initialData.variants || [],
           images,
@@ -193,8 +189,6 @@ export default function ProductFormModal({
   const setCategoryId = (value: string) => updateCurrentProduct({ categoryId: value })
   const price = currentProduct.price
   const setPrice = (value: number | '') => updateCurrentProduct({ price: value })
-  const wholesalePrice = currentProduct.wholesalePrice
-  const setWholesalePrice = (value: number | '') => updateCurrentProduct({ wholesalePrice: value })
   const options = currentProduct.options
   const setOptions = (value: OptionGroup[]) => updateCurrentProduct({ options: value })
   const variants = currentProduct.variants
@@ -255,7 +249,7 @@ export default function ProductFormModal({
     setOptions(options.filter((_, i) => i !== index))
   }
 
-  const handleUpdateVariant = (index: number, field: 'price' | 'wholesalePrice' | 'stock', value: number) => {
+  const handleUpdateVariant = (index: number, field: 'price' | 'stock', value: number) => {
     const updated = [...variants]
     updated[index] = { ...updated[index], [field]: value }
     setVariants(updated)
@@ -338,7 +332,6 @@ export default function ProductFormModal({
           categoryId: product.categoryId.trim() || null,
           currency: 'KRW',
           price: calculatedPrice,
-          wholesalePrice: typeof product.wholesalePrice === 'number' ? product.wholesalePrice : null,
         }),
       })
 
@@ -564,20 +557,6 @@ export default function ProductFormModal({
                   </p>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    도매가 (원)
-                  </label>
-                  <Input
-                    type="number"
-                    value={wholesalePrice}
-                    onChange={(e) => setWholesalePrice(e.target.value ? parseInt(e.target.value) : '')}
-                    placeholder="0"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    원가 또는 도매가 (선택사항)
-                  </p>
-                </div>
               </div>
             </div>
           )}
@@ -730,9 +709,6 @@ export default function ProductFormModal({
                             판매가 (원) <span className="text-red-500">*</span>
                           </th>
                           <th className="px-3 py-2 text-left font-medium text-gray-700">
-                            정상가 (원)
-                          </th>
-                          <th className="px-3 py-2 text-left font-medium text-gray-700">
                             재고
                           </th>
                         </tr>
@@ -749,20 +725,6 @@ export default function ProductFormModal({
                                 value={variant.price || ''}
                                 onChange={(e) =>
                                   handleUpdateVariant(index, 'price', parseInt(e.target.value) || 0)
-                                }
-                                className="w-24"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input
-                                type="number"
-                                value={variant.wholesalePrice || ''}
-                                onChange={(e) =>
-                                  handleUpdateVariant(
-                                    index,
-                                    'wholesalePrice',
-                                    e.target.value ? parseInt(e.target.value) : 0
-                                  )
                                 }
                                 className="w-24"
                               />
