@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, RefreshCw, Package, Trash2, Filter, X, ArrowRight } from 'lucide-react'
+import { Search, RefreshCw, Package, Trash2, Filter, X, Plus, ChevronDown, ChevronRight } from 'lucide-react'
+import Image from 'next/image'
 import Button from '@/components/ui/Button'
+import Modal, { ModalFooter } from '@/components/ui/Modal'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
@@ -15,6 +17,41 @@ interface Channel {
   id: number
   name: string
   coverUrl: string | null
+}
+
+interface AvailablePost {
+  id: number
+  title: string
+  content: string
+  author: string | null
+  channel: {
+    id: number
+    name: string
+    channelKey: string
+    coverUrl: string | null
+  }
+  images: Array<{
+    id: number
+    imageUrl: string
+  }>
+}
+
+interface ProductDraft {
+  name: string
+  description: string
+  categoryId: string | null
+  price: number | null
+  currency: string
+  options: Array<{
+    groupName: string
+    values: string[]
+  }>
+  variants: Array<{
+    sku: string | null
+    optionSummary: string | null
+    price: number | null
+    stock: number
+  }>
 }
 
 interface CollectedProduct {
@@ -55,6 +92,7 @@ export default function CollectedProductListPage() {
   const [products, setProducts] = useState<CollectedProduct[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [query, setQuery] = useState('')
 
   // Filter states
   const [showFilters, setShowFilters] = useState(false)
@@ -78,13 +116,25 @@ export default function CollectedProductListPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // 상품 등록 모달 states
+  const [showRegisterModal, setShowRegisterModal] = useState(false)
+  const [modalStep, setModalStep] = useState<'select' | 'transforming' | 'edit'>('select')
+  const [availablePosts, setAvailablePosts] = useState<AvailablePost[]>([])
+  const [isLoadingPosts, setIsLoadingPosts] = useState(false)
+  const [selectedPostId, setSelectedPostId] = useState<number | null>(null)
+  const [selectedPost, setSelectedPost] = useState<AvailablePost | null>(null)
+  const [transformedDraft, setTransformedDraft] = useState<ProductDraft | null>(null)
+  const [editableData, setEditableData] = useState({
+    name: '',
+    description: '',
+    price: '',
+  })
+  const [isSaving, setIsSaving] = useState(false)
+  const [expandedChannelKeys, setExpandedChannelKeys] = useState<string[]>([])
+
   useEffect(() => {
     loadChannels()
   }, [])
-
-  useEffect(() => {
-    loadProducts()
-  }, [currentPage, selectedChannelId, startDate, endDate])
 
   const loadChannels = async () => {
     try {
@@ -98,15 +148,16 @@ export default function CollectedProductListPage() {
     }
   }
 
-  const loadProducts = async () => {
+  // 데이터 조회 함수 (page 파라미터를 받아서 사용)
+  const fetchProducts = useCallback(async (page: number) => {
     try {
       setIsLoading(true)
       const params = new URLSearchParams({
-        page: currentPage.toString(),
+        page: page.toString(),
         limit: itemsPerPage.toString(),
       })
 
-      if (searchTerm) params.append('search', searchTerm)
+      if (query) params.append('search', query)
       if (selectedChannelId) params.append('channelId', selectedChannelId)
       if (startDate) params.append('startDate', startDate)
       if (endDate) params.append('endDate', endDate)
@@ -118,6 +169,7 @@ export default function CollectedProductListPage() {
         setProducts(data.data)
         setTotalItems(data.total || 0)
         setTotalPages(Math.ceil((data.total || 0) / itemsPerPage))
+        setCurrentPage(page)
       } else {
         toast.error('수집상품 목록을 불러오는데 실패했습니다.')
       }
@@ -127,6 +179,17 @@ export default function CollectedProductListPage() {
     } finally {
       setIsLoading(false)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChannelId, startDate, endDate, query, itemsPerPage])
+
+  // 필터 변경 시 1페이지로 리셋하여 조회
+  useEffect(() => {
+    fetchProducts(1)
+  }, [fetchProducts])
+
+  // 새로고침용 함수
+  const loadProducts = () => {
+    fetchProducts(currentPage)
   }
 
   const handleClearFilters = () => {
@@ -134,18 +197,21 @@ export default function CollectedProductListPage() {
     setStartDate('')
     setEndDate('')
     setSearchTerm('')
-    setCurrentPage(1)
+    setQuery('')
   }
 
-  const hasActiveFilters = selectedChannelId || startDate || endDate
+  const hasActiveFilters = selectedChannelId || startDate || endDate || Boolean(query)
 
   const handleSearch = () => {
-    setCurrentPage(1)
-    loadProducts()
+    if (query !== searchTerm) {
+      setQuery(searchTerm)
+    } else {
+      fetchProducts(1)
+    }
   }
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page)
+    fetchProducts(page)
   }
 
   const handleToggleSelectAll = () => {
@@ -167,11 +233,6 @@ export default function CollectedProductListPage() {
       setSelectAll(newSelection.length === products.length)
       return newSelection
     })
-  }
-
-  const handleDeleteProduct = (id: number) => {
-    setDeleteTargetId(id)
-    setShowDeleteConfirm(true)
   }
 
   const handleDeleteSelected = () => {
@@ -233,6 +294,155 @@ export default function CollectedProductListPage() {
     }
   }
 
+  // =============================================
+  // 상품 등록 모달 핸들러
+  // =============================================
+
+  const handleOpenRegisterModal = async () => {
+    setShowRegisterModal(true)
+    setModalStep('select')
+    setSelectedPostId(null)
+    setSelectedPost(null)
+    setTransformedDraft(null)
+    setEditableData({ name: '', description: '', price: '' })
+    setExpandedChannelKeys([])
+    await loadAvailablePosts()
+  }
+
+  const loadAvailablePosts = async () => {
+    setIsLoadingPosts(true)
+    try {
+      // 아직 수집상품으로 변환되지 않은 게시물만 조회
+      const response = await fetch('/api/post?limit=100')
+      const data = await response.json()
+
+      if (data.success) {
+        // 이미 수집상품이 있는 게시물 ID 목록 조회
+        const collectedResponse = await fetch('/api/collected-product?limit=1000')
+        const collectedData = await collectedResponse.json()
+        const usedPostIds = new Set(
+          collectedData.data?.map((cp: any) => cp.postId) || []
+        )
+
+        // 아직 사용되지 않은 게시물만 필터링
+        const filtered = data.data.filter((post: any) => !usedPostIds.has(post.id))
+        setAvailablePosts(filtered)
+      }
+    } catch (error) {
+      console.error('게시물 목록 조회 실패:', error)
+      toast.error('게시물 목록을 불러오는데 실패했습니다.')
+    } finally {
+      setIsLoadingPosts(false)
+    }
+  }
+
+  const handleSelectPost = (post: AvailablePost) => {
+    setSelectedPostId(post.id)
+    setSelectedPost(post)
+  }
+
+  const handleToggleChannelExpand = (channelKey: string) => {
+    setExpandedChannelKeys((prev) =>
+      prev.includes(channelKey)
+        ? prev.filter((key) => key !== channelKey)
+        : [...prev, channelKey]
+    )
+  }
+
+  // 채널별로 게시물 그룹화
+  const groupedAvailablePosts = availablePosts.reduce((acc, post) => {
+    const channelKey = post.channel.channelKey
+    if (!acc[channelKey]) {
+      acc[channelKey] = {
+        channel: post.channel,
+        posts: [],
+      }
+    }
+    acc[channelKey].posts.push(post)
+    return acc
+  }, {} as Record<string, { channel: AvailablePost['channel']; posts: AvailablePost[] }>)
+
+  const handleTransform = async () => {
+    if (!selectedPostId || !selectedPost) {
+      toast.error('게시물을 선택해주세요.')
+      return
+    }
+
+    setModalStep('transforming')
+
+    try {
+      const response = await fetch('/api/product/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: selectedPostId }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        const draft = data.draft as ProductDraft
+        setTransformedDraft(draft)
+        setEditableData({
+          name: draft.name || '',
+          description: draft.description || '',
+          price: draft.price?.toString() || '',
+        })
+        setModalStep('edit')
+      } else {
+        toast.error(data.error || 'AI 변환에 실패했습니다.')
+        setModalStep('select')
+      }
+    } catch (error) {
+      console.error('AI 변환 실패:', error)
+      toast.error('AI 변환 중 오류가 발생했습니다.')
+      setModalStep('select')
+    }
+  }
+
+  const handleSaveProduct = async () => {
+    if (!selectedPostId) return
+
+    setIsSaving(true)
+
+    try {
+      const response = await fetch('/api/product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId: selectedPostId,
+          name: editableData.name,
+          description: editableData.description,
+          price: editableData.price ? parseInt(editableData.price) : null,
+          currency: 'KRW',
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success('상품이 등록되었습니다.')
+        setShowRegisterModal(false)
+        loadProducts()
+      } else {
+        toast.error(data.error || '상품 등록에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('상품 등록 실패:', error)
+      toast.error('상품 등록 중 오류가 발생했습니다.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleCloseRegisterModal = () => {
+    setShowRegisterModal(false)
+    setModalStep('select')
+    setSelectedPostId(null)
+    setSelectedPost(null)
+    setTransformedDraft(null)
+    setEditableData({ name: '', description: '', price: '' })
+  }
+
   const formatPrice = (price: number | null) => {
     if (!price) return '-'
     return `₩${price.toLocaleString()}`
@@ -249,7 +459,7 @@ export default function CollectedProductListPage() {
     }
     return (
       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-        변환완료 ({productCount})
+        변환완료
       </span>
     )
   }
@@ -306,6 +516,13 @@ export default function CollectedProductListPage() {
                 >
                   <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
                   새로고침
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleOpenRegisterModal}
+                >
+                  <Plus size={16} />
+                  상품 등록
                 </Button>
                 <Button
                   variant="danger"
@@ -435,7 +652,7 @@ export default function CollectedProductListPage() {
               <Loading />
             </div>
           ) : (
-            <Table>
+            <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[4%]">
@@ -446,106 +663,85 @@ export default function CollectedProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[30%]">상품명 / 게시물</TableHead>
-                  <TableHead className="w-[15%]">출처 채널</TableHead>
-                  <TableHead className="w-[10%]">도매가</TableHead>
-                  <TableHead className="w-[10%]">판매가</TableHead>
-                  <TableHead className="w-[12%]">변환상태</TableHead>
-                  <TableHead className="w-[10%]">수집일</TableHead>
-                  <TableHead className="w-[9%]">액션</TableHead>
+                  <TableHead className="w-[36%]">상품명 / 게시물</TableHead>
+                  <TableHead className="w-[16%]">출처 채널</TableHead>
+                  <TableHead className="w-[14%]">가격</TableHead>
+                  <TableHead className="w-[16%]">변환상태</TableHead>
+                  <TableHead className="w-[14%]">수집일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.length === 0 ? (
-                  <TableEmpty message="수집된 상품이 없습니다." />
-                ) : (
-                  products.map((product) => (
-                    <TableRow
-                      key={product.id}
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/collected-product/${product.id}`)}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(product.id)}
-                          onChange={() => handleToggleSelection(product.id)}
-                          className="w-4 h-4 cursor-pointer"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          {product.post?.images?.[0]?.imageUrl ? (
-                            <img
+                {/* 데이터 행 */}
+                {products.map((product) => (
+                  <TableRow
+                    key={product.id}
+                    className="hover:bg-gray-50 cursor-pointer h-[72px]"
+                    onClick={() => router.push(`/collected-product/${product.id}`)}
+                  >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(product.id)}
+                        onChange={() => handleToggleSelection(product.id)}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        {product.post?.images?.[0]?.imageUrl ? (
+                          <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                            <Image
                               src={product.post.images[0].imageUrl}
                               alt={product.name || product.post.title}
-                              className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                              fill
+                              sizes="56px"
+                              className="object-cover"
                             />
-                          ) : (
-                            <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                              <Package size={24} className="text-gray-400" />
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-gray-900 text-base truncate">
-                              {product.name || '(상품명 미추출)'}
-                            </div>
-                            <div className="text-sm text-gray-500 truncate">
-                              {product.post?.title}
-                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                            <Package size={24} className="text-gray-400" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-gray-900 text-base truncate">
+                            {product.name || '(상품명 미추출)'}
+                          </div>
+                          <div className="text-sm text-gray-500 truncate">
+                            {product.post?.title}
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-gray-600 truncate">
-                          {product.post?.channel?.name || '-'}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium text-gray-900">
-                          {formatPrice(product.wholesalePrice)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-gray-600 truncate">
+                        {product.post?.channel?.name || '-'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-0.5">
                         <div className="font-medium text-gray-900">
                           {formatPrice(product.price)}
                         </div>
-                      </TableCell>
-                      <TableCell>{getProductStatusSummary(product)}</TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600 whitespace-nowrap">
-                          {new Date(product.createdAt).toLocaleDateString('ko-KR', {
-                            year: '2-digit',
-                            month: '2-digit',
-                            day: '2-digit',
-                          }).replace(/\. /g, '.').replace(/\.$/, '')}
-                        </span>
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-1">
-                          {product.products?.length === 0 && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => router.push(`/product/list?collectedProductId=${product.id}`)}
-                              title="상품으로 변환"
-                            >
-                              <ArrowRight size={14} />
-                            </Button>
-                          )}
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleDeleteProduct(product.id)}
-                            title="삭제"
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                        {product.wholesalePrice && (
+                          <div className="text-xs text-gray-500">
+                            도매 {formatPrice(product.wholesalePrice)}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>{getProductStatusSummary(product)}</TableCell>
+                    <TableCell>
+                      <span className="text-sm text-gray-600 whitespace-nowrap">
+                        {new Date(product.createdAt).toLocaleDateString('ko-KR', {
+                          year: '2-digit',
+                          month: '2-digit',
+                          day: '2-digit',
+                        }).replace(/\. /g, '.').replace(/\.$/, '')}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}
@@ -579,6 +775,228 @@ export default function CollectedProductListPage() {
         variant="danger"
         isLoading={isDeleting}
       />
+
+      {/* 상품 등록 모달 */}
+      <Modal
+        isOpen={showRegisterModal}
+        onClose={handleCloseRegisterModal}
+        title={
+          modalStep === 'select'
+            ? '상품 등록 - 게시물 선택'
+            : modalStep === 'transforming'
+            ? '상품 등록 - AI 분석 중'
+            : '상품 등록 - 정보 수정'
+        }
+        size="2xl"
+      >
+        {/* Step 1: 게시물 선택 */}
+        {modalStep === 'select' && (
+          <div className="flex flex-col h-[calc(70vh-8rem)]">
+            {isLoadingPosts ? (
+              <div className="flex-1 flex items-center justify-center">
+                <Loading />
+              </div>
+            ) : availablePosts.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
+                <Package size={48} className="mb-4 text-gray-300" />
+                <p>변환 가능한 게시물이 없습니다.</p>
+                <p className="text-sm mt-2">게시물 관리에서 먼저 게시물을 추가해주세요.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 overflow-y-auto space-y-3">
+                  {Object.entries(groupedAvailablePosts).map(([channelKey, group]) => {
+                    const isExpanded = expandedChannelKeys.includes(channelKey)
+                    return (
+                      <div key={channelKey} className="border rounded-lg">
+                        {/* 채널 헤더 */}
+                        <div
+                          className="p-3 bg-gray-50 border-b cursor-pointer hover:bg-gray-100 transition-colors"
+                          onClick={() => handleToggleChannelExpand(channelKey)}
+                        >
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? (
+                              <ChevronDown size={20} className="text-gray-600" />
+                            ) : (
+                              <ChevronRight size={20} className="text-gray-600" />
+                            )}
+                            {group.channel.coverUrl && (
+                              <img
+                                src={group.channel.coverUrl}
+                                alt={group.channel.name}
+                                className="w-8 h-8 rounded object-cover"
+                              />
+                            )}
+                            <span className="font-semibold">{group.channel.name}</span>
+                            <span className="text-sm text-gray-500">({group.posts.length}개)</span>
+                          </div>
+                        </div>
+
+                        {/* 게시물 목록 */}
+                        {isExpanded && (
+                          <div className="p-2 space-y-2">
+                            {group.posts.map((post) => (
+                              <div
+                                key={post.id}
+                                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                                  selectedPostId === post.id
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                                onClick={() => handleSelectPost(post)}
+                              >
+                                <div className="flex items-start gap-3">
+                                  {post.images?.[0] && (
+                                    <img
+                                      src={post.images[0].imageUrl}
+                                      alt=""
+                                      className="w-16 h-16 rounded object-cover flex-shrink-0"
+                                    />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="font-medium text-gray-900 truncate">
+                                      {post.title}
+                                    </h4>
+                                    <p className="text-sm text-gray-500 line-clamp-2 mt-1">
+                                      {post.content?.substring(0, 100)}...
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <ModalFooter>
+                  <Button variant="secondary" onClick={handleCloseRegisterModal}>
+                    취소
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={handleTransform}
+                    disabled={!selectedPostId}
+                  >
+                    AI 변환
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Step 2: AI 변환 중 */}
+        {modalStep === 'transforming' && (
+          <div className="py-12 flex flex-col items-center gap-4">
+            <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                AI가 게시물을 분석하고 있습니다...
+              </h3>
+              <p className="text-gray-600">잠시만 기다려주세요.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: 결과 수정 */}
+        {modalStep === 'edit' && (
+          <div className="flex flex-col h-[calc(70vh-8rem)]">
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {/* 원본 게시물 정보 */}
+              {selectedPost && (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <h4 className="text-sm font-medium text-gray-500 mb-2">원본 게시물</h4>
+                  <div className="flex items-start gap-3">
+                    {selectedPost.images?.[0] && (
+                      <img
+                        src={selectedPost.images[0].imageUrl}
+                        alt=""
+                        className="w-20 h-20 rounded object-cover"
+                      />
+                    )}
+                    <div>
+                      <p className="font-medium">{selectedPost.title}</p>
+                      <p className="text-sm text-gray-500">{selectedPost.channel.name}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 상품 정보 수정 */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    상품명 *
+                  </label>
+                  <Input
+                    type="text"
+                    value={editableData.name}
+                    onChange={(e) => setEditableData({ ...editableData, name: e.target.value })}
+                    placeholder="상품명을 입력하세요"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    상품 설명
+                  </label>
+                  <textarea
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows={6}
+                    value={editableData.description}
+                    onChange={(e) => setEditableData({ ...editableData, description: e.target.value })}
+                    placeholder="상품 설명을 입력하세요"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    판매가 (원)
+                  </label>
+                  <Input
+                    type="number"
+                    value={editableData.price}
+                    onChange={(e) => setEditableData({ ...editableData, price: e.target.value })}
+                    placeholder="판매가를 입력하세요"
+                  />
+                </div>
+
+                {/* AI 분석 옵션 정보 (읽기 전용) */}
+                {transformedDraft?.options && transformedDraft.options.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      AI 추출 옵션
+                    </label>
+                    <div className="p-3 bg-gray-50 rounded-md">
+                      {transformedDraft.options.map((opt, idx) => (
+                        <div key={idx} className="text-sm">
+                          <span className="font-medium">{opt.groupName}:</span>{' '}
+                          {opt.values.join(', ')}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <ModalFooter>
+              <Button variant="secondary" onClick={() => setModalStep('select')}>
+                이전
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSaveProduct}
+                disabled={!editableData.name || isSaving}
+              >
+                {isSaving ? '등록 중...' : '등록'}
+              </Button>
+            </ModalFooter>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

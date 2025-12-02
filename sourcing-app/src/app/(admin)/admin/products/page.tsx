@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Package, Search, Edit3, Trash2, Plus, DollarSign, Calendar, Tag, Download, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react'
+import { Package, Search, Edit3, Trash2, DollarSign, Calendar, Tag, Download, ChevronLeft, ChevronRight, CheckCircle, Plus } from 'lucide-react'
 import ConfirmModal from '@/components/ui/ConfirmModal'
+import Modal, { ModalFooter } from '@/components/ui/Modal'
+import Button from '@/components/ui/Button'
 
 interface Product {
   id: number
@@ -38,6 +40,35 @@ interface Product {
   originalCreatedAt?: string | null
 }
 
+interface CollectedProduct {
+  id: number
+  userId: number
+  postId: number
+  name: string | null
+  description: string | null
+  currency: string
+  price: number | null
+  wholesalePrice: number | null
+  createdAt: string
+  post: {
+    id: number
+    title: string
+    channel: {
+      id: number
+      name: string
+      coverUrl: string | null
+    }
+    images: Array<{
+      id: number
+      imageUrl: string
+    }>
+  }
+  products: Array<{
+    id: number
+    name: string
+  }>
+}
+
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -62,6 +93,13 @@ export default function ProductsPage() {
   const [showSingleDeleteConfirm, setShowSingleDeleteConfirm] = useState(false)
   const [pendingDeleteProductId, setPendingDeleteProductId] = useState<number | null>(null)
   const [pendingDeleteProductTitle, setPendingDeleteProductTitle] = useState<string>('')
+
+  // 상품 등록 모달 states
+  const [showRegisterModal, setShowRegisterModal] = useState(false)
+  const [collectedProducts, setCollectedProducts] = useState<CollectedProduct[]>([])
+  const [isLoadingCollected, setIsLoadingCollected] = useState(false)
+  const [selectedCollectedId, setSelectedCollectedId] = useState<number | null>(null)
+  const [isConverting, setIsConverting] = useState(false)
 
   useEffect(() => {
     loadProducts()
@@ -93,7 +131,7 @@ export default function ProductsPage() {
       setIsLoading(true)
       const response = await fetch('/api/product')
       const data = await response.json()
-      
+
       if (data.success) {
         // API 응답을 페이지 인터페이스에 맞게 매핑
         const mappedProducts = (data.data || []).map((p: any) => ({
@@ -118,6 +156,82 @@ export default function ProductsPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // 상품 등록 모달 관련 함수들
+  const handleOpenRegisterModal = async () => {
+    setShowRegisterModal(true)
+    setSelectedCollectedId(null)
+    await loadCollectedProducts()
+  }
+
+  const loadCollectedProducts = async () => {
+    setIsLoadingCollected(true)
+    try {
+      const response = await fetch('/api/collected-product?limit=1000')
+      const data = await response.json()
+
+      if (data.success) {
+        // Product로 변환되지 않은 CollectedProduct만 필터링
+        const unconverted = data.data.filter(
+          (cp: CollectedProduct) => !cp.products || cp.products.length === 0
+        )
+        setCollectedProducts(unconverted)
+      }
+    } catch (error) {
+      console.error('수집상품 목록 조회 실패:', error)
+      alert('수집상품 목록을 불러오는데 실패했습니다.')
+    } finally {
+      setIsLoadingCollected(false)
+    }
+  }
+
+  const handleConvertToProduct = async () => {
+    if (!selectedCollectedId) {
+      alert('수집상품을 선택해주세요.')
+      return
+    }
+
+    const selectedCP = collectedProducts.find(cp => cp.id === selectedCollectedId)
+    if (!selectedCP) {
+      alert('선택한 수집상품을 찾을 수 없습니다.')
+      return
+    }
+
+    setIsConverting(true)
+    try {
+      const response = await fetch('/api/product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          collectedProductId: selectedCollectedId,
+          name: selectedCP.name || selectedCP.post.title || '상품명 미지정',
+          description: selectedCP.description || '',
+          price: selectedCP.price || null,
+          currency: selectedCP.currency || 'KRW',
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        alert('상품이 등록되었습니다.')
+        setShowRegisterModal(false)
+        loadProducts()
+      } else {
+        alert(data.error || '상품 등록에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('상품 등록 실패:', error)
+      alert('상품 등록 중 오류가 발생했습니다.')
+    } finally {
+      setIsConverting(false)
+    }
+  }
+
+  const handleCloseRegisterModal = () => {
+    setShowRegisterModal(false)
+    setSelectedCollectedId(null)
   }
 
   // 체크박스 관련 함수들
@@ -655,11 +769,14 @@ export default function ProductsPage() {
               <p className="text-gray-600">수집된 게시물에서 생성된 상품들을 관리합니다.</p>
             </div>
             <div className="flex gap-3">
-              <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2">
+              <button
+                onClick={handleOpenRegisterModal}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+              >
                 <Plus className="h-4 w-4" />
-                상품 직접 추가
+                상품 등록
               </button>
-              <button 
+              <button
                 onClick={handleStrokePayExport}
                 className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
               >
@@ -1607,6 +1724,88 @@ export default function ProductsPage() {
           confirmText="삭제"
           variant="danger"
         />
+
+        {/* 상품 등록 모달 */}
+        <Modal
+          isOpen={showRegisterModal}
+          onClose={handleCloseRegisterModal}
+          title="상품 등록 - 수집상품 선택"
+          size="2xl"
+        >
+          <div className="flex flex-col h-[calc(70vh-8rem)]">
+            {isLoadingCollected ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : collectedProducts.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
+                <Package size={48} className="mb-4 text-gray-300" />
+                <p>변환 가능한 수집상품이 없습니다.</p>
+                <p className="text-sm mt-2">수집상품 관리에서 먼저 수집상품을 추가해주세요.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 overflow-y-auto space-y-2">
+                  {collectedProducts.map((cp) => (
+                    <div
+                      key={cp.id}
+                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                        selectedCollectedId === cp.id
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => setSelectedCollectedId(cp.id)}
+                    >
+                      <div className="flex items-start gap-3">
+                        {cp.post?.images?.[0]?.imageUrl ? (
+                          <img
+                            src={cp.post.images[0].imageUrl}
+                            alt={cp.name || cp.post.title}
+                            className="w-20 h-20 rounded object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-20 h-20 rounded bg-gray-200 flex items-center justify-center flex-shrink-0">
+                            <Package size={24} className="text-gray-400" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-gray-900 truncate">
+                            {cp.name || '(상품명 미추출)'}
+                          </h4>
+                          <p className="text-sm text-gray-500 truncate">
+                            {cp.post?.title}
+                          </p>
+                          <div className="flex items-center gap-3 mt-2">
+                            <span className="text-sm text-gray-600">
+                              {cp.post?.channel?.name}
+                            </span>
+                            {cp.price && (
+                              <span className="text-sm font-medium text-gray-900">
+                                ₩{cp.price.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <ModalFooter>
+                  <Button variant="secondary" onClick={handleCloseRegisterModal}>
+                    취소
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={handleConvertToProduct}
+                    disabled={!selectedCollectedId || isConverting}
+                  >
+                    {isConverting ? '등록 중...' : '상품 등록'}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </div>
+        </Modal>
       </div>
     </div>
   )

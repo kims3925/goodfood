@@ -119,7 +119,6 @@ export default function RetailBandPublishPage() {
       const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: itemsPerPage.toString(),
-        status: 'COLLECTED',
       })
 
       if (searchTerm) {

@@ -50,7 +50,6 @@ interface PublishedProduct {
     id: number
     name: string
     thumbnailUrl: string | null
-    status: string
     collectedProduct: {
       post: {
         channel: {
@@ -146,19 +145,48 @@ export default function PublishedProductListPage() {
       if (endDate) params.append('endDate', endDate)
 
       const response = await fetch(`/api/published-product?${params.toString()}`)
+
+      // HTTP 상태 코드 체크
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: '알 수 없는 오류' }))
+
+        if (response.status === 401) {
+          toast.error('로그인이 필요합니다.')
+          console.error('인증 오류:', errorData)
+          return
+        }
+
+        if (response.status === 500) {
+          toast.error('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+          console.error('서버 오류:', errorData)
+          return
+        }
+
+        toast.error(errorData.error || '발행상품 목록을 불러오는데 실패했습니다.')
+        console.error('API 오류:', errorData)
+        return
+      }
+
       const data = await response.json()
 
       if (data.success) {
-        setProducts(data.data)
+        setProducts(data.data || [])
         setTotalItems(data.total || 0)
         setTotalPages(Math.ceil((data.total || 0) / itemsPerPage))
         setCurrentPage(page)
+
+        // 데이터가 없어도 에러가 아니므로 조용히 처리 (토스트 없음)
+        if (data.total === 0) {
+          console.log('조회된 발행상품이 없습니다.')
+        }
       } else {
-        toast.error('발행상품 목록을 불러오는데 실패했습니다.')
+        // success: false인 경우
+        toast.error(data.error || '발행상품 목록을 불러오는데 실패했습니다.')
+        console.error('API 응답 오류:', data)
       }
     } catch (error) {
       console.error('발행상품 목록 조회 실패:', error)
-      toast.error('발행상품 목록을 불러오는데 실패했습니다.')
+      toast.error('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.')
     } finally {
       setIsLoading(false)
     }
@@ -240,26 +268,57 @@ export default function PublishedProductListPage() {
         const response = await fetch(`/api/published-product?id=${deleteTargetId}`, {
           method: 'DELETE',
         })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: '알 수 없는 오류' }))
+
+          if (response.status === 404) {
+            toast.error('발행상품을 찾을 수 없습니다.')
+            console.error('발행상품 미존재:', errorData)
+            return
+          }
+
+          toast.error(errorData.error || '발행상품 삭제에 실패했습니다.')
+          console.error('삭제 API 오류:', errorData)
+          return
+        }
+
         const data = await response.json()
 
         if (data.success) {
           toast.success('발행상품이 삭제되었습니다.')
           loadProducts()
         } else {
-          toast.error('발행상품 삭제에 실패했습니다.')
+          toast.error(data.error || '발행상품 삭제에 실패했습니다.')
+          console.error('삭제 응답 오류:', data)
         }
       } else {
         // 일괄 삭제
         let successCount = 0
+        let failCount = 0
+
         for (const id of selectedIds) {
           try {
             const response = await fetch(`/api/published-product?id=${id}`, {
               method: 'DELETE',
             })
+
+            if (!response.ok) {
+              failCount++
+              console.error(`발행상품 삭제 실패 (ID: ${id}), 상태 코드:`, response.status)
+              continue
+            }
+
             const data = await response.json()
-            if (data.success) successCount++
+            if (data.success) {
+              successCount++
+            } else {
+              failCount++
+              console.error(`발행상품 삭제 실패 (ID: ${id}):`, data)
+            }
           } catch (error) {
-            console.error(`발행상품 삭제 실패 (ID: ${id}):`, error)
+            failCount++
+            console.error(`발행상품 삭제 오류 (ID: ${id}):`, error)
           }
         }
 
@@ -267,15 +326,17 @@ export default function PublishedProductListPage() {
         setSelectAll(false)
         loadProducts()
 
-        if (successCount > 0) {
+        if (successCount > 0 && failCount === 0) {
           toast.success(`${successCount}개의 발행상품이 삭제되었습니다.`)
+        } else if (successCount > 0 && failCount > 0) {
+          toast.warning(`${successCount}개 삭제 성공, ${failCount}개 삭제 실패`)
         } else {
           toast.error('발행상품 삭제에 실패했습니다.')
         }
       }
     } catch (error) {
       console.error('발행상품 삭제 실패:', error)
-      toast.error('발행상품 삭제에 실패했습니다.')
+      toast.error('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.')
     } finally {
       setIsDeleting(false)
       setShowDeleteConfirm(false)
@@ -512,7 +573,7 @@ export default function PublishedProductListPage() {
               <Loading />
             </div>
           ) : (
-            <Table>
+            <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[4%]">
@@ -587,17 +648,6 @@ export default function PublishedProductListPage() {
                         {formatDateTime(product.publishedAt)}
                       </span>
                     </TableCell>
-                  </TableRow>
-                ))}
-                {/* 빈 행 채우기 (10개 고정) */}
-                {Array.from({ length: itemsPerPage - products.length }).map((_, index) => (
-                  <TableRow key={`empty-${index}`} className="h-[72px]">
-                    <TableCell>&nbsp;</TableCell>
-                    <TableCell>&nbsp;</TableCell>
-                    <TableCell>&nbsp;</TableCell>
-                    <TableCell>&nbsp;</TableCell>
-                    <TableCell>&nbsp;</TableCell>
-                    <TableCell>&nbsp;</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
