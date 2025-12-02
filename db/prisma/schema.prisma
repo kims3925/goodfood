@@ -83,6 +83,7 @@ enum TossPaymentMethod {
   CULTURE_GIFT
   BOOK_GIFT
   GAME_GIFT
+  BANK_TRANSFER
 }
 
 enum TossPaymentStatus {

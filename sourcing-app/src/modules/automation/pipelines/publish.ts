@@ -179,7 +179,7 @@ export async function runPublishPipeline(
         })
 
         // PublishedProduct 레코드 생성/업데이트
-        await prisma.publishedProduct.upsert({
+        const publishedProduct = await prisma.publishedProduct.upsert({
           where: {
             productId_channelId: {
               productId: product.id,
@@ -196,6 +196,19 @@ export async function runPublishPipeline(
             publishedAt: new Date(),
           },
         })
+
+        // 장바구니 링크 댓글 작성
+        try {
+          const shopUrl = process.env.SHOP_URL || 'http://localhost:3000'
+          const cartLink = `${shopUrl}/cart?add=${publishedProduct.id}`
+          const commentContent = `🛒 장바구니에 담기 👉 ${cartLink}`
+
+          await bandClient.createComment(channel.channelKey, postKey, commentContent)
+          console.log(`[Publish] Added cart comment for product ${product.id}`)
+        } catch (commentError) {
+          // 댓글 실패해도 발행 자체는 성공으로 처리
+          console.error(`[Publish] Failed to create cart comment:`, commentError)
+        }
 
         channelResult.success++
         currentSuccess++

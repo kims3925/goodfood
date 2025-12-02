@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Minus, Plus, X, ShoppingBag, Check, Truck } from 'lucide-react'
 import { ConfirmModal } from '@/modules/common/ui-kit/src/ui'
 
@@ -30,10 +31,14 @@ interface Cart {
 
 export default function CartPage() {
   const { data: session } = useSession()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [cart, setCart] = useState<Cart | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedItems, setSelectedItems] = useState<number[]>([])
   const [isMounted, setIsMounted] = useState(false)
+  const [isAutoAdding, setIsAutoAdding] = useState(false)
+  const autoAddProcessed = useRef(false)
 
   // ConfirmModal 상태
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
@@ -91,6 +96,43 @@ export default function CartPage() {
       loadCart()
     }
   }, [isMounted, loadCart])
+
+  // URL 파라미터로 자동 장바구니 추가 (?add=publishedProductId)
+  useEffect(() => {
+    const addProductId = searchParams.get('add')
+
+    if (!isMounted || !addProductId || autoAddProcessed.current) return
+
+    autoAddProcessed.current = true
+
+    const autoAddToCart = async () => {
+      setIsAutoAdding(true)
+      try {
+        const response = await fetch('/api/cart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            publishedProductId: parseInt(addProductId),
+            quantity: 1,
+          }),
+        })
+
+        if (response.ok) {
+          // 장바구니 다시 로드
+          await loadCart()
+        }
+      } catch (error) {
+        console.error('자동 장바구니 추가 실패:', error)
+      } finally {
+        setIsAutoAdding(false)
+        // URL에서 add 파라미터 제거 (히스토리 교체)
+        router.replace('/cart', { scroll: false })
+      }
+    }
+
+    autoAddToCart()
+  }, [isMounted, searchParams, loadCart, router])
 
   const formatPrice = (price: number) => {
     return price?.toLocaleString('ko-KR') || '0'
@@ -267,10 +309,15 @@ export default function CartPage() {
   )
 
   // 마운트 전이거나 로딩 중일 때 로딩 표시
-  if (!isMounted || isLoading) {
+  if (!isMounted || isLoading || isAutoAdding) {
     return (
       <div className="min-h-screen bg-[#f4f4f4] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B6B]"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B6B] mx-auto"></div>
+          {isAutoAdding && (
+            <p className="mt-4 text-gray-600">장바구니에 담는 중...</p>
+          )}
+        </div>
       </div>
     )
   }
@@ -474,7 +521,7 @@ export default function CartPage() {
                       }}
                     >
                       {selectedItems.length > 0
-                        ? `주문하기 (${selectedItems.length}개)`
+                        ? `주문하기`
                         : '상품을 선택해주세요'}
                     </Link>
                   ) : (

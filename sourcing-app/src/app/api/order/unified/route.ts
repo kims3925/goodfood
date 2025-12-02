@@ -20,6 +20,8 @@ export interface UnifiedOrder {
   // 상세 정보
   address?: string
   deliveryMemo?: string
+  // 결제 정보
+  paymentMethod?: string
 }
 
 // 상태 라벨 매핑
@@ -86,6 +88,11 @@ export async function GET(request: NextRequest) {
               productName: true,
             },
           },
+          payment: {
+            select: {
+              method: true,
+            },
+          },
         },
         orderBy: { orderedAt: 'desc' },
       })
@@ -110,6 +117,7 @@ export async function GET(request: NextRequest) {
           createdAt: order.orderedAt.toISOString(),
           address: `${order.address} ${order.addressDetail || ''}`.trim(),
           deliveryMemo: order.deliveryMemo || undefined,
+          paymentMethod: order.payment?.method || undefined,
         })
       }
     }

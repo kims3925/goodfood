@@ -4,8 +4,14 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { ArrowLeft, Package, User, MapPin, CreditCard, Truck, Plus, Check } from 'lucide-react'
+import { ArrowLeft, Package, User, MapPin, CreditCard, Truck, Plus, Check, Building2, Wallet } from 'lucide-react'
 import TossPaymentWidget from '@/modules/payments/components/TossPaymentWidget'
+
+interface BankInfo {
+  bankName: string
+  bankAccount: string
+  accountHolder: string
+}
 
 declare global {
   interface Window {
@@ -61,7 +67,13 @@ function CheckoutContent() {
   const [product, setProduct] = useState<any>(null)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [cartChannelId, setCartChannelId] = useState<number | null>(null)
+  const [productChannelId, setProductChannelId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // 결제 방식 관련
+  const [paymentMethod, setPaymentMethod] = useState<'TOSS' | 'BANK_TRANSFER'>('TOSS')
+  const [channelBankInfo, setChannelBankInfo] = useState<BankInfo | null>(null)
+  const [bankInfoLoading, setBankInfoLoading] = useState(false)
 
   // 회원 배송지 관련
   const [addresses, setAddresses] = useState<Address[]>([])
@@ -230,6 +242,11 @@ function CheckoutContent() {
         const mainVariant = product.variants?.[0]
         const images = product.post?.images?.map((img: any) => img.imageUrl) || []
 
+        // 채널 ID 저장
+        if (pp.channelId) {
+          setProductChannelId(pp.channelId)
+        }
+
         setProduct({
           id: product.id,
           publishedProductId: pp.id,
@@ -278,6 +295,36 @@ function CheckoutContent() {
     return subtotal >= freeShippingAmount ? 0 : shippingFee
   }
 
+  // 채널 입금정보 로드
+  const loadBankInfo = async (channelId: number) => {
+    try {
+      setBankInfoLoading(true)
+      const response = await fetch(`/api/shop/channel/${channelId}/bank-info`)
+      const data = await response.json()
+      if (data.success) {
+        setChannelBankInfo(data.bankInfo)
+      } else {
+        setChannelBankInfo(null)
+        console.error('입금정보 로드 실패:', data.error)
+      }
+    } catch (error) {
+      console.error('입금정보 로드 오류:', error)
+      setChannelBankInfo(null)
+    } finally {
+      setBankInfoLoading(false)
+    }
+  }
+
+  // 무통장입금 선택 시 입금정보 로드
+  useEffect(() => {
+    if (paymentMethod === 'BANK_TRANSFER') {
+      const channelId = fromCart ? cartChannelId : productChannelId
+      if (channelId) {
+        loadBankInfo(channelId)
+      }
+    }
+  }, [paymentMethod, cartChannelId, productChannelId, fromCart])
+
   const handleFormChange = (field: string, value: string | boolean) => {
     if (field.startsWith('shippingAddress.')) {
       const addressField = field.split('.')[1]
@@ -322,7 +369,7 @@ function CheckoutContent() {
     try {
       setIsSubmitting(true)
 
-      // 주문 준비 API 호출 (실제 주문은 결제 성공 시 생성됨)
+      // 주문 요청 데이터 준비
       const orderRequestData: any = {
         userId: session?.user?.id ? parseInt(session.user.id as string) : undefined,
         customerInfo: {
@@ -350,23 +397,52 @@ function CheckoutContent() {
         }]
       }
 
-      const response = await fetch('/api/orders/prepare', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(orderRequestData)
-      })
+      // 무통장입금 분기
+      if (paymentMethod === 'BANK_TRANSFER') {
+        const response = await fetch('/api/orders/bank-transfer', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(orderRequestData)
+        })
 
-      const data = await response.json()
+        const data = await response.json()
 
-      if (data.success) {
-        // 주문번호 저장 (실제 주문은 결제 성공 시 생성됨)
-        setTempOrderId(data.order.orderNumber)
-        setShowPaymentWidget(true)
-        // 🔼 여기서 페이지 맨 위로 스크롤
-        if (typeof window !== 'undefined') {
-          window.scrollTo({ top: 0, behavior: 'smooth' })
+        if (data.success) {
+          // 무통장입금 주문 완료 페이지로 이동
+          const params = new URLSearchParams({
+            orderNumber: data.order.orderNumber,
+            totalAmount: data.order.totalAmount.toString(),
+            bankName: data.bankInfo.bankName,
+            bankAccount: data.bankInfo.bankAccount,
+            accountHolder: data.bankInfo.accountHolder,
+            depositDeadline: data.bankInfo.depositDeadline,
+          })
+          router.push(`/order/bank-transfer/complete?${params.toString()}`)
+        } else {
+          alert(data.error || '주문 생성에 실패했습니다.')
+        }
+      } else {
+        // 토스 결제 플로우
+        const response = await fetch('/api/orders/prepare', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(orderRequestData)
+        })
+
+        const data = await response.json()
+
+        if (data.success) {
+          // 주문번호 저장 (실제 주문은 결제 성공 시 생성됨)
+          setTempOrderId(data.order.orderNumber)
+          setShowPaymentWidget(true)
+          // 🔼 여기서 페이지 맨 위로 스크롤
+          if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }
         }
       }
     } catch (error) {
@@ -810,6 +886,119 @@ function CheckoutContent() {
                     <option value="부재 시 연락 부탁드립니다">부재 시 연락 부탁드립니다</option>
                   </select>
                 </div>
+
+                {/* 결제 방식 선택 */}
+                <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Wallet className="w-5 h-5 text-gray-600" />
+                    결제 방식
+                  </h2>
+                  <div className="space-y-3">
+                    <label
+                      className={`flex items-center p-4 border rounded-lg cursor-pointer transition-all ${
+                        paymentMethod === 'TOSS'
+                          ? 'border-[#FF6B6B] bg-[#FFF5F5]'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="TOSS"
+                        checked={paymentMethod === 'TOSS'}
+                        onChange={() => setPaymentMethod('TOSS')}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center gap-3 flex-1">
+                        <CreditCard className={`w-5 h-5 ${paymentMethod === 'TOSS' ? 'text-[#FF6B6B]' : 'text-gray-400'}`} />
+                        <div>
+                          <span className={`font-medium ${paymentMethod === 'TOSS' ? 'text-gray-900' : 'text-gray-700'}`}>
+                            신용카드 / 간편결제
+                          </span>
+                          <p className="text-xs text-gray-500 mt-0.5">토스페이먼츠를 통한 안전한 결제</p>
+                        </div>
+                      </div>
+                      {paymentMethod === 'TOSS' && (
+                        <Check className="w-5 h-5 text-[#FF6B6B]" />
+                      )}
+                    </label>
+
+                    <label
+                      className={`flex items-center p-4 border rounded-lg cursor-pointer transition-all ${
+                        paymentMethod === 'BANK_TRANSFER'
+                          ? 'border-[#FF6B6B] bg-[#FFF5F5]'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="BANK_TRANSFER"
+                        checked={paymentMethod === 'BANK_TRANSFER'}
+                        onChange={() => setPaymentMethod('BANK_TRANSFER')}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center gap-3 flex-1">
+                        <Building2 className={`w-5 h-5 ${paymentMethod === 'BANK_TRANSFER' ? 'text-[#FF6B6B]' : 'text-gray-400'}`} />
+                        <div>
+                          <span className={`font-medium ${paymentMethod === 'BANK_TRANSFER' ? 'text-gray-900' : 'text-gray-700'}`}>
+                            무통장입금
+                          </span>
+                          <p className="text-xs text-gray-500 mt-0.5">계좌이체로 직접 입금</p>
+                        </div>
+                      </div>
+                      {paymentMethod === 'BANK_TRANSFER' && (
+                        <Check className="w-5 h-5 text-[#FF6B6B]" />
+                      )}
+                    </label>
+                  </div>
+
+                  {/* 무통장입금 선택 시 입금 계좌 정보 표시 */}
+                  {paymentMethod === 'BANK_TRANSFER' && (
+                    <div className="mt-4 bg-blue-50 rounded-lg p-4 border border-blue-100">
+                      <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                        <Building2 className="w-4 h-4" />
+                        입금 계좌 안내
+                      </h3>
+                      {bankInfoLoading ? (
+                        <div className="flex items-center gap-2 text-blue-600">
+                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                          <span className="text-sm">계좌 정보를 불러오는 중...</span>
+                        </div>
+                      ) : channelBankInfo ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-blue-700 w-14">은행</span>
+                            <span className="font-medium text-blue-900">{channelBankInfo.bankName}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-blue-700 w-14">계좌번호</span>
+                            <span className="font-medium text-blue-900 font-mono">{channelBankInfo.bankAccount}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-blue-700 w-14">예금주</span>
+                            <span className="font-medium text-blue-900">{channelBankInfo.accountHolder}</span>
+                          </div>
+                          <div className="mt-3 pt-3 border-t border-blue-200">
+                            <p className="text-xs text-blue-600">
+                              * 주문 후 3일 이내에 입금해 주세요.
+                            </p>
+                            <p className="text-xs text-blue-600">
+                              * 미입금 시 주문이 자동 취소됩니다.
+                            </p>
+                            <p className="text-xs text-blue-600">
+                              * 입금자명은 주문자명과 동일하게 해주세요.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-red-600">
+                          입금 계좌 정보를 불러올 수 없습니다. 관리자에게 문의해주세요.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* 우측: 결제 정보 (스티키) */}
@@ -853,10 +1042,15 @@ function CheckoutContent() {
                     <div className="p-5 pb-4">
                       <button
                         onClick={handleSubmit}
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || (paymentMethod === 'BANK_TRANSFER' && !channelBankInfo)}
                         className="w-full py-4 rounded-lg text-center font-semibold text-base transition-colors bg-[#FF6B6B] text-white hover:bg-[#FF5252] disabled:bg-gray-300 disabled:cursor-not-allowed"
                       >
-                        {isSubmitting ? '주문 생성 중...' : `${formatPrice(totalAmount)}원 결제하기`}
+                        {isSubmitting
+                          ? '주문 생성 중...'
+                          : paymentMethod === 'BANK_TRANSFER'
+                            ? `${formatPrice(totalAmount)}원 주문하기`
+                            : `${formatPrice(totalAmount)}원 결제하기`
+                        }
                       </button>
                     </div>
 
