@@ -47,22 +47,32 @@ export class SettingsRepository {
   }
 
   async upsertAiConfig(userId: number, provider: string, data: any) {
-    const existing = await this.findAiConfigByProvider(userId, provider)
+    console.log('[upsertAiConfig] userId:', userId, 'provider:', provider, 'data:', data)
 
-    if (existing) {
-      return prisma.aiApiConfig.update({
-        where: { id: existing.id },
-        data,
+    try {
+      const existing = await this.findAiConfigByProvider(userId, provider)
+      console.log('[upsertAiConfig] existing:', existing)
+
+      if (existing) {
+        return prisma.aiApiConfig.update({
+          where: { id: existing.id },
+          data,
+        })
+      }
+
+      return prisma.aiApiConfig.create({
+        data: {
+          userId,
+          provider: provider as any,
+          ...data,
+        },
       })
+    } catch (error: any) {
+      console.error('[upsertAiConfig] Error:', error.message)
+      console.error('[upsertAiConfig] Error code:', error.code)
+      console.error('[upsertAiConfig] Error meta:', error.meta)
+      throw error
     }
-
-    return prisma.aiApiConfig.create({
-      data: {
-        userId,
-        provider: provider as any,
-        ...data,
-      },
-    })
   }
 }
 

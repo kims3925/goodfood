@@ -46,6 +46,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: aiConfig })
   } catch (error: any) {
     console.error('AI 설정 저장 실패:', error)
+    console.error('Error code:', error.code)
+    console.error('Error message:', error.message)
+    console.error('Error meta:', error.meta)
 
     if (error.message === '지원하지 않는 AI 제공업체입니다.') {
       return NextResponse.json(
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: false, error: 'AI 설정 저장에 실패했습니다.' },
+      { success: false, error: 'AI 설정 저장에 실패했습니다.', details: error.message },
       { status: 500 }
     )
   }

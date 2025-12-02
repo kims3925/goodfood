@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
@@ -83,6 +84,7 @@ export default function ChannelFormModal({
   channel,
 }: ChannelFormModalProps) {
   const toast = useToast()
+  const router = useRouter()
   const isEditMode = !!channel
 
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -515,14 +517,46 @@ export default function ChannelFormModal({
               </div>
             ) : bandError ? (
               <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{bandError}</p>
-                <button
-                  type="button"
-                  onClick={fetchBandList}
-                  className="mt-2 text-sm text-red-700 underline hover:no-underline"
-                >
-                  다시 시도
-                </button>
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-red-800">{bandError}</p>
+                    {bandError.includes('API 설정') ? (
+                      <div className="mt-3">
+                        <p className="text-xs text-red-600 mb-2">
+                          Band API 연동을 위해 먼저 Access Token을 설정해야 합니다.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose()
+                            router.push('/admin/settings/api')
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          API 설정 페이지로 이동
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={fetchBandList}
+                        className="mt-2 inline-flex items-center gap-1 text-sm text-red-700 hover:text-red-800 font-medium"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        다시 시도
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             ) : bandList.length === 0 ? (
               <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
