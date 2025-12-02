@@ -56,6 +56,7 @@ interface PublishedProduct {
     id: number
     name: string
     thumbnailUrl: string | null
+    images?: ProductImage[]
     collectedProduct: {
       post: {
         channel: {

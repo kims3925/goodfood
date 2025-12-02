@@ -26,10 +26,12 @@ export interface PostUpdateInput {
   author?: string
 }
 
-export interface SavedImage {
-  name: string
-  relativePath: string
+export interface SavedPostImage {
+  fileName: string
+  url: string
   fileSize: number
+  fileHash: string
+  isExisting: boolean
 }
 
 export interface PaginatedResult<T> {

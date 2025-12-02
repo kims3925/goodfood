@@ -12,19 +12,33 @@ const expandTilde = (filePath: string): string => {
   return filePath
 }
 
-// MIME 타입 매핑
-const getMimeType = (ext: string): string => {
+const getImageStoragePath = () => {
+  const storagePath = process.env.POST_IMAGE_STORAGE_PATH
+  if (!storagePath) {
+    throw new Error('POST_IMAGE_STORAGE_PATH 환경변수가 설정되지 않았습니다.')
+  }
+  return expandTilde(storagePath)
+}
+
+// MIME 타입 결정
+const getMimeType = (filename: string): string => {
+  const ext = path.extname(filename).toLowerCase()
   const mimeTypes: Record<string, string> = {
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
     '.png': 'image/png',
     '.gif': 'image/gif',
     '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
   }
-  return mimeTypes[ext.toLowerCase()] || 'application/octet-stream'
+  return mimeTypes[ext] || 'application/octet-stream'
 }
 
-// GET: 이미지 서빙
+/**
+ * GET /api/images/post/file/[filename]
+ *
+ * Serve post image file by filename
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ filename: string }> }
@@ -32,40 +46,36 @@ export async function GET(
   try {
     const { filename } = await params
 
-    // 파일명 검증 (경로 탐색 공격 방지)
-    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    if (!filename) {
       return NextResponse.json(
-        { success: false, error: '잘못된 파일명입니다.' },
+        { success: false, error: '파일명이 필요합니다.' },
         { status: 400 }
       )
     }
 
-    // 환경변수에서 이미지 저장 경로 가져오기
-    const imageStoragePath = process.env.IMAGE_STORAGE_PATH
-    if (!imageStoragePath) {
+    const imageDir = getImageStoragePath()
+    const filePath = path.join(imageDir, filename)
+
+    // 보안: 디렉토리 트래버설 방지
+    const resolvedPath = path.resolve(filePath)
+    const resolvedDir = path.resolve(imageDir)
+    if (!resolvedPath.startsWith(resolvedDir)) {
       return NextResponse.json(
-        { success: false, error: '서버 설정 오류' },
-        { status: 500 }
+        { success: false, error: '유효하지 않은 파일 경로입니다.' },
+        { status: 400 }
       )
     }
 
-    const imageDir = expandTilde(imageStoragePath)
-    const filePath = path.join(imageDir, filename)
-
-    // 파일 존재 확인
     if (!existsSync(filePath)) {
       return NextResponse.json(
-        { success: false, error: '파일을 찾을 수 없습니다.' },
+        { success: false, error: '이미지를 찾을 수 없습니다.' },
         { status: 404 }
       )
     }
 
-    // 파일 읽기
     const fileBuffer = await readFile(filePath)
-    const ext = path.extname(filename)
-    const mimeType = getMimeType(ext)
+    const mimeType = getMimeType(filename)
 
-    // 이미지 응답 (Buffer를 Uint8Array로 변환)
     return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': mimeType,
@@ -73,7 +83,7 @@ export async function GET(
       },
     })
   } catch (error) {
-    console.error('이미지 서빙 실패:', error)
+    console.error('게시물 이미지 서빙 실패:', error)
     return NextResponse.json(
       { success: false, error: '이미지를 불러올 수 없습니다.' },
       { status: 500 }

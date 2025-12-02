@@ -16,7 +16,7 @@ interface Post {
     channelKey: string
   }
   images: Array<{
-    imageUrl: string
+    url: string
   }>
   createdAt: string
 }
@@ -293,7 +293,7 @@ export default function PostSelectionModal({
                                           {post.images.slice(0, 4).map((img, idx) => (
                                             <img
                                               key={idx}
-                                              src={img.imageUrl}
+                                              src={img.url}
                                               alt={`이미지 ${idx + 1}`}
                                               className="w-20 h-20 rounded object-cover flex-shrink-0"
                                             />

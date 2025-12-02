@@ -1757,9 +1757,9 @@ export default function ProductsPage() {
                       onClick={() => setSelectedCollectedId(cp.id)}
                     >
                       <div className="flex items-start gap-3">
-                        {cp.post?.images?.[0]?.imageUrl ? (
+                        {cp.post?.images?.[0]?.url ? (
                           <img
-                            src={cp.post.images[0].imageUrl}
+                            src={cp.post.images[0].url}
                             alt={cp.name || cp.post.title}
                             className="w-20 h-20 rounded object-cover flex-shrink-0"
                           />

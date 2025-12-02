@@ -1,5 +1,5 @@
 import prisma from '@bandauto/db'
-import type { PostListParams, PostUpdateInput, SavedImage } from '../types/post.types'
+import type { PostListParams, PostUpdateInput, SavedPostImage } from '../types/post.types'
 
 export class CollectedPostRepository {
   async findMany(params: PostListParams) {
@@ -106,8 +106,18 @@ export class CollectedPostRepository {
     content: string
     author?: string
     comments?: Array<{ author: string; content: string }>
-    savedImages?: SavedImage[]
+    savedPostImages?: SavedPostImage[]
   }) {
+    const imagesToCreate = data.savedPostImages && data.savedPostImages.length > 0
+      ? data.savedPostImages.map((img, index) => ({
+          url: img.url,
+          fileHash: img.fileHash,
+          fileName: img.fileName,
+          fileSize: img.fileSize,
+          sortOrder: index,
+        }))
+      : null
+
     return prisma.collectedPost.create({
       data: {
         userId: data.userId,
@@ -124,13 +134,9 @@ export class CollectedPostRepository {
             })),
           },
         }),
-        ...(data.savedImages && data.savedImages.length > 0 && {
+        ...(imagesToCreate && {
           images: {
-            create: data.savedImages.map((img, index) => ({
-              url: img.relativePath,
-              fileSize: img.fileSize,
-              sortOrder: index,
-            })),
+            create: imagesToCreate,
           },
         }),
       },

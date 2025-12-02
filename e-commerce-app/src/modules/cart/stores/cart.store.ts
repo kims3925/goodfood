@@ -151,14 +151,11 @@ export const useCartStore = create<CartState>()(
           0
         )
 
-        // 배송비 계산 (환경변수에서 가져오기)
-        const freeShippingAmount = parseFloat(
-          process.env.NEXT_PUBLIC_FREE_SHIPPING_AMOUNT || '30000'
+        // 배송비는 상품별로 계산 (각 상품의 shippingFee 합산)
+        const shippingFee = items.reduce(
+          (sum, item) => sum + (item.product.shippingFee || 0),
+          0
         )
-        const defaultShippingFee = parseFloat(
-          process.env.NEXT_PUBLIC_DEFAULT_SHIPPING_FEE || '3000'
-        )
-        const shippingFee = totalAmount >= freeShippingAmount ? 0 : defaultShippingFee
 
         const finalAmount = totalAmount + shippingFee
 

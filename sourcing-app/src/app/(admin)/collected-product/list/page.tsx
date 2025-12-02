@@ -33,7 +33,7 @@ interface AvailablePost {
   }
   images: Array<{
     id: number
-    imageUrl: string
+    url: string
   }>
 }
 
@@ -78,6 +78,7 @@ interface CollectedProduct {
     images: Array<{
       id: number
       url: string
+      sortOrder: number
     }>
   }
   products: Array<{
@@ -689,10 +690,10 @@ export default function CollectedProductListPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        {product.post?.images?.[0]?.imageUrl ? (
+                        {product.post?.images?.[0]?.url ? (
                           <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                             <Image
-                              src={product.post.images[0].imageUrl}
+                              src={product.post.images[0].url}
                               alt={product.name || product.post.title}
                               fill
                               sizes="56px"
@@ -849,7 +850,7 @@ export default function CollectedProductListPage() {
                                 <div className="flex items-start gap-3">
                                   {post.images?.[0] && (
                                     <img
-                                      src={post.images[0].imageUrl}
+                                      src={post.images[0].url}
                                       alt=""
                                       className="w-16 h-16 rounded object-cover flex-shrink-0"
                                     />
@@ -912,7 +913,7 @@ export default function CollectedProductListPage() {
                   <div className="flex items-start gap-3">
                     {selectedPost.images?.[0] && (
                       <img
-                        src={selectedPost.images[0].imageUrl}
+                        src={selectedPost.images[0].url}
                         alt=""
                         className="w-20 h-20 rounded object-cover"
                       />

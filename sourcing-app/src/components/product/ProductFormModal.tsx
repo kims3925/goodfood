@@ -92,8 +92,7 @@ export default function ProductFormModal({
       if (data.success && data.data?.images) {
         return data.data.images.map((img: any) => ({
           id: img.id,
-          imageUrl: img.imageUrl,
-          name: img.name,
+          url: img.url,
           sortOrder: img.sortOrder,
         }))
       }

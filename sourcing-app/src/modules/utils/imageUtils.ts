@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import os from 'os'
+import prisma from '@bandauto/db'
 
 /**
  * UUID 16자리 생성
@@ -36,14 +37,25 @@ function expandHomePath(filepath: string): string {
 }
 
 /**
- * URL에서 이미지 다운로드 및 서버에 저장
- * @param imageUrl 원본 이미지 URL
- * @returns { name: string, relativePath: string, fileSize: number }
+ * 버퍼에서 SHA-256 해시 생성
  */
-export async function downloadAndSaveImage(imageUrl: string): Promise<{
-  name: string
-  relativePath: string
+function generateFileHash(buffer: Buffer): string {
+  return crypto.createHash('sha256').update(buffer).digest('hex')
+}
+
+/**
+ * 상품 이미지 전용: URL에서 이미지 다운로드 및 서버에 저장
+ * 환경변수 PRODUCT_IMAGE_STORAGE_PATH에 저장
+ * 동일한 해시의 이미지가 이미 존재하면 기존 이미지 정보 반환 (중복 방지)
+ * @param imageUrl 원본 이미지 URL
+ * @returns { fileName: string, url: string, fileSize: number, fileHash: string, isExisting: boolean }
+ */
+export async function downloadAndSaveProductImage(imageUrl: string): Promise<{
+  fileName: string
+  url: string
   fileSize: number
+  fileHash: string
+  isExisting: boolean
 }> {
   try {
     // 이미지 다운로드
@@ -55,6 +67,33 @@ export async function downloadAndSaveImage(imageUrl: string): Promise<{
     const arrayBuffer = await response.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
+    // 파일 해시 생성
+    const fileHash = generateFileHash(buffer)
+
+    // 동일 해시의 기존 이미지 확인
+    const existingImage = await prisma.productImage.findFirst({
+      where: { fileHash },
+      select: { fileName: true, url: true, fileSize: true, fileHash: true },
+    })
+
+    if (existingImage && existingImage.fileName) {
+      // 기존 파일이 실제로 존재하는지 확인
+      const storagePath = process.env.PRODUCT_IMAGE_STORAGE_PATH || 'assets/images/product'
+      const imagesDir = expandHomePath(storagePath)
+      const existingFilePath = path.join(imagesDir, existingImage.fileName)
+
+      if (fs.existsSync(existingFilePath)) {
+        console.log(`[Product Image] 중복 이미지 발견, 기존 파일 사용: ${existingImage.fileName}`)
+        return {
+          fileName: existingImage.fileName,
+          url: existingImage.url,
+          fileSize: existingImage.fileSize || buffer.length,
+          fileHash: existingImage.fileHash!,
+          isExisting: true,
+        }
+      }
+    }
+
     // 파일 확장자 추출 (없으면 jpg로 기본 설정)
     const urlPath = new URL(imageUrl).pathname
     const ext = path.extname(urlPath) || '.jpg'
@@ -64,8 +103,8 @@ export async function downloadAndSaveImage(imageUrl: string): Promise<{
     const timestamp = getTimestamp()
     const fileName = `${uuid}_${timestamp}${ext}`
 
-    // 환경 변수에서 저장 경로 가져오기
-    const storagePath = process.env.IMAGE_STORAGE_PATH || '~/assets/images'
+    // 환경 변수에서 상품 이미지 저장 경로 가져오기
+    const storagePath = process.env.PRODUCT_IMAGE_STORAGE_PATH || 'assets/images/product'
 
     // ~ (홈 디렉토리) 확장
     const imagesDir = expandHomePath(storagePath)
@@ -79,36 +118,38 @@ export async function downloadAndSaveImage(imageUrl: string): Promise<{
     // 파일 저장
     fs.writeFileSync(filePath, buffer)
 
-    // 웹에서 접근 가능한 API 경로 반환 (API 라우트 구조와 일치)
-    const relativePath = `/api/assets/images/${fileName}`
+    // 웹에서 접근 가능한 API 경로 반환
+    const url = `/api/images/product/file/${fileName}`
 
     return {
-      name: fileName,
-      relativePath,
+      fileName,
+      url,
       fileSize: buffer.length,
+      fileHash,
+      isExisting: false,
     }
   } catch (error) {
-    console.error('이미지 다운로드 실패:', error)
+    console.error('상품 이미지 다운로드 실패:', error)
     throw error
   }
 }
 
 /**
- * 여러 이미지를 순차적으로 다운로드
+ * 여러 상품 이미지를 순차적으로 다운로드
  * @param imageUrls 이미지 URL 배열
  * @returns 저장된 이미지 정보 배열
  */
-export async function downloadAndSaveImages(
+export async function downloadAndSaveProductImages(
   imageUrls: string[]
-): Promise<Array<{ name: string; relativePath: string; fileSize: number }>> {
+): Promise<Array<{ fileName: string; url: string; fileSize: number; fileHash: string; isExisting: boolean }>> {
   const results = []
 
   for (let i = 0; i < imageUrls.length; i++) {
     try {
-      const result = await downloadAndSaveImage(imageUrls[i])
+      const result = await downloadAndSaveProductImage(imageUrls[i])
       results.push(result)
     } catch (error) {
-      console.error(`이미지 다운로드 실패 (${i + 1}/${imageUrls.length}):`, error)
+      console.error(`상품 이미지 다운로드 실패 (${i + 1}/${imageUrls.length}):`, error)
       // 실패한 이미지는 건너뛰고 계속 진행
     }
   }
@@ -117,37 +158,207 @@ export async function downloadAndSaveImages(
 }
 
 /**
- * 서버에서 이미지 파일 삭제
+ * 상품 이미지 파일 삭제 (다른 상품에서 참조하지 않는 경우에만)
  * @param fileName 파일명 (예: uuid_timestamp.jpg)
+ * @param excludeProductId 제외할 상품 ID (삭제 중인 상품)
  */
-export function deleteImageFile(fileName: string): void {
+export async function deleteProductImageFile(fileName: string, excludeProductId?: number): Promise<void> {
   try {
-    // 환경 변수에서 저장 경로 가져오기
-    const storagePath = process.env.IMAGE_STORAGE_PATH || '~/assets/images'
+    // 같은 파일명을 참조하는 다른 상품 이미지가 있는지 확인
+    const otherReferences = await prisma.productImage.count({
+      where: {
+        fileName,
+        ...(excludeProductId ? { productId: { not: excludeProductId } } : {}),
+      },
+    })
+
+    if (otherReferences > 0) {
+      console.log(`[Product Image] 다른 상품에서 참조 중, 파일 유지: ${fileName} (${otherReferences}개 참조)`)
+      return
+    }
+
+    const storagePath = process.env.PRODUCT_IMAGE_STORAGE_PATH || 'assets/images/product'
+    const imagesDir = expandHomePath(storagePath)
+    const filePath = path.join(imagesDir, fileName)
+
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath)
+      console.log(`상품 이미지 파일 삭제 완료: ${fileName}`)
+    } else {
+      console.warn(`상품 이미지 파일이 존재하지 않음: ${fileName}`)
+    }
+  } catch (error) {
+    console.error(`상품 이미지 파일 삭제 실패 (${fileName}):`, error)
+  }
+}
+
+/**
+ * 여러 상품 이미지 파일을 삭제 (다른 상품에서 참조하지 않는 경우에만)
+ * @param fileNames 파일명 배열
+ * @param excludeProductId 제외할 상품 ID (삭제 중인 상품)
+ */
+export async function deleteProductImageFiles(fileNames: string[], excludeProductId?: number): Promise<void> {
+  for (const fileName of fileNames) {
+    await deleteProductImageFile(fileName, excludeProductId)
+  }
+}
+
+/**
+ * 게시물 이미지 전용: URL에서 이미지 다운로드 및 서버에 저장
+ * 환경변수 POST_IMAGE_STORAGE_PATH에 저장
+ * 동일한 해시의 이미지가 이미 존재하면 기존 이미지 정보 반환 (중복 방지)
+ * @param imageUrl 원본 이미지 URL
+ * @returns { fileName: string, url: string, fileSize: number, fileHash: string, isExisting: boolean }
+ */
+export async function downloadAndSavePostImage(imageUrl: string): Promise<{
+  fileName: string
+  url: string
+  fileSize: number
+  fileHash: string
+  isExisting: boolean
+}> {
+  try {
+    // 이미지 다운로드
+    const response = await fetch(imageUrl)
+    if (!response.ok) {
+      throw new Error(`Failed to download image: ${response.statusText}`)
+    }
+
+    const arrayBuffer = await response.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+
+    // 파일 해시 생성
+    const fileHash = generateFileHash(buffer)
+
+    // 동일 해시의 기존 이미지 확인
+    const existingImage = await prisma.collectedPostImage.findFirst({
+      where: { fileHash },
+      select: { fileName: true, url: true, fileSize: true, fileHash: true },
+    })
+
+    if (existingImage && existingImage.fileName) {
+      // 기존 파일이 실제로 존재하는지 확인
+      const storagePath = process.env.POST_IMAGE_STORAGE_PATH || 'assets/images/post'
+      const imagesDir = expandHomePath(storagePath)
+      const existingFilePath = path.join(imagesDir, existingImage.fileName)
+
+      if (fs.existsSync(existingFilePath)) {
+        console.log(`[Post Image] 중복 이미지 발견, 기존 파일 사용: ${existingImage.fileName}`)
+        return {
+          fileName: existingImage.fileName,
+          url: existingImage.url,
+          fileSize: existingImage.fileSize || buffer.length,
+          fileHash: existingImage.fileHash!,
+          isExisting: true,
+        }
+      }
+    }
+
+    // 파일 확장자 추출 (없으면 jpg로 기본 설정)
+    const urlPath = new URL(imageUrl).pathname
+    const ext = path.extname(urlPath) || '.jpg'
+
+    // 파일명 생성: uuid_timestamp.ext
+    const uuid = generateShortUUID()
+    const timestamp = getTimestamp()
+    const fileName = `${uuid}_${timestamp}${ext}`
+
+    // 환경 변수에서 게시물 이미지 저장 경로 가져오기
+    const storagePath = process.env.POST_IMAGE_STORAGE_PATH || 'assets/images/post'
 
     // ~ (홈 디렉토리) 확장
     const imagesDir = expandHomePath(storagePath)
     const filePath = path.join(imagesDir, fileName)
 
-    // 파일이 존재하면 삭제
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath)
-      console.log(`이미지 파일 삭제 완료: ${fileName}`)
-    } else {
-      console.warn(`이미지 파일이 존재하지 않음: ${fileName}`)
+    // 디렉토리가 없으면 생성
+    if (!fs.existsSync(imagesDir)) {
+      fs.mkdirSync(imagesDir, { recursive: true })
+    }
+
+    // 파일 저장
+    fs.writeFileSync(filePath, buffer)
+
+    // 웹에서 접근 가능한 API 경로 반환
+    const url = `/api/images/post/file/${fileName}`
+
+    return {
+      fileName,
+      url,
+      fileSize: buffer.length,
+      fileHash,
+      isExisting: false,
     }
   } catch (error) {
-    console.error(`이미지 파일 삭제 실패 (${fileName}):`, error)
-    // 파일 삭제 실패해도 에러를 던지지 않음 (DB 삭제는 진행되어야 함)
+    console.error('게시물 이미지 다운로드 실패:', error)
+    throw error
   }
 }
 
 /**
- * 여러 이미지 파일을 삭제
- * @param fileNames 파일명 배열
+ * 여러 게시물 이미지를 순차적으로 다운로드
+ * @param imageUrls 이미지 URL 배열
+ * @returns 저장된 이미지 정보 배열
  */
-export function deleteImageFiles(fileNames: string[]): void {
+export async function downloadAndSavePostImages(
+  imageUrls: string[]
+): Promise<Array<{ fileName: string; url: string; fileSize: number; fileHash: string; isExisting: boolean }>> {
+  const results = []
+
+  for (let i = 0; i < imageUrls.length; i++) {
+    try {
+      const result = await downloadAndSavePostImage(imageUrls[i])
+      results.push(result)
+    } catch (error) {
+      console.error(`게시물 이미지 다운로드 실패 (${i + 1}/${imageUrls.length}):`, error)
+      // 실패한 이미지는 건너뛰고 계속 진행
+    }
+  }
+
+  return results
+}
+
+/**
+ * 게시물 이미지 파일 삭제 (다른 게시물에서 참조하지 않는 경우에만)
+ * @param fileName 파일명 (예: uuid_timestamp.jpg)
+ * @param excludePostId 제외할 게시물 ID (삭제 중인 게시물)
+ */
+export async function deletePostImageFile(fileName: string, excludePostId?: number): Promise<void> {
+  try {
+    // 같은 파일명을 참조하는 다른 게시물 이미지가 있는지 확인
+    const otherReferences = await prisma.collectedPostImage.count({
+      where: {
+        fileName,
+        ...(excludePostId ? { postId: { not: excludePostId } } : {}),
+      },
+    })
+
+    if (otherReferences > 0) {
+      console.log(`[Post Image] 다른 게시물에서 참조 중, 파일 유지: ${fileName} (${otherReferences}개 참조)`)
+      return
+    }
+
+    const storagePath = process.env.POST_IMAGE_STORAGE_PATH || 'assets/images/post'
+    const imagesDir = expandHomePath(storagePath)
+    const filePath = path.join(imagesDir, fileName)
+
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath)
+      console.log(`게시물 이미지 파일 삭제 완료: ${fileName}`)
+    } else {
+      console.warn(`게시물 이미지 파일이 존재하지 않음: ${fileName}`)
+    }
+  } catch (error) {
+    console.error(`게시물 이미지 파일 삭제 실패 (${fileName}):`, error)
+  }
+}
+
+/**
+ * 여러 게시물 이미지 파일을 삭제 (다른 게시물에서 참조하지 않는 경우에만)
+ * @param fileNames 파일명 배열
+ * @param excludePostId 제외할 게시물 ID (삭제 중인 게시물)
+ */
+export async function deletePostImageFiles(fileNames: string[], excludePostId?: number): Promise<void> {
   for (const fileName of fileNames) {
-    deleteImageFile(fileName)
+    await deletePostImageFile(fileName, excludePostId)
   }
 }

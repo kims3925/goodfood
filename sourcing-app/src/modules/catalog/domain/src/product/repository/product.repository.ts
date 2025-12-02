@@ -1,5 +1,6 @@
 import prisma, { ChannelKind } from '@bandauto/db'
 import type { ProductListParams, ProductCreateInput, ProductUpdateInput } from '../types/product.types'
+import { downloadAndSaveProductImages } from '@/modules/utils/imageUtils'
 
 export class ProductRepository {
   async findMany(params: ProductListParams) {
@@ -154,6 +155,17 @@ export class ProductRepository {
     })
   }
 
+  async getWithImages(id: number, userId: number) {
+    return prisma.product.findFirst({
+      where: { id, userId },
+      include: {
+        images: {
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    })
+  }
+
   async findByCollectedProductId(collectedProductId: number) {
     return prisma.product.findFirst({
       where: { collectedProductId },
@@ -169,7 +181,21 @@ export class ProductRepository {
           include: {
             images: {
               orderBy: { sortOrder: 'asc' },
-              take: 1,
+            },
+          },
+        },
+      },
+    })
+  }
+
+  async getCollectedProductById(id: number) {
+    return prisma.collectedProduct.findFirst({
+      where: { id },
+      include: {
+        post: {
+          include: {
+            images: {
+              orderBy: { sortOrder: 'asc' },
             },
           },
         },
@@ -197,8 +223,9 @@ export class ProductRepository {
     })
   }
 
-  async create(data: ProductCreateInput & { thumbnailUrl?: string | null }) {
-    return prisma.product.create({
+  async create(data: ProductCreateInput & { thumbnailUrl?: string | null; imageUrls?: string[] }) {
+    // 1. 상품 생성
+    const product = await prisma.product.create({
       data: {
         userId: data.userId,
         collectedProductId: data.collectedProductId || null,
@@ -210,6 +237,49 @@ export class ProductRepository {
         thumbnailUrl: data.thumbnailUrl || null,
       },
     })
+
+    // 2. 이미지 URL이 있으면 다운로드하여 ProductImage에 저장
+    if (data.imageUrls && data.imageUrls.length > 0) {
+      try {
+        console.log(`[Product Create] 이미지 다운로드 시작: ${data.imageUrls.length}개`)
+        const downloadedImages = await downloadAndSaveProductImages(data.imageUrls)
+
+        if (downloadedImages.length > 0) {
+          // 중복 이미지 로그
+          const existingCount = downloadedImages.filter((img) => img.isExisting).length
+          if (existingCount > 0) {
+            console.log(`[Product Create] 중복 이미지 재사용: ${existingCount}개`)
+          }
+
+          // ProductImage 레코드 생성 (해시, 파일명, 파일크기 포함)
+          await prisma.productImage.createMany({
+            data: downloadedImages.map((img, index) => ({
+              productId: product.id,
+              url: img.url,
+              fileHash: img.fileHash,
+              fileName: img.fileName,
+              fileSize: img.fileSize,
+              sortOrder: index,
+            })),
+          })
+
+          // 첫 번째 이미지를 썸네일로 설정 (thumbnailUrl이 없는 경우)
+          if (!product.thumbnailUrl) {
+            await prisma.product.update({
+              where: { id: product.id },
+              data: { thumbnailUrl: downloadedImages[0].url },
+            })
+          }
+
+          console.log(`[Product Create] 이미지 저장 완료: ${downloadedImages.length}개`)
+        }
+      } catch (error) {
+        console.error('[Product Create] 이미지 다운로드/저장 실패:', error)
+        // 이미지 저장 실패해도 상품은 생성됨
+      }
+    }
+
+    return product
   }
 
   async update(id: number, data: ProductUpdateInput) {

@@ -69,6 +69,10 @@ export async function GET(request: NextRequest) {
               id: true,
               name: true,
               thumbnailUrl: true,
+              images: {
+                orderBy: { sortOrder: 'asc' },
+                take: 1,
+              },
               collectedProduct: {
                 select: {
                   post: {

@@ -1,6 +1,6 @@
 import { postRepository } from '../repository/post.repository'
-import { downloadAndSaveImages, deleteImageFiles } from '@/modules/utils/imageUtils'
-import type { PostListParams, PostCreateInput, PostUpdateInput } from '../types/post.types'
+import { downloadAndSavePostImages, deletePostImageFiles } from '@/modules/utils/imageUtils'
+import type { PostListParams, PostCreateInput, PostUpdateInput, SavedPostImage } from '../types/post.types'
 
 export class PostService {
   async getList(params: PostListParams) {
@@ -18,11 +18,11 @@ export class PostService {
       throw new Error('이미 등록된 게시물입니다.')
     }
 
-    // 이미지가 있으면 다운로드 및 저장
-    let savedImages: Array<{ name: string; relativePath: string; fileSize: number }> = []
+    // 이미지가 있으면 다운로드 및 저장 (POST_IMAGE_STORAGE_PATH에 저장)
+    let savedPostImages: SavedPostImage[] = []
     if (data.images && data.images.length > 0) {
       try {
-        savedImages = await downloadAndSaveImages(data.images)
+        savedPostImages = await downloadAndSavePostImages(data.images)
       } catch (error) {
         console.error('이미지 저장 실패:', error)
       }
@@ -36,7 +36,7 @@ export class PostService {
       content: data.content,
       author: data.author,
       comments: data.comments,
-      savedImages,
+      savedPostImages,
     })
   }
 
@@ -55,10 +55,16 @@ export class PostService {
       throw new Error('게시물을 찾을 수 없습니다.')
     }
 
-    // 서버에서 실제 이미지 파일 삭제
+    // 서버에서 실제 이미지 파일 삭제 (POST_IMAGE_STORAGE_PATH에서 삭제)
+    // 다른 게시물에서 같은 파일을 참조하지 않는 경우에만 삭제
     if (post.images && post.images.length > 0) {
-      const fileNames = post.images.map((img) => img.name)
-      deleteImageFiles(fileNames)
+      // URL에서 파일명 추출: /api/images/post/file/{fileName}
+      const fileNames = post.images.map((img) => {
+        const url = img.url
+        const parts = url.split('/')
+        return parts[parts.length - 1]
+      })
+      await deletePostImageFiles(fileNames, id)
     }
 
     return postRepository.delete(id)
