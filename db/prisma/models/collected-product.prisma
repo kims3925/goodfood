@@ -17,9 +17,6 @@ model CollectedProduct {
   price          Int?
   wholesalePrice Int?     @map("wholesale_price")
 
-  // 원본 JSON 그대로 넣고 싶은 경우
-  rawMetadata    Json?    @map("raw_metadata")
-
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 

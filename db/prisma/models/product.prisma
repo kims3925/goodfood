@@ -26,7 +26,6 @@ model Product {
   // Pricing
   currency           String        @default("KRW") @db.VarChar(10)
   price              Int?
-  wholesalePrice     Int?          @map("wholesale_price")
 
   createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)

@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
     const channelId = searchParams.get('channelId')
+    const sourcePlatform = searchParams.get('sourcePlatform')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const page = parseInt(searchParams.get('page') || '1')
@@ -25,6 +26,13 @@ export async function GET(request: NextRequest) {
     // 조건 생성
     const where: any = {
       userId: currentUser.userId,
+    }
+
+    // sourcePlatform 필터: channel.platform으로 필터링
+    if (sourcePlatform) {
+      where.channel = {
+        platform: sourcePlatform,
+      }
     }
 
     if (search) {
@@ -49,6 +57,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    console.log('Published Product API - where:', JSON.stringify(where, null, 2))
+    console.log('Published Product API - page:', page, 'limit:', limit, 'skip:', skip)
+
     const [data, total] = await Promise.all([
       prisma.publishedProduct.findMany({
         where,
@@ -58,9 +69,22 @@ export async function GET(request: NextRequest) {
               id: true,
               name: true,
               thumbnailUrl: true,
-              price: true,
-              wholesalePrice: true,
               status: true,
+              collectedProduct: {
+                select: {
+                  post: {
+                    select: {
+                      channel: {
+                        select: {
+                          id: true,
+                          name: true,
+                          platform: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
           channel: {
@@ -78,6 +102,8 @@ export async function GET(request: NextRequest) {
       }),
       prisma.publishedProduct.count({ where }),
     ])
+
+    console.log('Published Product API - total:', total, 'data.length:', data.length)
 
     return NextResponse.json({
       success: true,

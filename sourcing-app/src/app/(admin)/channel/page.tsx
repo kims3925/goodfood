@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Plus, Search, RefreshCw, Trash2, Edit, Store, ExternalLink } from 'lucide-react'
+import { Plus, Search, RefreshCw, Trash2, Store } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import ChannelFormModal from '@/components/channel/ChannelFormModal'
@@ -75,8 +75,20 @@ export default function ChannelListPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [editingChannel, setEditingChannel] = useState<Channel | null>(null)
+
+  // UTC+9 시간 포맷 함수
+  const formatDateTimeKST = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).replace(/\. /g, '.').replace(/\.$/, '')
+  }
 
   useEffect(() => {
     loadChannels()
@@ -140,11 +152,6 @@ export default function ChannelListPage() {
       setSelectAll(newSelection.length === channels.length)
       return newSelection
     })
-  }
-
-  const handleDeleteChannel = (id: number) => {
-    setDeleteTargetId(id)
-    setShowDeleteConfirm(true)
   }
 
   const handleDeleteSelected = () => {
@@ -359,13 +366,13 @@ export default function ChannelListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[25%]">채널명</TableHead>
-                  <TableHead className="w-[12%]">유형</TableHead>
-                  <TableHead className="w-[12%]">플랫폼</TableHead>
-                  <TableHead className="w-[15%]">채널키</TableHead>
-                  <TableHead className="w-[10%]">상태</TableHead>
-                  <TableHead className="w-[12%]">생성일</TableHead>
-                  <TableHead className="w-[10%]">액션</TableHead>
+                  <TableHead className="w-[22%]">채널명</TableHead>
+                  <TableHead className="w-[10%]">유형</TableHead>
+                  <TableHead className="w-[10%]">플랫폼</TableHead>
+                  <TableHead className="w-[14%]">채널키</TableHead>
+                  <TableHead className="w-[8%]">상태</TableHead>
+                  <TableHead className="w-[16%]">생성일</TableHead>
+                  <TableHead className="w-[16%]">수정일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -375,7 +382,8 @@ export default function ChannelListPage() {
                   channels.map((channel) => (
                     <TableRow
                       key={channel.id}
-                      className="hover:bg-gray-50"
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => router.push(`/channel/${channel.id}`)}
                     >
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <input
@@ -415,45 +423,13 @@ export default function ChannelListPage() {
                       <TableCell>{getStatusBadge(channel.isActive)}</TableCell>
                       <TableCell>
                         <span className="text-sm text-gray-600">
-                          {new Date(channel.createdAt).toLocaleDateString('ko-KR', {
-                            year: '2-digit',
-                            month: '2-digit',
-                            day: '2-digit',
-                          }).replace(/\. /g, '.').replace(/\.$/, '')}
+                          {formatDateTimeKST(channel.createdAt)}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
-                          {channel.formUrl && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => window.open(channel.formUrl!, '_blank')}
-                              title="주문폼 열기"
-                            >
-                              <ExternalLink size={14} />
-                            </Button>
-                          )}
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => {
-                              setEditingChannel(channel)
-                              setShowEditModal(true)
-                            }}
-                            title="수정"
-                          >
-                            <Edit size={14} />
-                          </Button>
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleDeleteChannel(channel.id)}
-                            title="삭제"
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
+                        <span className="text-sm text-gray-600">
+                          {formatDateTimeKST(channel.updatedAt)}
+                        </span>
                       </TableCell>
                     </TableRow>
                   ))
@@ -492,16 +468,12 @@ export default function ChannelListPage() {
         isLoading={isDeleting}
       />
 
-      {/* 채널 등록/수정 모달 */}
+      {/* 채널 등록 모달 */}
       <ChannelFormModal
-        isOpen={showAddModal || showEditModal}
-        onClose={() => {
-          setShowAddModal(false)
-          setShowEditModal(false)
-          setEditingChannel(null)
-        }}
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
         onSuccess={loadChannels}
-        channel={editingChannel}
+        channel={null}
       />
     </div>
   )

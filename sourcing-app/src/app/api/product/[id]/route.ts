@@ -70,3 +70,83 @@ export async function GET(
     )
   }
 }
+
+/**
+ * PUT /api/product/[id]
+ *
+ * Update product by ID
+ *
+ * Body:
+ * - name?: string
+ * - price?: number
+ * - description?: string
+ *
+ * Response:
+ * - success: boolean
+ * - data?: Product
+ * - error?: string
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: '로그인이 필요합니다.' },
+        { status: 401 }
+      )
+    }
+    const userId = currentUser.userId
+
+    const id = parseInt(params.id)
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { success: false, error: '유효하지 않은 상품 ID입니다.' },
+        { status: 400 }
+      )
+    }
+
+    // Check if product exists and belongs to user
+    const existingProduct = await prisma.product.findFirst({
+      where: { id, userId },
+    })
+
+    if (!existingProduct) {
+      return NextResponse.json(
+        { success: false, error: '상품을 찾을 수 없습니다.' },
+        { status: 404 }
+      )
+    }
+
+    const body = await request.json()
+    const { name, price, description } = body
+
+    const updateData: {
+      name?: string
+      price?: number | null
+      description?: string | null
+    } = {}
+
+    if (name !== undefined) updateData.name = name
+    if (price !== undefined) updateData.price = price
+    if (description !== undefined) updateData.description = description
+
+    const updatedProduct = await prisma.product.update({
+      where: { id },
+      data: updateData,
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: updatedProduct,
+    })
+  } catch (error) {
+    console.error('상품 수정 실패:', error)
+    return NextResponse.json(
+      { success: false, error: '상품 수정에 실패했습니다.' },
+      { status: 500 }
+    )
+  }
+}

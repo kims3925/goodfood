@@ -12,11 +12,30 @@ import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
 import Image from 'next/image'
 
+// 밴드 로고 아이콘
+const BandIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+  </svg>
+)
+
 interface Channel {
   id: number
   name: string
   coverUrl: string | null
   platform: string
+}
+
+type SourcePlatform = 'BAND' | 'ALIEXPRESS' | 'NAVER_CAFE' | 'SMARTSTORE' | 'COUPANG' | 'SHOP' | 'CUSTOM'
+
+const PLATFORM_LABELS: Record<SourcePlatform, string> = {
+  BAND: 'Band',
+  ALIEXPRESS: 'Ali',
+  NAVER_CAFE: '네이버카페',
+  SMARTSTORE: '스마트스토어',
+  COUPANG: '쿠팡',
+  SHOP: '쇼핑몰',
+  CUSTOM: '기타',
 }
 
 interface PublishedProduct {
@@ -31,9 +50,15 @@ interface PublishedProduct {
     id: number
     name: string
     thumbnailUrl: string | null
-    price: number | null
-    wholesalePrice: number | null
     status: string
+    collectedProduct: {
+      post: {
+        channel: {
+          id: number
+          name: string
+        }
+      }
+    } | null
   }
   channel: {
     id: number
@@ -54,7 +79,9 @@ export default function PublishedProductListPage() {
   // Filter states
   const [showFilters, setShowFilters] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
+  const [availablePlatforms, setAvailablePlatforms] = useState<SourcePlatform[]>([])
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
+  const [selectedSourcePlatform, setSelectedSourcePlatform] = useState<string>('')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
 
@@ -75,6 +102,7 @@ export default function PublishedProductListPage() {
 
   useEffect(() => {
     loadChannels()
+    loadAvailablePlatforms()
   }, [])
 
   const loadChannels = async () => {
@@ -89,16 +117,31 @@ export default function PublishedProductListPage() {
     }
   }
 
-  const loadProducts = useCallback(async () => {
+  const loadAvailablePlatforms = async () => {
+    try {
+      const response = await fetch('/api/channel?kind=WHOLESALE&limit=100')
+      const data = await response.json()
+      if (data.success && data.data) {
+        const platforms = [...new Set(data.data.map((ch: { platform: string }) => ch.platform))] as SourcePlatform[]
+        setAvailablePlatforms(platforms)
+      }
+    } catch (error) {
+      console.error('소싱처 플랫폼 목록 조회 실패:', error)
+    }
+  }
+
+  // 데이터 조회 함수 (page 파라미터를 받아서 사용)
+  const fetchProducts = useCallback(async (page: number) => {
     try {
       setIsLoading(true)
       const params = new URLSearchParams({
-        page: currentPage.toString(),
+        page: page.toString(),
         limit: itemsPerPage.toString(),
       })
 
       if (query) params.append('search', query)
       if (selectedChannelId) params.append('channelId', selectedChannelId)
+      if (selectedSourcePlatform) params.append('sourcePlatform', selectedSourcePlatform)
       if (startDate) params.append('startDate', startDate)
       if (endDate) params.append('endDate', endDate)
 
@@ -109,6 +152,7 @@ export default function PublishedProductListPage() {
         setProducts(data.data)
         setTotalItems(data.total || 0)
         setTotalPages(Math.ceil((data.total || 0) / itemsPerPage))
+        setCurrentPage(page)
       } else {
         toast.error('발행상품 목록을 불러오는데 실패했습니다.')
       }
@@ -118,34 +162,40 @@ export default function PublishedProductListPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentPage, selectedChannelId, startDate, endDate, query, itemsPerPage, toast])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChannelId, selectedSourcePlatform, startDate, endDate, query, itemsPerPage])
 
+  // 필터 변경 시 1페이지로 리셋하여 조회
   useEffect(() => {
-    loadProducts()
-  }, [loadProducts])
+    fetchProducts(1)
+  }, [fetchProducts])
+
+  // 새로고침용 함수
+  const loadProducts = () => {
+    fetchProducts(currentPage)
+  }
 
   const handleClearFilters = () => {
     setSelectedChannelId('')
+    setSelectedSourcePlatform('')
     setStartDate('')
     setEndDate('')
     setSearchTerm('')
     setQuery('')
-    setCurrentPage(1)
   }
 
-  const hasActiveFilters = selectedChannelId || startDate || endDate || Boolean(query)
+  const hasActiveFilters = selectedChannelId || selectedSourcePlatform || startDate || endDate || Boolean(query)
 
   const handleSearch = () => {
-    setCurrentPage(1)
-    if (query === searchTerm) {
-      loadProducts()
-    } else {
+    if (query !== searchTerm) {
       setQuery(searchTerm)
+    } else {
+      fetchProducts(1)
     }
   }
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page)
+    fetchProducts(page)
   }
 
   const handleToggleSelectAll = () => {
@@ -250,9 +300,17 @@ export default function PublishedProductListPage() {
     )
   }
 
-  const formatPrice = (price: number | null) => {
-    if (!price) return '-'
-    return `₩${price.toLocaleString()}`
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString) return '-'
+    const date = new Date(dateString)
+    return date.toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).replace(/\. /g, '.').replace(/\.$/, '')
   }
 
   return (
@@ -297,6 +355,42 @@ export default function PublishedProductListPage() {
                     </span>
                   )}
                 </Button>
+                {availablePlatforms.length > 0 && (
+                  <div className="flex gap-1">
+                    {availablePlatforms.map((platform) => {
+                      const isSelected = selectedSourcePlatform === platform
+                      const isBand = platform === 'BAND'
+
+                      return (
+                        <button
+                          key={platform}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedSourcePlatform('')
+                            } else {
+                              setSelectedSourcePlatform(platform)
+                            }
+                          }}
+                          title={`소싱처: ${PLATFORM_LABELS[platform]}`}
+                          className={`
+                            inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors
+                            ${isBand
+                              ? isSelected
+                                ? 'bg-green-600 text-white'
+                                : 'bg-green-50 text-green-700 border border-green-300 hover:bg-green-100'
+                              : isSelected
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                            }
+                          `}
+                        >
+                          {isBand ? <BandIcon size={14} /> : null}
+                          {PLATFORM_LABELS[platform]}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2">
@@ -329,10 +423,7 @@ export default function PublishedProductListPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">발행 채널</label>
                   <select
                     value={selectedChannelId}
-                    onChange={(e) => {
-                      setSelectedChannelId(e.target.value)
-                      setCurrentPage(1)
-                    }}
+                    onChange={(e) => setSelectedChannelId(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
                   >
                     <option value="">전체 채널</option>
@@ -350,10 +441,7 @@ export default function PublishedProductListPage() {
                   <input
                     type="date"
                     value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value)
-                      setCurrentPage(1)
-                    }}
+                    onChange={(e) => setStartDate(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
                   />
                 </div>
@@ -363,10 +451,7 @@ export default function PublishedProductListPage() {
                   <input
                     type="date"
                     value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.target.value)
-                      setCurrentPage(1)
-                    }}
+                    onChange={(e) => setEndDate(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
                   />
                 </div>
@@ -387,10 +472,7 @@ export default function PublishedProductListPage() {
                     <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
                       채널: {channels.find(c => c.id.toString() === selectedChannelId)?.name}
                       <button
-                        onClick={() => {
-                          setSelectedChannelId('')
-                          setCurrentPage(1)
-                        }}
+                        onClick={() => setSelectedChannelId('')}
                         className="hover:text-purple-600"
                       >
                         <X size={14} />
@@ -401,10 +483,7 @@ export default function PublishedProductListPage() {
                     <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
                       시작일: {startDate}
                       <button
-                        onClick={() => {
-                          setStartDate('')
-                          setCurrentPage(1)
-                        }}
+                        onClick={() => setStartDate('')}
                         className="hover:text-purple-600"
                       >
                         <X size={14} />
@@ -415,10 +494,7 @@ export default function PublishedProductListPage() {
                     <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
                       종료일: {endDate}
                       <button
-                        onClick={() => {
-                          setEndDate('')
-                          setCurrentPage(1)
-                        }}
+                        onClick={() => setEndDate('')}
                         className="hover:text-purple-600"
                       >
                         <X size={14} />
@@ -447,12 +523,11 @@ export default function PublishedProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[28%]">상품명</TableHead>
-                  <TableHead className="w-[15%]">발행 채널</TableHead>
-                  <TableHead className="w-[9%]">도매가</TableHead>
-                  <TableHead className="w-[9%]">판매가</TableHead>
-                  <TableHead className="w-[10%]">발행일</TableHead>
-                  <TableHead className="w-[15%]">액션</TableHead>
+                  <TableHead className="w-[32%]">상품명</TableHead>
+                  <TableHead className="w-[16%]">발행 채널</TableHead>
+                  <TableHead className="w-[16%]">생성일시</TableHead>
+                  <TableHead className="w-[16%]">수정일시</TableHead>
+                  <TableHead className="w-[16%]">발행일시</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -499,37 +574,19 @@ export default function PublishedProductListPage() {
                       </TableCell>
                       <TableCell>{getChannelBadge(product)}</TableCell>
                       <TableCell>
-                        <div className="font-medium text-gray-900">
-                          {formatPrice(product.product?.wholesalePrice)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium text-gray-900">
-                          {formatPrice(product.product?.price)}
-                        </div>
+                        <span className="text-sm text-gray-600 whitespace-nowrap">
+                          {formatDateTime(product.createdAt)}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-gray-600 whitespace-nowrap">
-                          {product.publishedAt
-                            ? new Date(product.publishedAt).toLocaleDateString('ko-KR', {
-                                year: '2-digit',
-                                month: '2-digit',
-                                day: '2-digit',
-                              }).replace(/\. /g, '.').replace(/\.$/, '')
-                            : '-'}
+                          {formatDateTime(product.updatedAt)}
                         </span>
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleDeleteProduct(product.id)}
-                            title="삭제"
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
+                      <TableCell>
+                        <span className="text-sm text-gray-600 whitespace-nowrap">
+                          {formatDateTime(product.publishedAt)}
+                        </span>
                       </TableCell>
                     </TableRow>
                   ))
