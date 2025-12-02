@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, RefreshCw, Package, Trash2, Filter, X, Plus, ChevronDown, ChevronRight } from 'lucide-react'
+import { Search, Package, Trash2, Plus, ChevronDown, ChevronRight, ChevronUp, Boxes, CheckCircle, Clock } from 'lucide-react'
 import Image from 'next/image'
 import Button from '@/components/ui/Button'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
@@ -14,6 +14,8 @@ import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
 import ThumbnailImage from '@/components/ui/ThumbnailImage'
 
+type ChannelPlatform = 'BAND' | 'NAVER_CAFE' | 'ALIEXPRESS'
+
 interface Channel {
   id: number
   name: string
@@ -21,23 +23,23 @@ interface Channel {
   platform?: string
 }
 
-type SourcePlatform = 'BAND' | 'ALIEXPRESS' | 'NAVER_CAFE' | 'SMARTSTORE' | 'COUPANG' | 'CUSTOM'
+const PLATFORM_OPTIONS: { value: ChannelPlatform; label: string }[] = [
+  { value: 'BAND', label: '밴드' },
+  { value: 'NAVER_CAFE', label: '네이버 카페' },
+  { value: 'ALIEXPRESS', label: '알리익스프레스' },
+]
 
-const PLATFORM_LABELS: Record<SourcePlatform, string> = {
-  BAND: 'Band',
-  ALIEXPRESS: 'Ali',
-  NAVER_CAFE: '네이버카페',
-  SMARTSTORE: '스마트스토어',
-  COUPANG: '쿠팡',
-  CUSTOM: '기타',
+// DB에서 가져온 가격 정책 인터페이스
+interface PricingPolicyItem {
+  id: number
+  name: string
+  description: string | null
+  content: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
 }
 
-// 밴드 로고 아이콘
-const BandIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
-    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
-  </svg>
-)
 
 interface AvailablePost {
   id: number
@@ -49,6 +51,7 @@ interface AvailablePost {
     name: string
     channelKey: string
     coverUrl: string | null
+    platform?: string
   }
   images: Array<{
     id: number
@@ -116,13 +119,8 @@ export default function CollectedProductListPage() {
   const [query, setQuery] = useState('')
 
   // Filter states
-  const [showFilters, setShowFilters] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
-  const [availablePlatforms, setAvailablePlatforms] = useState<SourcePlatform[]>([])
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
-  const [selectedSourcePlatform, setSelectedSourcePlatform] = useState<string>('')
-  const [startDate, setStartDate] = useState<string>('')
-  const [endDate, setEndDate] = useState<string>('')
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
@@ -141,23 +139,22 @@ export default function CollectedProductListPage() {
 
   // 상품 등록 모달 states
   const [showRegisterModal, setShowRegisterModal] = useState(false)
-  const [modalStep, setModalStep] = useState<'select' | 'transforming' | 'edit'>('select')
+  const [modalStep, setModalStep] = useState<'pricing' | 'select' | 'transforming'>('pricing')
+  const [pricingPolicies, setPricingPolicies] = useState<PricingPolicyItem[]>([])
+  const [selectedPolicyId, setSelectedPolicyId] = useState<number | null>(null)
+  const [isLoadingPolicies, setIsLoadingPolicies] = useState(false)
+  const [expandedPolicyIds, setExpandedPolicyIds] = useState<number[]>([]) // 펼쳐진 정책 ID
+  const [selectedPlatform, setSelectedPlatform] = useState<ChannelPlatform>('BAND')
   const [availablePosts, setAvailablePosts] = useState<AvailablePost[]>([])
+  const [allAvailablePosts, setAllAvailablePosts] = useState<AvailablePost[]>([]) // 전체 게시물 (플랫폼 필터링 전)
   const [isLoadingPosts, setIsLoadingPosts] = useState(false)
-  const [selectedPostId, setSelectedPostId] = useState<number | null>(null)
-  const [selectedPost, setSelectedPost] = useState<AvailablePost | null>(null)
-  const [transformedDraft, setTransformedDraft] = useState<ProductDraft | null>(null)
-  const [editableData, setEditableData] = useState({
-    name: '',
-    description: '',
-    price: '',
-  })
-  const [isSaving, setIsSaving] = useState(false)
-  const [expandedChannelKeys, setExpandedChannelKeys] = useState<string[]>([])
+  const [selectedPostIds, setSelectedPostIds] = useState<number[]>([]) // 다중 선택
+  const [selectedPosts, setSelectedPosts] = useState<AvailablePost[]>([]) // 다중 선택된 게시물들
+  const [currentProcessingIndex, setCurrentProcessingIndex] = useState(0) // 현재 처리 중인 인덱스
+  const [expandedPostIds, setExpandedPostIds] = useState<number[]>([]) // 펼쳐진 게시물 ID
 
   useEffect(() => {
     loadChannels()
-    loadAvailablePlatforms()
   }, [])
 
   const loadChannels = async () => {
@@ -172,19 +169,6 @@ export default function CollectedProductListPage() {
     }
   }
 
-  const loadAvailablePlatforms = async () => {
-    try {
-      const response = await fetch('/api/channel?kind=WHOLESALE&limit=100')
-      const data = await response.json()
-      if (data.success && data.data) {
-        const platforms = [...new Set(data.data.map((ch: { platform: string }) => ch.platform))] as SourcePlatform[]
-        setAvailablePlatforms(platforms)
-      }
-    } catch (error) {
-      console.error('소싱처 플랫폼 목록 조회 실패:', error)
-    }
-  }
-
   // 데이터 조회 함수 (page 파라미터를 받아서 사용)
   const fetchProducts = useCallback(async (page: number) => {
     try {
@@ -196,9 +180,6 @@ export default function CollectedProductListPage() {
 
       if (query) params.append('search', query)
       if (selectedChannelId) params.append('channelId', selectedChannelId)
-      if (selectedSourcePlatform) params.append('sourcePlatform', selectedSourcePlatform)
-      if (startDate) params.append('startDate', startDate)
-      if (endDate) params.append('endDate', endDate)
 
       const response = await fetch(`/api/collected-product?${params.toString()}`)
       const data = await response.json()
@@ -218,7 +199,7 @@ export default function CollectedProductListPage() {
       setIsLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedChannelId, selectedSourcePlatform, startDate, endDate, query, itemsPerPage])
+  }, [selectedChannelId, query, itemsPerPage])
 
   // 필터 변경 시 1페이지로 리셋하여 조회
   useEffect(() => {
@@ -228,25 +209,6 @@ export default function CollectedProductListPage() {
   // 새로고침용 함수
   const loadProducts = () => {
     fetchProducts(currentPage)
-  }
-
-  const handleClearFilters = () => {
-    setSelectedChannelId('')
-    setSelectedSourcePlatform('')
-    setStartDate('')
-    setEndDate('')
-    setSearchTerm('')
-    setQuery('')
-  }
-
-  const hasActiveFilters = selectedChannelId || selectedSourcePlatform || startDate || endDate || Boolean(query)
-
-  const handleSearch = () => {
-    if (query !== searchTerm) {
-      setQuery(searchTerm)
-    } else {
-      fetchProducts(1)
-    }
   }
 
   const handlePageChange = (page: number) => {
@@ -339,17 +301,62 @@ export default function CollectedProductListPage() {
 
   const handleOpenRegisterModal = async () => {
     setShowRegisterModal(true)
-    setModalStep('select')
-    setSelectedPostId(null)
-    setSelectedPost(null)
-    setTransformedDraft(null)
-    setEditableData({ name: '', description: '', price: '' })
-    setExpandedChannelKeys([])
-    await loadAvailablePosts()
+    setModalStep('pricing')
+    setSelectedPolicyId(null)
+    setSelectedPlatform('BAND')
+    setSelectedPostIds([])
+    setSelectedPosts([])
+    setCurrentProcessingIndex(0)
+    setExpandedPostIds([])
+    setExpandedPolicyIds([])
+    await loadPricingPolicies()
   }
 
-  const loadAvailablePosts = async () => {
+  // 가격 정책 목록 로드 (활성화된 정책만)
+  const loadPricingPolicies = async () => {
+    setIsLoadingPolicies(true)
+    try {
+      const response = await fetch('/api/policy?limit=100')
+      const data = await response.json()
+      if (data.success) {
+        // 활성화된 정책만 필터링
+        const activePolicies = data.data.filter((p: PricingPolicyItem) => p.isActive)
+        setPricingPolicies(activePolicies)
+        // 첫 번째 정책을 기본 선택
+        if (activePolicies.length > 0) {
+          setSelectedPolicyId(activePolicies[0].id)
+        }
+      }
+    } catch (error) {
+      console.error('가격 정책 목록 조회 실패:', error)
+      toast.error('가격 정책을 불러오는데 실패했습니다.')
+    } finally {
+      setIsLoadingPolicies(false)
+    }
+  }
+
+  // 정책 펼치기/접기 토글
+  const handleTogglePolicyExpand = (policyId: number) => {
+    setExpandedPolicyIds((prev) =>
+      prev.includes(policyId)
+        ? prev.filter((id) => id !== policyId)
+        : [...prev, policyId]
+    )
+  }
+
+  // 가격 정책 설정 후 게시물 선택 단계로 이동
+  const handlePricingNext = async () => {
+    if (!selectedPolicyId) {
+      toast.error('가격 정책을 선택해주세요.')
+      return
+    }
+    setModalStep('select')
+    await loadAvailablePosts('BAND')
+  }
+
+  const loadAvailablePosts = async (platform: ChannelPlatform) => {
     setIsLoadingPosts(true)
+    setAvailablePosts([])
     try {
       // 아직 수집상품으로 변환되지 않은 게시물만 조회
       const response = await fetch('/api/post?limit=100')
@@ -365,7 +372,13 @@ export default function CollectedProductListPage() {
 
         // 아직 사용되지 않은 게시물만 필터링
         const filtered = data.data.filter((post: any) => !usedPostIds.has(post.id))
-        setAvailablePosts(filtered)
+        setAllAvailablePosts(filtered)
+
+        // 플랫폼별로 필터링
+        const platformFiltered = filtered.filter((post: AvailablePost) =>
+          post.channel.platform === platform
+        )
+        setAvailablePosts(platformFiltered)
       }
     } catch (error) {
       console.error('게시물 목록 조회 실패:', error)
@@ -375,111 +388,140 @@ export default function CollectedProductListPage() {
     }
   }
 
-  const handleSelectPost = (post: AvailablePost) => {
-    setSelectedPostId(post.id)
-    setSelectedPost(post)
+  // 플랫폼 선택 핸들러
+  const handlePlatformSelect = (platform: ChannelPlatform) => {
+    setSelectedPlatform(platform)
+    // 플랫폼 변경 시 선택 상태 초기화
+    setSelectedPostIds([])
+    setSelectedPosts([])
+    setExpandedPostIds([])
+
+    // 이미 로드된 전체 게시물에서 플랫폼별로 필터링
+    if (allAvailablePosts.length > 0) {
+      const platformFiltered = allAvailablePosts.filter((post: AvailablePost) =>
+        post.channel.platform === platform
+      )
+      setAvailablePosts(platformFiltered)
+    } else {
+      loadAvailablePosts(platform)
+    }
   }
 
-  const handleToggleChannelExpand = (channelKey: string) => {
-    setExpandedChannelKeys((prev) =>
-      prev.includes(channelKey)
-        ? prev.filter((key) => key !== channelKey)
-        : [...prev, channelKey]
+  // 게시물 선택/해제 토글 (다중 선택)
+  const handleTogglePostSelect = (post: AvailablePost) => {
+    setSelectedPostIds(prev => {
+      if (prev.includes(post.id)) {
+        // 선택 해제
+        setSelectedPosts(posts => posts.filter(p => p.id !== post.id))
+        return prev.filter(id => id !== post.id)
+      } else {
+        // 선택 추가
+        setSelectedPosts(posts => [...posts, post])
+        return [...prev, post.id]
+      }
+    })
+  }
+
+  // 게시물 펼치기/접기 토글
+  const handleTogglePostExpand = (postId: number) => {
+    setExpandedPostIds((prev) =>
+      prev.includes(postId)
+        ? prev.filter((id) => id !== postId)
+        : [...prev, postId]
     )
   }
 
-  // 채널별로 게시물 그룹화
-  const groupedAvailablePosts = availablePosts.reduce((acc, post) => {
-    const channelKey = post.channel.channelKey
-    if (!acc[channelKey]) {
-      acc[channelKey] = {
-        channel: post.channel,
-        posts: [],
-      }
-    }
-    acc[channelKey].posts.push(post)
-    return acc
-  }, {} as Record<string, { channel: AvailablePost['channel']; posts: AvailablePost[] }>)
-
   const handleTransform = async () => {
-    if (!selectedPostId || !selectedPost) {
+    if (selectedPostIds.length === 0) {
       toast.error('게시물을 선택해주세요.')
       return
     }
 
     setModalStep('transforming')
+    setCurrentProcessingIndex(0)
 
-    try {
-      const response = await fetch('/api/product/ai-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId: selectedPostId }),
-      })
+    // 선택된 모든 게시물을 순차적으로 처리
+    let successCount = 0
+    let failCount = 0
 
-      const data = await response.json()
+    for (let i = 0; i < selectedPosts.length; i++) {
+      setCurrentProcessingIndex(i + 1)
+      const post = selectedPosts[i]
 
-      if (data.success) {
-        const draft = data.draft as ProductDraft
-        setTransformedDraft(draft)
-        setEditableData({
-          name: draft.name || '',
-          description: draft.description || '',
-          price: draft.price?.toString() || '',
+      try {
+        // 선택된 정책의 content 가져오기
+        const selectedPolicy = pricingPolicies.find(p => p.id === selectedPolicyId)
+
+        // AI 변환 (가격 정책 포함)
+        const response = await fetch('/api/product/ai-generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            postId: post.id,
+            policyContent: selectedPolicy?.content,
+          }),
         })
-        setModalStep('edit')
-      } else {
-        toast.error(data.error || 'AI 변환에 실패했습니다.')
-        setModalStep('select')
+
+        const data = await response.json()
+
+        if (data.success) {
+          const draft = data.draft as ProductDraft
+
+          // 바로 상품 등록
+          const saveResponse = await fetch('/api/collected-product', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              postId: post.id,
+              name: draft.name,
+              description: draft.description,
+              price: draft.price,
+              currency: 'KRW',
+              rawMetadata: draft,
+            }),
+          })
+
+          const saveData = await saveResponse.json()
+
+          if (saveData.success) {
+            successCount++
+          } else {
+            failCount++
+            console.error(`상품 등록 실패 (${post.title}):`, saveData.error)
+          }
+        } else {
+          failCount++
+          console.error(`AI 변환 실패 (${post.title}):`, data.error)
+        }
+      } catch (error) {
+        failCount++
+        console.error(`처리 실패 (${post.title}):`, error)
       }
-    } catch (error) {
-      console.error('AI 변환 실패:', error)
-      toast.error('AI 변환 중 오류가 발생했습니다.')
-      setModalStep('select')
     }
-  }
 
-  const handleSaveProduct = async () => {
-    if (!selectedPostId) return
-
-    setIsSaving(true)
-
-    try {
-      const response = await fetch('/api/product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          postId: selectedPostId,
-          name: editableData.name,
-          description: editableData.description,
-          price: editableData.price ? parseInt(editableData.price) : null,
-          currency: 'KRW',
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success('상품이 등록되었습니다.')
-        setShowRegisterModal(false)
-        loadProducts()
-      } else {
-        toast.error(data.error || '상품 등록에 실패했습니다.')
-      }
-    } catch (error) {
-      console.error('상품 등록 실패:', error)
-      toast.error('상품 등록 중 오류가 발생했습니다.')
-    } finally {
-      setIsSaving(false)
+    // 완료 처리
+    if (successCount > 0) {
+      toast.success(`${successCount}개 상품이 등록되었습니다.${failCount > 0 ? ` (${failCount}개 실패)` : ''}`)
+      setShowRegisterModal(false)
+      loadProducts()
+    } else {
+      toast.error('상품 등록에 실패했습니다.')
+      setModalStep('select')
     }
   }
 
   const handleCloseRegisterModal = () => {
     setShowRegisterModal(false)
-    setModalStep('select')
-    setSelectedPostId(null)
-    setSelectedPost(null)
-    setTransformedDraft(null)
-    setEditableData({ name: '', description: '', price: '' })
+    setModalStep('pricing')
+    setSelectedPolicyId(null)
+    setPricingPolicies([])
+    setSelectedPlatform('BAND')
+    setSelectedPostIds([])
+    setSelectedPosts([])
+    setCurrentProcessingIndex(0)
+    setAvailablePosts([])
+    setAllAvailablePosts([])
+    setExpandedPostIds([])
   }
 
   const formatPrice = (price: number | null) => {
@@ -514,221 +556,147 @@ export default function CollectedProductListPage() {
           </p>
         </div>
 
+        {/* 통계 및 액션 카드 */}
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <Package size={24} className="text-gray-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">전체 수집상품</p>
+                <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <CheckCircle size={24} className="text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">변환완료</p>
+                <p className="text-2xl font-bold text-green-600">{products.filter(p => (p.products?.length || 0) > 0).length}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-yellow-100 rounded-lg">
+                <Clock size={24} className="text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">미변환</p>
+                <p className="text-2xl font-bold text-yellow-600">{products.filter(p => (p.products?.length || 0) === 0).length}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Boxes size={24} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">채널 수</p>
+                <p className="text-2xl font-bold text-blue-600">{channels.length}</p>
+              </div>
+            </div>
+          </div>
+          {/* 수집 상품 등록 카드 */}
+          <button
+            onClick={handleOpenRegisterModal}
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Plus size={24} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">수집 상품</p>
+                <p className="text-lg font-bold text-blue-600">등록하기</p>
+              </div>
+            </div>
+          </button>
+          {/* 선택 삭제 카드 */}
+          <button
+            onClick={handleDeleteSelected}
+            disabled={selectedIds.length === 0}
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
+              selectedIds.length > 0
+                ? 'hover:border-red-300 hover:bg-red-50 cursor-pointer'
+                : 'opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-3 rounded-lg ${selectedIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
+                <Trash2 size={24} className={selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'} />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">선택 삭제</p>
+                <p className={`text-lg font-bold ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                  {selectedIds.length}개 선택됨
+                </p>
+              </div>
+            </div>
+          </button>
+        </div>
+
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-4 border-b border-gray-200">
-            {/* 첫 번째 줄: 검색창 + 액션 버튼 */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex gap-2 items-center">
-                <div className="relative w-64">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                  <Input
-                    type="text"
-                    placeholder="상품명 또는 게시물 제목으로 검색..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    className="pl-10"
-                  />
-                </div>
-                <Button variant="secondary" onClick={handleSearch}>
-                  검색
-                </Button>
-                <Button
-                  variant={showFilters || hasActiveFilters ? 'primary' : 'secondary'}
-                  onClick={() => setShowFilters(!showFilters)}
-                >
-                  <Filter size={16} />
-                  필터
-                  {hasActiveFilters && (
-                    <span className="ml-1 bg-white text-purple-600 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
-                      !
-                    </span>
-                  )}
-                </Button>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={loadProducts}
-                  disabled={isLoading}
-                >
-                  <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-                  새로고침
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={handleOpenRegisterModal}
-                >
-                  <Plus size={16} />
-                  상품 등록
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={handleDeleteSelected}
-                  disabled={selectedIds.length === 0}
-                >
-                  <Trash2 size={16} />
-                  선택 삭제 ({selectedIds.length})
-                </Button>
-              </div>
-            </div>
-
-            {/* 두 번째 줄: 플랫폼 필터 버튼 */}
-            {availablePlatforms.length > 0 && (
-              <div className="flex gap-1.5 mt-3 pt-3 border-t border-gray-100">
-                <button
-                  onClick={() => setSelectedSourcePlatform('')}
-                  className={`
-                    inline-flex items-center justify-center min-w-[52px] px-3 py-1.5 text-sm font-medium rounded-md border transition-colors
-                    ${!selectedSourcePlatform
-                      ? 'bg-purple-600 text-white border-purple-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }
-                  `}
-                >
-                  전체
-                </button>
-                {availablePlatforms.map((platform) => {
-                  const isSelected = selectedSourcePlatform === platform
-                  const isBand = platform === 'BAND'
-
-                  return (
-                    <button
-                      key={platform}
-                      onClick={() => setSelectedSourcePlatform(platform)}
-                      title={`소싱처: ${PLATFORM_LABELS[platform]}`}
-                      className={`
-                        inline-flex items-center justify-center gap-1.5 min-w-[52px] px-3 py-1.5 text-sm font-medium rounded-md border transition-colors
-                        ${isBand
-                          ? isSelected
-                            ? 'bg-green-600 text-white border-green-600'
-                            : 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100'
-                          : isSelected
-                            ? 'bg-purple-600 text-white border-purple-600'
-                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                        }
-                      `}
-                    >
-                      {isBand ? <BandIcon size={14} /> : null}
-                      {PLATFORM_LABELS[platform]}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* 필터 영역 */}
-          {showFilters && (
-            <div className="p-4 bg-gray-50 border-b border-gray-200">
-              <div className="flex flex-wrap gap-4 items-end">
-                {/* 채널 필터 */}
-                <div className="w-48">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">출처 채널</label>
-                  <select
-                    value={selectedChannelId}
-                    onChange={(e) => {
-                      setSelectedChannelId(e.target.value)
-                      setCurrentPage(1)
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+              {/* 왼쪽: 변환상태 필터 + 출처 채널 필터 */}
+              <div className="flex items-center gap-3 overflow-x-auto">
+                {/* 변환상태 필터 */}
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => { setSelectedChannelId(''); setCurrentPage(1) }}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+                      !selectedChannelId
+                        ? 'bg-white shadow-sm text-gray-900'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
                   >
-                    <option value="">전체 채널</option>
-                    {channels.map((channel) => (
-                      <option key={channel.id} value={channel.id.toString()}>
-                        {channel.name}
-                      </option>
-                    ))}
-                  </select>
+                    전체
+                  </button>
+                  {channels.map((channel) => (
+                    <button
+                      key={channel.id}
+                      onClick={() => { setSelectedChannelId(channel.id.toString()); setCurrentPage(1) }}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                        selectedChannelId === channel.id.toString()
+                          ? 'bg-white shadow-sm text-purple-600'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      {channel.coverUrl ? (
+                        <img
+                          src={channel.coverUrl}
+                          alt={channel.name}
+                          className="w-5 h-5 rounded object-cover"
+                        />
+                      ) : (
+                        <Boxes size={14} />
+                      )}
+                      <span className="max-w-[100px] truncate">{channel.name}</span>
+                    </button>
+                  ))}
                 </div>
-
-                {/* 날짜 필터 */}
-                <div className="w-40">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">시작일</label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value)
-                      setCurrentPage(1)
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
-                  />
-                </div>
-
-                <div className="w-40">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">종료일</label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.target.value)
-                      setCurrentPage(1)
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
-                  />
-                </div>
-
-                {/* 필터 초기화 버튼 */}
-                {hasActiveFilters && (
-                  <Button variant="secondary" onClick={handleClearFilters}>
-                    <X size={16} />
-                    필터 초기화
-                  </Button>
-                )}
               </div>
 
-              {/* 활성 필터 태그 */}
-              {hasActiveFilters && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {selectedChannelId && (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                      채널: {channels.find(c => c.id.toString() === selectedChannelId)?.name}
-                      <button
-                        onClick={() => {
-                          setSelectedChannelId('')
-                          setCurrentPage(1)
-                        }}
-                        className="hover:text-purple-600"
-                      >
-                        <X size={14} />
-                      </button>
-                    </span>
-                  )}
-                  {startDate && (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                      시작일: {startDate}
-                      <button
-                        onClick={() => {
-                          setStartDate('')
-                          setCurrentPage(1)
-                        }}
-                        className="hover:text-purple-600"
-                      >
-                        <X size={14} />
-                      </button>
-                    </span>
-                  )}
-                  {endDate && (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                      종료일: {endDate}
-                      <button
-                        onClick={() => {
-                          setEndDate('')
-                          setCurrentPage(1)
-                        }}
-                        className="hover:text-purple-600"
-                      >
-                        <X size={14} />
-                      </button>
-                    </span>
-                  )}
-                </div>
-              )}
+              {/* 오른쪽: 검색창 */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Input
+                  type="text"
+                  placeholder="상품명으로 검색..."
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setQuery(e.target.value) }}
+                  className="pl-10 w-64"
+                />
+              </div>
             </div>
-          )}
+          </div>
 
           {/* 테이블 */}
           {isLoading ? (
@@ -860,226 +828,417 @@ export default function CollectedProductListPage() {
         isLoading={isDeleting}
       />
 
-      {/* 상품 등록 모달 */}
+      {/* 수집 상품 등록 모달 */}
       <Modal
         isOpen={showRegisterModal}
         onClose={handleCloseRegisterModal}
         title={
-          modalStep === 'select'
-            ? '상품 등록 - 게시물 선택'
-            : modalStep === 'transforming'
-            ? '상품 등록 - AI 분석 중'
-            : '상품 등록 - 정보 수정'
+          modalStep === 'pricing'
+            ? '수집 상품 등록 - 가격 정책 설정'
+            : modalStep === 'select'
+            ? '수집 상품 등록 - 게시물 선택'
+            : '수집 상품 등록 - AI 분석 중'
         }
         size="2xl"
       >
-        {/* Step 1: 게시물 선택 */}
-        {modalStep === 'select' && (
-          <div className="flex flex-col h-[calc(70vh-8rem)]">
-            {isLoadingPosts ? (
-              <div className="flex-1 flex items-center justify-center">
-                <Loading />
+        {/* Step 0: 가격 정책 선택 */}
+        {modalStep === 'pricing' && (
+          <div className="space-y-5">
+            {/* 헤더 영역 */}
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div>
+                <p className="text-gray-600">
+                  AI 상품 변환에 사용할 가격 정책을 선택해주세요.
+                </p>
               </div>
-            ) : availablePosts.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
-                <Package size={48} className="mb-4 text-gray-300" />
-                <p>변환 가능한 게시물이 없습니다.</p>
-                <p className="text-sm mt-2">게시물 관리에서 먼저 게시물을 추가해주세요.</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex-1 overflow-y-auto space-y-3">
-                  {Object.entries(groupedAvailablePosts).map(([channelKey, group]) => {
-                    const isExpanded = expandedChannelKeys.includes(channelKey)
-                    return (
-                      <div key={channelKey} className="border rounded-lg">
-                        {/* 채널 헤더 */}
-                        <div
-                          className="p-3 bg-gray-50 border-b cursor-pointer hover:bg-gray-100 transition-colors"
-                          onClick={() => handleToggleChannelExpand(channelKey)}
-                        >
-                          <div className="flex items-center gap-2">
-                            {isExpanded ? (
-                              <ChevronDown size={20} className="text-gray-600" />
-                            ) : (
-                              <ChevronRight size={20} className="text-gray-600" />
-                            )}
-                            {group.channel.coverUrl && (
-                              <img
-                                src={group.channel.coverUrl}
-                                alt={group.channel.name}
-                                className="w-8 h-8 rounded object-cover"
-                              />
-                            )}
-                            <span className="font-semibold">{group.channel.name}</span>
-                            <span className="text-sm text-gray-500">({group.posts.length}개)</span>
-                          </div>
-                        </div>
+              {pricingPolicies.length > 0 && (
+                <span className="px-3 py-1 text-sm font-medium text-gray-600 bg-gray-100 rounded-full">
+                  {pricingPolicies.length}개 정책
+                </span>
+              )}
+            </div>
 
-                        {/* 게시물 목록 */}
-                        {isExpanded && (
-                          <div className="p-2 space-y-2">
-                            {group.posts.map((post) => (
-                              <div
-                                key={post.id}
-                                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                                  selectedPostId === post.id
-                                    ? 'border-blue-500 bg-blue-50'
-                                    : 'border-gray-200 hover:border-gray-300'
-                                }`}
-                                onClick={() => handleSelectPost(post)}
-                              >
-                                <div className="flex items-start gap-3">
-                                  {post.images?.[0] && (
-                                    <img
-                                      src={post.images[0].url}
-                                      alt=""
-                                      className="w-16 h-16 rounded object-cover flex-shrink-0"
-                                    />
-                                  )}
-                                  <div className="flex-1 min-w-0">
-                                    <h4 className="font-medium text-gray-900 truncate">
-                                      {post.title}
-                                    </h4>
-                                    <p className="text-sm text-gray-500 line-clamp-2 mt-1">
-                                      {post.content?.substring(0, 100)}...
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+            {/* 가격 정책 목록 */}
+            <div className="h-[480px] overflow-hidden">
+              {isLoadingPolicies ? (
+                <div className="h-full flex flex-col items-center justify-center">
+                  <Loading />
+                  <p className="text-center text-gray-600 mt-4">
+                    가격 정책을 불러오는 중...
+                  </p>
                 </div>
-                <ModalFooter>
-                  <Button variant="secondary" onClick={handleCloseRegisterModal}>
-                    취소
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={handleTransform}
-                    disabled={!selectedPostId}
-                  >
-                    AI 변환
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
+              ) : pricingPolicies.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                  <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                    <Package size={40} className="text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">등록된 가격 정책이 없습니다</h3>
+                  <p className="text-gray-500 text-center text-sm">
+                    환경 설정 &gt; 자동화 설정에서<br />
+                    가격 정책을 먼저 등록해주세요.
+                  </p>
+                </div>
+              ) : (
+                <div className="h-full overflow-y-auto pr-1">
+                  <div className="space-y-3">
+                    {pricingPolicies.map((policy) => {
+                      const isSelected = selectedPolicyId === policy.id
+                      const isExpanded = expandedPolicyIds.includes(policy.id)
+                      return (
+                        <div
+                          key={policy.id}
+                          className={`
+                            relative rounded-xl transition-all duration-200 border-2 overflow-hidden
+                            ${isSelected
+                              ? 'border-blue-500 bg-blue-50/50 shadow-md shadow-blue-100'
+                              : 'border-gray-200 bg-white hover:border-gray-300'
+                            }
+                          `}
+                        >
+                          {/* 카드 헤더 (클릭하여 선택) */}
+                          <div
+                            className={`p-4 cursor-pointer transition-colors ${
+                              isSelected ? 'hover:bg-blue-100/50' : 'hover:bg-gray-50'
+                            }`}
+                            onClick={() => setSelectedPolicyId(policy.id)}
+                          >
+                            <div className="flex items-center gap-3">
+                              {/* 선택 체크박스 */}
+                              <div className={`
+                                w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0
+                                ${isSelected
+                                  ? 'border-blue-500 bg-blue-500'
+                                  : 'border-gray-300'
+                                }
+                              `}>
+                                {isSelected && (
+                                  <CheckCircle size={14} className="text-white" />
+                                )}
+                              </div>
+
+                              {/* 정책 정보 */}
+                              <div className="flex-1 min-w-0">
+                                <h4 className={`font-semibold text-base ${
+                                  isSelected ? 'text-blue-900' : 'text-gray-900'
+                                }`}>
+                                  {policy.name}
+                                </h4>
+                                {policy.description && (
+                                  <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">
+                                    {policy.description}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* 펼치기/접기 버튼 */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleTogglePolicyExpand(policy.id)
+                                }}
+                                className={`
+                                  p-1.5 rounded-lg transition-colors flex-shrink-0
+                                  ${isSelected
+                                    ? 'hover:bg-blue-200/50 text-blue-600'
+                                    : 'hover:bg-gray-200 text-gray-400'
+                                  }
+                                `}
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp size={20} />
+                                ) : (
+                                  <ChevronDown size={20} />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 펼쳐진 내용 */}
+                          {isExpanded && (
+                            <div className={`
+                              px-4 pb-4 border-t
+                              ${isSelected ? 'border-blue-200 bg-blue-50/30' : 'border-gray-100'}
+                            `}>
+                              <div className={`
+                                mt-3 p-4 rounded-lg text-sm leading-relaxed
+                                ${isSelected ? 'bg-white' : 'bg-gray-50'}
+                              `}>
+                                <p className="text-gray-700 whitespace-pre-wrap">
+                                  {policy.content}
+                                </p>
+                              </div>
+                              <div className="flex items-center justify-end mt-3">
+                                <span className="text-xs text-gray-400">
+                                  수정일: {new Date(policy.updatedAt).toLocaleDateString('ko-KR')}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <div className="text-sm text-gray-500">
+                {selectedPolicyId && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <CheckCircle size={14} className="text-blue-500" />
+                    <span className="text-blue-600 font-medium">
+                      {pricingPolicies.find(p => p.id === selectedPolicyId)?.name}
+                    </span>
+                    선택됨
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={handleCloseRegisterModal}>
+                  취소
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handlePricingNext}
+                  disabled={!selectedPolicyId || pricingPolicies.length === 0}
+                >
+                  다음 단계
+                  <ChevronRight size={16} />
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Step 2: AI 변환 중 */}
+        {/* Step 1: 게시물 선택 (다중 선택) */}
+        {modalStep === 'select' && (
+          <div className="space-y-4">
+            {/* 플랫폼 선택 탭 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                플랫폼 선택
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {PLATFORM_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => handlePlatformSelect(option.value)}
+                    disabled={isLoadingPosts}
+                    className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                      selectedPlatform === option.value
+                        ? 'border-blue-500 bg-blue-500 text-white'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                    } ${isLoadingPosts ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 게시물 목록 영역 - 고정 높이 */}
+            <div className="h-[750px] border border-gray-200 rounded-lg overflow-hidden">
+              {isLoadingPosts ? (
+                <div className="h-full flex flex-col items-center justify-center">
+                  <Loading />
+                  <p className="text-center text-gray-600 mt-4">
+                    {selectedPlatform === 'BAND' && '밴드 게시물을 불러오는 중...'}
+                    {selectedPlatform === 'NAVER_CAFE' && '네이버 카페 게시물을 불러오는 중...'}
+                    {selectedPlatform === 'ALIEXPRESS' && '알리익스프레스 상품을 불러오는 중...'}
+                  </p>
+                </div>
+              ) : selectedPlatform !== 'BAND' ? (
+                // BAND가 아닌 플랫폼은 준비 중 표시
+                <div className="h-full flex items-center justify-center text-gray-400">
+                  <div className="text-center">
+                    <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <p className="text-sm">
+                      {selectedPlatform === 'NAVER_CAFE' && '네이버 카페 연동 준비 중'}
+                      {selectedPlatform === 'ALIEXPRESS' && '알리익스프레스 연동 준비 중'}
+                    </p>
+                    <p className="text-xs mt-1">API 설정 후 이용 가능합니다</p>
+                  </div>
+                </div>
+              ) : availablePosts.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center">
+                  <Package size={48} className="text-gray-300" />
+                  <div className="text-center mt-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">변환 가능한 게시물이 없습니다</h3>
+                    <p className="text-gray-600">게시물 관리에서 먼저 게시물을 추가해주세요.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full flex flex-col overflow-y-auto p-2">
+                  {/* 게시물 목록 */}
+                  <div className="space-y-2">
+                    {availablePosts.map((post) => {
+                      const isSelected = selectedPostIds.includes(post.id)
+                      const isExpanded = expandedPostIds.includes(post.id)
+                      return (
+                        <div
+                          key={post.id}
+                          className={`
+                            border rounded-lg transition-colors
+                            ${
+                              isSelected
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-200'
+                            }
+                          `}
+                        >
+                          {/* 간략 정보 */}
+                          <div
+                            className={`p-4 cursor-pointer transition-colors ${
+                              isSelected
+                                ? 'hover:bg-blue-100'
+                                : 'hover:bg-gray-50'
+                            }`}
+                            onClick={() => handleTogglePostSelect(post)}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-start gap-3 flex-1 min-w-0">
+                                {post.images?.[0] && (
+                                  <img
+                                    src={post.images[0].url}
+                                    alt=""
+                                    className="w-16 h-16 rounded object-cover flex-shrink-0"
+                                  />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium text-gray-900 truncate">{post.title}</h4>
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    {post.channel.name} · {post.author || '알 수 없음'}
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleTogglePostExpand(post.id)
+                                }}
+                                className="p-1 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp size={20} className="text-gray-400" />
+                                ) : (
+                                  <ChevronDown size={20} className="text-gray-400" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 상세 정보 (확장 시) */}
+                          {isExpanded && (
+                            <div className="px-4 pb-4 pt-2 border-t border-gray-200">
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                                    {post.content}
+                                  </p>
+                                </div>
+                                {post.images && post.images.length > 0 && (
+                                  <div>
+                                    <div className="flex gap-2 mt-1 overflow-x-auto">
+                                      {post.images.slice(0, 4).map((img, idx) => (
+                                        <img
+                                          key={idx}
+                                          src={img.url}
+                                          alt={`이미지 ${idx + 1}`}
+                                          className="w-20 h-20 rounded object-cover flex-shrink-0"
+                                        />
+                                      ))}
+                                      {post.images.length > 4 && (
+                                        <div className="w-20 h-20 rounded bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                          <span className="text-xs text-gray-600">+{post.images.length - 4}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="flex items-center justify-between">
+                                  <div className="text-xs text-gray-400">
+                                    출처: {post.channel.name}
+                                  </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleTogglePostExpand(post.id)
+                                    }}
+                                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                                  >
+                                    <ChevronUp size={16} />
+                                    접기
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 선택 정보 및 Footer */}
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm text-gray-500">
+                {selectedPostIds.length > 0
+                  ? `${selectedPostIds.length}개 게시물 선택됨`
+                  : `전체 ${availablePosts.length}개 게시물`}
+              </p>
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => setModalStep('pricing')}>
+                  이전
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleTransform}
+                  disabled={selectedPostIds.length === 0 || selectedPlatform !== 'BAND'}
+                >
+                  {selectedPostIds.length > 0
+                    ? `선택한 상품 등록`
+                    : '게시물 선택'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: AI 변환 중 (진행 상황 표시) */}
         {modalStep === 'transforming' && (
           <div className="py-12 flex flex-col items-center gap-4">
-            <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
             <div className="text-center">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 AI가 게시물을 분석하고 있습니다...
               </h3>
-              <p className="text-gray-600">잠시만 기다려주세요.</p>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: 결과 수정 */}
-        {modalStep === 'edit' && (
-          <div className="flex flex-col h-[calc(70vh-8rem)]">
-            <div className="flex-1 overflow-y-auto space-y-4">
-              {/* 원본 게시물 정보 */}
-              {selectedPost && (
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="text-sm font-medium text-gray-500 mb-2">원본 게시물</h4>
-                  <div className="flex items-start gap-3">
-                    {selectedPost.images?.[0] && (
-                      <img
-                        src={selectedPost.images[0].url}
-                        alt=""
-                        className="w-20 h-20 rounded object-cover"
-                      />
-                    )}
-                    <div>
-                      <p className="font-medium">{selectedPost.title}</p>
-                      <p className="text-sm text-gray-500">{selectedPost.channel.name}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 상품 정보 수정 */}
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    상품명 *
-                  </label>
-                  <Input
-                    type="text"
-                    value={editableData.name}
-                    onChange={(e) => setEditableData({ ...editableData, name: e.target.value })}
-                    placeholder="상품명을 입력하세요"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    상품 설명
-                  </label>
-                  <textarea
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    rows={6}
-                    value={editableData.description}
-                    onChange={(e) => setEditableData({ ...editableData, description: e.target.value })}
-                    placeholder="상품 설명을 입력하세요"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    판매가 (원)
-                  </label>
-                  <Input
-                    type="number"
-                    value={editableData.price}
-                    onChange={(e) => setEditableData({ ...editableData, price: e.target.value })}
-                    placeholder="판매가를 입력하세요"
-                  />
-                </div>
-
-                {/* AI 분석 옵션 정보 (읽기 전용) */}
-                {transformedDraft?.options && transformedDraft.options.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      AI 추출 옵션
-                    </label>
-                    <div className="p-3 bg-gray-50 rounded-md">
-                      {transformedDraft.options.map((opt, idx) => (
-                        <div key={idx} className="text-sm">
-                          <span className="font-medium">{opt.groupName}:</span>{' '}
-                          {opt.values.join(', ')}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <p className="text-gray-600 mb-4">잠시만 기다려주세요.</p>
+              {/* 진행 상황 */}
+              <div className="text-sm text-blue-600 font-medium">
+                {currentProcessingIndex} / {selectedPosts.length} 처리 중
               </div>
+              <div className="w-64 h-2 bg-gray-200 rounded-full mt-2 mx-auto">
+                <div
+                  className="h-2 bg-blue-500 rounded-full transition-all duration-300"
+                  style={{ width: `${(currentProcessingIndex / selectedPosts.length) * 100}%` }}
+                />
+              </div>
+              {selectedPosts[currentProcessingIndex - 1] && (
+                <p className="text-xs text-gray-500 mt-2 truncate max-w-xs">
+                  {selectedPosts[currentProcessingIndex - 1].title}
+                </p>
+              )}
             </div>
-
-            <ModalFooter>
-              <Button variant="secondary" onClick={() => setModalStep('select')}>
-                이전
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleSaveProduct}
-                disabled={!editableData.name || isSaving}
-              >
-                {isSaving ? '등록 중...' : '등록'}
-              </Button>
-            </ModalFooter>
           </div>
         )}
+
       </Modal>
     </div>
   )

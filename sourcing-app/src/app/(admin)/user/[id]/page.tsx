@@ -214,50 +214,31 @@ export default function UserDetailPage({
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
-        <div className="mb-8 flex items-start justify-between">
+        <div className="mb-8 flex items-center gap-4">
+          <Link href="/user/list">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              목록으로
+            </Button>
+          </Link>
           <div className="flex items-center gap-4">
-            <Link href="/user/list">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                목록으로
-              </Button>
-            </Link>
-            <div className="flex items-center gap-4">
-              {user.profileImage ? (
-                <img
-                  src={user.profileImage}
-                  alt={user.name || '프로필'}
-                  className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-lg"
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center border-2 border-white shadow-lg">
-                  <Users className="w-8 h-8 text-gray-500" />
-                </div>
-              )}
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  {user.name || '(이름 없음)'}
-                </h1>
+            {user.profileImage ? (
+              <img
+                src={user.profileImage}
+                alt={user.name || '프로필'}
+                className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-lg"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center border-2 border-white shadow-lg">
+                <Users className="w-8 h-8 text-gray-500" />
               </div>
+            )}
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                {user.name || '(이름 없음)'}
+              </h1>
             </div>
           </div>
-          {!editing ? (
-            <Button onClick={() => setEditing(true)}>
-              <Edit className="w-4 h-4 mr-2" />
-              정보 수정
-            </Button>
-          ) : (
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => setEditing(false)}>
-                <X className="w-4 h-4 mr-2" />
-                취소
-              </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                <Save className="w-4 h-4 mr-2" />
-                저장
-              </Button>
-            </div>
-          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -265,7 +246,26 @@ export default function UserDetailPage({
           <div className="lg:col-span-1 space-y-6">
             {/* 기본 정보 */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">기본 정보</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">기본 정보</h2>
+                {!editing ? (
+                  <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+                    <Edit className="w-4 h-4 mr-1" />
+                    수정
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+                      <X className="w-4 h-4 mr-1" />
+                      취소
+                    </Button>
+                    <Button size="sm" onClick={handleSave} disabled={saving}>
+                      <Save className="w-4 h-4 mr-1" />
+                      저장
+                    </Button>
+                  </div>
+                )}
+              </div>
               {editing ? (
                 <div className="space-y-4">
                   <div>

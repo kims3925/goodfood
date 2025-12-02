@@ -44,10 +44,43 @@ function generateFileHash(buffer: Buffer): string {
 }
 
 /**
+ * 로컬 게시물 이미지 API 경로에서 파일명 추출
+ * @param url API 경로 (예: /api/images/post/file/abc123.jpg)
+ * @returns 파일명 또는 null
+ */
+function extractPostImageFileName(url: string): string | null {
+  const postImagePattern = /^\/api\/images\/post\/file\/(.+)$/
+  const match = url.match(postImagePattern)
+  return match ? match[1] : null
+}
+
+/**
+ * 로컬 게시물 이미지 파일을 읽어서 버퍼 반환
+ * @param fileName 파일명
+ * @returns 파일 버퍼 또는 null
+ */
+function readLocalPostImage(fileName: string): Buffer | null {
+  try {
+    const storagePath = process.env.POST_IMAGE_STORAGE_PATH || 'assets/images/post'
+    const imagesDir = expandHomePath(storagePath)
+    const filePath = path.join(imagesDir, fileName)
+
+    if (fs.existsSync(filePath)) {
+      return fs.readFileSync(filePath)
+    }
+    return null
+  } catch (error) {
+    console.error(`[Product Image] 로컬 게시물 이미지 읽기 실패: ${fileName}`, error)
+    return null
+  }
+}
+
+/**
  * 상품 이미지 전용: URL에서 이미지 다운로드 및 서버에 저장
  * 환경변수 PRODUCT_IMAGE_STORAGE_PATH에 저장
  * 동일한 해시의 이미지가 이미 존재하면 기존 이미지 정보 반환 (중복 방지)
- * @param imageUrl 원본 이미지 URL
+ * 로컬 게시물 이미지 경로(/api/images/post/file/...)인 경우 직접 파일 복사
+ * @param imageUrl 원본 이미지 URL 또는 로컬 API 경로
  * @returns { fileName: string, url: string, fileSize: number, fileHash: string, isExisting: boolean }
  */
 export async function downloadAndSaveProductImage(imageUrl: string): Promise<{
@@ -58,14 +91,27 @@ export async function downloadAndSaveProductImage(imageUrl: string): Promise<{
   isExisting: boolean
 }> {
   try {
-    // 이미지 다운로드
-    const response = await fetch(imageUrl)
-    if (!response.ok) {
-      throw new Error(`Failed to download image: ${response.statusText}`)
-    }
+    let buffer: Buffer
 
-    const arrayBuffer = await response.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+    // 로컬 게시물 이미지 경로인 경우 직접 파일 읽기
+    const postImageFileName = extractPostImageFileName(imageUrl)
+    if (postImageFileName) {
+      const localBuffer = readLocalPostImage(postImageFileName)
+      if (!localBuffer) {
+        throw new Error(`로컬 게시물 이미지 파일을 찾을 수 없음: ${postImageFileName}`)
+      }
+      buffer = localBuffer
+      console.log(`[Product Image] 로컬 게시물 이미지에서 복사: ${postImageFileName}`)
+    } else {
+      // 외부 URL에서 이미지 다운로드
+      const response = await fetch(imageUrl)
+      if (!response.ok) {
+        throw new Error(`Failed to download image: ${response.statusText}`)
+      }
+
+      const arrayBuffer = await response.arrayBuffer()
+      buffer = Buffer.from(arrayBuffer)
+    }
 
     // 파일 해시 생성
     const fileHash = generateFileHash(buffer)
@@ -95,8 +141,19 @@ export async function downloadAndSaveProductImage(imageUrl: string): Promise<{
     }
 
     // 파일 확장자 추출 (없으면 jpg로 기본 설정)
-    const urlPath = new URL(imageUrl).pathname
-    const ext = path.extname(urlPath) || '.jpg'
+    let ext: string
+    if (postImageFileName) {
+      // 로컬 파일에서 확장자 추출
+      ext = path.extname(postImageFileName) || '.jpg'
+    } else {
+      // URL에서 확장자 추출
+      try {
+        const urlPath = new URL(imageUrl).pathname
+        ext = path.extname(urlPath) || '.jpg'
+      } catch {
+        ext = path.extname(imageUrl) || '.jpg'
+      }
+    }
 
     // 파일명 생성: uuid_timestamp.ext
     const uuid = generateShortUUID()

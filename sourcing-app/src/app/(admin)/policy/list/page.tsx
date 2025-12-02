@@ -2,7 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2, RefreshCw } from 'lucide-react'
+import {
+  Plus,
+  Search,
+  Trash2,
+  FileText,
+  CheckCircle,
+  XCircle,
+  Calendar,
+} from 'lucide-react'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
@@ -22,18 +30,32 @@ interface PricingPolicy {
   updatedAt: string
 }
 
+const statusOptions = [
+  { value: 'ALL', label: '전체', icon: FileText, color: 'text-gray-600' },
+  { value: 'ACTIVE', label: '활성', icon: CheckCircle, color: 'text-green-600' },
+  { value: 'INACTIVE', label: '비활성', icon: XCircle, color: 'text-gray-500' },
+]
+
 export default function PolicyManagePage() {
   const router = useRouter()
   const toast = useToast()
   const [policies, setPolicies] = useState<PricingPolicy[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+
+  // Stats
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+  })
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  const itemsPerPage = 10
+  const itemsPerPage = 20
 
   // 선택 삭제 관련 상태
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -43,18 +65,35 @@ export default function PolicyManagePage() {
 
   useEffect(() => {
     loadPolicies()
-  }, [currentPage])
+  }, [currentPage, statusFilter])
 
   const loadPolicies = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/policy?search=${searchTerm}&page=${currentPage}&limit=${itemsPerPage}`)
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+      })
+      if (searchTerm) params.set('search', searchTerm)
+      if (statusFilter !== 'ALL') {
+        params.set('isActive', statusFilter === 'ACTIVE' ? 'true' : 'false')
+      }
+
+      const response = await fetch(`/api/policy?${params}`)
       const data = await response.json()
 
       if (data.success) {
         setPolicies(data.data)
         setTotalItems(data.pagination?.total || 0)
         setTotalPages(data.pagination?.totalPages || 1)
+
+        // 통계 계산
+        const allPolicies = data.data
+        setStats({
+          total: data.pagination?.total || allPolicies.length,
+          active: allPolicies.filter((p: PricingPolicy) => p.isActive).length,
+          inactive: allPolicies.filter((p: PricingPolicy) => !p.isActive).length,
+        })
       } else {
         toast.error('정책 목록을 불러오는데 실패했습니다.')
       }
@@ -156,14 +195,24 @@ export default function PolicyManagePage() {
 
   const getStatusBadge = (isActive: boolean) => {
     return isActive ? (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+        <CheckCircle size={12} />
         활성
       </span>
     ) : (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+        <XCircle size={12} />
         비활성
       </span>
     )
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('ko-KR', {
+      year: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+    }).replace(/\. /g, '.').replace(/\.$/, '')
   }
 
   return (
@@ -177,10 +226,48 @@ export default function PolicyManagePage() {
           </p>
         </div>
 
+        {/* 통계 카드 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <FileText size={24} className="text-gray-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">전체 정책</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <CheckCircle size={24} className="text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">활성 정책</p>
+                <p className="text-2xl font-bold text-green-600">{stats.active}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <XCircle size={24} className="text-gray-500" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">비활성 정책</p>
+                <p className="text-2xl font-bold text-gray-500">{stats.inactive}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-4 border-b border-gray-200">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+              {/* 검색 */}
               <div className="flex gap-2 flex-1 max-w-md">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -198,15 +285,29 @@ export default function PolicyManagePage() {
                 </Button>
               </div>
 
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={loadPolicies}
-                  disabled={isLoading}
-                >
-                  <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-                  새로고침
-                </Button>
+              {/* 필터 & 버튼 */}
+              <div className="flex gap-2 items-center">
+                {/* 상태 필터 (탭 형태) */}
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                  {statusOptions.map((status) => {
+                    const Icon = status.icon
+                    return (
+                      <button
+                        key={status.value}
+                        onClick={() => { setStatusFilter(status.value); setCurrentPage(1) }}
+                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                          statusFilter === status.value
+                            ? `bg-white shadow-sm ${status.color}`
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        <Icon size={14} />
+                        {status.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
                 <Button variant="primary" onClick={() => router.push('/policy/new')}>
                   <Plus size={16} />
                   정책 추가
@@ -217,7 +318,7 @@ export default function PolicyManagePage() {
                   disabled={selectedIds.length === 0}
                 >
                   <Trash2 size={16} />
-                  선택 삭제 ({selectedIds.length})
+                  삭제 ({selectedIds.length})
                 </Button>
               </div>
             </div>
@@ -237,21 +338,22 @@ export default function PolicyManagePage() {
                       type="checkbox"
                       checked={selectAll}
                       onChange={handleToggleSelectAll}
-                      className="w-4 h-4 cursor-pointer"
+                      className="w-4 h-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
                   </TableHead>
+                  <TableHead className="w-[5%]">순서</TableHead>
                   <TableHead className="w-[20%]">이름</TableHead>
                   <TableHead className="w-[30%]">설명</TableHead>
                   <TableHead className="w-[20%]">정책 내용</TableHead>
                   <TableHead className="w-[10%]">상태</TableHead>
-                  <TableHead className="w-[15%]">생성일</TableHead>
+                  <TableHead className="w-[10%]">생성일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {policies.length === 0 ? (
                   <TableEmpty message="등록된 정책이 없습니다." />
                 ) : (
-                  policies.map((policy) => (
+                  policies.map((policy, index) => (
                     <TableRow
                       key={policy.id}
                       className="hover:bg-gray-50 cursor-pointer"
@@ -262,11 +364,16 @@ export default function PolicyManagePage() {
                           type="checkbox"
                           checked={selectedIds.includes(policy.id)}
                           onChange={(e) => handleToggleSelection(policy.id, e as unknown as React.MouseEvent)}
-                          className="w-4 h-4 cursor-pointer"
+                          className="w-4 h-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
                       </TableCell>
                       <TableCell>
-                        <span className="font-semibold text-gray-900 text-base">{policy.name}</span>
+                        <span className="text-gray-500 text-sm">
+                          {(currentPage - 1) * itemsPerPage + index + 1}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-semibold text-gray-900">{policy.name}</span>
                       </TableCell>
                       <TableCell>
                         <span className="text-gray-600">
@@ -274,7 +381,7 @@ export default function PolicyManagePage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-gray-600 text-sm">
+                        <span className="text-gray-500 text-sm">
                           {truncateText(policy.content, 30)}
                         </span>
                       </TableCell>
@@ -282,8 +389,9 @@ export default function PolicyManagePage() {
                         {getStatusBadge(policy.isActive)}
                       </TableCell>
                       <TableCell>
-                        <span className="text-gray-600 text-sm">
-                          {new Date(policy.createdAt).toLocaleDateString('ko-KR')}
+                        <span className="text-gray-500 text-sm flex items-center gap-1">
+                          <Calendar size={12} />
+                          {formatDate(policy.createdAt)}
                         </span>
                       </TableCell>
                     </TableRow>

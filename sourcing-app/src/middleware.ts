@@ -2,13 +2,16 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyToken } from '@/modules/auth/auth.service'
 
+// sourcing-app에 접근 가능한 역할
+const ALLOWED_ROLES = ['ADMIN', 'SOURCING_USER']
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // 인증이 필요 없는 경로
   const publicPaths = [
     '/login',
-    '/unauthorized',
+    '/forbidden',
     '/api/auth/login',
     '/api/auth/logout',
     '/api/order/webhook',  // Google Forms 웹훅
@@ -25,19 +28,25 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get('auth-token')?.value
 
   if (!token) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    // 로그인이 안 되어있으면 로그인 페이지로 리다이렉트
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(loginUrl)
   }
 
   // 토큰 검증
   const payload = await verifyToken(token)
 
   if (!payload) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    // 토큰이 유효하지 않으면 로그인 페이지로 리다이렉트
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(loginUrl)
   }
 
-  // sourcing-app은 ADMIN 역할만 접근 가능
-  if (payload.role !== 'ADMIN') {
-    return NextResponse.redirect(new URL('/unauthorized', request.url))
+  // sourcing-app은 ADMIN 또는 SOURCING_USER만 접근 가능
+  if (!ALLOWED_ROLES.includes(payload.role)) {
+    return NextResponse.redirect(new URL('/forbidden', request.url))
   }
 
   return NextResponse.next()

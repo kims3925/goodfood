@@ -2,6 +2,43 @@ import prisma from '@bandauto/db'
 import { ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { channelRepository } from '../repository/channel.repository'
 import type { ChannelListParams, ChannelUpdateInput, ChannelCreateInput } from '../types/channel.types'
+import { unlink } from 'fs/promises'
+import { existsSync } from 'fs'
+import path from 'path'
+import os from 'os'
+
+// ~ 경로를 홈 디렉토리로 확장
+const expandTilde = (filePath: string): string => {
+  if (filePath.startsWith('~/') || filePath === '~') {
+    return path.join(os.homedir(), filePath.slice(1))
+  }
+  return filePath
+}
+
+// 채널 이미지 파일 삭제 함수
+const deleteChannelImageFile = async (coverUrl: string | null) => {
+  if (!coverUrl || !coverUrl.startsWith('/api/images/channel/file/')) {
+    return
+  }
+
+  const filename = coverUrl.split('/').pop()
+  if (!filename) return
+
+  const storagePath = process.env.CHANNEL_IMAGE_STORAGE_PATH
+  if (!storagePath) return
+
+  const expandedPath = expandTilde(storagePath)
+  const filePath = path.join(expandedPath, filename)
+
+  if (existsSync(filePath)) {
+    try {
+      await unlink(filePath)
+      console.log(`채널 이미지 파일 삭제 완료: ${filePath}`)
+    } catch (error) {
+      console.error(`채널 이미지 파일 삭제 실패: ${filePath}`, error)
+    }
+  }
+}
 
 export class ChannelService {
   async getList(params: ChannelListParams) {
@@ -64,6 +101,11 @@ export class ChannelService {
       throw new Error('채널을 찾을 수 없습니다.')
     }
 
+    // 이미지가 변경되면 기존 이미지 삭제
+    if (data.coverUrl !== undefined && existing.coverUrl && existing.coverUrl !== data.coverUrl) {
+      await deleteChannelImageFile(existing.coverUrl)
+    }
+
     return channelRepository.update(id, data)
   }
 
@@ -71,6 +113,11 @@ export class ChannelService {
     const existing = await channelRepository.findById(id)
     if (!existing) {
       throw new Error('채널을 찾을 수 없습니다.')
+    }
+
+    // 채널 이미지 파일 삭제 (있는 경우)
+    if (existing.coverUrl) {
+      await deleteChannelImageFile(existing.coverUrl)
     }
 
     return channelRepository.delete(id)

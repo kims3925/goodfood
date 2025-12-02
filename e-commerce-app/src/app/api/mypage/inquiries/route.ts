@@ -34,6 +34,11 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        replies: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',

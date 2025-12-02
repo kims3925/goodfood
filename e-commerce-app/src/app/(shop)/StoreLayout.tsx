@@ -82,13 +82,6 @@ function StoreLayoutContent({
                       <span className="flex items-center gap-0.5">
                         <span className="font-medium text-[#FF6B6B]">{session.user?.name || '회원'}</span>
                         <span className="text-gray-600">님</span>
-                        {(session.user as any)?.provider && (
-                          <img
-                            src={`/icons/${(session.user as any).provider}.png`}
-                            alt={(session.user as any).provider}
-                            className="w-3 h-3 ml-0.5"
-                          />
-                        )}
                       </span>
                       <ChevronDown className={`w-3 h-3 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
@@ -204,7 +197,7 @@ function StoreLayoutContent({
           <div className="kurly-header-top">
             {/* Logo */}
             <Link href="/main" className="kurly-logo flex items-center gap-2">
-              <span className="text-3xl font-black text-[#FF6B6B]">ABC마켓</span>
+              <span className="text-xl md:text-2xl lg:text-3xl font-black text-[#FF6B6B]">ABC마켓</span>
             </Link>
 
             {/* Search Bar */}
@@ -228,25 +221,25 @@ function StoreLayoutContent({
 
             {/* Header Icons */}
             <div className="kurly-header-icons">
-              <Link href="/mypage/addresses" className="kurly-header-icon">
-                <MapPin className="w-6 h-6" />
-                <span className="text-xs mt-1">배송지</span>
+              <Link href="/mypage/addresses" className="kurly-header-icon hidden md:flex">
+                <MapPin className="w-5 h-5 md:w-6 md:h-6" />
+                <span className="kurly-header-icon-text">배송지</span>
               </Link>
-              <Link href="/mypage/wishlist" className="kurly-header-icon">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <Link href="/mypage/wishlist" className="kurly-header-icon hidden sm:flex">
+                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
-                <span className="text-xs mt-1">찜하기</span>
+                <span className="kurly-header-icon-text">찜하기</span>
               </Link>
               <div className="relative">
                 <Link href="/cart" className="kurly-header-icon relative">
-                  <ShoppingCart className="w-6 h-6" />
+                  <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />
                   {cartCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#FF6B6B] text-white text-xs rounded-full flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 w-4 h-4 md:w-5 md:h-5 bg-[#FF6B6B] text-white text-[10px] md:text-xs rounded-full flex items-center justify-center">
                       {cartCount > 99 ? '99+' : cartCount}
                     </span>
                   )}
-                  <span className="text-xs mt-1">장바구니</span>
+                  <span className="kurly-header-icon-text">장바구니</span>
                 </Link>
                 {/* 장바구니 알림 버블 */}
                 <CartNotificationBubble />
@@ -315,15 +308,15 @@ function StoreLayoutContent({
       {/* Footer */}
       <footer className="kurly-footer">
         <div className="kurly-container">
-          <div className="grid grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
             <div>
-              <h4 className="font-bold text-gray-900 mb-4">고객행복센터</h4>
-              <p className="text-2xl font-bold text-[#FF6B6B] mb-2">1234-5678</p>
-              <p className="text-sm text-gray-600">월~토 오전 7시 ~ 오후 6시</p>
+              <h4 className="font-bold text-gray-900 mb-3 md:mb-4">고객행복센터</h4>
+              <p className="text-xl md:text-2xl font-bold text-[#FF6B6B] mb-2">1234-5678</p>
+              <p className="text-xs md:text-sm text-gray-600">월~토 오전 7시 ~ 오후 6시</p>
             </div>
             <div>
-              <h4 className="font-bold text-gray-900 mb-4">ABC마켓</h4>
-              <ul className="space-y-2 text-sm text-gray-600">
+              <h4 className="font-bold text-gray-900 mb-3 md:mb-4">ABC마켓</h4>
+              <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-600">
                 <li><Link href="/about" className="hover:text-[#FF6B6B]">회사소개</Link></li>
                 <li><Link href="/careers" className="hover:text-[#FF6B6B]">채용정보</Link></li>
                 <li><Link href="/terms" className="hover:text-[#FF6B6B]">이용약관</Link></li>
@@ -331,29 +324,29 @@ function StoreLayoutContent({
               </ul>
             </div>
             <div>
-              <h4 className="font-bold text-gray-900 mb-4">고객센터</h4>
-              <ul className="space-y-2 text-sm text-gray-600">
+              <h4 className="font-bold text-gray-900 mb-3 md:mb-4">고객센터</h4>
+              <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-600">
                 <li><Link href="/cs" className="hover:text-[#FF6B6B]">고객센터</Link></li>
                 <li><Link href="/cs/faq" className="hover:text-[#FF6B6B]">자주묻는질문</Link></li>
                 <li><Link href="/cs/inquiry" className="hover:text-[#FF6B6B]">1:1문의</Link></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-bold text-gray-900 mb-4">SNS</h4>
-              <div className="flex gap-4">
-                <a href="#" className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
-                  <span className="text-gray-600">f</span>
+              <h4 className="font-bold text-gray-900 mb-3 md:mb-4">SNS</h4>
+              <div className="flex gap-3 md:gap-4">
+                <a href="#" className="w-8 h-8 md:w-10 md:h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
+                  <span className="text-gray-600 text-sm md:text-base">f</span>
                 </a>
-                <a href="#" className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
-                  <span className="text-gray-600">in</span>
+                <a href="#" className="w-8 h-8 md:w-10 md:h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
+                  <span className="text-gray-600 text-sm md:text-base">in</span>
                 </a>
-                <a href="#" className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
-                  <span className="text-gray-600">yt</span>
+                <a href="#" className="w-8 h-8 md:w-10 md:h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
+                  <span className="text-gray-600 text-sm md:text-base">yt</span>
                 </a>
               </div>
             </div>
           </div>
-          <div className="mt-8 pt-8 border-t border-gray-200 text-center text-sm text-gray-500">
+          <div className="mt-6 md:mt-8 pt-6 md:pt-8 border-t border-gray-200 text-center text-xs md:text-sm text-gray-500">
             <p>ABC마켓 | 대표: 홍길동 | 사업자등록번호: 123-45-67890</p>
             <p className="mt-2">Copyright &copy; 2024 ABC마켓. All rights reserved.</p>
           </div>

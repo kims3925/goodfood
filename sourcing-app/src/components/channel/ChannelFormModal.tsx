@@ -108,6 +108,10 @@ export default function ChannelFormModal({
   const [bandError, setBandError] = useState<string | null>(null)
   const [bandListFetched, setBandListFetched] = useState(false)
 
+  // 설정된 API 플랫폼 상태
+  const [configuredPlatforms, setConfiguredPlatforms] = useState<string[]>([])
+  const [isLoadingApiSettings, setIsLoadingApiSettings] = useState(false)
+
   // 파일 업로드 관련 상태
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
@@ -121,6 +125,35 @@ export default function ChannelFormModal({
     }
     return result
   }
+
+  // 설정된 API 플랫폼 조회
+  const fetchConfiguredPlatforms = useCallback(async () => {
+    setIsLoadingApiSettings(true)
+    try {
+      const response = await fetch('/api/settings/api')
+      const data = await response.json()
+      if (data.success && data.settings) {
+        const platforms: string[] = []
+        // Band API 설정 확인
+        if (data.settings.band?.accessToken) {
+          platforms.push('BAND')
+        }
+        // Aliexpress API 설정 확인
+        if (data.settings.aliexpress?.apiKey || data.settings.aliexpress?.accessToken) {
+          platforms.push('ALIEXPRESS')
+        }
+        // SHOP은 API 설정 없이 사용 가능
+        platforms.push('SHOP')
+        setConfiguredPlatforms(platforms)
+      }
+    } catch (error) {
+      console.error('API 설정 조회 실패:', error)
+      // 실패 시 기본적으로 SHOP만 허용
+      setConfiguredPlatforms(['SHOP'])
+    } finally {
+      setIsLoadingApiSettings(false)
+    }
+  }, [])
 
   // 밴드 목록 조회
   const fetchBandList = useCallback(async () => {
@@ -163,9 +196,10 @@ export default function ChannelFormModal({
           bankName: channel.bankName || '',
         })
       } else {
+        // 등록 모드: 초기 플랫폼은 API 설정 조회 후 설정
         setFormData({
           kind: 'WHOLESALE',
-          platform: 'BAND',
+          platform: '' as ChannelPlatform, // 초기값 비움
           channelKey: '',
           name: '',
           coverUrl: '',
@@ -174,22 +208,16 @@ export default function ChannelFormModal({
           bankAccount: '',
           bankName: '',
         })
+        // API 설정 조회
+        fetchConfiguredPlatforms()
       }
       setErrors({})
       setBandList([])
       setBandError(null)
       setBandListFetched(false)
       setLogoPreview(null)
-
-      // 등록 모드이고 초기 플랫폼이 BAND인 경우 밴드 목록 조회
-      if (!channel) {
-        // 약간의 딜레이 후 조회 (상태 초기화 완료 후)
-        setTimeout(() => {
-          fetchBandListImmediate()
-        }, 0)
-      }
     }
-  }, [isOpen, channel])
+  }, [isOpen, channel, fetchConfiguredPlatforms])
 
   // 즉시 밴드 목록 조회 (초기 로드용)
   const fetchBandListImmediate = async () => {
@@ -214,15 +242,60 @@ export default function ChannelFormModal({
     }
   }
 
+  // API 설정된 플랫폼 로드 후 첫 번째 플랫폼 선택 및 BAND 목록 조회
+  useEffect(() => {
+    if (!isEditMode && configuredPlatforms.length > 0 && !formData.platform) {
+      // 현재 kind에서 사용 가능한 설정된 플랫폼 찾기
+      const availableConfigured = PLATFORM_OPTIONS.filter(
+        (p) => p.kinds.includes(formData.kind) && configuredPlatforms.includes(p.value)
+      )
+      if (availableConfigured.length > 0) {
+        const firstPlatform = availableConfigured[0].value
+        // SHOP인 경우 channelKey 자동 생성
+        if (firstPlatform === 'SHOP') {
+          setFormData((prev) => ({ ...prev, platform: firstPlatform, channelKey: generateShortUUID() }))
+        } else {
+          setFormData((prev) => ({ ...prev, platform: firstPlatform }))
+        }
+        // BAND인 경우 밴드 목록 조회
+        if (firstPlatform === 'BAND') {
+          fetchBandListImmediate()
+        }
+      }
+    }
+  }, [configuredPlatforms, formData.kind, formData.platform, isEditMode])
+
   // kind 변경 시 platform 초기화
   useEffect(() => {
-    const availablePlatforms = PLATFORM_OPTIONS.filter((p) => p.kinds.includes(formData.kind))
-    const currentPlatformAvailable = availablePlatforms.some((p) => p.value === formData.platform)
+    if (isEditMode) return // 수정 모드에서는 변경하지 않음
 
-    if (!currentPlatformAvailable && availablePlatforms.length > 0) {
-      setFormData((prev) => ({ ...prev, platform: availablePlatforms[0].value }))
+    const availableConfigured = PLATFORM_OPTIONS.filter(
+      (p) => p.kinds.includes(formData.kind) && configuredPlatforms.includes(p.value)
+    )
+    const currentPlatformAvailable = availableConfigured.some((p) => p.value === formData.platform)
+
+    if (!currentPlatformAvailable && availableConfigured.length > 0) {
+      const newPlatform = availableConfigured[0].value
+      // SHOP인 경우 channelKey 자동 생성
+      if (newPlatform === 'SHOP') {
+        setFormData((prev) => ({
+          ...prev,
+          platform: newPlatform,
+          channelKey: generateShortUUID(),
+          name: '',
+          coverUrl: ''
+        }))
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          platform: newPlatform,
+          channelKey: '',
+          name: '',
+          coverUrl: ''
+        }))
+      }
     }
-  }, [formData.kind])
+  }, [formData.kind, configuredPlatforms, isEditMode])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -243,9 +316,20 @@ export default function ChannelFormModal({
         newErrors.channelKey = '채널 키를 입력해주세요.'
       }
     }
-    // 수정 모드 또는 쇼핑몰일 때 채널명 검사 (나머지는 자동 설정)
-    if ((isEditMode || formData.platform === 'SHOP') && !formData.name.trim()) {
-      newErrors.name = formData.platform === 'SHOP' ? '쇼핑몰명을 입력해주세요.' : '채널명을 입력해주세요.'
+
+    // 채널명 검사: 수정 모드 또는 등록 모드일 때 필수
+    if (!formData.name.trim()) {
+      if (isEditMode) {
+        newErrors.name = '채널명을 입력해주세요.'
+      } else if (formData.platform === 'SHOP') {
+        newErrors.name = '쇼핑몰명을 입력해주세요.'
+      } else if (formData.platform === 'BAND' && !formData.channelKey) {
+        // BAND는 밴드 선택 시 name이 자동 설정되므로, channelKey가 없을 때만 에러 (channelKey 에러가 우선)
+      } else if (!formData.channelKey) {
+        // 다른 플랫폼도 선택 시 name이 자동 설정됨
+      } else {
+        newErrors.name = '채널명을 입력해주세요.'
+      }
     }
 
     setErrors(newErrors)
@@ -371,7 +455,7 @@ export default function ChannelFormModal({
       const formDataUpload = new FormData()
       formDataUpload.append('file', file)
 
-      const response = await fetch('/api/upload', {
+      const response = await fetch('/api/images/channel', {
         method: 'POST',
         body: formDataUpload,
       })
@@ -393,8 +477,24 @@ export default function ChannelFormModal({
     }
   }
 
-  // 로고 삭제 핸들러
-  const handleLogoRemove = () => {
+  // 로고 삭제 핸들러 (파일시스템에서도 삭제)
+  const handleLogoRemove = async () => {
+    const currentCoverUrl = formData.coverUrl
+
+    // 새로 업로드한 채널 이미지인 경우에만 파일시스템에서 삭제
+    if (currentCoverUrl && currentCoverUrl.startsWith('/api/images/channel/file/')) {
+      const filename = currentCoverUrl.split('/').pop()
+      if (filename) {
+        try {
+          await fetch(`/api/images/channel?filename=${filename}`, {
+            method: 'DELETE',
+          })
+        } catch (error) {
+          console.error('로고 파일 삭제 실패:', error)
+        }
+      }
+    }
+
     setFormData((prev) => ({ ...prev, coverUrl: '' }))
     setLogoPreview(null)
   }
@@ -424,7 +524,10 @@ export default function ChannelFormModal({
     }
   }
 
-  const availablePlatforms = PLATFORM_OPTIONS.filter((p) => p.kinds.includes(formData.kind))
+  // API 설정된 플랫폼만 필터링 (등록 모드), 수정 모드에서는 전체
+  const availablePlatforms = isEditMode
+    ? PLATFORM_OPTIONS.filter((p) => p.kinds.includes(formData.kind))
+    : PLATFORM_OPTIONS.filter((p) => p.kinds.includes(formData.kind) && configuredPlatforms.includes(p.value))
   const isRetail = formData.kind === 'RETAIL'
 
   return (
@@ -467,22 +570,62 @@ export default function ChannelFormModal({
             <label className="block text-sm font-medium text-gray-700 mb-3">
               플랫폼 <span className="text-red-500">*</span>
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              {availablePlatforms.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => handlePlatformSelect(option.value)}
-                  className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                    formData.platform === option.value
-                      ? 'border-purple-500 bg-purple-500 text-white'
-                      : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+            {isLoadingApiSettings ? (
+              <div className="flex items-center justify-center py-4 text-gray-500">
+                <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                플랫폼 설정 확인 중...
+              </div>
+            ) : availablePlatforms.length === 0 ? (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-800">
+                      {formData.kind === 'WHOLESALE' ? '도매 채널' : '소매 채널'}에 사용 가능한 플랫폼이 없습니다.
+                    </p>
+                    <p className="text-xs text-yellow-600 mt-1">
+                      API 설정 페이지에서 플랫폼 연동을 먼저 완료해주세요.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose()
+                        router.push('/admin/settings/api')
+                      }}
+                      className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      API 설정 페이지로 이동
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {availablePlatforms.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => handlePlatformSelect(option.value)}
+                    className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                      formData.platform === option.value
+                        ? 'border-purple-500 bg-purple-500 text-white'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

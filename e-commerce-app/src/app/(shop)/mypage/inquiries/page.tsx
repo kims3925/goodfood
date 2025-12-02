@@ -4,6 +4,13 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { MessageSquare, CheckCircle, Clock } from 'lucide-react'
 
+interface InquiryReply {
+  id: number
+  content: string
+  isAdmin: boolean
+  createdAt: string
+}
+
 interface Inquiry {
   id: number
   inquiryType: string
@@ -22,6 +29,7 @@ interface Inquiry {
       thumbnailUrl: string | null
     } | null
   } | null
+  replies: InquiryReply[]
 }
 
 const inquiryTypeLabels: Record<string, string> = {
@@ -158,21 +166,46 @@ export default function InquiriesPage() {
                 </div>
 
                 {/* 관리자 답변 */}
-                {inquiry.status === 'ANSWERED' && inquiry.adminReply && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 bg-blue-50 -mx-6 -mb-6 px-6 py-4">
-                    <div className="flex items-start gap-2 mb-2">
-                      <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded">
-                        답변
-                      </span>
-                      {inquiry.repliedAt && (
-                        <span className="text-xs text-gray-500">
-                          {formatDate(inquiry.repliedAt)}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-gray-700 whitespace-pre-wrap">
-                      {inquiry.adminReply}
-                    </p>
+                {inquiry.status === 'ANSWERED' && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 -mx-6 -mb-6">
+                    {/* 기존 adminReply 필드 (replies가 없는 경우) */}
+                    {inquiry.adminReply && (!inquiry.replies || inquiry.replies.length === 0) && (
+                      <div className="bg-blue-50 px-6 py-4">
+                        <div className="flex items-start gap-2 mb-2">
+                          <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded">
+                            답변
+                          </span>
+                          {inquiry.repliedAt && (
+                            <span className="text-xs text-gray-500">
+                              {formatDate(inquiry.repliedAt)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-gray-700 whitespace-pre-wrap">
+                          {inquiry.adminReply}
+                        </p>
+                      </div>
+                    )}
+                    {/* 새로운 replies 배열 */}
+                    {inquiry.replies && inquiry.replies.length > 0 && (
+                      <div className="divide-y divide-gray-100">
+                        {inquiry.replies.filter(reply => reply.isAdmin).map((reply) => (
+                          <div key={reply.id} className="bg-blue-50 px-6 py-4">
+                            <div className="flex items-start gap-2 mb-2">
+                              <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded">
+                                답변
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {formatDate(reply.createdAt)}
+                              </span>
+                            </div>
+                            <p className="text-gray-700 whitespace-pre-wrap">
+                              {reply.content}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

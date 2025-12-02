@@ -2,22 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, RefreshCw, Trash2, Filter, X, Store } from 'lucide-react'
-import Button from '@/components/ui/Button'
+import { Search, Trash2, Store, Package, CheckCircle } from 'lucide-react'
 import ConfirmModal from '@/components/ui/ConfirmModal'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
 import ThumbnailImage from '@/components/ui/ThumbnailImage'
-
-// 밴드 로고 아이콘
-const BandIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
-    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
-  </svg>
-)
 
 interface Channel {
   id: number
@@ -26,33 +18,23 @@ interface Channel {
   platform: string
 }
 
-type SourcePlatform = 'BAND' | 'ALIEXPRESS' | 'NAVER_CAFE' | 'SMARTSTORE' | 'COUPANG' | 'SHOP' | 'CUSTOM'
-
-const PLATFORM_LABELS: Record<SourcePlatform, string> = {
-  BAND: 'Band',
-  ALIEXPRESS: 'Ali',
-  NAVER_CAFE: '네이버카페',
-  SMARTSTORE: '스마트스토어',
-  COUPANG: '쿠팡',
-  SHOP: '쇼핑몰',
-  CUSTOM: '기타',
+interface PublishedChannel {
+  publishId: number
+  channelId: number | null
+  channelName: string | null
+  channelCoverUrl: string | null
+  platform: string | null
+  publishedAt: string | null
+  createdAt: string
+  updatedAt: string
 }
 
-interface ProductImage {
-  id: number
-  url: string
-  sortOrder: number
-}
-
-interface PublishedProduct {
-  id: number
-  userId: number
+interface PublishedProductGroup {
   productId: number
   product: {
     id: number
     name: string
     thumbnailUrl: string | null
-    images?: ProductImage[]
     collectedProduct: {
       post: {
         channel: {
@@ -63,25 +45,14 @@ interface PublishedProduct {
       }
     } | null
   }
-  channel: {
-    id: number
-    name: string
-    coverUrl: string | null
-    platform: string
-  } | null
+  publishedChannels: PublishedChannel[]
+  latestPublishedAt: string | null
+  createdAt: string
 }
 
-// 발행상품 이미지 URL 가져오기 (product_image 우선)
-const getPublishedProductThumbnailUrl = (publishedProduct: PublishedProduct): string | null => {
-  // 1. product_image 테이블에서 첫 번째 이미지
-  if (publishedProduct.product?.images && publishedProduct.product.images.length > 0) {
-    return publishedProduct.product.images[0].url
-  }
-  // 2. thumbnailUrl 필드 (기존 호환성)
-  if (publishedProduct.product?.thumbnailUrl) {
-    return publishedProduct.product.thumbnailUrl
-  }
-  return null
+// 발행상품 이미지 URL 가져오기
+const getPublishedProductThumbnailUrl = (productGroup: PublishedProductGroup): string | null => {
+  return productGroup.product?.thumbnailUrl || null
 }
 
 export default function PublishedProductListPage() {
@@ -93,14 +64,8 @@ export default function PublishedProductListPage() {
   const [query, setQuery] = useState('')
 
   // Filter states
-  const [showFilters, setShowFilters] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
-  const [availablePlatforms, setAvailablePlatforms] = useState<SourcePlatform[]>([])
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
-  const [selectedSourcePlatform, setSelectedSourcePlatform] = useState<string>('')
-  const [onlyShoppingMall, setOnlyShoppingMall] = useState<boolean>(false)
-  const [startDate, setStartDate] = useState<string>('')
-  const [endDate, setEndDate] = useState<string>('')
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
@@ -119,7 +84,6 @@ export default function PublishedProductListPage() {
 
   useEffect(() => {
     loadChannels()
-    loadAvailablePlatforms()
   }, [])
 
   const loadChannels = async () => {
@@ -134,19 +98,6 @@ export default function PublishedProductListPage() {
     }
   }
 
-  const loadAvailablePlatforms = async () => {
-    try {
-      const response = await fetch('/api/channel?kind=WHOLESALE&limit=100')
-      const data = await response.json()
-      if (data.success && data.data) {
-        const platforms = [...new Set(data.data.map((ch: { platform: string }) => ch.platform))] as SourcePlatform[]
-        setAvailablePlatforms(platforms)
-      }
-    } catch (error) {
-      console.error('소싱처 플랫폼 목록 조회 실패:', error)
-    }
-  }
-
   // 데이터 조회 함수 (page 파라미터를 받아서 사용)
   const fetchProducts = useCallback(async (page: number) => {
     try {
@@ -158,10 +109,6 @@ export default function PublishedProductListPage() {
 
       if (query) params.append('search', query)
       if (selectedChannelId) params.append('channelId', selectedChannelId)
-      if (selectedSourcePlatform) params.append('sourcePlatform', selectedSourcePlatform)
-      if (onlyShoppingMall) params.append('onlyShoppingMall', 'true')
-      if (startDate) params.append('startDate', startDate)
-      if (endDate) params.append('endDate', endDate)
 
       const response = await fetch(`/api/published-product?${params.toString()}`)
 
@@ -210,7 +157,7 @@ export default function PublishedProductListPage() {
       setIsLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedChannelId, selectedSourcePlatform, onlyShoppingMall, startDate, endDate, query, itemsPerPage])
+  }, [selectedChannelId, query, itemsPerPage])
 
   // 필터 변경 시 1페이지로 리셋하여 조회
   useEffect(() => {
@@ -220,26 +167,6 @@ export default function PublishedProductListPage() {
   // 새로고침용 함수
   const loadProducts = () => {
     fetchProducts(currentPage)
-  }
-
-  const handleClearFilters = () => {
-    setSelectedChannelId('')
-    setSelectedSourcePlatform('')
-    setOnlyShoppingMall(false)
-    setStartDate('')
-    setEndDate('')
-    setSearchTerm('')
-    setQuery('')
-  }
-
-  const hasActiveFilters = selectedChannelId || selectedSourcePlatform || onlyShoppingMall || startDate || endDate || Boolean(query)
-
-  const handleSearch = () => {
-    if (query !== searchTerm) {
-      setQuery(searchTerm)
-    } else {
-      fetchProducts(1)
-    }
   }
 
   const handlePageChange = (page: number) => {
@@ -392,32 +319,16 @@ export default function PublishedProductListPage() {
 
     return (
       <div className="flex flex-wrap gap-1.5">
-        {productGroup.publishedChannels.map((channel) => {
-          const isShoppingMall = !channel.channelId
-
-          if (isShoppingMall) {
-            return (
-              <span
-                key={channel.publishId}
-                className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium"
-              >
-                <Store size={12} />
-                쇼핑몰
-              </span>
-            )
-          }
-
-          return (
-            <span
-              key={channel.publishId}
-              className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium"
-              title={channel.channelName || '알 수 없음'}
-            >
-              <Store size={12} />
-              {channel.channelName || '알 수 없음'}
-            </span>
-          )
-        })}
+        {productGroup.publishedChannels.map((channel) => (
+          <span
+            key={channel.publishId}
+            className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium"
+            title={channel.channelName || '알 수 없음'}
+          >
+            <Store size={12} />
+            {channel.channelName || '알 수 없음'}
+          </span>
+        ))}
       </div>
     )
   }
@@ -446,233 +357,107 @@ export default function PublishedProductListPage() {
           </p>
         </div>
 
+        {/* 통계 및 액션 카드 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <Package size={24} className="text-gray-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">전체 발행상품</p>
+                <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <CheckCircle size={24} className="text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">발행 채널 수</p>
+                <p className="text-2xl font-bold text-green-600">{channels.length}</p>
+              </div>
+            </div>
+          </div>
+          {/* 선택 삭제 카드 */}
+          <button
+            onClick={handleDeleteSelected}
+            disabled={selectedIds.length === 0}
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
+              selectedIds.length > 0
+                ? 'hover:border-red-300 hover:bg-red-50 cursor-pointer'
+                : 'opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-3 rounded-lg ${selectedIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
+                <Trash2 size={24} className={selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'} />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">선택 삭제</p>
+                <p className={`text-lg font-bold ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                  {selectedIds.length}개 선택됨
+                </p>
+              </div>
+            </div>
+          </button>
+        </div>
+
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-4 border-b border-gray-200">
-            {/* 첫 번째 줄: 검색창 + 액션 버튼 */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex gap-2 items-center">
-                <div className="relative w-64">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                  <Input
-                    type="text"
-                    placeholder="상품명으로 검색..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    className="pl-10"
-                  />
-                </div>
-                <Button variant="secondary" onClick={handleSearch}>
-                  검색
-                </Button>
-                <Button
-                  variant={showFilters || hasActiveFilters ? 'primary' : 'secondary'}
-                  onClick={() => setShowFilters(!showFilters)}
-                >
-                  <Filter size={16} />
-                  필터
-                  {hasActiveFilters && (
-                    <span className="ml-1 bg-white text-purple-600 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
-                      !
-                    </span>
-                  )}
-                </Button>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={loadProducts}
-                  disabled={isLoading}
-                >
-                  <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-                  새로고침
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={handleDeleteSelected}
-                  disabled={selectedIds.length === 0}
-                >
-                  <Trash2 size={16} />
-                  선택 삭제 ({selectedIds.length})
-                </Button>
-              </div>
-            </div>
-
-            {/* 두 번째 줄: 플랫폼 필터 버튼 */}
-            {availablePlatforms.length > 0 && (
-              <div className="flex gap-1.5 mt-3 pt-3 border-t border-gray-100">
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+              {/* 왼쪽: 채널 필터 */}
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto">
                 <button
-                  onClick={() => {
-                    setSelectedSourcePlatform('')
-                    setOnlyShoppingMall(false)
-                  }}
-                  className={`
-                    inline-flex items-center justify-center min-w-[52px] px-3 py-1.5 text-sm font-medium rounded-md border transition-colors
-                    ${!selectedSourcePlatform && !onlyShoppingMall
-                      ? 'bg-purple-600 text-white border-purple-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }
-                  `}
+                  onClick={() => { setSelectedChannelId(''); setCurrentPage(1) }}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+                    !selectedChannelId
+                      ? 'bg-white shadow-sm text-gray-900'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
                 >
                   전체
                 </button>
-                {availablePlatforms.map((platform) => {
-                  const isSelected = selectedSourcePlatform === platform
-                  const isBand = platform === 'BAND'
-
-                  return (
-                    <button
-                      key={platform}
-                      onClick={() => {
-                        setSelectedSourcePlatform(platform)
-                        setOnlyShoppingMall(false)
-                      }}
-                      title={`소싱처: ${PLATFORM_LABELS[platform]}`}
-                      className={`
-                        inline-flex items-center justify-center gap-1.5 min-w-[52px] px-3 py-1.5 text-sm font-medium rounded-md border transition-colors
-                        ${isBand
-                          ? isSelected
-                            ? 'bg-green-600 text-white border-green-600'
-                            : 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100'
-                          : isSelected
-                            ? 'bg-purple-600 text-white border-purple-600'
-                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                        }
-                      `}
-                    >
-                      {isBand ? <BandIcon size={14} /> : null}
-                      {PLATFORM_LABELS[platform]}
-                    </button>
-                  )
-                })}
-                {/* 쇼핑몰 필터 버튼 */}
-                <button
-                  onClick={() => {
-                    setOnlyShoppingMall(!onlyShoppingMall)
-                    if (!onlyShoppingMall) {
-                      setSelectedSourcePlatform('')
-                    }
-                  }}
-                  title="쇼핑몰에 발행된 상품만 표시"
-                  className={`
-                    inline-flex items-center justify-center gap-1.5 min-w-[72px] px-3 py-1.5 text-sm font-medium rounded-md border transition-colors
-                    ${onlyShoppingMall
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100'
-                    }
-                  `}
-                >
-                  <Store size={14} />
-                  쇼핑몰
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* 필터 영역 */}
-          {showFilters && (
-            <div className="p-4 bg-gray-50 border-b border-gray-200">
-              <div className="flex flex-wrap gap-4 items-end">
-                {/* 채널 필터 */}
-                <div className="w-48">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">발행 채널</label>
-                  <select
-                    value={selectedChannelId}
-                    onChange={(e) => setSelectedChannelId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                {channels.map((channel) => (
+                  <button
+                    key={channel.id}
+                    onClick={() => { setSelectedChannelId(channel.id.toString()); setCurrentPage(1) }}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                      selectedChannelId === channel.id.toString()
+                        ? 'bg-white shadow-sm text-purple-600'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
                   >
-                    <option value="">전체 채널</option>
-                    {channels.map((channel) => (
-                      <option key={channel.id} value={channel.id.toString()}>
-                        {channel.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 날짜 필터 */}
-                <div className="w-40">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">시작일</label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
-                  />
-                </div>
-
-                <div className="w-40">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">종료일</label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
-                  />
-                </div>
-
-                {/* 필터 초기화 버튼 */}
-                {hasActiveFilters && (
-                  <Button variant="secondary" onClick={handleClearFilters}>
-                    <X size={16} />
-                    필터 초기화
-                  </Button>
-                )}
+                    {channel.coverUrl ? (
+                      <img
+                        src={channel.coverUrl}
+                        alt={channel.name}
+                        className="w-5 h-5 rounded object-cover"
+                      />
+                    ) : (
+                      <Store size={14} />
+                    )}
+                    <span className="max-w-[100px] truncate">{channel.name}</span>
+                  </button>
+                ))}
               </div>
 
-              {/* 활성 필터 태그 */}
-              {hasActiveFilters && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {selectedChannelId && (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                      채널: {channels.find(c => c.id.toString() === selectedChannelId)?.name}
-                      <button
-                        onClick={() => setSelectedChannelId('')}
-                        className="hover:text-purple-600"
-                      >
-                        <X size={14} />
-                      </button>
-                    </span>
-                  )}
-                  {onlyShoppingMall && (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                      쇼핑몰만 표시
-                      <button
-                        onClick={() => setOnlyShoppingMall(false)}
-                        className="hover:text-blue-600"
-                      >
-                        <X size={14} />
-                      </button>
-                    </span>
-                  )}
-                  {startDate && (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                      시작일: {startDate}
-                      <button
-                        onClick={() => setStartDate('')}
-                        className="hover:text-purple-600"
-                      >
-                        <X size={14} />
-                      </button>
-                    </span>
-                  )}
-                  {endDate && (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                      종료일: {endDate}
-                      <button
-                        onClick={() => setEndDate('')}
-                        className="hover:text-purple-600"
-                      >
-                        <X size={14} />
-                      </button>
-                    </span>
-                  )}
-                </div>
-              )}
+              {/* 오른쪽: 검색창 */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Input
+                  type="text"
+                  placeholder="상품명으로 검색..."
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setQuery(e.target.value) }}
+                  className="pl-10 w-64"
+                />
+              </div>
             </div>
-          )}
+          </div>
 
           {/* 테이블 */}
           {isLoading ? (
@@ -718,8 +503,8 @@ export default function PublishedProductListPage() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <ThumbnailImage
-                          src={getPublishedProductThumbnailUrl(product)}
-                          alt={product.product?.name || '상품'}
+                          src={getPublishedProductThumbnailUrl(productGroup)}
+                          alt={productGroup.product?.name || '상품'}
                           size="md"
                           rounded="lg"
                           fallbackIcon="package"
