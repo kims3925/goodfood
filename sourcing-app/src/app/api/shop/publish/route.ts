@@ -37,28 +37,6 @@ export async function GET(request: NextRequest) {
     // Get total count
     const total = await prisma.product.count({ where })
 
-    // 전체 통계 계산 (탭과 무관하게 일정한 값)
-    const allProductsWithPublish = await prisma.product.findMany({
-      where: {
-        userId,
-      },
-      select: {
-        id: true,
-        productPublishes: {
-          where: {
-            publishType: PublishType.SHOPPING_MALL,
-          },
-          select: { id: true },
-        },
-      },
-    })
-
-    const totalProducts = allProductsWithPublish.length
-    const publishedProducts = allProductsWithPublish.filter(
-      (p) => p.productPublishes.length > 0
-    ).length
-    const unpublishedProducts = totalProducts - publishedProducts
-
     // Get products with publish info
     const products = await prisma.product.findMany({
       where,
@@ -175,11 +153,6 @@ export async function GET(request: NextRequest) {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
-      },
-      stats: {
-        total: totalProducts,
-        published: publishedProducts,
-        unpublished: unpublishedProducts,
       },
     })
   } catch (error) {

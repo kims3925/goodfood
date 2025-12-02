@@ -69,15 +69,6 @@ export async function GET(request: NextRequest) {
               id: true,
               name: true,
               thumbnailUrl: true,
-              images: {
-                select: {
-                  id: true,
-                  url: true,
-                  sortOrder: true,
-                },
-                orderBy: { sortOrder: 'asc' },
-                take: 1,
-              },
               collectedProduct: {
                 select: {
                   post: {

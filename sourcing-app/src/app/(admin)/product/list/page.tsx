@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2, RefreshCw, Package, Sparkles, Filter, X } from 'lucide-react'
+import { Plus, Search, Trash2, RefreshCw, Package, Filter, X } from 'lucide-react'
+import Image from 'next/image'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
+import Modal, { ModalFooter } from '@/components/ui/Modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -73,21 +75,33 @@ interface Product {
   publishSummary?: string
 }
 
-// 상품 이미지 URL 가져오기 (product_image 우선, 없으면 수집상품 이미지)
-const getProductThumbnailUrl = (product: Product): string | null => {
-  // 1. product_image 테이블에서 첫 번째 이미지
-  if (product.images && product.images.length > 0) {
-    return product.images[0].url
+interface CollectedProduct {
+  id: number
+  userId: number
+  postId: number
+  name: string | null
+  description: string | null
+  currency: string
+  price: number | null
+  wholesalePrice: number | null
+  createdAt: string
+  post: {
+    id: number
+    title: string
+    channel: {
+      id: number
+      name: string
+      coverUrl: string | null
+    }
+    images: Array<{
+      id: number
+      imageUrl: string
+    }>
   }
-  // 2. thumbnailUrl 필드 (기존 호환성)
-  if (product.thumbnailUrl) {
-    return product.thumbnailUrl
-  }
-  // 3. 수집상품의 게시물 이미지
-  if (product.collectedProduct?.post?.images?.[0]?.url) {
-    return product.collectedProduct.post.images[0].url
-  }
-  return null
+  products: Array<{
+    id: number
+    name: string
+  }>
 }
 
 export default function ProductListPage() {
@@ -96,6 +110,7 @@ export default function ProductListPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [query, setQuery] = useState('')
 
   // Filter states
   const [showFilters, setShowFilters] = useState(false)
@@ -133,13 +148,16 @@ export default function ProductListPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // CollectedProduct 등록 모달 states
+  const [showCollectedProductModal, setShowCollectedProductModal] = useState(false)
+  const [collectedProducts, setCollectedProducts] = useState<CollectedProduct[]>([])
+  const [isLoadingCollected, setIsLoadingCollected] = useState(false)
+  const [selectedCollectedId, setSelectedCollectedId] = useState<number | null>(null)
+  const [isConverting, setIsConverting] = useState(false)
+
   useEffect(() => {
     loadChannels()
   }, [])
-
-  useEffect(() => {
-    loadProducts()
-  }, [currentPage, selectedChannelId, startDate, endDate])
 
   const loadChannels = async () => {
     try {
@@ -154,15 +172,92 @@ export default function ProductListPage() {
     }
   }
 
-  const loadProducts = async () => {
+  // CollectedProduct 등록 관련 함수들
+  const handleOpenCollectedProductModal = async () => {
+    setShowCollectedProductModal(true)
+    setSelectedCollectedId(null)
+    await loadCollectedProducts()
+  }
+
+  const loadCollectedProducts = async () => {
+    setIsLoadingCollected(true)
+    try {
+      const response = await fetch('/api/collected-product?limit=1000')
+      const data = await response.json()
+
+      if (data.success) {
+        // Product로 변환되지 않은 CollectedProduct만 필터링
+        const unconverted = data.data.filter(
+          (cp: CollectedProduct) => !cp.products || cp.products.length === 0
+        )
+        setCollectedProducts(unconverted)
+      }
+    } catch (error) {
+      console.error('수집상품 목록 조회 실패:', error)
+      toast.error('수집상품 목록을 불러오는데 실패했습니다.')
+    } finally {
+      setIsLoadingCollected(false)
+    }
+  }
+
+  const handleConvertToProduct = async () => {
+    if (!selectedCollectedId) {
+      toast.error('수집상품을 선택해주세요.')
+      return
+    }
+
+    const selectedCP = collectedProducts.find(cp => cp.id === selectedCollectedId)
+    if (!selectedCP) {
+      toast.error('선택한 수집상품을 찾을 수 없습니다.')
+      return
+    }
+
+    setIsConverting(true)
+    try {
+      const response = await fetch('/api/product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          collectedProductId: selectedCollectedId,
+          name: selectedCP.name || selectedCP.post.title || '상품명 미지정',
+          description: selectedCP.description || '',
+          price: selectedCP.price || null,
+          currency: selectedCP.currency || 'KRW',
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success('상품이 등록되었습니다.')
+        setShowCollectedProductModal(false)
+        loadProducts()
+      } else {
+        toast.error(data.error || '상품 등록에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('상품 등록 실패:', error)
+      toast.error('상품 등록 중 오류가 발생했습니다.')
+    } finally {
+      setIsConverting(false)
+    }
+  }
+
+  const handleCloseCollectedProductModal = () => {
+    setShowCollectedProductModal(false)
+    setSelectedCollectedId(null)
+  }
+
+  // 데이터 조회 함수 (page 파라미터를 받아서 사용)
+  const fetchProducts = useCallback(async (page: number) => {
     try {
       setIsLoading(true)
       const params = new URLSearchParams({
-        page: currentPage.toString(),
+        page: page.toString(),
         limit: itemsPerPage.toString(),
       })
 
-      if (searchTerm) params.append('search', searchTerm)
+      if (query) params.append('search', query)
       if (selectedChannelId) params.append('channelId', selectedChannelId)
       if (startDate) params.append('startDate', startDate)
       if (endDate) params.append('endDate', endDate)
@@ -174,6 +269,7 @@ export default function ProductListPage() {
         setProducts(data.data)
         setTotalItems(data.total || 0)
         setTotalPages(Math.ceil((data.total || 0) / itemsPerPage))
+        setCurrentPage(page)
       } else {
         toast.error('상품 목록을 불러오는데 실패했습니다.')
       }
@@ -183,6 +279,17 @@ export default function ProductListPage() {
     } finally {
       setIsLoading(false)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChannelId, startDate, endDate, query, itemsPerPage])
+
+  // 필터 변경 시 1페이지로 리셋하여 조회
+  useEffect(() => {
+    fetchProducts(1)
+  }, [fetchProducts])
+
+  // 새로고침용 함수
+  const loadProducts = () => {
+    fetchProducts(currentPage)
   }
 
   const handleClearFilters = () => {
@@ -190,22 +297,21 @@ export default function ProductListPage() {
     setStartDate('')
     setEndDate('')
     setSearchTerm('')
-    setCurrentPage(1)
+    setQuery('')
   }
 
-  const hasActiveFilters = selectedChannelId || startDate || endDate
+  const hasActiveFilters = selectedChannelId || startDate || endDate || Boolean(query)
 
   const handleSearch = () => {
-    setCurrentPage(1)
-    loadProducts()
+    if (query !== searchTerm) {
+      setQuery(searchTerm)
+    } else {
+      fetchProducts(1)
+    }
   }
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-  }
-
-  const handleOpenAddProductFlow = () => {
-    setShowPostSelectionModal(true)
+    fetchProducts(page)
   }
 
   // 단일 게시물 선택 (하위 호환성)
@@ -632,11 +738,13 @@ export default function ProductListPage() {
                   <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
                   새로고침
                 </Button>
-                <Button variant="primary" onClick={handleOpenAddProductFlow}>
-                  <Sparkles size={16} />
+                <Button
+                  variant="primary"
+                  onClick={handleOpenCollectedProductModal}
+                >
+                  <Plus size={16} />
                   상품 등록
                 </Button>
-
                 <Button
                   variant="danger"
                   onClick={handleDeleteSelected}
@@ -765,7 +873,7 @@ export default function ProductListPage() {
               <Loading />
             </div>
           ) : (
-            <Table>
+            <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[4%]">
@@ -776,75 +884,80 @@ export default function ProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[35%]">상품명</TableHead>
-                  <TableHead className="w-[15%]">출처 채널</TableHead>
-                  <TableHead className="w-[12%]">판매가</TableHead>
-                  <TableHead className="w-[18%]">발행현황</TableHead>
-                  <TableHead className="w-[12%] whitespace-nowrap">생성일</TableHead>
+                  <TableHead className="w-[36%]">상품명</TableHead>
+                  <TableHead className="w-[16%]">출처 채널</TableHead>
+                  <TableHead className="w-[14%]">판매가</TableHead>
+                  <TableHead className="w-[16%]">발행현황</TableHead>
+                  <TableHead className="w-[14%]">생성일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.length === 0 ? (
-                  <TableEmpty message="등록된 상품이 없습니다." />
-                ) : (
-                  products.map((product) => (
-                    <TableRow
-                      key={product.id}
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/product/detail/${product.id}`)}
+                {/* 데이터 행 */}
+                {products.map((product) => (
+                  <TableRow
+                    key={product.id}
+                    className="hover:bg-gray-50 cursor-pointer h-[72px]"
+                    onClick={() => router.push(`/product/detail/${product.id}`)}
+                  >
+                    <TableCell
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <TableCell
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedProductIds.includes(product.id)}
-                          onChange={() => handleToggleSelection(product.id)}
-                          className="w-4 h-4 cursor-pointer"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <ThumbnailImage
-                            src={getProductThumbnailUrl(product)}
-                            alt={product.name}
-                            size="md"
-                            rounded="lg"
-                            fallbackIcon="package"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-gray-900 text-base">{product.name}</div>
-                            {product.description && (
-                              <div className="text-sm text-gray-500 truncate mt-1">
-                                {product.description.substring(0, 60)}...
-                              </div>
-                            )}
+                      <input
+                        type="checkbox"
+                        checked={selectedProductIds.includes(product.id)}
+                        onChange={() => handleToggleSelection(product.id)}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        {product.thumbnailUrl ? (
+                          <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                            <Image
+                              src={product.thumbnailUrl}
+                              alt={product.name}
+                              fill
+                              sizes="56px"
+                              className="object-cover"
+                            />
                           </div>
+                        ) : (
+                          <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                            <Package size={24} className="text-gray-400" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-gray-900 text-base truncate">{product.name}</div>
+                          {product.description && (
+                            <div className="text-sm text-gray-500 truncate mt-1">
+                              {product.description.substring(0, 60)}...
+                            </div>
+                          )}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-gray-600 truncate">
-                          {product.collectedProduct?.post?.channel?.name || '-'}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium text-gray-900">
-                          {formatPrice(product.price)}
-                        </div>
-                      </TableCell>
-                      <TableCell>{getPublishStatusBadge(product)}</TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600 whitespace-nowrap">
-                          {new Date(product.createdAt).toLocaleDateString('ko-KR', {
-                            year: '2-digit',
-                            month: '2-digit',
-                            day: '2-digit',
-                          }).replace(/\. /g, '.').replace(/\.$/, '')}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-gray-600 truncate">
+                        {product.collectedProduct?.post?.channel?.name || '-'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium text-gray-900">
+                        {formatPrice(product.price)}
+                      </div>
+                    </TableCell>
+                    <TableCell>{getPublishStatusBadge(product)}</TableCell>
+                    <TableCell>
+                      <span className="text-sm text-gray-600 whitespace-nowrap">
+                        {new Date(product.createdAt).toLocaleDateString('ko-KR', {
+                          year: '2-digit',
+                          month: '2-digit',
+                          day: '2-digit',
+                        }).replace(/\. /g, '.').replace(/\.$/, '')}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}
@@ -956,6 +1069,92 @@ export default function ProductListPage() {
           onRetry={handleRetryAI}
         />
       )}
+
+      {/* 수집상품 선택 모달 */}
+      <Modal
+        isOpen={showCollectedProductModal}
+        onClose={handleCloseCollectedProductModal}
+        title="상품 등록 - 수집상품 선택"
+        size="2xl"
+      >
+        <div className="flex flex-col h-[calc(70vh-8rem)]">
+          {isLoadingCollected ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : collectedProducts.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
+              <Package size={48} className="mb-4 text-gray-300" />
+              <p>변환 가능한 수집상품이 없습니다.</p>
+              <p className="text-sm mt-2">수집상품 관리에서 먼저 수집상품을 추가해주세요.</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex-1 overflow-y-auto space-y-2">
+                {collectedProducts.map((cp) => (
+                  <div
+                    key={cp.id}
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      selectedCollectedId === cp.id
+                        ? 'border-purple-500 bg-purple-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setSelectedCollectedId(cp.id)}
+                  >
+                    <div className="flex items-start gap-3">
+                      {cp.post?.images?.[0]?.imageUrl ? (
+                        <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                          <Image
+                            src={cp.post.images[0].imageUrl}
+                            alt={cp.name || cp.post.title}
+                            fill
+                            sizes="80px"
+                            className="object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 rounded bg-gray-200 flex items-center justify-center flex-shrink-0">
+                          <Package size={24} className="text-gray-400" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-gray-900 truncate">
+                          {cp.name || '(상품명 미추출)'}
+                        </h4>
+                        <p className="text-sm text-gray-500 truncate">
+                          {cp.post?.title}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className="text-sm text-gray-600">
+                            {cp.post?.channel?.name}
+                          </span>
+                          {cp.price && (
+                            <span className="text-sm font-medium text-gray-900">
+                              ₩{cp.price.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <ModalFooter>
+                <Button variant="secondary" onClick={handleCloseCollectedProductModal}>
+                  취소
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleConvertToProduct}
+                  disabled={!selectedCollectedId || isConverting}
+                >
+                  {isConverting ? '등록 중...' : '상품 등록'}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </div>
+      </Modal>
     </div>
   )
 }
