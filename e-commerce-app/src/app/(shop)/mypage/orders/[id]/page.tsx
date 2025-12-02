@@ -20,7 +20,9 @@ import {
   Copy,
   Check,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Building2,
+  AlertCircle
 } from 'lucide-react'
 
 // 취소 사유 목록
@@ -67,6 +69,13 @@ interface Payment {
   approvedAt: string | null
 }
 
+interface BankTransferInfo {
+  bankName: string
+  bankAccount: string
+  accountHolder: string
+  depositDeadline: string
+}
+
 interface Order {
   id: number
   orderNumber: string
@@ -94,6 +103,7 @@ interface Order {
   items: OrderItem[]
   hasWritableReview: boolean
   payment: Payment | null
+  bankTransferInfo: BankTransferInfo | null
 }
 
 const statusLabels: Record<string, string> = {
@@ -124,6 +134,7 @@ const paymentMethodLabels: Record<string, string> = {
   CULTURE_GIFT: '문화상품권',
   BOOK_GIFT: '도서문화상품권',
   GAME_GIFT: '게임문화상품권',
+  BANK_TRANSFER: '무통장입금',
 }
 
 export default function OrderDetailPage() {
@@ -134,6 +145,7 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [bankAccountCopied, setBankAccountCopied] = useState(false)
 
   // 취소 모달 상태
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
@@ -190,6 +202,14 @@ export default function OrderDetailPage() {
       await navigator.clipboard.writeText(order.orderNumber)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const copyBankAccount = async () => {
+    if (order?.bankTransferInfo?.bankAccount) {
+      await navigator.clipboard.writeText(order.bankTransferInfo.bankAccount)
+      setBankAccountCopied(true)
+      setTimeout(() => setBankAccountCopied(false), 2000)
     }
   }
 
@@ -326,6 +346,73 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 무통장입금 정보 (PENDING 상태이고 BANK_TRANSFER인 경우) */}
+      {order.bankTransferInfo && order.status === 'PENDING' && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-blue-600" />
+            입금 계좌 안내
+          </h2>
+
+          <div className="bg-white rounded-lg p-5 shadow-sm mb-4">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 text-sm">은행</span>
+                <span className="font-semibold text-gray-900">{order.bankTransferInfo.bankName}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 text-sm">계좌번호</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-semibold text-gray-900">{order.bankTransferInfo.bankAccount}</span>
+                  <button
+                    onClick={copyBankAccount}
+                    className={`px-3 py-1 text-xs rounded-lg transition-all ${
+                      bankAccountCopied
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {bankAccountCopied ? '복사완료' : '복사'}
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 text-sm">예금주</span>
+                <span className="font-semibold text-gray-900">{order.bankTransferInfo.accountHolder}</span>
+              </div>
+              <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
+                <span className="text-gray-500 text-sm">입금 금액</span>
+                <span className="text-xl font-bold text-[#FF6B6B]">{formatPrice(order.totalAmount)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 입금 기한 */}
+          <div className="flex items-center gap-2 text-blue-700 bg-blue-100 rounded-lg px-4 py-3 mb-4">
+            <Clock className="w-5 h-5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium">입금 기한</p>
+              <p className="text-xs">{formatDate(order.bankTransferInfo.depositDeadline)}까지</p>
+            </div>
+          </div>
+
+          {/* 안내사항 */}
+          <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-700 space-y-1">
+                <p className="font-medium text-amber-800">입금 시 주의사항</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  <li>입금자명은 주문자명과 동일하게 해주세요</li>
+                  <li>입금 기한 내 미입금 시 주문이 자동 취소됩니다</li>
+                  <li>입금 확인은 영업일 기준 1-2일 소요될 수 있습니다</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 배송 진행 상태 (취소되지 않은 경우) */}
       {!isCancelled && (

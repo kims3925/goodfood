@@ -116,7 +116,7 @@ function BankTransferCompleteContent() {
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
-                      {copied ? '복사됨!' : '복사'}
+                      {copied ? '복사완료' : '복사'}
                     </button>
                   </div>
                 </div>

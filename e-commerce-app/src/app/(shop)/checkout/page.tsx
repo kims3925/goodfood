@@ -953,49 +953,42 @@ function CheckoutContent() {
                     </label>
                   </div>
 
-                  {/* 무통장입금 선택 시 입금 계좌 정보 표시 */}
+                  {/* 무통장입금 선택 시 상세 안내 */}
                   {paymentMethod === 'BANK_TRANSFER' && (
-                    <div className="mt-4 bg-blue-50 rounded-lg p-4 border border-blue-100">
-                      <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                        <Building2 className="w-4 h-4" />
-                        입금 계좌 안내
-                      </h3>
-                      {bankInfoLoading ? (
-                        <div className="flex items-center gap-2 text-blue-600">
-                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                          <span className="text-sm">계좌 정보를 불러오는 중...</span>
-                        </div>
-                      ) : channelBankInfo ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-blue-700 w-14">은행</span>
-                            <span className="font-medium text-blue-900">{channelBankInfo.bankName}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-blue-700 w-14">계좌번호</span>
-                            <span className="font-medium text-blue-900 font-mono">{channelBankInfo.bankAccount}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-blue-700 w-14">예금주</span>
-                            <span className="font-medium text-blue-900">{channelBankInfo.accountHolder}</span>
-                          </div>
-                          <div className="mt-3 pt-3 border-t border-blue-200">
-                            <p className="text-xs text-blue-600">
-                              * 주문 후 3일 이내에 입금해 주세요.
-                            </p>
-                            <p className="text-xs text-blue-600">
-                              * 미입금 시 주문이 자동 취소됩니다.
-                            </p>
-                            <p className="text-xs text-blue-600">
-                              * 입금자명은 주문자명과 동일하게 해주세요.
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-red-600">
-                          입금 계좌 정보를 불러올 수 없습니다. 관리자에게 문의해주세요.
+                    <div className="mt-4 space-y-3">
+                      {/* 입금기한 안내 */}
+                      <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                        <p className="text-sm font-medium text-blue-800 mb-1">입금기한</p>
+                        <p className="text-sm text-blue-700">
+                          주문 완료일로부터 3일 이내
                         </p>
-                      )}
+                      </div>
+                      
+                      {/* 주의사항 */}
+                      <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
+                        <p className="text-sm font-medium text-amber-800 mb-2">안내사항</p>
+                        <ul className="text-xs text-amber-700 space-y-1.5">
+                          <li className="flex items-start gap-1.5">
+                            <span className="mt-1.5 w-1 h-1 bg-amber-500 rounded-full flex-shrink-0" />
+                            <span>입금완료 후 상품품절로 인해 자동취소된 상품은 환불 처리해 드립니다</span>
+                          </li>
+                          <li className="flex items-start gap-1.5">
+                            <span className="mt-1.5 w-1 h-1 bg-amber-500 rounded-full flex-shrink-0" />
+                            <span>은행 이체 수수료가 발생될 수 있습니다. 입금시 수수료를 확인해주세요.</span>
+                          </li>
+                          <li className="flex items-start gap-1.5">
+                            <span className="mt-1.5 w-1 h-1 bg-amber-500 rounded-full flex-shrink-0" />
+                            <span>입금 기한 내 미입금 시 주문이 자동 취소됩니다</span>
+                          </li>
+                        </ul>
+                      </div>
+
+                      {/* 계좌 안내 예고 */}
+                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <p className="text-sm text-gray-600">
+                          주문 완료 후 입금 계좌 정보가 안내됩니다.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>

@@ -3,13 +3,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Store, Trash2, Pencil, X, Save, ImageIcon, Package, Calendar, Globe, History, DollarSign, Clock, AlertCircle, CheckCircle } from 'lucide-react'
+// Pencil, X, Save는 상품 정보 편집에서 사용됨
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import Input from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toast'
 import ProductImageViewer from '@/components/ui/ProductImageViewer'
-import ImageSortable, { SortableImage } from '@/components/product/ImageSortable'
 
 interface PublishedProductDetail {
   id: number
@@ -100,12 +100,6 @@ export default function PublishedProductDetailPage({
     description: '',
   })
 
-  // 이미지 수정 상태
-  const [isEditingImages, setIsEditingImages] = useState(false)
-  const [isSavingImages, setIsSavingImages] = useState(false)
-  const [images, setImages] = useState<SortableImage[]>([])
-  const [imageOrderChanged, setImageOrderChanged] = useState(false)
-  const [deletingImageId, setDeletingImageId] = useState<number | null>(null)
 
   const loadProduct = useCallback(async () => {
     try {
@@ -124,15 +118,6 @@ export default function PublishedProductDetailPage({
         setOriginalForm(formData)
         setProductChanged(false)
         setIsEditingProduct(false)
-        if (data.data.product.collectedProduct?.post?.images) {
-          setImages(data.data.product.collectedProduct.post.images.map((img: any) => ({
-            id: img.id,
-            url: img.url,
-            sortOrder: img.sortOrder,
-          })))
-        }
-        setImageOrderChanged(false)
-        setIsEditingImages(false)
       } else {
         toast.error('발행상품을 불러오는데 실패했습니다.')
         router.push('/published-product/list')
@@ -199,23 +184,6 @@ export default function PublishedProductDetailPage({
     setProductChanged(hasChanged)
   }
 
-  const startEditingImages = () => {
-    setIsEditingImages(true)
-    setImageOrderChanged(false)
-  }
-
-  const cancelEditingImages = () => {
-    if (product?.product.collectedProduct?.post?.images) {
-      setImages(product.product.collectedProduct.post.images.map((img) => ({
-        id: img.id,
-        url: img.url,
-        sortOrder: img.sortOrder,
-      })))
-    }
-    setImageOrderChanged(false)
-    setIsEditingImages(false)
-  }
-
   const handleSaveProduct = async () => {
     if (!product) return
 
@@ -248,93 +216,6 @@ export default function PublishedProductDetailPage({
       toast.error('상품 저장에 실패했습니다.')
     } finally {
       setIsSavingProduct(false)
-    }
-  }
-
-  const handleSaveImages = async () => {
-    if (!product || !product.product.collectedProduct?.post?.id) {
-      toast.error('게시물 정보를 찾을 수 없습니다.')
-      return
-    }
-
-    if (images.length === 0) {
-      toast.error('저장할 이미지가 없습니다.')
-      return
-    }
-
-    setIsSavingImages(true)
-    try {
-      const response = await fetch('/api/images/post/reorder', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          postId: product.product.collectedProduct.post.id,
-          imageIds: images.map((img) => img.id),
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || `서버 오류 (${response.status})`)
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success('이미지 순서가 저장되었습니다.')
-        setImageOrderChanged(false)
-        setIsEditingImages(false)
-        loadProduct()
-      } else {
-        toast.error(data.error || '이미지 순서 변경에 실패했습니다.')
-      }
-    } catch (error) {
-      console.error('이미지 순서 저장 실패:', error)
-      const errorMessage = error instanceof Error ? error.message : '이미지 순서 저장에 실패했습니다.'
-      toast.error(errorMessage)
-    } finally {
-      setIsSavingImages(false)
-    }
-  }
-
-  const handleImageReorder = (newOrder: SortableImage[]) => {
-    setImages(newOrder)
-    setImageOrderChanged(true)
-  }
-
-  const handleDeleteImage = async (imageId: number) => {
-    if (!product) return
-
-    if (images.length <= 1) {
-      toast.error('최소 1개의 이미지가 필요합니다.')
-      return
-    }
-
-    setDeletingImageId(imageId)
-    try {
-      const response = await fetch(`/api/images/post/${imageId}`, {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || `서버 오류 (${response.status})`)
-      }
-
-      const data = await response.json()
-      if (data.success) {
-        setImages(prev => prev.filter(img => img.id !== imageId))
-        toast.success('이미지가 삭제되었습니다.')
-        loadProduct()
-      } else {
-        toast.error(data.error || '이미지 삭제에 실패했습니다.')
-      }
-    } catch (error) {
-      console.error('이미지 삭제 실패:', error)
-      const errorMessage = error instanceof Error ? error.message : '이미지 삭제에 실패했습니다.'
-      toast.error(errorMessage)
-    } finally {
-      setDeletingImageId(null)
     }
   }
 
@@ -412,62 +293,19 @@ export default function PublishedProductDetailPage({
             <div className="xl:sticky xl:top-24">
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 border-b border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-slate-100 rounded-lg">
-                        <ImageIcon size={18} className="text-slate-600" />
-                      </div>
-                      <span className="font-semibold text-slate-900">상품 이미지</span>
-                      {galleryImages.length > 0 && (
-                        <span className="text-sm text-slate-500">({galleryImages.length}개)</span>
-                      )}
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-slate-100 rounded-lg">
+                      <ImageIcon size={18} className="text-slate-600" />
                     </div>
-                    {!isEditingImages && galleryImages.length > 0 && (
-                      <Button size="sm" variant="secondary" onClick={startEditingImages}>
-                        <Pencil size={14} />
-                        수정
-                      </Button>
-                    )}
-                    {isEditingImages && (
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="secondary" onClick={cancelEditingImages}>
-                          <X size={14} />
-                          취소
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleSaveImages}
-                          disabled={!imageOrderChanged || isSavingImages}
-                        >
-                          <Save size={14} />
-                          {isSavingImages ? '저장중...' : '저장'}
-                        </Button>
-                      </div>
+                    <span className="font-semibold text-slate-900">상품 이미지</span>
+                    {galleryImages.length > 0 && (
+                      <span className="text-sm text-slate-500">({galleryImages.length}개)</span>
                     )}
                   </div>
-                  {isEditingImages && (
-                    <p className="text-sm text-slate-500 mt-2">
-                      드래그하여 순서를 변경하거나, 호버하여 삭제할 수 있습니다.
-                    </p>
-                  )}
                 </div>
 
                 <div className="p-4">
-                  {isEditingImages ? (
-                    images.length > 0 ? (
-                      <ImageSortable
-                        images={images}
-                        onReorder={handleImageReorder}
-                        onDelete={handleDeleteImage}
-                        deletingImageId={deletingImageId ?? undefined}
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                        <ImageIcon size={48} className="mb-2" />
-                        <p className="text-sm">이미지가 없습니다</p>
-                      </div>
-                    )
-                  ) : galleryImages.length > 0 ? (
+                  {galleryImages.length > 0 ? (
                     <ProductImageViewer
                       images={galleryImages}
                       productName={product.product.name}

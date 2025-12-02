@@ -490,7 +490,12 @@ export default function PublishedProductListPage() {
                   <TableRow
                     key={productGroup.productId}
                     className="hover:bg-gray-50 cursor-pointer h-[72px]"
-                    onClick={() => router.push(`/product/${productGroup.productId}`)}
+                    onClick={() => {
+                      const firstPublishId = productGroup.publishedChannels[0]?.publishId
+                      if (firstPublishId) {
+                        router.push(`/published-product/${firstPublishId}`)
+                      }
+                    }}
                   >
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <input

@@ -87,9 +87,10 @@ export default function ProductDetailPage() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [activeTab, setActiveTab] = useState<TabType>('info')
 
-  // 편집 모드 상태
-  const [isEditing, setIsEditing] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
+  // 편집 모드 상태 (카드별 분리)
+  const [isEditingInfo, setIsEditingInfo] = useState(false)
+  const [isEditingImages, setIsEditingImages] = useState(false)
+  const [isSavingInfo, setIsSavingInfo] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -173,10 +174,10 @@ export default function ProductDetailPage() {
     }
   }
 
-  const handleSave = async () => {
+  const handleSaveInfo = async () => {
     if (!product || !formData.name.trim()) return
 
-    setIsSaving(true)
+    setIsSavingInfo(true)
     try {
       const response = await fetch('/api/product', {
         method: 'PUT',
@@ -192,9 +193,9 @@ export default function ProductDetailPage() {
 
       const data = await response.json()
       if (data.success) {
-        toast.success('상품이 저장되었습니다.')
+        toast.success('상품 정보가 저장되었습니다.')
         loadProduct()
-        setIsEditing(false)
+        setIsEditingInfo(false)
       } else {
         toast.error('상품 저장에 실패했습니다.')
       }
@@ -202,7 +203,7 @@ export default function ProductDetailPage() {
       console.error('상품 저장 실패:', error)
       toast.error('상품 저장에 실패했습니다.')
     } finally {
-      setIsSaving(false)
+      setIsSavingInfo(false)
     }
   }
 
@@ -398,46 +399,14 @@ export default function ProductDetailPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {isEditing ? (
-                <>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setIsEditing(false)}
-                    className="!px-4 !py-2"
-                  >
-                    <X size={16} />
-                    <span className="hidden sm:inline">취소</span>
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="!px-4 !py-2"
-                  >
-                    <Save size={16} />
-                    {isSaving ? '저장중...' : '저장'}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setIsEditing(true)}
-                    className="!px-4 !py-2"
-                  >
-                    <Edit size={16} />
-                    <span className="hidden sm:inline">수정</span>
-                  </Button>
-                  <Button
-                    variant="danger"
-                    onClick={handleDelete}
-                    className="!px-4 !py-2"
-                  >
-                    <Trash2 size={16} />
-                    <span className="hidden sm:inline">삭제</span>
-                  </Button>
-                </>
-              )}
+              <Button
+                variant="danger"
+                onClick={handleDelete}
+                className="!px-4 !py-2"
+              >
+                <Trash2 size={16} />
+                <span className="hidden sm:inline">삭제</span>
+              </Button>
             </div>
           </div>
 
@@ -481,25 +450,49 @@ export default function ProductDetailPage() {
             <div className="xl:col-span-5 2xl:col-span-4">
               <div className="xl:sticky xl:top-32">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                  {isEditing ? (
+                  {isEditingImages ? (
                     <>
                       <div className="p-4 border-b border-slate-100">
-                        <div className="flex items-center gap-2">
-                          <div className="p-2 bg-slate-100 rounded-lg">
-                            <ImageIcon size={18} className="text-slate-600" />
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="p-2 bg-slate-100 rounded-lg">
+                              <ImageIcon size={18} className="text-slate-600" />
+                            </div>
+                            <span className="font-semibold text-slate-900">이미지 관리</span>
                           </div>
-                          <span className="font-semibold text-slate-900">이미지 관리</span>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setIsEditingImages(false)}
+                          >
+                            <X size={14} className="mr-1" />
+                            닫기
+                          </Button>
                         </div>
                         <p className="text-sm text-slate-500 mt-2">드래그하여 순서를 변경하거나, 호버하여 삭제할 수 있습니다.</p>
                       </div>
                       <div className="p-4">
                         {images.length > 0 ? (
-                          <ImageSortable
-                            images={images}
-                            onReorder={handleImageReorder}
-                            onDelete={handleDeleteImage}
-                            deletingImageId={deletingImageId ?? undefined}
-                          />
+                          <>
+                            <ImageSortable
+                              images={images}
+                              onReorder={handleImageReorder}
+                              onDelete={handleDeleteImage}
+                              deletingImageId={deletingImageId ?? undefined}
+                            />
+                            {imageOrderChanged && (
+                              <div className="mt-4 flex justify-end">
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  onClick={handleSaveImageOrder}
+                                >
+                                  <Save size={14} className="mr-1" />
+                                  이미지 순서 저장
+                                </Button>
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <div className="flex items-center justify-center h-48 bg-slate-50 rounded-xl">
                             <Package size={48} className="text-slate-300" />
@@ -512,12 +505,22 @@ export default function ProductDetailPage() {
                       {images.length > 0 ? (
                         <>
                           <div className="p-4 border-b border-slate-100">
-                            <div className="flex items-center gap-2">
-                              <div className="p-2 bg-slate-100 rounded-lg">
-                                <ImageIcon size={18} className="text-slate-600" />
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="p-2 bg-slate-100 rounded-lg">
+                                  <ImageIcon size={18} className="text-slate-600" />
+                                </div>
+                                <span className="font-semibold text-slate-900">상품 이미지</span>
+                                <span className="text-sm text-slate-500">({images.length}개)</span>
                               </div>
-                              <span className="font-semibold text-slate-900">상품 이미지</span>
-                              <span className="text-sm text-slate-500">({images.length}개)</span>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setIsEditingImages(true)}
+                              >
+                                <Edit size={14} className="mr-1" />
+                                수정
+                              </Button>
                             </div>
                           </div>
                           <div className="relative aspect-square bg-slate-50">
@@ -581,16 +584,56 @@ export default function ProductDetailPage() {
               {/* 기본 정보 카드 */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Package size={18} className="text-blue-600" />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Package size={18} className="text-blue-600" />
+                      </div>
+                      <span className="font-semibold text-slate-900">기본 정보</span>
                     </div>
-                    <span className="font-semibold text-slate-900">기본 정보</span>
+                    {isEditingInfo ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setIsEditingInfo(false)
+                            setFormData({
+                              name: product?.name || '',
+                              description: product?.description || '',
+                              categoryId: product?.categoryId || '',
+                              price: product?.price?.toString() || '',
+                            })
+                          }}
+                        >
+                          <X size={14} className="mr-1" />
+                          취소
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={handleSaveInfo}
+                          disabled={isSavingInfo}
+                        >
+                          <Save size={14} className="mr-1" />
+                          {isSavingInfo ? '저장중...' : '저장'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setIsEditingInfo(true)}
+                      >
+                        <Edit size={14} className="mr-1" />
+                        수정
+                      </Button>
+                    )}
                   </div>
                 </div>
 
                 <div className="p-6">
-                  {isEditing ? (
+                  {isEditingInfo ? (
                     <div className="space-y-5">
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">상품명</label>

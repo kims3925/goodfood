@@ -11,7 +11,6 @@ import {
   XCircle,
   Calendar,
 } from 'lucide-react'
-import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
@@ -65,7 +64,7 @@ export default function PolicyManagePage() {
 
   useEffect(() => {
     loadPolicies()
-  }, [currentPage, statusFilter])
+  }, [currentPage, statusFilter, searchTerm])
 
   const loadPolicies = async () => {
     try {
@@ -103,11 +102,6 @@ export default function PolicyManagePage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const handleSearch = () => {
-    setCurrentPage(1)
-    loadPolicies()
   }
 
   const handlePageChange = (page: number) => {
@@ -226,8 +220,8 @@ export default function PolicyManagePage() {
           </p>
         </div>
 
-        {/* 통계 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {/* 통계 및 액션 카드 */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-gray-100 rounded-lg">
@@ -261,65 +255,80 @@ export default function PolicyManagePage() {
               </div>
             </div>
           </div>
+          {/* 정책 추가 카드 */}
+          <button
+            onClick={() => router.push('/policy/new')}
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Plus size={24} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">정책</p>
+                <p className="text-lg font-bold text-blue-600">추가하기</p>
+              </div>
+            </div>
+          </button>
+          {/* 정책 삭제 카드 */}
+          <button
+            onClick={handleDeleteSelected}
+            disabled={selectedIds.length === 0}
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
+              selectedIds.length > 0
+                ? 'hover:border-red-300 hover:bg-red-50 cursor-pointer'
+                : 'opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-3 rounded-lg ${selectedIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
+                <Trash2 size={24} className={selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'} />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">선택 삭제</p>
+                <p className={`text-lg font-bold ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                  {selectedIds.length}개 선택됨
+                </p>
+              </div>
+            </div>
+          </button>
         </div>
 
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-4 border-b border-gray-200">
             <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-              {/* 검색 */}
-              <div className="flex gap-2 flex-1 max-w-md">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                  <Input
-                    type="text"
-                    placeholder="정책 이름으로 검색..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    className="pl-10"
-                  />
-                </div>
-                <Button variant="secondary" onClick={handleSearch}>
-                  검색
-                </Button>
+              {/* 왼쪽: 상태 필터 */}
+              <div className="flex items-center gap-1">
+                {statusOptions.map((status) => {
+                  const Icon = status.icon
+                  return (
+                    <button
+                      key={status.value}
+                      onClick={() => { setStatusFilter(status.value); setCurrentPage(1) }}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                        statusFilter === status.value
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Icon size={14} />
+                      {status.label}
+                    </button>
+                  )
+                })}
               </div>
 
-              {/* 필터 & 버튼 */}
-              <div className="flex gap-2 items-center">
-                {/* 상태 필터 (탭 형태) */}
-                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-                  {statusOptions.map((status) => {
-                    const Icon = status.icon
-                    return (
-                      <button
-                        key={status.value}
-                        onClick={() => { setStatusFilter(status.value); setCurrentPage(1) }}
-                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
-                          statusFilter === status.value
-                            ? `bg-white shadow-sm ${status.color}`
-                            : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                      >
-                        <Icon size={14} />
-                        {status.label}
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <Button variant="primary" onClick={() => router.push('/policy/new')}>
-                  <Plus size={16} />
-                  정책 추가
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={handleDeleteSelected}
-                  disabled={selectedIds.length === 0}
-                >
-                  <Trash2 size={16} />
-                  삭제 ({selectedIds.length})
-                </Button>
+              {/* 오른쪽: 검색 */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Input
+                  type="text"
+                  placeholder="정책 이름으로 검색..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-64"
+                />
               </div>
             </div>
           </div>

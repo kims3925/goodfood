@@ -58,6 +58,9 @@ export async function GET(
                   select: {
                     id: true,
                     name: true,
+                    bankName: true,
+                    bankAccount: true,
+                    accountHolder: true,
                   },
                 },
               },
@@ -165,6 +168,23 @@ export async function GET(
         virtualAccountDueDate: order.payment.virtualAccountDueDate?.toISOString() || null,
         approvedAt: order.payment.approvedAt?.toISOString() || null,
       } : null,
+      // 무통장입금 정보 (BANK_TRANSFER인 경우)
+      bankTransferInfo: order.payment?.method === 'BANK_TRANSFER' ? (() => {
+        // 첫 번째 아이템의 채널에서 입금정보 가져오기
+        const channel = order.items[0]?.publishedProduct?.channel
+        if (channel?.bankName && channel?.bankAccount) {
+          // 입금기한: 주문일로부터 3일 후
+          const deadline = new Date(order.orderedAt)
+          deadline.setDate(deadline.getDate() + 3)
+          return {
+            bankName: channel.bankName,
+            bankAccount: channel.bankAccount,
+            accountHolder: channel.accountHolder || '',
+            depositDeadline: deadline.toISOString(),
+          }
+        }
+        return null
+      })() : null,
     }
 
     return NextResponse.json({

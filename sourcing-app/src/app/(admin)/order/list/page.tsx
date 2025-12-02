@@ -4,8 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Search,
-  RefreshCw,
-  Filter,
   ShoppingBag,
   FileSpreadsheet,
   ChevronLeft,
@@ -13,7 +11,6 @@ import {
   Phone,
   MapPin,
   Package,
-  Plus,
   Store,
   Building2,
   CheckCircle,
@@ -212,69 +209,53 @@ export default function UnifiedOrderListPage() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-4 border-b border-gray-200">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              {/* 검색 */}
-              <div className="flex gap-2 flex-1 max-w-md">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                  <Input
-                    type="text"
-                    placeholder="주문번호, 고객명, 연락처 검색..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    className="pl-10"
-                  />
-                </div>
-                <Button variant="secondary" onClick={handleSearch}>
-                  검색
-                </Button>
+              {/* 필터 */}
+              <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => { setSourceFilter('ALL'); setPage(1) }}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    sourceFilter === 'ALL'
+                      ? 'bg-white shadow-sm text-gray-900'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  전체
+                </button>
+                <button
+                  onClick={() => { setSourceFilter('SHOPPING_MALL'); setPage(1) }}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                    sourceFilter === 'SHOPPING_MALL'
+                      ? 'bg-white shadow-sm text-blue-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <ShoppingBag size={14} />
+                  쇼핑몰
+                </button>
+                <button
+                  onClick={() => { setSourceFilter('GOOGLE_FORM'); setPage(1) }}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                    sourceFilter === 'GOOGLE_FORM'
+                      ? 'bg-white shadow-sm text-green-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <FileSpreadsheet size={14} />
+                  밴드
+                </button>
               </div>
 
-              {/* 필터 & 새로고침 */}
-              <div className="flex gap-2 items-center">
-                <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
-                  <button
-                    onClick={() => { setSourceFilter('ALL'); setPage(1) }}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                      sourceFilter === 'ALL'
-                        ? 'bg-white shadow-sm text-gray-900'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    전체
-                  </button>
-                  <button
-                    onClick={() => { setSourceFilter('SHOPPING_MALL'); setPage(1) }}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
-                      sourceFilter === 'SHOPPING_MALL'
-                        ? 'bg-white shadow-sm text-blue-600'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <ShoppingBag size={14} />
-                    쇼핑몰
-                  </button>
-                  <button
-                    onClick={() => { setSourceFilter('GOOGLE_FORM'); setPage(1) }}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
-                      sourceFilter === 'GOOGLE_FORM'
-                        ? 'bg-white shadow-sm text-green-600'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <FileSpreadsheet size={14} />
-                    밴드
-                  </button>
-                </div>
-
-                <Button
-                  variant="secondary"
-                  onClick={fetchOrders}
-                  disabled={loading}
-                >
-                  <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                  새로고침
-                </Button>
+              {/* 검색 */}
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Input
+                  type="text"
+                  placeholder="주문번호, 고객명, 연락처 검색..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  className="pl-10"
+                />
               </div>
             </div>
           </div>

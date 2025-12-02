@@ -63,106 +63,123 @@ export async function GET(request: NextRequest) {
     // 1. 쇼핑몰 주문 조회 (source가 ALL 또는 SHOPPING_MALL인 경우)
     // Order.userId는 고객 ID이므로, PublishedProduct를 통해 관리자의 상품이 포함된 주문을 조회
     if (!source || source === 'ALL' || source === 'SHOPPING_MALL') {
-      const shopOrders = await prisma.order.findMany({
-        where: {
-          // 관리자가 발행한 상품이 포함된 주문 조회
-          items: {
-            some: {
-              publishedProduct: {
-                userId: user.userId,
+      try {
+        // 먼저 현재 사용자의 PublishedProduct ID 목록을 조회
+        const userPublishedProducts = await prisma.publishedProduct.findMany({
+          where: { userId: user.userId },
+          select: { id: true },
+        })
+        const publishedProductIds = userPublishedProducts.map(pp => pp.id)
+
+        if (publishedProductIds.length > 0) {
+          const shopOrders = await prisma.order.findMany({
+            where: {
+              // 관리자가 발행한 상품이 포함된 주문 조회
+              items: {
+                some: {
+                  publishedProductId: { in: publishedProductIds },
+                },
+              },
+              ...(search && {
+                OR: [
+                  { orderNumber: { contains: search } },
+                  { recipientName: { contains: search } },
+                  { recipientPhone: { contains: search } },
+                ],
+              }),
+              ...(status && { status: status as any }),
+            },
+            include: {
+              items: {
+                select: {
+                  productName: true,
+                },
+              },
+              payment: {
+                select: {
+                  method: true,
+                },
               },
             },
-          },
-          ...(search && {
-            OR: [
-              { orderNumber: { contains: search } },
-              { recipientName: { contains: search } },
-              { recipientPhone: { contains: search } },
-            ],
-          }),
-          ...(status && { status: status as any }),
-        },
-        include: {
-          items: {
-            select: {
-              productName: true,
-            },
-          },
-          payment: {
-            select: {
-              method: true,
-            },
-          },
-        },
-        orderBy: { orderedAt: 'desc' },
-      })
+            orderBy: { orderedAt: 'desc' },
+          })
 
-      for (const order of shopOrders) {
-        const productNames = order.items.map(i => i.productName)
-        const productSummary = productNames.length > 1
-          ? `${productNames[0]} 외 ${productNames.length - 1}개`
-          : productNames[0] || '상품 없음'
+          for (const order of shopOrders) {
+            const productNames = order.items.map(i => i.productName)
+            const productSummary = productNames.length > 1
+              ? `${productNames[0]} 외 ${productNames.length - 1}개`
+              : productNames[0] || '상품 없음'
 
-        unifiedOrders.push({
-          id: order.id,
-          source: 'SHOPPING_MALL',
-          orderNumber: order.orderNumber,
-          customerName: order.recipientName,
-          customerPhone: order.recipientPhone,
-          productSummary,
-          itemCount: order.items.length,
-          totalAmount: Number(order.totalAmount),
-          status: order.status,
-          statusLabel: statusLabels[order.status] || order.status,
-          createdAt: order.orderedAt.toISOString(),
-          address: `${order.address} ${order.addressDetail || ''}`.trim(),
-          deliveryMemo: order.deliveryMemo || undefined,
-          paymentMethod: order.payment?.method || undefined,
-        })
+            unifiedOrders.push({
+              id: order.id,
+              source: 'SHOPPING_MALL',
+              orderNumber: order.orderNumber,
+              customerName: order.recipientName,
+              customerPhone: order.recipientPhone,
+              productSummary,
+              itemCount: order.items.length,
+              totalAmount: Number(order.totalAmount),
+              status: order.status,
+              statusLabel: statusLabels[order.status] || order.status,
+              createdAt: order.orderedAt.toISOString(),
+              address: `${order.address} ${order.addressDetail || ''}`.trim(),
+              deliveryMemo: order.deliveryMemo || undefined,
+              paymentMethod: order.payment?.method || undefined,
+            })
+          }
+        }
+      } catch (shopOrderError) {
+        console.error('쇼핑몰 주문 조회 실패:', shopOrderError)
+        // 쇼핑몰 주문 조회 실패 시 빈 배열로 처리하고 계속 진행
       }
     }
 
     // 2. 구글폼 주문 조회 (source가 ALL 또는 GOOGLE_FORM인 경우)
     if (!source || source === 'ALL' || source === 'GOOGLE_FORM') {
-      const formOrders = await prisma.orderTest.findMany({
-        where: {
-          userId: user.userId,
-          ...(search && {
-            OR: [
-              { productName: { contains: search } },
-              { customerName: { contains: search } },
-            ],
-          }),
-        },
-        include: {
-          publishedProduct: {
-            include: {
-              product: {
-                select: {
-                  name: true,
-                  thumbnailUrl: true,
+      try {
+        const formOrders = await prisma.orderTest.findMany({
+          where: {
+            userId: user.userId,
+            ...(search && {
+              OR: [
+                { productName: { contains: search } },
+                { customerName: { contains: search } },
+              ],
+            }),
+          },
+          include: {
+            publishedProduct: {
+              include: {
+                product: {
+                  select: {
+                    name: true,
+                    thumbnailUrl: true,
+                  },
                 },
               },
             },
           },
-        },
-        orderBy: { createdAt: 'desc' },
-      })
-
-      for (const order of formOrders) {
-        unifiedOrders.push({
-          id: order.id,
-          source: 'GOOGLE_FORM',
-          orderNumber: `BAND-${String(order.id).padStart(6, '0')}`,
-          customerName: order.customerName,
-          customerPhone: null,
-          productSummary: order.publishedProduct?.product?.name || order.productName,
-          itemCount: 1,
-          totalAmount: order.totalPrice || 0,
-          status: 'RECEIVED',
-          statusLabel: '주문접수',
-          createdAt: order.createdAt.toISOString(),
+          orderBy: { createdAt: 'desc' },
         })
+
+        for (const order of formOrders) {
+          unifiedOrders.push({
+            id: order.id,
+            source: 'GOOGLE_FORM',
+            orderNumber: `BAND-${String(order.id).padStart(6, '0')}`,
+            customerName: order.customerName,
+            customerPhone: null,
+            productSummary: order.publishedProduct?.product?.name || order.productName,
+            itemCount: 1,
+            totalAmount: order.totalPrice || 0,
+            status: 'RECEIVED',
+            statusLabel: '주문접수',
+            createdAt: order.createdAt.toISOString(),
+          })
+        }
+      } catch (formOrderError) {
+        console.error('밴드 주문 조회 실패:', formOrderError)
+        // 밴드 주문 조회 실패 시 빈 배열로 처리하고 계속 진행
       }
     }
 
@@ -173,7 +190,7 @@ export async function GET(request: NextRequest) {
 
     // 페이지네이션
     const total = unifiedOrders.length
-    const totalPages = Math.ceil(total / limit)
+    const totalPages = Math.ceil(total / limit) || 1
     const paginatedOrders = unifiedOrders.slice((page - 1) * limit, page * limit)
 
     return NextResponse.json({
