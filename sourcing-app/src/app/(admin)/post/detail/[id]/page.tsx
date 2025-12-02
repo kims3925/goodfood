@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Save, X, Trash2, MessageCircle, ImageIcon } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Trash2, MessageCircle, ImageIcon, Calendar, User, ExternalLink } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -120,12 +120,15 @@ export default function PostDetailPage() {
       const data = await response.json()
 
       if (data.success) {
+        toast.success('게시물이 저장되었습니다.')
         loadPost()
         setIsEditing(false)
       } else {
+        toast.error('게시물 저장에 실패했습니다.')
       }
     } catch (error) {
       console.error('게시물 저장 실패:', error)
+      toast.error('게시물 저장에 실패했습니다.')
     } finally {
       setIsSaving(false)
     }
@@ -178,20 +181,21 @@ export default function PostDetailPage() {
   }
 
   const getStatusBadge = (status: string) => {
-    const statusMap: { [key: string]: { label: string; color: string } } = {
-      COLLECTED: { label: '수집됨', color: 'bg-blue-100 text-blue-800' },
-      ANALYZING: { label: 'AI 분석중', color: 'bg-yellow-100 text-yellow-800' },
-      ANALYZED: { label: 'AI 분석완료', color: 'bg-green-100 text-green-800' },
-      MODIFIED: { label: '수정됨', color: 'bg-purple-100 text-purple-800' },
-      READY: { label: '발행준비', color: 'bg-indigo-100 text-indigo-800' },
-      PUBLISHED: { label: '발행완료', color: 'bg-gray-100 text-gray-800' },
-      FAILED: { label: '실패', color: 'bg-red-100 text-red-800' },
+    const statusMap: { [key: string]: { label: string; bgColor: string; textColor: string; dotColor: string } } = {
+      COLLECTED: { label: '수집됨', bgColor: 'bg-blue-50', textColor: 'text-blue-700', dotColor: 'bg-blue-500' },
+      ANALYZING: { label: 'AI 분석중', bgColor: 'bg-amber-50', textColor: 'text-amber-700', dotColor: 'bg-amber-500' },
+      ANALYZED: { label: 'AI 분석완료', bgColor: 'bg-emerald-50', textColor: 'text-emerald-700', dotColor: 'bg-emerald-500' },
+      MODIFIED: { label: '수정됨', bgColor: 'bg-violet-50', textColor: 'text-violet-700', dotColor: 'bg-violet-500' },
+      READY: { label: '발행준비', bgColor: 'bg-indigo-50', textColor: 'text-indigo-700', dotColor: 'bg-indigo-500' },
+      PUBLISHED: { label: '발행완료', bgColor: 'bg-slate-100', textColor: 'text-slate-700', dotColor: 'bg-slate-500' },
+      FAILED: { label: '실패', bgColor: 'bg-red-50', textColor: 'text-red-700', dotColor: 'bg-red-500' },
     }
 
-    const statusInfo = statusMap[status] || { label: status, color: 'bg-gray-100 text-gray-800' }
+    const statusInfo = statusMap[status] || { label: status, bgColor: 'bg-gray-100', textColor: 'text-gray-700', dotColor: 'bg-gray-500' }
 
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
+      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${statusInfo.bgColor} ${statusInfo.textColor}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dotColor}`}></span>
         {statusInfo.label}
       </span>
     )
@@ -199,7 +203,7 @@ export default function PostDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <Loading />
       </div>
     )
@@ -210,199 +214,276 @@ export default function PostDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 헤더 */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => router.push('/post/list')}
-            >
-              <ArrowLeft size={20} />
-              목록으로
-            </Button>
-            <h1 className="text-3xl font-bold text-gray-900">게시물 상세</h1>
-            {getStatusBadge(post.status)}
-          </div>
-          <div className="flex gap-2">
-            {isEditing ? (
-              <>
-                <Button variant="secondary" onClick={handleCancelEdit}>
-                  <X size={16} />
-                  취소
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={handleSave}
-                  disabled={isSaving}
-                >
-                  <Save size={16} />
-                  {isSaving ? '저장중...' : '저장'}
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="secondary" onClick={handleStartEdit}>
-                  <Edit size={16} />
-                  수정
-                </Button>
-                <Button variant="danger" onClick={handleDelete}>
-                  <Trash2 size={16} />
-                  삭제
-                </Button>
-              </>
-            )}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* 상단 네비게이션 바 */}
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/post/list')}
+                className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                <ArrowLeft size={20} />
+                <span className="font-medium">목록</span>
+              </button>
+              <div className="hidden sm:block h-6 w-px bg-slate-200"></div>
+              <div className="hidden sm:flex items-center gap-2">
+                <span className="text-slate-400 text-sm">게시물</span>
+                <span className="text-slate-300">/</span>
+                <span className="text-slate-700 text-sm font-medium truncate max-w-[200px]">
+                  {post.title || `#${post.id}`}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {isEditing ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    onClick={handleCancelEdit}
+                    className="!px-4 !py-2"
+                  >
+                    <X size={16} />
+                    <span className="hidden sm:inline">취소</span>
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="!px-4 !py-2"
+                  >
+                    <Save size={16} />
+                    {isSaving ? '저장중...' : '저장'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="secondary"
+                    onClick={handleStartEdit}
+                    className="!px-4 !py-2"
+                  >
+                    <Edit size={16} />
+                    <span className="hidden sm:inline">수정</span>
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onClick={handleDelete}
+                    className="!px-4 !py-2"
+                  >
+                    <Trash2 size={16} />
+                    <span className="hidden sm:inline">삭제</span>
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* 메타 정보 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-500">출처 밴드</label>
-              <div className="flex items-center gap-3 mt-1">
-                {post.channel?.coverUrl ? (
-                  <img
-                    src={post.channel.coverUrl}
-                    alt={post.channel.name}
-                    className="w-12 h-12 rounded-lg object-cover"
-                  />
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* 2컬럼 레이아웃 */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          {/* 왼쪽: 이미지 갤러리 */}
+          <div className="xl:col-span-5 2xl:col-span-4">
+            <div className="xl:sticky xl:top-24">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                {post.images && post.images.length > 0 ? (
+                  <>
+                    <div className="p-4 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 bg-slate-100 rounded-lg">
+                          <ImageIcon size={18} className="text-slate-600" />
+                        </div>
+                        <span className="font-semibold text-slate-900">이미지</span>
+                        <span className="text-sm text-slate-500">({post.images.length}개)</span>
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <ImageGallery
+                        images={post.images}
+                        gridCols={2}
+                        aspectRatio="square"
+                        enableLightbox={true}
+                        showThumbnails={true}
+                      />
+                    </div>
+                  </>
                 ) : (
-                  <div className="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center">
-                    <span className="text-gray-400 text-xs">No</span>
+                  <div className="p-12 text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                      <ImageIcon size={32} className="text-slate-400" />
+                    </div>
+                    <p className="text-slate-500 font-medium">이미지가 없습니다</p>
                   </div>
                 )}
-                <div>
-                  <div className="font-medium text-gray-900">{post.channel?.name || '-'}</div>
-                </div>
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">수집일</label>
-              <div className="text-gray-900 mt-1">
-                {new Date(post.createdAt).toLocaleString('ko-KR')}
               </div>
             </div>
           </div>
-        </div>
 
-        {/* 게시물 정보 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">게시물 정보</h2>
-
-          <div className="space-y-6">
-            {/* 작성자 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-500 mb-2">
-                작성자
-              </label>
-              {isEditing ? (
-                <Input
-                  type="text"
-                  value={formData.author}
-                  onChange={(e) => setFormData({ ...formData, author: e.target.value })}
-                  placeholder="작성자"
-                />
-              ) : (
-                <p className="text-gray-900">{post.author || '-'}</p>
-              )}
-            </div>
-
-            {/* 제목 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-500 mb-2">
-                제목
-              </label>
-              {isEditing ? (
-                <Input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="제목"
-                />
-              ) : (
-                <p className="text-gray-900 text-lg font-semibold">{post.title || '-'}</p>
-              )}
-            </div>
-
-            {/* 내용 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-500 mb-2">
-                내용
-              </label>
-              {isEditing ? (
-                <textarea
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={20}
-                  value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  placeholder="내용"
-                />
-              ) : (
-                <pre className="whitespace-pre-wrap text-gray-800 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  {post.content || '-'}
-                </pre>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* 이미지 갤러리 */}
-        {post.images && post.images.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <ImageIcon size={20} className="text-gray-400" />
-              <h2 className="text-xl font-bold text-gray-900">
-                이미지 ({post.images.length}개)
-              </h2>
-            </div>
-            <ImageGallery
-              images={post.images}
-              gridCols={4}
-              aspectRatio="square"
-              enableLightbox={true}
-              showThumbnails={true}
-            />
-          </div>
-        )}
-
-        {/* 댓글 섹션 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <MessageCircle size={20} className="text-gray-400" />
-            <h2 className="text-xl font-bold text-gray-900">
-              댓글 ({post.comments?.length || 0}개)
-            </h2>
-          </div>
-          {post.comments && post.comments.length > 0 ? (
-            <div className="space-y-4">
-              {post.comments.map((comment) => (
-                <div
-                  key={comment.id}
-                  className="border-l-4 border-blue-500 bg-gray-50 p-4 rounded-r-lg"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium text-sm">
-                        {comment.author.charAt(0)}
-                      </div>
-                      <span className="font-medium text-gray-900">{comment.author}</span>
+          {/* 오른쪽: 게시물 정보 */}
+          <div className="xl:col-span-7 2xl:col-span-8 space-y-6">
+            {/* 헤더 카드 */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                <div className="flex items-center gap-3">
+                  {post.channel?.coverUrl ? (
+                    <img
+                      src={post.channel.coverUrl}
+                      alt={post.channel.name}
+                      className="w-12 h-12 rounded-xl object-cover ring-2 ring-slate-100"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
+                      <span className="text-slate-500 text-sm font-medium">B</span>
                     </div>
-                    <span className="text-sm text-gray-500">
-                      {new Date(comment.createdAt).toLocaleString('ko-KR')}
-                    </span>
+                  )}
+                  <div>
+                    <p className="text-sm text-slate-500">출처 밴드</p>
+                    <p className="font-semibold text-slate-900">{post.channel?.name || '-'}</p>
                   </div>
-                  <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>
                 </div>
-              ))}
+                {getStatusBadge(post.status)}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+                <div className="flex items-center gap-2 text-sm">
+                  <User size={16} className="text-slate-400" />
+                  <span className="text-slate-500">작성자:</span>
+                  <span className="font-medium text-slate-700">{post.author || '-'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm col-span-2">
+                  <Calendar size={16} className="text-slate-400" />
+                  <span className="text-slate-500">수집일:</span>
+                  <span className="font-medium text-slate-700">
+                    {new Date(post.createdAt).toLocaleString('ko-KR')}
+                  </span>
+                </div>
+              </div>
             </div>
-          ) : (
-            <div className="text-center py-12 text-gray-500">
-              <MessageCircle size={48} className="mx-auto mb-4 text-gray-300" />
-              <p>댓글이 없습니다.</p>
+
+            {/* 제목 & 내용 카드 */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-6 space-y-6">
+                {/* 작성자 (수정 모드) */}
+                {isEditing && (
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      작성자
+                    </label>
+                    <Input
+                      type="text"
+                      value={formData.author}
+                      onChange={(e) => setFormData({ ...formData, author: e.target.value })}
+                      placeholder="작성자 이름"
+                      className="!rounded-xl"
+                    />
+                  </div>
+                )}
+
+                {/* 제목 */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    제목
+                  </label>
+                  {isEditing ? (
+                    <Input
+                      type="text"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      placeholder="게시물 제목"
+                      className="!rounded-xl !text-lg"
+                    />
+                  ) : (
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">
+                      {post.title || '(제목 없음)'}
+                    </h1>
+                  )}
+                </div>
+
+                {/* 내용 */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    내용
+                  </label>
+                  {isEditing ? (
+                    <textarea
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all"
+                      rows={16}
+                      value={formData.content}
+                      onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                      placeholder="게시물 내용을 입력하세요"
+                    />
+                  ) : (
+                    <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
+                      <pre className="whitespace-pre-wrap text-slate-700 text-[15px] leading-relaxed font-sans">
+                        {post.content || '(내용 없음)'}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          )}
+
+            {/* 댓글 카드 */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <MessageCircle size={18} className="text-blue-600" />
+                  </div>
+                  <span className="font-semibold text-slate-900">댓글</span>
+                  <span className="px-2 py-0.5 bg-slate-200 rounded-full text-xs font-medium text-slate-600">
+                    {post.comments?.length || 0}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-4">
+                {post.comments && post.comments.length > 0 ? (
+                  <div className="space-y-3">
+                    {post.comments.map((comment, index) => (
+                      <div
+                        key={comment.id}
+                        className="group relative bg-gradient-to-r from-slate-50 to-white p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-sm">
+                            {comment.author.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold text-slate-900">{comment.author}</span>
+                              <span className="text-xs text-slate-400">
+                                {new Date(comment.createdAt).toLocaleString('ko-KR', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+                            <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
+                              {comment.content}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                      <MessageCircle size={32} className="text-slate-400" />
+                    </div>
+                    <p className="text-slate-500 font-medium">댓글이 없습니다</p>
+                    <p className="text-slate-400 text-sm mt-1">아직 작성된 댓글이 없습니다</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -412,7 +493,7 @@ export default function PostDetailPage() {
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={confirmDelete}
         title="게시물 삭제"
-        message="이 게시물을 삭제하시겠습니까?"
+        message="이 게시물을 삭제하시겠습니까? 삭제된 게시물은 복구할 수 없습니다."
         confirmText="삭제"
         variant="danger"
         isLoading={isDeleting}

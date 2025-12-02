@@ -85,18 +85,9 @@ export async function GET(request: NextRequest) {
       prisma.product.findMany({
         where,
         include: {
-          publishedProducts: {
-            include: {
-              channel: {
-                select: {
-                  id: true,
-                  name: true,
-                  coverUrl: true,
-                  platform: true,
-                },
-              },
-            },
-            orderBy: { createdAt: 'desc' },
+          images: {
+            orderBy: { sortOrder: 'asc' },
+            take: 1,
           },
           collectedProduct: {
             select: {
@@ -112,6 +103,19 @@ export async function GET(request: NextRequest) {
                 },
               },
             },
+          },
+          publishedProducts: {
+            include: {
+              channel: {
+                select: {
+                  id: true,
+                  name: true,
+                  coverUrl: true,
+                  platform: true,
+                },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
           },
         },
         orderBy: { createdAt: 'desc' },

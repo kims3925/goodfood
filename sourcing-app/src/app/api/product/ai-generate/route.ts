@@ -11,6 +11,7 @@ import prisma from '@bandauto/db'
  * Request Body:
  * - postId: number - Post ID to transform
  * - aiProvider?: 'GEMINI' | 'OPENAI' - AI provider (optional, uses user's active config if not provided)
+ * - policyContent?: string - 가격 정책 내용 (DB에서 가져온 정책 content)
  *
  * Response:
  * - success: boolean

@@ -685,8 +685,8 @@ export default function PostsManagePage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[15%]">출처 밴드</TableHead>
                   <TableHead className="w-[32%]">제목</TableHead>
+                  <TableHead className="w-[15%]">출처 밴드</TableHead>
                   <TableHead className="w-[13%]">작성자</TableHead>
                   <TableHead className="w-[18%]">생성일</TableHead>
                   <TableHead className="w-[18%]">수정일</TableHead>
@@ -714,6 +714,14 @@ export default function PostsManagePage() {
                         />
                       </TableCell>
                       <TableCell
+                        className="w-[32%] cursor-pointer"
+                        onClick={() => router.push(`/post/detail/${post.id}`)}
+                      >
+                        <div className="font-medium text-gray-900 truncate">
+                          {truncateText(post.title, 50)}
+                        </div>
+                      </TableCell>
+                      <TableCell
                         className="w-[15%] cursor-pointer"
                         onClick={() => router.push(`/post/detail/${post.id}`)}
                       >
@@ -732,14 +740,6 @@ export default function PostsManagePage() {
                           <div className="min-w-0 flex-1">
                             <div className="font-semibold text-gray-900 truncate text-sm">{post.channel.name}</div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell
-                        className="w-[32%] cursor-pointer"
-                        onClick={() => router.push(`/post/detail/${post.id}`)}
-                      >
-                        <div className="font-medium text-gray-900 truncate">
-                          {truncateText(post.title, 50)}
                         </div>
                       </TableCell>
                       <TableCell

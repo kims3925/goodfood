@@ -115,6 +115,100 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// POST: 수집상품 등록
+export async function POST(request: NextRequest) {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: '로그인이 필요합니다.' },
+        { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+    const { postId, name, description, price, currency, wholesalePrice } = body
+
+    if (!postId) {
+      return NextResponse.json(
+        { success: false, error: 'postId가 필요합니다.' },
+        { status: 400 }
+      )
+    }
+
+    // 해당 게시물이 존재하는지 확인
+    const post = await prisma.collectedPost.findFirst({
+      where: {
+        id: postId,
+        userId: currentUser.userId,
+      },
+    })
+
+    if (!post) {
+      return NextResponse.json(
+        { success: false, error: '게시물을 찾을 수 없습니다.' },
+        { status: 404 }
+      )
+    }
+
+    // 이미 수집상품이 있는지 확인
+    const existingProduct = await prisma.collectedProduct.findFirst({
+      where: {
+        postId,
+        userId: currentUser.userId,
+      },
+    })
+
+    if (existingProduct) {
+      return NextResponse.json(
+        { success: false, error: '이미 해당 게시물로 등록된 수집상품이 있습니다.' },
+        { status: 400 }
+      )
+    }
+
+    // 수집상품 생성
+    const collectedProduct = await prisma.collectedProduct.create({
+      data: {
+        userId: currentUser.userId,
+        postId,
+        name: name || null,
+        description: description || null,
+        price: price || null,
+        currency: currency || 'KRW',
+        wholesalePrice: wholesalePrice || null,
+      },
+      include: {
+        post: {
+          include: {
+            channel: {
+              select: {
+                id: true,
+                name: true,
+                coverUrl: true,
+              },
+            },
+            images: {
+              take: 1,
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
+      },
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: collectedProduct,
+    })
+  } catch (error) {
+    console.error('수집상품 등록 실패:', error)
+    return NextResponse.json(
+      { success: false, error: '수집상품 등록에 실패했습니다.' },
+      { status: 500 }
+    )
+  }
+}
+
 // DELETE: 수집상품 삭제
 export async function DELETE(request: NextRequest) {
   try {

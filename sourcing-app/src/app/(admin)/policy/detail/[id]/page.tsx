@@ -2,7 +2,21 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Trash2, AlertCircle, Save, X } from 'lucide-react'
+import Link from 'next/link'
+import {
+  ArrowLeft,
+  Edit,
+  Trash2,
+  AlertCircle,
+  Save,
+  X,
+  FileText,
+  Calendar,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Info,
+} from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -93,9 +107,11 @@ export default function PolicyDetailPage() {
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
+      toast.error('정책 이름을 입력해주세요.')
       return
     }
     if (!formData.content.trim()) {
+      toast.error('정책 내용을 입력해주세요.')
       return
     }
 
@@ -115,9 +131,13 @@ export default function PolicyDetailPage() {
       if (data.success) {
         setPolicy(data.data)
         setIsEditing(false)
+        toast.success('정책이 저장되었습니다.')
+      } else {
+        toast.error(data.error || '정책 저장에 실패했습니다.')
       }
     } catch (error) {
       console.error('정책 저장 실패:', error)
+      toast.error('정책 저장에 실패했습니다.')
     } finally {
       setIsSaving(false)
     }
@@ -156,18 +176,26 @@ export default function PolicyDetailPage() {
 
   const getStatusBadge = (isActive: boolean) => {
     return isActive ? (
-      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
+        <CheckCircle size={16} />
         활성
       </span>
     ) : (
-      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
+        <XCircle size={16} />
         비활성
       </span>
     )
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('ko-KR')
+    return new Date(dateString).toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   }
 
   if (isLoading) {
@@ -182,9 +210,11 @@ export default function PolicyDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
             <div className="flex flex-col items-center justify-center space-y-4">
-              <AlertCircle className="text-red-500" size={48} />
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertCircle className="text-red-500" size={32} />
+              </div>
               <div className="text-center">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">정책을 찾을 수 없습니다</h3>
                 <p className="text-gray-600">{error}</p>
@@ -202,18 +232,24 @@ export default function PolicyDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => router.push('/policy/list')}>
-              <ArrowLeft size={20} />
+        {/* 헤더 */}
+        <div className="mb-8 flex items-center gap-4">
+          <Link href="/policy/list">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              목록으로
             </Button>
+          </Link>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+              <FileText className="w-6 h-6 text-blue-600" />
+            </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">정책 상세</h1>
-              <p className="text-gray-600 mt-1">정책 정보를 확인하고 수정할 수 있습니다.</p>
+              <h1 className="text-2xl font-bold text-gray-900">정책 상세</h1>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="ml-auto flex items-center gap-2">
+            {getStatusBadge(policy.isActive)}
             {isEditing ? (
               <>
                 <Button variant="secondary" onClick={handleCancelEdit}>
@@ -240,16 +276,17 @@ export default function PolicyDetailPage() {
           </div>
         </div>
 
-        <div className="space-y-6">
-          {/* Row 1: 기본정보 + 상태관리 */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-            {/* Basic Info Card */}
-            <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">기본 정보</h2>
-              </div>
-              <div className="p-6 space-y-6 flex-1">
-                {/* Name */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 왼쪽: 기본 정보 */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* 기본 정보 카드 */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Info className="w-5 h-5 text-gray-400" />
+                기본 정보
+              </h2>
+
+              <div className="space-y-4">
                 <div>
                   <label className="text-sm font-medium text-gray-500 mb-2 block">정책 이름</label>
                   {isEditing ? (
@@ -261,11 +298,10 @@ export default function PolicyDetailPage() {
                       maxLength={100}
                     />
                   ) : (
-                    <p className="text-2xl font-bold text-gray-900">{policy.name}</p>
+                    <p className="text-lg font-bold text-gray-900">{policy.name}</p>
                   )}
                 </div>
 
-                {/* Description */}
                 <div>
                   <label className="text-sm font-medium text-gray-500 mb-2 block">설명</label>
                   {isEditing ? (
@@ -273,78 +309,82 @@ export default function PolicyDetailPage() {
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       placeholder="정책에 대한 간단한 설명"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      rows={3}
                     />
                   ) : (
                     <p className="text-gray-600">{policy.description || '-'}</p>
                   )}
                 </div>
-              </div>
-            </div>
 
-            {/* Status Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">상태 관리</h2>
-              </div>
-              <div className="p-6 space-y-4 flex-1">
                 <div>
-                  <label className="text-sm font-medium text-gray-500 mb-2 block">현재 상태</label>
+                  <label className="text-sm font-medium text-gray-500 mb-2 block">상태</label>
                   {isEditing ? (
-                    <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        id="isActive"
                         checked={formData.isActive}
                         onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                        className="w-4 h-4"
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
-                      <label htmlFor="isActive" className="text-sm text-gray-700">
-                        활성화
-                      </label>
-                    </div>
+                      <span className="text-sm text-gray-700">활성화</span>
+                    </label>
                   ) : (
                     getStatusBadge(policy.isActive)
                   )}
                 </div>
+              </div>
+            </div>
 
-                <div className="pt-4 border-t border-gray-200 space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">생성일</label>
-                    <p className="mt-1 text-sm text-gray-900">{formatDate(policy.createdAt)}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">수정일</label>
-                    <p className="mt-1 text-sm text-gray-900">{formatDate(policy.updatedAt)}</p>
-                  </div>
+            {/* 날짜 정보 카드 */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">날짜 정보</h2>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-gray-600 flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    생성일
+                  </span>
+                  <span className="text-gray-900 font-medium text-sm">{formatDate(policy.createdAt)}</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-gray-600 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    수정일
+                  </span>
+                  <span className="text-gray-900 font-medium text-sm">{formatDate(policy.updatedAt)}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Policy Content Card */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">정책 내용</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                AI가 가격을 계산할 때 참조하는 정책 내용입니다.
-              </p>
-            </div>
-            <div className="p-6">
-              {isEditing ? (
-                <textarea
-                  value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  placeholder="정책 내용을 입력하세요"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                  rows={15}
-                />
-              ) : (
-                <pre className="whitespace-pre-wrap text-gray-800 font-mono text-sm bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  {policy.content}
-                </pre>
-              )}
+          {/* 오른쪽: 정책 내용 */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-200 bg-gray-50">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-gray-400" />
+                  정책 내용
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  AI가 가격을 계산할 때 참조하는 정책 내용입니다.
+                </p>
+              </div>
+              <div className="p-6">
+                {isEditing ? (
+                  <textarea
+                    value={formData.content}
+                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                    placeholder="정책 내용을 입력하세요"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-none"
+                    rows={20}
+                  />
+                ) : (
+                  <pre className="whitespace-pre-wrap text-gray-800 font-mono text-sm bg-gray-50 p-4 rounded-lg border border-gray-200 leading-relaxed">
+                    {policy.content}
+                  </pre>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -356,7 +396,7 @@ export default function PolicyDetailPage() {
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={confirmDelete}
         title="정책 삭제"
-        message="이 정책을 삭제하시겠습니까?"
+        message="이 정책을 삭제하시겠습니까? 삭제된 정책은 복구할 수 없습니다."
         confirmText="삭제"
         variant="danger"
         isLoading={isDeleting}

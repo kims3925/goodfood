@@ -58,7 +58,7 @@ export default function APISettingsPage() {
     }
   })
   const [isSaving, setIsSaving] = useState(false)
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string; solution?: string; detail?: string; errorCode?: number } | null>(null)
   const [testSuccess, setTestSuccess] = useState<Record<APIProvider, boolean>>({
     band: false,
     aliexpress: false,
@@ -416,16 +416,35 @@ export default function APISettingsPage() {
           {testResult && (
             <div className={`mt-6 p-4 rounded-lg border ${
               testResult.success
-                ? 'bg-green-50 border-green-200 text-green-800'
-                : 'bg-red-50 border-red-200 text-red-800'
+                ? 'bg-green-50 border-green-200'
+                : 'bg-red-50 border-red-200'
             }`}>
-              <div className="flex items-center gap-2">
-                {testResult.success ? (
-                  <Check className="w-5 h-5" />
-                ) : (
-                  <AlertCircle className="w-5 h-5" />
-                )}
-                <span className="font-medium">{testResult.message}</span>
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  {testResult.success ? (
+                    <Check className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className={`font-medium ${testResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                    {testResult.message}
+                  </p>
+                  {testResult.detail && (
+                    <p className="text-sm text-green-700 mt-1">{testResult.detail}</p>
+                  )}
+                  {testResult.solution && !testResult.success && (
+                    <div className="mt-2 p-3 bg-red-100/50 rounded-md">
+                      <p className="text-sm text-red-700">
+                        <span className="font-medium">해결 방법:</span> {testResult.solution}
+                      </p>
+                    </div>
+                  )}
+                  {testResult.errorCode && !testResult.success && (
+                    <p className="text-xs text-red-500 mt-2">에러 코드: {testResult.errorCode}</p>
+                  )}
+                </div>
               </div>
             </div>
           )}

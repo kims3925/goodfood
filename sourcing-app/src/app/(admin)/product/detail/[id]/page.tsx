@@ -1,15 +1,8 @@
 'use client'
 
-/**
- * 상품 상세 페이지 - 심플 모던 레이아웃
- * - 좌우 분할: 이미지 갤러리 좌측, 상품 정보 우측
- * - 깔끔한 카드 디자인
- * - 큰 이미지 미리보기 + 발행현황 탭
- */
-
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, DollarSign, Layers, History } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -107,8 +100,6 @@ export default function ProductDetailPage() {
   // 이미지 관련 상태
   const [images, setImages] = useState<SortableImage[]>([])
   const [imageOrderChanged, setImageOrderChanged] = useState(false)
-  const [isImageReordering, setIsImageReordering] = useState(false)
-  const [isReorderingSaving, setIsReorderingSaving] = useState(false)
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null)
 
   // 삭제 확인 모달 상태
@@ -147,7 +138,6 @@ export default function ProductDetailPage() {
           categoryId: data.data.categoryId || '',
           price: data.data.price?.toString() || '',
         })
-        // 이미지 상태 초기화
         if (data.data.images) {
           setImages(data.data.images.map((img: any) => ({
             id: img.id,
@@ -243,13 +233,11 @@ export default function ProductDetailPage() {
     }
   }
 
-  // 이미지 순서 변경 핸들러
   const handleImageReorder = (newOrder: SortableImage[]) => {
     setImages(newOrder)
     setImageOrderChanged(true)
   }
 
-  // 이미지 순서 저장
   const handleSaveImageOrder = async () => {
     if (!product || images.length === 0) return
 
@@ -272,25 +260,9 @@ export default function ProductDetailPage() {
       }
     } catch (error) {
       console.error('이미지 순서 저장 실패:', error)
-    } finally {
-      setIsReorderingSaving(false)
     }
   }
 
-  // 이미지 순서 변경 취소
-  const handleCancelImageReorder = () => {
-    if (product?.images) {
-      setImages(product.images.map((img) => ({
-        id: img.id,
-        url: img.url,
-        sortOrder: img.sortOrder,
-      })))
-    }
-    setImageOrderChanged(false)
-    setIsImageReordering(false)
-  }
-
-  // 이미지 삭제 핸들러
   const handleDeleteImage = async (imageId: number) => {
     if (!product) return
 
@@ -304,7 +276,6 @@ export default function ProductDetailPage() {
       if (data.success) {
         loadProduct()
         toast.success('이미지가 삭제되었습니다.')
-        // 삭제된 이미지가 현재 선택된 이미지인 경우 인덱스 조정
         if (selectedImageIndex >= images.length - 1) {
           setSelectedImageIndex(Math.max(0, images.length - 2))
         }
@@ -319,41 +290,29 @@ export default function ProductDetailPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    const statusMap: { [key: string]: { label: string; color: string } } = {
-      COLLECTED: { label: '수집', color: 'bg-gray-100 text-gray-800 border-gray-300' },
-      PUBLISHED: { label: '발행', color: 'bg-green-100 text-green-800 border-green-300' },
-    }
-    const statusInfo = statusMap[status] || { label: status, color: 'bg-gray-100 text-gray-800 border-gray-300' }
-    return (
-      <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-sm font-semibold border ${statusInfo.color}`}>
-        {statusInfo.label}
-      </span>
-    )
-  }
-
   const getPublishStatusBadge = (status: string) => {
-    const statusMap: { [key: string]: { label: string; color: string } } = {
-      PENDING: { label: '대기중', color: 'bg-yellow-100 text-yellow-800' },
-      SUCCESS: { label: '성공', color: 'bg-green-100 text-green-800' },
-      FAILED: { label: '실패', color: 'bg-red-100 text-red-800' },
+    const statusMap: { [key: string]: { label: string; bgColor: string; textColor: string; dotColor: string } } = {
+      PENDING: { label: '대기중', bgColor: 'bg-amber-50', textColor: 'text-amber-700', dotColor: 'bg-amber-500' },
+      SUCCESS: { label: '성공', bgColor: 'bg-emerald-50', textColor: 'text-emerald-700', dotColor: 'bg-emerald-500' },
+      FAILED: { label: '실패', bgColor: 'bg-red-50', textColor: 'text-red-700', dotColor: 'bg-red-500' },
     }
-    const statusInfo = statusMap[status] || { label: status, color: 'bg-gray-100 text-gray-800' }
+    const statusInfo = statusMap[status] || { label: status, bgColor: 'bg-slate-100', textColor: 'text-slate-700', dotColor: 'bg-slate-500' }
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${statusInfo.bgColor} ${statusInfo.textColor}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dotColor}`}></span>
         {statusInfo.label}
       </span>
     )
   }
 
   const getPublishTypeBadge = (type: string) => {
-    const typeMap: { [key: string]: { label: string; color: string } } = {
-      RETAIL_BAND: { label: '소매밴드', color: 'bg-purple-100 text-purple-800' },
-      SHOPPING_MALL: { label: '쇼핑몰', color: 'bg-blue-100 text-blue-800' },
+    const typeMap: { [key: string]: { label: string; bgColor: string; textColor: string } } = {
+      RETAIL_BAND: { label: '소매밴드', bgColor: 'bg-violet-50', textColor: 'text-violet-700' },
+      SHOPPING_MALL: { label: '쇼핑몰', bgColor: 'bg-blue-50', textColor: 'text-blue-700' },
     }
-    const typeInfo = typeMap[type] || { label: type, color: 'bg-gray-100 text-gray-800' }
+    const typeInfo = typeMap[type] || { label: type, bgColor: 'bg-slate-100', textColor: 'text-slate-700' }
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeInfo.color}`}>
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${typeInfo.bgColor} ${typeInfo.textColor}`}>
         {typeInfo.label}
       </span>
     )
@@ -374,9 +333,6 @@ export default function ProductDetailPage() {
     })
   }
 
-  // ImageSortable용 이미지 변환 (images 상태 변수 사용)
-  const sortableImages: SortableImage[] = images
-
   const handlePrevImage = () => {
     setSelectedImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))
   }
@@ -385,7 +341,6 @@ export default function ProductDetailPage() {
     setSelectedImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))
   }
 
-  // Group options by groupName
   const groupedOptions = (product?.options || []).reduce((acc, option) => {
     if (!acc[option.groupName]) {
       acc[option.groupName] = []
@@ -396,7 +351,7 @@ export default function ProductDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <Loading />
       </div>
     )
@@ -404,11 +359,13 @@ export default function ProductDetailPage() {
 
   if (error || !product) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="text-red-500 mx-auto mb-4" size={48} />
-          <h3 className="text-lg font-semibold mb-2">상품을 찾을 수 없습니다</h3>
-          <p className="text-gray-600 mb-4">{error}</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+          <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-2xl flex items-center justify-center">
+            <AlertCircle className="text-red-500" size={32} />
+          </div>
+          <h3 className="text-lg font-semibold mb-2 text-slate-900">상품을 찾을 수 없습니다</h3>
+          <p className="text-slate-500 mb-6">{error}</p>
           <Button variant="primary" onClick={() => router.push('/product/list')}>
             상품 목록으로 돌아가기
           </Button>
@@ -418,39 +375,66 @@ export default function ProductDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* 상단 네비게이션 바 */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => router.push('/product/list')}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
               >
                 <ArrowLeft size={20} />
+                <span className="font-medium">목록</span>
               </button>
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold text-gray-900">{product.name}</h1>
+              <div className="hidden sm:block h-6 w-px bg-slate-200"></div>
+              <div className="hidden sm:flex items-center gap-2">
+                <span className="text-slate-400 text-sm">상품</span>
+                <span className="text-slate-300">/</span>
+                <span className="text-slate-700 text-sm font-medium truncate max-w-[200px]">
+                  {product.name}
+                </span>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               {isEditing ? (
                 <>
-                  <Button variant="secondary" onClick={() => setIsEditing(false)}>
-                    <X size={16} /> 취소
+                  <Button
+                    variant="secondary"
+                    onClick={() => setIsEditing(false)}
+                    className="!px-4 !py-2"
+                  >
+                    <X size={16} />
+                    <span className="hidden sm:inline">취소</span>
                   </Button>
-                  <Button variant="primary" onClick={handleSave} disabled={isSaving}>
-                    <Save size={16} /> {isSaving ? '저장 중...' : '저장'}
+                  <Button
+                    variant="primary"
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="!px-4 !py-2"
+                  >
+                    <Save size={16} />
+                    {isSaving ? '저장중...' : '저장'}
                   </Button>
                 </>
               ) : (
                 <>
-                  <Button variant="secondary" onClick={() => setIsEditing(true)}>
-                    <Edit size={16} /> 수정
+                  <Button
+                    variant="secondary"
+                    onClick={() => setIsEditing(true)}
+                    className="!px-4 !py-2"
+                  >
+                    <Edit size={16} />
+                    <span className="hidden sm:inline">수정</span>
                   </Button>
-                  <Button variant="danger" onClick={handleDelete}>
-                    <Trash2 size={16} /> 삭제
+                  <Button
+                    variant="danger"
+                    onClick={handleDelete}
+                    className="!px-4 !py-2"
+                  >
+                    <Trash2 size={16} />
+                    <span className="hidden sm:inline">삭제</span>
                   </Button>
                 </>
               )}
@@ -458,29 +442,29 @@ export default function ProductDetailPage() {
           </div>
 
           {/* 탭 */}
-          <div className="flex gap-1 mt-4">
+          <div className="flex gap-1 -mb-px">
             <button
               onClick={() => setActiveTab('info')}
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+              className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
                 activeTab === 'info'
-                  ? 'bg-gray-100 text-purple-600 border-b-2 border-purple-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-blue-600 border-blue-600'
+                  : 'text-slate-500 border-transparent hover:text-slate-700'
               }`}
             >
               상품 정보
             </button>
             <button
               onClick={() => setActiveTab('publish')}
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
+              className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
                 activeTab === 'publish'
-                  ? 'bg-gray-100 text-purple-600 border-b-2 border-purple-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-blue-600 border-blue-600'
+                  : 'text-slate-500 border-transparent hover:text-slate-700'
               }`}
             >
               발행현황
               {publishHistory.length > 0 && (
                 <span className={`px-1.5 py-0.5 rounded-full text-xs ${
-                  activeTab === 'publish' ? 'bg-purple-100 text-purple-600' : 'bg-gray-200 text-gray-600'
+                  activeTab === 'publish' ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-600'
                 }`}>
                   {publishHistory.length}
                 </span>
@@ -490,157 +474,217 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {activeTab === 'info' ? (
-          <>
-            {/* 상품 정보 탭 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* 좌측: 이미지 갤러리 */}
-            <div className="space-y-4">
-              {isEditing ? (
-                // 편집 모드: ImageSortable 사용
-                <div className="bg-white rounded-2xl shadow-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">이미지 관리</h3>
-                  <p className="text-sm text-gray-500 mb-4">드래그하여 순서를 변경하거나, 호버하여 삭제할 수 있습니다.</p>
-                  {sortableImages.length > 0 ? (
-                    <ImageSortable
-                      images={sortableImages}
-                      onReorder={handleImageReorder}
-                      onDelete={handleDeleteImage}
-                      deletingImageId={deletingImageId ?? undefined}
-                    />
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+            {/* 왼쪽: 이미지 갤러리 */}
+            <div className="xl:col-span-5 2xl:col-span-4">
+              <div className="xl:sticky xl:top-32">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                  {isEditing ? (
+                    <>
+                      <div className="p-4 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-slate-100 rounded-lg">
+                            <ImageIcon size={18} className="text-slate-600" />
+                          </div>
+                          <span className="font-semibold text-slate-900">이미지 관리</span>
+                        </div>
+                        <p className="text-sm text-slate-500 mt-2">드래그하여 순서를 변경하거나, 호버하여 삭제할 수 있습니다.</p>
+                      </div>
+                      <div className="p-4">
+                        {images.length > 0 ? (
+                          <ImageSortable
+                            images={images}
+                            onReorder={handleImageReorder}
+                            onDelete={handleDeleteImage}
+                            deletingImageId={deletingImageId ?? undefined}
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-48 bg-slate-50 rounded-xl">
+                            <Package size={48} className="text-slate-300" />
+                          </div>
+                        )}
+                      </div>
+                    </>
                   ) : (
-                    <div className="flex items-center justify-center h-48 bg-gray-100 rounded-xl">
-                      <Package size={48} className="text-gray-300" />
+                    <>
+                      {images.length > 0 ? (
+                        <>
+                          <div className="p-4 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                              <div className="p-2 bg-slate-100 rounded-lg">
+                                <ImageIcon size={18} className="text-slate-600" />
+                              </div>
+                              <span className="font-semibold text-slate-900">상품 이미지</span>
+                              <span className="text-sm text-slate-500">({images.length}개)</span>
+                            </div>
+                          </div>
+                          <div className="relative aspect-square bg-slate-50">
+                            <img
+                              src={images[selectedImageIndex]?.url}
+                              alt={`상품 이미지 ${selectedImageIndex + 1}`}
+                              className="w-full h-full object-contain"
+                            />
+                            {images.length > 1 && (
+                              <>
+                                <button
+                                  onClick={handlePrevImage}
+                                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                                >
+                                  <ChevronLeft size={20} />
+                                </button>
+                                <button
+                                  onClick={handleNextImage}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                                >
+                                  <ChevronRight size={20} />
+                                </button>
+                                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/50 text-white text-sm rounded-full">
+                                  {selectedImageIndex + 1} / {images.length}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                          {images.length > 1 && (
+                            <div className="p-4 flex gap-2 overflow-x-auto">
+                              {images.map((image, index) => (
+                                <button
+                                  key={image.id}
+                                  onClick={() => setSelectedImageIndex(index)}
+                                  className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
+                                    selectedImageIndex === index ? 'border-blue-500' : 'border-transparent hover:border-slate-300'
+                                  }`}
+                                >
+                                  <img src={image.url} alt="" className="w-full h-full object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="p-12 text-center">
+                          <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                            <ImageIcon size={32} className="text-slate-400" />
+                          </div>
+                          <p className="text-slate-500 font-medium">이미지가 없습니다</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 오른쪽: 상품 정보 */}
+            <div className="xl:col-span-7 2xl:col-span-8 space-y-6">
+              {/* 기본 정보 카드 */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Package size={18} className="text-blue-600" />
+                    </div>
+                    <span className="font-semibold text-slate-900">기본 정보</span>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  {isEditing ? (
+                    <div className="space-y-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">상품명</label>
+                        <Input
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          className="!rounded-xl"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">설명</label>
+                        <textarea
+                          value={formData.description}
+                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                          rows={6}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">판매가</label>
+                        <Input
+                          type="number"
+                          value={formData.price}
+                          onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                          className="!rounded-xl"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">상품명</label>
+                        <h1 className="text-xl font-bold text-slate-900">{product.name}</h1>
+                      </div>
+
+                      {product.description && (
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">설명</label>
+                          <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                            <p className="text-slate-700 whitespace-pre-wrap text-sm leading-relaxed">
+                              {product.description}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-xl">
+                            <DollarSign size={18} className="text-emerald-600" />
+                          </div>
+                          <div>
+                            <p className="text-slate-500 text-xs">판매가</p>
+                            <p className="text-xl font-bold text-slate-900">{formatPrice(product.price)}</p>
+                          </div>
+                        </div>
+                        {product.categoryId && (
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
+                              <Tag size={18} className="text-slate-500" />
+                            </div>
+                            <div>
+                              <p className="text-slate-500 text-xs">카테고리</p>
+                              <p className="font-medium text-slate-900">{product.categoryId}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
-              ) : (
-                // 보기 모드: 기존 갤러리
-                <>
-                  {/* 메인 이미지 */}
-                  <div className="relative bg-white rounded-2xl overflow-hidden shadow-lg aspect-square">
-                    {images.length > 0 ? (
-                      <>
-                        <img
-                          src={images[selectedImageIndex]?.url}
-                          alt={`상품 이미지 ${selectedImageIndex + 1}`}
-                          className="w-full h-full object-contain"
-                        />
-                        {images.length > 1 && (
-                          <>
-                            <button
-                              onClick={handlePrevImage}
-                              className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
-                            >
-                              <ChevronLeft size={24} />
-                            </button>
-                            <button
-                              onClick={handleNextImage}
-                              className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
-                            >
-                              <ChevronRight size={24} />
-                            </button>
-                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/50 text-white text-sm rounded-full">
-                              {selectedImageIndex + 1} / {images.length}
-                            </div>
-                          </>
-                        )}
-                      </>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                        <Package size={64} className="text-gray-300" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 썸네일 */}
-                  {images.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto pb-2">
-                      {images.map((image, index) => (
-                        <button
-                          key={image.id}
-                          onClick={() => setSelectedImageIndex(index)}
-                          className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
-                            selectedImageIndex === index ? 'border-purple-500' : 'border-transparent'
-                          }`}
-                        >
-                          <img src={image.url} alt="" className="w-full h-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* 우측: 상품 정보 */}
-            <div className="space-y-6">
-              {/* 기본 정보 카드 */}
-              <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 pb-4 border-b">기본 정보</h2>
-
-                {isEditing ? (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">상품명</label>
-                      <Input
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">설명</label>
-                      <textarea
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        rows={4}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">판매가</label>
-                      <Input
-                        type="number"
-                        value={formData.price}
-                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {product.description && (
-                      <p className="text-gray-600 mb-6 whitespace-pre-wrap">{product.description}</p>
-                    )}
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                        <span className="text-gray-500">판매가</span>
-                        <span className="text-2xl font-bold text-gray-900">{formatPrice(product.price)}</span>
-                      </div>
-                      {product.categoryId && (
-                        <div className="flex justify-between items-center py-3">
-                          <span className="text-gray-500">카테고리</span>
-                          <span className="text-gray-900">{product.categoryId}</span>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
               </div>
 
               {/* 옵션 정보 */}
               {Object.keys(groupedOptions).length > 0 && (
-                <div className="bg-white rounded-2xl shadow-lg p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4 pb-4 border-b">옵션</h2>
-                  <div className="space-y-4">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-violet-100 rounded-lg">
+                        <Layers size={18} className="text-violet-600" />
+                      </div>
+                      <span className="font-semibold text-slate-900">옵션</span>
+                    </div>
+                  </div>
+
+                  <div className="p-6 space-y-4">
                     {Object.entries(groupedOptions).map(([groupName, values]) => (
                       <div key={groupName}>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">{groupName}</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">{groupName}</label>
                         <div className="flex flex-wrap gap-2">
                           {values.map((value, idx) => (
                             <span
                               key={idx}
-                              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-sm"
+                              className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-full text-sm font-medium"
                             >
                               {value}
                             </span>
@@ -654,75 +698,97 @@ export default function ProductDetailPage() {
 
               {/* 원본 게시물 정보 */}
               {product.collectedProduct?.post && (
-                <div className="bg-white rounded-2xl shadow-lg p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4 pb-4 border-b flex items-center gap-2">
-                    <FileText size={20} />
-                    원본 게시물 정보
-                  </h2>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                      <span className="text-gray-500">출처 채널</span>
-                      <span className="text-gray-900 font-medium">{product.collectedProduct.post.channel.name}</span>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-amber-100 rounded-lg">
+                        <FileText size={18} className="text-amber-600" />
+                      </div>
+                      <span className="font-semibold text-slate-900">원본 게시물 정보</span>
                     </div>
-                    <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                      <span className="text-gray-500">게시물 제목</span>
-                      <span className="text-gray-900 truncate max-w-[200px]">{product.collectedProduct.post.title}</span>
+                  </div>
+
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-center gap-3">
+                      {product.collectedProduct.post.channel.coverUrl ? (
+                        <img
+                          src={product.collectedProduct.post.channel.coverUrl}
+                          alt={product.collectedProduct.post.channel.name}
+                          className="w-10 h-10 rounded-xl object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center">
+                          <Store size={18} className="text-slate-400" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-slate-500 text-xs">출처 채널</p>
+                        <p className="font-medium text-slate-900">{product.collectedProduct.post.channel.name}</p>
+                      </div>
                     </div>
-                    <div className="pt-2">
-                      <Link
-                        href={`/collected-product/${product.collectedProductId}`}
-                        className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-700 text-sm font-medium"
-                      >
-                        <ExternalLink size={16} />
-                        수집 상품 상세 보기
-                      </Link>
+
+                    <div>
+                      <p className="text-slate-500 text-xs mb-1">게시물 제목</p>
+                      <p className="text-slate-900 font-medium">{product.collectedProduct.post.title}</p>
                     </div>
+
+                    <Link
+                      href={`/collected-product/${product.collectedProductId}`}
+                      className="inline-flex items-center gap-2 text-amber-600 hover:text-amber-700 text-sm font-medium transition-colors"
+                    >
+                      <ExternalLink size={16} />
+                      수집 상품 상세 보기
+                    </Link>
                   </div>
                 </div>
               )}
             </div>
           </div>
-
-          </>
         ) : (
-          // 발행현황 탭
-          <div className="bg-white rounded-2xl shadow-lg">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">발행 이력</h2>
-              <p className="text-sm text-gray-500 mt-1">이 상품의 발행 현황을 확인할 수 있습니다.</p>
+          /* 발행현황 탭 */
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                  <History size={18} className="text-emerald-600" />
+                </div>
+                <span className="font-semibold text-slate-900">발행 이력</span>
+              </div>
+              <p className="text-sm text-slate-500 mt-2">이 상품의 발행 현황을 확인할 수 있습니다.</p>
             </div>
+
             <div className="p-6">
               {isLoadingPublish ? (
                 <div className="flex justify-center py-12">
                   <Loading />
                 </div>
               ) : publishHistory.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {publishHistory.map((publish) => (
                     <div
                       key={publish.id}
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-xl"
+                      className="group relative bg-gradient-to-r from-slate-50 to-white p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                          <Store size={20} className="text-purple-600" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            {getPublishTypeBadge(publish.publishType)}
-                            {publish.retailBand && (
-                              <span className="font-medium text-gray-900">
-                                {publish.retailBand.name}
-                              </span>
-                            )}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
+                            <Store size={20} className="text-violet-600" />
                           </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                            <Calendar size={14} />
-                            {formatDate(publish.createdAt)}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              {getPublishTypeBadge(publish.publishType)}
+                              {publish.retailBand && (
+                                <span className="font-medium text-slate-900">
+                                  {publish.retailBand.name}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-slate-500 mt-1">
+                              <Calendar size={14} />
+                              {formatDate(publish.createdAt)}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3">
                         {getPublishStatusBadge(publish.status)}
                       </div>
                     </div>
@@ -730,9 +796,11 @@ export default function ProductDetailPage() {
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <Store size={48} className="mx-auto text-gray-300 mb-4" />
-                  <p className="text-gray-500">발행 이력이 없습니다.</p>
-                  <p className="text-sm text-gray-400 mt-1">상품을 발행하면 이곳에 표시됩니다.</p>
+                  <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                    <Store size={32} className="text-slate-400" />
+                  </div>
+                  <p className="text-slate-500 font-medium">발행 이력이 없습니다</p>
+                  <p className="text-sm text-slate-400 mt-1">상품을 발행하면 이곳에 표시됩니다</p>
                 </div>
               )}
             </div>
@@ -746,7 +814,7 @@ export default function ProductDetailPage() {
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={confirmDelete}
         title="상품 삭제"
-        message="정말 이 상품을 삭제하시겠습니까?"
+        message="정말 이 상품을 삭제하시겠습니까? 삭제된 상품은 복구할 수 없습니다."
         confirmText="삭제"
         variant="danger"
         isLoading={isDeleting}

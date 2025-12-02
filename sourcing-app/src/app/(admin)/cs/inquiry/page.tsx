@@ -2,12 +2,23 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { MessageSquare, Clock, CheckCircle, Search, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
-import Button from '@/components/ui/Button'
+import {
+  MessageSquare,
+  Clock,
+  CheckCircle,
+  Search,
+  HelpCircle,
+  Package,
+  Truck,
+  CreditCard,
+  RotateCcw,
+  Wallet,
+} from 'lucide-react'
 import Input from '@/components/ui/Input'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Loading from '@/components/ui/Loading'
 import Pagination from '@/components/ui/Pagination'
+import { useToast } from '@/components/ui/Toast'
 
 interface Inquiry {
   id: number
@@ -25,29 +36,33 @@ interface Inquiry {
 }
 
 const inquiryTypes = [
-  { value: 'ALL', label: '전체' },
-  { value: 'PRODUCT', label: '상품 문의' },
-  { value: 'DELIVERY', label: '배송 문의' },
-  { value: 'ORDER', label: '주문/결제 문의' },
-  { value: 'PAYMENT', label: '환불 문의' },
-  { value: 'RETURN', label: '교환/반품 문의' },
-  { value: 'EXCHANGE', label: '교환 문의' },
-  { value: 'GENERAL', label: '기타 문의' },
+  { value: 'ALL', label: '전체', icon: HelpCircle },
+  { value: 'PRODUCT', label: '상품', icon: Package },
+  { value: 'DELIVERY', label: '배송', icon: Truck },
+  { value: 'ORDER', label: '주문/결제', icon: CreditCard },
+  { value: 'PAYMENT', label: '환불', icon: Wallet },
+  { value: 'RETURN', label: '교환/반품', icon: RotateCcw },
+  { value: 'GENERAL', label: '기타', icon: MessageSquare },
 ]
 
 const statusOptions = [
-  { value: 'ALL', label: '전체 상태' },
-  { value: 'PENDING', label: '답변대기' },
-  { value: 'ANSWERED', label: '답변완료' },
+  { value: 'ALL', label: '전체', icon: MessageSquare, color: 'text-gray-600' },
+  { value: 'PENDING', label: '답변대기', icon: Clock, color: 'text-yellow-600' },
+  { value: 'ANSWERED', label: '답변완료', icon: CheckCircle, color: 'text-green-600' },
 ]
-
-type SortField = 'id' | 'inquiryType' | 'status' | 'createdAt'
-type SortOrder = 'asc' | 'desc'
 
 export default function InquiryManagementPage() {
   const router = useRouter()
+  const toast = useToast()
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [isLoading, setIsLoading] = useState(true)
+
+  // Stats
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    answered: 0,
+  })
 
   // Filters
   const [typeFilter, setTypeFilter] = useState('ALL')
@@ -58,11 +73,7 @@ export default function InquiryManagementPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  const itemsPerPage = 10
-
-  // Sorting
-  const [sortField, setSortField] = useState<SortField>('createdAt')
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+  const itemsPerPage = 20
 
   const loadInquiries = useCallback(async () => {
     try {
@@ -81,22 +92,31 @@ export default function InquiryManagementPage() {
         setInquiries(data.inquiries)
         setTotalItems(data.total || data.inquiries.length)
         setTotalPages(Math.ceil((data.total || data.inquiries.length) / itemsPerPage))
+
+        // 통계 계산
+        if (data.stats) {
+          setStats(data.stats)
+        } else {
+          // API에서 stats를 제공하지 않으면 로컬에서 계산
+          const allInquiries = data.inquiries
+          setStats({
+            total: data.total || allInquiries.length,
+            pending: allInquiries.filter((i: Inquiry) => i.status === 'PENDING').length,
+            answered: allInquiries.filter((i: Inquiry) => i.status === 'ANSWERED').length,
+          })
+        }
       }
     } catch (error) {
       console.error('Failed to load inquiries:', error)
+      toast.error('문의 목록을 불러오는데 실패했습니다.')
     } finally {
       setIsLoading(false)
     }
-  }, [typeFilter, statusFilter, searchQuery, currentPage])
+  }, [typeFilter, statusFilter, searchQuery, currentPage, toast])
 
   useEffect(() => {
     loadInquiries()
   }, [loadInquiries])
-
-  const handleSearch = () => {
-    setCurrentPage(1)
-    loadInquiries()
-  }
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -108,12 +128,12 @@ export default function InquiryManagementPage() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('ko-KR', {
-      year: 'numeric',
+      year: '2-digit',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-    })
+    }).replace(/\. /g, '.').replace(/\.$/, '')
   }
 
   const getTypeLabel = (type: string) => {
@@ -137,50 +157,6 @@ export default function InquiryManagementPage() {
     )
   }
 
-  // 정렬 핸들러
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortField(field)
-      setSortOrder('asc')
-    }
-  }
-
-  // 정렬 아이콘 렌더링
-  const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) {
-      return <ArrowUpDown size={14} className="text-gray-400" />
-    }
-    return sortOrder === 'asc'
-      ? <ArrowUp size={14} className="text-blue-600" />
-      : <ArrowDown size={14} className="text-blue-600" />
-  }
-
-  // 정렬된 데이터
-  const sortedInquiries = [...inquiries].sort((a, b) => {
-    let comparison = 0
-
-    switch (sortField) {
-      case 'id':
-        comparison = a.id - b.id
-        break
-      case 'inquiryType':
-        comparison = a.inquiryType.localeCompare(b.inquiryType)
-        break
-      case 'status':
-        comparison = a.status.localeCompare(b.status)
-        break
-      case 'createdAt':
-        comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        break
-    }
-
-    return sortOrder === 'asc' ? comparison : -comparison
-  })
-
-  const pendingCount = inquiries.filter(i => i.status === 'PENDING').length
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -192,66 +168,102 @@ export default function InquiryManagementPage() {
           </p>
         </div>
 
+        {/* 통계 카드 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <MessageSquare size={24} className="text-gray-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">전체 문의</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-yellow-100 rounded-lg">
+                <Clock size={24} className="text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">답변대기</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <CheckCircle size={24} className="text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">답변완료</p>
+                <p className="text-2xl font-bold text-green-600">{stats.answered}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-4 border-b border-gray-200">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex gap-2 flex-1 max-w-md">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                  <Input
-                    type="text"
-                    placeholder="제목, 내용, 고객명 검색..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    className="pl-10"
-                  />
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+              {/* 왼쪽: 필터 영역 */}
+              <div className="flex flex-col gap-3">
+                {/* 상태 필터 */}
+                <div className="flex items-center gap-1">
+                  {statusOptions.map((status) => {
+                    const Icon = status.icon
+                    return (
+                      <button
+                        key={status.value}
+                        onClick={() => { setStatusFilter(status.value); setCurrentPage(1) }}
+                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                          statusFilter === status.value
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Icon size={14} />
+                        {status.label}
+                      </button>
+                    )
+                  })}
                 </div>
-                <Button variant="secondary" onClick={handleSearch}>
-                  검색
-                </Button>
+
+                {/* 문의 유형 필터 */}
+                <div className="flex items-center gap-1 overflow-x-auto">
+                  {inquiryTypes.map((type) => {
+                    const Icon = type.icon
+                    return (
+                      <button
+                        key={type.value}
+                        onClick={() => { setTypeFilter(type.value); setCurrentPage(1) }}
+                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap ${
+                          typeFilter === type.value
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                        }`}
+                      >
+                        <Icon size={14} />
+                        {type.label}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
-              <div className="flex gap-2 items-center">
-                <select
-                  value={typeFilter}
-                  onChange={e => {
-                    setTypeFilter(e.target.value)
-                    setCurrentPage(1)
-                  }}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                >
-                  {inquiryTypes.map(type => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={statusFilter}
-                  onChange={e => {
-                    setStatusFilter(e.target.value)
-                    setCurrentPage(1)
-                  }}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                >
-                  {statusOptions.map(status => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-
-                <Button
-                  variant="secondary"
-                  onClick={loadInquiries}
-                  disabled={isLoading}
-                >
-                  <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-                  새로고침
-                </Button>
+              {/* 오른쪽: 검색 */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Input
+                  type="text"
+                  placeholder="제목, 내용, 고객명 검색..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 w-64"
+                />
               </div>
             </div>
           </div>
@@ -265,59 +277,29 @@ export default function InquiryManagementPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead
-                    className="w-[5%] cursor-pointer hover:bg-gray-100 select-none"
-                    onClick={() => handleSort('id')}
-                  >
-                    <div className="flex items-center gap-1">
-                      순서
-                      {renderSortIcon('id')}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="w-[10%] cursor-pointer hover:bg-gray-100 select-none"
-                    onClick={() => handleSort('inquiryType')}
-                  >
-                    <div className="flex items-center gap-1">
-                      문의유형
-                      {renderSortIcon('inquiryType')}
-                    </div>
-                  </TableHead>
+                  <TableHead className="w-[5%]">순서</TableHead>
+                  <TableHead className="w-[10%]">문의유형</TableHead>
                   <TableHead className="w-[35%]">제목</TableHead>
                   <TableHead className="w-[15%]">고객</TableHead>
-                  <TableHead
-                    className="w-[10%] cursor-pointer hover:bg-gray-100 select-none"
-                    onClick={() => handleSort('status')}
-                  >
-                    <div className="flex items-center gap-1">
-                      상태
-                      {renderSortIcon('status')}
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-[8%]">답변수</TableHead>
-                  <TableHead
-                    className="w-[17%] cursor-pointer hover:bg-gray-100 select-none"
-                    onClick={() => handleSort('createdAt')}
-                  >
-                    <div className="flex items-center gap-1">
-                      등록일
-                      {renderSortIcon('createdAt')}
-                    </div>
-                  </TableHead>
+                  <TableHead className="w-[10%]">상태</TableHead>
+                  <TableHead className="w-[8%] text-center">답변수</TableHead>
+                  <TableHead className="w-[17%]">등록일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedInquiries.length === 0 ? (
+                {inquiries.length === 0 ? (
                   <TableEmpty message="문의 내역이 없습니다." />
                 ) : (
-                  sortedInquiries.map((inquiry, index) => (
+                  inquiries.map((inquiry, index) => (
                     <TableRow
                       key={inquiry.id}
                       className="hover:bg-gray-50 cursor-pointer"
                       onClick={() => handleRowClick(inquiry.id)}
                     >
                       <TableCell>
-                        <span className="text-gray-600 font-medium">{(currentPage - 1) * itemsPerPage + index + 1}</span>
+                        <span className="text-gray-500 text-sm">
+                          {(currentPage - 1) * itemsPerPage + index + 1}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
@@ -327,18 +309,20 @@ export default function InquiryManagementPage() {
                       <TableCell>
                         <div className="font-medium text-gray-900 truncate">{inquiry.title}</div>
                         <div className="text-sm text-gray-500 truncate mt-1">
-                          {inquiry.content.substring(0, 50)}...
+                          {inquiry.content.length > 50
+                            ? `${inquiry.content.substring(0, 50)}...`
+                            : inquiry.content}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-gray-900">{inquiry.user.name}</div>
+                        <div className="text-gray-900 font-medium">{inquiry.user.name}</div>
                         <div className="text-sm text-gray-500">{inquiry.user.email}</div>
                       </TableCell>
                       <TableCell>
                         {getStatusBadge(inquiry.status)}
                       </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center gap-1 text-sm text-gray-600">
+                      <TableCell className="text-center">
+                        <span className="inline-flex items-center justify-center gap-1 text-sm text-gray-600">
                           <MessageSquare size={14} />
                           {inquiry.replyCount}
                         </span>

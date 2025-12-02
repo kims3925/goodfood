@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Store, Trash2, Pencil, X, Save } from 'lucide-react'
+import { ArrowLeft, Store, Trash2, Pencil, X, Save, ImageIcon, Package, Calendar, Globe, History, DollarSign, Clock, AlertCircle, CheckCircle } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -115,7 +115,6 @@ export default function PublishedProductDetailPage({
 
       if (data.success) {
         setProduct(data.data)
-        // 편집 폼 초기화
         const formData = {
           name: data.data.product.name || '',
           price: data.data.product.price?.toString() || '',
@@ -125,7 +124,6 @@ export default function PublishedProductDetailPage({
         setOriginalForm(formData)
         setProductChanged(false)
         setIsEditingProduct(false)
-        // 이미지 상태 초기화
         if (data.data.product.collectedProduct?.post?.images) {
           setImages(data.data.product.collectedProduct.post.images.map((img: any) => ({
             id: img.id,
@@ -180,24 +178,20 @@ export default function PublishedProductDetailPage({
     return `₩${price.toLocaleString()}`
   }
 
-  // 상품 정보 수정 시작
   const startEditingProduct = () => {
     setIsEditingProduct(true)
     setProductChanged(false)
   }
 
-  // 상품 정보 수정 취소
   const cancelEditingProduct = () => {
     setEditForm(originalForm)
     setProductChanged(false)
     setIsEditingProduct(false)
   }
 
-  // 상품 폼 변경 핸들러
   const handleFormChange = (field: string, value: string) => {
     const newForm = { ...editForm, [field]: value }
     setEditForm(newForm)
-    // 원본과 비교하여 변경 여부 확인
     const hasChanged =
       newForm.name !== originalForm.name ||
       newForm.price !== originalForm.price ||
@@ -205,13 +199,11 @@ export default function PublishedProductDetailPage({
     setProductChanged(hasChanged)
   }
 
-  // 이미지 수정 시작
   const startEditingImages = () => {
     setIsEditingImages(true)
     setImageOrderChanged(false)
   }
 
-  // 이미지 수정 취소
   const cancelEditingImages = () => {
     if (product?.product.collectedProduct?.post?.images) {
       setImages(product.product.collectedProduct.post.images.map((img) => ({
@@ -224,7 +216,6 @@ export default function PublishedProductDetailPage({
     setIsEditingImages(false)
   }
 
-  // 상품 정보 저장
   const handleSaveProduct = async () => {
     if (!product) return
 
@@ -245,7 +236,6 @@ export default function PublishedProductDetailPage({
 
       if (data.success) {
         toast.success('상품 정보가 저장되었습니다.')
-        // 원본 폼을 현재 폼으로 업데이트
         setOriginalForm(editForm)
         setProductChanged(false)
         setIsEditingProduct(false)
@@ -261,7 +251,6 @@ export default function PublishedProductDetailPage({
     }
   }
 
-  // 이미지 순서 저장
   const handleSaveImages = async () => {
     if (!product || !product.product.collectedProduct?.post?.id) {
       toast.error('게시물 정보를 찾을 수 없습니다.')
@@ -308,17 +297,14 @@ export default function PublishedProductDetailPage({
     }
   }
 
-  // 이미지 순서 변경 핸들러
   const handleImageReorder = (newOrder: SortableImage[]) => {
     setImages(newOrder)
     setImageOrderChanged(true)
   }
 
-  // 이미지 삭제 핸들러 (서버에서 바로 삭제됨)
   const handleDeleteImage = async (imageId: number) => {
     if (!product) return
 
-    // 마지막 이미지 삭제 방지
     if (images.length <= 1) {
       toast.error('최소 1개의 이미지가 필요합니다.')
       return
@@ -337,10 +323,8 @@ export default function PublishedProductDetailPage({
 
       const data = await response.json()
       if (data.success) {
-        // 삭제된 이미지를 목록에서 제거 (서버에서 이미 삭제됨)
         setImages(prev => prev.filter(img => img.id !== imageId))
         toast.success('이미지가 삭제되었습니다.')
-        // 데이터 새로고침
         loadProduct()
       } else {
         toast.error(data.error || '이미지 삭제에 실패했습니다.')
@@ -354,9 +338,24 @@ export default function PublishedProductDetailPage({
     }
   }
 
+  const getHistoryStatusBadge = (status: string) => {
+    const statusMap: { [key: string]: { label: string; bgColor: string; textColor: string; dotColor: string; icon: typeof CheckCircle } } = {
+      SUCCESS: { label: '발행 성공', bgColor: 'bg-emerald-50', textColor: 'text-emerald-700', dotColor: 'bg-emerald-500', icon: CheckCircle },
+      FAILED: { label: '발행 실패', bgColor: 'bg-red-50', textColor: 'text-red-700', dotColor: 'bg-red-500', icon: AlertCircle },
+      PENDING: { label: '발행 대기', bgColor: 'bg-amber-50', textColor: 'text-amber-700', dotColor: 'bg-amber-500', icon: Clock },
+    }
+    const statusInfo = statusMap[status] || { label: status, bgColor: 'bg-slate-100', textColor: 'text-slate-700', dotColor: 'bg-slate-500', icon: Clock }
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${statusInfo.bgColor} ${statusInfo.textColor}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dotColor}`}></span>
+        {statusInfo.label}
+      </span>
+    )
+  }
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <Loading />
       </div>
     )
@@ -369,245 +368,347 @@ export default function PublishedProductDetailPage({
   const galleryImages = product.product.collectedProduct?.post?.images ?? []
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 헤더 */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="secondary" onClick={() => router.push('/published-product/list')}>
-              <ArrowLeft size={16} />
-              목록으로
-            </Button>
-            <h1 className="text-2xl font-bold text-gray-900">발행상품 상세</h1>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="danger" onClick={() => setShowDeleteConfirm(true)}>
-              <Trash2 size={16} />
-              삭제
-            </Button>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* 상단 네비게이션 바 */}
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/published-product/list')}
+                className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                <ArrowLeft size={20} />
+                <span className="font-medium">목록</span>
+              </button>
+              <div className="hidden sm:block h-6 w-px bg-slate-200"></div>
+              <div className="hidden sm:flex items-center gap-2">
+                <span className="text-slate-400 text-sm">발행상품</span>
+                <span className="text-slate-300">/</span>
+                <span className="text-slate-700 text-sm font-medium truncate max-w-[200px]">
+                  {product.product.name}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="danger"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="!px-4 !py-2"
+              >
+                <Trash2 size={16} />
+                <span className="hidden sm:inline">삭제</span>
+              </Button>
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="space-y-6">
-          {/* 발행 정보 */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">발행 정보</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">발행 채널</label>
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* 2컬럼 레이아웃 */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          {/* 왼쪽: 이미지 갤러리 */}
+          <div className="xl:col-span-5 2xl:col-span-4">
+            <div className="xl:sticky xl:top-24">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <ImageIcon size={18} className="text-slate-600" />
+                      </div>
+                      <span className="font-semibold text-slate-900">상품 이미지</span>
+                      {galleryImages.length > 0 && (
+                        <span className="text-sm text-slate-500">({galleryImages.length}개)</span>
+                      )}
+                    </div>
+                    {!isEditingImages && galleryImages.length > 0 && (
+                      <Button size="sm" variant="secondary" onClick={startEditingImages}>
+                        <Pencil size={14} />
+                        수정
+                      </Button>
+                    )}
+                    {isEditingImages && (
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="secondary" onClick={cancelEditingImages}>
+                          <X size={14} />
+                          취소
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleSaveImages}
+                          disabled={!imageOrderChanged || isSavingImages}
+                        >
+                          <Save size={14} />
+                          {isSavingImages ? '저장중...' : '저장'}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  {isEditingImages && (
+                    <p className="text-sm text-slate-500 mt-2">
+                      드래그하여 순서를 변경하거나, 호버하여 삭제할 수 있습니다.
+                    </p>
+                  )}
+                </div>
+
+                <div className="p-4">
+                  {isEditingImages ? (
+                    images.length > 0 ? (
+                      <ImageSortable
+                        images={images}
+                        onReorder={handleImageReorder}
+                        onDelete={handleDeleteImage}
+                        deletingImageId={deletingImageId ?? undefined}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                        <ImageIcon size={48} className="mb-2" />
+                        <p className="text-sm">이미지가 없습니다</p>
+                      </div>
+                    )
+                  ) : galleryImages.length > 0 ? (
+                    <ProductImageViewer
+                      images={galleryImages}
+                      productName={product.product.name}
+                      enableLightbox={true}
+                      showThumbnails={true}
+                      thumbnailSize="md"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                      <ImageIcon size={48} className="mb-2" />
+                      <p className="text-sm">이미지가 없습니다</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 오른쪽: 상품 정보 */}
+          <div className="xl:col-span-7 2xl:col-span-8 space-y-6">
+            {/* 발행 정보 카드 */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                 <div className="flex items-center gap-2">
-                  <Store size={16} className="text-gray-400" />
-                  <span className="text-gray-900">
-                    {product.channel?.name || '쇼핑몰'}
+                  <div className="p-2 bg-emerald-100 rounded-lg">
+                    <Globe size={18} className="text-emerald-600" />
+                  </div>
+                  <span className="font-semibold text-slate-900">발행 정보</span>
+                </div>
+              </div>
+
+              <div className="p-6">
+                <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-3">
+                    {product.channel?.coverUrl ? (
+                      <img
+                        src={product.channel.coverUrl}
+                        alt={product.channel.name}
+                        className="w-12 h-12 rounded-xl object-cover ring-2 ring-slate-100"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
+                        <Store size={24} className="text-slate-500" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm text-slate-500">발행 채널</p>
+                      <p className="font-semibold text-slate-900">{product.channel?.name || '쇼핑몰'}</p>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    {product.channel?.platform || 'SHOP'}
                   </span>
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">플랫폼</label>
-                <p className="text-gray-900">
-                  {product.channel?.platform || 'SHOP'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">발행일시</label>
-                <p className="text-gray-900">
-                  {product.publishedAt
-                    ? new Date(product.publishedAt).toLocaleString('ko-KR')
-                    : '-'}
-                </p>
+
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
+                      <Calendar size={18} className="text-slate-500" />
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-xs">발행일시</p>
+                      <p className="font-medium text-slate-900">
+                        {product.publishedAt
+                          ? new Date(product.publishedAt).toLocaleString('ko-KR')
+                          : '-'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
+                      <Clock size={18} className="text-slate-500" />
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-xs">등록일시</p>
+                      <p className="font-medium text-slate-900">
+                        {new Date(product.createdAt).toLocaleString('ko-KR')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* 상품 정보 */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">상품 정보</h2>
-              <div className="flex gap-2">
-                {isEditingProduct ? (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={cancelEditingProduct}
-                    >
-                      <X size={14} />
-                      취소
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleSaveProduct}
-                      disabled={!productChanged || isSavingProduct || !editForm.name}
-                    >
-                      <Save size={14} />
-                      {isSavingProduct ? '저장 중...' : '저장'}
-                    </Button>
-                  </>
-                ) : (
-                  <Button size="sm" variant="secondary" onClick={startEditingProduct}>
-                    <Pencil size={14} />
-                    수정
-                  </Button>
-                )}
-              </div>
-            </div>
-            {isEditingProduct ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">상품명</label>
-                  <Input
-                    value={editForm.name}
-                    onChange={(e) => handleFormChange('name', e.target.value)}
-                    placeholder="상품명을 입력하세요"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">판매가</label>
-                  <Input
-                    type="number"
-                    value={editForm.price}
-                    onChange={(e) => handleFormChange('price', e.target.value)}
-                    placeholder="판매가를 입력하세요"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">설명</label>
-                  <textarea
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                    rows={5}
-                    value={editForm.description}
-                    onChange={(e) => handleFormChange('description', e.target.value)}
-                    placeholder="상품 설명을 입력하세요"
-                  />
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-500 mb-1">상품명</label>
-                    <p className="text-gray-900 font-semibold">{product.product.name}</p>
+            {/* 상품 정보 카드 */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Package size={18} className="text-blue-600" />
+                    </div>
+                    <span className="font-semibold text-slate-900">상품 정보</span>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">판매가</label>
-                    <p className="text-gray-900 font-semibold">{formatPrice(product.product.price)}</p>
-                  </div>
-                </div>
-                {product.product.description && (
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-500 mb-1">설명</label>
-                    <p className="text-gray-700 whitespace-pre-wrap text-sm">
-                      {product.product.description.substring(0, 300)}
-                      {product.product.description.length > 300 && '...'}
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* 사진 */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-semibold text-gray-900">사진</h2>
-              <div className="flex gap-2">
-                {isEditingImages ? (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={cancelEditingImages}
-                    >
-                      <X size={14} />
-                      취소
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleSaveImages}
-                      disabled={!imageOrderChanged || isSavingImages}
-                    >
-                      <Save size={14} />
-                      {isSavingImages ? '저장 중...' : '저장'}
-                    </Button>
-                  </>
-                ) : (
-                  galleryImages.length > 0 && (
-                    <Button size="sm" variant="secondary" onClick={startEditingImages}>
+                  {isEditingProduct ? (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="secondary" onClick={cancelEditingProduct}>
+                        <X size={14} />
+                        취소
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleSaveProduct}
+                        disabled={!productChanged || isSavingProduct || !editForm.name}
+                      >
+                        <Save size={14} />
+                        {isSavingProduct ? '저장중...' : '저장'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button size="sm" variant="secondary" onClick={startEditingProduct}>
                       <Pencil size={14} />
                       수정
                     </Button>
-                  )
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-            {isEditingImages ? (
-              <>
-                <p className="text-sm text-gray-500 mb-4">
-                  드래그하여 순서를 변경하거나, 호버하여 삭제할 수 있습니다. 첫 번째 이미지가 대표 이미지로 설정됩니다.
-                </p>
-                {images.length > 0 ? (
-                  <ImageSortable
-                    images={images}
-                    onReorder={handleImageReorder}
-                    onDelete={handleDeleteImage}
-                    deletingImageId={deletingImageId ?? undefined}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                    <p className="text-sm">이미지가 없습니다</p>
-                  </div>
-                )}
-              </>
-            ) : (
-              galleryImages.length > 0 ? (
-                <div className="mt-4">
-                  <ProductImageViewer
-                    images={galleryImages}
-                    productName={product.product.name}
-                    enableLightbox={true}
-                    showThumbnails={true}
-                    thumbnailSize="md"
-                  />
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                  <p className="text-sm">이미지가 없습니다</p>
-                </div>
-              )
-            )}
-          </div>
 
-          {/* 발행 이력 */}
-          {product.publishHistories.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                발행 이력 ({product.publishHistories.length})
-              </h2>
-              <div className="space-y-3">
-                {product.publishHistories.map((history) => (
-                  <div
-                    key={history.id}
-                    className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-900">
-                          {history.status === 'SUCCESS' ? '발행 성공' :
-                            history.status === 'FAILED' ? '발행 실패' : '발행 대기'}
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          {new Date(history.publishedAt).toLocaleString('ko-KR')}
-                        </span>
-                      </div>
-                      {history.errorMessage && (
-                        <p className="text-sm text-red-600 mt-1">{history.errorMessage}</p>
-                      )}
+              <div className="p-6">
+                {isEditingProduct ? (
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">상품명</label>
+                      <Input
+                        value={editForm.name}
+                        onChange={(e) => handleFormChange('name', e.target.value)}
+                        placeholder="상품명을 입력하세요"
+                        className="!rounded-xl"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">판매가</label>
+                      <Input
+                        type="number"
+                        value={editForm.price}
+                        onChange={(e) => handleFormChange('price', e.target.value)}
+                        placeholder="판매가를 입력하세요"
+                        className="!rounded-xl"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">설명</label>
+                      <textarea
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        rows={6}
+                        value={editForm.description}
+                        onChange={(e) => handleFormChange('description', e.target.value)}
+                        placeholder="상품 설명을 입력하세요"
+                      />
                     </div>
                   </div>
-                ))}
+                ) : (
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">상품명</label>
+                      <h1 className="text-xl font-bold text-slate-900">{product.product.name}</h1>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-xl">
+                        <DollarSign size={18} className="text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-xs">판매가</p>
+                        <p className="text-xl font-bold text-slate-900">{formatPrice(product.product.price)}</p>
+                      </div>
+                    </div>
+
+                    {product.product.description && (
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">설명</label>
+                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                          <p className="text-slate-700 whitespace-pre-wrap text-sm leading-relaxed">
+                            {product.product.description.length > 300
+                              ? `${product.product.description.substring(0, 300)}...`
+                              : product.product.description}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
-          )}
+
+            {/* 발행 이력 카드 */}
+            {product.publishHistories.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-violet-100 rounded-lg">
+                      <History size={18} className="text-violet-600" />
+                    </div>
+                    <span className="font-semibold text-slate-900">발행 이력</span>
+                    <span className="px-2 py-0.5 bg-slate-200 rounded-full text-xs font-medium text-slate-600">
+                      {product.publishHistories.length}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  <div className="space-y-3">
+                    {product.publishHistories.map((history) => (
+                      <div
+                        key={history.id}
+                        className="group relative bg-gradient-to-r from-slate-50 to-white p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                              history.status === 'SUCCESS' ? 'bg-emerald-100' :
+                              history.status === 'FAILED' ? 'bg-red-100' : 'bg-amber-100'
+                            }`}>
+                              {history.status === 'SUCCESS' && <CheckCircle size={20} className="text-emerald-600" />}
+                              {history.status === 'FAILED' && <AlertCircle size={20} className="text-red-600" />}
+                              {history.status === 'PENDING' && <Clock size={20} className="text-amber-600" />}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                {getHistoryStatusBadge(history.status)}
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-slate-500">
+                                <Calendar size={14} />
+                                {new Date(history.publishedAt).toLocaleString('ko-KR')}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        {history.errorMessage && (
+                          <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-100">
+                            <p className="text-sm text-red-700">{history.errorMessage}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

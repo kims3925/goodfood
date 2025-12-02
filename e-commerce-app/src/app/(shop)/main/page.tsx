@@ -115,32 +115,32 @@ export default function StorePage() {
     <div className="bg-white min-h-screen">
       {/* Featured Products Carousel - 추천 상품 캐러셀 */}
       {featuredProducts.length > 0 && (
-        <section className="py-10 bg-gradient-to-b from-[#FFF5F5] to-white">
+        <section className="py-6 md:py-10 bg-gradient-to-b from-[#FFF5F5] to-white">
           <div className="kurly-container">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">추천 상품</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6 text-center">추천 상품</h2>
             <div className="relative">
               {/* Left Arrow */}
               <button
                 onClick={prevSlide}
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50"
+                className="absolute -left-2 md:left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 md:w-10 md:h-10 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50"
               >
-                <ChevronLeft className="w-5 h-5 text-gray-700" />
+                <ChevronLeft className="w-4 h-4 md:w-5 md:h-5 text-gray-700" />
               </button>
 
               {/* Carousel Container */}
-              <div className="overflow-hidden mx-12">
+              <div className="overflow-hidden mx-8 md:mx-12">
                 <div
                   className="flex transition-transform duration-500 ease-in-out"
                   style={{ transform: `translateX(-${currentSlide * 100}%)` }}
                 >
                   {Array.from({ length: totalSlides }).map((_, slideIndex) => (
-                    <div key={slideIndex} className="w-full flex-shrink-0 flex gap-4 px-2">
+                    <div key={slideIndex} className="w-full flex-shrink-0 flex gap-2 md:gap-4 px-1 md:px-2">
                       {featuredProducts
                         .slice(slideIndex * cardsPerView, (slideIndex + 1) * cardsPerView)
                         .map((product) => (
-                          <div key={product.id} className="w-[220px] flex-shrink-0">
+                          <div key={product.id} className="w-[140px] sm:w-[160px] md:w-[180px] lg:w-[220px] flex-shrink-0">
                             <Link href={`/product/${product.id}`} className="block group">
-                              <div className="relative h-[280px] w-[220px] rounded-lg overflow-hidden bg-gray-100">
+                              <div className="relative aspect-[220/280] rounded-lg overflow-hidden bg-gray-100">
                                 <img
                                   src={product.images[0] || '/placeholder.jpg'}
                                   alt={product.title}
@@ -148,33 +148,33 @@ export default function StorePage() {
                                 />
                                 <button
                                   onClick={(e) => handleAddToCart(product, e)}
-                                  className="absolute bottom-2 right-2 w-9 h-9 bg-white rounded-full shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-50"
+                                  className="absolute bottom-2 right-2 w-7 h-7 md:w-9 md:h-9 bg-white rounded-full shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-50"
                                   title="장바구니 담기"
                                 >
-                                  <ShoppingCart className="w-4 h-4 text-gray-700" />
+                                  <ShoppingCart className="w-3 h-3 md:w-4 md:h-4 text-gray-700" />
                                 </button>
                                 {product.discount > 0 && (
-                                  <span className="absolute top-2 left-2 px-2 py-1 text-xs font-bold text-white rounded bg-[#FF6B6B]">
+                                  <span className="absolute top-2 left-2 px-1.5 md:px-2 py-0.5 md:py-1 text-[10px] md:text-xs font-bold text-white rounded bg-[#FF6B6B]">
                                     {product.discount}%
                                   </span>
                                 )}
                               </div>
                               <div className="mt-2">
-                                <h4 className="text-sm font-medium text-gray-900 line-clamp-2 min-h-[40px]">
+                                <h4 className="text-xs md:text-sm font-medium text-gray-900 line-clamp-2 min-h-[32px] md:min-h-[40px]">
                                   {product.title}
                                 </h4>
-                                <div className="flex items-center gap-2 mt-1">
+                                <div className="flex items-center gap-1 md:gap-2 mt-1">
                                   {product.discount > 0 && (
-                                    <span className="text-sm font-bold text-[#FF6B6B]">
+                                    <span className="text-xs md:text-sm font-bold text-[#FF6B6B]">
                                       {product.discount}%
                                     </span>
                                   )}
-                                  <span className="text-sm font-bold text-gray-900">
+                                  <span className="text-xs md:text-sm font-bold text-gray-900">
                                     {formatPrice(product.salePrice)}원
                                   </span>
                                 </div>
                                 {product.originalPrice > product.salePrice && (
-                                  <p className="text-xs text-gray-400 line-through">
+                                  <p className="text-[10px] md:text-xs text-gray-400 line-through">
                                     {formatPrice(product.originalPrice)}원
                                   </p>
                                 )}
@@ -190,18 +190,18 @@ export default function StorePage() {
               {/* Right Arrow */}
               <button
                 onClick={nextSlide}
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50"
+                className="absolute -right-2 md:right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 md:w-10 md:h-10 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50"
               >
-                <ChevronRight className="w-5 h-5 text-gray-700" />
+                <ChevronRight className="w-4 h-4 md:w-5 md:h-5 text-gray-700" />
               </button>
 
               {/* Slide Indicators */}
-              <div className="flex justify-center gap-2 mt-4">
+              <div className="flex justify-center gap-1.5 md:gap-2 mt-3 md:mt-4">
                 {Array.from({ length: totalSlides }).map((_, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentSlide(index)}
-                    className={`w-2 h-2 rounded-full transition-colors ${
+                    className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full transition-colors ${
                       currentSlide === index ? 'bg-[#FF6B6B]' : 'bg-gray-300'
                     }`}
                   />
@@ -215,12 +215,12 @@ export default function StorePage() {
       {/* Retail Band Sections - 소매밴드별 상품 */}
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B6B]"></div>
+          <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-[#FF6B6B]"></div>
         </div>
       ) : retailSections.length > 0 ? (
-        <section className="py-10 bg-white">
+        <section className="py-6 md:py-10 bg-white">
           <div className="kurly-container">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {retailSections.map((section) => (
                 <BandProductSection
                   key={section.id}
@@ -234,8 +234,8 @@ export default function StorePage() {
         </section>
       ) : (
         <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-          <Store className="w-12 h-12 mb-4 text-gray-300" />
-          <p>등록된 판매처가 없습니다</p>
+          <Store className="w-10 h-10 md:w-12 md:h-12 mb-4 text-gray-300" />
+          <p className="text-sm md:text-base">등록된 판매처가 없습니다</p>
         </div>
       )}
     </div>
@@ -277,7 +277,7 @@ function BandProductSection({
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
       {/* Band Header */}
       <div
-        className="relative h-24 bg-gradient-to-r overflow-hidden"
+        className="relative h-20 md:h-24 bg-gradient-to-r overflow-hidden"
         style={{
           backgroundImage: band.coverUrl ? `url(${band.coverUrl})` : undefined,
           backgroundSize: 'cover',
@@ -286,17 +286,17 @@ function BandProductSection({
         }}
       >
         <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
-        <div className="relative h-full flex items-center px-4">
-          <div className="flex items-center gap-3">
+        <div className="relative h-full flex items-center px-3 md:px-4">
+          <div className="flex items-center gap-2 md:gap-3">
             <div
-              className="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center"
+              className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white shadow-lg flex items-center justify-center"
               style={{ borderColor: accentColor, borderWidth: '2px' }}
             >
-              <Store className="w-6 h-6" style={{ color: accentColor }} />
+              <Store className="w-5 h-5 md:w-6 md:h-6" style={{ color: accentColor }} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">{band.name}</h3>
-              <p className="text-xs text-white/80">
+              <h3 className="text-base md:text-lg font-bold text-white">{band.name}</h3>
+              <p className="text-[10px] md:text-xs text-white/80">
                 {products.length}개 상품
               </p>
             </div>
@@ -305,20 +305,20 @@ function BandProductSection({
       </div>
 
       {/* Products Carousel */}
-      <div className="p-3 flex-1">
+      <div className="p-2 md:p-3 flex-1">
         <div className="relative">
           {/* Left Arrow */}
           {totalSlides > 1 && (
             <button
               onClick={prevSlide}
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50"
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-6 h-6 md:w-8 md:h-8 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50"
             >
-              <ChevronLeft className="w-4 h-4 text-gray-700" />
+              <ChevronLeft className="w-3 h-3 md:w-4 md:h-4 text-gray-700" />
             </button>
           )}
 
           {/* Carousel Container */}
-          <div className="overflow-hidden mx-8">
+          <div className="overflow-hidden mx-6 md:mx-8">
             <div
               className="flex transition-transform duration-500 ease-in-out"
               style={{ transform: `translateX(-${currentSlide * 100}%)` }}
@@ -334,31 +334,31 @@ function BandProductSection({
                       />
                       <button
                         onClick={(e) => onAddToCart(product, e)}
-                        className="absolute bottom-2 right-2 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity hover:bg-gray-50"
+                        className="absolute bottom-2 right-2 w-7 h-7 md:w-8 md:h-8 bg-white rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity hover:bg-gray-50"
                         title="장바구니 담기"
                       >
-                        <ShoppingCart className="w-4 h-4 text-gray-700" />
+                        <ShoppingCart className="w-3 h-3 md:w-4 md:h-4 text-gray-700" />
                       </button>
                       {product.discount > 0 && (
                         <span
-                          className="absolute top-2 left-2 px-1.5 py-0.5 text-xs font-bold text-white rounded"
+                          className="absolute top-2 left-2 px-1 md:px-1.5 py-0.5 text-[10px] md:text-xs font-bold text-white rounded"
                           style={{ backgroundColor: accentColor }}
                         >
                           {product.discount}%
                         </span>
                       )}
                     </div>
-                    <div className="mt-2">
-                      <h4 className="text-xs font-medium text-gray-900 line-clamp-2 min-h-[32px]">
+                    <div className="mt-1.5 md:mt-2">
+                      <h4 className="text-[11px] md:text-xs font-medium text-gray-900 line-clamp-2 min-h-[28px] md:min-h-[32px]">
                         {product.title}
                       </h4>
-                      <div className="flex items-center gap-1 mt-1">
+                      <div className="flex items-center gap-1 mt-0.5 md:mt-1">
                         {product.discount > 0 && (
-                          <span className="text-xs font-bold" style={{ color: accentColor }}>
+                          <span className="text-[10px] md:text-xs font-bold" style={{ color: accentColor }}>
                             {product.discount}%
                           </span>
                         )}
-                        <span className="text-xs font-bold text-gray-900">
+                        <span className="text-[10px] md:text-xs font-bold text-gray-900">
                           {formatPrice(product.salePrice)}원
                         </span>
                       </div>
@@ -373,20 +373,20 @@ function BandProductSection({
           {totalSlides > 1 && (
             <button
               onClick={nextSlide}
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50"
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-6 h-6 md:w-8 md:h-8 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50"
             >
-              <ChevronRight className="w-4 h-4 text-gray-700" />
+              <ChevronRight className="w-3 h-3 md:w-4 md:h-4 text-gray-700" />
             </button>
           )}
 
           {/* Slide Indicators */}
           {totalSlides > 1 && (
-            <div className="flex justify-center gap-1.5 mt-3">
+            <div className="flex justify-center gap-1 md:gap-1.5 mt-2 md:mt-3">
               {displayProducts.map((_, index) => (
                 <button
                   key={index}
                   onClick={() => setCurrentSlide(index)}
-                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                  className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full transition-colors ${
                     currentSlide === index ? 'bg-[#FF6B6B]' : 'bg-gray-300'
                   }`}
                 />
@@ -399,9 +399,9 @@ function BandProductSection({
       {/* 바로가기 섹션 - 소매밴드 상품 목록 페이지로 이동 */}
       <Link
         href={`/band/${band.id}`}
-        className="flex items-center justify-center gap-2 w-full py-3 bg-[#FF6B6B] text-white text-sm font-medium hover:bg-[#FF5252] transition-colors"
+        className="flex items-center justify-center gap-1.5 md:gap-2 w-full py-2.5 md:py-3 bg-[#FF6B6B] text-white text-xs md:text-sm font-medium hover:bg-[#FF5252] transition-colors"
       >
-        <ArrowRight className="w-4 h-4" />
+        <ArrowRight className="w-3.5 h-3.5 md:w-4 md:h-4" />
         바로가기
       </Link>
     </div>
