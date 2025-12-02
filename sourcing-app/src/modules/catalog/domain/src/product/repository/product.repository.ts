@@ -9,7 +9,6 @@ export class ProductRepository {
       postId,
       search,
       channelId,
-      status,
       startDate,
       endDate,
       page = 1,
@@ -45,9 +44,6 @@ export class ProductRepository {
       where.collectedProduct = collectedProductWhere
     }
 
-    if (status) {
-      where.status = status
-    }
 
     if (startDate || endDate) {
       where.createdAt = {}
@@ -185,7 +181,6 @@ export class ProductRepository {
     description?: string
     currency?: string
     price?: number
-    wholesalePrice?: number
   }) {
     return prisma.collectedProduct.create({
       data: {
@@ -195,7 +190,6 @@ export class ProductRepository {
         description: params.description || null,
         currency: params.currency || 'KRW',
         price: params.price || null,
-        wholesalePrice: params.wholesalePrice || null,
       },
     })
   }
@@ -210,7 +204,6 @@ export class ProductRepository {
         categoryId: data.categoryId || null,
         currency: data.currency || 'KRW',
         price: data.price || null,
-        wholesalePrice: data.wholesalePrice || null,
         thumbnailUrl: data.thumbnailUrl || null,
       },
     })
@@ -222,8 +215,6 @@ export class ProductRepository {
     if (data.description !== undefined) updateData.description = data.description
     if (data.categoryId !== undefined) updateData.categoryId = data.categoryId
     if (data.price !== undefined) updateData.price = data.price
-    if (data.wholesalePrice !== undefined) updateData.wholesalePrice = data.wholesalePrice
-    if (data.status !== undefined) updateData.status = data.status
 
     return prisma.product.update({
       where: { id },

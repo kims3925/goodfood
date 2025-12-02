@@ -66,10 +66,8 @@ export async function GET(
     const images = product.collectedProduct?.post?.images?.map((img) => img.imageUrl) || []
 
     const salePrice = mainVariant?.price || product.price || 0
-    const originalPrice = mainVariant?.wholesalePrice || product.wholesalePrice || salePrice
-    const discount = originalPrice > salePrice
-      ? Math.round(((originalPrice - salePrice) / originalPrice) * 100)
-      : 0
+    const originalPrice = salePrice
+    const discount = 0
 
     // 옵션 그룹화
     const optionGroups = product.options.reduce((acc: Record<string, string[]>, option) => {

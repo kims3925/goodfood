@@ -14,9 +14,6 @@ model Product {
   name               String        @db.VarChar(500)
   description        String?       @db.Text
 
-  // Status
-  status             ProductStatus @default(COLLECTED)
-
   // Images
   thumbnailUrl       String?       @map("thumbnail_url") @db.VarChar(1000)
 
@@ -41,7 +38,6 @@ model Product {
   @@index([userId])
   @@index([collectedProductId])
   @@index([categoryId])
-  @@index([status])
   @@index([createdAt])
   @@map("product")
 }

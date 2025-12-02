@@ -46,7 +46,6 @@ export interface GeneratedVariant {
   optionSummary: string                    // "색상:빨강, 사이즈:L"
   options: Record<string, string>          // { "색상": "빨강", "사이즈": "L" }
   price?: number                           // Optional price (판매가)
-  wholesalePrice?: number                  // Optional wholesale price (도매가)
   stock?: number                           // Optional stock
   sku?: string                             // Optional SKU
 }
@@ -66,7 +65,6 @@ export interface ProductDraft {
   // Pricing
   currency: string
   price?: number         // 판매가 (selling price)
-  wholesalePrice?: number // 도매가 (wholesale price)
 
   // Options & Variants
   options: OptionGroup[]
@@ -88,7 +86,6 @@ export interface AiProductAnalysis {
   // Pricing information
   pricing: {
     price?: number         // 판매가 (selling price)
-    wholesalePrice?: number // 도매가 (wholesale price)
     currency?: string
     priceRange?: {
       min: number

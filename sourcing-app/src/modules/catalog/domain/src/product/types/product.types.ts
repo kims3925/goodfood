@@ -4,7 +4,6 @@ export interface ProductListParams {
   postId?: number
   search?: string
   channelId?: number
-  status?: string
   startDate?: string
   endDate?: string
   page?: number
@@ -20,7 +19,6 @@ export interface ProductCreateInput {
   categoryId?: string
   currency?: string
   price?: number
-  wholesalePrice?: number
   thumbnailUrl?: string | null
 }
 
@@ -29,8 +27,6 @@ export interface ProductUpdateInput {
   description?: string
   categoryId?: string
   price?: number
-  wholesalePrice?: number
-  status?: string
 }
 
 export interface PaginatedResult<T> {

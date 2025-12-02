@@ -41,13 +41,26 @@ export function ToastProvider({ children }: ToastProviderProps) {
   }, [])
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = Math.random().toString(36).substring(2, 9)
-    setToasts((prev) => [...prev, { id, type, message }])
+    // 중복 메시지 방지: 같은 타입과 메시지가 이미 있으면 추가하지 않음
+    setToasts((prev) => {
+      const isDuplicate = prev.some(
+        (toast) => toast.message === message && toast.type === type
+      )
 
-    // 3초 후 자동 삭제
-    setTimeout(() => {
-      removeToast(id)
-    }, 3000)
+      if (isDuplicate) {
+        return prev
+      }
+
+      const id = Math.random().toString(36).substring(2, 9)
+      const newToast = { id, type, message }
+
+      // 3초 후 자동 삭제
+      setTimeout(() => {
+        removeToast(id)
+      }, 3000)
+
+      return [...prev, newToast]
+    })
   }, [removeToast])
 
   const success = useCallback((message: string) => showToast(message, 'success'), [showToast])

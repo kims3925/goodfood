@@ -23,10 +23,8 @@ interface Product {
   collectedProductId: number | null
   name: string
   description: string | null
-  status: 'COLLECTED' | 'ARCHIVED'
   thumbnailUrl: string | null
   price: number | null
-  wholesalePrice: number | null
   categoryId: string | null
   currency: string
   createdAt: string
@@ -60,7 +58,6 @@ interface Product {
     sku: string | null
     optionSummary: string | null
     price: number
-    wholesalePrice: number | null
     stock: number
   }>
 }
@@ -97,7 +94,6 @@ export default function ProductDetailTestB() {
     description: '',
     categoryId: '',
     price: '',
-    wholesalePrice: '',
   })
 
   // 이미지 관련 상태
@@ -132,7 +128,6 @@ export default function ProductDetailTestB() {
           description: data.data.description || '',
           categoryId: data.data.categoryId || '',
           price: data.data.price?.toString() || '',
-          wholesalePrice: data.data.wholesalePrice?.toString() || '',
         })
       } else {
         setError(data.error || '상품을 불러오는데 실패했습니다.')
@@ -181,7 +176,6 @@ export default function ProductDetailTestB() {
           description: formData.description.trim() || null,
           categoryId: formData.categoryId.trim() || null,
           price: formData.price ? parseInt(formData.price) : null,
-          wholesalePrice: formData.wholesalePrice ? parseInt(formData.wholesalePrice) : null,
         }),
       })
 
@@ -231,7 +225,7 @@ export default function ProductDetailTestB() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          postId: product.postId,
+          postId: product.collectedProduct?.post?.id,
           imageIds: reorderedImages.map((img) => img.id),
         }),
       })
@@ -388,13 +382,6 @@ export default function ProductDetailTestB() {
               <div>
                 <div className="flex items-center gap-3 mb-1">
                   <h1 className="text-2xl font-bold text-white">{product.name}</h1>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    product.status === 'ARCHIVED'
-                      ? 'bg-yellow-200 text-yellow-800'
-                      : 'bg-white/30 text-white'
-                  }`}>
-                    {product.status === 'ARCHIVED' ? '보관' : '수집'}
-                  </span>
                 </div>
                 <p className="text-purple-100 text-sm">
                   {product.collectedProduct?.post?.wholesaleBand.name || '출처 없음'} • 등록일 {formatDate(product.createdAt)}
@@ -427,14 +414,10 @@ export default function ProductDetailTestB() {
 
         {/* 통계 카드들 */}
         <div className="max-w-7xl mx-auto px-6 pb-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-white">
               <div className="text-purple-200 text-sm mb-1">판매가</div>
               <div className="text-2xl font-bold">{formatPrice(product.price)}</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-white">
-              <div className="text-purple-200 text-sm mb-1">도매가</div>
-              <div className="text-2xl font-bold">{formatPrice(product.wholesalePrice)}</div>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-white">
               <div className="text-purple-200 text-sm mb-1">이미지</div>
@@ -503,9 +486,9 @@ export default function ProductDetailTestB() {
               /* 편집 모드: ImageSortable 사용 */
               <>
                 <p className="text-sm text-gray-500 mb-4">드래그하여 순서를 변경하거나, 호버하여 삭제할 수 있습니다.</p>
-                {sortableImages.length > 0 ? (
+                {images.length > 0 ? (
                   <ImageSortable
-                    images={sortableImages}
+                    images={images.map((img, index) => ({ id: img.id, imageUrl: img.imageUrl, name: img.name, sortOrder: img.sortOrder ?? index }))}
                     onReorder={handleImageReorder}
                     onDelete={handleDeleteImage}
                     deletingImageId={deletingImageId ?? undefined}
@@ -572,7 +555,7 @@ export default function ProductDetailTestB() {
                       rows={6}
                     />
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">카테고리</label>
                       <Input
@@ -586,14 +569,6 @@ export default function ProductDetailTestB() {
                         type="number"
                         value={formData.price}
                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">도매가</label>
-                      <Input
-                        type="number"
-                        value={formData.wholesalePrice}
-                        onChange={(e) => setFormData({ ...formData, wholesalePrice: e.target.value })}
                       />
                     </div>
                   </div>

@@ -5,35 +5,33 @@ import { Package, Search, Edit3, Trash2, Plus, DollarSign, Calendar, Tag, Downlo
 import ConfirmModal from '@/components/ui/ConfirmModal'
 
 interface Product {
-  id: string
+  id: number
   title: string
-  originalPrice: number
   salePrice: number
   description: string
-  status: string
   sourceType?: string | null
   sourceId?: string | null
   createdAt: string
   updatedAt: string
-  
+
   // AI 분석 결과 및 추가 정보
   images?: string
   hookingTitle?: string | null
   hookingContent?: string | null
   detailedContent?: string | null
   productCategory?: string | null
-  
+
   // 가격 관련 정보
   shippingFee?: number | null
   priceInfo?: string | null
-  
+
   // 특이사항 및 메타데이터
   specialNotes?: string | null
   hasDeadline?: boolean
   deadlineInfo?: string | null
   isAvailable?: boolean
   unavailableReason?: string | null
-  
+
   // 소싱 정보
   wholesaleBandName?: string | null
   author?: string | null
@@ -44,7 +42,6 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
@@ -53,7 +50,7 @@ export default function ProductsPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [editedProduct, setEditedProduct] = useState<Product | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([])
+  const [selectedProducts, setSelectedProducts] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
   const [currentDetailIndex, setCurrentDetailIndex] = useState(0)
   const [isIndividualProcessing, setIsIndividualProcessing] = useState(false)
@@ -63,7 +60,7 @@ export default function ProductsPage() {
   const [pendingOptionIndex, setPendingOptionIndex] = useState<number | null>(null)
   const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false)
   const [showSingleDeleteConfirm, setShowSingleDeleteConfirm] = useState(false)
-  const [pendingDeleteProductId, setPendingDeleteProductId] = useState<string | null>(null)
+  const [pendingDeleteProductId, setPendingDeleteProductId] = useState<number | null>(null)
   const [pendingDeleteProductTitle, setPendingDeleteProductTitle] = useState<string>('')
 
   useEffect(() => {
@@ -100,17 +97,15 @@ export default function ProductsPage() {
       if (data.success) {
         // API 응답을 페이지 인터페이스에 맞게 매핑
         const mappedProducts = (data.data || []).map((p: any) => ({
-          id: String(p.id),
+          id: p.id,
           title: p.name || '',
-          originalPrice: p.wholesalePrice || 0,
           salePrice: p.price || 0,
           description: p.description || '',
-          status: p.status || 'DRAFT',
           productCategory: p.categoryId || null,
           images: p.thumbnailUrl ? JSON.stringify([p.thumbnailUrl]) : undefined,
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
-          wholesaleBandName: p.post?.wholesaleBand?.name || null,
+          wholesaleBandName: p.collectedProduct?.post?.channel?.name || null,
         }))
         setProducts(mappedProducts)
       } else {
@@ -135,7 +130,7 @@ export default function ProductsPage() {
     }
   }
 
-  const handleProductSelect = (productId: string, checked: boolean) => {
+  const handleProductSelect = (productId: number, checked: boolean) => {
     if (checked) {
       setSelectedProducts(prev => [...prev, productId])
     } else {
@@ -167,7 +162,7 @@ export default function ProductsPage() {
   }
 
   // 공통 스룩페이 등록 처리 함수
-  const processStrokePayRegistration = async (productIds: string[], description: string) => {
+  const processStrokePayRegistration = async (productIds: number[], description: string) => {
     try {
       // 1. 엑셀 파일 생성
       const response = await fetch('/api/products/generate-excel', {
@@ -223,13 +218,12 @@ export default function ProductsPage() {
                            product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            (product.hookingTitle && product.hookingTitle.toLowerCase().includes(searchTerm.toLowerCase())) ||
                            (product.wholesaleBandName && product.wholesaleBandName.toLowerCase().includes(searchTerm.toLowerCase()))
-      
-      const matchesStatus = statusFilter === 'all' || product.status.toLowerCase() === statusFilter.toLowerCase()
+
       const matchesCategory = categoryFilter === 'all' || product.productCategory === categoryFilter
-      
-      return matchesSearch && matchesStatus && matchesCategory
+
+      return matchesSearch && matchesCategory
     })
-  }, [products, searchTerm, statusFilter, categoryFilter])
+  }, [products, searchTerm, categoryFilter])
 
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
@@ -249,23 +243,6 @@ export default function ProductsPage() {
       day: 'numeric'
     })
   }
-
-  const getStatusBadge = (status: string) => {
-    const statusMap: { [key: string]: { label: string; className: string } } = {
-      DRAFT: { label: '초안', className: 'bg-gray-100 text-gray-800' },
-      ACTIVE: { label: '판매중', className: 'bg-green-100 text-green-800' },
-      SOLD_OUT: { label: '품절', className: 'bg-red-100 text-red-800' }
-    }
-    
-    const statusInfo = statusMap[status] || { label: status, className: 'bg-gray-100 text-gray-800' }
-    
-    return (
-      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${statusInfo.className}`}>
-        {statusInfo.label}
-      </span>
-    )
-  }
-
 
   const getCategoryLabel = (category: string | null) => {
     const labels = {
@@ -299,102 +276,9 @@ export default function ProductsPage() {
     }
   }
 
-  // 공급가 추출 (정책 적용 전 원가)
-  const getSupplyPrice = (product: Product) => {
-    return product.originalPrice
-  }
-
-  // 판매가 추출 - 정책이 적용된 최종 판매가격 (실시간 계산)
+  // 판매가 추출
   const getSellingPrice = (product: Product) => {
-    // 조정된 가격이 있으면 우선 사용
-    if (product.salePrice && product.salePrice > 0) {
-      return product.salePrice
-    }
-
-    // 실시간 가격정책 적용 계산
-    const policyText = product.wholesaleBandName ? getPricingPolicyByBandName(product.wholesaleBandName) : ''
-    if (!policyText) {
-      return product.originalPrice // 가격정책이 없으면 원가 반환
-    }
-
-    const originalPrice = product.originalPrice
-    if (!originalPrice || originalPrice <= 0) {
-      return null
-    }
-
-    // 가격 파싱 함수
-    const parsePrice = (priceValue: any) => {
-      if (!priceValue) return 10000
-      if (typeof priceValue === 'number' && !isNaN(priceValue)) return Math.floor(priceValue)
-
-      let cleanStr = String(priceValue)
-      const priceMatch = cleanStr.match(/([0-9,]+)원/)
-      if (priceMatch) {
-        const priceOnly = priceMatch[1].replace(/,/g, '')
-        const parsed = parseInt(priceOnly)
-        return !isNaN(parsed) && parsed > 0 ? parsed : 10000
-      }
-
-      const numberMatch = cleanStr.match(/^[0-9,]+/)
-      if (numberMatch) {
-        const cleanPrice = numberMatch[0].replace(/,/g, '')
-        const parsed = parseInt(cleanPrice)
-        return !isNaN(parsed) && parsed > 0 ? parsed : 10000
-      }
-
-      const allNumbers = cleanStr.replace(/[^0-9]/g, '')
-      if (allNumbers) {
-        const limitedNumbers = allNumbers.substring(0, 6)
-        const parsed = parseInt(limitedNumbers)
-        return !isNaN(parsed) && parsed > 0 ? parsed : 10000
-      }
-
-      return 10000
-    }
-
-    const parsedPrice = parsePrice(originalPrice)
-
-    // 자연어 가격정책 해석 및 적용
-    let result = parsedPrice
-
-    // 1. 가족도매방: 판매가는 원가 그대로
-    if (policyText.includes('원가 그대로')) {
-      return parsedPrice
-    }
-
-    // 2. 요한이네♧소매방 & 초록이네: 수집가격 기준 구간별 마진 적용
-    if (policyText.includes('수집가격 기준 구간별 마진 적용')) {
-      if (parsedPrice <= 19900) {
-        result = parsedPrice + 1000
-      } else if (parsedPrice >= 20000 && parsedPrice <= 29900) {
-        result = parsedPrice + 2000
-      } else if (parsedPrice >= 30000 && parsedPrice <= 39900) {
-        result = parsedPrice + 3000
-      } else if (parsedPrice >= 40000 && parsedPrice <= 49900) {
-        result = parsedPrice + 4000
-      } else if (parsedPrice >= 50000 && parsedPrice <= 59900) {
-        result = parsedPrice + 5000
-      } else if (parsedPrice >= 60000) {
-        result = parsedPrice + 6000
-      }
-      return result
-    }
-
-    // 3. 나은 상품 공급방, S D 푸드, 폐쇄몰VIP도매: 공급가에만 마진 적용, 배송비 별도
-    if (policyText.includes('공급가와 배송비를 분리, 공급가에만 마진 적용')) {
-      if (parsedPrice <= 19900) {
-        result = parsedPrice + 4000 // 공급가 + 4,000원 마진
-      } else {
-        const excess = parsedPrice - 19900
-        const additionalSections = Math.ceil(excess / 10000)
-        const additionalMargin = additionalSections * 1000
-        result = parsedPrice + 4000 + additionalMargin
-      }
-      return result // 배송비는 별도 표시
-    }
-
-    // 기본값: 원가 그대로
-    return parsedPrice
+    return product.salePrice || 0
   }
 
   // 도매밴드명으로 가격정책 조회
@@ -472,9 +356,7 @@ export default function ProductsPage() {
           name: editedProduct.title,
           description: editedProduct.description,
           price: editedProduct.salePrice,
-          wholesalePrice: editedProduct.originalPrice,
           categoryId: editedProduct.productCategory,
-          status: editedProduct.status,
         }),
       })
 
@@ -515,7 +397,7 @@ export default function ProductsPage() {
       const updatedOptions = [...priceData.processedPriceOptions]
       updatedOptions[optionIndex] = {
         ...updatedOptions[optionIndex],
-        [field]: field === 'salePrice' || field === 'originalPrice' ? (parseFloat(value) || 0) : value
+        [field]: field === 'salePrice' ? (parseFloat(value) || 0) : value
       }
       
       const updatedPriceData = {
@@ -722,7 +604,7 @@ export default function ProductsPage() {
     }
   }
 
-  const handleDeleteProduct = (productId: string, productTitle: string) => {
+  const handleDeleteProduct = (productId: number, productTitle: string) => {
     setPendingDeleteProductId(productId)
     setPendingDeleteProductTitle(productTitle)
     setShowSingleDeleteConfirm(true)
@@ -789,7 +671,7 @@ export default function ProductsPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -801,35 +683,7 @@ export default function ProductsPage() {
               </div>
             </div>
           </div>
-          
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Tag className="h-8 w-8 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">판매중</p>
-                <p className="text-2xl font-semibold text-gray-900">
-                  {products.filter(p => p.status === 'ACTIVE').length}
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Edit3 className="h-8 w-8 text-yellow-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">초안</p>
-                <p className="text-2xl font-semibold text-gray-900">
-                  {products.filter(p => p.status === 'DRAFT').length}
-                </p>
-              </div>
-            </div>
-          </div>
-          
+
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -861,18 +715,7 @@ export default function ProductsPage() {
                   <Search className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
                 </div>
                 
-                <select 
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="all">전체 상태</option>
-                  <option value="draft">초안</option>
-                  <option value="active">판매중</option>
-                  <option value="sold_out">품절</option>
-                </select>
-
-                <select 
+                <select
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
                   className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -922,32 +765,30 @@ export default function ProductsPage() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-4 py-3 text-left">
-                    <input 
-                      type="checkbox" 
-                      className="rounded border-gray-300" 
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300"
                       checked={selectAll}
                       onChange={(e) => handleSelectAll(e.target.checked)}
                     />
                   </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">번호</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">상품명</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">분류</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">소싱처</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">상태</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">생성일</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">판매가</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">수집일</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                       <Package className="h-6 w-6 mx-auto mb-2 animate-pulse" />
                       상품을 불러오는 중...
                     </td>
                   </tr>
                 ) : paginatedProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                       <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                       <p className="text-lg font-medium text-gray-900 mb-2">등록된 상품이 없습니다</p>
                       <p className="text-gray-500">도매 밴드에서 게시물을 수집하여 상품을 생성해보세요.</p>
@@ -963,9 +804,6 @@ export default function ProductsPage() {
                           checked={selectedProducts.includes(product.id)}
                           onChange={(e) => handleProductSelect(product.id, e.target.checked)}
                         />
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {startIndex + index + 1}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-start gap-3">
@@ -1013,11 +851,6 @@ export default function ProductsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getCategoryColor(product.productCategory || null)}`}>
-                          {getCategoryLabel(product.productCategory || null)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
                         <div className="text-sm text-blue-600 font-medium">
                           {product.wholesaleBandName || '직접 입력'}
                         </div>
@@ -1028,15 +861,8 @@ export default function ProductsPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="space-y-1">
-                          {getStatusBadge(product.status)}
-                          {!product.isAvailable && (
-                            <div>
-                              <span className="inline-flex px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full">
-                                이용불가
-                              </span>
-                            </div>
-                          )}
+                        <div className="text-sm font-semibold text-gray-900">
+                          {formatPrice(product.salePrice)}원
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
@@ -1133,15 +959,6 @@ export default function ProductsPage() {
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${getCategoryColor(selectedProduct.productCategory || null)}`}>
                       {getCategoryLabel(selectedProduct.productCategory || null)}
                     </span>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      selectedProduct.status === 'ACTIVE' 
-                        ? 'bg-green-100 text-green-700'
-                        : selectedProduct.status === 'DRAFT'
-                        ? 'bg-gray-100 text-gray-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}>
-                      {selectedProduct.status === 'ACTIVE' ? '소싱완료' : selectedProduct.status === 'DRAFT' ? '초안' : '품절'}
-                    </span>
                   </div>
                 </div>
                 
@@ -1198,17 +1015,17 @@ export default function ProductsPage() {
 
                       {/* 공급가 */}
                       <div>
-                        <h4 className="text-sm font-medium text-gray-700 mb-1">공급가</h4>
+                        <h4 className="text-sm font-medium text-gray-700 mb-1">판매가</h4>
                         {isEditing ? (
                           <input
                             type="number"
-                            value={editedProduct?.originalPrice || 0}
-                            onChange={(e) => handleEditChange('originalPrice', parseFloat(e.target.value) || 0)}
+                            value={editedProduct?.salePrice || 0}
+                            onChange={(e) => handleEditChange('salePrice', parseFloat(e.target.value) || 0)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-orange-600 font-semibold focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                           />
                         ) : (
                           <p className="text-orange-600 font-semibold">
-                            {formatPrice(selectedProduct.originalPrice)}
+                            {formatPrice(selectedProduct.salePrice)}원
                           </p>
                         )}
                       </div>
@@ -1226,29 +1043,16 @@ export default function ProductsPage() {
                           ) : (
                             selectedProduct.shippingFee && (
                               <p className="text-blue-600 font-semibold">
-                                {formatPrice(selectedProduct.shippingFee)}
+                                {formatPrice(selectedProduct.shippingFee)}원
                               </p>
                             )
                           )}
                         </div>
                       )}
 
-                      {/* 상태 및 분류 편집 */}
+                      {/* 분류 편집 */}
                       {isEditing && (
-                        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-blue-200">
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-1">상태</h4>
-                            <select
-                              value={editedProduct?.status || 'DRAFT'}
-                              onChange={(e) => handleEditChange('status', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            >
-                              <option value="DRAFT">초안</option>
-                              <option value="ACTIVE">판매중</option>
-                              <option value="SOLD_OUT">품절</option>
-                            </select>
-                          </div>
-                          
+                        <div className="pt-2 border-t border-blue-200">
                           <div>
                             <h4 className="text-sm font-medium text-gray-700 mb-1">분류</h4>
                             <select
@@ -1518,9 +1322,9 @@ export default function ProductsPage() {
                                 }
                               }
 
-                              // 판매가가 없으면 기본 가격 표시 (공급가가 아닌 판매 예정가)
+                              // 판매가가 없으면 기본 가격 표시
                               if (!priceAdded) {
-                                const basePrice = selectedProduct.salePrice || selectedProduct.originalPrice
+                                const basePrice = selectedProduct.salePrice
                                 if (basePrice) {
                                   finalContent.push('')
                                   finalContent.push('💰 판매가격:')
@@ -1739,25 +1543,23 @@ export default function ProductsPage() {
                         <Edit3 className="h-4 w-4" />
                         편집
                       </button>
-                      {selectedProduct.status !== 'ACTIVE' && (
-                        <button
-                          onClick={handleIndividualSourceConfirm}
-                          disabled={isIndividualProcessing}
-                          className="px-6 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-                        >
-                          {isIndividualProcessing ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                              소싱확정 중...
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="h-4 w-4" />
-                              소싱확정
-                            </>
-                          )}
-                        </button>
-                      )}
+                      <button
+                        onClick={handleIndividualSourceConfirm}
+                        disabled={isIndividualProcessing}
+                        className="px-6 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                      >
+                        {isIndividualProcessing ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            소싱확정 중...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-4 w-4" />
+                            소싱확정
+                          </>
+                        )}
+                      </button>
                     </>
                   )}
                 </div>
