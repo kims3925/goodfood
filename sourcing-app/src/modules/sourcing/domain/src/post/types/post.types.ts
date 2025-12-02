@@ -1,6 +1,7 @@
 export interface PostListParams {
   userId: number
   search?: string
+  channelId?: number
   page?: number
   limit?: number
 }

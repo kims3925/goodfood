@@ -3,10 +3,11 @@ import type { PostListParams, PostUpdateInput, SavedImage } from '../types/post.
 
 export class CollectedPostRepository {
   async findMany(params: PostListParams) {
-    const { userId, search = '', page = 1, limit = 10 } = params
+    const { userId, search = '', channelId, page = 1, limit = 10 } = params
 
     const where = {
       userId,
+      ...(channelId && { channelId }),
       ...(search && {
         OR: [
           { title: { contains: search } },
@@ -126,8 +127,7 @@ export class CollectedPostRepository {
         ...(data.savedImages && data.savedImages.length > 0 && {
           images: {
             create: data.savedImages.map((img, index) => ({
-              name: img.name,
-              imageUrl: img.relativePath,
+              url: img.relativePath,
               fileSize: img.fileSize,
               sortOrder: index,
             })),

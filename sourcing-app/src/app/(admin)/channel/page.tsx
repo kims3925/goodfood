@@ -1,15 +1,32 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Plus, Search, RefreshCw, Trash2, Store } from 'lucide-react'
+import {
+  Search,
+  Trash2,
+  Store,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
+  ShoppingCart,
+  Boxes,
+} from 'lucide-react'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import ChannelFormModal from '@/components/channel/ChannelFormModal'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+  TableEmpty,
+} from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
-import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
 
 interface Channel {
@@ -22,7 +39,6 @@ interface Channel {
   name: string
   coverUrl: string | null
   isActive: boolean
-  formUrl: string | null
   accountHolder: string | null
   bankAccount: string | null
   bankName: string | null
@@ -30,22 +46,7 @@ interface Channel {
   updatedAt: string
 }
 
-const KIND_OPTIONS = [
-  { value: '', label: '전체 유형' },
-  { value: 'WHOLESALE', label: '도매(소싱)' },
-  { value: 'RETAIL', label: '소매(판매)' },
-]
-
-const PLATFORM_OPTIONS = [
-  { value: '', label: '전체 플랫폼' },
-  { value: 'BAND', label: '밴드' },
-  { value: 'NAVER_CAFE', label: '네이버 카페' },
-  { value: 'ALIEXPRESS', label: '알리익스프레스' },
-  { value: 'SMARTSTORE', label: '스마트스토어' },
-  { value: 'COUPANG', label: '쿠팡' },
-  { value: 'SHOP', label: '쇼핑몰' },
-  { value: 'CUSTOM', label: '커스텀' },
-]
+type ChannelKind = 'WHOLESALE' | 'RETAIL'
 
 export default function ChannelListPage() {
   const router = useRouter()
@@ -57,14 +58,15 @@ export default function ChannelListPage() {
   const [searchTerm, setSearchTerm] = useState('')
 
   // Filter states
-  const [selectedKind, setSelectedKind] = useState<string>(searchParams.get('kind') || '')
-  const [selectedPlatform, setSelectedPlatform] = useState<string>('')
+  const [selectedKind, setSelectedKind] = useState<ChannelKind | 'ALL'>(
+    (searchParams.get('kind') as ChannelKind) || 'ALL'
+  )
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  const itemsPerPage = 10
+  const itemsPerPage = 20
 
   // Selection states
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -79,22 +81,17 @@ export default function ChannelListPage() {
   // UTC+9 시간 포맷 함수
   const formatDateTimeKST = (dateString: string) => {
     const date = new Date(dateString)
-    return date.toLocaleString('ko-KR', {
-      timeZone: 'Asia/Seoul',
-      year: '2-digit',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).replace(/\. /g, '.').replace(/\.$/, '')
+    const kst = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }))
+    const yyyy = kst.getFullYear()
+    const mm = String(kst.getMonth() + 1).padStart(2, '0')
+    const dd = String(kst.getDate()).padStart(2, '0')
+    const hh = String(kst.getHours()).padStart(2, '0')
+    const mi = String(kst.getMinutes()).padStart(2, '0')
+    const ss = String(kst.getSeconds()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
   }
 
-  useEffect(() => {
-    loadChannels()
-  }, [currentPage, selectedKind, selectedPlatform])
-
-  const loadChannels = async () => {
+  const loadChannels = useCallback(async () => {
     try {
       setIsLoading(true)
       const params = new URLSearchParams({
@@ -103,18 +100,25 @@ export default function ChannelListPage() {
       })
 
       if (searchTerm) params.append('search', searchTerm)
-      if (selectedKind) params.append('kind', selectedKind)
-      if (selectedPlatform) params.append('platform', selectedPlatform)
+      if (selectedKind !== 'ALL') params.append('kind', selectedKind)
 
       const response = await fetch(`/api/channel?${params.toString()}`)
+
+      if (!response.ok) {
+        console.error('API 응답 실패:', response.status, response.statusText)
+        toast.error('채널 목록을 불러오는데 실패했습니다.')
+        return
+      }
+
       const data = await response.json()
 
       if (data.success) {
-        setChannels(data.data)
+        setChannels(data.data || [])
         setTotalItems(data.pagination?.total || 0)
         setTotalPages(data.pagination?.totalPages || 1)
       } else {
-        toast.error('채널 목록을 불러오는데 실패했습니다.')
+        console.error('API 응답 실패:', data.error)
+        toast.error(data.error || '채널 목록을 불러오는데 실패했습니다.')
       }
     } catch (error) {
       console.error('채널 목록 조회 실패:', error)
@@ -122,16 +126,11 @@ export default function ChannelListPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentPage, searchTerm, selectedKind, toast])
 
-  const handleSearch = () => {
-    setCurrentPage(1)
+  useEffect(() => {
     loadChannels()
-  }
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-  }
+  }, [loadChannels])
 
   const handleToggleSelectAll = () => {
     if (selectAll) {
@@ -211,10 +210,10 @@ export default function ChannelListPage() {
 
   const getKindBadge = (kind: string) => {
     const kindMap: { [key: string]: { label: string; color: string } } = {
-      WHOLESALE: { label: '도매(소싱)', color: 'bg-blue-100 text-blue-800' },
-      RETAIL: { label: '소매(판매)', color: 'bg-green-100 text-green-800' },
+      WHOLESALE: { label: '도매(소싱)', color: 'bg-blue-100 text-blue-700' },
+      RETAIL: { label: '소매(판매)', color: 'bg-green-100 text-green-700' },
     }
-    const kindInfo = kindMap[kind] || { label: kind, color: 'bg-gray-100 text-gray-800' }
+    const kindInfo = kindMap[kind] || { label: kind, color: 'bg-gray-100 text-gray-700' }
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${kindInfo.color}`}>
         {kindInfo.label}
@@ -237,7 +236,7 @@ export default function ChannelListPage() {
 
   const getStatusBadge = (isActive: boolean) => {
     return isActive ? (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
         활성
       </span>
     ) : (
@@ -247,6 +246,11 @@ export default function ChannelListPage() {
     )
   }
 
+  // 통계
+  const wholesaleCount = channels.filter((c) => c.kind === 'WHOLESALE').length
+  const retailCount = channels.filter((c) => c.kind === 'RETAIL').length
+  const activeCount = channels.filter((c) => c.isActive).length
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -254,97 +258,145 @@ export default function ChannelListPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">채널 관리</h1>
           <p className="text-gray-600">
-            소싱(도매) 채널과 판매(소매) 채널을 통합 관리합니다. 밴드, 쇼핑몰 등 다양한 플랫폼의 채널을 등록하고 관리할 수 있습니다.
+            소싱(도매) 채널과 판매(소매) 채널을 통합 관리합니다.
           </p>
         </div>
 
-        {/* 탭 필터 */}
-        <div className="mb-6 flex gap-2">
-          <Button
-            variant={selectedKind === '' ? 'primary' : 'secondary'}
-            onClick={() => {
-              setSelectedKind('')
-              setCurrentPage(1)
-            }}
+        {/* 통계 및 액션 카드 */}
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <Globe size={24} className="text-gray-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">전체 채널</p>
+                <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Boxes size={24} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">도매(소싱)</p>
+                <p className="text-2xl font-bold text-blue-600">{wholesaleCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <ShoppingCart size={24} className="text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">소매(판매)</p>
+                <p className="text-2xl font-bold text-green-600">{retailCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <Store size={24} className="text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">활성 채널</p>
+                <p className="text-2xl font-bold text-purple-600">{activeCount}</p>
+              </div>
+            </div>
+          </div>
+          {/* 채널 등록 카드 */}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left"
           >
-            전체
-          </Button>
-          <Button
-            variant={selectedKind === 'WHOLESALE' ? 'primary' : 'secondary'}
-            onClick={() => {
-              setSelectedKind('WHOLESALE')
-              setCurrentPage(1)
-            }}
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Plus size={24} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">채널</p>
+                <p className="text-lg font-bold text-blue-600">등록하기</p>
+              </div>
+            </div>
+          </button>
+          {/* 채널 삭제 카드 */}
+          <button
+            onClick={handleDeleteSelected}
+            disabled={selectedIds.length === 0}
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
+              selectedIds.length > 0
+                ? 'hover:border-red-300 hover:bg-red-50 cursor-pointer'
+                : 'opacity-50 cursor-not-allowed'
+            }`}
           >
-            도매(소싱) 채널
-          </Button>
-          <Button
-            variant={selectedKind === 'RETAIL' ? 'primary' : 'secondary'}
-            onClick={() => {
-              setSelectedKind('RETAIL')
-              setCurrentPage(1)
-            }}
-          >
-            소매(판매) 채널
-          </Button>
+            <div className="flex items-center gap-3">
+              <div className={`p-3 rounded-lg ${selectedIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
+                <Trash2 size={24} className={selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'} />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">선택 삭제</p>
+                <p className={`text-lg font-bold ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                  {selectedIds.length}개 선택됨
+                </p>
+              </div>
+            </div>
+          </button>
         </div>
 
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-4 border-b border-gray-200">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex gap-2 flex-1 max-w-lg">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                  <Input
-                    type="text"
-                    placeholder="채널명으로 검색..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    className="pl-10"
-                  />
-                </div>
-                <select
-                  value={selectedPlatform}
-                  onChange={(e) => {
-                    setSelectedPlatform(e.target.value)
-                    setCurrentPage(1)
-                  }}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+              {/* 왼쪽: 도매/소매 필터 */}
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => { setSelectedKind('ALL'); setCurrentPage(1) }}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    selectedKind === 'ALL'
+                      ? 'bg-white shadow-sm text-gray-900'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
                 >
-                  {PLATFORM_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <Button variant="secondary" onClick={handleSearch}>
-                  검색
-                </Button>
+                  전체
+                </button>
+                <button
+                  onClick={() => { setSelectedKind('WHOLESALE'); setCurrentPage(1) }}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                    selectedKind === 'WHOLESALE'
+                      ? 'bg-white shadow-sm text-blue-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Boxes size={14} />
+                  도매
+                </button>
+                <button
+                  onClick={() => { setSelectedKind('RETAIL'); setCurrentPage(1) }}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                    selectedKind === 'RETAIL'
+                      ? 'bg-white shadow-sm text-green-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <ShoppingCart size={14} />
+                  소매
+                </button>
               </div>
 
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={loadChannels}
-                  disabled={isLoading}
-                >
-                  <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-                  새로고침
-                </Button>
-                <Button variant="primary" onClick={() => setShowAddModal(true)}>
-                  <Plus size={16} />
-                  채널 등록
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={handleDeleteSelected}
-                  disabled={selectedIds.length === 0}
-                >
-                  <Trash2 size={16} />
-                  선택 삭제 ({selectedIds.length})
-                </Button>
+              {/* 검색창 */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Input
+                  type="text"
+                  placeholder="채널명으로 검색..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-64"
+                />
               </div>
             </div>
           </div>
@@ -366,20 +418,21 @@ export default function ChannelListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
+                  <TableHead className="w-[5%]">순서</TableHead>
                   <TableHead className="w-[22%]">채널명</TableHead>
                   <TableHead className="w-[10%]">유형</TableHead>
                   <TableHead className="w-[10%]">플랫폼</TableHead>
-                  <TableHead className="w-[14%]">채널키</TableHead>
+                  <TableHead className="w-[12%]">채널키</TableHead>
                   <TableHead className="w-[8%]">상태</TableHead>
-                  <TableHead className="w-[16%]">생성일</TableHead>
-                  <TableHead className="w-[16%]">수정일</TableHead>
+                  <TableHead className="w-[14%]">생성일</TableHead>
+                  <TableHead className="w-[14%]">수정일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {channels.length === 0 ? (
                   <TableEmpty message="등록된 채널이 없습니다." />
                 ) : (
-                  channels.map((channel) => (
+                  channels.map((channel, index) => (
                     <TableRow
                       key={channel.id}
                       className="hover:bg-gray-50 cursor-pointer"
@@ -392,6 +445,11 @@ export default function ChannelListPage() {
                           onChange={() => handleToggleSelection(channel.id)}
                           className="w-4 h-4 cursor-pointer"
                         />
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-gray-500 text-sm">
+                          {(currentPage - 1) * itemsPerPage + index + 1}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -416,7 +474,7 @@ export default function ChannelListPage() {
                         <span className="text-gray-600">{getPlatformLabel(channel.platform)}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-gray-500 text-sm font-mono truncate block max-w-[150px]">
+                        <span className="text-gray-500 text-sm font-mono truncate block max-w-[120px]">
                           {channel.channelKey}
                         </span>
                       </TableCell>
@@ -439,13 +497,32 @@ export default function ChannelListPage() {
           )}
 
           {/* Pagination */}
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            itemsPerPage={itemsPerPage}
-            onPageChange={handlePageChange}
-          />
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+              <p className="text-sm text-gray-600">
+                총 {totalItems}개 중 {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalItems)}개
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="text-sm text-gray-600">
+                  {currentPage} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
