@@ -570,7 +570,7 @@ export default function CollectedProductListPage() {
                   disabled={selectedIds.length === 0}
                 >
                   <Trash2 size={16} />
-                  선택 삭제 ({selectedIds.length})
+                  선택 삭제
                 </Button>
               </div>
             </div>

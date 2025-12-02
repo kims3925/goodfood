@@ -145,14 +145,16 @@ export async function getAutomationStats(userId: number): Promise<AutomationStat
     }
   })
 
-  // 오늘 발행된 상품 수
-  const todayPublished = await prisma.publishedProduct.count({
+  // 오늘 발행된 상품 수 (같은 상품은 1개로 카운트)
+  const todayPublishedProducts = await prisma.publishedProduct.findMany({
     where: {
       userId,
-      status: 'SUCCESS',
       publishedAt: { gte: today }
-    }
+    },
+    distinct: ['productId'],
+    select: { productId: true }
   })
+  const todayPublished = todayPublishedProducts.length
 
   return {
     todayCollected,

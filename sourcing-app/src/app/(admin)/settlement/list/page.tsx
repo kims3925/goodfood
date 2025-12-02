@@ -94,10 +94,18 @@ export default function SettlementListPage() {
   const [showUnclassified, setShowUnclassified] = useState(false)
 
   // 필터 상태
-  const [selectedPlatform, setSelectedPlatform] = useState<string>('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [selectedChannelId, setSelectedBandId] = useState<string>('')
+
+  // 정렬 상태
+  type SortColumn = 'name' | 'itemCount' | 'shopCount' | 'webhookCount' | 'totalAmount'
+  type SortDirection = 'asc' | 'desc'
+  const [sortColumn, setSortColumn] = useState<SortColumn>('totalAmount')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+
+  // 선택된 채널 상세 보기
+  const [selectedChannelForDetails, setSelectedChannelForDetails] = useState<number | null>(null)
 
   // 정산 모달 상태
   const [settlementModal, setSettlementModal] = useState<{
@@ -110,7 +118,6 @@ export default function SettlementListPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (selectedPlatform) params.set('platform', selectedPlatform)
       if (startDate) params.set('startDate', startDate)
       if (endDate) params.set('endDate', endDate)
       if (selectedChannelId) params.set('channelId', selectedChannelId)
@@ -126,7 +133,7 @@ export default function SettlementListPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedPlatform, startDate, endDate, selectedChannelId])
+  }, [startDate, endDate, selectedChannelId])
 
   useEffect(() => {
     fetchData()
@@ -176,7 +183,6 @@ export default function SettlementListPage() {
   }
 
   const handleResetFilter = () => {
-    setSelectedPlatform('')
     setStartDate('')
     setEndDate('')
     setSelectedBandId('')
@@ -210,6 +216,67 @@ export default function SettlementListPage() {
 
   const closeSettlementModal = () => {
     setSettlementModal(null)
+  }
+
+  // 정렬 핸들러
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      // 같은 컬럼 클릭 시 방향 반전
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // 다른 컬럼 클릭 시 해당 컬럼으로 정렬 (기본: 내림차순)
+      setSortColumn(column)
+      setSortDirection('desc')
+    }
+  }
+
+  // 채널 정렬 함수
+  const sortChannels = (channels: ChannelData[]) => {
+    return [...channels].sort((a, b) => {
+      let aValue: any
+      let bValue: any
+
+      switch (sortColumn) {
+        case 'name':
+          aValue = a.name.toLowerCase()
+          bValue = b.name.toLowerCase()
+          break
+        case 'itemCount':
+          aValue = a.itemCount
+          bValue = b.itemCount
+          break
+        case 'shopCount':
+          aValue = a.shopCount
+          bValue = b.shopCount
+          break
+        case 'webhookCount':
+          aValue = a.webhookCount
+          bValue = b.webhookCount
+          break
+        case 'totalAmount':
+          aValue = a.totalAmount
+          bValue = b.totalAmount
+          break
+        default:
+          return 0
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+  }
+
+  // 정렬 아이콘 컴포넌트
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) {
+      return <ChevronDown size={14} className="text-gray-300" />
+    }
+    return sortDirection === 'asc' ? (
+      <ChevronUp size={14} className="text-blue-600" />
+    ) : (
+      <ChevronDown size={14} className="text-blue-600" />
+    )
   }
 
   // 채널 뱃지 컴포넌트
@@ -254,7 +321,7 @@ export default function SettlementListPage() {
 
         {/* 통계 카드 */}
         {data && (
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -279,99 +346,17 @@ export default function SettlementListPage() {
             </div>
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <ShoppingCart className="text-blue-600" size={20} />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">쇼핑몰 주문</p>
-                  <p className="text-xl font-bold text-gray-900">{data.summary.shopCount}건</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                  <FileText className="text-purple-600" size={20} />
+                  <Store className="text-purple-600" size={20} />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">웹훅 주문</p>
-                  <p className="text-xl font-bold text-gray-900">{data.summary.webhookCount}건</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
-                  <AlertCircle className="text-orange-600" size={20} />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">미분류</p>
-                  <p className="text-xl font-bold text-gray-900">{data.unclassified.itemCount}건</p>
+                  <p className="text-sm text-gray-500">소매채널</p>
+                  <p className="text-xl font-bold text-gray-900">{data.channels.length}개</p>
                 </div>
               </div>
             </div>
           </div>
         )}
-
-        {/* 소싱처 탭 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="flex border-b border-gray-200">
-            <button
-              onClick={() => setSelectedPlatform('')}
-              className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
-                selectedPlatform === ''
-                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <ShoppingBag size={18} />
-                <span>전체</span>
-                {data && (
-                  <span className="text-xs bg-gray-200 px-2 py-0.5 rounded-full">
-                    {data.summary.totalItems}건
-                  </span>
-                )}
-              </div>
-            </button>
-            <button
-              onClick={() => setSelectedPlatform('BAND')}
-              className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
-                selectedPlatform === 'BAND'
-                  ? 'text-green-600 border-b-2 border-green-600 bg-green-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Store size={18} />
-                <span>밴드</span>
-                {data && (
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                    {data.platforms.find(p => p.platform === 'BAND')?.itemCount || 0}건
-                  </span>
-                )}
-              </div>
-            </button>
-            <button
-              onClick={() => setSelectedPlatform('ALIEXPRESS')}
-              className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
-                selectedPlatform === 'ALIEXPRESS'
-                  ? 'text-orange-600 border-b-2 border-orange-600 bg-orange-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Package size={18} />
-                <span>알리익스프레스</span>
-                {data && (
-                  <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
-                    {data.platforms.find(p => p.platform === 'ALIEXPRESS')?.itemCount || 0}건
-                  </span>
-                )}
-              </div>
-            </button>
-          </div>
-        </div>
 
         {/* 필터 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
@@ -474,6 +459,335 @@ export default function SettlementListPage() {
           </div>
         ) : data ? (
           <div className="space-y-6">
+            {/* 소매채널 요약 테이블 */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-200">
+                <h2 className="text-lg font-bold text-gray-900">소매채널별 정산 요약</h2>
+                <p className="text-sm text-gray-500 mt-1">각 소매채널의 주문 및 매출 현황을 확인하세요</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <button
+                          onClick={() => handleSort('name')}
+                          className="flex items-center gap-1 hover:text-gray-700 transition-colors"
+                        >
+                          채널명
+                          <SortIcon column="name" />
+                        </button>
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        플랫폼
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <button
+                          onClick={() => handleSort('itemCount')}
+                          className="flex items-center gap-1 ml-auto hover:text-gray-700 transition-colors"
+                        >
+                          총 주문
+                          <SortIcon column="itemCount" />
+                        </button>
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <button
+                          onClick={() => handleSort('shopCount')}
+                          className="flex items-center gap-1 ml-auto hover:text-gray-700 transition-colors"
+                        >
+                          쇼핑몰
+                          <SortIcon column="shopCount" />
+                        </button>
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <button
+                          onClick={() => handleSort('webhookCount')}
+                          className="flex items-center gap-1 ml-auto hover:text-gray-700 transition-colors"
+                        >
+                          웹훅
+                          <SortIcon column="webhookCount" />
+                        </button>
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <button
+                          onClick={() => handleSort('totalAmount')}
+                          className="flex items-center gap-1 ml-auto hover:text-gray-700 transition-colors"
+                        >
+                          총 매출
+                          <SortIcon column="totalAmount" />
+                        </button>
+                      </th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        액션
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {data.channels.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                          등록된 소매채널이 없습니다.
+                        </td>
+                      </tr>
+                    ) : (
+                      sortChannels(data.channels).map((channel) => (
+                          <tr
+                            key={channel.id}
+                            onClick={() =>
+                              setSelectedChannelForDetails(
+                                selectedChannelForDetails === channel.id ? null : channel.id
+                              )
+                            }
+                            className={`cursor-pointer transition-colors ${
+                              selectedChannelForDetails === channel.id
+                                ? 'bg-blue-50 border-l-4 border-blue-500'
+                                : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                {channel.coverUrl ? (
+                                  <Image
+                                    src={channel.coverUrl}
+                                    alt={channel.name}
+                                    width={40}
+                                    height={40}
+                                    className="w-10 h-10 rounded-lg object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                                    <Store size={16} className="text-white" />
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="font-medium text-gray-900">{channel.name}</p>
+                                  <p className="text-xs text-gray-500">ID: {channel.id}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                channel.platform === 'BAND'
+                                  ? 'bg-green-100 text-green-700'
+                                  : channel.platform === 'SHOP'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-gray-100 text-gray-700'
+                              }`}>
+                                {channel.platform}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="font-semibold text-gray-900">{channel.itemCount}건</span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="text-blue-600">{channel.shopCount}건</span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="text-purple-600">{channel.webhookCount}건</span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="font-bold text-gray-900">{formatPrice(channel.totalAmount)}</span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openSettlementModal(channel.id, channel.name)
+                                }}
+                              >
+                                정산
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 선택된 채널 상세 통계 */}
+            {selectedChannelForDetails && data.channels.find(c => c.id === selectedChannelForDetails) && (
+              <div className="bg-white rounded-lg shadow-sm border border-blue-200 overflow-hidden">
+                {(() => {
+                  const selectedChannel = data.channels.find(c => c.id === selectedChannelForDetails)!
+                  return (
+                    <>
+                      <div className="p-4 bg-blue-50 border-b border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {selectedChannel.coverUrl ? (
+                              <Image
+                                src={selectedChannel.coverUrl}
+                                alt={selectedChannel.name}
+                                width={48}
+                                height={48}
+                                className="w-12 h-12 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                                <Store size={20} className="text-white" />
+                              </div>
+                            )}
+                            <div>
+                              <h3 className="text-lg font-bold text-gray-900">{selectedChannel.name} 상세 통계</h3>
+                              <p className="text-sm text-gray-600">
+                                총 {selectedChannel.itemCount}건 | 매출 {formatPrice(selectedChannel.totalAmount)}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setSelectedChannelForDetails(null)}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            <ChevronUp size={24} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 통계 카드 */}
+                      <div className="p-4 bg-gray-50 border-b border-gray-200">
+                        <div className="grid grid-cols-4 gap-4">
+                          <div className="bg-white rounded-lg p-3 border border-gray-200">
+                            <div className="flex items-center gap-2 mb-1">
+                              <ShoppingBag size={16} className="text-blue-600" />
+                              <p className="text-xs text-gray-500">총 주문</p>
+                            </div>
+                            <p className="text-xl font-bold text-gray-900">{selectedChannel.itemCount}건</p>
+                          </div>
+                          <div className="bg-white rounded-lg p-3 border border-gray-200">
+                            <div className="flex items-center gap-2 mb-1">
+                              <ShoppingCart size={16} className="text-blue-600" />
+                              <p className="text-xs text-gray-500">쇼핑몰 주문</p>
+                            </div>
+                            <p className="text-xl font-bold text-blue-600">{selectedChannel.shopCount}건</p>
+                          </div>
+                          <div className="bg-white rounded-lg p-3 border border-gray-200">
+                            <div className="flex items-center gap-2 mb-1">
+                              <FileText size={16} className="text-purple-600" />
+                              <p className="text-xs text-gray-500">웹훅 주문</p>
+                            </div>
+                            <p className="text-xl font-bold text-purple-600">{selectedChannel.webhookCount}건</p>
+                          </div>
+                          <div className="bg-white rounded-lg p-3 border border-gray-200">
+                            <div className="flex items-center gap-2 mb-1">
+                              <DollarSign size={16} className="text-green-600" />
+                              <p className="text-xs text-gray-500">총 매출</p>
+                            </div>
+                            <p className="text-xl font-bold text-green-600">{formatPrice(selectedChannel.totalAmount)}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 주문 상세 목록 */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                채널
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                주문번호
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                상품명
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                주문자
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                수량
+                              </th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                금액
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                상태
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                주문일
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {selectedChannel.items.map((item) => (
+                              <tr key={`${item.channel}-${item.id}`} className="hover:bg-gray-50">
+                                <td className="px-4 py-3">
+                                  <ChannelBadge channel={item.channel} />
+                                </td>
+                                <td className="px-4 py-3 text-sm font-mono">
+                                  {item.orderId ? (
+                                    <a
+                                      href={`/order/${item.orderId}`}
+                                      className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {item.orderNumber}
+                                      <ExternalLink size={12} />
+                                    </a>
+                                  ) : (
+                                    <span className="text-gray-900">{item.orderNumber}</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2">
+                                    {item.thumbnailUrl ? (
+                                      <Image
+                                        src={item.thumbnailUrl}
+                                        alt={item.productName}
+                                        width={32}
+                                        height={32}
+                                        className="w-8 h-8 rounded object-cover"
+                                      />
+                                    ) : (
+                                      <Package size={16} className="text-gray-400 flex-shrink-0" />
+                                    )}
+                                    <span className="text-sm text-gray-900 line-clamp-1">
+                                      {item.productName}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-600">
+                                  {item.customerName}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                                  {item.quantity}개
+                                </td>
+                                <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                                  {formatPrice(item.totalPrice)}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                    item.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
+                                    item.status === 'SHIPPED' ? 'bg-blue-100 text-blue-700' :
+                                    item.status === 'PAID' ? 'bg-yellow-100 text-yellow-700' :
+                                    item.status === 'WEBHOOK' ? 'bg-purple-100 text-purple-700' :
+                                    'bg-gray-100 text-gray-700'
+                                  }`}>
+                                    {item.status === 'DELIVERED' ? '배송완료' :
+                                     item.status === 'SHIPPED' ? '배송중' :
+                                     item.status === 'PAID' ? '결제완료' :
+                                     item.status === 'PENDING' ? '대기중' :
+                                     item.status === 'WEBHOOK' ? '웹훅' : item.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-500">
+                                  {formatDate(item.orderedAt)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )
+                })()}
+              </div>
+            )}
+
             {/* 소싱처별 그룹 */}
             {data.platforms.map((platformGroup) => (
               <div key={platformGroup.platform} className="space-y-4">

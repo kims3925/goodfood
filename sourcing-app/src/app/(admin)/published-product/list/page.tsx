@@ -163,6 +163,10 @@ export default function PublishedProductListPage() {
       if (startDate) params.append('startDate', startDate)
       if (endDate) params.append('endDate', endDate)
 
+      console.log('[DEBUG] fetchProducts - selectedSourcePlatform:', selectedSourcePlatform)
+      console.log('[DEBUG] fetchProducts - onlyShoppingMall:', onlyShoppingMall)
+      console.log('[DEBUG] fetchProducts - params:', params.toString())
+
       const response = await fetch(`/api/published-product?${params.toString()}`)
 
       // HTTP 상태 코드 체크
@@ -495,7 +499,7 @@ export default function PublishedProductListPage() {
                   disabled={selectedIds.length === 0}
                 >
                   <Trash2 size={16} />
-                  선택 삭제 ({selectedIds.length})
+                  선택 삭제
                 </Button>
               </div>
             </div>
@@ -718,8 +722,8 @@ export default function PublishedProductListPage() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <ThumbnailImage
-                          src={getPublishedProductThumbnailUrl(product)}
-                          alt={product.product?.name || '상품'}
+                          src={productGroup.product?.thumbnailUrl || ''}
+                          alt={productGroup.product?.name || '상품'}
                           size="md"
                           rounded="lg"
                           fallbackIcon="package"

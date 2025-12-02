@@ -24,6 +24,9 @@ import {
   Calculator,
   MessageSquare,
   Users,
+  PanelRight,
+  Grid3X3,
+  Minimize2,
 } from 'lucide-react'
 
 interface SidebarProps {

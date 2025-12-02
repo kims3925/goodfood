@@ -38,14 +38,23 @@ export async function GET(request: NextRequest) {
     // publishedProducts 필터 조건
     const publishedProductsFilter: any = {}
 
-    // 쇼핑몰 필터: channel.platform이 SHOP인 상품만
+    // 발행 채널 플랫폼 필터 (쇼핑몰, Band 등)
     if (onlyShoppingMall) {
+      // 쇼핑몰 필터: channel.platform이 SHOP인 상품만
       publishedProductsFilter.channel = {
-        platform: 'SHOP',
+        is: {
+          platform: 'SHOP',
+        },
       }
-    }
-    // channelId 필터: 특정 채널에 발행된 상품 (쇼핑몰 필터와 배타적)
-    else if (channelId) {
+    } else if (sourcePlatform) {
+      // Band 등 다른 플랫폼 필터: 해당 플랫폼에 발행된 상품
+      publishedProductsFilter.channel = {
+        is: {
+          platform: sourcePlatform,
+        },
+      }
+    } else if (channelId) {
+      // 특정 채널 필터: 해당 채널에 발행된 상품
       publishedProductsFilter.channelId = parseInt(channelId)
     }
 
@@ -67,17 +76,6 @@ export async function GET(request: NextRequest) {
       where.publishedProducts = { some: publishedProductsFilter }
     }
 
-    // sourcePlatform 필터: 수집 출처 플랫폼
-    if (sourcePlatform) {
-      where.collectedProduct = {
-        post: {
-          channel: {
-            platform: sourcePlatform,
-          },
-        },
-      }
-    }
-
     console.log('Published Product API - onlyShoppingMall:', onlyShoppingMall)
     console.log('Published Product API - publishedProductsFilter:', JSON.stringify(publishedProductsFilter, null, 2))
     console.log('Published Product API - where:', JSON.stringify(where, null, 2))
@@ -87,38 +85,32 @@ export async function GET(request: NextRequest) {
       prisma.product.findMany({
         where,
         include: {
-          product: {
-            select: {
-              id: true,
-              name: true,
-              thumbnailUrl: true,
-              images: {
-                orderBy: { sortOrder: 'asc' },
-                take: 1,
-              },
-              collectedProduct: {
+          publishedProducts: {
+            include: {
+              channel: {
                 select: {
-                  post: {
+                  id: true,
+                  name: true,
+                  coverUrl: true,
+                  platform: true,
+                },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+          collectedProduct: {
+            select: {
+              post: {
+                select: {
+                  channel: {
                     select: {
-                      channel: {
-                        select: {
-                          id: true,
-                          name: true,
-                          platform: true,
-                        },
-                      },
+                      id: true,
+                      name: true,
+                      platform: true,
                     },
                   },
                 },
               },
-            },
-          },
-          channel: {
-            select: {
-              id: true,
-              name: true,
-              coverUrl: true,
-              platform: true,
             },
           },
         },
