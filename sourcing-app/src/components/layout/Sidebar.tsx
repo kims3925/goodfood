@@ -13,11 +13,9 @@ import {
   FileText,
   Bot,
   X,
-  Upload,
   Send,
   Database,
   Link2,
-  Globe,
   ScrollText,
   ClipboardList,
   LayoutDashboard,
@@ -26,6 +24,9 @@ import {
   Calculator,
   MessageSquare,
   Users,
+  PanelRight,
+  Grid3X3,
+  Minimize2,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -121,19 +122,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     },
     {
       label: '발행',
+      href: '/publish',
       icon: <Send size={20} />,
-      children: [
-        {
-          label: '소매밴드 발행',
-          href: '/publish/retail-band',
-          icon: <Upload size={16} />,
-        },
-        {
-          label: '쇼핑몰 발행',
-          href: '/publish/shopping-mall',
-          icon: <Globe size={16} />,
-        },
-      ],
     },
     {
       label: '주문 목록',

@@ -49,7 +49,11 @@ export class NaverBandClient {
 
     if (data.result_code !== 1) {
       const errorData = data.result_data as any
-      throw new Error(errorData?.message || data.message || `Band API Error: ${data.result_code}`)
+      const errorMessage = this.getErrorMessage(
+        data.result_code,
+        errorData?.message || data.message
+      )
+      throw new Error(errorMessage)
     }
 
     return { postKey: data.result_data!.post_key }
@@ -80,7 +84,12 @@ export class NaverBandClient {
     const data: BandApiResponse<{ comment_key: string }> = await response.json()
 
     if (data.result_code !== 1) {
-      throw new Error(data.message || `Band API Error: ${data.result_code}`)
+      const errorData = data.result_data as any
+      const errorMessage = this.getErrorMessage(
+        data.result_code,
+        errorData?.message || data.message
+      )
+      throw new Error(errorMessage)
     }
 
     return { commentKey: data.result_data!.comment_key }
@@ -91,13 +100,62 @@ export class NaverBandClient {
    */
   private getErrorMessage(resultCode: number, defaultMessage?: string): string {
     const errorMessages: Record<number, string> = {
-      1001: 'Band API 액세스 토큰이 만료되었습니다. API 설정에서 토큰을 갱신해주세요.',
-      1002: 'Band API 액세스 토큰이 유효하지 않습니다. API 설정을 확인해주세요.',
-      1003: 'Band API 권한이 부족합니다.',
-      1004: '요청 파라미터가 올바르지 않습니다.',
-      1005: '해당 밴드를 찾을 수 없습니다.',
-      1006: '해당 게시물을 찾을 수 없습니다.',
-      1007: 'API 호출 횟수 제한을 초과했습니다. 잠시 후 다시 시도해주세요.',
+      // 파라미터 오류
+      211: '잘못된 파라미터입니다.',
+      212: '필수 파라미터를 확인하고 추가해 주세요.',
+
+      // 쿼터 및 제한
+      1001: 'Band API 쿼터가 초과되었습니다. 잠시 후 다시 시도해주세요.',
+      1002: '사용자별 API 쿼터가 초과되었습니다. 잠시 후 다시 시도해주세요.',
+      1003: 'API 쿨타임 제한입니다. 잠시 후 다시 시도해주세요.',
+
+      // 권한 오류
+      2142: '밴드 리더만 사용할 수 있는 기능입니다.',
+      2300: '서버 응답 오류가 발생했습니다. 고객센터에 문의해 주세요.',
+
+      // 요청 오류
+      3000: '잘못된 요청입니다. 경로 및 파라미터를 확인해 주세요.',
+      3001: '문자열 길이 제한을 초과했습니다. 내용을 줄여주세요.',
+      3002: '이미지 파일 크기가 너무 큽니다. 파일 크기를 줄여주세요.',
+      3003: '첨부 이미지 개수가 제한을 초과했습니다. 이미지 수를 줄여주세요.',
+
+      // 인증/권한
+      10401: '인증 토큰이 없거나 만료되었습니다. API 설정에서 토큰을 갱신해주세요.',
+      10403: '접근 권한이 없습니다. 해당 기능 사용 권한을 확인해 주세요.',
+
+      // 파라미터 검증
+      60000: '잘못된 파라미터입니다. 필수 파라미터와 타입을 확인해 주세요.',
+
+      // 사용자 관련
+      60100: '존재하지 않는 사용자입니다.',
+      60101: '사용자의 친구가 아닙니다.',
+      60102: '밴드 멤버가 아닙니다. 밴드에 가입해 주세요.',
+      60103: '연동되지 않은 사용자입니다.',
+      60104: '이미 연동된 사용자입니다.',
+      60105: '멤버가 있는 밴드는 리더가 탈퇴할 수 없습니다.',
+      60106: '특정 멤버에게만 권한이 부여된 기능입니다.',
+
+      // 밴드 관련
+      60200: '존재하지 않거나 연동되지 않은 밴드입니다.',
+      60201: '이미 가입한 밴드입니다.',
+      60202: '가입할 수 있는 최대 밴드 수를 초과했습니다.',
+      60203: '앱과 연동되지 않은 밴드입니다.',
+      60204: '접근이 차단된 밴드입니다.',
+
+      // 메시지 관련
+      60300: '상대방이 메시지 수신을 거부했습니다.',
+      60301: '메시지 형식이 올바르지 않습니다.',
+      60302: '메시지 서비스 오류가 발생했습니다.',
+
+      // 포스트 관련
+      60400: '글쓰기 권한이 없습니다.',
+      60401: '앱과 연동되지 않은 포스트입니다.',
+      60402: '포스트를 수정할 수 없습니다.',
+
+      // 기타
+      60700: '유효하지 않은 초대장입니다.',
+      60800: '유효하지 않은 형식의 이미지 URL입니다.',
+      60801: '존재하지 않는 앨범입니다.',
     }
     return errorMessages[resultCode] || defaultMessage || `Band API 오류가 발생했습니다. (코드: ${resultCode})`
   }

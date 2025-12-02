@@ -318,7 +318,7 @@ export default function PublishedProductListPage() {
                   disabled={selectedProductIds.length === 0}
                 >
                   <Trash2 size={16} />
-                  선택 삭제 ({selectedProductIds.length}상품 / {getSelectedPublishCount()}건)
+                  선택 삭제
                 </Button>
               </div>
             </div>

@@ -38,14 +38,23 @@ export async function GET(request: NextRequest) {
     // publishedProducts 필터 조건
     const publishedProductsFilter: any = {}
 
-    // 쇼핑몰 필터: channel.platform이 SHOP인 상품만
+    // 발행 채널 플랫폼 필터 (쇼핑몰, Band 등)
     if (onlyShoppingMall) {
+      // 쇼핑몰 필터: channel.platform이 SHOP인 상품만
       publishedProductsFilter.channel = {
-        platform: 'SHOP',
+        is: {
+          platform: 'SHOP',
+        },
       }
-    }
-    // channelId 필터: 특정 채널에 발행된 상품 (쇼핑몰 필터와 배타적)
-    else if (channelId) {
+    } else if (sourcePlatform) {
+      // Band 등 다른 플랫폼 필터: 해당 플랫폼에 발행된 상품
+      publishedProductsFilter.channel = {
+        is: {
+          platform: sourcePlatform,
+        },
+      }
+    } else if (channelId) {
+      // 특정 채널 필터: 해당 채널에 발행된 상품
       publishedProductsFilter.channelId = parseInt(channelId)
     }
 
@@ -65,17 +74,6 @@ export async function GET(request: NextRequest) {
     // publishedProducts 필터가 있으면 적용
     if (Object.keys(publishedProductsFilter).length > 0) {
       where.publishedProducts = { some: publishedProductsFilter }
-    }
-
-    // sourcePlatform 필터: 수집 출처 플랫폼
-    if (sourcePlatform) {
-      where.collectedProduct = {
-        post: {
-          channel: {
-            platform: sourcePlatform,
-          },
-        },
-      }
     }
 
     console.log('Published Product API - onlyShoppingMall:', onlyShoppingMall)
