@@ -3,17 +3,56 @@ import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 /**
- * DELETE /api/post-image/[id]
+ * GET /api/images/post/[id]
  *
- * Delete a single image from a post
+ * Get image info by ID (URL redirect)
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const imageId = parseInt(id)
+
+    if (isNaN(imageId)) {
+      return NextResponse.json(
+        { success: false, error: '유효하지 않은 ID입니다.' },
+        { status: 400 }
+      )
+    }
+
+    // DB에서 이미지 정보 조회
+    const image = await prisma.collectedPostImage.findUnique({
+      where: { id: imageId },
+    })
+
+    if (!image) {
+      return NextResponse.json(
+        { success: false, error: '이미지를 찾을 수 없습니다.' },
+        { status: 404 }
+      )
+    }
+
+    // URL로 리다이렉트
+    return NextResponse.redirect(image.url)
+  } catch (error) {
+    console.error('이미지 서빙 실패:', error)
+    return NextResponse.json(
+      { success: false, error: '이미지를 불러올 수 없습니다.' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE /api/images/post/[id]
  *
- * Response:
- * - success: boolean
- * - data?: { deletedId: number, newThumbnailUrl: string | null }
+ * Delete a single image from a post by ID
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const currentUser = await getCurrentUser()
@@ -25,7 +64,9 @@ export async function DELETE(
     }
     const userId = currentUser.userId
 
-    const imageId = parseInt(params.id)
+    const { id } = await params
+    const imageId = parseInt(id)
+
     if (isNaN(imageId)) {
       return NextResponse.json(
         { success: false, error: '유효하지 않은 이미지 ID입니다.' },
@@ -37,15 +78,7 @@ export async function DELETE(
     const image = await prisma.collectedPostImage.findUnique({
       where: { id: imageId },
       include: {
-        post: {
-          include: {
-            collectedProducts: {
-              include: {
-                products: true,
-              },
-            },
-          },
-        },
+        post: true,
       },
     })
 
@@ -67,7 +100,7 @@ export async function DELETE(
     const postId = image.postId
     const deletedSortOrder = image.sortOrder
 
-    // Delete the image
+    // Delete the image from DB
     await prisma.collectedPostImage.delete({
       where: { id: imageId },
     })
@@ -83,31 +116,10 @@ export async function DELETE(
       },
     })
 
-    // Get the new first image (new thumbnail)
-    const firstImage = await prisma.collectedPostImage.findFirst({
-      where: { postId },
-      orderBy: { sortOrder: 'asc' },
-    })
-
-    const newThumbnailUrl = firstImage?.imageUrl || null
-
-    // Update product's thumbnailUrl if product exists
-    const productIds = image.post.collectedProducts.flatMap((cp) =>
-      cp.products.map((p) => p.id)
-    )
-
-    if (productIds.length > 0) {
-      await prisma.product.updateMany({
-        where: { id: { in: productIds } },
-        data: { thumbnailUrl: newThumbnailUrl },
-      })
-    }
-
     return NextResponse.json({
       success: true,
       data: {
         deletedId: imageId,
-        newThumbnailUrl,
       },
     })
   } catch (error: any) {

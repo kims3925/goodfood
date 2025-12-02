@@ -1,25 +1,18 @@
-// =============================================
-// COLLECTED POST (수집된 게시물)
-// 도매 밴드에서 수집한 원본 게시물
-// =============================================
-
 model CollectedPost {
-  id              Int                 @id @default(autoincrement())
-  userId          Int                 @map("user_id")
-  channelId       Int                 @map("channel_id")
-  externalId      String              @map("external_id") @db.VarChar(255)
-  title           String              @db.VarChar(500)
-  content         String              @db.Text
-  author          String?             @db.VarChar(100)
-  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt       DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  channel           Channel                   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  id                Int                    @id @default(autoincrement())
+  userId            Int                    @map("user_id")
+  externalId        String                 @map("external_id") @db.VarChar(255)
+  title             String                 @db.VarChar(500)
+  content           String                 @db.Text
+  author            String?                @db.VarChar(100)
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  channelId         Int                    @map("channel_id")
+  channel           Channel                @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   comments          CollectedPostComment[]
   images            CollectedPostImage[]
-  collectedProducts CollectedProduct[]        // 이 게시물에서 추출된 수집 상품들
+  collectedProducts CollectedProduct[]
 
   @@unique([channelId, externalId])
   @@index([userId])
@@ -30,14 +23,13 @@ model CollectedPost {
 }
 
 model CollectedPostImage {
-  id              Int           @id @default(autoincrement())
-  postId          Int           @map("collected_post_id")
-  name            String        @db.VarChar(255)
-  imageUrl        String        @map("image_url") @db.VarChar(1000)
-  fileSize        Int?          @map("file_size")
-  sortOrder       Int           @default(0) @map("sort_order")
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
-  post            CollectedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id        Int           @id @default(autoincrement())
+  postId    Int           @map("collected_post_id")
+  url       String        @db.VarChar(1000)
+  fileSize  Int?          @map("file_size")
+  sortOrder Int           @default(0) @map("sort_order")
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  post      CollectedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId])
   @@index([sortOrder])

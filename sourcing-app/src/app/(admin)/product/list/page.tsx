@@ -13,11 +13,18 @@ import PolicySelectionModal from '@/components/product/PolicySelectionModal'
 import ProductFormModal from '@/components/product/ProductFormModal'
 import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
+import ThumbnailImage from '@/components/ui/ThumbnailImage'
 
 interface Channel {
   id: number
   name: string
   coverUrl: string | null
+}
+
+interface ProductImage {
+  id: number
+  url: string
+  sortOrder: number
 }
 
 interface Product {
@@ -29,6 +36,7 @@ interface Product {
   price: number | null
   currency: string
   createdAt: string
+  images?: ProductImage[]
   collectedProduct?: {
     post?: {
       title: string
@@ -38,7 +46,7 @@ interface Product {
         coverUrl: string | null
       }
       images: Array<{
-        imageUrl: string
+        url: string
       }>
     }
   } | null
@@ -63,6 +71,23 @@ interface Product {
     shoppingMall: boolean
   }
   publishSummary?: string
+}
+
+// 상품 이미지 URL 가져오기 (product_image 우선, 없으면 수집상품 이미지)
+const getProductThumbnailUrl = (product: Product): string | null => {
+  // 1. product_image 테이블에서 첫 번째 이미지
+  if (product.images && product.images.length > 0) {
+    return product.images[0].url
+  }
+  // 2. thumbnailUrl 필드 (기존 호환성)
+  if (product.thumbnailUrl) {
+    return product.thumbnailUrl
+  }
+  // 3. 수집상품의 게시물 이미지
+  if (product.collectedProduct?.post?.images?.[0]?.url) {
+    return product.collectedProduct.post.images[0].url
+  }
+  return null
 }
 
 export default function ProductListPage() {
@@ -780,17 +805,13 @@ export default function ProductListPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          {product.thumbnailUrl ? (
-                            <img
-                              src={product.thumbnailUrl}
-                              alt={product.name}
-                              className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                              <Package size={24} className="text-gray-400" />
-                            </div>
-                          )}
+                          <ThumbnailImage
+                            src={getProductThumbnailUrl(product)}
+                            alt={product.name}
+                            size="md"
+                            rounded="lg"
+                            fallbackIcon="package"
+                          />
                           <div className="min-w-0 flex-1">
                             <div className="font-semibold text-gray-900 text-base">{product.name}</div>
                             {product.description && (

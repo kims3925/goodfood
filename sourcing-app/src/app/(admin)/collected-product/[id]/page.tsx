@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Package, Store, ArrowRight, ExternalLink, Trash2 } from 'lucide-react'
+import { ArrowLeft, Package, Store, ArrowRight, ExternalLink, Trash2, ImageIcon } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
+import ProductImageViewer from '@/components/ui/ProductImageViewer'
 
 interface CollectedProductDetail {
   id: number
@@ -34,8 +35,7 @@ interface CollectedProductDetail {
     }
     images: Array<{
       id: number
-      imageUrl: string
-      name: string
+      url: string
       sortOrder: number
     }>
     comments: Array<{
@@ -87,7 +87,6 @@ export default function CollectedProductDetailPage({
   const [isLoading, setIsLoading] = useState(true)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
 
   useEffect(() => {
     loadProduct()
@@ -187,43 +186,19 @@ export default function CollectedProductDetailPage({
           {/* 이미지 섹션 */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">상품 이미지</h2>
-              {product.post.images.length > 0 ? (
-                <>
-                  <div className="aspect-square rounded-lg overflow-hidden mb-4 bg-gray-100">
-                    <img
-                      src={product.post.images[selectedImageIndex]?.imageUrl}
-                      alt={product.name || product.post.title}
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                  {product.post.images.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto pb-2">
-                      {product.post.images.map((image, index) => (
-                        <button
-                          key={image.id}
-                          onClick={() => setSelectedImageIndex(index)}
-                          className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 ${
-                            selectedImageIndex === index
-                              ? 'border-purple-500'
-                              : 'border-transparent'
-                          }`}
-                        >
-                          <img
-                            src={image.imageUrl}
-                            alt={`이미지 ${index + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="aspect-square rounded-lg bg-gray-100 flex items-center justify-center">
-                  <Package size={48} className="text-gray-400" />
-                </div>
-              )}
+              <div className="flex items-center gap-2 mb-4">
+                <ImageIcon size={18} className="text-gray-400" />
+                <h2 className="text-lg font-semibold text-gray-900">
+                  상품 이미지 ({product.post.images.length}개)
+                </h2>
+              </div>
+              <ProductImageViewer
+                images={product.post.images}
+                productName={product.name || product.post.title}
+                enableLightbox={true}
+                showThumbnails={true}
+                thumbnailSize="md"
+              />
             </div>
           </div>
 

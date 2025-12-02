@@ -81,6 +81,9 @@ export class ProductRepository {
             },
           },
         },
+        images: {
+          orderBy: { sortOrder: 'asc' },
+        },
         publishedProducts: {
           where: {
             channel: {

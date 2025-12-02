@@ -23,8 +23,7 @@ import ConfirmModal from '@/components/ui/ConfirmModal'
 
 export interface SortableImage {
   id: number
-  imageUrl: string
-  name?: string
+  url: string
   sortOrder: number
 }
 
@@ -108,8 +107,8 @@ function SortableImageItem({ image, index, onRequestDelete, isDeleting }: Sortab
       {/* Image */}
       <div className="aspect-square bg-gray-100">
         <img
-          src={image.imageUrl}
-          alt={image.name || `이미지 ${index + 1}`}
+          src={image.url}
+          alt={`이미지 ${index + 1}`}
           className="w-full h-full object-cover"
           draggable={false}
         />
@@ -208,8 +207,8 @@ export default function ImageSortable({
             </div>
             <div className="aspect-square bg-gray-100">
               <img
-                src={image.imageUrl}
-                alt={image.name || `이미지 ${index + 1}`}
+                src={image.url}
+                alt={`이미지 ${index + 1}`}
                 className="w-full h-full object-cover"
               />
             </div>

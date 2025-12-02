@@ -115,19 +115,6 @@ export async function runTransformPipeline(
     try {
       console.log(`[Transform] Processing post ${post.id}: ${post.title.substring(0, 50)}...`)
 
-      // 이미 CollectedProduct가 있는지 다시 확인 (동시성 방지)
-      const existingCollectedProduct = await prisma.collectedProduct.findFirst({
-        where: { postId: post.id },
-        include: { products: true },
-      })
-
-      if (existingCollectedProduct) {
-        transformedPost.status = 'skipped'
-        transformedPost.productId = existingCollectedProduct.products[0]?.id
-        transformedPosts.push(transformedPost)
-        continue
-      }
-
       // AI 변환 실행
       const draft = await transformPostToProduct({
         post: post as any,
@@ -139,8 +126,8 @@ export async function runTransformPipeline(
         policyContent: pricingPolicyContent || undefined,
       })
 
-      // 1. CollectedProduct 생성 (원본 수집 상품)
-      const collectedProduct = await prisma.collectedProduct.create({
+      // CollectedProduct 생성 (원본 수집 상품)
+      await prisma.collectedProduct.create({
         data: {
           userId,
           postId: post.id,
@@ -148,25 +135,19 @@ export async function runTransformPipeline(
           description: draft.description || null,
           currency: draft.currency || 'KRW',
           price: draft.price || null,
-          rawMetadata: {
-            originalTitle: post.title,
-            originalContent: post.content,
-            aiGenerated: true,
-          },
         },
       })
 
-      // 2. Product 생성 (내부 기준 상품)
+      // Product 생성 (내부 기준 상품 - collectedProduct와 독립)
       const product = await prisma.product.create({
         data: {
           userId,
-          collectedProductId: collectedProduct.id,
           name: draft.name,
           description: draft.description || null,
           categoryId: draft.categoryId || null,
           currency: draft.currency || 'KRW',
           price: draft.price || null,
-          thumbnailUrl: post.images[0]?.imageUrl || null,
+          thumbnailUrl: post.images[0]?.url || null,
           options: draft.options?.length
             ? {
                 create: draft.options.flatMap((opt, groupIndex) =>

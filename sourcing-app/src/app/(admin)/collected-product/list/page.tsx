@@ -10,6 +10,7 @@ import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
+import ThumbnailImage from '@/components/ui/ThumbnailImage'
 
 interface Channel {
   id: number
@@ -39,7 +40,7 @@ interface CollectedProduct {
     }
     images: Array<{
       id: number
-      imageUrl: string
+      url: string
     }>
   }
   products: Array<{
@@ -475,17 +476,13 @@ export default function CollectedProductListPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          {product.post?.images?.[0]?.imageUrl ? (
-                            <img
-                              src={product.post.images[0].imageUrl}
-                              alt={product.name || product.post.title}
-                              className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                              <Package size={24} className="text-gray-400" />
-                            </div>
-                          )}
+                          <ThumbnailImage
+                            src={product.post?.images?.[0]?.url}
+                            alt={product.name || product.post?.title || ''}
+                            size="md"
+                            rounded="lg"
+                            fallbackIcon="package"
+                          />
                           <div className="min-w-0 flex-1">
                             <div className="font-semibold text-gray-900 text-base truncate">
                               {product.name || '(상품명 미추출)'}

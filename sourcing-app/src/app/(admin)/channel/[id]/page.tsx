@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Store, Save, Trash2, ExternalLink, Edit, X } from 'lucide-react'
+import { ArrowLeft, Store, Save, Trash2, Edit, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -19,7 +19,6 @@ interface Channel {
   name: string
   coverUrl: string | null
   isActive: boolean
-  formUrl: string | null
   accountHolder: string | null
   bankAccount: string | null
   bankName: string | null
@@ -62,7 +61,6 @@ export default function ChannelDetailPage({
   const [name, setName] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [coverUrl, setCoverUrl] = useState('')
-  const [formUrl, setFormUrl] = useState('')
   const [accountHolder, setAccountHolder] = useState('')
   const [bankAccount, setBankAccount] = useState('')
   const [bankName, setBankName] = useState('')
@@ -83,7 +81,6 @@ export default function ChannelDetailPage({
         setName(ch.name || '')
         setIsActive(ch.isActive)
         setCoverUrl(ch.coverUrl || '')
-        setFormUrl(ch.formUrl || '')
         setAccountHolder(ch.accountHolder || '')
         setBankAccount(ch.bankAccount || '')
         setBankName(ch.bankName || '')
@@ -115,7 +112,6 @@ export default function ChannelDetailPage({
           name,
           isActive,
           coverUrl: coverUrl || null,
-          formUrl: formUrl || null,
           accountHolder: accountHolder || null,
           bankAccount: bankAccount || null,
           bankName: bankName || null,
@@ -166,7 +162,6 @@ export default function ChannelDetailPage({
       setName(channel.name || '')
       setIsActive(channel.isActive)
       setCoverUrl(channel.coverUrl || '')
-      setFormUrl(channel.formUrl || '')
       setAccountHolder(channel.accountHolder || '')
       setBankAccount(channel.bankAccount || '')
       setBankName(channel.bankName || '')
@@ -348,41 +343,6 @@ export default function ChannelDetailPage({
                     <p className="text-gray-900 break-all">{channel.coverUrl || '-'}</p>
                   )}
                 </div>
-              </div>
-            </div>
-
-            {/* 주문폼 설정 */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex-1">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">주문폼 설정</h2>
-                {channel.formUrl && !isEditMode && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => window.open(channel.formUrl!, '_blank')}
-                  >
-                    <ExternalLink size={14} />
-                    주문폼 열기
-                  </Button>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">주문폼 URL</label>
-                {isEditMode ? (
-                  <>
-                    <Input
-                      type="text"
-                      value={formUrl}
-                      onChange={(e) => setFormUrl(e.target.value)}
-                      placeholder="https://..."
-                    />
-                    <p className="mt-1 text-sm text-gray-500">
-                      소매 채널의 경우 주문폼 URL을 입력하면 목록에서 바로 열 수 있습니다.
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-gray-900 break-all">{channel.formUrl || '-'}</p>
-                )}
               </div>
             </div>
 

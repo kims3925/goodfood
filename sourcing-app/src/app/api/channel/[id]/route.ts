@@ -51,13 +51,12 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, isActive, coverUrl, formUrl, accountHolder, bankAccount, bankName } = body
+    const { name, isActive, coverUrl, accountHolder, bankAccount, bankName } = body
 
     const channel = await channelService.update(id, {
       name,
       isActive,
       coverUrl,
-      formUrl,
       accountHolder,
       bankAccount,
       bankName,

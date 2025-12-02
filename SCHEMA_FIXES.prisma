@@ -1,0 +1,365 @@
+// ============================================================================
+// BANDAUTO SCHEMA - RECOMMENDED FIXES
+// ============================================================================
+// This file contains specific Prisma schema updates to address identified issues
+// Copy/paste these changes into the appropriate model files
+// ============================================================================
+
+// ============================================================================
+// FIX 1: Add Foreign Keys for Admin References
+// File: db/prisma/models/inquiry.prisma
+// ============================================================================
+
+// BEFORE:
+// model Inquiry {
+//   repliedBy      Int?              @map("replied_by")
+// }
+// 
+// model InquiryReply {
+//   adminId        Int?              @map("admin_id")
+// }
+
+// AFTER:
+model Inquiry {
+  id                 Int               @id @default(autoincrement())
+  userId             Int               @map("user_id")
+  inquiryType        InquiryType       @map("inquiry_type")
+  title              String            @db.VarChar(200)
+  content            String            @db.Text
+  isPrivate          Boolean           @default(false) @map("is_private")
+  status             InquiryStatus     @default(PENDING)
+  adminReply         String?           @map("admin_reply") @db.Text
+  repliedAt          DateTime?         @map("replied_at") @db.Timestamp(0)
+  repliedBy          Int?              @map("replied_by")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamp(0)
+  publishedProductId Int?              @map("published_product_id")
+  
+  // ✓ NEW: Add foreign key relation
+  repliedByUser      User?             @relation("InquiryRepliedBy", fields: [repliedBy], references: [id], onDelete: SetNull)
+  publishedProduct   PublishedProduct? @relation(fields: [publishedProductId], references: [id])
+  user               User              @relation("InquiryCreatedBy", fields: [userId], references: [id], onDelete: Cascade)
+  replies            InquiryReply[]
+
+  @@index([userId])
+  @@index([publishedProductId])
+  @@index([status])
+  @@index([userId, status])
+  @@index([repliedBy])  // ✓ NEW: Index for admin dashboards
+  @@map("inquiry")
+}
+
+model InquiryReply {
+  id        Int      @id @default(autoincrement())
+  inquiryId Int      @map("inquiry_id")
+  content   String   @db.Text
+  isAdmin   Boolean  @default(true) @map("is_admin")
+  adminId   Int?     @map("admin_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  
+  // ✓ NEW: Add foreign key relation
+  admin     User?    @relation("InquiryReplyAdmin", fields: [adminId], references: [id], onDelete: SetNull)
+  inquiry   Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+
+  @@index([inquiryId])
+  @@index([adminId])  // ✓ NEW: Index for admin dashboards
+  @@map("inquiry_reply")
+}
+
+// ✓ In user.prisma, add these relations:
+// model User {
+//   inquiriesCreatedBy  Inquiry[]         @relation("InquiryCreatedBy")
+//   inquiriesRepliedBy  Inquiry[]         @relation("InquiryRepliedBy")
+//   inquiryReplies      InquiryReply[]    @relation("InquiryReplyAdmin")
+// }
+
+// ============================================================================
+// FIX 2: Fix OrderItem Cascade Delete Risk
+// File: db/prisma/models/order.prisma
+// ============================================================================
+
+// BEFORE:
+// model OrderItem {
+//   publishedProduct   PublishedProduct @relation(fields: [publishedProductId], references: [id])
+// }
+
+// AFTER:
+model OrderItem {
+  id                 Int              @id @default(autoincrement())
+  orderId            Int              @map("order_id")
+  publishedProductId Int              @map("published_product_id")
+  variantId          Int?             @map("variant_id")
+  productName        String           @map("product_name") @db.VarChar(500)
+  optionSummary      String?          @map("option_summary") @db.VarChar(500)
+  thumbnailUrl       String?          @map("thumbnail_url") @db.VarChar(1000)
+  quantity           Int
+  unitPrice          Decimal          @map("unit_price") @db.Decimal(10, 2)
+  totalPrice         Decimal          @map("total_price") @db.Decimal(12, 2)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  
+  // ✓ CHANGED: Use Restrict instead of default Cascade
+  // This prevents deletion of published product if order items reference it
+  order              Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  publishedProduct   PublishedProduct @relation(fields: [publishedProductId], references: [id], onDelete: Restrict)
+  variant            ProductVariant?  @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  review             Review?
+
+  @@index([orderId])
+  @@index([publishedProductId])
+  @@index([variantId])
+  @@map("order_item")
+}
+
+// ============================================================================
+// FIX 3: Add Documentation for Denormalized Fields
+// File: db/prisma/models/order.prisma
+// ============================================================================
+
+// ADD COMMENT BLOCK TO OrderItem MODEL:
+
+model OrderItem {
+  // ========================================
+  // HISTORICAL SNAPSHOT - DO NOT MODIFY
+  // ========================================
+  // These fields store the product state at the time the order was placed.
+  // They do NOT automatically sync with Product or ProductVariant changes.
+  // 
+  // This is INTENTIONAL - preserving historical accuracy of the order.
+  // Do NOT attempt to update these fields based on current product state.
+  // 
+  // If product data changes, order records must retain the original data
+  // that was shown to the customer when they placed the order.
+  // ========================================
+  productName        String           @map("product_name") @db.VarChar(500)
+  optionSummary      String?          @map("option_summary") @db.VarChar(500)
+  thumbnailUrl       String?          @map("thumbnail_url") @db.VarChar(1000)
+  
+  // ========================================
+  // CURRENT REFERENCES
+  // ========================================
+  // These relationships point to current data for lookup/validation
+  publishedProductId Int              @map("published_product_id")
+  variantId          Int?             @map("variant_id")
+}
+
+// ============================================================================
+// FIX 4: New Indexes for Query Performance
+// Add these @@index lines to the specified models
+// ============================================================================
+
+// review.prisma - AFTER existing @@index([userId]):
+model Review {
+  // ... existing fields ...
+  
+  @@index([userId])
+  @@index([userId, isVisible])     // ✓ NEW: Filter reviews by visibility
+  @@index([isVisible, createdAt])  // ✓ NEW: Get recent public reviews
+  @@index([rating])                // ✓ KEEP: For rating filters
+  @@map("review")
+}
+
+// user.prisma (UserLoginLog) - AFTER existing @@index([createdAt]):
+model UserLoginLog {
+  // ... existing fields ...
+  
+  @@index([userId])
+  @@index([provider])
+  @@index([createdAt])
+  @@index([userId, isSuccess])     // ✓ NEW: User login history
+  @@index([provider, isSuccess])   // ✓ NEW: OAuth provider success rate
+  @@map("user_login_log")
+}
+
+// coupon.prisma - UPDATE existing indexes:
+model Coupon {
+  // ... existing fields ...
+  
+  @@index([code])                              // ✓ KEEP: Lookup by code
+  @@index([isActive])                          // ✓ KEEP: Active coupons
+  @@index([code, isActive])                    // ✓ NEW: Valid coupon lookup
+  @@index([isActive, validUntil])              // ✓ NEW: Expiration cleanup
+  @@index([validFrom, validUntil])             // ✓ KEEP: Validity range
+  @@map("coupon")
+}
+
+// order.prisma - ADD new indexes:
+model Order {
+  // ... existing fields ...
+  
+  @@index([userId])
+  @@index([orderNumber])
+  @@index([status])
+  @@index([orderedAt])
+  @@index([userId, status])                    // ✓ KEEP: User order history
+  @@index([userId, status, orderedAt])         // ✓ NEW: User history with timeline
+  @@index([status, createdAt])                 // ✓ NEW: Dashboard recent orders
+  @@map("order")
+}
+
+// cart.prisma - UPDATE existing indexes:
+model Cart {
+  // ... existing fields ...
+  
+  @@index([sessionId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([userId, expiresAt])                 // ✓ NEW: User cart expiration
+  @@index([sessionId, expiresAt])              // ✓ NEW: Session cleanup
+  @@map("cart")
+}
+
+// wishlist.prisma - ADD new indexes:
+model Wishlist {
+  // ... existing fields ...
+  
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+  @@index([userId, addedAt])                   // ✓ NEW: User wishlist chronological
+  @@index([productId])                         // ✓ NEW: Product popularity
+  @@map("wishlist")
+}
+
+// ============================================================================
+// FIX 5: Fix AutomationConfig Design Limitation
+// File: db/prisma/models/automation.prisma
+// ============================================================================
+
+// BEFORE:
+// model AutomationConfig {
+//   userId              Int            @unique @map("user_id")
+// }
+
+// AFTER:
+model AutomationConfig {
+  id                  Int            @id @default(autoincrement())
+  userId              Int            @map("user_id")
+  name                String         @db.VarChar(100)  // ✓ NEW: Config name
+  isDefault           Boolean        @default(false) @map("is_default")  // ✓ NEW
+  isEnabled           Boolean        @default(false) @map("is_enabled")
+  cronExpression      String?        @map("cron_expression") @db.VarChar(50)
+  collectFromAllBands Boolean        @default(true) @map("collect_from_all_bands")
+  wholesaleBandIds    String?        @map("wholesale_band_ids") @db.LongText
+  aiProvider          AiProvider     @default(GEMINI) @map("ai_provider")
+  pricingPolicyId     Int?           @map("pricing_policy_id")
+  autoPublish         Boolean        @default(false) @map("auto_publish")
+  retailBandIds       String?        @map("retail_band_ids") @db.LongText
+  lastRunAt           DateTime?      @map("last_run_at") @db.Timestamp(0)
+  nextRunAt           DateTime?      @map("next_run_at") @db.Timestamp(0)
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamp(0)
+  channelIds          String?        @map("channel_ids") @db.LongText
+  retailChannelIds    String?        @map("retail_channel_ids") @db.LongText
+  pricingPolicy       PricingPolicy? @relation(fields: [pricingPolicyId], references: [id])
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])          // ✓ CHANGED: Allow multiple configs, unique names per user
+  @@index([isEnabled])
+  @@index([userId])                 // ✓ NEW: For multi-config lookups
+  @@index([userId, isDefault])      // ✓ NEW: Find default config
+  @@index([pricingPolicyId])
+  @@map("automation_config")
+}
+
+// ============================================================================
+// FIX 6: Standardize Boolean Field Naming
+// File: db/prisma/models/user.prisma
+// ============================================================================
+
+// BEFORE:
+// model UserLoginLog {
+//   success   Boolean  @default(true)
+// }
+
+// AFTER:
+model UserLoginLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @map("user_id")
+  provider  String   @db.VarChar(50)
+  email     String?  @db.VarChar(255)
+  ip        String?  @db.VarChar(100)
+  userAgent String?  @map("user_agent") @db.VarChar(500)
+  isSuccess Boolean  @default(true) @map("is_success")  // ✓ CHANGED: success → isSuccess
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([provider])
+  @@index([createdAt])
+  @@index([userId, isSuccess])  // ✓ NEW
+  @@map("user_login_log")
+}
+
+// ============================================================================
+// FIX 7: Remove Redundant Indexes
+// File: db/prisma/models/channel.prisma
+// ============================================================================
+
+// BEFORE:
+// model Channel {
+//   @@unique([userId, channelKey])
+//   @@index([userId])        // ← REDUNDANT (unique covers it)
+//   @@index([apiConfigId])
+//   @@index([isActive])
+//   @@index([kind, platform])
+// }
+
+// AFTER:
+model Channel {
+  // ... existing fields ...
+  
+  @@unique([userId, channelKey])   // ← This index covers userId lookups
+  // REMOVED: @@index([userId])    // ← No longer needed
+  @@index([apiConfigId])
+  @@index([isActive])
+  @@index([kind, platform])
+  @@map("channel")
+}
+
+// ============================================================================
+// MIGRATION STEPS
+// ============================================================================
+/*
+1. Update schema files with the fixes above
+
+2. Run migration:
+   cd db
+   npx prisma migrate dev --schema prisma --name "fix_data_integrity_and_performance"
+
+3. For OrderItem cascade fix, you may need to:
+   - Add migration to backfill missing publishedProductId references
+   - Or use raw SQL: 
+     UPDATE order_item SET published_product_id = '...' WHERE published_product_id IS NULL
+
+4. Test queries after migration:
+   - Test order item retrieval
+   - Test admin dashboards
+   - Benchmark slow queries
+
+5. Deploy with feature flag if needed for gradual rollout
+*/
+
+// ============================================================================
+// VERIFY MIGRATION
+// ============================================================================
+/*
+After migration, verify with:
+
+1. Check foreign keys created:
+   SELECT * FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+   WHERE TABLE_SCHEMA = 'bandauto' AND REFERENCED_TABLE_NAME IS NOT NULL;
+
+2. Check indexes created:
+   SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME
+   FROM INFORMATION_SCHEMA.STATISTICS
+   WHERE TABLE_SCHEMA = 'bandauto'
+   ORDER BY TABLE_NAME, SEQ_IN_INDEX;
+
+3. Test cascade behavior:
+   -- This should fail if order items exist
+   DELETE FROM published_product WHERE id = 123;
+
+4. Test query performance:
+   EXPLAIN ANALYZE SELECT * FROM `order` 
+   WHERE user_id = 1 AND status = 'PAID' ORDER BY ordered_at DESC;
+*/

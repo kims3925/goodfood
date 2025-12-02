@@ -1,7 +1,3 @@
-// =============================================
-// PAYMENT (결제)
-// =============================================
-
 model Payment {
   id                    Int               @id @default(autoincrement())
   orderId               Int               @unique @map("order_id")

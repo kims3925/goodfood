@@ -41,8 +41,7 @@ interface Product {
       }
       images: Array<{
         id: number
-        imageUrl: string
-        name?: string
+        url: string
         sortOrder: number
       }>
     } | null
@@ -488,7 +487,7 @@ export default function ProductDetailTestB() {
                 <p className="text-sm text-gray-500 mb-4">드래그하여 순서를 변경하거나, 호버하여 삭제할 수 있습니다.</p>
                 {images.length > 0 ? (
                   <ImageSortable
-                    images={images.map((img, index) => ({ id: img.id, imageUrl: img.imageUrl, name: img.name, sortOrder: img.sortOrder ?? index }))}
+                    images={images.map((img, index) => ({ id: img.id, url: img.url, sortOrder: img.sortOrder ?? index }))}
                     onReorder={handleImageReorder}
                     onDelete={handleDeleteImage}
                     deletingImageId={deletingImageId ?? undefined}
@@ -511,7 +510,7 @@ export default function ProductDetailTestB() {
                         </div>
                       )}
                       <img
-                        src={image.imageUrl}
+                        src={image.url}
                         alt={`상품 이미지 ${index + 1}`}
                         className="w-48 h-48 object-cover rounded-xl border border-gray-200"
                       />
@@ -639,7 +638,7 @@ export default function ProductDetailTestB() {
                 <div className="flex items-start gap-3">
                   {product.collectedProduct?.post?.images[0] && (
                     <img
-                      src={product.collectedProduct.post.images[0].imageUrl}
+                      src={product.collectedProduct.post.images[0].url}
                       alt=""
                       className="w-16 h-16 rounded-lg object-cover"
                     />

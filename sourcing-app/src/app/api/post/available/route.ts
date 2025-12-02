@@ -15,13 +15,27 @@ export async function GET(request: NextRequest) {
     }
     const userId = currentUser.userId
 
-    // 사용자의 도매채널 및 API 설정 조회 (Band 플랫폼만)
+    // 플랫폼 파라미터 가져오기 (기본값: BAND)
+    const searchParams = request.nextUrl.searchParams
+    const platformParam = searchParams.get('platform') as ChannelPlatform | null
+    const platform = platformParam || ChannelPlatform.BAND
+
+    // 현재 BAND만 지원
+    if (platform !== ChannelPlatform.BAND) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        message: `${platform} 플랫폼은 아직 지원되지 않습니다.`,
+      })
+    }
+
+    // 사용자의 도매채널 및 API 설정 조회 (해당 플랫폼만)
     const wholesaleChannels = await prisma.channel.findMany({
       where: {
         userId: userId,
         isActive: true,
         kind: ChannelKind.WHOLESALE,
-        platform: ChannelPlatform.BAND,
+        platform: platform,
       },
       include: {
         apiConfig: {

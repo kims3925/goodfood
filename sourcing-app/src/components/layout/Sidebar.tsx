@@ -25,6 +25,7 @@ import {
   Cog,
   Calculator,
   MessageSquare,
+  Users,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -57,6 +58,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       '/automation': '자동화 관리',
       '/settlement': '정산 관리',
       '/cs': '고객 문의',
+      '/user': '사용자 관리',
       '/admin/settings': '환경 설정',
     }
 
@@ -168,6 +170,11 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       label: '고객 문의',
       href: '/cs/inquiry',
       icon: <MessageSquare size={20} />,
+    },
+    {
+      label: '사용자 관리',
+      href: '/user/list',
+      icon: <Users size={20} />,
     },
     {
       label: '환경 설정',

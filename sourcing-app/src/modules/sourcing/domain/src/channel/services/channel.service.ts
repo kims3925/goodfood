@@ -52,7 +52,6 @@ export class ChannelService {
       channelKey: data.channelKey,
       name: data.name,
       coverUrl: data.coverUrl || null,
-      formUrl: data.formUrl || null,
       accountHolder: data.accountHolder || null,
       bankAccount: data.bankAccount || null,
       bankName: data.bankName || null,

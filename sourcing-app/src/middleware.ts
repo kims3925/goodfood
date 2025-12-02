@@ -12,6 +12,8 @@ export async function middleware(request: NextRequest) {
     '/api/auth/login',
     '/api/auth/logout',
     '/api/order/webhook',  // Google Forms 웹훅
+    '/api/assets/',        // 이미지 등 정적 자산
+    '/api/images/',        // 이미지 API
   ]
 
   // 공개 경로는 통과

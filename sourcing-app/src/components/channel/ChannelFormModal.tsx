@@ -25,7 +25,6 @@ interface Channel {
   name: string
   coverUrl: string | null
   isActive: boolean
-  formUrl: string | null
   accountHolder: string | null
   bankAccount: string | null
   bankName: string | null
@@ -95,7 +94,6 @@ export default function ChannelFormModal({
     coverUrl: '',
     isActive: true,
     // Retail 전용 필드
-    formUrl: '',
     accountHolder: '',
     bankAccount: '',
     bankName: '',
@@ -158,7 +156,6 @@ export default function ChannelFormModal({
           name: channel.name,
           coverUrl: channel.coverUrl || '',
           isActive: channel.isActive,
-          formUrl: channel.formUrl || '',
           accountHolder: channel.accountHolder || '',
           bankAccount: channel.bankAccount || '',
           bankName: channel.bankName || '',
@@ -171,7 +168,6 @@ export default function ChannelFormModal({
           name: '',
           coverUrl: '',
           isActive: true,
-          formUrl: '',
           accountHolder: '',
           bankAccount: '',
           bankName: '',
@@ -268,7 +264,6 @@ export default function ChannelFormModal({
             name: formData.name,
             isActive: formData.isActive,
             coverUrl: formData.coverUrl || null,
-            formUrl: formData.formUrl || null,
             accountHolder: formData.accountHolder || null,
             bankAccount: formData.bankAccount || null,
             bankName: formData.bankName || null,
@@ -279,7 +274,6 @@ export default function ChannelFormModal({
             channelKey: formData.channelKey,
             name: formData.name,
             coverUrl: formData.coverUrl || null,
-            formUrl: formData.formUrl || null,
             accountHolder: formData.accountHolder || null,
             bankAccount: formData.bankAccount || null,
             bankName: formData.bankName || null,
@@ -775,17 +769,6 @@ export default function ChannelFormModal({
             <h3 className="text-sm font-semibold text-gray-900 mb-4">소매 채널 정보</h3>
 
             <div className="space-y-4">
-              {/* 주문폼 URL */}
-              <div>
-                <Input
-                  label="주문폼 URL"
-                  placeholder="https://example.com/order-form"
-                  value={formData.formUrl}
-                  onChange={(e) => handleChange('formUrl', e.target.value)}
-                  helperText="고객이 주문할 때 사용하는 주문폼 URL"
-                />
-              </div>
-
               {/* 정산 계좌 정보 */}
               <div className="grid grid-cols-3 gap-4">
                 <div>
@@ -905,17 +888,6 @@ export default function ChannelFormModal({
             <h3 className="text-sm font-semibold text-gray-900 mb-4">소매 채널 정보</h3>
 
             <div className="space-y-4">
-              {/* 주문폼 URL */}
-              <div>
-                <Input
-                  label="주문폼 URL"
-                  placeholder="https://example.com/order-form"
-                  value={formData.formUrl}
-                  onChange={(e) => handleChange('formUrl', e.target.value)}
-                  helperText="고객이 주문할 때 사용하는 주문폼 URL"
-                />
-              </div>
-
               {/* 정산 계좌 정보 */}
               <div className="grid grid-cols-3 gap-4">
                 <div>
