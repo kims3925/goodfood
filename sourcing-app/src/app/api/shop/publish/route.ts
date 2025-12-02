@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
 
     // Format response
     const formattedProducts = products.map((product) => {
-      const mainImage = product.collectedProduct?.post?.images?.[0]?.imageUrl || product.thumbnailUrl
+      const mainImage = product.collectedProduct?.post?.images?.[0]?.url || product.thumbnailUrl
       const mainVariant = product.variants?.[0]
 
       // 발행 유형별 분류:

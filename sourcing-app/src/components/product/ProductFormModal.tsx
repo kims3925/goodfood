@@ -208,7 +208,7 @@ export default function ProductFormModal({
 
     try {
       setIsReorderingSaving(true)
-      const response = await fetch('/api/post-image/reorder', {
+      const response = await fetch('/api/images/post/reorder', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

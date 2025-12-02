@@ -9,14 +9,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// =============================================
-// ENUMS
-// =============================================
-
 enum UserRole {
-  USER
-  CUSTOMER
-  ADMIN
+  SOURCING_USER // 소싱앱 관리자
+  CUSTOMER      // 쇼핑몰 고객
+  ADMIN         // 슈퍼 관리자
 }
 
 enum SourcingPlatform {
@@ -25,8 +21,8 @@ enum SourcingPlatform {
 }
 
 enum ChannelKind {
-  WHOLESALE   // 소싱/도매 채널
-  RETAIL      // 판매/노출 채널
+  WHOLESALE
+  RETAIL
 }
 
 enum ChannelPlatform {
@@ -35,22 +31,14 @@ enum ChannelPlatform {
   ALIEXPRESS
   SMARTSTORE
   COUPANG
-  SHOP        // 쇼핑몰 (자체 e-commerce)
-  CUSTOM      // 그 외 커스텀 채널
+  SHOP
+  CUSTOM
 }
 
 enum AiProvider {
   GEMINI
   OPENAI
 }
-
-enum ProductStatus {
-  COLLECTED  // 수집됨 - 활성 상태
-  ARCHIVED   // 보관됨 - 비활성 상태
-}
-
-// 도매처/발행처 채널 타입 enum 제거됨
-// - SourceChannel, PublishChannel 테이블 삭제로 인해 불필요
 
 enum WorkflowType {
   COLLECT
@@ -77,8 +65,6 @@ enum PublishStatus {
   FAILED
   PENDING
 }
-
-// PublishType enum 제거됨 - Channel.platform으로 대체
 
 enum CustomerOrderStatus {
   PENDING
@@ -150,4 +136,3 @@ enum RefundMethod {
   BANK_TRANSFER
   POINTS
 }
-

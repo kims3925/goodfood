@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, RefreshCw, Package, Trash2, Filter, X, Store } from 'lucide-react'
+import { Search, RefreshCw, Trash2, Filter, X, Store } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
@@ -10,7 +10,7 @@ import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
-import Image from 'next/image'
+import ThumbnailImage from '@/components/ui/ThumbnailImage'
 
 // 밴드 로고 아이콘
 const BandIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
@@ -38,7 +38,15 @@ const PLATFORM_LABELS: Record<SourcePlatform, string> = {
   CUSTOM: '기타',
 }
 
-interface PublishedProductGroup {
+interface ProductImage {
+  id: number
+  url: string
+  sortOrder: number
+}
+
+interface PublishedProduct {
+  id: number
+  userId: number
   productId: number
   product: {
     id: number
@@ -54,18 +62,25 @@ interface PublishedProductGroup {
       }
     } | null
   }
-  publishedChannels: Array<{
-    publishId: number
-    channelId: number | null
-    channelName: string | null
-    channelCoverUrl: string | null
-    platform: string | null
-    publishedAt: string | null
-    createdAt: string
-    updatedAt: string
-  }>
-  latestPublishedAt: string | null
-  createdAt: string
+  channel: {
+    id: number
+    name: string
+    coverUrl: string | null
+    platform: string
+  } | null
+}
+
+// 발행상품 이미지 URL 가져오기 (product_image 우선)
+const getPublishedProductThumbnailUrl = (publishedProduct: PublishedProduct): string | null => {
+  // 1. product_image 테이블에서 첫 번째 이미지
+  if (publishedProduct.product?.images && publishedProduct.product.images.length > 0) {
+    return publishedProduct.product.images[0].url
+  }
+  // 2. thumbnailUrl 필드 (기존 호환성)
+  if (publishedProduct.product?.thumbnailUrl) {
+    return publishedProduct.product.thumbnailUrl
+  }
+  return null
 }
 
 export default function PublishedProductListPage() {
@@ -701,21 +716,13 @@ export default function PublishedProductListPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        {productGroup.product?.thumbnailUrl ? (
-                          <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                            <Image
-                              src={productGroup.product.thumbnailUrl}
-                              alt={productGroup.product.name}
-                              fill
-                              sizes="56px"
-                              className="object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                            <Package size={24} className="text-gray-400" />
-                          </div>
-                        )}
+                        <ThumbnailImage
+                          src={getPublishedProductThumbnailUrl(product)}
+                          alt={product.product?.name || '상품'}
+                          size="md"
+                          rounded="lg"
+                          fallbackIcon="package"
+                        />
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold text-gray-900 text-base truncate">
                             {productGroup.product?.name || '상품 정보 없음'}

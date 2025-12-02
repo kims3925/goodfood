@@ -1,7 +1,3 @@
-// =============================================
-// ORDER (주문)
-// =============================================
-
 model Order {
   id             Int                 @id @default(autoincrement())
   userId         Int                 @map("user_id")
@@ -60,10 +56,6 @@ model OrderItem {
   @@index([variantId])
   @@map("order_item")
 }
-
-// =============================================
-// ORDER TEST (웹훅 주문 - 구글폼 등)
-// =============================================
 
 model OrderTest {
   id                 Int               @id @default(autoincrement())

@@ -1,28 +1,19 @@
-// =============================================
-// PUBLISHED PRODUCT (발행된 상품)
-// 특정 채널(RetailBand 등)에 실제로 발행된 리스팅 단위 상품
-// =============================================
-
 model PublishedProduct {
-  id               Int           @id @default(autoincrement())
-  userId           Int           @map("user_id")
-  productId        Int           @map("product_id")
-  channelId        Int?          @map("channel_id") // null = 쇼핑몰 직접 발행
-
-  publishedAt      DateTime?     @map("published_at") @db.Timestamp(0)
-
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product          Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  channel          Channel?        @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  orderItems       OrderItem[]
-  orderTests       OrderTest[]
+  id               Int              @id @default(autoincrement())
+  userId           Int              @map("user_id")
+  productId        Int              @map("product_id")
+  publishedAt      DateTime?        @map("published_at") @db.Timestamp(0)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamp(0)
+  channelId        Int?             @map("channel_id")
   cartItems        CartItem[]
   inquiries        Inquiry[]
+  orderItems       OrderItem[]
+  orderTests       OrderTest[]
   publishHistories PublishHistory[]
+  channel          Channel?         @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  product          Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([productId, channelId])
   @@index([userId])
@@ -31,10 +22,6 @@ model PublishedProduct {
   @@map("published_product")
 }
 
-// =============================================
-// PUBLISH HISTORY (발행 이력)
-// =============================================
-
 model PublishHistory {
   id                 Int              @id @default(autoincrement())
   userId             Int              @map("user_id")
@@ -42,10 +29,8 @@ model PublishHistory {
   status             PublishStatus    @default(PENDING)
   errorMessage       String?          @map("error_message") @db.Text
   publishedAt        DateTime         @default(now()) @map("published_at") @db.Timestamp(0)
-
-  // Relationships
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  publishedProduct PublishedProduct @relation(fields: [publishedProductId], references: [id], onDelete: Cascade)
+  publishedProduct   PublishedProduct @relation(fields: [publishedProductId], references: [id], onDelete: Cascade)
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([publishedProductId])

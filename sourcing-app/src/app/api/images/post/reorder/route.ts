@@ -3,7 +3,7 @@ import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 /**
- * PUT /api/post-image/reorder
+ * PUT /api/images/post/reorder
  *
  * Reorder images for a post
  *
@@ -13,7 +13,7 @@ import { getCurrentUser } from '@/modules/auth/auth.service'
  *
  * Response:
  * - success: boolean
- * - data?: { updatedCount: number, thumbnailUrl: string | null }
+ * - data?: { updatedCount: number }
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -42,13 +42,6 @@ export async function PUT(request: NextRequest) {
         id: postId,
         userId,
       },
-      include: {
-        collectedProducts: {
-          include: {
-            products: true,
-          },
-        },
-      },
     })
 
     if (!post) {
@@ -63,7 +56,7 @@ export async function PUT(request: NextRequest) {
       prisma.collectedPostImage.updateMany({
         where: {
           id: imageId,
-          postId, // Ensure image belongs to this post
+          postId,
         },
         data: {
           sortOrder: index,
@@ -73,31 +66,10 @@ export async function PUT(request: NextRequest) {
 
     await Promise.all(updatePromises)
 
-    // Get the first image (new thumbnail)
-    const firstImage = await prisma.collectedPostImage.findFirst({
-      where: { postId },
-      orderBy: { sortOrder: 'asc' },
-    })
-
-    const thumbnailUrl = firstImage?.imageUrl || null
-
-    // Update product's thumbnailUrl if product exists
-    const productIds = post.collectedProducts.flatMap((cp) =>
-      cp.products.map((p) => p.id)
-    )
-
-    if (productIds.length > 0) {
-      await prisma.product.updateMany({
-        where: { id: { in: productIds } },
-        data: { thumbnailUrl },
-      })
-    }
-
     return NextResponse.json({
       success: true,
       data: {
         updatedCount: imageIds.length,
-        thumbnailUrl,
       },
     })
   } catch (error: any) {

@@ -20,8 +20,6 @@ const DEFAULT_USER_ID = parseInt(process.env.DEFAULT_USER_ID || '1')
  * 선택 필드:
  * - quantity: 수량 (기본값: 1)
  * - totalPrice: 총액 (없으면 자동 계산)
- * - formUrl: 폼 URL (channelId 없을 때 폴백)
- * - channelId: 하위 호환성 (channelId로 대체됨)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -50,8 +48,6 @@ export async function POST(request: NextRequest) {
       quantity: rawQuantity,
       totalPrice,
       channelId: rawChannelId,
-      channelId: rawRetailChannelId, // 하위 호환성
-      formUrl
     } = body
 
     if (!customerName) {
@@ -94,12 +90,11 @@ export async function POST(request: NextRequest) {
     // === 소매채널 ID 확정 ===
     let channelId: number | null = null
 
-    // 1순위: channelId 직접 전달
-    const rawId = rawChannelId || rawRetailChannelId // 하위 호환성
-    if (rawId) {
-      const parsedId = typeof rawId === 'number'
-        ? rawId
-        : parseInt(String(rawId))
+    // channelId 직접 전달
+    if (rawChannelId) {
+      const parsedId = typeof rawChannelId === 'number'
+        ? rawChannelId
+        : parseInt(String(rawChannelId))
 
       if (!isNaN(parsedId)) {
         const channel = await prisma.channel.findFirst({
@@ -112,19 +107,6 @@ export async function POST(request: NextRequest) {
         })
         channelId = channel?.id || null
       }
-    }
-
-    // 2순위: formUrl로 Channel 매칭
-    if (!channelId && formUrl) {
-      const channel = await prisma.channel.findFirst({
-        where: {
-          userId: DEFAULT_USER_ID,
-          kind: ChannelKind.RETAIL,
-          formUrl: { contains: formUrl },
-        },
-        select: { id: true },
-      })
-      channelId = channel?.id || null
     }
 
     // === PublishedProduct 매칭 (channelId + productName) ===
@@ -248,7 +230,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const channelSource = rawId ? '직접전달' : formUrl ? 'formUrl' : '미분류'
+    const channelSource = rawChannelId ? '직접전달' : '미분류'
     const priceSource = matchedPublish?.product?.price ? '자동계산' : totalPrice ? '직접입력' : '없음'
     console.log(`[Webhook] 주문 생성: ID=${order.id}, 고객=${customerName}, 상품=${productName}(${quantity}개), 단가=${unitPrice || '?'}원, 총액=${calculatedTotalPrice || '?'}원(${priceSource}), PublishedProduct=${publishedProductId || '없음'}, 채널ID=${channelId || '없음'}(${channelSource})`)
 

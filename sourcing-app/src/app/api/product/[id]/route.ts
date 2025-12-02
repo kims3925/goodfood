@@ -46,6 +46,9 @@ export async function GET(
             },
           },
         },
+        images: {
+          orderBy: { sortOrder: 'asc' },
+        },
         options: true,
         variants: true,
       },

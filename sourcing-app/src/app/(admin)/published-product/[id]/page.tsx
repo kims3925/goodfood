@@ -8,7 +8,7 @@ import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import Input from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toast'
-import Image from 'next/image'
+import ProductImageViewer from '@/components/ui/ProductImageViewer'
 import ImageSortable, { SortableImage } from '@/components/product/ImageSortable'
 
 interface PublishedProductDetail {
@@ -50,7 +50,7 @@ interface PublishedProductDetail {
         }
         images: Array<{
           id: number
-          imageUrl: string
+          url: string
           sortOrder: number
         }>
       }
@@ -129,7 +129,7 @@ export default function PublishedProductDetailPage({
         if (data.data.product.collectedProduct?.post?.images) {
           setImages(data.data.product.collectedProduct.post.images.map((img: any) => ({
             id: img.id,
-            imageUrl: img.imageUrl,
+            url: img.url,
             sortOrder: img.sortOrder,
           })))
         }
@@ -216,7 +216,7 @@ export default function PublishedProductDetailPage({
     if (product?.product.collectedProduct?.post?.images) {
       setImages(product.product.collectedProduct.post.images.map((img) => ({
         id: img.id,
-        imageUrl: img.imageUrl,
+        url: img.url,
         sortOrder: img.sortOrder,
       })))
     }
@@ -275,7 +275,7 @@ export default function PublishedProductDetailPage({
 
     setIsSavingImages(true)
     try {
-      const response = await fetch('/api/post-image/reorder', {
+      const response = await fetch('/api/images/post/reorder', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -326,7 +326,7 @@ export default function PublishedProductDetailPage({
 
     setDeletingImageId(imageId)
     try {
-      const response = await fetch(`/api/post-image/${imageId}`, {
+      const response = await fetch(`/api/images/post/${imageId}`, {
         method: 'DELETE',
       })
 
@@ -560,26 +560,14 @@ export default function PublishedProductDetailPage({
               </>
             ) : (
               galleryImages.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
-                  {galleryImages.map((image, index) => (
-                    <div
-                      key={image.id}
-                      className="relative aspect-square rounded-lg overflow-hidden border border-dashed border-gray-200"
-                    >
-                      <Image
-                        src={image.imageUrl}
-                        alt={`상품 이미지 ${image.id}`}
-                        fill
-                        sizes="(max-width: 1024px) 100vw, 240px"
-                        className="object-cover"
-                      />
-                      {index === 0 && (
-                        <div className="absolute top-2 left-2 px-2 py-1 bg-purple-600 text-white text-xs rounded-full">
-                          대표
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div className="mt-4">
+                  <ProductImageViewer
+                    images={galleryImages}
+                    productName={product.product.name}
+                    enableLightbox={true}
+                    showThumbnails={true}
+                    thumbnailSize="md"
+                  />
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-gray-400">

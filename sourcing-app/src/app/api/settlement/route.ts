@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
         if (platform && channelData.platform !== platform) continue
 
         const thumbnailUrl = item.thumbnailUrl ||
-          item.publishedProduct?.product?.collectedProduct?.post?.images?.[0]?.imageUrl || null
+          item.publishedProduct?.product?.collectedProduct?.post?.images?.[0]?.url || null
 
         channelData.items.push({
           id: item.id,

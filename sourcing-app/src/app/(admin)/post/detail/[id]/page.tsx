@@ -2,18 +2,18 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Save, X, Trash2, MessageCircle } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Trash2, MessageCircle, ImageIcon } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
+import ImageGallery from '@/components/ui/ImageGallery'
 
 interface PostImage {
   id: number
   postId: number
-  name: string
-  imageUrl: string
+  url: string
   fileSize: number | null
   sortOrder: number
 }
@@ -351,30 +351,19 @@ export default function PostDetailPage() {
         {/* 이미지 갤러리 */}
         {post.images && post.images.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
-              이미지 ({post.images.length}개)
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {post.images.map((image, index) => (
-                <div key={image.id} className="relative group">
-                  <img
-                    src={image.imageUrl}
-                    alt={`이미지 ${index + 1}`}
-                    className="w-full h-48 object-cover rounded-lg"
-                  />
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity rounded-lg flex items-center justify-center">
-                    <a
-                      href={image.imageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="opacity-0 group-hover:opacity-100 text-white text-sm font-medium"
-                    >
-                      원본 보기
-                    </a>
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center gap-2 mb-4">
+              <ImageIcon size={20} className="text-gray-400" />
+              <h2 className="text-xl font-bold text-gray-900">
+                이미지 ({post.images.length}개)
+              </h2>
             </div>
+            <ImageGallery
+              images={post.images}
+              gridCols={4}
+              aspectRatio="square"
+              enableLightbox={true}
+              showThumbnails={true}
+            />
           </div>
         )}
 

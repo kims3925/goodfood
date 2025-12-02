@@ -1,29 +1,17 @@
-// =============================================
-// COLLECTED PRODUCT (수집 상품)
-// 도매 밴드 Post에서 추출한 원본 상품 정보
-// =============================================
-
 model CollectedProduct {
-  id             Int      @id @default(autoincrement())
-  userId         Int      @map("user_id")
-  postId         Int      @map("collected_post_id")
-
-  // 원본에서 추출한 상품 정보 (불완전해도 됨)
-  name           String?  @db.VarChar(500)
-  description    String?  @db.Text
-
-  // Pricing
-  currency       String   @default("KRW") @db.VarChar(10)
+  id             Int           @id @default(autoincrement())
+  userId         Int           @map("user_id")
+  postId         Int           @map("collected_post_id")
+  name           String?       @db.VarChar(500)
+  description    String?       @db.Text
+  currency       String        @default("KRW") @db.VarChar(10)
   price          Int?
-  wholesalePrice Int?     @map("wholesale_price")
-
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // Relationships
-  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post           CollectedPost     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  products       Product[]         // 이 수집 상품에서 파생된 내부 상품들
+  wholesalePrice Int?          @map("wholesale_price")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
+  post           CollectedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products       Product[]
 
   @@index([userId])
   @@index([postId])

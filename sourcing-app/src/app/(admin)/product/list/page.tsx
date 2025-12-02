@@ -15,6 +15,7 @@ import PolicySelectionModal from '@/components/product/PolicySelectionModal'
 import ProductFormModal from '@/components/product/ProductFormModal'
 import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
+import ThumbnailImage from '@/components/ui/ThumbnailImage'
 
 interface Channel {
   id: number
@@ -50,6 +51,7 @@ interface Product {
   price: number | null
   currency: string
   createdAt: string
+  images?: ProductImage[]
   collectedProduct?: {
     post?: {
       title: string
@@ -59,7 +61,7 @@ interface Product {
         coverUrl: string | null
       }
       images: Array<{
-        imageUrl: string
+        url: string
       }>
     }
   } | null

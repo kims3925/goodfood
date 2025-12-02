@@ -178,12 +178,6 @@ export async function runPublishPipeline(
           doPush: false, // 푸시 알림 비활성화
         })
 
-        // 댓글로 주문서 URL 추가 (채널의 formUrl 사용)
-        if (channel.formUrl) {
-          const commentContent = buildCommentContent(channel.formUrl)
-          await bandClient.createComment(channel.channelKey, postKey, commentContent)
-        }
-
         // PublishedProduct 레코드 생성/업데이트
         await prisma.publishedProduct.upsert({
           where: {
@@ -311,18 +305,6 @@ function buildPostContent(product: any): string {
   } else if (product.collectedProduct?.post?.content) {
     lines.push(product.collectedProduct.post.content)
   }
-
-  return lines.join('\n')
-}
-
-/**
- * 댓글 내용 생성 (주문서 URL)
- */
-function buildCommentContent(formUrl: string): string {
-  const lines: string[] = []
-
-  lines.push(`📋 주문서 작성하기`)
-  lines.push(formUrl)
 
   return lines.join('\n')
 }

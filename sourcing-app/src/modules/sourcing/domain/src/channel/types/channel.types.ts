@@ -17,7 +17,6 @@ export interface ChannelCreateInput {
   name: string
   coverUrl?: string | null
   // Retail 전용 필드
-  formUrl?: string | null
   accountHolder?: string | null
   bankAccount?: string | null
   bankName?: string | null
@@ -28,7 +27,6 @@ export interface ChannelUpdateInput {
   isActive?: boolean
   coverUrl?: string | null
   // Retail 전용 필드
-  formUrl?: string | null
   accountHolder?: string | null
   bankAccount?: string | null
   bankName?: string | null

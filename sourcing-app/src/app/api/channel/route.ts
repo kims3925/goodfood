@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { channelKey, name, kind, platform, coverUrl, formUrl, accountHolder, bankAccount, bankName } = body
+    const { channelKey, name, kind, platform, coverUrl, accountHolder, bankAccount, bankName } = body
 
     if (!channelKey || !name || !kind || !platform) {
       return NextResponse.json(
@@ -62,7 +62,6 @@ export async function POST(request: NextRequest) {
       kind,
       platform,
       coverUrl,
-      formUrl,
       accountHolder,
       bankAccount,
       bankName,
@@ -96,7 +95,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, name, isActive, coverUrl, formUrl, accountHolder, bankAccount, bankName } = body
+    const { id, name, isActive, coverUrl, accountHolder, bankAccount, bankName } = body
 
     if (!id) {
       return NextResponse.json(
@@ -109,7 +108,6 @@ export async function PUT(request: NextRequest) {
       name,
       isActive,
       coverUrl,
-      formUrl,
       accountHolder,
       bankAccount,
       bankName,

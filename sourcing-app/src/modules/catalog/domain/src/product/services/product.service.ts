@@ -28,7 +28,7 @@ export class ProductService {
 
       if (existingCollected) {
         collectedProductId = existingCollected.id
-        thumbnailUrl = thumbnailUrl || existingCollected.post?.images?.[0]?.imageUrl || null
+        thumbnailUrl = thumbnailUrl || existingCollected.post?.images?.[0]?.url || null
       } else {
         const collected = await productRepository.createCollectedProductFromPost({
           userId: data.userId,
@@ -39,7 +39,7 @@ export class ProductService {
           price: data.price,
         })
         collectedProductId = collected.id
-        thumbnailUrl = thumbnailUrl || post.images[0]?.imageUrl || null
+        thumbnailUrl = thumbnailUrl || post.images[0]?.url || null
       }
     }
 

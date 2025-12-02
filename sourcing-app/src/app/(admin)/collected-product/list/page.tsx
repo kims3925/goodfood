@@ -12,6 +12,7 @@ import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
+import ThumbnailImage from '@/components/ui/ThumbnailImage'
 
 interface Channel {
   id: number
@@ -95,7 +96,7 @@ interface CollectedProduct {
     }
     images: Array<{
       id: number
-      imageUrl: string
+      url: string
     }>
   }
   products: Array<{

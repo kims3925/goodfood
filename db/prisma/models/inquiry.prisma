@@ -1,24 +1,19 @@
-// =============================================
-// INQUIRY (상품 문의)
-// =============================================
-
 model Inquiry {
-  id                 Int              @id @default(autoincrement())
-  userId             Int              @map("user_id")
-  publishedProductId Int?             @map("published_product_id") // null이면 일반 문의
-  inquiryType        InquiryType      @map("inquiry_type")
-  title              String           @db.VarChar(200)
-  content            String           @db.Text
-  isPrivate          Boolean          @default(false) @map("is_private")
-  status             InquiryStatus    @default(PENDING)
-  adminReply         String?          @map("admin_reply") @db.Text // 레거시, replies 사용 권장
-  repliedAt          DateTime?        @map("replied_at") @db.Timestamp(0)
-  repliedBy          Int?             @map("replied_by")
-  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  publishedProduct   PublishedProduct? @relation(fields: [publishedProductId], references: [id], onDelete: SetNull)
+  id                 Int               @id @default(autoincrement())
+  userId             Int               @map("user_id")
+  inquiryType        InquiryType       @map("inquiry_type")
+  title              String            @db.VarChar(200)
+  content            String            @db.Text
+  isPrivate          Boolean           @default(false) @map("is_private")
+  status             InquiryStatus     @default(PENDING)
+  adminReply         String?           @map("admin_reply") @db.Text
+  repliedAt          DateTime?         @map("replied_at") @db.Timestamp(0)
+  repliedBy          Int?              @map("replied_by")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamp(0)
+  publishedProductId Int?              @map("published_product_id")
+  publishedProduct   PublishedProduct? @relation(fields: [publishedProductId], references: [id])
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   replies            InquiryReply[]
 
   @@index([userId])
@@ -28,19 +23,14 @@ model Inquiry {
   @@map("inquiry")
 }
 
-// =============================================
-// INQUIRY REPLY (문의 답변)
-// =============================================
-
 model InquiryReply {
-  id              Int           @id @default(autoincrement())
-  inquiryId       Int           @map("inquiry_id")
-  content         String        @db.Text
-  isAdmin         Boolean       @default(true) @map("is_admin") // true: 관리자 답변, false: 고객 추가 문의
-  adminId         Int?          @map("admin_id") // 관리자 ID (추후 관리자 테이블 연결 가능)
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
-
-  inquiry         Inquiry       @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  id        Int      @id @default(autoincrement())
+  inquiryId Int      @map("inquiry_id")
+  content   String   @db.Text
+  isAdmin   Boolean  @default(true) @map("is_admin")
+  adminId   Int?     @map("admin_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  inquiry   Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
 
   @@index([inquiryId])
   @@map("inquiry_reply")

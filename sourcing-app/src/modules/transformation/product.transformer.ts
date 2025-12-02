@@ -253,7 +253,7 @@ function buildProductDraft(
   const { post } = input
 
   // Get thumbnail from first image
-  const thumbnailUrl = post.images?.[0]?.imageUrl || null
+  const thumbnailUrl = post.images?.[0]?.url || null
 
   // Generate variants from options
   const variants = analysis.options.length > 0
