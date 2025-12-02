@@ -3,7 +3,7 @@ import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 const TOSS_SECRET_KEY = process.env.TOSS_PAYMENTS_SECRET_KEY || ''
-const TOSS_API_URL = 'https://api.tosspayments.com/v1/payments'
+const TOSS_API_URL = process.env.TOSS_API_URL || 'https://api.tosspayments.com/v1/payments'
 
 // GET: 주문 상세 조회
 export async function GET(

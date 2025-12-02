@@ -21,6 +21,7 @@ export interface ProductCreateInput {
   currency?: string
   price?: number
   thumbnailUrl?: string | null
+  imageUrls?: string[]
 }
 
 export interface ProductUpdateInput {

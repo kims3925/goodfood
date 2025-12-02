@@ -26,6 +26,8 @@ model CollectedPostImage {
   id        Int           @id @default(autoincrement())
   postId    Int           @map("collected_post_id")
   url       String        @db.VarChar(1000)
+  fileHash  String?       @map("file_hash") @db.VarChar(64)
+  fileName  String?       @map("file_name") @db.VarChar(255)
   fileSize  Int?          @map("file_size")
   sortOrder Int           @default(0) @map("sort_order")
   createdAt DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
@@ -33,6 +35,7 @@ model CollectedPostImage {
 
   @@index([postId])
   @@index([sortOrder])
+  @@index([fileHash])
   @@map("collected_post_image")
 }
 
