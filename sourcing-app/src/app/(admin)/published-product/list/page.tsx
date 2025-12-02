@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, RefreshCw, Package, Trash2, Filter, X, Store, ExternalLink, RotateCcw } from 'lucide-react'
+import { Search, RefreshCw, Package, Trash2, Filter, X, Store } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
@@ -10,6 +10,7 @@ import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
+import Image from 'next/image'
 
 interface Channel {
   id: number
@@ -23,10 +24,6 @@ interface PublishedProduct {
   userId: number
   productId: number
   channelId: number | null
-  status: 'PENDING' | 'SUCCESS' | 'FAILED'
-  externalId: string | null
-  externalUrl: string | null
-  errorMessage: string | null
   publishedAt: string | null
   createdAt: string
   updatedAt: string
@@ -46,25 +43,18 @@ interface PublishedProduct {
   } | null
 }
 
-const STATUS_OPTIONS = [
-  { value: 'ALL', label: '전체 상태' },
-  { value: 'PENDING', label: '대기중' },
-  { value: 'SUCCESS', label: '발행완료' },
-  { value: 'FAILED', label: '발행실패' },
-]
-
 export default function PublishedProductListPage() {
   const router = useRouter()
   const toast = useToast()
   const [products, setProducts] = useState<PublishedProduct[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [query, setQuery] = useState('')
 
   // Filter states
   const [showFilters, setShowFilters] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
-  const [selectedStatus, setSelectedStatus] = useState<string>('ALL')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
 
@@ -87,10 +77,6 @@ export default function PublishedProductListPage() {
     loadChannels()
   }, [])
 
-  useEffect(() => {
-    loadProducts()
-  }, [currentPage, selectedChannelId, selectedStatus, startDate, endDate])
-
   const loadChannels = async () => {
     try {
       const response = await fetch('/api/channel?kind=RETAIL&limit=100')
@@ -103,7 +89,7 @@ export default function PublishedProductListPage() {
     }
   }
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     try {
       setIsLoading(true)
       const params = new URLSearchParams({
@@ -111,9 +97,8 @@ export default function PublishedProductListPage() {
         limit: itemsPerPage.toString(),
       })
 
-      if (searchTerm) params.append('search', searchTerm)
+      if (query) params.append('search', query)
       if (selectedChannelId) params.append('channelId', selectedChannelId)
-      if (selectedStatus && selectedStatus !== 'ALL') params.append('status', selectedStatus)
       if (startDate) params.append('startDate', startDate)
       if (endDate) params.append('endDate', endDate)
 
@@ -133,22 +118,30 @@ export default function PublishedProductListPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentPage, selectedChannelId, startDate, endDate, query, itemsPerPage, toast])
+
+  useEffect(() => {
+    loadProducts()
+  }, [loadProducts])
 
   const handleClearFilters = () => {
     setSelectedChannelId('')
-    setSelectedStatus('ALL')
     setStartDate('')
     setEndDate('')
     setSearchTerm('')
+    setQuery('')
     setCurrentPage(1)
   }
 
-  const hasActiveFilters = selectedChannelId || selectedStatus !== 'ALL' || startDate || endDate
+  const hasActiveFilters = selectedChannelId || startDate || endDate || Boolean(query)
 
   const handleSearch = () => {
     setCurrentPage(1)
-    loadProducts()
+    if (query === searchTerm) {
+      loadProducts()
+    } else {
+      setQuery(searchTerm)
+    }
   }
 
   const handlePageChange = (page: number) => {
@@ -240,22 +233,6 @@ export default function PublishedProductListPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    const statusMap: { [key: string]: { label: string; color: string } } = {
-      PENDING: { label: '대기중', color: 'bg-yellow-100 text-yellow-800' },
-      SUCCESS: { label: '발행완료', color: 'bg-green-100 text-green-800' },
-      FAILED: { label: '발행실패', color: 'bg-red-100 text-red-800' },
-    }
-
-    const statusInfo = statusMap[status] || { label: status, color: 'bg-gray-100 text-gray-800' }
-
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
-        {statusInfo.label}
-      </span>
-    )
-  }
-
   const getChannelBadge = (product: PublishedProduct) => {
     if (product.channel) {
       return (
@@ -276,15 +253,6 @@ export default function PublishedProductListPage() {
   const formatPrice = (price: number | null) => {
     if (!price) return '-'
     return `₩${price.toLocaleString()}`
-  }
-
-  const handleRetryPublish = async (id: number) => {
-    try {
-      toast.info('재발행 기능은 준비 중입니다.')
-    } catch (error) {
-      console.error('재발행 실패:', error)
-      toast.error('재발행에 실패했습니다.')
-    }
   }
 
   return (
@@ -376,25 +344,6 @@ export default function PublishedProductListPage() {
                   </select>
                 </div>
 
-                {/* 상태 필터 */}
-                <div className="w-40">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">발행 상태</label>
-                  <select
-                    value={selectedStatus}
-                    onChange={(e) => {
-                      setSelectedStatus(e.target.value)
-                      setCurrentPage(1)
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
-                  >
-                    {STATUS_OPTIONS.map((status) => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 {/* 날짜 필터 */}
                 <div className="w-40">
                   <label className="block text-sm font-medium text-gray-700 mb-1">시작일</label>
@@ -440,20 +389,6 @@ export default function PublishedProductListPage() {
                       <button
                         onClick={() => {
                           setSelectedChannelId('')
-                          setCurrentPage(1)
-                        }}
-                        className="hover:text-purple-600"
-                      >
-                        <X size={14} />
-                      </button>
-                    </span>
-                  )}
-                  {selectedStatus !== 'ALL' && (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                      상태: {STATUS_OPTIONS.find(s => s.value === selectedStatus)?.label}
-                      <button
-                        onClick={() => {
-                          setSelectedStatus('ALL')
                           setCurrentPage(1)
                         }}
                         className="hover:text-purple-600"
@@ -523,11 +458,11 @@ export default function PublishedProductListPage() {
                   <TableEmpty message="발행된 상품이 없습니다." />
                 ) : (
                   products.map((product) => (
-                    <TableRow
-                      key={product.id}
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/product/detail/${product.productId}`)}
-                    >
+                  <TableRow
+                    key={product.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => router.push(`/published-product/${product.id}`)}
+                  >
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
@@ -539,11 +474,15 @@ export default function PublishedProductListPage() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           {product.product?.thumbnailUrl ? (
-                            <img
-                              src={product.product.thumbnailUrl}
-                              alt={product.product.name}
-                              className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
-                            />
+                            <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                              <Image
+                                src={product.product.thumbnailUrl}
+                                alt={product.product.name}
+                                fill
+                                sizes="56px"
+                                className="object-cover"
+                              />
+                            </div>
                           ) : (
                             <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
                               <Package size={24} className="text-gray-400" />
@@ -553,11 +492,6 @@ export default function PublishedProductListPage() {
                             <div className="font-semibold text-gray-900 text-base truncate">
                               {product.product?.name || '상품 정보 없음'}
                             </div>
-                            {product.externalId && (
-                              <div className="text-xs text-gray-400 truncate">
-                                ID: {product.externalId}
-                              </div>
-                            )}
                           </div>
                         </div>
                       </TableCell>
@@ -577,6 +511,18 @@ export default function PublishedProductListPage() {
                               }).replace(/\. /g, '.').replace(/\.$/, '')
                             : '-'}
                         </span>
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleDeleteProduct(product.id)}
+                            title="삭제"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

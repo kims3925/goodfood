@@ -2,27 +2,42 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
+type RouteContext = { params: { id: string } }
+
+const unauthorizedResponse = NextResponse.json(
+  { success: false, error: '로그인이 필요합니다.' },
+  { status: 401 }
+)
+
+const invalidIdResponse = NextResponse.json(
+  { success: false, error: '유효하지 않은 id입니다.' },
+  { status: 400 }
+)
+
+const notFoundResponse = NextResponse.json(
+  { success: false, error: '발행상품을 찾을 수 없습니다.' },
+  { status: 404 }
+)
+
+const parsePublishedProductId = (params?: RouteContext['params']) => {
+  const publishedProductId = parseInt(params?.id || '', 10)
+  if (!params?.id || Number.isNaN(publishedProductId)) {
+    return null
+  }
+  return publishedProductId
+}
+
 // GET: 발행상품 상세 조회
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: NextRequest, { params }: RouteContext) {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return NextResponse.json(
-        { success: false, error: '로그인이 필요합니다.' },
-        { status: 401 }
-      )
+      return unauthorizedResponse
     }
 
-    const { id } = await params
-    const publishedProductId = parseInt(id, 10)
-    if (isNaN(publishedProductId)) {
-      return NextResponse.json(
-        { success: false, error: '유효하지 않은 id입니다.' },
-        { status: 400 }
-      )
+    const publishedProductId = parsePublishedProductId(params)
+    if (publishedProductId === null) {
+      return invalidIdResponse
     }
 
     const publishedProduct = await prisma.publishedProduct.findFirst({
@@ -66,10 +81,7 @@ export async function GET(
     })
 
     if (!publishedProduct) {
-      return NextResponse.json(
-        { success: false, error: '발행상품을 찾을 수 없습니다.' },
-        { status: 404 }
-      )
+      return notFoundResponse
     }
 
     return NextResponse.json({
@@ -86,30 +98,17 @@ export async function GET(
 }
 
 // PUT: 발행상품 수정 (재발행 시도 등)
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: RouteContext) {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return NextResponse.json(
-        { success: false, error: '로그인이 필요합니다.' },
-        { status: 401 }
-      )
+      return unauthorizedResponse
     }
 
-    const { id } = await params
-    const publishedProductId = parseInt(id, 10)
-    if (isNaN(publishedProductId)) {
-      return NextResponse.json(
-        { success: false, error: '유효하지 않은 id입니다.' },
-        { status: 400 }
-      )
+    const publishedProductId = parsePublishedProductId(params)
+    if (publishedProductId === null) {
+      return invalidIdResponse
     }
-
-    const body = await request.json()
-    const { status, externalId, externalUrl, errorMessage } = body
 
     // 발행상품 확인
     const existingProduct = await prisma.publishedProduct.findFirst({
@@ -120,11 +119,11 @@ export async function PUT(
     })
 
     if (!existingProduct) {
-      return NextResponse.json(
-        { success: false, error: '발행상품을 찾을 수 없습니다.' },
-        { status: 404 }
-      )
+      return notFoundResponse
     }
+
+    const body = await request.json()
+    const { status, externalId, externalUrl, errorMessage } = body
 
     const updateData: any = {}
     if (status !== undefined) updateData.status = status
@@ -152,26 +151,16 @@ export async function PUT(
 }
 
 // DELETE: 발행상품 삭제
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return NextResponse.json(
-        { success: false, error: '로그인이 필요합니다.' },
-        { status: 401 }
-      )
+      return unauthorizedResponse
     }
 
-    const { id } = await params
-    const publishedProductId = parseInt(id, 10)
-    if (isNaN(publishedProductId)) {
-      return NextResponse.json(
-        { success: false, error: '유효하지 않은 id입니다.' },
-        { status: 400 }
-      )
+    const publishedProductId = parsePublishedProductId(params)
+    if (publishedProductId === null) {
+      return invalidIdResponse
     }
 
     // 발행상품 확인
@@ -183,10 +172,7 @@ export async function DELETE(
     })
 
     if (!existingProduct) {
-      return NextResponse.json(
-        { success: false, error: '발행상품을 찾을 수 없습니다.' },
-        { status: 404 }
-      )
+      return notFoundResponse
     }
 
     await prisma.publishedProduct.delete({

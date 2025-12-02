@@ -4,7 +4,7 @@
  * PublishedProduct 기반 스키마 지원
  */
 
-import prisma, { PublishStatus } from '@bandauto/db'
+import prisma from '@bandauto/db'
 import { v4 as uuidv4 } from 'uuid'
 import {
   ValidationError,
@@ -317,11 +317,10 @@ export class CartService {
       throw new ValidationError('publishedProductId는 필수입니다')
     }
 
-    // publishedProduct 확인 (STATUS가 SUCCESS인 것만)
+    // publishedProduct 확인 (존재 여부만 확인)
     const publishedProduct = await prisma.publishedProduct.findFirst({
       where: {
         id: publishedProductId,
-        status: PublishStatus.SUCCESS,
       },
       include: {
         product: {

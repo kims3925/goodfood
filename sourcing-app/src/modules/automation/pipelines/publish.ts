@@ -3,7 +3,7 @@
  * 상품을 소매채널(소매밴드 등)에 발행
  */
 
-import prisma, { PublishStatus, ChannelKind } from '@bandauto/db'
+import prisma, { ChannelKind } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { NaverBandClient } from '@/modules/sourcing/domain/src/channel'
@@ -152,13 +152,13 @@ export async function runPublishPipeline(
         },
       })
 
-      if (existingPublish && existingPublish.status === PublishStatus.SUCCESS) {
+      if (existingPublish) {
         channelResult.skipped++
         publishedProducts.push({
           productId: product.id,
           channelId: channel.id,
-          postKey: existingPublish.externalId || undefined,
-          status: PublishStatus.SUCCESS,
+          postKey: undefined,
+          status: 'SUCCESS',
         })
         continue
       }
@@ -196,14 +196,9 @@ export async function runPublishPipeline(
             userId,
             productId: product.id,
             channelId: channel.id,
-            status: PublishStatus.SUCCESS,
-            externalId: postKey,
             publishedAt: new Date(),
           },
           update: {
-            status: PublishStatus.SUCCESS,
-            externalId: postKey,
-            errorMessage: null,
             publishedAt: new Date(),
           },
         })
@@ -214,7 +209,7 @@ export async function runPublishPipeline(
           productId: product.id,
           channelId: channel.id,
           postKey,
-          status: PublishStatus.SUCCESS,
+          status: 'SUCCESS',
         })
 
         // 진행 상황 업데이트
@@ -241,13 +236,9 @@ export async function runPublishPipeline(
             userId,
             productId: product.id,
             channelId: channel.id,
-            status: PublishStatus.FAILED,
-            errorMessage: publishError.message,
             publishedAt: new Date(),
           },
           update: {
-            status: PublishStatus.FAILED,
-            errorMessage: publishError.message,
             publishedAt: new Date(),
           },
         })
@@ -258,7 +249,7 @@ export async function runPublishPipeline(
         publishedProducts.push({
           productId: product.id,
           channelId: channel.id,
-          status: PublishStatus.FAILED,
+          status: 'FAILED',
           error: publishError.message,
         })
 

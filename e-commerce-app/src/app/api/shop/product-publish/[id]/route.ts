@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { PublishStatus } from '@bandauto/db'
+import prisma from '@bandauto/db'
 
 export async function GET(
   req: NextRequest,
@@ -23,7 +23,6 @@ export async function GET(
     const publishedProduct = await prisma.publishedProduct.findFirst({
       where: {
         id: publishedProductId,
-        status: PublishStatus.SUCCESS,
       },
       include: {
         product: {
