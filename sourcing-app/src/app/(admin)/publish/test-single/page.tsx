@@ -6,13 +6,13 @@ import {
   Search,
   RefreshCw,
   Package,
-  Check,
   X,
   Send,
   Globe,
   ExternalLink,
   AlertCircle,
   CheckCircle,
+  ShoppingBag,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -20,12 +20,19 @@ import Loading from '@/components/ui/Loading'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Pagination from '@/components/ui/Pagination'
 
+// 밴드 아이콘
+const BandIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+  </svg>
+)
+
 interface Channel {
   id: number
   name: string
   channelKey: string
   coverUrl: string | null
-  platform?: string | null
+  platform: string | null
   isActive: boolean
 }
 
@@ -57,8 +64,15 @@ interface Product {
 }
 
 type TabType = 'unpublished' | 'published' | 'all'
+type PlatformType = 'ALL' | 'SHOP' | 'BAND' | 'OTHER'
 
-export default function RetailBandPublishPage() {
+const PLATFORM_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
+  SHOP: { label: '쇼핑몰', color: 'text-blue-600', bgColor: 'bg-blue-50 border-blue-200', icon: <ShoppingBag size={16} /> },
+  BAND: { label: '밴드', color: 'text-green-600', bgColor: 'bg-green-50 border-green-200', icon: <BandIcon size={16} /> },
+  OTHER: { label: '기타', color: 'text-gray-600', bgColor: 'bg-gray-50 border-gray-200', icon: <Store size={16} /> },
+}
+
+export default function TestSinglePublishPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isPublishing, setIsPublishing] = useState(false)
@@ -66,6 +80,7 @@ export default function RetailBandPublishPage() {
   const [channels, setChannels] = useState<Channel[]>([])
   const [selectedChannelId, setSelectedChannelId] = useState<number | null>(null)
   const [isLoadingChannels, setIsLoadingChannels] = useState(true)
+  const [platformFilter, setPlatformFilter] = useState<PlatformType>('ALL')
 
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([])
   const [selectAllProducts, setSelectAllProducts] = useState(false)
@@ -78,7 +93,6 @@ export default function RetailBandPublishPage() {
   const [totalItems, setTotalItems] = useState(0)
   const itemsPerPage = 10
 
-  // Stats (탭과 무관하게 일정한 값)
   const [stats, setStats] = useState({ total: 0, published: 0, unpublished: 0 })
 
   const [publishResult, setPublishResult] = useState<{
@@ -103,14 +117,14 @@ export default function RetailBandPublishPage() {
       const data = await response.json()
 
       if (data.success) {
-        const retailChannels = (data.data as Channel[]).filter((ch) => ch.platform !== 'SHOP' && ch.isActive)
-        setChannels(retailChannels)
-        if (retailChannels.length > 0 && !selectedChannelId) {
-          setSelectedChannelId(retailChannels[0].id)
+        const activeChannels = (data.data as Channel[]).filter((ch) => ch.isActive)
+        setChannels(activeChannels)
+        if (activeChannels.length > 0 && !selectedChannelId) {
+          setSelectedChannelId(activeChannels[0].id)
         }
       }
     } catch (error) {
-      console.error('소매채널 조회 실패:', error)
+      console.error('채널 조회 실패:', error)
     } finally {
       setIsLoadingChannels(false)
     }
@@ -144,12 +158,11 @@ export default function RetailBandPublishPage() {
         setTotalItems(data.pagination.total)
         setTotalPages(data.pagination.totalPages)
 
-        // 전체 통계 업데이트 (탭과 무관하게 일정)
         if (data.stats) {
           setStats({
             total: data.stats.total,
-            published: data.stats.retailBandPublished,
-            unpublished: data.stats.retailBandUnpublished,
+            published: data.stats.published,
+            unpublished: data.stats.unpublished,
           })
         }
       }
@@ -159,6 +172,33 @@ export default function RetailBandPublishPage() {
       setIsLoading(false)
     }
   }
+
+  // 플랫폼별 채널 그룹화
+  const groupedChannels = useMemo(() => {
+    const groups: Record<string, Channel[]> = {
+      SHOP: [],
+      BAND: [],
+      OTHER: [],
+    }
+
+    channels.forEach((ch) => {
+      if (ch.platform === 'SHOP') {
+        groups.SHOP.push(ch)
+      } else if (ch.platform === 'BAND') {
+        groups.BAND.push(ch)
+      } else {
+        groups.OTHER.push(ch)
+      }
+    })
+
+    return groups
+  }, [channels])
+
+  // 필터링된 채널
+  const filteredChannels = useMemo(() => {
+    if (platformFilter === 'ALL') return channels
+    return groupedChannels[platformFilter] || []
+  }, [channels, groupedChannels, platformFilter])
 
   const handleSearch = () => {
     setCurrentPage(1)
@@ -258,7 +298,6 @@ export default function RetailBandPublishPage() {
       }
     } catch (error) {
       console.error('발행 취소 실패:', error)
-      alert('발행 취소 중 오류가 발생했습니다.')
     }
   }
 
@@ -278,19 +317,32 @@ export default function RetailBandPublishPage() {
     [channels, selectedChannelId]
   )
 
+  const getChannelPlatformConfig = (channel: Channel) => {
+    if (channel.platform === 'SHOP') return PLATFORM_CONFIG.SHOP
+    if (channel.platform === 'BAND') return PLATFORM_CONFIG.BAND
+    return PLATFORM_CONFIG.OTHER
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 헤더 */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Store className="text-primary-color" size={32} />
-            <h1 className="text-3xl font-bold text-gray-900">소매밴드 발행</h1>
+            <Send className="text-purple-600" size={32} />
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">상품 발행</h1>
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 ml-2">
+                테스트 A: 단일 채널 선택
+              </span>
+            </div>
           </div>
           <p className="text-gray-600">
-            소매 채널(밴드, 카페 등)에 상품을 발행합니다. 채널을 선택하고 원하는 상품을 일괄 발행하세요.
+            모든 소매 채널(쇼핑몰, 밴드, 카페 등)을 하나의 페이지에서 관리합니다. 채널을 선택하고 상품을 발행하세요.
           </p>
         </div>
 
+        {/* 대시보드 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
@@ -298,7 +350,7 @@ export default function RetailBandPublishPage() {
                 <Package className="text-blue-600" size={20} />
               </div>
               <div>
-                <p className="text-sm text-gray-500">판매 가능 상품</p>
+                <p className="text-sm text-gray-500">전체 상품</p>
                 <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
               </div>
             </div>
@@ -320,62 +372,104 @@ export default function RetailBandPublishPage() {
                 <AlertCircle className="text-yellow-600" size={20} />
               </div>
               <div>
-                <p className="text-sm text-gray-500">미발행 상품</p>
+                <p className="text-sm text-gray-500">미발행</p>
                 <p className="text-2xl font-bold text-yellow-600">{stats.unpublished}</p>
               </div>
             </div>
           </div>
         </div>
 
+        {/* 발행 채널 선택 영역 */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Store className="text-purple-600" size={20} />
+              <h3 className="font-semibold text-gray-900">발행 채널 선택</h3>
+            </div>
+            {/* 플랫폼 필터 */}
+            <div className="flex gap-1">
+              {(['ALL', 'SHOP', 'BAND', 'OTHER'] as PlatformType[]).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setPlatformFilter(type)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${
+                    platformFilter === type
+                      ? 'bg-purple-600 text-white border-purple-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {type === 'ALL' ? '전체' : PLATFORM_CONFIG[type]?.label || type}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {isLoadingChannels ? (
+            <div className="py-8 text-center text-gray-500">
+              <RefreshCw size={20} className="animate-spin inline mr-2" />
+              채널 로딩 중...
+            </div>
+          ) : filteredChannels.length === 0 ? (
+            <div className="py-8 text-center text-gray-500">
+              해당 플랫폼에 등록된 채널이 없습니다.
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {filteredChannels.map((channel) => {
+                const config = getChannelPlatformConfig(channel)
+                const isSelected = selectedChannelId === channel.id
+                return (
+                  <button
+                    key={channel.id}
+                    onClick={() => setSelectedChannelId(channel.id)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                      isSelected
+                        ? 'border-purple-600 bg-purple-50'
+                        : `${config.bgColor} hover:border-gray-400`
+                    }`}
+                  >
+                    <span className={config.color}>{config.icon}</span>
+                    <span className={`font-medium ${isSelected ? 'text-purple-700' : 'text-gray-700'}`}>
+                      {channel.name}
+                    </span>
+                    {isSelected && <CheckCircle size={16} className="text-purple-600" />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* 메인 콘텐츠 */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* 상품 목록 */}
           <div className="lg:col-span-3">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              {/* 탭 */}
               <div className="border-b border-gray-200">
                 <div className="flex">
-                  <button
-                    onClick={() => {
-                      setActiveTab('unpublished')
-                      setCurrentPage(1)
-                    }}
-                    className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === 'unpublished'
-                        ? 'border-primary-color text-primary-color'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    미발행
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveTab('published')
-                      setCurrentPage(1)
-                    }}
-                    className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === 'published'
-                        ? 'border-primary-color text-primary-color'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    발행 완료
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveTab('all')
-                      setCurrentPage(1)
-                    }}
-                    className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === 'all'
-                        ? 'border-primary-color text-primary-color'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    전체
-                  </button>
+                  {(['unpublished', 'published', 'all'] as TabType[]).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => {
+                        setActiveTab(tab)
+                        setCurrentPage(1)
+                      }}
+                      className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === tab
+                          ? 'border-purple-600 text-purple-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {tab === 'unpublished' ? '미발행' : tab === 'published' ? '발행 완료' : '전체'}
+                    </button>
+                  ))}
                 </div>
               </div>
 
+              {/* 검색 */}
               <div className="p-4 border-b border-gray-200">
-                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                <div className="flex gap-4 items-center justify-between">
                   <div className="flex gap-2 flex-1 max-w-md">
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -392,21 +486,16 @@ export default function RetailBandPublishPage() {
                       검색
                     </Button>
                   </div>
-                  <Button
-                    variant="secondary"
-                    onClick={loadProducts}
-                    disabled={isLoading}
-                  >
+                  <Button variant="secondary" onClick={loadProducts} disabled={isLoading}>
                     <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
                     새로고침
                   </Button>
                 </div>
               </div>
 
+              {/* 테이블 */}
               {isLoading ? (
-                <div className="p-12">
-                  <Loading />
-                </div>
+                <div className="p-12"><Loading /></div>
               ) : (
                 <Table>
                   <TableHeader>
@@ -428,15 +517,7 @@ export default function RetailBandPublishPage() {
                   </TableHeader>
                   <TableBody>
                     {products.length === 0 ? (
-                      <TableEmpty
-                        message={
-                          activeTab === 'unpublished'
-                            ? '미발행 상품이 없습니다.'
-                            : activeTab === 'published'
-                            ? '발행된 상품이 없습니다.'
-                            : '판매중인 상품이 없습니다.'
-                        }
-                      />
+                      <TableEmpty message="상품이 없습니다." />
                     ) : (
                       products.map((product) => {
                         const publishId = getPublishIdForSelectedChannel(product)
@@ -464,24 +545,16 @@ export default function RetailBandPublishPage() {
                                   </div>
                                 )}
                                 <div className="min-w-0 flex-1">
-                                  <div className="font-medium text-gray-900 truncate">
-                                    {product.name}
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-0.5">
-                                    {product.publishSummary}
-                                  </div>
+                                  <div className="font-medium text-gray-900 truncate">{product.name}</div>
+                                  <div className="text-xs text-gray-500 mt-0.5">{product.publishSummary}</div>
                                 </div>
                               </div>
                             </TableCell>
                             <TableCell>
-                              <span className="text-gray-600">
-                                {formatPrice(product.wholesalePrice)}
-                              </span>
+                              <span className="text-gray-600">{formatPrice(product.wholesalePrice)}</span>
                             </TableCell>
                             <TableCell>
-                              <span className="font-medium text-gray-900">
-                                {formatPrice(product.price)}
-                              </span>
+                              <span className="font-medium text-gray-900">{formatPrice(product.price)}</span>
                             </TableCell>
                             <TableCell>
                               <span className="text-green-600 font-medium">
@@ -528,78 +601,27 @@ export default function RetailBandPublishPage() {
             </div>
           </div>
 
+          {/* 사이드바: 발행 정보 */}
           <div className="lg:col-span-1 space-y-6">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center gap-2 mb-4">
-                <Store className="text-primary-color" size={20} />
-                <h3 className="font-semibold text-gray-900">소매채널 선택</h3>
-              </div>
-
-              {isLoadingChannels ? (
-                <div className="py-4 text-center text-gray-500 text-sm">
-                  <RefreshCw size={16} className="animate-spin inline mr-2" />
-                  채널 로딩 중...
-                </div>
-              ) : channels.length === 0 ? (
-                <div className="py-4 text-center">
-                  <p className="text-gray-500 text-sm mb-3">등록된 소매채널이 없습니다.</p>
-                  <a
-                    href="/channel"
-                    className="text-primary-color text-sm font-medium hover:underline"
-                  >
-                    채널 관리에서 등록하기
-                  </a>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {channels.map((channel) => (
-                    <button
-                      key={channel.id}
-                      onClick={() => setSelectedChannelId(channel.id)}
-                      className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
-                        selectedChannelId === channel.id
-                          ? 'border-primary-color bg-purple-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      {channel.coverUrl ? (
-                        <img
-                          src={channel.coverUrl}
-                          alt={channel.name}
-                          className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                          <Store size={20} className="text-gray-400" />
-                        </div>
-                      )}
-                      <div className="flex-1 text-left">
-                        <div className="font-medium text-gray-900 text-sm">
-                          {channel.name}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {channel.channelKey}
-                        </div>
-                      </div>
-                      {selectedChannelId === channel.id && (
-                        <CheckCircle size={20} className="text-primary-color flex-shrink-0" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Globe className="text-primary-color" size={20} />
+                <Globe className="text-purple-600" size={20} />
                 <h3 className="font-semibold text-gray-900">발행 정보</h3>
               </div>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">발행 대상</span>
-                  <span className="font-medium">
-                    {selectedChannel ? selectedChannel.name : '미선택'}
+                  <span className="font-medium flex items-center gap-1">
+                    {selectedChannel ? (
+                      <>
+                        <span className={getChannelPlatformConfig(selectedChannel).color}>
+                          {getChannelPlatformConfig(selectedChannel).icon}
+                        </span>
+                        {selectedChannel.name}
+                      </>
+                    ) : (
+                      '미선택'
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -609,15 +631,10 @@ export default function RetailBandPublishPage() {
                 <div className="border-t pt-3">
                   <div className="flex justify-between">
                     <span className="text-gray-700 font-medium">발행 예정</span>
-                    <span className="font-bold text-primary-color">
-                      {selectedProductIds.length}건
-                    </span>
+                    <span className="font-bold text-purple-600">{selectedProductIds.length}건</span>
                   </div>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-4">
-                선택한 상품이 지정한 소매채널에 발행됩니다.
-              </p>
             </div>
 
             <Button
@@ -634,7 +651,7 @@ export default function RetailBandPublishPage() {
               ) : (
                 <>
                   <Send size={16} />
-                  소매채널에 발행하기
+                  선택 채널에 발행하기
                 </>
               )}
             </Button>

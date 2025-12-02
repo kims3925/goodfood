@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
     const channelId = searchParams.get('channelId')
+    const sourcePlatform = searchParams.get('sourcePlatform')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const page = parseInt(searchParams.get('page') || '1')
@@ -34,11 +35,23 @@ export async function GET(request: NextRequest) {
       ]
     }
 
+    // post 관련 필터 조건 생성
+    const postFilter: any = {}
+
     if (channelId) {
-      where.post = {
-        ...where.post,
-        channelId: parseInt(channelId),
+      postFilter.channelId = parseInt(channelId)
+    }
+
+    // sourcePlatform 필터: 수집 출처 플랫폼
+    if (sourcePlatform) {
+      postFilter.channel = {
+        platform: sourcePlatform,
       }
+    }
+
+    // post 필터가 있으면 적용
+    if (Object.keys(postFilter).length > 0) {
+      where.post = postFilter
     }
 
     if (startDate || endDate) {

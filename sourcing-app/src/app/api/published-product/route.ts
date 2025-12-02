@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
-// GET: 발행상품 목록 조회
+// GET: 발행상품 목록 조회 (Product 기준 그룹핑)
 export async function GET(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
@@ -17,81 +17,102 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     const channelId = searchParams.get('channelId')
     const sourcePlatform = searchParams.get('sourcePlatform')
+    const onlyShoppingMall = searchParams.get('onlyShoppingMall') === 'true'
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const skip = (page - 1) * limit
 
-    // 조건 생성
+    // Product 기준 조건 생성
     const where: any = {
       userId: currentUser.userId,
+      publishedProducts: { some: {} }, // 발행 레코드가 있는 상품만
     }
 
-    // sourcePlatform 필터: channel.platform으로 필터링
-    if (sourcePlatform) {
-      where.channel = {
-        platform: sourcePlatform,
-      }
-    }
-
+    // 상품명 검색
     if (search) {
-      where.product = {
-        name: { contains: search },
+      where.name = { contains: search }
+    }
+
+    // publishedProducts 필터 조건
+    const publishedProductsFilter: any = {}
+
+    // 쇼핑몰 필터: channel.platform이 SHOP인 상품만
+    if (onlyShoppingMall) {
+      publishedProductsFilter.channel = {
+        platform: 'SHOP',
       }
     }
-
-    if (channelId) {
-      where.channelId = parseInt(channelId)
+    // channelId 필터: 특정 채널에 발행된 상품 (쇼핑몰 필터와 배타적)
+    else if (channelId) {
+      publishedProductsFilter.channelId = parseInt(channelId)
     }
 
+    // 날짜 필터: 해당 날짜에 발행된 상품
     if (startDate || endDate) {
-      where.createdAt = {}
+      publishedProductsFilter.createdAt = {}
       if (startDate) {
-        where.createdAt.gte = new Date(startDate)
+        publishedProductsFilter.createdAt.gte = new Date(startDate)
       }
       if (endDate) {
         const end = new Date(endDate)
         end.setHours(23, 59, 59, 999)
-        where.createdAt.lte = end
+        publishedProductsFilter.createdAt.lte = end
       }
     }
 
+    // publishedProducts 필터가 있으면 적용
+    if (Object.keys(publishedProductsFilter).length > 0) {
+      where.publishedProducts = { some: publishedProductsFilter }
+    }
+
+    // sourcePlatform 필터: 수집 출처 플랫폼
+    if (sourcePlatform) {
+      where.collectedProduct = {
+        post: {
+          channel: {
+            platform: sourcePlatform,
+          },
+        },
+      }
+    }
+
+    console.log('Published Product API - onlyShoppingMall:', onlyShoppingMall)
+    console.log('Published Product API - publishedProductsFilter:', JSON.stringify(publishedProductsFilter, null, 2))
     console.log('Published Product API - where:', JSON.stringify(where, null, 2))
     console.log('Published Product API - page:', page, 'limit:', limit, 'skip:', skip)
 
-    const [data, total] = await Promise.all([
-      prisma.publishedProduct.findMany({
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
         where,
         include: {
-          product: {
-            select: {
-              id: true,
-              name: true,
-              thumbnailUrl: true,
-              collectedProduct: {
+          publishedProducts: {
+            include: {
+              channel: {
                 select: {
-                  post: {
+                  id: true,
+                  name: true,
+                  coverUrl: true,
+                  platform: true,
+                },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+          collectedProduct: {
+            select: {
+              post: {
+                select: {
+                  channel: {
                     select: {
-                      channel: {
-                        select: {
-                          id: true,
-                          name: true,
-                          platform: true,
-                        },
-                      },
+                      id: true,
+                      name: true,
+                      platform: true,
                     },
                   },
                 },
               },
-            },
-          },
-          channel: {
-            select: {
-              id: true,
-              name: true,
-              coverUrl: true,
-              platform: true,
             },
           },
         },
@@ -99,8 +120,31 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit,
       }),
-      prisma.publishedProduct.count({ where }),
+      prisma.product.count({ where }),
     ])
+
+    // 응답 데이터 변환
+    const data = products.map((product) => ({
+      productId: product.id,
+      product: {
+        id: product.id,
+        name: product.name,
+        thumbnailUrl: product.thumbnailUrl,
+        collectedProduct: product.collectedProduct,
+      },
+      publishedChannels: product.publishedProducts.map((pp) => ({
+        publishId: pp.id,
+        channelId: pp.channelId,
+        channelName: pp.channel?.name || null,
+        channelCoverUrl: pp.channel?.coverUrl || null,
+        platform: pp.channel?.platform || null,
+        publishedAt: pp.publishedAt,
+        createdAt: pp.createdAt,
+        updatedAt: pp.updatedAt,
+      })),
+      latestPublishedAt: product.publishedProducts[0]?.publishedAt || product.publishedProducts[0]?.createdAt,
+      createdAt: product.createdAt,
+    }))
 
     console.log('Published Product API - total:', total, 'data.length:', data.length)
 

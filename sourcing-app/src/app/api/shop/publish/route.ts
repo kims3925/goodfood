@@ -37,6 +37,50 @@ export async function GET(request: NextRequest) {
     // Get total count
     const total = await prisma.product.count({ where })
 
+    // 통계 계산 (탭과 무관하게 일정한 값)
+    const allProducts = await prisma.product.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        publishedProducts: {
+          select: {
+            id: true,
+            channelId: true,
+            channel: {
+              select: {
+                kind: true,
+                platform: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    let totalCount = allProducts.length
+    let shoppingMallPublishedCount = 0
+    let retailBandPublishedCount = 0
+
+    for (const product of allProducts) {
+      const hasShoppingMall = product.publishedProducts.some(
+        (pp) => !pp.channelId || pp.channel?.platform === ChannelPlatform.SHOP
+      )
+      const hasRetailBand = product.publishedProducts.some(
+        (pp) => pp.channelId && pp.channel?.kind === ChannelKind.RETAIL && pp.channel?.platform !== ChannelPlatform.SHOP
+      )
+
+      if (hasShoppingMall) shoppingMallPublishedCount++
+      if (hasRetailBand) retailBandPublishedCount++
+    }
+
+    const stats = {
+      total: totalCount,
+      published: shoppingMallPublishedCount,
+      unpublished: totalCount - shoppingMallPublishedCount,
+      retailBandPublished: retailBandPublishedCount,
+      retailBandUnpublished: totalCount - retailBandPublishedCount,
+    }
+
     // Get products with publish info
     const products = await prisma.product.findMany({
       where,
@@ -154,6 +198,7 @@ export async function GET(request: NextRequest) {
         limit,
         totalPages: Math.ceil(total / limit),
       },
+      stats,
     })
   } catch (error) {
     console.error('발행 가능 상품 조회 실패:', error)
