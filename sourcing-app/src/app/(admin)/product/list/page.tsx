@@ -162,7 +162,6 @@ export default function ProductListPage() {
 
   const handleClearFilters = () => {
     setSelectedChannelId('')
-    setSelectedStatus('')
     setStartDate('')
     setEndDate('')
     setSearchTerm('')
@@ -694,20 +693,6 @@ export default function ProductListPage() {
                       <button
                         onClick={() => {
                           setSelectedChannelId('')
-                          setCurrentPage(1)
-                        }}
-                        className="hover:text-purple-600"
-                      >
-                        <X size={14} />
-                      </button>
-                    </span>
-                  )}
-                  {selectedStatus && (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                      상태: {STATUS_OPTIONS.find(s => s.value === selectedStatus)?.label}
-                      <button
-                        onClick={() => {
-                          setSelectedStatus('')
                           setCurrentPage(1)
                         }}
                         className="hover:text-purple-600"

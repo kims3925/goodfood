@@ -64,8 +64,6 @@ export async function GET(request: NextRequest) {
               name: true,
               thumbnailUrl: true,
               price: true,
-              wholesalePrice: true,
-              status: true,
             },
           },
           channel: {

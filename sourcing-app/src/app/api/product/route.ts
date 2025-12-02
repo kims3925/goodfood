@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
     const collectedProductId = searchParams.get('collectedProductId')
     const search = searchParams.get('search')
     const channelId = searchParams.get('channelId') || searchParams.get('channelId') // 하위 호환성
-    const status = searchParams.get('status')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const page = parseInt(searchParams.get('page') || '1')
@@ -30,7 +29,6 @@ export async function GET(request: NextRequest) {
       collectedProductId: collectedProductId ? parseInt(collectedProductId) : undefined,
       search: search || undefined,
       channelId: channelId ? parseInt(channelId) : undefined,
-      status: status || undefined,
       startDate: startDate || undefined,
       endDate: endDate || undefined,
       page,
@@ -73,7 +71,6 @@ export async function POST(request: NextRequest) {
       categoryId,
       currency,
       price,
-      wholesalePrice,
     } = body
 
     console.log('[Product Create] Request:', { postId, name })
@@ -101,7 +98,6 @@ export async function POST(request: NextRequest) {
       categoryId,
       currency,
       price,
-      wholesalePrice,
     })
 
     console.log('[Product Create] Success:', product.id)
@@ -142,7 +138,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, name, description, categoryId, price, wholesalePrice, status } = body
+    const { id, name, description, categoryId, price } = body
 
     if (!id) {
       return NextResponse.json(
@@ -156,8 +152,6 @@ export async function PUT(request: NextRequest) {
       description,
       categoryId,
       price,
-      wholesalePrice,
-      status,
     })
 
     return NextResponse.json({ success: true, data: product })

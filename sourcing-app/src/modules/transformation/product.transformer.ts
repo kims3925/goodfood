@@ -221,7 +221,6 @@ function parseAiResponse(aiResponse: AiResponse): AiProductAnalysis {
       options: parsed.options || [],
       pricing: {
         price: parsed.pricing?.price, // 정책 적용 시 AI가 계산한 판매가
-        wholesalePrice: parsed.pricing?.wholesalePrice,
         currency: parsed.pricing?.currency || 'KRW',
       },
       rawResponse: aiResponse.content,

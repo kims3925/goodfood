@@ -512,30 +512,10 @@ export default function PublishedProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[28%]">상품명</TableHead>
-                  <TableHead className="w-[15%]">발행 채널</TableHead>
-                  <TableHead className="w-[9%]">도매가</TableHead>
-                  <TableHead className="w-[9%]">판매가</TableHead>
-                  <TableHead className="w-[10%]">
-                    <select
-                      value={selectedStatus}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        setSelectedStatus(e.target.value)
-                        setCurrentPage(1)
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 bg-white cursor-pointer"
-                    >
-                      {STATUS_OPTIONS.map((status) => (
-                        <option key={status.value} value={status.value}>
-                          {status.label}
-                        </option>
-                      ))}
-                    </select>
-                  </TableHead>
-                  <TableHead className="w-[10%]">발행일</TableHead>
-                  <TableHead className="w-[15%]">액션</TableHead>
+                  <TableHead className="w-[40%]">상품명</TableHead>
+                  <TableHead className="w-[20%]">발행 채널</TableHead>
+                  <TableHead className="w-[18%]">판매가</TableHead>
+                  <TableHead className="w-[18%]">발행일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -584,22 +564,7 @@ export default function PublishedProductListPage() {
                       <TableCell>{getChannelBadge(product)}</TableCell>
                       <TableCell>
                         <div className="font-medium text-gray-900">
-                          {formatPrice(product.product?.wholesalePrice)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium text-gray-900">
                           {formatPrice(product.product?.price)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          {getStatusBadge(product.status)}
-                          {product.status === 'FAILED' && product.errorMessage && (
-                            <span className="text-xs text-red-500 truncate max-w-[100px]" title={product.errorMessage}>
-                              {product.errorMessage}
-                            </span>
-                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -612,38 +577,6 @@ export default function PublishedProductListPage() {
                               }).replace(/\. /g, '.').replace(/\.$/, '')
                             : '-'}
                         </span>
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-1">
-                          {product.externalUrl && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => window.open(product.externalUrl!, '_blank')}
-                              title="외부 링크 열기"
-                            >
-                              <ExternalLink size={14} />
-                            </Button>
-                          )}
-                          {product.status === 'FAILED' && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => handleRetryPublish(product.id)}
-                              title="재발행"
-                            >
-                              <RotateCcw size={14} />
-                            </Button>
-                          )}
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleDeleteProduct(product.id)}
-                            title="삭제"
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
                       </TableCell>
                     </TableRow>
                   ))

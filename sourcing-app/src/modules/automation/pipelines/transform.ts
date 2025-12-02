@@ -148,7 +148,6 @@ export async function runTransformPipeline(
           description: draft.description || null,
           currency: draft.currency || 'KRW',
           price: draft.price || null,
-          wholesalePrice: draft.wholesalePrice || null,
           rawMetadata: {
             originalTitle: post.title,
             originalContent: post.content,
@@ -167,7 +166,6 @@ export async function runTransformPipeline(
           categoryId: draft.categoryId || null,
           currency: draft.currency || 'KRW',
           price: draft.price || null,
-          wholesalePrice: draft.wholesalePrice || null,
           thumbnailUrl: post.images[0]?.imageUrl || null,
           options: draft.options?.length
             ? {
@@ -186,7 +184,6 @@ export async function runTransformPipeline(
                   sku: v.sku || null,
                   optionSummary: v.optionSummary || null,
                   price: v.price || draft.price || 0,
-                  wholesalePrice: v.wholesalePrice || draft.wholesalePrice || null,
                   stock: v.stock || 0,
                 })),
               }

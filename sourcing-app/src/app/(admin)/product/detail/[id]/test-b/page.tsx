@@ -94,7 +94,6 @@ export default function ProductDetailTestB() {
     description: '',
     categoryId: '',
     price: '',
-    wholesalePrice: '',
   })
 
   // 이미지 관련 상태
@@ -129,7 +128,6 @@ export default function ProductDetailTestB() {
           description: data.data.description || '',
           categoryId: data.data.categoryId || '',
           price: data.data.price?.toString() || '',
-          wholesalePrice: data.data.wholesalePrice?.toString() || '',
         })
       } else {
         setError(data.error || '상품을 불러오는데 실패했습니다.')
@@ -178,7 +176,6 @@ export default function ProductDetailTestB() {
           description: formData.description.trim() || null,
           categoryId: formData.categoryId.trim() || null,
           price: formData.price ? parseInt(formData.price) : null,
-          wholesalePrice: formData.wholesalePrice ? parseInt(formData.wholesalePrice) : null,
         }),
       })
 
@@ -228,7 +225,7 @@ export default function ProductDetailTestB() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          postId: product.postId,
+          postId: product.collectedProduct?.post?.id,
           imageIds: reorderedImages.map((img) => img.id),
         }),
       })
@@ -489,9 +486,9 @@ export default function ProductDetailTestB() {
               /* 편집 모드: ImageSortable 사용 */
               <>
                 <p className="text-sm text-gray-500 mb-4">드래그하여 순서를 변경하거나, 호버하여 삭제할 수 있습니다.</p>
-                {sortableImages.length > 0 ? (
+                {images.length > 0 ? (
                   <ImageSortable
-                    images={sortableImages}
+                    images={images.map((img, index) => ({ id: img.id, imageUrl: img.imageUrl, name: img.name, sortOrder: img.sortOrder ?? index }))}
                     onReorder={handleImageReorder}
                     onDelete={handleDeleteImage}
                     deletingImageId={deletingImageId ?? undefined}
@@ -558,7 +555,7 @@ export default function ProductDetailTestB() {
                       rows={6}
                     />
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">카테고리</label>
                       <Input
@@ -572,14 +569,6 @@ export default function ProductDetailTestB() {
                         type="number"
                         value={formData.price}
                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">도매가</label>
-                      <Input
-                        type="number"
-                        value={formData.wholesalePrice}
-                        onChange={(e) => setFormData({ ...formData, wholesalePrice: e.target.value })}
                       />
                     </div>
                   </div>
