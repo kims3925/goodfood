@@ -521,6 +521,7 @@ export default function PublishedProductListPage() {
                       checked={selectAll}
                       onChange={handleToggleSelectAll}
                       className="w-4 h-4 cursor-pointer"
+                      disabled={products.length === 0}
                     />
                   </TableHead>
                   <TableHead className="w-[32%]">상품명</TableHead>
@@ -531,66 +532,74 @@ export default function PublishedProductListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.length === 0 ? (
-                  <TableEmpty message="발행된 상품이 없습니다." />
-                ) : (
-                  products.map((product) => (
+                {/* 데이터 행 */}
+                {products.map((product) => (
                   <TableRow
                     key={product.id}
-                    className="hover:bg-gray-50 cursor-pointer"
+                    className="hover:bg-gray-50 cursor-pointer h-[72px]"
                     onClick={() => router.push(`/published-product/${product.id}`)}
                   >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(product.id)}
-                          onChange={() => handleToggleSelection(product.id)}
-                          className="w-4 h-4 cursor-pointer"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          {product.product?.thumbnailUrl ? (
-                            <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                              <Image
-                                src={product.product.thumbnailUrl}
-                                alt={product.product.name}
-                                fill
-                                sizes="56px"
-                                className="object-cover"
-                              />
-                            </div>
-                          ) : (
-                            <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                              <Package size={24} className="text-gray-400" />
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-gray-900 text-base truncate">
-                              {product.product?.name || '상품 정보 없음'}
-                            </div>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(product.id)}
+                        onChange={() => handleToggleSelection(product.id)}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        {product.product?.thumbnailUrl ? (
+                          <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                            <Image
+                              src={product.product.thumbnailUrl}
+                              alt={product.product.name}
+                              fill
+                              sizes="56px"
+                              className="object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                            <Package size={24} className="text-gray-400" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-gray-900 text-base truncate">
+                            {product.product?.name || '상품 정보 없음'}
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell>{getChannelBadge(product)}</TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600 whitespace-nowrap">
-                          {formatDateTime(product.createdAt)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600 whitespace-nowrap">
-                          {formatDateTime(product.updatedAt)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600 whitespace-nowrap">
-                          {formatDateTime(product.publishedAt)}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                      </div>
+                    </TableCell>
+                    <TableCell>{getChannelBadge(product)}</TableCell>
+                    <TableCell>
+                      <span className="text-sm text-gray-600 whitespace-nowrap">
+                        {formatDateTime(product.createdAt)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-gray-600 whitespace-nowrap">
+                        {formatDateTime(product.updatedAt)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-gray-600 whitespace-nowrap">
+                        {formatDateTime(product.publishedAt)}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {/* 빈 행 채우기 (10개 고정) */}
+                {Array.from({ length: itemsPerPage - products.length }).map((_, index) => (
+                  <TableRow key={`empty-${index}`} className="h-[72px]">
+                    <TableCell>&nbsp;</TableCell>
+                    <TableCell>&nbsp;</TableCell>
+                    <TableCell>&nbsp;</TableCell>
+                    <TableCell>&nbsp;</TableCell>
+                    <TableCell>&nbsp;</TableCell>
+                    <TableCell>&nbsp;</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}
