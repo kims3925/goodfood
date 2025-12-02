@@ -178,15 +178,6 @@ export default function SettlementListPage() {
     })
   }
 
-  const handleFilter = () => {
-    fetchData()
-  }
-
-  const handleResetFilter = () => {
-    setStartDate('')
-    setEndDate('')
-    setSelectedBandId('')
-  }
 
   const getPlatformIcon = (platform: string) => {
     switch (platform) {
@@ -358,12 +349,73 @@ export default function SettlementListPage() {
           </div>
         )}
 
-        {/* 필터 영역 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="p-4">
-            <div className="flex flex-col gap-4">
-              {/* 날짜 필터 및 버튼 */}
-              <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+        {/* 소매채널 필터 */}
+        {data && data.channels.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+            <div className="p-4">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setSelectedBandId('')}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                    selectedChannelId === ''
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
+                  }`}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center">
+                    <Store size={14} className="text-white" />
+                  </div>
+                  <span className="text-sm font-medium">전체</span>
+                </button>
+                {data.channels.map((band) => (
+                  <button
+                    key={band.id}
+                    onClick={() => setSelectedBandId(band.id.toString())}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                      selectedChannelId === band.id.toString()
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                    title={`${band.name} (${band.itemCount}건)`}
+                  >
+                    {band.coverUrl ? (
+                      <Image
+                        src={band.coverUrl}
+                        alt={band.name}
+                        width={32}
+                        height={32}
+                        className="w-8 h-8 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                        <Store size={14} className="text-white" />
+                      </div>
+                    )}
+                    <div className="text-left">
+                      <p className="text-sm font-medium line-clamp-1 max-w-[120px]">{band.name}</p>
+                      <p className="text-xs text-gray-400">{band.itemCount}건</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 메인 콘텐츠 */}
+        {loading ? (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
+            <Loading />
+          </div>
+        ) : data ? (
+          <div className="space-y-6">
+            {/* 소매채널 요약 테이블 */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">소매채널별 정산 요약</h2>
+                  <p className="text-sm text-gray-500 mt-1">각 소매채널의 주문 및 매출 현황을 확인하세요</p>
+                </div>
                 <div className="flex items-center gap-2">
                   <Calendar size={16} className="text-gray-400" />
                   <input
@@ -380,90 +432,6 @@ export default function SettlementListPage() {
                     className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-
-                <div className="flex gap-2">
-                  <Button variant="secondary" onClick={handleResetFilter}>
-                    초기화
-                  </Button>
-                  <Button variant="primary" onClick={handleFilter}>
-                    <Filter size={16} />
-                    필터 적용
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={fetchData}
-                    disabled={loading}
-                  >
-                    <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                    새로고침
-                  </Button>
-                </div>
-              </div>
-
-              {/* 소매채널 썸네일 버튼 */}
-              {data && data.channels.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
-                  <button
-                    onClick={() => setSelectedBandId('')}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                      selectedChannelId === ''
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
-                    }`}
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center">
-                      <Store size={14} className="text-white" />
-                    </div>
-                    <span className="text-sm font-medium">전체</span>
-                  </button>
-                  {data.channels.map((band) => (
-                    <button
-                      key={band.id}
-                      onClick={() => setSelectedBandId(band.id.toString())}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                        selectedChannelId === band.id.toString()
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                      }`}
-                      title={`${band.name} (${band.itemCount}건)`}
-                    >
-                      {band.coverUrl ? (
-                        <Image
-                          src={band.coverUrl}
-                          alt={band.name}
-                          width={32}
-                          height={32}
-                          className="w-8 h-8 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-                          <Store size={14} className="text-white" />
-                        </div>
-                      )}
-                      <div className="text-left">
-                        <p className="text-sm font-medium line-clamp-1 max-w-[120px]">{band.name}</p>
-                        <p className="text-xs text-gray-400">{band.itemCount}건</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* 메인 콘텐츠 */}
-        {loading ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
-            <Loading />
-          </div>
-        ) : data ? (
-          <div className="space-y-6">
-            {/* 소매채널 요약 테이블 */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-4 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">소매채널별 정산 요약</h2>
-                <p className="text-sm text-gray-500 mt-1">각 소매채널의 주문 및 매출 현황을 확인하세요</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">

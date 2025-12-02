@@ -125,6 +125,9 @@ export default function PublishPage() {
   const cellKey = (productId: number, channelId: number) => `${productId}-${channelId}`
 
   const handleCellClick = (productId: number, channelId: number) => {
+    // 이미 발행된 셀은 선택할 수 없음
+    if (isPublished(productId, channelId)) return
+
     const key = cellKey(productId, channelId)
     setSelectedCells((prev) => {
       const next = new Set(prev)
@@ -135,7 +138,11 @@ export default function PublishPage() {
   }
 
   const handleSelectRow = (productId: number) => {
-    const rowKeys = channels.map((ch) => cellKey(productId, ch.id))
+    // 미발행 셀만 선택 가능
+    const rowKeys = channels
+      .filter((ch) => !isPublished(productId, ch.id))
+      .map((ch) => cellKey(productId, ch.id))
+
     setSelectedCells((prev) => {
       const allSelected = rowKeys.every((k) => prev.has(k))
       const next = new Set(prev)
@@ -148,7 +155,11 @@ export default function PublishPage() {
   }
 
   const handleSelectColumn = (channelId: number) => {
-    const colKeys = products.map((p) => cellKey(p.id, channelId))
+    // 미발행 셀만 선택 가능
+    const colKeys = products
+      .filter((p) => !isPublished(p.id, channelId))
+      .map((p) => cellKey(p.id, channelId))
+
     setSelectedCells((prev) => {
       const allSelected = colKeys.every((k) => prev.has(k))
       const next = new Set(prev)
@@ -234,11 +245,10 @@ export default function PublishPage() {
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-6">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3">
             <Send className="text-purple-600" size={32} />
             <h1 className="text-3xl font-bold text-gray-900">상품 발행</h1>
           </div>
-          <p className="text-gray-600">행(상품) × 열(채널) 매트릭스로 한눈에 발행 현황 확인. 셀 클릭으로 선택, 일괄 발행/취소</p>
         </div>
 
         {/* 컨트롤 바 */}
@@ -288,23 +298,23 @@ export default function PublishPage() {
         </div>
 
         {/* 범례 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-4">
-          <div className="flex items-center gap-6 text-sm">
-            <span className="text-gray-500">범례:</span>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-green-500 flex items-center justify-center">
-                <Check size={14} className="text-white" />
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 mr-2">범례:</span>
+            <button className="px-3 py-1.5 rounded-md text-sm font-medium bg-green-100 text-green-700 flex items-center gap-1.5 pointer-events-none">
+              <div className="w-3 h-3 rounded bg-green-500 flex items-center justify-center">
+                <Check size={10} className="text-white" />
               </div>
-              <span>발행됨</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-gray-200" />
-              <span>미발행</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-purple-500" />
-              <span>선택됨</span>
-            </div>
+              발행됨
+            </button>
+            <button className="px-3 py-1.5 rounded-md text-sm font-medium bg-gray-100 text-gray-700 flex items-center gap-1.5 pointer-events-none">
+              <div className="w-3 h-3 rounded bg-gray-300" />
+              미발행
+            </button>
+            <button className="px-3 py-1.5 rounded-md text-sm font-medium bg-purple-100 text-purple-700 flex items-center gap-1.5 pointer-events-none">
+              <div className="w-3 h-3 rounded bg-purple-500" />
+              선택됨
+            </button>
           </div>
         </div>
 
@@ -341,12 +351,12 @@ export default function PublishPage() {
                       group.channels.map((ch) => (
                         <th
                           key={ch.id}
-                          className="border-b border-gray-200 p-1 min-w-[60px] cursor-pointer hover:bg-gray-100"
+                          className="border-b border-gray-200 p-1 min-w-[80px] cursor-pointer hover:bg-gray-100"
                           onClick={() => handleSelectColumn(ch.id)}
                           title={`${ch.name} 전체 선택/해제`}
                         >
-                          <div className="text-xs text-gray-600 truncate max-w-[60px] mx-auto" title={ch.name}>
-                            {ch.name.length > 6 ? ch.name.slice(0, 6) + '...' : ch.name}
+                          <div className="text-xs text-gray-600 truncate max-w-[80px] mx-auto" title={ch.name}>
+                            {ch.name.length > 8 ? ch.name.slice(0, 8) + '...' : ch.name}
                           </div>
                         </th>
                       ))
@@ -389,12 +399,12 @@ export default function PublishPage() {
                                 onClick={() => handleCellClick(product.id, ch.id)}
                                 className={`w-8 h-8 rounded transition-all ${
                                   selected
-                                    ? 'bg-purple-500 hover:bg-purple-600'
+                                    ? 'bg-purple-500 hover:bg-purple-600 cursor-pointer'
                                     : published
-                                    ? 'bg-green-500 hover:bg-green-600'
-                                    : 'bg-gray-200 hover:bg-gray-300'
+                                    ? 'bg-green-500 cursor-not-allowed'
+                                    : 'bg-gray-200 hover:bg-gray-300 cursor-pointer'
                                 }`}
-                                title={`${product.name} → ${ch.name}: ${published ? '발행됨' : '미발행'}`}
+                                title={`${product.name} → ${ch.name}: ${published ? '발행됨 (선택 불가)' : '미발행'}`}
                               >
                                 {published && <Check size={16} className="text-white mx-auto" />}
                               </button>
