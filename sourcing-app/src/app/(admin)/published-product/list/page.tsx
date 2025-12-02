@@ -48,10 +48,6 @@ interface PublishedProduct {
   id: number
   userId: number
   productId: number
-  channelId: number | null
-  publishedAt: string | null
-  createdAt: string
-  updatedAt: string
   product: {
     id: number
     name: string
@@ -62,6 +58,7 @@ interface PublishedProduct {
         channel: {
           id: number
           name: string
+          platform: string
         }
       }
     } | null
@@ -90,7 +87,7 @@ const getPublishedProductThumbnailUrl = (publishedProduct: PublishedProduct): st
 export default function PublishedProductListPage() {
   const router = useRouter()
   const toast = useToast()
-  const [products, setProducts] = useState<PublishedProduct[]>([])
+  const [products, setProducts] = useState<PublishedProductGroup[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [query, setQuery] = useState('')
@@ -101,6 +98,7 @@ export default function PublishedProductListPage() {
   const [availablePlatforms, setAvailablePlatforms] = useState<SourcePlatform[]>([])
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
   const [selectedSourcePlatform, setSelectedSourcePlatform] = useState<string>('')
+  const [onlyShoppingMall, setOnlyShoppingMall] = useState<boolean>(false)
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
 
@@ -161,6 +159,7 @@ export default function PublishedProductListPage() {
       if (query) params.append('search', query)
       if (selectedChannelId) params.append('channelId', selectedChannelId)
       if (selectedSourcePlatform) params.append('sourcePlatform', selectedSourcePlatform)
+      if (onlyShoppingMall) params.append('onlyShoppingMall', 'true')
       if (startDate) params.append('startDate', startDate)
       if (endDate) params.append('endDate', endDate)
 
@@ -211,7 +210,7 @@ export default function PublishedProductListPage() {
       setIsLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedChannelId, selectedSourcePlatform, startDate, endDate, query, itemsPerPage])
+  }, [selectedChannelId, selectedSourcePlatform, onlyShoppingMall, startDate, endDate, query, itemsPerPage])
 
   // 필터 변경 시 1페이지로 리셋하여 조회
   useEffect(() => {
@@ -226,13 +225,14 @@ export default function PublishedProductListPage() {
   const handleClearFilters = () => {
     setSelectedChannelId('')
     setSelectedSourcePlatform('')
+    setOnlyShoppingMall(false)
     setStartDate('')
     setEndDate('')
     setSearchTerm('')
     setQuery('')
   }
 
-  const hasActiveFilters = selectedChannelId || selectedSourcePlatform || startDate || endDate || Boolean(query)
+  const hasActiveFilters = selectedChannelId || selectedSourcePlatform || onlyShoppingMall || startDate || endDate || Boolean(query)
 
   const handleSearch = () => {
     if (query !== searchTerm) {
@@ -251,20 +251,41 @@ export default function PublishedProductListPage() {
       setSelectedIds([])
       setSelectAll(false)
     } else {
-      const allIds = products.map((p) => p.id)
+      // 모든 상품의 모든 publishId를 선택
+      const allIds = products.flatMap((p) => p.publishedChannels.map((ch) => ch.publishId))
       setSelectedIds(allIds)
       setSelectAll(true)
     }
   }
 
-  const handleToggleSelection = (id: number) => {
+  const handleToggleSelection = (productGroup: PublishedProductGroup) => {
+    // 해당 상품의 모든 publishId
+    const productPublishIds = productGroup.publishedChannels.map((ch) => ch.publishId)
+
     setSelectedIds((prev) => {
-      const newSelection = prev.includes(id)
-        ? prev.filter((pid) => pid !== id)
-        : [...prev, id]
-      setSelectAll(newSelection.length === products.length)
+      // 이 상품의 publishId가 하나라도 선택되어 있는지 확인
+      const isAnySelected = productPublishIds.some((id) => prev.includes(id))
+
+      let newSelection: number[]
+      if (isAnySelected) {
+        // 선택 해제: 이 상품의 모든 publishId를 제거
+        newSelection = prev.filter((id) => !productPublishIds.includes(id))
+      } else {
+        // 선택: 이 상품의 모든 publishId를 추가
+        newSelection = [...prev, ...productPublishIds]
+      }
+
+      // 전체 선택 체크박스 상태 업데이트
+      const allPublishIds = products.flatMap((p) => p.publishedChannels.map((ch) => ch.publishId))
+      setSelectAll(newSelection.length === allPublishIds.length && allPublishIds.length > 0)
+
       return newSelection
     })
+  }
+
+  const isProductSelected = (productGroup: PublishedProductGroup) => {
+    const productPublishIds = productGroup.publishedChannels.map((ch) => ch.publishId)
+    return productPublishIds.every((id) => selectedIds.includes(id))
   }
 
   const handleDeleteProduct = (id: number) => {
@@ -364,19 +385,39 @@ export default function PublishedProductListPage() {
     }
   }
 
-  const getChannelBadge = (product: PublishedProduct) => {
-    if (product.channel) {
-      return (
-        <div className="flex items-center gap-2">
-          <Store size={16} className="text-gray-400" />
-          <span className="text-gray-600">{product.channel.name}</span>
-        </div>
-      )
+  const getChannelBadges = (productGroup: PublishedProductGroup) => {
+    if (!productGroup.publishedChannels || productGroup.publishedChannels.length === 0) {
+      return <span className="text-gray-400 text-sm">발행 채널 없음</span>
     }
+
     return (
-      <div className="flex items-center gap-2">
-        <Store size={16} className="text-blue-400" />
-        <span className="text-blue-600">쇼핑몰</span>
+      <div className="flex flex-wrap gap-1.5">
+        {productGroup.publishedChannels.map((channel) => {
+          const isShoppingMall = !channel.channelId
+
+          if (isShoppingMall) {
+            return (
+              <span
+                key={channel.publishId}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium"
+              >
+                <Store size={12} />
+                쇼핑몰
+              </span>
+            )
+          }
+
+          return (
+            <span
+              key={channel.publishId}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium"
+              title={channel.channelName || '알 수 없음'}
+            >
+              <Store size={12} />
+              {channel.channelName || '알 수 없음'}
+            </span>
+          )
+        })}
       </div>
     )
   }
@@ -408,9 +449,10 @@ export default function PublishedProductListPage() {
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-4 border-b border-gray-200">
+            {/* 첫 번째 줄: 검색창 + 액션 버튼 */}
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex gap-2 flex-1 max-w-lg">
-                <div className="relative flex-1">
+              <div className="flex gap-2 items-center">
+                <div className="relative w-64">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                   <Input
                     type="text"
@@ -436,42 +478,6 @@ export default function PublishedProductListPage() {
                     </span>
                   )}
                 </Button>
-                {availablePlatforms.length > 0 && (
-                  <div className="flex gap-1">
-                    {availablePlatforms.map((platform) => {
-                      const isSelected = selectedSourcePlatform === platform
-                      const isBand = platform === 'BAND'
-
-                      return (
-                        <button
-                          key={platform}
-                          onClick={() => {
-                            if (isSelected) {
-                              setSelectedSourcePlatform('')
-                            } else {
-                              setSelectedSourcePlatform(platform)
-                            }
-                          }}
-                          title={`소싱처: ${PLATFORM_LABELS[platform]}`}
-                          className={`
-                            inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors
-                            ${isBand
-                              ? isSelected
-                                ? 'bg-green-600 text-white'
-                                : 'bg-green-50 text-green-700 border border-green-300 hover:bg-green-100'
-                              : isSelected
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                            }
-                          `}
-                        >
-                          {isBand ? <BandIcon size={14} /> : null}
-                          {PLATFORM_LABELS[platform]}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
               </div>
 
               <div className="flex gap-2">
@@ -493,6 +499,76 @@ export default function PublishedProductListPage() {
                 </Button>
               </div>
             </div>
+
+            {/* 두 번째 줄: 플랫폼 필터 버튼 */}
+            {availablePlatforms.length > 0 && (
+              <div className="flex gap-1.5 mt-3 pt-3 border-t border-gray-100">
+                <button
+                  onClick={() => {
+                    setSelectedSourcePlatform('')
+                    setOnlyShoppingMall(false)
+                  }}
+                  className={`
+                    inline-flex items-center justify-center min-w-[52px] px-3 py-1.5 text-sm font-medium rounded-md border transition-colors
+                    ${!selectedSourcePlatform && !onlyShoppingMall
+                      ? 'bg-purple-600 text-white border-purple-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }
+                  `}
+                >
+                  전체
+                </button>
+                {availablePlatforms.map((platform) => {
+                  const isSelected = selectedSourcePlatform === platform
+                  const isBand = platform === 'BAND'
+
+                  return (
+                    <button
+                      key={platform}
+                      onClick={() => {
+                        setSelectedSourcePlatform(platform)
+                        setOnlyShoppingMall(false)
+                      }}
+                      title={`소싱처: ${PLATFORM_LABELS[platform]}`}
+                      className={`
+                        inline-flex items-center justify-center gap-1.5 min-w-[52px] px-3 py-1.5 text-sm font-medium rounded-md border transition-colors
+                        ${isBand
+                          ? isSelected
+                            ? 'bg-green-600 text-white border-green-600'
+                            : 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100'
+                          : isSelected
+                            ? 'bg-purple-600 text-white border-purple-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        }
+                      `}
+                    >
+                      {isBand ? <BandIcon size={14} /> : null}
+                      {PLATFORM_LABELS[platform]}
+                    </button>
+                  )
+                })}
+                {/* 쇼핑몰 필터 버튼 */}
+                <button
+                  onClick={() => {
+                    setOnlyShoppingMall(!onlyShoppingMall)
+                    if (!onlyShoppingMall) {
+                      setSelectedSourcePlatform('')
+                    }
+                  }}
+                  title="쇼핑몰에 발행된 상품만 표시"
+                  className={`
+                    inline-flex items-center justify-center gap-1.5 min-w-[72px] px-3 py-1.5 text-sm font-medium rounded-md border transition-colors
+                    ${onlyShoppingMall
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100'
+                    }
+                  `}
+                >
+                  <Store size={14} />
+                  쇼핑몰
+                </button>
+              </div>
+            )}
           </div>
 
           {/* 필터 영역 */}
@@ -560,6 +636,17 @@ export default function PublishedProductListPage() {
                       </button>
                     </span>
                   )}
+                  {onlyShoppingMall && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                      쇼핑몰만 표시
+                      <button
+                        onClick={() => setOnlyShoppingMall(false)}
+                        className="hover:text-blue-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  )}
                   {startDate && (
                     <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
                       시작일: {startDate}
@@ -614,17 +701,17 @@ export default function PublishedProductListPage() {
               </TableHeader>
               <TableBody>
                 {/* 데이터 행 */}
-                {products.map((product) => (
+                {products.map((productGroup) => (
                   <TableRow
-                    key={product.id}
+                    key={productGroup.productId}
                     className="hover:bg-gray-50 cursor-pointer h-[72px]"
-                    onClick={() => router.push(`/published-product/${product.id}`)}
+                    onClick={() => router.push(`/product/${productGroup.productId}`)}
                   >
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
-                        checked={selectedIds.includes(product.id)}
-                        onChange={() => handleToggleSelection(product.id)}
+                        checked={isProductSelected(productGroup)}
+                        onChange={() => handleToggleSelection(productGroup)}
                         className="w-4 h-4 cursor-pointer"
                       />
                     </TableCell>
@@ -639,25 +726,25 @@ export default function PublishedProductListPage() {
                         />
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold text-gray-900 text-base truncate">
-                            {product.product?.name || '상품 정보 없음'}
+                            {productGroup.product?.name || '상품 정보 없음'}
                           </div>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{getChannelBadge(product)}</TableCell>
+                    <TableCell>{getChannelBadges(productGroup)}</TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-600 whitespace-nowrap">
-                        {formatDateTime(product.createdAt)}
+                        {formatDateTime(productGroup.createdAt)}
                       </span>
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-600 whitespace-nowrap">
-                        {formatDateTime(product.updatedAt)}
+                        {formatDateTime(productGroup.publishedChannels[0]?.updatedAt || null)}
                       </span>
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-600 whitespace-nowrap">
-                        {formatDateTime(product.publishedAt)}
+                        {formatDateTime(productGroup.latestPublishedAt)}
                       </span>
                     </TableCell>
                   </TableRow>

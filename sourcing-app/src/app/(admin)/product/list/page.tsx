@@ -21,13 +21,26 @@ interface Channel {
   id: number
   name: string
   coverUrl: string | null
+  platform?: string
 }
 
-interface ProductImage {
-  id: number
-  url: string
-  sortOrder: number
+type SourcePlatform = 'BAND' | 'ALIEXPRESS' | 'NAVER_CAFE' | 'SMARTSTORE' | 'COUPANG' | 'CUSTOM'
+
+const PLATFORM_LABELS: Record<SourcePlatform, string> = {
+  BAND: 'Band',
+  ALIEXPRESS: 'Ali',
+  NAVER_CAFE: '네이버카페',
+  SMARTSTORE: '스마트스토어',
+  COUPANG: '쿠팡',
+  CUSTOM: '기타',
 }
+
+// 밴드 로고 아이콘
+const BandIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+  </svg>
+)
 
 interface Product {
   id: number
@@ -115,7 +128,9 @@ export default function ProductListPage() {
   // Filter states
   const [showFilters, setShowFilters] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
+  const [availablePlatforms, setAvailablePlatforms] = useState<SourcePlatform[]>([])
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
+  const [selectedSourcePlatform, setSelectedSourcePlatform] = useState<string>('')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
 
@@ -157,6 +172,7 @@ export default function ProductListPage() {
 
   useEffect(() => {
     loadChannels()
+    loadAvailablePlatforms()
   }, [])
 
   const loadChannels = async () => {
@@ -169,6 +185,19 @@ export default function ProductListPage() {
     } catch (error) {
       console.error('채널 목록 조회 실패:', error)
       toast.error('채널 목록을 불러오는데 실패했습니다.')
+    }
+  }
+
+  const loadAvailablePlatforms = async () => {
+    try {
+      const response = await fetch('/api/channel?kind=WHOLESALE&limit=100')
+      const data = await response.json()
+      if (data.success && data.data) {
+        const platforms = [...new Set(data.data.map((ch: { platform: string }) => ch.platform))] as SourcePlatform[]
+        setAvailablePlatforms(platforms)
+      }
+    } catch (error) {
+      console.error('소싱처 플랫폼 목록 조회 실패:', error)
     }
   }
 
@@ -259,6 +288,7 @@ export default function ProductListPage() {
 
       if (query) params.append('search', query)
       if (selectedChannelId) params.append('channelId', selectedChannelId)
+      if (selectedSourcePlatform) params.append('sourcePlatform', selectedSourcePlatform)
       if (startDate) params.append('startDate', startDate)
       if (endDate) params.append('endDate', endDate)
 
@@ -280,7 +310,7 @@ export default function ProductListPage() {
       setIsLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedChannelId, startDate, endDate, query, itemsPerPage])
+  }, [selectedChannelId, selectedSourcePlatform, startDate, endDate, query, itemsPerPage])
 
   // 필터 변경 시 1페이지로 리셋하여 조회
   useEffect(() => {
@@ -294,13 +324,14 @@ export default function ProductListPage() {
 
   const handleClearFilters = () => {
     setSelectedChannelId('')
+    setSelectedSourcePlatform('')
     setStartDate('')
     setEndDate('')
     setSearchTerm('')
     setQuery('')
   }
 
-  const hasActiveFilters = selectedChannelId || startDate || endDate || Boolean(query)
+  const hasActiveFilters = selectedChannelId || selectedSourcePlatform || startDate || endDate || Boolean(query)
 
   const handleSearch = () => {
     if (query !== searchTerm) {
@@ -699,9 +730,10 @@ export default function ProductListPage() {
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-4 border-b border-gray-200">
+            {/* 첫 번째 줄: 검색창 + 액션 버튼 */}
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex gap-2 flex-1 max-w-md">
-                <div className="relative flex-1">
+              <div className="flex gap-2 items-center">
+                <div className="relative w-64">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                   <Input
                     type="text"
@@ -755,6 +787,56 @@ export default function ProductListPage() {
                 </Button>
               </div>
             </div>
+
+            {/* 두 번째 줄: 플랫폼 필터 버튼 */}
+            {availablePlatforms.length > 0 && (
+              <div className="flex gap-1.5 mt-3 pt-3 border-t border-gray-100">
+                <button
+                  onClick={() => {
+                    setSelectedSourcePlatform('')
+                    setCurrentPage(1)
+                  }}
+                  className={`
+                    inline-flex items-center justify-center min-w-[52px] px-3 py-1.5 text-sm font-medium rounded-md border transition-colors
+                    ${!selectedSourcePlatform
+                      ? 'bg-purple-600 text-white border-purple-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }
+                  `}
+                >
+                  전체
+                </button>
+                {availablePlatforms.map((platform) => {
+                  const isSelected = selectedSourcePlatform === platform
+                  const isBand = platform === 'BAND'
+
+                  return (
+                    <button
+                      key={platform}
+                      onClick={() => {
+                        setSelectedSourcePlatform(platform)
+                        setCurrentPage(1)
+                      }}
+                      title={`소싱처: ${PLATFORM_LABELS[platform] || platform}`}
+                      className={`
+                        inline-flex items-center justify-center gap-1.5 min-w-[52px] px-3 py-1.5 text-sm font-medium rounded-md border transition-colors
+                        ${isBand
+                          ? isSelected
+                            ? 'bg-green-600 text-white border-green-600'
+                            : 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100'
+                          : isSelected
+                            ? 'bg-purple-600 text-white border-purple-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        }
+                      `}
+                    >
+                      {isBand && <BandIcon size={14} />}
+                      {PLATFORM_LABELS[platform] || platform}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* 필터 영역 */}
@@ -826,6 +908,20 @@ export default function ProductListPage() {
                       <button
                         onClick={() => {
                           setSelectedChannelId('')
+                          setCurrentPage(1)
+                        }}
+                        className="hover:text-purple-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  )}
+                  {selectedSourcePlatform && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
+                      소싱처: {PLATFORM_LABELS[selectedSourcePlatform as SourcePlatform] || selectedSourcePlatform}
+                      <button
+                        onClick={() => {
+                          setSelectedSourcePlatform('')
                           setCurrentPage(1)
                         }}
                         className="hover:text-purple-600"

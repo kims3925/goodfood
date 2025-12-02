@@ -17,7 +17,8 @@ export async function GET(request: NextRequest) {
     const postId = searchParams.get('postId')
     const collectedProductId = searchParams.get('collectedProductId')
     const search = searchParams.get('search')
-    const channelId = searchParams.get('channelId') || searchParams.get('channelId') // 하위 호환성
+    const channelId = searchParams.get('channelId')
+    const sourcePlatform = searchParams.get('sourcePlatform')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const page = parseInt(searchParams.get('page') || '1')
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest) {
       collectedProductId: collectedProductId ? parseInt(collectedProductId) : undefined,
       search: search || undefined,
       channelId: channelId ? parseInt(channelId) : undefined,
+      sourcePlatform: sourcePlatform || undefined,
       startDate: startDate || undefined,
       endDate: endDate || undefined,
       page,
