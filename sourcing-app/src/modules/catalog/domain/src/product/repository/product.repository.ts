@@ -9,6 +9,7 @@ export class ProductRepository {
       postId,
       search,
       channelId,
+      sourcePlatform,
       startDate,
       endDate,
       page = 1,
@@ -22,6 +23,7 @@ export class ProductRepository {
     }
 
     const collectedProductWhere: any = {}
+    const postWhere: any = {}
 
     if (postId) {
       collectedProductWhere.postId = postId
@@ -35,9 +37,19 @@ export class ProductRepository {
     }
 
     if (channelId) {
-      collectedProductWhere.post = {
-        channelId,
+      postWhere.channelId = channelId
+    }
+
+    // sourcePlatform 필터: 수집 출처 플랫폼
+    if (sourcePlatform) {
+      postWhere.channel = {
+        platform: sourcePlatform,
       }
+    }
+
+    // post 필터가 있으면 적용
+    if (Object.keys(postWhere).length > 0) {
+      collectedProductWhere.post = postWhere
     }
 
     if (Object.keys(collectedProductWhere).length > 0) {

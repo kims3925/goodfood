@@ -4,6 +4,7 @@ export interface ProductListParams {
   postId?: number
   search?: string
   channelId?: number
+  sourcePlatform?: string
   startDate?: string
   endDate?: string
   page?: number
