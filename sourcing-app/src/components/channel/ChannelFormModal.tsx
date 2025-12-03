@@ -108,6 +108,9 @@ export default function ChannelFormModal({
   const [bandError, setBandError] = useState<string | null>(null)
   const [bandListFetched, setBandListFetched] = useState(false)
 
+  // 다중 선택 관련 상태
+  const [selectedBands, setSelectedBands] = useState<BandInfo[]>([])
+
   // 설정된 API 플랫폼 상태
   const [configuredPlatforms, setConfiguredPlatforms] = useState<string[]>([])
   const [isLoadingApiSettings, setIsLoadingApiSettings] = useState(false)
@@ -216,6 +219,7 @@ export default function ChannelFormModal({
       setBandError(null)
       setBandListFetched(false)
       setLogoPreview(null)
+      setSelectedBands([])
     }
   }, [isOpen, channel, fetchConfiguredPlatforms])
 
@@ -300,11 +304,15 @@ export default function ChannelFormModal({
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    // SHOP 플랫폼은 channelKey가 자동 생성되므로 검증 제외
-    if (!formData.channelKey.trim() && formData.platform !== 'SHOP') {
-      if (formData.platform === 'BAND') {
+    // BAND 플랫폼: 다중 선택 확인
+    if (formData.platform === 'BAND' && !isEditMode) {
+      if (selectedBands.length === 0) {
         newErrors.channelKey = '밴드를 선택해주세요.'
-      } else if (formData.platform === 'NAVER_CAFE') {
+      }
+    }
+    // SHOP 플랫폼은 channelKey가 자동 생성되므로 검증 제외
+    else if (!formData.channelKey.trim() && formData.platform !== 'SHOP') {
+      if (formData.platform === 'NAVER_CAFE') {
         newErrors.channelKey = '네이버 카페를 선택해주세요.'
       } else if (formData.platform === 'ALIEXPRESS') {
         newErrors.channelKey = '알리익스프레스 스토어를 선택해주세요.'
@@ -317,14 +325,16 @@ export default function ChannelFormModal({
       }
     }
 
-    // 채널명 검사: 수정 모드 또는 등록 모드일 때 필수
+    // 채널명 검사: 수정 모드 또는 등록 모드일 때 필수 (BAND 다중 선택 제외)
     if (!formData.name.trim()) {
       if (isEditMode) {
         newErrors.name = '채널명을 입력해주세요.'
       } else if (formData.platform === 'SHOP') {
         newErrors.name = '쇼핑몰명을 입력해주세요.'
-      } else if (formData.platform === 'BAND' && !formData.channelKey) {
-        // BAND는 밴드 선택 시 name이 자동 설정되므로, channelKey가 없을 때만 에러 (channelKey 에러가 우선)
+      } else if (formData.platform === 'BAND' && selectedBands.length > 0) {
+        // BAND 다중 선택 시 name은 각 밴드에서 가져오므로 검증 제외
+      } else if (formData.platform === 'BAND' && selectedBands.length === 0) {
+        // BAND는 밴드 선택 시 name이 자동 설정되므로, 선택이 없을 때는 channelKey 에러가 우선
       } else if (!formData.channelKey) {
         // 다른 플랫폼도 선택 시 name이 자동 설정됨
       } else {
@@ -342,43 +352,113 @@ export default function ChannelFormModal({
     setIsSubmitting(true)
     try {
       const url = '/api/channel'
-      const method = isEditMode ? 'PUT' : 'POST'
 
-      const body = isEditMode
-        ? {
-            id: channel!.id,
-            name: formData.name,
-            isActive: formData.isActive,
-            coverUrl: formData.coverUrl || null,
-            accountHolder: formData.accountHolder || null,
-            bankAccount: formData.bankAccount || null,
-            bankName: formData.bankName || null,
+      if (isEditMode) {
+        // 수정 모드
+        const body = {
+          id: channel!.id,
+          name: formData.name,
+          isActive: formData.isActive,
+          coverUrl: formData.coverUrl || null,
+          accountHolder: formData.accountHolder || null,
+          bankAccount: formData.bankAccount || null,
+          bankName: formData.bankName || null,
+        }
+
+        const response = await fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+
+        const data = await response.json()
+
+        if (data.success) {
+          toast.success('채널이 수정되었습니다.')
+          onSuccess()
+          onClose()
+        } else {
+          toast.error(data.error || '처리에 실패했습니다.')
+        }
+      } else if (formData.platform === 'BAND' && selectedBands.length > 0) {
+        // BAND 다중 등록
+        let successCount = 0
+        let failCount = 0
+        const failedBands: string[] = []
+
+        for (const band of selectedBands) {
+          try {
+            const body = {
+              kind: formData.kind,
+              platform: formData.platform,
+              channelKey: band.bandKey,
+              name: band.name,
+              coverUrl: band.coverUrl || null,
+              accountHolder: formData.accountHolder || null,
+              bankAccount: formData.bankAccount || null,
+              bankName: formData.bankName || null,
+            }
+
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            })
+
+            const data = await response.json()
+
+            if (data.success) {
+              successCount++
+            } else {
+              failCount++
+              failedBands.push(band.name)
+            }
+          } catch (error) {
+            console.error(`밴드 등록 실패 (${band.name}):`, error)
+            failCount++
+            failedBands.push(band.name)
           }
-        : {
-            kind: formData.kind,
-            platform: formData.platform,
-            channelKey: formData.channelKey,
-            name: formData.name,
-            coverUrl: formData.coverUrl || null,
-            accountHolder: formData.accountHolder || null,
-            bankAccount: formData.bankAccount || null,
-            bankName: formData.bankName || null,
+        }
+
+        if (successCount > 0) {
+          if (failCount > 0) {
+            toast.success(`${successCount}개 채널 등록 완료. ${failCount}개 실패: ${failedBands.join(', ')}`)
+          } else {
+            toast.success(`${successCount}개 채널이 등록되었습니다.`)
           }
-
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(isEditMode ? '채널이 수정되었습니다.' : '채널이 등록되었습니다.')
-        onSuccess()
-        onClose()
+          onSuccess()
+          onClose()
+        } else {
+          toast.error('채널 등록에 실패했습니다.')
+        }
       } else {
-        toast.error(data.error || '처리에 실패했습니다.')
+        // 단일 등록 (다른 플랫폼)
+        const body = {
+          kind: formData.kind,
+          platform: formData.platform,
+          channelKey: formData.channelKey,
+          name: formData.name,
+          coverUrl: formData.coverUrl || null,
+          accountHolder: formData.accountHolder || null,
+          bankAccount: formData.bankAccount || null,
+          bankName: formData.bankName || null,
+        }
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+
+        const data = await response.json()
+
+        if (data.success) {
+          toast.success('채널이 등록되었습니다.')
+          onSuccess()
+          onClose()
+        } else {
+          toast.error(data.error || '처리에 실패했습니다.')
+        }
       }
     } catch (error) {
       console.error('채널 처리 실패:', error)
@@ -403,6 +483,8 @@ export default function ChannelFormModal({
   const handlePlatformSelect = (platform: ChannelPlatform) => {
     // 로고 프리뷰 초기화
     setLogoPreview(null)
+    // 선택된 밴드 초기화
+    setSelectedBands([])
 
     // SHOP 플랫폼인 경우 자동으로 16자리 UUID 생성
     if (platform === 'SHOP') {
@@ -499,14 +581,16 @@ export default function ChannelFormModal({
     setLogoPreview(null)
   }
 
-  // 밴드 선택 핸들러
+  // 밴드 선택 핸들러 (다중 선택)
   const handleBandSelect = (band: BandInfo) => {
-    setFormData((prev) => ({
-      ...prev,
-      channelKey: band.bandKey,
-      name: band.name,
-      coverUrl: band.coverUrl || '',
-    }))
+    setSelectedBands((prev) => {
+      const isSelected = prev.some((b) => b.bandKey === band.bandKey)
+      if (isSelected) {
+        return prev.filter((b) => b.bandKey !== band.bandKey)
+      } else {
+        return [...prev, band]
+      }
+    })
     // 채널 키 에러 제거
     if (errors.channelKey) {
       setErrors((prev) => {
@@ -523,6 +607,16 @@ export default function ChannelFormModal({
       })
     }
   }
+
+  // 전체 선택/해제 핸들러
+  const handleSelectAllBands = () => {
+    if (selectedBands.length === bandList.length) {
+      setSelectedBands([])
+    } else {
+      setSelectedBands([...bandList])
+    }
+  }
+
 
   // API 설정된 플랫폼만 필터링 (등록 모드), 수정 모드에서는 전체
   const availablePlatforms = isEditMode
@@ -632,12 +726,27 @@ export default function ChannelFormModal({
         {/* 밴드 선택 (등록 시, 플랫폼이 BAND일 때만) */}
         {!isEditMode && formData.platform === 'BAND' && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              밴드 선택 <span className="text-red-500">*</span>
-            </label>
-            {errors.channelKey && !formData.channelKey && (
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-gray-700">
+                밴드 선택 <span className="text-red-500">*</span>
+                {selectedBands.length > 0 && (
+                  <span className="ml-2 text-purple-600">({selectedBands.length}개 선택됨)</span>
+                )}
+              </label>
+              {bandList.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleSelectAllBands}
+                  className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                >
+                  {selectedBands.length === bandList.length ? '전체 해제' : '전체 선택'}
+                </button>
+              )}
+            </div>
+            {errors.channelKey && selectedBands.length === 0 && (
               <p className="text-sm text-red-500 mb-2">{errors.channelKey}</p>
             )}
+
             {isLoadingBands ? (
               <div className="flex items-center justify-center py-8 text-gray-500">
                 <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
@@ -706,52 +815,55 @@ export default function ChannelFormModal({
                 <p className="text-sm text-gray-500">등록된 밴드가 없습니다.</p>
               </div>
             ) : (
-              <div className="border border-gray-200 rounded-lg h-80 overflow-y-auto">
+              <div className="border border-gray-200 rounded-lg h-96 overflow-y-auto">
                 <div className="grid grid-cols-1 gap-2 p-2">
-                  {bandList.map((band) => (
-                    <button
-                      key={band.bandKey}
-                      type="button"
-                      onClick={() => handleBandSelect(band)}
-                      className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
-                        formData.channelKey === band.bandKey
-                          ? 'border-purple-500 bg-purple-50'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      {band.coverUrl ? (
-                        <img
-                          src={band.coverUrl}
-                          alt={band.name}
-                          className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {bandList.map((band) => {
+                    const isSelected = selectedBands.some((b) => b.bandKey === band.bandKey)
+                    return (
+                      <button
+                        key={band.bandKey}
+                        type="button"
+                        onClick={() => handleBandSelect(band)}
+                        className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
+                          isSelected
+                            ? 'border-purple-500 bg-purple-50'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {band.coverUrl ? (
+                          <img
+                            src={band.coverUrl}
+                            alt={band.name}
+                            className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                            </svg>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-900 truncate">{band.name}</div>
+                          <div className="text-xs text-gray-500 truncate">{band.bandKey}</div>
+                        </div>
+                        {isSelected && (
+                          <svg className="w-5 h-5 text-purple-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                              fillRule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                              clipRule="evenodd"
                             />
                           </svg>
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 truncate">{band.name}</div>
-                        <div className="text-xs text-gray-500 truncate">{band.bandKey}</div>
-                      </div>
-                      {formData.channelKey === band.bandKey && (
-                        <svg className="w-5 h-5 text-purple-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      )}
-                    </button>
-                  ))}
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -1105,7 +1217,11 @@ export default function ChannelFormModal({
           취소
         </Button>
         <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting}>
-          {isSubmitting ? '처리 중...' : isEditMode ? '수정' : '등록'}
+          {isSubmitting
+            ? '처리 중...'
+            : isEditMode
+            ? '수정'
+            : '등록'}
         </Button>
       </ModalFooter>
     </Modal>

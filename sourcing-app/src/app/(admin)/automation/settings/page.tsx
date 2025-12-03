@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLeft, ChevronRight, Clock, Download, Upload, Play, Square, Zap, Settings2 } from 'lucide-react'
+import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLeft, ChevronRight, Clock, Download, Upload, Zap, Settings2 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
@@ -215,6 +215,30 @@ export default function AutomationSettingsPage() {
 
   // 자동화 시작 핸들러
   const handleStartAutomation = () => {
+    // 필수 설정 검증
+    const missingSettings: string[] = []
+
+    // 수집할 도매채널 확인
+    if (config.wholesaleChannelIds.length === 0) {
+      missingSettings.push('수집할 도매채널')
+    }
+
+    // AI 제공자 확인
+    if (!config.aiProvider) {
+      missingSettings.push('AI 제공자')
+    }
+
+    // 발행할 소매채널 확인
+    if (config.retailChannelIds.length === 0) {
+      missingSettings.push('발행할 소매채널')
+    }
+
+    // 필수 설정이 없으면 toast로 안내
+    if (missingSettings.length > 0) {
+      toast.error(`자동화를 시작하려면 다음 설정이 필요합니다: ${missingSettings.join(', ')}`)
+      return
+    }
+
     const unsavedSections: string[] = []
 
     if (hasScheduleChanges) unsavedSections.push('schedule')
@@ -394,95 +418,102 @@ export default function AutomationSettingsPage() {
       `}</style>
 
       {/* 자동화 상태 배너 */}
-      {config.isEnabled ? (
-        <div className="relative overflow-hidden p-4 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 rounded-xl shadow-lg">
-          <div className="relative flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
-                <Zap className="w-5 h-5 text-white" />
-              </div>
-              <div className="text-white">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold">자동화 실행 중</h2>
-                  <span className="px-1.5 py-0.5 bg-white/20 rounded text-[10px] font-medium">Active</span>
-                </div>
-                <div className="flex items-center gap-2 mt-0.5 text-green-100 text-xs">
-                  <Clock size={12} />
-                  <span>다음: <span className="font-semibold text-white">{getNextExecution(config.cronInterval)}</span></span>
-                  <span className="w-1 h-1 bg-green-200 rounded-full" />
-                  <span>{INTERVAL_OPTIONS.find(o => o.value === config.cronInterval)?.label}</span>
-                </div>
-              </div>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleStopAutomation}
-              className="bg-white/10 border-white/30 text-white hover:bg-white/20 flex items-center gap-1.5 text-sm"
-            >
-              <Square size={14} />
-              중지
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div
-          className={`relative overflow-hidden p-4 rounded-xl border-2 transition-all ease-out ${
-            warningPhase === 'shake' ? 'duration-0' : 'duration-[2000ms]'
-          } ${
-            warningPhase === 'shake'
-              ? 'bg-red-50 border-red-400 animate-shake'
+      <div
+        className={`relative overflow-hidden p-4 rounded-xl border-2 transition-all ease-out ${
+          warningPhase === 'shake' ? 'duration-0' : 'duration-300'
+        } ${
+          warningPhase === 'shake'
+            ? 'bg-red-50 border-red-400 animate-shake'
+            : config.isEnabled
+              ? 'bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 border-transparent shadow-lg'
               : 'bg-gradient-to-r from-gray-50 to-slate-100 border-gray-200'
-          }`}
-        >
-          <div className="relative flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ease-out ${
-                warningPhase === 'shake' ? 'duration-0 bg-red-200' : 'duration-[2000ms] bg-gray-200'
-              }`}>
-                <Zap className={`w-5 h-5 transition-all ease-out ${
-                  warningPhase === 'shake' ? 'duration-0 text-red-600' : 'duration-[2000ms] text-gray-400'
-                }`} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className={`text-base font-bold transition-all ease-out ${
-                    warningPhase === 'shake' ? 'duration-0 text-red-700' : 'duration-[2000ms] text-gray-700'
-                  }`}>
-                    {warningSections.length > 0 ? '저장되지 않은 설정이 있습니다' : '자동화 비활성화'}
-                  </h2>
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-all ease-out ${
-                    warningPhase === 'shake' ? 'duration-0 bg-red-200 text-red-700' : 'duration-[2000ms] bg-gray-200 text-gray-600'
-                  }`}>
-                    Inactive
-                  </span>
-                </div>
-                <p className={`text-xs mt-0.5 transition-all ease-out ${
-                  warningPhase === 'shake' ? 'duration-0 text-red-600' : 'duration-[2000ms] text-gray-500'
+        }`}
+      >
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
+              warningPhase === 'shake'
+                ? 'bg-red-200'
+                : config.isEnabled
+                  ? 'bg-white/20 backdrop-blur-sm'
+                  : 'bg-gray-200'
+            }`}>
+              <Zap className={`w-5 h-5 transition-all ${
+                warningPhase === 'shake'
+                  ? 'text-red-600'
+                  : config.isEnabled
+                    ? 'text-white'
+                    : 'text-gray-400'
+              }`} />
+            </div>
+            <div className={config.isEnabled ? 'text-white' : ''}>
+              <div className="flex items-center gap-2">
+                <h2 className={`text-base font-bold transition-all ${
+                  warningPhase === 'shake'
+                    ? 'text-red-700'
+                    : config.isEnabled
+                      ? 'text-white'
+                      : 'text-gray-700'
                 }`}>
                   {warningSections.length > 0
-                    ? '아래 빨간색으로 표시된 섹션을 저장해주세요'
-                    : '아래 설정을 완료하고 자동화를 시작하세요'
+                    ? '저장되지 않은 설정이 있습니다'
+                    : config.isEnabled
+                      ? '자동화 실행 중'
+                      : '자동화 비활성화'
                   }
-                </p>
+                </h2>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-all ${
+                  warningPhase === 'shake'
+                    ? 'bg-red-200 text-red-700'
+                    : config.isEnabled
+                      ? 'bg-white/20 text-white'
+                      : 'bg-gray-200 text-gray-600'
+                }`}>
+                  {config.isEnabled ? 'Active' : 'Inactive'}
+                </span>
               </div>
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleStartAutomation}
-              className={`flex items-center gap-1.5 text-sm transition-all ease-out ${
+              <p className={`text-xs mt-0.5 transition-all ${
                 warningPhase === 'shake'
-                  ? 'duration-0 bg-red-500 hover:bg-red-600'
-                  : 'duration-[2000ms] bg-green-600 hover:bg-green-700'
-              }`}
-            >
-              <Play size={14} />
-              시작
-            </Button>
+                  ? 'text-red-600'
+                  : config.isEnabled
+                    ? 'text-green-100'
+                    : 'text-gray-500'
+              }`}>
+                {warningSections.length > 0
+                  ? '아래 빨간색으로 표시된 섹션을 저장해주세요'
+                  : config.isEnabled
+                    ? (
+                      <span className="flex items-center gap-2">
+                        <Clock size={12} />
+                        <span>다음: <span className="font-semibold text-white">{getNextExecution(config.cronInterval)}</span></span>
+                        <span className="w-1 h-1 bg-green-200 rounded-full" />
+                        <span>{INTERVAL_OPTIONS.find(o => o.value === config.cronInterval)?.label}</span>
+                      </span>
+                    )
+                    : '아래 설정을 완료하고 자동화를 시작하세요'
+                }
+              </p>
+            </div>
           </div>
+          {/* 토글 스위치 */}
+          <button
+            onClick={() => config.isEnabled ? handleStopAutomation() : handleStartAutomation()}
+            className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+              warningPhase === 'shake'
+                ? 'bg-red-300 focus:ring-red-500'
+                : config.isEnabled
+                  ? 'bg-white/30 focus:ring-white'
+                  : 'bg-gray-300 focus:ring-green-500'
+            }`}
+          >
+            <span
+              className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-300 ${
+                config.isEnabled ? 'translate-x-9' : 'translate-x-1'
+              }`}
+            />
+          </button>
         </div>
-      )}
+      </div>
 
       {/* Row 1: Schedule Settings + AI Settings - 2 Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

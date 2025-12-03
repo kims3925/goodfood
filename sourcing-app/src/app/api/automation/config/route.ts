@@ -39,6 +39,7 @@ export async function GET() {
           isEnabled: false,
           cronInterval: '1h' as CronInterval,
           channelIds: [],
+          wholesaleChannelIds: [],
           retailChannelIds: [],
           aiProvider: 'GEMINI',
           pricingPolicyId: null,
@@ -68,6 +69,7 @@ export async function GET() {
         ...config,
         cronInterval,
         channelIds,
+        wholesaleChannelIds: channelIds,
         retailChannelIds,
       },
     })
@@ -99,13 +101,15 @@ export async function POST(request: NextRequest) {
       isEnabled,
       cronInterval,
       channelIds,
+      wholesaleChannelIds,
       aiProvider,
       pricingPolicyId,
       autoPublish,
       retailChannelIds,
     } = body
 
-    const finalChannelIds = channelIds || []
+    // wholesaleChannelIds 또는 channelIds 둘 다 지원 (하위 호환성)
+    const finalChannelIds = wholesaleChannelIds || channelIds || []
     const finalRetailChannelIds = retailChannelIds || []
 
     // cronInterval을 cronExpression으로 변환

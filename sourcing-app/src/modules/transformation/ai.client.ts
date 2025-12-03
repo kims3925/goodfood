@@ -18,6 +18,7 @@ export interface AiClientConfig {
   model: string
   temperature?: number
   maxTokens?: number
+  timeout?: number // milliseconds, default 60000 (60s)
 }
 
 export interface AiResponse {
@@ -39,10 +40,12 @@ export abstract class BaseAiClient {
 
 export class GeminiClient extends BaseAiClient {
   private client: GoogleGenerativeAI
+  private timeout: number
 
   constructor(config: AiClientConfig) {
     super(config)
     this.client = new GoogleGenerativeAI(config.apiKey)
+    this.timeout = config.timeout ?? 60000 // default 60 seconds
   }
 
   async generateContent(prompt: string): Promise<AiResponse> {
@@ -53,13 +56,27 @@ export class GeminiClient extends BaseAiClient {
 
       const generationConfig = {
         temperature: this.config.temperature ?? 0.7,
-        maxOutputTokens: this.config.maxTokens ?? 2048,
+        maxOutputTokens: this.config.maxTokens ?? 4096, // 프롬프트가 상세해서 응답도 길어질 수 있음
       }
 
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig,
+      // 타임아웃이 있는 Promise.race 사용
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new ProductTransformationError(
+            `AI 응답 대기 시간이 초과되었습니다 (${this.timeout / 1000}초). 잠시 후 다시 시도해주세요.`,
+            TransformationErrorCode.AI_API_ERROR,
+            { timeout: this.timeout }
+          ))
+        }, this.timeout)
       })
+
+      const result = await Promise.race([
+        model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig,
+        }),
+        timeoutPromise,
+      ])
 
       const response = await result.response
 
@@ -142,8 +159,19 @@ export class GeminiClient extends BaseAiClient {
 // =============================================
 
 export class OpenAiClient extends BaseAiClient {
+  private timeout: number
+
+  constructor(config: AiClientConfig) {
+    super(config)
+    this.timeout = config.timeout ?? 60000 // default 60 seconds
+  }
+
   async generateContent(prompt: string): Promise<AiResponse> {
     try {
+      // AbortController를 사용한 타임아웃 구현
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout)
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -154,9 +182,12 @@ export class OpenAiClient extends BaseAiClient {
           model: this.config.model || 'gpt-4o-mini',
           messages: [{ role: 'user', content: prompt }],
           temperature: this.config.temperature ?? 0.7,
-          max_tokens: this.config.maxTokens ?? 2048,
+          max_tokens: this.config.maxTokens ?? 4096, // 프롬프트가 상세해서 응답도 길어질 수 있음
         }),
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
@@ -175,6 +206,14 @@ export class OpenAiClient extends BaseAiClient {
         provider: AiProvider.OPENAI,
       }
     } catch (error: any) {
+      // 타임아웃 에러 처리 (AbortError)
+      if (error.name === 'AbortError') {
+        throw new ProductTransformationError(
+          `AI 응답 대기 시간이 초과되었습니다 (${this.timeout / 1000}초). 잠시 후 다시 시도해주세요.`,
+          TransformationErrorCode.AI_API_ERROR,
+          { timeout: this.timeout }
+        )
+      }
       // 사용자 친화적 에러 메시지 처리
       const errorMsg = error.message || ''
       if (errorMsg.includes('quota') || errorMsg.includes('limit') || errorMsg.includes('rate')) {

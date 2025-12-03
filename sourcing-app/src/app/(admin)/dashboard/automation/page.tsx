@@ -19,6 +19,8 @@ import {
   BarChart3,
   Settings,
   History,
+  ShoppingBag,
+  Calendar,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -30,6 +32,14 @@ interface AutomationStats {
   pendingTransform: number
   readyToPublish: number
   todayPublished: number
+  // 전체 진행률 계산용 추가 필드
+  totalPosts: number
+  totalTransformed: number
+  totalProducts: number
+  totalPublishedProducts: number
+  // 오늘 통계
+  todayTransformed: number
+  todayProducts: number
 }
 
 interface AutomationConfig {
@@ -58,6 +68,24 @@ interface RecentLog {
   itemCount: number
 }
 
+// 기간 필터 타입
+type PeriodFilter = 'today' | '7days' | '30days' | 'custom'
+
+// 날짜 포맷 (YYYY-MM-DD)
+const formatDateForInput = (date: Date): string => {
+  return date.toISOString().split('T')[0]
+}
+
+// 오늘 날짜
+const getToday = () => new Date()
+
+// N일 전 날짜
+const getDaysAgo = (days: number) => {
+  const date = new Date()
+  date.setDate(date.getDate() - days)
+  return date
+}
+
 export default function AutomationDashboardPage() {
   const toast = useToast()
   const [stats, setStats] = useState<AutomationStats | null>(null)
@@ -69,10 +97,24 @@ export default function AutomationDashboardPage() {
   const [isCancelling, setIsCancelling] = useState(false)
   const [countdown, setCountdown] = useState<string>('')
 
+  // 날짜 필터 상태
+  const [period, setPeriod] = useState<PeriodFilter>('today')
+  const [startDate, setStartDate] = useState<string>(formatDateForInput(getToday()))
+  const [endDate, setEndDate] = useState<string>(formatDateForInput(getToday()))
+  const [isCustomDate, setIsCustomDate] = useState(false)
+
   const loadData = useCallback(async () => {
     try {
+      // 날짜 필터가 적용된 stats URL 생성
+      let statsUrl = '/api/automation/stats'
+      if (isCustomDate) {
+        statsUrl += `?period=custom&startDate=${startDate}&endDate=${endDate}`
+      } else {
+        statsUrl += `?period=${period}`
+      }
+
       const [statsRes, configRes, executeRes, logsRes] = await Promise.all([
-        fetch('/api/automation/stats'),
+        fetch(statsUrl),
         fetch('/api/automation/config'),
         fetch('/api/automation/execute'),
         fetch('/api/automation/logs?limit=5'),
@@ -92,13 +134,28 @@ export default function AutomationDashboardPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [period, isCustomDate, startDate, endDate])
 
   useEffect(() => {
     loadData()
     const interval = setInterval(loadData, 30000)
     return () => clearInterval(interval)
   }, [loadData])
+
+  // 기간 프리셋 선택 시
+  const handlePeriodChange = (newPeriod: PeriodFilter) => {
+    if (newPeriod === 'custom') {
+      setIsCustomDate(true)
+    } else {
+      setIsCustomDate(false)
+      setPeriod(newPeriod)
+
+      // 날짜 범위도 업데이트
+      const days = newPeriod === 'today' ? 0 : newPeriod === '7days' ? 6 : 29
+      setStartDate(formatDateForInput(getDaysAgo(days)))
+      setEndDate(formatDateForInput(getToday()))
+    }
+  }
 
   // 카운트다운 타이머
   useEffect(() => {
@@ -135,7 +192,7 @@ export default function AutomationDashboardPage() {
     return () => clearInterval(timer)
   }, [config?.nextRunAt, config?.isEnabled])
 
-  const handleExecute = async (type: 'collect' | 'transform' | 'publish' | 'full') => {
+  const handleExecute = async (type: 'collect' | 'transform' | 'register' | 'publish' | 'full') => {
     if (isExecuting || runningWorkflow) return
 
     setIsExecuting(true)
@@ -152,10 +209,15 @@ export default function AutomationDashboardPage() {
         toast.success(`${getTypeName(type)} 실행이 시작되었습니다.`)
         loadData()
       } else {
-        toast.error(data.error || '실행에 실패했습니다.')
+        // 설정 누락 에러인 경우 더 친절한 메시지 표시
+        if (data.missingItems?.length > 0) {
+          toast.error(`설정 필요: ${data.missingItems.join(', ')}`)
+        } else {
+          toast.error(data.error || '실행에 실패했습니다.')
+        }
       }
     } catch (error) {
-      toast.error('실행 중 오류가 발생했습니다.')
+      toast.error('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
       setIsExecuting(false)
     }
@@ -190,8 +252,9 @@ export default function AutomationDashboardPage() {
     switch (type) {
       case 'collect': return '게시물 수집'
       case 'transform': return 'AI 변환'
-      case 'publish': return '소매밴드 발행'
-      case 'full': return '전체 파이프라인'
+      case 'register': return '상품 등록'
+      case 'publish': return '발행'
+      case 'full': return '전체 실행'
       default: return type
     }
   }
@@ -234,6 +297,60 @@ export default function AutomationDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* 날짜 필터 */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-center gap-3">
+          <div className="flex rounded-xl bg-gray-100 p-1">
+            {[
+              { value: 'today', label: '오늘' },
+              { value: '7days', label: '7일' },
+              { value: '30days', label: '30일' },
+              { value: 'custom', label: '직접선택' },
+            ].map((item) => (
+              <button
+                key={item.value}
+                onClick={() => handlePeriodChange(item.value as PeriodFilter)}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                  (item.value === 'custom' && isCustomDate) || (!isCustomDate && period === item.value)
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => loadData()}
+            className="rounded-xl bg-gray-100 p-2.5 text-gray-600 transition-colors hover:bg-gray-200"
+          >
+            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+
+        {/* 직접선택 시 날짜 선택기 표시 */}
+        {isCustomDate && (
+          <div className="flex justify-center">
+            <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
+              <Calendar size={16} className="text-gray-400" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent text-sm text-gray-700 outline-none w-32"
+              />
+              <span className="text-gray-400">~</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent text-sm text-gray-700 outline-none w-32"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Hero Header */}
       <div className={`relative overflow-hidden rounded-2xl p-6 ${
         config?.isEnabled
@@ -312,32 +429,29 @@ export default function AutomationDashboardPage() {
         <div className="flex items-center justify-between">
           {/* Step 1: 수집 */}
           <div className="flex-1">
-            <div className={`relative p-5 rounded-xl border-2 transition-all ${
+            <div className={`relative p-4 rounded-xl border-2 transition-all ${
               runningWorkflow?.type === 'collect'
                 ? 'border-green-500 bg-green-50 shadow-lg shadow-green-100'
                 : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
             }`}>
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                   runningWorkflow?.type === 'collect' ? 'bg-green-500' : 'bg-green-100'
                 }`}>
-                  <Package size={24} className={runningWorkflow?.type === 'collect' ? 'text-white' : 'text-green-600'} />
+                  <Package size={20} className={runningWorkflow?.type === 'collect' ? 'text-white' : 'text-green-600'} />
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900">수집</p>
-                  <p className="text-xs text-gray-500">도매밴드에서 수집</p>
+                  <p className="font-semibold text-gray-900 text-sm">수집</p>
+                  <p className="text-xs text-gray-500">도매밴드</p>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-3xl font-bold text-gray-900">{stats?.todayCollected || 0}</span>
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">오늘</span>
-              </div>
+              <div className="text-2xl font-bold text-gray-900">{stats?.todayCollected || 0}</div>
               {runningWorkflow?.type === 'collect' && (
                 <div className="absolute -top-2 -right-2">
-                  <span className="flex h-5 w-5">
+                  <span className="flex h-4 w-4">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-5 w-5 bg-green-500 items-center justify-center">
-                      <RefreshCw size={12} className="text-white animate-spin" />
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500 items-center justify-center">
+                      <RefreshCw size={10} className="text-white animate-spin" />
                     </span>
                   </span>
                 </div>
@@ -346,40 +460,35 @@ export default function AutomationDashboardPage() {
           </div>
 
           {/* Arrow */}
-          <div className="px-4">
-            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-              <ArrowRight size={20} className="text-gray-400" />
-            </div>
+          <div className="px-2">
+            <ArrowRight size={18} className="text-gray-300" />
           </div>
 
           {/* Step 2: AI 변환 */}
           <div className="flex-1">
-            <div className={`relative p-5 rounded-xl border-2 transition-all ${
+            <div className={`relative p-4 rounded-xl border-2 transition-all ${
               runningWorkflow?.type === 'transform'
                 ? 'border-yellow-500 bg-yellow-50 shadow-lg shadow-yellow-100'
                 : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
             }`}>
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                   runningWorkflow?.type === 'transform' ? 'bg-yellow-500' : 'bg-yellow-100'
                 }`}>
-                  <Zap size={24} className={runningWorkflow?.type === 'transform' ? 'text-white' : 'text-yellow-600'} />
+                  <Zap size={20} className={runningWorkflow?.type === 'transform' ? 'text-white' : 'text-yellow-600'} />
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900">AI 변환</p>
-                  <p className="text-xs text-gray-500">상품 정보 생성</p>
+                  <p className="font-semibold text-gray-900 text-sm">AI 변환</p>
+                  <p className="text-xs text-gray-500">상품 정보</p>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-3xl font-bold text-gray-900">{stats?.pendingTransform || 0}</span>
-                <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">대기중</span>
-              </div>
+              <div className="text-2xl font-bold text-gray-900">{stats?.todayTransformed || 0}</div>
               {runningWorkflow?.type === 'transform' && (
                 <div className="absolute -top-2 -right-2">
-                  <span className="flex h-5 w-5">
+                  <span className="flex h-4 w-4">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-5 w-5 bg-yellow-500 items-center justify-center">
-                      <RefreshCw size={12} className="text-white animate-spin" />
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-yellow-500 items-center justify-center">
+                      <RefreshCw size={10} className="text-white animate-spin" />
                     </span>
                   </span>
                 </div>
@@ -388,71 +497,163 @@ export default function AutomationDashboardPage() {
           </div>
 
           {/* Arrow */}
-          <div className="px-4">
-            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-              <ArrowRight size={20} className="text-gray-400" />
+          <div className="px-2">
+            <ArrowRight size={18} className="text-gray-300" />
+          </div>
+
+          {/* Step 3: 상품 등록 */}
+          <div className="flex-1">
+            <div className="relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-gray-300 hover:shadow-md transition-all">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                  <ShoppingBag size={20} className="text-orange-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900 text-sm">상품 등록</p>
+                  <p className="text-xs text-gray-500">Product</p>
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-gray-900">{stats?.todayProducts || 0}</div>
             </div>
           </div>
 
-          {/* Step 3: 발행 */}
+          {/* Arrow */}
+          <div className="px-2">
+            <ArrowRight size={18} className="text-gray-300" />
+          </div>
+
+          {/* Step 4: 발행 */}
           <div className="flex-1">
-            <div className={`relative p-5 rounded-xl border-2 transition-all ${
+            <div className={`relative p-4 rounded-xl border-2 transition-all ${
               runningWorkflow?.type === 'publish'
                 ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-100'
                 : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
             }`}>
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                   runningWorkflow?.type === 'publish' ? 'bg-blue-500' : 'bg-blue-100'
                 }`}>
-                  <Upload size={24} className={runningWorkflow?.type === 'publish' ? 'text-white' : 'text-blue-600'} />
+                  <Upload size={20} className={runningWorkflow?.type === 'publish' ? 'text-white' : 'text-blue-600'} />
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900">발행</p>
-                  <p className="text-xs text-gray-500">소매밴드 발행</p>
+                  <p className="font-semibold text-gray-900 text-sm">발행</p>
+                  <p className="text-xs text-gray-500">소매밴드</p>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-3xl font-bold text-gray-900">{stats?.readyToPublish || 0}</span>
-                <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">준비됨</span>
-              </div>
+              <div className="text-2xl font-bold text-gray-900">{stats?.todayPublished || 0}</div>
               {runningWorkflow?.type === 'publish' && (
                 <div className="absolute -top-2 -right-2">
-                  <span className="flex h-5 w-5">
+                  <span className="flex h-4 w-4">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-5 w-5 bg-blue-500 items-center justify-center">
-                      <RefreshCw size={12} className="text-white animate-spin" />
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-500 items-center justify-center">
+                      <RefreshCw size={10} className="text-white animate-spin" />
                     </span>
                   </span>
                 </div>
               )}
             </div>
           </div>
+        </div>
+      </Card>
 
-          {/* Arrow */}
-          <div className="px-4">
-            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-              <ArrowRight size={20} className="text-gray-400" />
+      {/* Progress Section - 기간 내 진행률 */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+          <TrendingUp size={20} className="text-green-500" />
+          기간 내 진행률
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* 게시물 수집 진행률 */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                  <Package size={16} className="text-green-600" />
+                </div>
+                <span className="font-medium text-gray-700">게시물</span>
+              </div>
+              <span className="text-sm font-semibold text-green-600">{stats?.todayCollected || 0}건</span>
             </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-500"
+                style={{ width: '100%' }}
+              />
+            </div>
+            <p className="text-xs text-gray-500">전체 {stats?.totalPosts || 0}건</p>
           </div>
 
-          {/* Step 4: 완료 */}
-          <div className="flex-1">
-            <div className="relative p-5 rounded-xl border-2 border-gray-200 bg-gradient-to-br from-purple-50 to-white hover:border-purple-300 hover:shadow-md transition-all">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
-                  <CheckCircle size={24} className="text-purple-600" />
+          {/* AI 변환 진행률 */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center">
+                  <Zap size={16} className="text-yellow-600" />
                 </div>
-                <div>
-                  <p className="font-semibold text-gray-900">완료</p>
-                  <p className="text-xs text-gray-500">오늘 발행 완료</p>
-                </div>
+                <span className="font-medium text-gray-700">AI 변환</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-3xl font-bold text-purple-600">{stats?.todayPublished || 0}</span>
-                <span className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded">완료</span>
-              </div>
+              <span className="text-sm font-semibold text-yellow-600">
+                {stats?.todayTransformed || 0}/{stats?.todayCollected || 0}
+              </span>
             </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full transition-all duration-500"
+                style={{ width: `${stats?.todayCollected ? Math.round((stats.todayTransformed / stats.todayCollected) * 100) : 0}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              {stats?.todayCollected ? Math.round((stats.todayTransformed / stats.todayCollected) * 100) : 0}% 완료
+            </p>
+          </div>
+
+          {/* 상품 등록 진행률 */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+                  <ShoppingBag size={16} className="text-orange-600" />
+                </div>
+                <span className="font-medium text-gray-700">상품 등록</span>
+              </div>
+              <span className="text-sm font-semibold text-orange-600">
+                {stats?.todayProducts || 0}/{stats?.todayTransformed || 0}
+              </span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-500"
+                style={{ width: `${stats?.todayTransformed ? Math.round((stats.todayProducts / stats.todayTransformed) * 100) : 0}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              {stats?.todayTransformed ? Math.round((stats.todayProducts / stats.todayTransformed) * 100) : 0}% 완료
+            </p>
+          </div>
+
+          {/* 발행 진행률 */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <Upload size={16} className="text-blue-600" />
+                </div>
+                <span className="font-medium text-gray-700">발행</span>
+              </div>
+              <span className="text-sm font-semibold text-blue-600">
+                {stats?.todayPublished || 0}/{stats?.todayProducts || 0}
+              </span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-400 to-blue-500 rounded-full transition-all duration-500"
+                style={{ width: `${stats?.todayProducts ? Math.round((stats.todayPublished / stats.todayProducts) * 100) : 0}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              {stats?.todayProducts ? Math.round((stats.todayPublished / stats.todayProducts) * 100) : 0}% 완료
+            </p>
           </div>
         </div>
       </Card>
@@ -530,7 +731,7 @@ export default function AutomationDashboardPage() {
             <Play size={20} className="text-green-500" />
             수동 실행
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <button
               onClick={() => handleExecute('collect')}
               disabled={isExecuting || !!runningWorkflow}
@@ -540,7 +741,7 @@ export default function AutomationDashboardPage() {
                 <Package size={20} className="text-green-600 group-hover:text-white transition-colors" />
               </div>
               <p className="font-medium text-gray-900 text-sm">게시물 수집</p>
-              <p className="text-xs text-gray-500 mt-1">도매밴드 수집</p>
+              <p className="text-xs text-gray-500 mt-1">도매채널 게시물 수집</p>
             </button>
 
             <button
@@ -556,6 +757,18 @@ export default function AutomationDashboardPage() {
             </button>
 
             <button
+              onClick={() => handleExecute('register')}
+              disabled={isExecuting || !!runningWorkflow}
+              className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-orange-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="w-10 h-10 rounded-lg bg-orange-100 group-hover:bg-orange-500 flex items-center justify-center mb-3 transition-colors">
+                <ShoppingBag size={20} className="text-orange-600 group-hover:text-white transition-colors" />
+              </div>
+              <p className="font-medium text-gray-900 text-sm">상품 등록</p>
+              <p className="text-xs text-gray-500 mt-1">Product 생성</p>
+            </button>
+
+            <button
               onClick={() => handleExecute('publish')}
               disabled={isExecuting || !!runningWorkflow}
               className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-blue-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -563,8 +776,8 @@ export default function AutomationDashboardPage() {
               <div className="w-10 h-10 rounded-lg bg-blue-100 group-hover:bg-blue-500 flex items-center justify-center mb-3 transition-colors">
                 <Upload size={20} className="text-blue-600 group-hover:text-white transition-colors" />
               </div>
-              <p className="font-medium text-gray-900 text-sm">소매밴드 발행</p>
-              <p className="text-xs text-gray-500 mt-1">준비된 상품 발행</p>
+              <p className="font-medium text-gray-900 text-sm">발행</p>
+              <p className="text-xs text-gray-500 mt-1">소매밴드 발행</p>
             </button>
 
             <button

@@ -177,10 +177,21 @@ export interface WorkflowLogUpdate {
 // =============================================
 
 export interface AutomationStats {
+  // 기존 필드
   todayCollected: number
   pendingTransform: number
   readyToPublish: number
   todayPublished: number
+
+  // 전체 진행률 계산용 추가 필드
+  totalPosts: number           // 전체 게시물 수
+  totalTransformed: number     // AI 변환 완료된 게시물 수 (collectedProduct가 있는 게시물)
+  totalProducts: number        // 등록된 상품 수 (Product)
+  totalPublishedProducts: number  // 발행된 상품 수 (PublishedProduct의 distinct productId)
+
+  // 오늘 통계
+  todayTransformed: number     // 오늘 AI 변환 완료
+  todayProducts: number        // 오늘 등록된 상품
 }
 
 // =============================================
