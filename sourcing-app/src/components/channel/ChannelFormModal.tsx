@@ -869,12 +869,10 @@ export default function ChannelFormModal({
                 </div>
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  쇼핑몰명 <span className="text-red-500">*</span>
+                </label>
                 <Input
-                  label={
-                    <>
-                      쇼핑몰명 <span className="text-red-500">*</span>
-                    </>
-                  }
                   placeholder="쇼핑몰 이름을 입력하세요"
                   value={formData.name}
                   onChange={(e) => handleChange('name', e.target.value)}
@@ -1017,12 +1015,10 @@ export default function ChannelFormModal({
         {/* 수정 모드 - 채널명 */}
         {isEditMode && (
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              채널명 <span className="text-red-500">*</span>
+            </label>
             <Input
-              label={
-                <>
-                  채널명 <span className="text-red-500">*</span>
-                </>
-              }
               placeholder="채널 이름을 입력하세요"
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}

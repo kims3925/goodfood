@@ -23,7 +23,7 @@ export async function GET() {
       },
     })
 
-    if (!apiConfig) {
+    if (!apiConfig || !apiConfig.accessToken) {
       return NextResponse.json(
         { success: false, error: 'Band API 설정을 먼저 등록해주세요.' },
         { status: 404 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { ProductStatus, ChannelKind, ChannelPlatform } from '@bandauto/db'
+import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 /**
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
 
     // Format response
     const formattedProducts = products.map((product) => {
-      const mainImage = product.collectedProduct?.post?.images?.[0]?.url || product.thumbnailUrl
+      const mainImage = product.thumbnailUrl
       const mainVariant = product.variants?.[0]
 
       // 발행 유형별 분류:

@@ -24,6 +24,10 @@ interface Channel {
   platform?: string
 }
 
+interface ProductImage {
+  id: number
+  imageUrl: string
+}
 
 interface Product {
   id: number
