@@ -63,15 +63,17 @@ export async function GET(request: NextRequest) {
     let retailBandPublishedCount = 0
 
     for (const product of allProducts) {
+      // 쇼핑몰 발행: channelId가 없거나 SHOP 플랫폼 채널에 발행된 경우
       const hasShoppingMall = product.publishedProducts.some(
-        (pp) => !pp.channelId || pp.channel?.platform === ChannelPlatform.SHOP
+        (pp) => pp.channelId === null || pp.channel?.platform === ChannelPlatform.SHOP
       )
-      const hasRetailBand = product.publishedProducts.some(
-        (pp) => pp.channelId && pp.channel?.kind === ChannelKind.RETAIL && pp.channel?.platform !== ChannelPlatform.SHOP
+      // 채널 발행: channelId가 있는 모든 발행 (채널 삭제되어도 카운트)
+      const hasChannelPublish = product.publishedProducts.some(
+        (pp) => pp.channelId !== null
       )
 
       if (hasShoppingMall) shoppingMallPublishedCount++
-      if (hasRetailBand) retailBandPublishedCount++
+      if (hasChannelPublish) retailBandPublishedCount++
     }
 
     const stats = {
@@ -135,13 +137,13 @@ export async function GET(request: NextRequest) {
       const mainVariant = product.variants?.[0]
 
       // 발행 유형별 분류:
-      // - 채널 발행: RETAIL kind 채널에 발행된 모든 상품 (SHOP 플랫폼 포함)
-      // - 쇼핑몰 발행: channelId가 없는 경우 (하위 호환성)
+      // - channelPublishes: 모든 채널 발행 (매트릭스 UI에서 사용, SHOP 포함)
+      // - shoppingMallPublishes: 쇼핑몰 발행 (레거시 null 또는 SHOP 플랫폼)
       const channelPublishes = product.publishedProducts.filter(
-        (pp) => pp.channelId && pp.channel?.kind === ChannelKind.RETAIL
+        (pp) => pp.channelId !== null
       )
       const shoppingMallPublishes = product.publishedProducts.filter(
-        (pp) => !pp.channelId
+        (pp) => pp.channelId === null || pp.channel?.platform === ChannelPlatform.SHOP
       )
 
       const hasChannelPublish = channelPublishes.length > 0

@@ -252,41 +252,9 @@ export default function PublishPage() {
     }
   }
 
-  const handleUnpublishSelected = async () => {
-    if (selectedCells.size === 0) return
-    if (isPublishing) return  // 중복 호출 방지
-    if (!confirm('선택한 발행을 취소하시겠습니까?')) return
-
-    setIsPublishing(true)
-    try {
-      const publishIds: number[] = []
-      selectedCells.forEach((key) => {
-        const [productId, channelId] = key.split('-').map(Number)
-        const info = getPublishInfo(productId, channelId)
-        if (info) publishIds.push(info.publishId)
-      })
-
-      if (publishIds.length > 0) {
-        await fetch(`/api/shop/publish?ids=${publishIds.join(',')}`, { method: 'DELETE' })
-      }
-
-      setSelectedCells(new Set())
-      loadProducts()
-    } catch (error) {
-      console.error('발행 취소 실패:', error)
-    } finally {
-      setIsPublishing(false)
-    }
-  }
-
   const formatPrice = (price: number | null) => (!price ? '-' : `₩${price.toLocaleString()}`)
 
-  const selectedPublishedCount = Array.from(selectedCells).filter((key) => {
-    const [productId, channelId] = key.split('-').map(Number)
-    return isPublished(productId, channelId)
-  }).length
-
-  const selectedUnpublishedCount = selectedCells.size - selectedPublishedCount
+  const selectedUnpublishedCount = selectedCells.size
 
   // 통계 계산
   const stats = useMemo(() => {
@@ -322,7 +290,7 @@ export default function PublishPage() {
         </div>
 
         {/* 통계 및 액션 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-gray-100 rounded-lg">
@@ -374,28 +342,6 @@ export default function PublishPage() {
                 <p className="text-sm text-gray-500">선택 발행</p>
                 <p className={`text-lg font-bold ${selectedUnpublishedCount > 0 ? 'text-purple-600' : 'text-gray-400'}`}>
                   {selectedUnpublishedCount}개 선택됨
-                </p>
-              </div>
-            </div>
-          </button>
-          {/* 선택 취소 카드 */}
-          <button
-            onClick={handleUnpublishSelected}
-            disabled={selectedPublishedCount === 0 || isPublishing}
-            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
-              selectedPublishedCount > 0 && !isPublishing
-                ? 'hover:border-red-300 hover:bg-red-50 cursor-pointer'
-                : 'opacity-50 cursor-not-allowed'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-3 rounded-lg ${selectedPublishedCount > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
-                <XCircle size={24} className={selectedPublishedCount > 0 ? 'text-red-600' : 'text-gray-400'} />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">선택 취소</p>
-                <p className={`text-lg font-bold ${selectedPublishedCount > 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                  {selectedPublishedCount}개 선택됨
                 </p>
               </div>
             </div>

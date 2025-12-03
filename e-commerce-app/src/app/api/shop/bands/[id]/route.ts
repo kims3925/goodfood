@@ -71,7 +71,7 @@ export async function GET(
       .map((pp) => {
         const product = pp.product
         const mainVariant = product.variants[0]
-        const images = product.collectedProduct?.post?.images?.map((img) => img.imageUrl) || []
+        const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
 
         const salePrice = mainVariant?.price || product.price || 0
         const originalPrice = salePrice

@@ -259,7 +259,7 @@ export class CartService {
       const product = publishedProduct.product
       const variant = item.variant
       const mainVariant = product.variants[0]
-      const image = product.collectedProduct?.post?.images?.[0]?.imageUrl || product.thumbnailUrl || '/placeholder.jpg'
+      const image = product.collectedProduct?.post?.images?.[0]?.url || product.thumbnailUrl || '/placeholder.jpg'
 
       return {
         id: item.id,

@@ -240,7 +240,7 @@ function CheckoutContent() {
         const pp = data.publishedProduct
         const product = pp.product
         const mainVariant = product.variants?.[0]
-        const images = product.post?.images?.map((img: any) => img.imageUrl) || []
+        const images = product.post?.images?.map((img: any) => img.url) || []
 
         // 채널 ID 저장
         if (pp.channelId) {
