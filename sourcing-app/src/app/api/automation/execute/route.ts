@@ -77,14 +77,21 @@ export async function POST(request: NextRequest) {
       case 'publish':
         console.log(`[Execute] Publish for user ${currentUser.userId}`)
         if (!config?.channelIds?.length) {
-          // 자동화 설정에서 channelIds 가져오기
+          // 자동화 설정에서 retailChannelIds 가져오기
           const automationConfig = await prisma.automationConfig.findUnique({
             where: { userId: currentUser.userId },
           })
-          const channelIds = automationConfig?.channelIds as number[] | undefined
-          if (!channelIds || channelIds.length === 0) {
+          let channelIds: number[] = []
+          if (automationConfig?.retailChannelIds) {
+            try {
+              channelIds = JSON.parse(automationConfig.retailChannelIds)
+            } catch {
+              channelIds = []
+            }
+          }
+          if (channelIds.length === 0) {
             return NextResponse.json(
-              { success: false, error: '발행할 소매밴드가 설정되지 않았습니다.' },
+              { success: false, error: '발행할 소매채널이 설정되지 않았습니다.' },
               { status: 400 }
             )
           }

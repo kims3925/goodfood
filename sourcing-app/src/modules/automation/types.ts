@@ -43,10 +43,7 @@ export interface PipelineError {
 // =============================================
 
 export interface CollectionConfig {
-  channelIds?: number[]
-  collectFromAllChannels?: boolean
-  /** @deprecated use collectFromAllChannels instead */
-  collectFromAllBands?: boolean
+  channelIds?: number[]  // 필수 (비어있으면 수집 안함)
   limit?: number
 }
 

@@ -36,17 +36,30 @@ export async function runCollectionPipeline(
 
   console.log(`[Collection] Starting for user ${userId}`)
 
-  // 수집할 채널 목록 조회 (도매 채널만)
+  // channelIds가 없으면 수집하지 않음
+  const channelIds = config.channelIds
+  if (!channelIds?.length) {
+    console.log('[Collection] No channels configured, skipping collection')
+    return {
+      success: true,
+      totalItems: 0,
+      successCount: 0,
+      failedCount: 0,
+      details: {
+        channelResults: [],
+        totalNewPosts: 0,
+        totalDuplicates: 0,
+      },
+      errors: [],
+    }
+  }
+
+  // 수집할 채널 목록 조회 (지정된 도매 채널만)
   const whereClause: any = {
     userId,
     kind: ChannelKind.WHOLESALE,
     isActive: true,
-  }
-
-  // 하위 호환성: channelIds도 channelIds로 처리
-  const channelIds = config.channelIds || config.channelIds
-  if (!config.collectFromAllBands && channelIds?.length) {
-    whereClause.id = { in: channelIds }
+    id: { in: channelIds },
   }
 
   const wholesaleChannels = await prisma.channel.findMany({

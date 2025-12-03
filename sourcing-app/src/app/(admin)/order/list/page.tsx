@@ -84,7 +84,7 @@ export default function UnifiedOrderListPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, sourceFilter, toast])
+  }, [page, search, sourceFilter])
 
   useEffect(() => {
     fetchOrders()
@@ -92,7 +92,7 @@ export default function UnifiedOrderListPage() {
 
   const handleSearch = () => {
     setPage(1)
-    fetchOrders()
+    // useEffect에서 page 변경 감지하여 자동 로드
   }
 
   const formatDate = (dateString: string) => {

@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
     // 프론트엔드 형식으로 변환
     const formattedProducts = products.map((product) => {
       const mainVariant = product.variants[0]
-      const images = product.collectedProduct?.post?.images?.map((img) => img.imageUrl) || []
+      const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
 
       const salePrice = mainVariant?.price || product.price || 0
       const originalPrice = salePrice

@@ -87,8 +87,12 @@ export async function runPublishPipeline(
 
   console.log(`[Publish] Found ${products.length} products to publish`)
 
-  // 소매채널 조회 (하위 호환성: channelIds도 channelIds로 처리)
-  const channelIds = config.channelIds || config.channelIds
+  // 발행할 소매채널 조회
+  const channelIds = config.channelIds
+  if (!channelIds?.length) {
+    throw new Error('발행할 채널이 지정되지 않았습니다')
+  }
+
   const retailChannels = await prisma.channel.findMany({
     where: {
       userId,

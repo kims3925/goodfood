@@ -104,7 +104,7 @@ export default function PublishedProductListPage() {
 
   useEffect(() => {
     loadProducts()
-  }, [currentPage, statusFilter])
+  }, [currentPage, statusFilter, searchTerm])
 
   const loadProducts = async () => {
     try {
@@ -147,7 +147,7 @@ export default function PublishedProductListPage() {
 
   const handleSearch = () => {
     setCurrentPage(1)
-    loadProducts()
+    // useEffect에서 searchTerm 변경 감지하여 자동 로드
   }
 
   const handlePageChange = (page: number) => {

@@ -38,8 +38,6 @@ export async function GET() {
         data: {
           isEnabled: false,
           cronInterval: '1h' as CronInterval,
-          collectFromAllChannels: true,
-          collectFromAllBands: true,
           channelIds: [],
           retailChannelIds: [],
           aiProvider: 'GEMINI',
@@ -71,8 +69,6 @@ export async function GET() {
         cronInterval,
         channelIds,
         retailChannelIds,
-        collectFromAllChannels: config.collectFromAllBands,
-        collectFromAllBands: config.collectFromAllBands,
       },
     })
   } catch (error) {
@@ -102,8 +98,6 @@ export async function POST(request: NextRequest) {
     const {
       isEnabled,
       cronInterval,
-      collectFromAllBands,
-      collectFromAllChannels,
       channelIds,
       aiProvider,
       pricingPolicyId,
@@ -111,10 +105,8 @@ export async function POST(request: NextRequest) {
       retailChannelIds,
     } = body
 
-    // 새로운 필드명 우선, 없으면 이전 필드명 사용 (하위 호환성)
     const finalChannelIds = channelIds || []
     const finalRetailChannelIds = retailChannelIds || []
-    const finalCollectFromAll = collectFromAllChannels ?? collectFromAllBands ?? true
 
     // cronInterval을 cronExpression으로 변환
     const cronExpression = cronInterval ? CRON_EXPRESSIONS[cronInterval as CronInterval] : null
@@ -131,7 +123,6 @@ export async function POST(request: NextRequest) {
         userId: currentUser.userId,
         isEnabled: isEnabled ?? false,
         cronExpression,
-        collectFromAllBands: finalCollectFromAll,
         channelIds: JSON.stringify(finalChannelIds),
         aiProvider: aiProvider || 'GEMINI',
         pricingPolicyId: pricingPolicyId || null,
@@ -142,7 +133,6 @@ export async function POST(request: NextRequest) {
       update: {
         isEnabled: isEnabled ?? false,
         cronExpression,
-        collectFromAllBands: finalCollectFromAll,
         channelIds: JSON.stringify(finalChannelIds),
         aiProvider: aiProvider || 'GEMINI',
         pricingPolicyId: pricingPolicyId || null,
