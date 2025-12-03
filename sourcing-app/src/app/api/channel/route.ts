@@ -160,6 +160,14 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    // 주문이 있어서 삭제 불가능한 경우
+    if (error.message?.includes('주문이 있어 삭제할 수 없습니다')) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      )
+    }
+
     return NextResponse.json(
       { success: false, error: '채널 삭제에 실패했습니다.' },
       { status: 500 }

@@ -118,7 +118,7 @@ export interface PublishedProductResult {
   productId: number
   channelId: number
   postKey?: string
-  status: 'SUCCESS' | 'FAILED'
+  status: 'SUCCESS' | 'FAILED' | 'SKIPPED'
   error?: string
 }
 

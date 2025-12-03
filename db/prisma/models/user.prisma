@@ -22,7 +22,6 @@ model User {
   collectedProducts  CollectedProduct[]
   inquiries          Inquiry[]
   orders             Order[]
-  orderTests         OrderTest[]
   pricingPolicies    PricingPolicy[]
   products           Product[]
   publishHistories   PublishHistory[]

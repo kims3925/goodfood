@@ -57,23 +57,3 @@ model OrderItem {
   @@map("order_item")
 }
 
-model OrderTest {
-  id                 Int               @id @default(autoincrement())
-  userId             Int               @map("user_id")
-  publishedProductId Int?              @map("published_product_id")
-  productName        String            @map("product_name") @db.VarChar(500)
-  quantity           Int               @default(1)
-  unitPrice          Int?              @map("unit_price")
-  totalPrice         Int?              @map("total_price")
-  customerName       String            @map("customer_name") @db.VarChar(100)
-  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamp(0)
-  publishedProduct   PublishedProduct? @relation(fields: [publishedProductId], references: [id])
-  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([publishedProductId])
-  @@index([productName])
-  @@index([customerName])
-  @@map("order_test")
-}

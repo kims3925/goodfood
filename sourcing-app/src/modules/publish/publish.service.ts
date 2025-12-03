@@ -1,0 +1,322 @@
+/**
+ * Publish Service
+ * 상품을 소매채널(Band 등)에 발행하는 핵심 서비스
+ *
+ * 이 서비스는 다음에서 사용됩니다:
+ * - 발행 페이지 API (/api/shop/publish)
+ * - 자동화 파이프라인 (automation/pipelines/publish.ts)
+ */
+
+import prisma, { ChannelKind } from '@bandauto/db'
+import { NaverBandClient } from '@/modules/sourcing/domain/src/channel'
+import type {
+  PublishToChannelParams,
+  PublishToChannelResult,
+  PublishBatchParams,
+  PublishBatchResult,
+  PublishMultiChannelParams,
+  PublishMultiChannelResult,
+  ProductForPublish,
+  ChannelForPublish,
+} from './types'
+
+// Band API 쿨다운 지연 시간 (10초)
+const DEFAULT_COOLDOWN_MS = 10000
+
+// 지연 함수
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
+ * 게시글 내용 생성
+ */
+function buildPostContent(product: ProductForPublish): string {
+  const lines: string[] = []
+
+  // 상품명
+  lines.push(`🛍️ ${product.name}`)
+  lines.push('')
+
+  // 가격 정보 (판매가만 노출)
+  if (product.price) {
+    lines.push(`💰 판매가: ${product.price.toLocaleString()}원`)
+    lines.push('')
+  }
+
+  // 상품 설명
+  if (product.description) {
+    lines.push(product.description)
+  } else if (product.collectedProduct?.post?.content) {
+    lines.push(product.collectedProduct.post.content)
+  }
+
+  return lines.join('\n')
+}
+
+export class PublishService {
+  /**
+   * 단일 상품을 단일 채널에 발행
+   */
+  async publishToChannel(params: PublishToChannelParams): Promise<PublishToChannelResult> {
+    const { userId, productId, channelId } = params
+
+    try {
+      // 1. 채널 정보 조회
+      const channel = await prisma.channel.findFirst({
+        where: {
+          id: channelId,
+          userId,
+          kind: ChannelKind.RETAIL,
+          isActive: true,
+        },
+        include: {
+          apiConfig: true,
+        },
+      })
+
+      if (!channel) {
+        return {
+          success: false,
+          productId,
+          channelId,
+          error: '채널을 찾을 수 없거나 발행 권한이 없습니다.',
+        }
+      }
+
+      // 2. 상품 정보 조회
+      const product = await prisma.product.findFirst({
+        where: {
+          id: productId,
+          userId,
+        },
+        include: {
+          collectedProduct: {
+            include: {
+              post: {
+                select: {
+                  content: true,
+                },
+              },
+            },
+          },
+        },
+      })
+
+      if (!product) {
+        return {
+          success: false,
+          productId,
+          channelId,
+          error: '상품을 찾을 수 없습니다.',
+        }
+      }
+
+      // 3. 이미 발행 여부 확인
+      const existingPublish = await prisma.publishedProduct.findFirst({
+        where: {
+          productId,
+          channelId,
+        },
+      })
+
+      if (existingPublish) {
+        return {
+          success: true,
+          productId,
+          channelId,
+          publishedProductId: existingPublish.id,
+          skipped: true,
+          skipReason: '이미 발행된 상품입니다.',
+        }
+      }
+
+      // 4. API 토큰 확인
+      if (!channel.apiConfig?.accessToken) {
+        // API 토큰이 없으면 DB 기록만 생성 (수동 발행용)
+        const publishedProduct = await prisma.publishedProduct.create({
+          data: {
+            userId,
+            productId,
+            channelId,
+            publishedAt: new Date(),
+          },
+        })
+
+        return {
+          success: true,
+          productId,
+          channelId,
+          publishedProductId: publishedProduct.id,
+          skipped: true,
+          skipReason: 'API 토큰이 없어 DB 기록만 생성되었습니다.',
+        }
+      }
+
+      // 5. Band API로 게시물 작성
+      const bandClient = new NaverBandClient(channel.apiConfig.accessToken)
+      const postContent = buildPostContent(product)
+
+      const { postKey } = await bandClient.createPost(channel.channelKey, postContent, {
+        doPush: false, // 푸시 알림 비활성화
+      })
+
+      // 6. PublishedProduct 레코드 생성
+      const publishedProduct = await prisma.publishedProduct.create({
+        data: {
+          userId,
+          productId,
+          channelId,
+          publishedAt: new Date(),
+        },
+      })
+
+      // 7. 장바구니 링크 댓글 작성
+      try {
+        const shopUrl = process.env.SHOP_URL || 'http://localhost:3000'
+        const cartLink = `${shopUrl}/cart?add=${publishedProduct.id}`
+        const commentContent = `🛒 장바구니에 담기 👉 ${cartLink}`
+
+        await bandClient.createComment(channel.channelKey, postKey, commentContent)
+        console.log(`[PublishService] Added cart comment for product ${productId}`)
+      } catch (commentError) {
+        // 댓글 실패해도 발행 자체는 성공으로 처리
+        console.error(`[PublishService] Failed to create cart comment:`, commentError)
+      }
+
+      console.log(
+        `[PublishService] Published product ${productId} to channel ${channel.name} -> post_key: ${postKey}`
+      )
+
+      return {
+        success: true,
+        productId,
+        channelId,
+        postKey,
+        publishedProductId: publishedProduct.id,
+      }
+    } catch (error: any) {
+      console.error(`[PublishService] Error publishing product ${productId} to channel ${channelId}:`, error)
+
+      return {
+        success: false,
+        productId,
+        channelId,
+        error: error.message || '발행 중 오류가 발생했습니다.',
+      }
+    }
+  }
+
+  /**
+   * 여러 상품을 단일 채널에 발행 (배치)
+   */
+  async publishBatch(params: PublishBatchParams): Promise<PublishBatchResult> {
+    const { userId, productIds, channelId } = params
+
+    // 채널 정보 조회
+    const channel = await prisma.channel.findFirst({
+      where: {
+        id: channelId,
+        userId,
+        kind: ChannelKind.RETAIL,
+        isActive: true,
+      },
+      include: {
+        apiConfig: true,
+      },
+    })
+
+    if (!channel) {
+      return {
+        success: false,
+        channelId,
+        channelName: 'Unknown',
+        total: productIds.length,
+        successCount: 0,
+        failedCount: productIds.length,
+        skippedCount: 0,
+        results: productIds.map((productId) => ({
+          success: false,
+          productId,
+          channelId,
+          error: '채널을 찾을 수 없습니다.',
+        })),
+        errors: ['채널을 찾을 수 없습니다.'],
+      }
+    }
+
+    const results: PublishToChannelResult[] = []
+    const errors: string[] = []
+    let successCount = 0
+    let failedCount = 0
+    let skippedCount = 0
+
+    for (let i = 0; i < productIds.length; i++) {
+      const productId = productIds[i]
+
+      // 첫 번째가 아니면 쿨다운 대기 (Band API 제한)
+      if (i > 0 && channel.apiConfig) {
+        console.log(`[PublishService] Waiting ${DEFAULT_COOLDOWN_MS / 1000}s for Band API cooldown...`)
+        await delay(DEFAULT_COOLDOWN_MS)
+      }
+
+      const result = await this.publishToChannel({ userId, productId, channelId })
+      results.push(result)
+
+      if (result.success) {
+        if (result.skipped) {
+          skippedCount++
+        } else {
+          successCount++
+        }
+      } else {
+        failedCount++
+        if (result.error) {
+          errors.push(`Product ${productId}: ${result.error}`)
+        }
+      }
+    }
+
+    return {
+      success: failedCount === 0,
+      channelId,
+      channelName: channel.name,
+      total: productIds.length,
+      successCount,
+      failedCount,
+      skippedCount,
+      results,
+      errors,
+    }
+  }
+
+  /**
+   * 여러 상품을 여러 채널에 발행
+   */
+  async publishMultiChannel(params: PublishMultiChannelParams): Promise<PublishMultiChannelResult> {
+    const { userId, productIds, channelIds, cooldownMs = DEFAULT_COOLDOWN_MS } = params
+
+    const channelResults: PublishBatchResult[] = []
+    let totalSuccess = 0
+    let totalFailed = 0
+    let totalSkipped = 0
+
+    for (const channelId of channelIds) {
+      const result = await this.publishBatch({ userId, productIds, channelId })
+      channelResults.push(result)
+      totalSuccess += result.successCount
+      totalFailed += result.failedCount
+      totalSkipped += result.skippedCount
+    }
+
+    return {
+      success: totalFailed === 0,
+      totalItems: productIds.length * channelIds.length,
+      successCount: totalSuccess,
+      failedCount: totalFailed,
+      skippedCount: totalSkipped,
+      channelResults,
+    }
+  }
+}
+
+// 싱글톤 인스턴스
+export const publishService = new PublishService()
