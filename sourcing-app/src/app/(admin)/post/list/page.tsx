@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Search, Trash2, AlertCircle, ChevronDown, ChevronRight, ChevronUp, FileText, Store } from 'lucide-react'
 import Button from '@/components/ui/Button'
-import Modal, { ModalFooter } from '@/components/ui/Modal'
+import Modal from '@/components/ui/Modal'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
@@ -796,6 +796,30 @@ export default function PostsManagePage() {
         }}
         title="게시물 추가"
         size="2xl"
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowAddModal(false)
+                setApiError(null)
+                setAvailablePosts([])
+                setSelectedPostKeys([])
+                setExpandedPostKeys([])
+                setExpandedBandKeys([])
+              }}
+            >
+              취소
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleAddSelectedPosts}
+              disabled={selectedPostKeys.length === 0 || selectedPlatform !== 'BAND'}
+            >
+              선택한 게시물 추가 {selectedPostKeys.length > 0 && `(${selectedPostKeys.length}개)`}
+            </Button>
+          </div>
+        }
       >
         <div className="space-y-4">
           {/* 플랫폼 선택 탭 */}
@@ -1026,29 +1050,6 @@ export default function PostsManagePage() {
             )}
           </div>
 
-          {/* Footer */}
-          <ModalFooter className="mt-4 pt-0 pb-0">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowAddModal(false)
-                setApiError(null)
-                setAvailablePosts([])
-                setSelectedPostKeys([])
-                setExpandedPostKeys([])
-                setExpandedBandKeys([])
-              }}
-            >
-              취소
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleAddSelectedPosts}
-              disabled={selectedPostKeys.length === 0 || selectedPlatform !== 'BAND'}
-            >
-              선택한 게시물 추가
-            </Button>
-          </ModalFooter>
         </div>
       </Modal>
 

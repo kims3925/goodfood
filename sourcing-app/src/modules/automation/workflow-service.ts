@@ -37,7 +37,7 @@ export async function updateWorkflowLog(
     where: { id: logId },
     data: {
       ...update,
-      details: update.details ? JSON.parse(JSON.stringify(update.details)) : undefined,
+      details: update.details ? JSON.stringify(update.details) : undefined,
     }
   })
 }

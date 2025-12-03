@@ -7,6 +7,7 @@ model CollectedProduct {
   currency       String        @default("KRW") @db.VarChar(10)
   price          Int?
   wholesalePrice Int?          @map("wholesale_price")
+  rawMetadata    Json?         @map("raw_metadata")
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
   post           CollectedPost @relation(fields: [postId], references: [id], onDelete: Cascade)

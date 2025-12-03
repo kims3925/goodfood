@@ -127,7 +127,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { postId, name, description, price, currency, wholesalePrice } = body
+    const { postId, name, description, price, currency, wholesalePrice, rawMetadata } = body
+
+    console.log('[CollectedProduct POST] Request:', { postId, name, price, hasRawMetadata: !!rawMetadata })
 
     if (!postId) {
       return NextResponse.json(
@@ -145,6 +147,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!post) {
+      console.log('[CollectedProduct POST] Post not found:', postId)
       return NextResponse.json(
         { success: false, error: '게시물을 찾을 수 없습니다.' },
         { status: 404 }
@@ -160,6 +163,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (existingProduct) {
+      console.log('[CollectedProduct POST] Already exists:', existingProduct.id)
       return NextResponse.json(
         { success: false, error: '이미 해당 게시물로 등록된 수집상품이 있습니다.' },
         { status: 400 }
@@ -176,6 +180,7 @@ export async function POST(request: NextRequest) {
         price: price || null,
         currency: currency || 'KRW',
         wholesalePrice: wholesalePrice || null,
+        rawMetadata: rawMetadata || null,
       },
       include: {
         post: {
@@ -196,14 +201,16 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    console.log('[CollectedProduct POST] Created:', collectedProduct.id)
+
     return NextResponse.json({
       success: true,
       data: collectedProduct,
     })
-  } catch (error) {
-    console.error('수집상품 등록 실패:', error)
+  } catch (error: any) {
+    console.error('[CollectedProduct POST] Error:', error)
     return NextResponse.json(
-      { success: false, error: '수집상품 등록에 실패했습니다.' },
+      { success: false, error: '수집상품 등록에 실패했습니다.', details: error.message },
       { status: 500 }
     )
   }

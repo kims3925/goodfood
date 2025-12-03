@@ -83,12 +83,35 @@ export interface TransformConfig {
 export interface TransformResult extends PipelineResult {
   details: {
     transformedPosts: TransformedPost[]
-    createdProducts: number
+    createdProducts: number // 생성된 CollectedProduct 수
   }
 }
 
 export interface TransformedPost {
   postId: number
+  collectedProductId?: number
+  status: 'success' | 'failed' | 'skipped'
+  error?: string
+}
+
+// =============================================
+// PRODUCT CREATE PIPELINE TYPES
+// =============================================
+
+export interface ProductCreateConfig {
+  collectedProductIds?: number[]  // 특정 수집상품만 처리
+  createPendingOnly?: boolean     // Product가 없는 수집상품만 처리
+}
+
+export interface ProductCreateResult extends PipelineResult {
+  details: {
+    createdProducts: CreatedProductResult[]
+    totalCreated: number
+  }
+}
+
+export interface CreatedProductResult {
+  collectedProductId: number
   productId?: number
   status: 'success' | 'failed' | 'skipped'
   error?: string
@@ -139,6 +162,7 @@ export type BandPublishResult = ChannelPublishResult
 export interface FullPipelineConfig {
   collection: CollectionConfig
   transform: TransformConfig
+  productCreate: ProductCreateConfig
   publish: PublishConfig
 }
 
@@ -148,6 +172,7 @@ export interface FullPipelineResult {
   completedAt: Date
   collection?: CollectionResult
   transform?: TransformResult
+  productCreate?: ProductCreateResult
   publish?: PublishResult
   overallStatus: WorkflowStatus
 }

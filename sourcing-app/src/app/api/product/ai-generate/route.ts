@@ -65,13 +65,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if product already exists for this post via collected product
-    const existingCollectedProduct = await prisma.collectedProduct.findFirst({
-      where: { postId: post.id },
-      include: { products: true },
+    // Note: 수집상품 등록 여부는 여기서 체크하지 않음
+    // 수집상품 페이지에서 AI 변환 후 CollectedProduct를 직접 생성하기 때문
+    // Product 생성 여부만 체크 (중복 상품 방지)
+    const existingProduct = await prisma.product.findFirst({
+      where: {
+        collectedProduct: {
+          postId: post.id,
+        },
+      },
     })
 
-    if (existingCollectedProduct?.products?.length) {
+    if (existingProduct) {
       return NextResponse.json(
         {
           success: false,
