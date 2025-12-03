@@ -30,6 +30,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.49.0",
+    "recharts": "^3.5.1",
     "redis": "^4.6.12",
     "uuid": "^12.0.0",
     "xlsx": "^0.18.5",

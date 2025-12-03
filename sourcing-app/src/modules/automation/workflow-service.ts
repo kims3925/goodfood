@@ -60,15 +60,61 @@ export async function completeWorkflowLog(
       ? WorkflowStatus.PARTIAL_SUCCESS
       : WorkflowStatus.FAILED
 
+  // 에러 메시지 길이 제한
+  const truncatedMessage = errorMessage && errorMessage.length > 1000
+    ? errorMessage.substring(0, 1000) + '...(truncated)'
+    : errorMessage
+
+  // details 내 에러 배열 크기 제한 (각 채널별 최대 5개 에러만)
+  const sanitizedDetails = sanitizeDetails(details)
+
   await updateWorkflowLog(logId, {
     status,
     completedAt: new Date(),
     totalItems,
     successCount,
     failedCount,
-    details,
-    errorMessage,
+    details: sanitizedDetails,
+    errorMessage: truncatedMessage,
   })
+}
+
+/**
+ * details 객체 내 에러 배열 크기 제한
+ */
+function sanitizeDetails(details: Record<string, any>): Record<string, any> {
+  if (!details) return details
+
+  const sanitized = { ...details }
+
+  // collection 결과의 에러 배열 제한
+  if (sanitized.collection?.channelResults) {
+    sanitized.collection = {
+      ...sanitized.collection,
+      channelResults: sanitized.collection.channelResults.map((cr: any) => ({
+        ...cr,
+        errors: cr.errors?.slice(0, 5) || [], // 채널당 최대 5개 에러
+      })),
+    }
+  }
+
+  // transform 결과의 에러 배열 제한
+  if (sanitized.transform?.errors) {
+    sanitized.transform = {
+      ...sanitized.transform,
+      errors: sanitized.transform.errors.slice(0, 10), // 최대 10개 에러
+    }
+  }
+
+  // publish 결과의 에러 배열 제한
+  if (sanitized.publish?.errors) {
+    sanitized.publish = {
+      ...sanitized.publish,
+      errors: sanitized.publish.errors.slice(0, 10), // 최대 10개 에러
+    }
+  }
+
+  return sanitized
 }
 
 /**
@@ -79,10 +125,15 @@ export async function failWorkflowLog(
   errorMessage: string,
   details?: Record<string, any>
 ): Promise<void> {
+  // 에러 메시지 길이 제한 (DB 컬럼 제한 및 중첩 에러 방지)
+  const truncatedMessage = errorMessage && errorMessage.length > 1000
+    ? errorMessage.substring(0, 1000) + '...(truncated)'
+    : errorMessage
+
   await updateWorkflowLog(logId, {
     status: WorkflowStatus.FAILED,
     completedAt: new Date(),
-    errorMessage,
+    errorMessage: truncatedMessage,
     details,
   })
 }
@@ -113,54 +164,137 @@ export async function updateWorkflowProgress(
 /**
  * 자동화 통계 조회 (헤더용)
  */
-export async function getAutomationStats(userId: number): Promise<AutomationStats> {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+export async function getAutomationStats(
+  userId: number,
+  startDate?: Date,
+  endDate?: Date
+): Promise<AutomationStats> {
+  // 기본값: 오늘
+  const periodStart = startDate || (() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return today
+  })()
 
-  // 오늘 수집된 게시물 수
-  const todayCollected = await prisma.collectedPost.count({
-    where: {
-      userId,
-      createdAt: { gte: today }
-    }
-  })
+  const periodEnd = endDate || (() => {
+    const today = new Date()
+    today.setHours(23, 59, 59, 999)
+    return today
+  })()
 
-  // AI 변환 대기 중인 게시물 수 (CollectedProduct가 없는 게시물)
-  const pendingTransform = await prisma.collectedPost.count({
-    where: {
-      userId,
-      collectedProducts: {
-        none: {},
-      },
-    }
-  })
+  // 병렬로 모든 통계 조회
+  const [
+    totalPosts,
+    periodCollected,
+    pendingTransform,
+    totalTransformed,
+    periodTransformedPosts,
+    totalProducts,
+    periodProductsCount,
+    readyToPublish,
+    allPublishedProducts,
+    periodPublishedProducts,
+  ] = await Promise.all([
+    // 전체 게시물 수
+    prisma.collectedPost.count({
+      where: { userId }
+    }),
 
-  // 발행 준비된 상품 수 (미발행 상품)
-  const readyToPublish = await prisma.product.count({
-    where: {
-      userId,
-      publishedProducts: {
-        none: {}
+    // 기간 내 수집된 게시물 수
+    prisma.collectedPost.count({
+      where: {
+        userId,
+        createdAt: { gte: periodStart, lte: periodEnd }
       }
-    }
-  })
+    }),
 
-  // 오늘 발행된 상품 수 (같은 상품은 1개로 카운트)
-  const todayPublishedProducts = await prisma.publishedProduct.findMany({
-    where: {
-      userId,
-      publishedAt: { gte: today }
-    },
-    distinct: ['productId'],
-    select: { productId: true }
-  })
-  const todayPublished = todayPublishedProducts.length
+    // AI 변환 대기 중인 게시물 수 (CollectedProduct가 없는 게시물)
+    prisma.collectedPost.count({
+      where: {
+        userId,
+        collectedProducts: {
+          none: {},
+        },
+      }
+    }),
+
+    // AI 변환 완료된 게시물 수 (CollectedProduct가 있는 게시물)
+    prisma.collectedPost.count({
+      where: {
+        userId,
+        collectedProducts: {
+          some: {},
+        },
+      }
+    }),
+
+    // 기간 내 AI 변환 완료된 게시물 수
+    prisma.collectedProduct.findMany({
+      where: {
+        userId,
+        createdAt: { gte: periodStart, lte: periodEnd }
+      },
+      distinct: ['postId'],
+      select: { postId: true }
+    }),
+
+    // 전체 상품 수
+    prisma.product.count({
+      where: { userId }
+    }),
+
+    // 기간 내 등록된 상품 수
+    prisma.product.count({
+      where: {
+        userId,
+        createdAt: { gte: periodStart, lte: periodEnd }
+      }
+    }),
+
+    // 발행 준비된 상품 수 (미발행 상품)
+    prisma.product.count({
+      where: {
+        userId,
+        publishedProducts: {
+          none: {}
+        }
+      }
+    }),
+
+    // 전체 발행된 상품 수 (distinct productId)
+    prisma.publishedProduct.findMany({
+      where: { userId },
+      distinct: ['productId'],
+      select: { productId: true }
+    }),
+
+    // 기간 내 발행된 상품 수 (같은 상품은 1개로 카운트)
+    prisma.publishedProduct.findMany({
+      where: {
+        userId,
+        publishedAt: { gte: periodStart, lte: periodEnd }
+      },
+      distinct: ['productId'],
+      select: { productId: true }
+    }),
+  ])
 
   return {
-    todayCollected,
+    // 기존 필드 (이제 기간 기준)
+    todayCollected: periodCollected,
     pendingTransform,
     readyToPublish,
-    todayPublished,
+    todayPublished: periodPublishedProducts.length,
+
+    // 전체 진행률 계산용 추가 필드
+    totalPosts,
+    totalTransformed,
+    totalProducts,
+    totalPublishedProducts: allPublishedProducts.length,
+
+    // 기간 내 통계
+    todayTransformed: periodTransformedPosts.length,
+    todayProducts: periodProductsCount,
   }
 }
 
@@ -196,10 +330,39 @@ export async function getWorkflowLogsByType(
   })
 }
 
+// 자동 정리 임계값 (분)
+const AUTO_CLEANUP_THRESHOLD_MINUTES = 15
+
 /**
  * 실행 중인 워크플로우 확인
+ * - 15분 이상 RUNNING 상태인 워크플로우는 자동으로 실패 처리
  */
 export async function getRunningWorkflow(userId: number) {
+  const cutoffTime = new Date()
+  cutoffTime.setMinutes(cutoffTime.getMinutes() - AUTO_CLEANUP_THRESHOLD_MINUTES)
+
+  // 먼저 오래된 stuck 워크플로우를 자동 정리
+  const staleWorkflow = await prisma.workflowLog.findFirst({
+    where: {
+      userId,
+      status: WorkflowStatus.RUNNING,
+      startedAt: { lt: cutoffTime },
+    },
+  })
+
+  if (staleWorkflow) {
+    console.log(`[WorkflowService] Auto-cleaning stale workflow ${staleWorkflow.id} (started at ${staleWorkflow.startedAt})`)
+    await prisma.workflowLog.update({
+      where: { id: staleWorkflow.id },
+      data: {
+        status: WorkflowStatus.FAILED,
+        completedAt: new Date(),
+        errorMessage: `워크플로우가 ${AUTO_CLEANUP_THRESHOLD_MINUTES}분 이상 응답이 없어 자동 종료되었습니다. AI API 연결 문제일 수 있습니다.`,
+      },
+    })
+  }
+
+  // 정상적인 실행 중 워크플로우 반환
   return prisma.workflowLog.findFirst({
     where: {
       userId,

@@ -35,8 +35,36 @@ export interface ProductTransformationInput {
  * Option group configuration
  */
 export interface OptionGroup {
-  groupName: string  // e.g., "색상", "사이즈"
-  values: string[]   // e.g., ["빨강", "파랑"], ["S", "M", "L"]
+  groupName: string  // e.g., "색상", "사이즈", "용량"
+  values: string[]   // e.g., ["빨강", "파랑"], ["S", "M", "L"], ["소(250~300g)", "중(350~400g)"]
+}
+
+/**
+ * Option-specific pricing (for wholesale products with different prices per option)
+ */
+export interface OptionPrice {
+  option: string        // e.g., "소(250~300g)", "중(350~400g)"
+  price?: number        // Legacy: 단일 가격 (deprecated, use basePrice/sellingPrice)
+  basePrice?: number    // 도매가 (원가)
+  sellingPrice?: number // 판매가 (정책 적용된 가격)
+}
+
+/**
+ * Shipping information for wholesale products
+ */
+export interface ShippingInfo {
+  shippingIncluded: boolean        // 배송비 포함 여부
+  bundleDiscount?: string | null   // 묶음 할인 정보 (예: "2세트이상 4000원 차감")
+  maxBundle?: number | null        // 합배송 최대 수량
+}
+
+/**
+ * Wholesale-specific information
+ */
+export interface WholesaleInfo {
+  origin?: string | null           // 원산지 (예: "국내산", "구룡포")
+  orderDeadline?: string | null    // 발주마감 정보 (예: "오후 2시")
+  deliveryCompany?: string | null  // 택배사 (예: "롯데택배", "대한통운")
 }
 
 /**
@@ -85,13 +113,22 @@ export interface AiProductAnalysis {
 
   // Pricing information
   pricing: {
-    price?: number         // 판매가 (selling price)
+    basePrice?: number       // 도매가 (가장 낮은 옵션 가격)
+    sellingPrice?: number    // 판매가 (정책 적용된 가격)
+    price?: number           // Legacy: 판매가 (deprecated, use sellingPrice)
     currency?: string
+    optionPrices?: OptionPrice[]  // 옵션별 개별 가격
     priceRange?: {
       min: number
       max: number
     }
   }
+
+  // Shipping information (wholesale)
+  shipping?: ShippingInfo
+
+  // Wholesale-specific information
+  wholesale?: WholesaleInfo
 
   // Confidence scores (optional)
   confidence?: {

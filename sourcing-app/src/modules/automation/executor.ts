@@ -74,8 +74,7 @@ export async function executeCollectionPipeline(
     })
 
     const collectionConfig = {
-      collectFromAllChannels: config?.collectFromAllChannels ?? automationConfig?.collectFromAllBands ?? true,
-      channelIds: config?.channelIds ?? parseNumberArray(automationConfig?.channelIds || automationConfig?.channelIds),
+      channelIds: config?.channelIds ?? parseNumberArray(automationConfig?.channelIds),
       limit: config?.limit ?? 20,
     }
 
@@ -182,8 +181,8 @@ export async function executePublishPipeline(
       where: { userId },
     })
 
-    // 새로운 필드명 우선, 없으면 이전 필드명 사용 (하위 호환성)
-    const channelIdsForPublish = config?.channelIds ?? parseNumberArray(automationConfig?.retailChannelIds || automationConfig?.channelIds)
+    // retailChannelIds 사용
+    const channelIdsForPublish = config?.channelIds ?? parseNumberArray(automationConfig?.retailChannelIds)
 
     if (!channelIdsForPublish || channelIdsForPublish.length === 0) {
       throw new Error('발행할 채널이 설정되지 않았습니다')
@@ -270,8 +269,7 @@ export async function executeFullPipeline(
     if (!options?.skipCollection) {
       console.log('[FullPipeline] Step 1: Collection')
       collectionResult = await runCollectionPipeline({
-        collectFromAllChannels: automationConfig.collectFromAllBands,
-        channelIds: parseNumberArray(automationConfig.channelIds || automationConfig.channelIds) || undefined,
+        channelIds: parseNumberArray(automationConfig.channelIds),
       })
 
       // 진행 상황 업데이트
@@ -304,7 +302,7 @@ export async function executeFullPipeline(
 
     // 3. 발행 단계 (autoPublish가 true인 경우에만)
     if (!options?.skipPublish && automationConfig.autoPublish) {
-      const channelIdsForPublish = parseNumberArray(automationConfig.retailChannelIds || automationConfig.channelIds)
+      const channelIdsForPublish = parseNumberArray(automationConfig.retailChannelIds)
       if (channelIdsForPublish.length) {
         console.log('[FullPipeline] Step 3: Publish')
         publishResult = await runPublishPipeline({

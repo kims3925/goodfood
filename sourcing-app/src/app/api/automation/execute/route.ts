@@ -17,11 +17,98 @@ import {
 } from '@/modules/automation'
 
 /**
+ * 자동화 설정 검증 결과
+ */
+interface ConfigValidationResult {
+  isValid: boolean
+  error?: string
+  missingItems: string[]
+}
+
+/**
+ * 파이프라인 실행 전 설정 검증
+ */
+async function validateAutomationConfig(
+  userId: number,
+  type: 'collect' | 'transform' | 'register' | 'publish' | 'full'
+): Promise<ConfigValidationResult> {
+  const automationConfig = await prisma.automationConfig.findUnique({
+    where: { userId },
+    include: { pricingPolicy: true },
+  })
+
+  const missingItems: string[] = []
+
+  // 자동화 설정 자체가 없는 경우
+  if (!automationConfig) {
+    return {
+      isValid: false,
+      error: '자동화 설정이 없습니다. 먼저 설정 페이지에서 기본 설정을 완료해주세요.',
+      missingItems: ['자동화 설정'],
+    }
+  }
+
+  // 수집(collect) 검증
+  if (type === 'collect' || type === 'full') {
+    let channelIds: number[] = []
+    if (automationConfig.channelIds) {
+      try {
+        channelIds = JSON.parse(automationConfig.channelIds)
+      } catch {
+        channelIds = []
+      }
+    }
+    if (channelIds.length === 0) {
+      missingItems.push('수집할 도매채널')
+    }
+  }
+
+  // 변환(transform) 및 상품등록(register) 검증
+  if (type === 'transform' || type === 'register' || type === 'full') {
+    if (!automationConfig.aiProvider) {
+      missingItems.push('AI 제공자')
+    }
+  }
+
+  // 발행(publish) 검증
+  if (type === 'publish' || type === 'full') {
+    let retailChannelIds: number[] = []
+    if (automationConfig.retailChannelIds) {
+      try {
+        retailChannelIds = JSON.parse(automationConfig.retailChannelIds)
+      } catch {
+        retailChannelIds = []
+      }
+    }
+    if (retailChannelIds.length === 0) {
+      missingItems.push('발행할 소매채널')
+    }
+  }
+
+  if (missingItems.length > 0) {
+    const typeNames: Record<string, string> = {
+      collect: '게시물 수집',
+      transform: 'AI 변환',
+      register: '상품 등록',
+      publish: '발행',
+      full: '전체 실행',
+    }
+    return {
+      isValid: false,
+      error: `${typeNames[type]}을 실행하려면 다음 설정이 필요합니다: ${missingItems.join(', ')}. 설정 페이지에서 먼저 설정해주세요.`,
+      missingItems,
+    }
+  }
+
+  return { isValid: true, missingItems: [] }
+}
+
+/**
  * POST /api/automation/execute
  * 파이프라인 수동 실행
  *
  * Request Body:
- * - type: 'collect' | 'transform' | 'publish' | 'full'
+ * - type: 'collect' | 'transform' | 'register' | 'publish' | 'full'
  * - config?: 파이프라인별 추가 설정
  */
 export async function POST(request: NextRequest) {
@@ -50,7 +137,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: '이미 실행 중인 워크플로우가 있습니다.',
+          error: '이미 실행 중인 워크플로우가 있습니다. 완료될 때까지 기다려주세요.',
           runningWorkflow: {
             id: running.id,
             type: running.workflowType,
@@ -59,6 +146,25 @@ export async function POST(request: NextRequest) {
         },
         { status: 409 }
       )
+    }
+
+    // 설정 검증 (config가 명시적으로 제공된 경우는 검증 스킵)
+    const hasExplicitConfig = type === 'collect' ? config?.channelIds?.length > 0 :
+                             type === 'publish' ? config?.channelIds?.length > 0 :
+                             false
+
+    if (!hasExplicitConfig) {
+      const validation = await validateAutomationConfig(currentUser.userId, type)
+      if (!validation.isValid) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: validation.error,
+            missingItems: validation.missingItems,
+          },
+          { status: 400 }
+        )
+      }
     }
 
     let result
@@ -74,21 +180,14 @@ export async function POST(request: NextRequest) {
         result = await executeTransformPipeline(currentUser.userId, config)
         break
 
+      case 'register':
+        // register는 transform과 동일한 파이프라인 (AI 변환 + 상품 등록)
+        console.log(`[Execute] Register (transform) for user ${currentUser.userId}`)
+        result = await executeTransformPipeline(currentUser.userId, config)
+        break
+
       case 'publish':
         console.log(`[Execute] Publish for user ${currentUser.userId}`)
-        if (!config?.channelIds?.length) {
-          // 자동화 설정에서 channelIds 가져오기
-          const automationConfig = await prisma.automationConfig.findUnique({
-            where: { userId: currentUser.userId },
-          })
-          const channelIds = automationConfig?.channelIds as number[] | undefined
-          if (!channelIds || channelIds.length === 0) {
-            return NextResponse.json(
-              { success: false, error: '발행할 소매밴드가 설정되지 않았습니다.' },
-              { status: 400 }
-            )
-          }
-        }
         result = await executePublishPipeline(currentUser.userId, config)
         break
 

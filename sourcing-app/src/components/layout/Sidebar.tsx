@@ -50,6 +50,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   // 경로에 따라 해당 메뉴 그룹 자동 확장
   useEffect(() => {
     const pathToMenuMap: Record<string, string> = {
+      '/dashboard/shop': '대시보드',
+      '/dashboard/automation': '대시보드',
       '/channel': '채널 관리',
       '/collected-product': '상품 관리',
       '/product': '상품 관리',
@@ -86,8 +88,19 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const menuItems: MenuItem[] = [
     {
       label: '대시보드',
-      href: '/automation/dashboard',
       icon: <LayoutDashboard size={20} />,
+      children: [
+        {
+          label: '쇼핑몰',
+          href: '/dashboard/shop',
+          icon: <Store size={16} />,
+        },
+        {
+          label: '자동화',
+          href: '/dashboard/automation',
+          icon: <Zap size={16} />,
+        },
+      ],
     },
     {
       label: '채널 관리',

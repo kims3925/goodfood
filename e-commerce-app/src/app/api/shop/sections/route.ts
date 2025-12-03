@@ -90,13 +90,20 @@ export async function GET(req: NextRequest) {
           name: channel.name,
           coverUrl: channel.coverUrl,
           formUrl: channel.formUrl,
+          platform: channel.platform, // SHOP, BAND 등 플랫폼 정보
           products,
         }
       })
     )
 
-    // 상품이 있는 섹션만 반환
-    const filteredSections = sections.filter((section) => section.products.length > 0)
+    // SHOP 플랫폼(자사 제품)을 맨 앞으로 정렬
+    const filteredSections = sections
+      .filter((section) => section.products.length > 0)
+      .sort((a, b) => {
+        if (a.platform === ChannelPlatform.SHOP && b.platform !== ChannelPlatform.SHOP) return -1
+        if (a.platform !== ChannelPlatform.SHOP && b.platform === ChannelPlatform.SHOP) return 1
+        return 0
+      })
 
     // 3. 도매채널별 섹션 (발행된 상품만 포함)
     // 쇼핑몰에서는 product_publish를 통해서만 상품을 판매할 수 있음

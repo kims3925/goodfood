@@ -36,17 +36,30 @@ export async function runCollectionPipeline(
 
   console.log(`[Collection] Starting for user ${userId}`)
 
-  // 수집할 채널 목록 조회 (도매 채널만)
+  // channelIds가 없으면 수집하지 않음
+  const channelIds = config.channelIds
+  if (!channelIds?.length) {
+    console.log('[Collection] No channels configured, skipping collection')
+    return {
+      success: true,
+      totalItems: 0,
+      successCount: 0,
+      failedCount: 0,
+      details: {
+        channelResults: [],
+        totalNewPosts: 0,
+        totalDuplicates: 0,
+      },
+      errors: [],
+    }
+  }
+
+  // 수집할 채널 목록 조회 (지정된 도매 채널만)
   const whereClause: any = {
     userId,
     kind: ChannelKind.WHOLESALE,
     isActive: true,
-  }
-
-  // 하위 호환성: channelIds도 channelIds로 처리
-  const channelIds = config.channelIds || config.channelIds
-  if (!config.collectFromAllBands && channelIds?.length) {
-    whereClause.id = { in: channelIds }
+    id: { in: channelIds },
   }
 
   const wholesaleChannels = await prisma.channel.findMany({
@@ -143,8 +156,7 @@ export async function runCollectionPipeline(
               author: post.author?.name || null,
               images: {
                 create: (post.photos || []).map((photo: any, index: number) => ({
-                  name: `image_${index}`,
-                  imageUrl: photo.url,
+                  url: photo.url,
                   sortOrder: index,
                 })),
               },
@@ -154,7 +166,9 @@ export async function runCollectionPipeline(
           channelResult.newPosts++
         } catch (postError: any) {
           channelResult.failed++
-          channelResult.errors.push(postError.message)
+          // 에러 메시지 길이 제한 (Prisma 에러 등 너무 긴 메시지 방지)
+          const errorMsg = truncateErrorMessage(postError.message, 200)
+          channelResult.errors.push(errorMsg)
         }
       }
 
@@ -168,12 +182,14 @@ export async function runCollectionPipeline(
       successChannels++
     } catch (channelError: any) {
       console.error(`[Collection] Error collecting from ${channel.name}:`, channelError)
+      // 에러 메시지 길이 제한
+      const errorMsg = truncateErrorMessage(channelError.message, 200)
       errors.push({
         itemId: channel.id,
-        message: channelError.message,
+        message: errorMsg,
         timestamp: new Date(),
       })
-      channelResult.errors.push(channelError.message)
+      channelResult.errors.push(errorMsg)
       failedChannels++
     }
 
@@ -258,4 +274,14 @@ function extractTitle(content: string): string {
     return firstLine.trim() || '제목 없음'
   }
   return firstLine.substring(0, 100).trim() + '...'
+}
+
+/**
+ * 에러 메시지를 지정된 길이로 자르기
+ * Prisma 에러 등 너무 긴 메시지를 방지
+ */
+function truncateErrorMessage(message: string, maxLength: number = 200): string {
+  if (!message) return '알 수 없는 오류'
+  if (message.length <= maxLength) return message
+  return message.substring(0, maxLength) + '...(truncated)'
 }

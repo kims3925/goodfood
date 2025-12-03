@@ -78,16 +78,18 @@ function ChannelListContent() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
 
-  // UTC+9 시간 포맷 함수
+  // UTC+9 시간 포맷 함수 (hydration 안전)
   const formatDateTimeKST = (dateString: string) => {
     const date = new Date(dateString)
-    const kst = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }))
-    const yyyy = kst.getFullYear()
-    const mm = String(kst.getMonth() + 1).padStart(2, '0')
-    const dd = String(kst.getDate()).padStart(2, '0')
-    const hh = String(kst.getHours()).padStart(2, '0')
-    const mi = String(kst.getMinutes()).padStart(2, '0')
-    const ss = String(kst.getSeconds()).padStart(2, '0')
+    // UTC 시간에 9시간(KST)을 더함
+    const kstOffset = 9 * 60 * 60 * 1000
+    const kstDate = new Date(date.getTime() + kstOffset)
+    const yyyy = kstDate.getUTCFullYear()
+    const mm = String(kstDate.getUTCMonth() + 1).padStart(2, '0')
+    const dd = String(kstDate.getUTCDate()).padStart(2, '0')
+    const hh = String(kstDate.getUTCHours()).padStart(2, '0')
+    const mi = String(kstDate.getUTCMinutes()).padStart(2, '0')
+    const ss = String(kstDate.getUTCSeconds()).padStart(2, '0')
     return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
   }
 
