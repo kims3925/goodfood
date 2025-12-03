@@ -10,10 +10,11 @@ import {
   CheckCircle,
   ShoppingBag,
   Check,
+  XCircle,
 } from 'lucide-react'
-import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
+import { useToast } from '@/components/ui/Toast'
 
 const BandIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -47,6 +48,8 @@ interface Product {
 }
 
 export default function PublishPage() {
+  const toast = useToast()
+
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -173,6 +176,7 @@ export default function PublishPage() {
 
   const handlePublishSelected = async () => {
     if (selectedCells.size === 0) return
+    if (isPublishing) return  // 중복 호출 방지
     setIsPublishing(true)
 
     try {
@@ -186,20 +190,63 @@ export default function PublishPage() {
         }
       })
 
+      // 성공한 셀을 추적
+      const successfulCells = new Set<string>()
+      let totalSuccess = 0
+      let totalSkipped = 0
+      let totalFailed = 0
+
       for (const [channelId, productIds] of Object.entries(channelToProducts)) {
         if (productIds.length > 0) {
-          await fetch('/api/shop/publish', {
+          const response = await fetch('/api/shop/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ productIds, channelId: Number(channelId) }),
           })
+
+          const data = await response.json()
+
+          if (data.success && data.results) {
+            // API 응답의 각 결과를 확인하여 성공한 것만 처리
+            for (const result of data.results) {
+              if (result.status === 'SUCCESS') {
+                successfulCells.add(cellKey(result.productId, Number(channelId)))
+                totalSuccess++
+              } else if (result.status === 'SKIPPED') {
+                // 이미 발행된 경우도 선택 해제
+                successfulCells.add(cellKey(result.productId, Number(channelId)))
+                totalSkipped++
+              } else if (result.status === 'FAILED') {
+                totalFailed++
+              }
+            }
+          } else if (!data.success) {
+            // 전체 요청 실패 시 해당 채널의 모든 상품을 실패로 처리
+            totalFailed += productIds.length
+          }
         }
       }
 
-      setSelectedCells(new Set())
+      // 성공한 셀만 선택 해제
+      setSelectedCells((prev) => {
+        const next = new Set(prev)
+        successfulCells.forEach((key) => next.delete(key))
+        return next
+      })
+
+      // 결과 알림
+      if (totalFailed > 0) {
+        toast.warning(`발행 결과: 성공 ${totalSuccess}개, 건너뜀 ${totalSkipped}개, 실패 ${totalFailed}개`)
+      } else if (totalSuccess > 0) {
+        toast.success(`${totalSuccess}개 상품 발행 완료`)
+      } else if (totalSkipped > 0) {
+        toast.info(`${totalSkipped}개 상품 이미 발행됨`)
+      }
+
       loadProducts()
     } catch (error) {
       console.error('발행 실패:', error)
+      toast.error('발행 중 오류가 발생했습니다. 다시 시도해주세요.')
     } finally {
       setIsPublishing(false)
     }
@@ -207,6 +254,7 @@ export default function PublishPage() {
 
   const handleUnpublishSelected = async () => {
     if (selectedCells.size === 0) return
+    if (isPublishing) return  // 중복 호출 방지
     if (!confirm('선택한 발행을 취소하시겠습니까?')) return
 
     setIsPublishing(true)
@@ -240,91 +288,174 @@ export default function PublishPage() {
 
   const selectedUnpublishedCount = selectedCells.size - selectedPublishedCount
 
+  // 통계 계산
+  const stats = useMemo(() => {
+    const totalProducts = products.length
+    const totalCells = products.length * channels.length
+    let publishedCells = 0
+
+    products.forEach((product) => {
+      channels.forEach((channel) => {
+        if (isPublished(product.id, channel.id)) {
+          publishedCells++
+        }
+      })
+    })
+
+    return {
+      totalProducts,
+      totalChannels: channels.length,
+      publishedCells,
+      unpublishedCells: totalCells - publishedCells,
+    }
+  }, [products, channels])
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
-        <div className="mb-6">
-          <div className="flex items-center gap-3">
-            <Send className="text-purple-600" size={32} />
-            <h1 className="text-3xl font-bold text-gray-900">상품 발행</h1>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">상품 발행</h1>
+          <p className="text-gray-600">
+            상품을 선택하여 채널에 발행합니다. 셀을 클릭하여 선택하고 발행 버튼을 누르세요.
+          </p>
         </div>
 
-        {/* 컨트롤 바 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <Input
-                  type="text"
-                  placeholder="상품 검색..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && loadProducts()}
-                  className="pl-10 w-64"
-                />
+        {/* 통계 및 액션 카드 */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <Package size={24} className="text-gray-600" />
               </div>
-              <Button variant="secondary" onClick={loadProducts} disabled={isLoading}>
-                <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-              </Button>
+              <div>
+                <p className="text-sm text-gray-500">전체 상품</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalProducts}</p>
+              </div>
             </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <CheckCircle size={24} className="text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">발행됨</p>
+                <p className="text-2xl font-bold text-green-600">{stats.publishedCells}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <XCircle size={24} className="text-gray-500" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">미발행</p>
+                <p className="text-2xl font-bold text-gray-500">{stats.unpublishedCells}</p>
+              </div>
+            </div>
+          </div>
+          {/* 선택 발행 카드 */}
+          <button
+            onClick={handlePublishSelected}
+            disabled={selectedUnpublishedCount === 0 || isPublishing}
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
+              selectedUnpublishedCount > 0 && !isPublishing
+                ? 'hover:border-purple-300 hover:bg-purple-50 cursor-pointer'
+                : 'opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-3 rounded-lg ${selectedUnpublishedCount > 0 ? 'bg-purple-100' : 'bg-gray-100'}`}>
+                <Send size={24} className={selectedUnpublishedCount > 0 ? 'text-purple-600' : 'text-gray-400'} />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">선택 발행</p>
+                <p className={`text-lg font-bold ${selectedUnpublishedCount > 0 ? 'text-purple-600' : 'text-gray-400'}`}>
+                  {selectedUnpublishedCount}개 선택됨
+                </p>
+              </div>
+            </div>
+          </button>
+          {/* 선택 취소 카드 */}
+          <button
+            onClick={handleUnpublishSelected}
+            disabled={selectedPublishedCount === 0 || isPublishing}
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
+              selectedPublishedCount > 0 && !isPublishing
+                ? 'hover:border-red-300 hover:bg-red-50 cursor-pointer'
+                : 'opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-3 rounded-lg ${selectedPublishedCount > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
+                <XCircle size={24} className={selectedPublishedCount > 0 ? 'text-red-600' : 'text-gray-400'} />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">선택 취소</p>
+                <p className={`text-lg font-bold ${selectedPublishedCount > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                  {selectedPublishedCount}개 선택됨
+                </p>
+              </div>
+            </div>
+          </button>
+        </div>
 
-            <div className="flex items-center gap-4">
-              {selectedCells.size > 0 && (
-                <span className="text-sm text-gray-600">
-                  {selectedCells.size}개 선택 (발행됨: {selectedPublishedCount}, 미발행: {selectedUnpublishedCount})
+        {/* 컨트롤 영역 */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+              {/* 왼쪽: 범례 */}
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-gray-500 mr-2">범례:</span>
+                <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-green-100 text-green-700 flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-green-500 flex items-center justify-center">
+                    <Check size={10} className="text-white" />
+                  </div>
+                  발행됨
                 </span>
-              )}
-              <Button
-                variant="primary"
-                onClick={handlePublishSelected}
-                disabled={selectedUnpublishedCount === 0 || isPublishing}
-              >
-                <Send size={16} />
-                선택 발행 ({selectedUnpublishedCount})
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={handleUnpublishSelected}
-                disabled={selectedPublishedCount === 0 || isPublishing}
-                className="text-red-600 border-red-300 hover:bg-red-50"
-              >
-                선택 취소 ({selectedPublishedCount})
-              </Button>
+                <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-gray-100 text-gray-700 flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-gray-300" />
+                  미발행
+                </span>
+                <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-purple-100 text-purple-700 flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-purple-500" />
+                  선택됨
+                </span>
+              </div>
+
+              {/* 오른쪽: 검색 */}
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                  <Input
+                    type="text"
+                    placeholder="상품 검색..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && loadProducts()}
+                    className="pl-10 w-64"
+                  />
+                </div>
+                <button
+                  onClick={loadProducts}
+                  disabled={isLoading}
+                  className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw size={20} className={isLoading ? 'animate-spin text-gray-400' : 'text-gray-600'} />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* 범례 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 mr-2">범례:</span>
-            <button className="px-3 py-1.5 rounded-md text-sm font-medium bg-green-100 text-green-700 flex items-center gap-1.5 pointer-events-none">
-              <div className="w-3 h-3 rounded bg-green-500 flex items-center justify-center">
-                <Check size={10} className="text-white" />
-              </div>
-              발행됨
-            </button>
-            <button className="px-3 py-1.5 rounded-md text-sm font-medium bg-gray-100 text-gray-700 flex items-center gap-1.5 pointer-events-none">
-              <div className="w-3 h-3 rounded bg-gray-300" />
-              미발행
-            </button>
-            <button className="px-3 py-1.5 rounded-md text-sm font-medium bg-purple-100 text-purple-700 flex items-center gap-1.5 pointer-events-none">
-              <div className="w-3 h-3 rounded bg-purple-500" />
-              선택됨
-            </button>
-          </div>
-        </div>
-
-        {/* 매트릭스 테이블 */}
-        {isLoading || isLoadingChannels ? (
-          <div className="bg-white rounded-lg shadow-sm border p-12">
-            <Loading />
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          {/* 매트릭스 테이블 */}
+          {isLoading || isLoadingChannels ? (
+            <div className="p-12">
+              <Loading />
+            </div>
+          ) : (
+            <>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
@@ -418,14 +549,15 @@ export default function PublishPage() {
               </table>
             </div>
 
-            {products.length === 0 && (
-              <div className="p-12 text-center text-gray-500">
-                <Package size={48} className="mx-auto mb-4 text-gray-300" />
-                상품이 없습니다.
-              </div>
-            )}
-          </div>
-        )}
+          {products.length === 0 && (
+            <div className="p-12 text-center text-gray-500">
+              <Package size={48} className="mx-auto mb-4 text-gray-300" />
+              상품이 없습니다.
+            </div>
+          )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

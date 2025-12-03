@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { ProductStatus, ChannelKind, ChannelPlatform } from '@bandauto/db'
+import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
+import { publishService } from '@/modules/publish'
 
 /**
  * GET /api/shop/publish
@@ -130,17 +131,17 @@ export async function GET(request: NextRequest) {
 
     // Format response
     const formattedProducts = products.map((product) => {
-      const mainImage = product.collectedProduct?.post?.images?.[0]?.url || product.thumbnailUrl
+      const mainImage = product.thumbnailUrl
       const mainVariant = product.variants?.[0]
 
       // 발행 유형별 분류:
-      // - 채널 발행 (RETAIL kind, 비-SHOP): channelId가 있고 platform이 SHOP이 아닌 경우
-      // - 쇼핑몰 발행: platform이 SHOP인 경우 또는 channelId가 없는 경우 (하위 호환성)
+      // - 채널 발행: RETAIL kind 채널에 발행된 모든 상품 (SHOP 플랫폼 포함)
+      // - 쇼핑몰 발행: channelId가 없는 경우 (하위 호환성)
       const channelPublishes = product.publishedProducts.filter(
-        (pp) => pp.channelId && pp.channel?.kind === ChannelKind.RETAIL && pp.channel?.platform !== ChannelPlatform.SHOP
+        (pp) => pp.channelId && pp.channel?.kind === ChannelKind.RETAIL
       )
       const shoppingMallPublishes = product.publishedProducts.filter(
-        (pp) => !pp.channelId || pp.channel?.platform === ChannelPlatform.SHOP
+        (pp) => !pp.channelId
       )
 
       const hasChannelPublish = channelPublishes.length > 0
@@ -172,7 +173,7 @@ export async function GET(request: NextRequest) {
         // 발행된 채널 목록
         publishedChannels: channelPublishes.map((pp) => ({
           publishId: pp.id,
-          channelId: pp.channel?.id,
+          channelId: pp.channelId,
           channelName: pp.channel?.name,
           status: 'SUCCESS',
           createdAt: pp.createdAt,
@@ -214,6 +215,8 @@ export async function GET(request: NextRequest) {
  *
  * Publish products to a selected channel
  * channelId is required - user must select an existing channel
+ *
+ * PublishService를 사용하여 실제 Band API 발행을 수행합니다.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -261,84 +264,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate products belong to user
-    const products = await prisma.product.findMany({
-      where: {
-        id: { in: productIds },
-        userId,
-      },
+    // PublishService를 사용하여 배치 발행 수행
+    const batchResult = await publishService.publishBatch({
+      userId,
+      productIds,
+      channelId: channel.id,
     })
 
-    if (products.length !== productIds.length) {
-      return NextResponse.json(
-        { success: false, error: '일부 상품을 찾을 수 없습니다.' },
-        { status: 400 }
-      )
-    }
-
-    // Check existing publishes for this channel
-    const existingPublishes = await prisma.publishedProduct.findMany({
-      where: {
-        productId: { in: productIds },
-        channelId: channel.id,
-      },
-      select: {
-        productId: true,
-      },
-    })
-
-    const existingProductIds = new Set(existingPublishes.map((p) => p.productId))
-
-    // Create publish records
-    const results: {
-      productId: number
-      status: 'SUCCESS' | 'SKIPPED' | 'FAILED'
-      publishId?: number
-      message?: string
-    }[] = []
-
-    for (const productId of productIds) {
-      if (existingProductIds.has(productId)) {
-        results.push({
-          productId,
-          status: 'SKIPPED',
-          message: `이미 ${channel.name} 채널에 발행된 상품입니다.`,
-        })
-        continue
-      }
-
-      try {
-        const publish = await prisma.publishedProduct.create({
-          data: {
-            userId,
-            productId,
-            channelId: channel.id,
-            publishedAt: new Date(),
-          },
-        })
-
-        results.push({
-          productId,
-          status: 'SUCCESS',
-          publishId: publish.id,
-        })
-      } catch (error: any) {
-        console.error(`채널 발행 실패 (product: ${productId}, channel: ${channel.id}):`, error)
-        results.push({
-          productId,
-          status: 'FAILED',
-          message: error.message || '발행에 실패했습니다.',
-        })
-      }
-    }
-
-    const successCount = results.filter((r) => r.status === 'SUCCESS').length
-    const skippedCount = results.filter((r) => r.status === 'SKIPPED').length
-    const failedCount = results.filter((r) => r.status === 'FAILED').length
+    // 결과 변환
+    const results = batchResult.results.map((r) => ({
+      productId: r.productId,
+      status: r.success ? (r.skipped ? 'SKIPPED' : 'SUCCESS') : 'FAILED',
+      publishId: r.publishedProductId,
+      postKey: r.postKey,
+      message: r.skipped ? r.skipReason : r.error,
+    }))
 
     return NextResponse.json({
-      success: true,
-      message: `${successCount}개 발행 완료, ${skippedCount}개 건너뜀, ${failedCount}개 실패`,
+      success: batchResult.success,
+      message: `${batchResult.successCount}개 발행 완료, ${batchResult.skippedCount}개 건너뜀, ${batchResult.failedCount}개 실패`,
       channel: {
         id: channel.id,
         name: channel.name,
@@ -346,10 +290,10 @@ export async function POST(request: NextRequest) {
       },
       results,
       summary: {
-        total: results.length,
-        success: successCount,
-        skipped: skippedCount,
-        failed: failedCount,
+        total: batchResult.total,
+        success: batchResult.successCount,
+        skipped: batchResult.skippedCount,
+        failed: batchResult.failedCount,
       },
     })
   } catch (error) {

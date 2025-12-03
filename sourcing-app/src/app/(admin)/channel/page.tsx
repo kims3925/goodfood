@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Search,
@@ -48,7 +48,7 @@ interface Channel {
 
 type ChannelKind = 'WHOLESALE' | 'RETAIL'
 
-export default function ChannelListPage() {
+function ChannelListContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const toast = useToast()
@@ -553,5 +553,13 @@ export default function ChannelListPage() {
         channel={null}
       />
     </div>
+  )
+}
+
+export default function ChannelListPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loading /></div>}>
+      <ChannelListContent />
+    </Suspense>
   )
 }

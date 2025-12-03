@@ -23,11 +23,13 @@ interface Channel {
   platform?: string
 }
 
-const PLATFORM_OPTIONS: { value: ChannelPlatform; label: string }[] = [
-  { value: 'BAND', label: '밴드' },
-  { value: 'NAVER_CAFE', label: '네이버 카페' },
-  { value: 'ALIEXPRESS', label: '알리익스프레스' },
-]
+const PLATFORM_LABELS: Record<string, string> = {
+  'BAND': '밴드',
+  'NAVER_CAFE': '네이버 카페',
+  'ALIEXPRESS': '알리익스프레스',
+  'SHOP': '쇼핑몰',
+  'OTHER': '기타',
+}
 
 // DB에서 가져온 가격 정책 인터페이스
 interface PricingPolicyItem {
@@ -144,7 +146,8 @@ export default function CollectedProductListPage() {
   const [selectedPolicyId, setSelectedPolicyId] = useState<number | null>(null)
   const [isLoadingPolicies, setIsLoadingPolicies] = useState(false)
   const [expandedPolicyIds, setExpandedPolicyIds] = useState<number[]>([]) // 펼쳐진 정책 ID
-  const [selectedPlatform, setSelectedPlatform] = useState<ChannelPlatform>('BAND')
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('')
+  const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([]) // 실제 존재하는 플랫폼 목록
   const [availablePosts, setAvailablePosts] = useState<AvailablePost[]>([])
   const [allAvailablePosts, setAllAvailablePosts] = useState<AvailablePost[]>([]) // 전체 게시물 (플랫폼 필터링 전)
   const [isLoadingPosts, setIsLoadingPosts] = useState(false)
@@ -303,7 +306,8 @@ export default function CollectedProductListPage() {
     setShowRegisterModal(true)
     setModalStep('pricing')
     setSelectedPolicyId(null)
-    setSelectedPlatform('BAND')
+    setSelectedPlatform('')
+    setAvailablePlatforms([])
     setSelectedPostIds([])
     setSelectedPosts([])
     setCurrentProcessingIndex(0)
@@ -351,12 +355,13 @@ export default function CollectedProductListPage() {
       return
     }
     setModalStep('select')
-    await loadAvailablePosts('BAND')
+    await loadAvailablePosts()
   }
 
-  const loadAvailablePosts = async (platform: ChannelPlatform) => {
+  const loadAvailablePosts = async () => {
     setIsLoadingPosts(true)
     setAvailablePosts([])
+    setAvailablePlatforms([])
     try {
       // 아직 수집상품으로 변환되지 않은 게시물만 조회
       const response = await fetch('/api/post?limit=100')
@@ -374,11 +379,21 @@ export default function CollectedProductListPage() {
         const filtered = data.data.filter((post: any) => !usedPostIds.has(post.id))
         setAllAvailablePosts(filtered)
 
-        // 플랫폼별로 필터링
-        const platformFiltered = filtered.filter((post: AvailablePost) =>
-          post.channel.platform === platform
-        )
-        setAvailablePosts(platformFiltered)
+        // 고유한 플랫폼 목록 추출
+        const platforms = [...new Set(filtered.map((post: AvailablePost) => post.channel.platform).filter(Boolean))] as string[]
+        setAvailablePlatforms(platforms)
+
+        // 첫 번째 플랫폼 선택 및 필터링
+        if (platforms.length > 0) {
+          const firstPlatform = platforms[0]
+          setSelectedPlatform(firstPlatform)
+          const platformFiltered = filtered.filter((post: AvailablePost) =>
+            post.channel.platform === firstPlatform
+          )
+          setAvailablePosts(platformFiltered)
+        } else {
+          setAvailablePosts(filtered)
+        }
       }
     } catch (error) {
       console.error('게시물 목록 조회 실패:', error)
@@ -389,7 +404,7 @@ export default function CollectedProductListPage() {
   }
 
   // 플랫폼 선택 핸들러
-  const handlePlatformSelect = (platform: ChannelPlatform) => {
+  const handlePlatformSelect = (platform: string) => {
     setSelectedPlatform(platform)
     // 플랫폼 변경 시 선택 상태 초기화
     setSelectedPostIds([])
@@ -397,29 +412,25 @@ export default function CollectedProductListPage() {
     setExpandedPostIds([])
 
     // 이미 로드된 전체 게시물에서 플랫폼별로 필터링
-    if (allAvailablePosts.length > 0) {
-      const platformFiltered = allAvailablePosts.filter((post: AvailablePost) =>
-        post.channel.platform === platform
-      )
-      setAvailablePosts(platformFiltered)
-    } else {
-      loadAvailablePosts(platform)
-    }
+    const platformFiltered = allAvailablePosts.filter((post: AvailablePost) =>
+      post.channel.platform === platform
+    )
+    setAvailablePosts(platformFiltered)
   }
 
   // 게시물 선택/해제 토글 (다중 선택)
   const handleTogglePostSelect = (post: AvailablePost) => {
-    setSelectedPostIds(prev => {
-      if (prev.includes(post.id)) {
-        // 선택 해제
-        setSelectedPosts(posts => posts.filter(p => p.id !== post.id))
-        return prev.filter(id => id !== post.id)
-      } else {
-        // 선택 추가
-        setSelectedPosts(posts => [...posts, post])
-        return [...prev, post.id]
-      }
-    })
+    const isCurrentlySelected = selectedPostIds.includes(post.id)
+
+    if (isCurrentlySelected) {
+      // 선택 해제
+      setSelectedPostIds(prev => prev.filter(id => id !== post.id))
+      setSelectedPosts(prev => prev.filter(p => p.id !== post.id))
+    } else {
+      // 선택 추가 (중복 방지)
+      setSelectedPostIds(prev => prev.includes(post.id) ? prev : [...prev, post.id])
+      setSelectedPosts(prev => prev.some(p => p.id === post.id) ? prev : [...prev, post])
+    }
   }
 
   // 게시물 펼치기/접기 토글
@@ -1014,55 +1025,42 @@ export default function CollectedProductListPage() {
 
         {/* Step 1: 게시물 선택 (다중 선택) */}
         {modalStep === 'select' && (
-          <div className="space-y-4">
-            {/* 플랫폼 선택 탭 */}
-            <div>
+          <div className="flex flex-col h-[700px]">
+            {/* 플랫폼 선택 탭 - 고정 */}
+            <div className="flex-shrink-0 pb-4">
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 플랫폼 선택
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                {PLATFORM_OPTIONS.map((option) => (
+              <div className="flex flex-wrap gap-2">
+                {availablePlatforms.map((platform) => (
                   <button
-                    key={option.value}
+                    key={platform}
                     type="button"
-                    onClick={() => handlePlatformSelect(option.value)}
+                    onClick={() => handlePlatformSelect(platform)}
                     disabled={isLoadingPosts}
                     className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                      selectedPlatform === option.value
+                      selectedPlatform === platform
                         ? 'border-blue-500 bg-blue-500 text-white'
                         : 'border-gray-200 text-gray-700 hover:border-gray-300'
                     } ${isLoadingPosts ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    {option.label}
+                    {PLATFORM_LABELS[platform] || platform}
                   </button>
                 ))}
+                {availablePlatforms.length === 0 && !isLoadingPosts && (
+                  <span className="text-sm text-gray-500">등록된 플랫폼이 없습니다</span>
+                )}
               </div>
             </div>
 
-            {/* 게시물 목록 영역 - 고정 높이 */}
-            <div className="h-[750px] border border-gray-200 rounded-lg overflow-hidden">
+            {/* 게시물 목록 영역 - 스크롤 가능 */}
+            <div className="flex-1 min-h-0 border border-gray-200 rounded-lg overflow-hidden">
               {isLoadingPosts ? (
                 <div className="h-full flex flex-col items-center justify-center">
                   <Loading />
                   <p className="text-center text-gray-600 mt-4">
-                    {selectedPlatform === 'BAND' && '밴드 게시물을 불러오는 중...'}
-                    {selectedPlatform === 'NAVER_CAFE' && '네이버 카페 게시물을 불러오는 중...'}
-                    {selectedPlatform === 'ALIEXPRESS' && '알리익스프레스 상품을 불러오는 중...'}
+                    {PLATFORM_LABELS[selectedPlatform] || selectedPlatform} 게시물을 불러오는 중...
                   </p>
-                </div>
-              ) : selectedPlatform !== 'BAND' ? (
-                // BAND가 아닌 플랫폼은 준비 중 표시
-                <div className="h-full flex items-center justify-center text-gray-400">
-                  <div className="text-center">
-                    <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    <p className="text-sm">
-                      {selectedPlatform === 'NAVER_CAFE' && '네이버 카페 연동 준비 중'}
-                      {selectedPlatform === 'ALIEXPRESS' && '알리익스프레스 연동 준비 중'}
-                    </p>
-                    <p className="text-xs mt-1">API 설정 후 이용 가능합니다</p>
-                  </div>
                 </div>
               ) : availablePosts.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center">
@@ -1186,8 +1184,8 @@ export default function CollectedProductListPage() {
               )}
             </div>
 
-            {/* 선택 정보 및 Footer */}
-            <div className="mt-4 flex items-center justify-between">
+            {/* 선택 정보 및 Footer - 하단 고정 */}
+            <div className="flex-shrink-0 pt-4 flex items-center justify-between border-t border-gray-200 mt-4">
               <p className="text-sm text-gray-500">
                 {selectedPostIds.length > 0
                   ? `${selectedPostIds.length}개 게시물 선택됨`
@@ -1200,7 +1198,7 @@ export default function CollectedProductListPage() {
                 <Button
                   variant="primary"
                   onClick={handleTransform}
-                  disabled={selectedPostIds.length === 0 || selectedPlatform !== 'BAND'}
+                  disabled={selectedPostIds.length === 0}
                 >
                   {selectedPostIds.length > 0
                     ? `선택한 상품 등록`

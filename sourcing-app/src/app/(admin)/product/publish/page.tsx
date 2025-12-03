@@ -15,8 +15,7 @@ interface PublishedProduct {
   id: number
   userId: number
   productId: number
-  channelId: number
-  status: 'PENDING' | 'SUCCESS' | 'FAILED'
+  channelId: number | null
   createdAt: string
   updatedAt: string
   product: {
@@ -26,11 +25,11 @@ interface PublishedProduct {
     price: number | null
     wholesalePrice: number | null
   }
-  retailBand: {
+  channel: {
     id: number
     name: string
-    bandKey: string
-  }
+    channelKey: string
+  } | null
 }
 
 interface GroupedPublishedProduct {
@@ -44,14 +43,13 @@ interface GroupedPublishedProduct {
   }
   publishes: Array<{
     id: number
-    retailBandId: number
-    status: 'PENDING' | 'SUCCESS' | 'FAILED'
+    channelId: number | null
     createdAt: string
-    retailBand: {
+    channel: {
       id: number
       name: string
-      bandKey: string
-    }
+      channelKey: string
+    } | null
   }>
 }
 
@@ -92,10 +90,9 @@ export default function PublishedProductListPage() {
       }
       grouped.get(item.productId)!.publishes.push({
         id: item.id,
-        retailBandId: item.retailBandId,
-        status: item.status,
+        channelId: item.channelId,
         createdAt: item.createdAt,
-        retailBand: item.retailBand,
+        channel: item.channel,
       })
     })
 
@@ -411,11 +408,10 @@ export default function PublishedProductListPage() {
                               <div className="flex items-center gap-2 min-w-0 flex-1">
                                 <Store size={14} className="text-gray-400 flex-shrink-0" />
                                 <span className="text-sm text-gray-700 truncate">
-                                  {publish.retailBand?.name || '-'}
+                                  {publish.channel?.name || '-'}
                                 </span>
                               </div>
                               <div className="flex items-center gap-3 flex-shrink-0">
-                                {getStatusBadge(publish.status)}
                                 <span className="text-xs text-gray-500">
                                   {new Date(publish.createdAt).toLocaleDateString('ko-KR')}
                                 </span>

@@ -10,7 +10,7 @@ export interface ChannelListParams {
 
 export interface ChannelCreateInput {
   userId: number
-  apiConfigId: number
+  apiConfigId: number | null
   kind: ChannelKind
   platform: ChannelPlatform
   channelKey: string

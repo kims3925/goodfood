@@ -1,12 +1,15 @@
 /**
  * Publish Pipeline
  * 상품을 소매채널(소매밴드 등)에 발행
+ *
+ * 이 파이프라인은 PublishService를 사용하여 실제 발행을 수행합니다.
+ * 워크플로우 진행 상황 추적 기능을 추가합니다.
  */
 
 import prisma, { ChannelKind } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
-import { NaverBandClient } from '@/modules/sourcing/domain/src/channel'
+import { publishService } from '@/modules/publish'
 import {
   PublishConfig,
   PublishResult,
@@ -15,18 +18,13 @@ import {
   PipelineError,
 } from '../types'
 
-// 지연 함수
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-
-// Band API 쿨다운 지연 시간 (10초)
-const BAND_API_COOLDOWN_MS = 10000
-
 // =============================================
 // PUBLISH PIPELINE
 // =============================================
 
 /**
  * 발행 파이프라인 실행
+ * PublishService를 사용하여 상품을 소매채널에 발행
  */
 export async function runPublishPipeline(
   config: PublishConfig
@@ -36,14 +34,14 @@ export async function runPublishPipeline(
     throw new Error('Batch context is required')
   }
 
-  const { userId } = context
+  const { userId, workflowLogId } = context
   const errors: PipelineError[] = []
   const publishedProducts: PublishedProductResult[] = []
   const channelResults: ChannelPublishResult[] = []
 
-  console.log(`[Publish] Starting for user ${userId}`)
+  console.log(`[Publish Pipeline] Starting for user ${userId}`)
 
-  // 발행할 상품 조회 (선택된 상품만)
+  // 발행할 상품 조회
   const whereClause: any = {
     userId,
   }
@@ -54,24 +52,11 @@ export async function runPublishPipeline(
 
   const products = await prisma.product.findMany({
     where: whereClause,
-    include: {
-      collectedProduct: {
-        include: {
-          post: {
-            include: {
-              images: {
-                orderBy: { sortOrder: 'asc' },
-              },
-            },
-          },
-        },
-      },
-      variants: true,
-    },
+    select: { id: true },
   })
 
   if (products.length === 0) {
-    console.log('[Publish] No products to publish')
+    console.log('[Publish Pipeline] No products to publish')
     return {
       success: true,
       totalItems: 0,
@@ -85,7 +70,8 @@ export async function runPublishPipeline(
     }
   }
 
-  console.log(`[Publish] Found ${products.length} products to publish`)
+  const productIds = products.map((p) => p.id)
+  console.log(`[Publish Pipeline] Found ${productIds.length} products to publish`)
 
   // 발행할 소매채널 조회
   const channelIds = config.channelIds
@@ -100,20 +86,17 @@ export async function runPublishPipeline(
       kind: ChannelKind.RETAIL,
       isActive: true,
     },
-    include: {
-      apiConfig: true,
-    },
+    select: { id: true, name: true },
   })
 
   if (retailChannels.length === 0) {
     throw new Error('No active retail channels found')
   }
 
-  console.log(`[Publish] Publishing to ${retailChannels.length} retail channels`)
+  console.log(`[Publish Pipeline] Publishing to ${retailChannels.length} retail channels`)
 
   // 진행 상황 초기화
-  const { workflowLogId } = context
-  const totalItems = products.length * retailChannels.length
+  const totalItems = productIds.length * retailChannels.length
   let currentSuccess = 0
   let currentFailed = 0
 
@@ -121,163 +104,57 @@ export async function runPublishPipeline(
     await updateWorkflowProgress(workflowLogId, totalItems, 0, 0)
   }
 
-  // 각 소매채널에 발행
+  // PublishService를 사용하여 각 채널에 발행
   for (const channel of retailChannels) {
-    const channelResult: ChannelPublishResult = {
+    const result = await publishService.publishBatch({
+      userId,
+      productIds,
       channelId: channel.id,
-      channelName: channel.name,
-      attempted: 0,
-      success: 0,
-      failed: 0,
-      skipped: 0,
-      errors: [],
+    })
+
+    // 채널별 결과 변환
+    const channelResult: ChannelPublishResult = {
+      channelId: result.channelId,
+      channelName: result.channelName,
+      attempted: result.total,
+      success: result.successCount,
+      failed: result.failedCount,
+      skipped: result.skippedCount,
+      errors: result.errors,
     }
+    channelResults.push(channelResult)
 
-    if (!channel.apiConfig?.accessToken) {
-      channelResult.errors.push('API 토큰이 설정되지 않았습니다')
-      channelResults.push(channelResult)
-      continue
-    }
-
-    // Band API 클라이언트 초기화
-    const bandClient = new NaverBandClient(channel.apiConfig.accessToken)
-
-    // 각 상품 발행
-    for (const product of products) {
-      channelResult.attempted++
-
-      // 이미 발행된 상품인지 확인
-      const existingPublish = await prisma.publishedProduct.findUnique({
-        where: {
-          productId_channelId: {
-            productId: product.id,
-            channelId: channel.id,
-          },
-        },
+    // 개별 상품 결과 변환
+    for (const productResult of result.results) {
+      publishedProducts.push({
+        productId: productResult.productId,
+        channelId: productResult.channelId,
+        postKey: productResult.postKey,
+        status: productResult.success
+          ? productResult.skipped
+            ? 'SKIPPED'
+            : 'SUCCESS'
+          : 'FAILED',
+        error: productResult.error,
       })
 
-      if (existingPublish) {
-        channelResult.skipped++
-        publishedProducts.push({
-          productId: product.id,
-          channelId: channel.id,
-          postKey: undefined,
-          status: 'SUCCESS',
-        })
-        continue
-      }
-
-      try {
-        // 첫 번째 상품이 아니면 쿨다운 대기 (Band API 제한)
-        if (channelResult.attempted > 1) {
-          console.log(`[Publish] Waiting ${BAND_API_COOLDOWN_MS / 1000}s for Band API cooldown...`)
-          await delay(BAND_API_COOLDOWN_MS)
-        }
-
-        // 게시글 내용 생성
-        const postContent = buildPostContent(product)
-
-        // Band API로 게시물 작성
-        const { postKey } = await bandClient.createPost(channel.channelKey, postContent, {
-          doPush: false, // 푸시 알림 비활성화
-        })
-
-        // PublishedProduct 레코드 생성/업데이트
-        const publishedProduct = await prisma.publishedProduct.upsert({
-          where: {
-            productId_channelId: {
-              productId: product.id,
-              channelId: channel.id,
-            },
-          },
-          create: {
-            userId,
-            productId: product.id,
-            channelId: channel.id,
-            publishedAt: new Date(),
-          },
-          update: {
-            publishedAt: new Date(),
-          },
-        })
-
-        // 장바구니 링크 댓글 작성
-        try {
-          const shopUrl = process.env.SHOP_URL || 'http://localhost:3000'
-          const cartLink = `${shopUrl}/cart?add=${publishedProduct.id}`
-          const commentContent = `🛒 장바구니에 담기 👉 ${cartLink}`
-
-          await bandClient.createComment(channel.channelKey, postKey, commentContent)
-          console.log(`[Publish] Added cart comment for product ${product.id}`)
-        } catch (commentError) {
-          // 댓글 실패해도 발행 자체는 성공으로 처리
-          console.error(`[Publish] Failed to create cart comment:`, commentError)
-        }
-
-        channelResult.success++
-        currentSuccess++
-        publishedProducts.push({
-          productId: product.id,
-          channelId: channel.id,
-          postKey,
-          status: 'SUCCESS',
-        })
-
-        // 진행 상황 업데이트
-        if (workflowLogId) {
-          await updateWorkflowProgress(workflowLogId, totalItems, currentSuccess, currentFailed)
-        }
-
-        console.log(`[Publish] Published product ${product.id} to ${channel.name} -> post_key: ${postKey}`)
-      } catch (publishError: any) {
-        console.error(
-          `[Publish] Error publishing product ${product.id} to ${channel.name}:`,
-          publishError
-        )
-
-        // 실패 이력 저장
-        await prisma.publishedProduct.upsert({
-          where: {
-            productId_channelId: {
-              productId: product.id,
-              channelId: channel.id,
-            },
-          },
-          create: {
-            userId,
-            productId: product.id,
-            channelId: channel.id,
-            publishedAt: new Date(),
-          },
-          update: {
-            publishedAt: new Date(),
-          },
-        })
-
-        channelResult.failed++
-        currentFailed++
-        channelResult.errors.push(`Product ${product.id}: ${publishError.message}`)
-        publishedProducts.push({
-          productId: product.id,
-          channelId: channel.id,
-          status: 'FAILED',
-          error: publishError.message,
-        })
-
-        // 진행 상황 업데이트
-        if (workflowLogId) {
-          await updateWorkflowProgress(workflowLogId, totalItems, currentSuccess, currentFailed)
-        }
-
+      // 에러 수집
+      if (!productResult.success && productResult.error) {
         errors.push({
-          itemId: `${product.id}-${channel.id}`,
-          message: publishError.message,
+          itemId: `${productResult.productId}-${productResult.channelId}`,
+          message: productResult.error,
           timestamp: new Date(),
         })
       }
     }
 
-    channelResults.push(channelResult)
+    // 진행 상황 업데이트
+    currentSuccess += result.successCount
+    currentFailed += result.failedCount
+
+    if (workflowLogId) {
+      await updateWorkflowProgress(workflowLogId, totalItems, currentSuccess, currentFailed)
+    }
   }
 
   const totalSuccess = channelResults.reduce((sum, r) => sum + r.success, 0)
@@ -285,7 +162,7 @@ export async function runPublishPipeline(
 
   return {
     success: totalFailed === 0,
-    totalItems: products.length * retailChannels.length,
+    totalItems: productIds.length * retailChannels.length,
     successCount: totalSuccess,
     failedCount: totalFailed,
     details: {
@@ -294,34 +171,4 @@ export async function runPublishPipeline(
     },
     errors,
   }
-}
-
-// =============================================
-// HELPER FUNCTIONS
-// =============================================
-
-/**
- * 게시글 내용 생성
- */
-function buildPostContent(product: any): string {
-  const lines: string[] = []
-
-  // 상품명
-  lines.push(`🛍️ ${product.name}`)
-  lines.push('')
-
-  // 가격 정보 (판매가만 노출)
-  if (product.price) {
-    lines.push(`💰 판매가: ${product.price.toLocaleString()}원`)
-    lines.push('')
-  }
-
-  // 상품 설명
-  if (product.description) {
-    lines.push(product.description)
-  } else if (product.collectedProduct?.post?.content) {
-    lines.push(product.collectedProduct.post.content)
-  }
-
-  return lines.join('\n')
 }

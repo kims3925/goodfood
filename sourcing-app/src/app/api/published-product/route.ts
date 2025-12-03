@@ -85,10 +85,6 @@ export async function GET(request: NextRequest) {
       prisma.product.findMany({
         where,
         include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-            take: 1,
-          },
           collectedProduct: {
             select: {
               post: {
