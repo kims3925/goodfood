@@ -11,6 +11,18 @@ export interface ProductListParams {
   limit?: number
 }
 
+export interface OptionGroupInput {
+  groupName: string
+  values: string[]
+}
+
+export interface VariantInput {
+  optionSummary?: string
+  options?: Record<string, string>
+  wholesalePrice?: number
+  price?: number
+}
+
 export interface ProductCreateInput {
   userId: number
   postId?: number
@@ -19,16 +31,28 @@ export interface ProductCreateInput {
   description?: string
   categoryId?: string
   currency?: string
-  price?: number
+  shippingFee?: number
+  shippingInfo?: string
   thumbnailUrl?: string | null
   imageUrls?: string[]
+  options?: OptionGroupInput[]
+  variants?: VariantInput[]
+}
+
+export interface OptionInput {
+  groupName: string
+  value: string
+  sortOrder?: number
 }
 
 export interface ProductUpdateInput {
   name?: string
   description?: string
   categoryId?: string
-  price?: number
+  shippingFee?: number
+  shippingInfo?: string
+  options?: OptionInput[]
+  variants?: VariantInput[]
 }
 
 export interface PaginatedResult<T> {

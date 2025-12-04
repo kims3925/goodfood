@@ -97,7 +97,7 @@ export default function ConfirmModal({
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
       onClick={handleOverlayClick}
     >
-      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden animate-scale-in">
+      <div className="bg-white rounded-2xl shadow-xl max-w-[280px] w-full overflow-hidden animate-scale-in">
         {/* Close button */}
         <button
           onClick={onClose}

@@ -458,7 +458,6 @@ export default function PublishPage() {
                           )}
                           <div className="min-w-0">
                             <div className="text-sm font-medium text-gray-900 truncate max-w-[70px]">{product.name}</div>
-                            <div className="text-xs text-gray-500">{formatPrice(product.price)}</div>
                           </div>
                         </div>
                       </td>

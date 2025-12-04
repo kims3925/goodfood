@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Package, Store, ArrowRight, ExternalLink, Trash2, ImageIcon, Calendar, Tag, DollarSign, User, FileText, ShoppingBag } from 'lucide-react'
+import { ArrowLeft, Package, Store, ExternalLink, Trash2, ImageIcon, Calendar, User, FileText, ShoppingBag, Layers, Grid3X3, Truck } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -16,8 +16,6 @@ interface CollectedProductDetail {
   name: string | null
   description: string | null
   currency: string
-  price: number | null
-  wholesalePrice: number | null
   rawMetadata: any
   createdAt: string
   updatedAt: string
@@ -49,13 +47,11 @@ interface CollectedProductDetail {
     id: number
     name: string
     status: string
-    price: number | null
-    wholesalePrice: number | null
     variants: Array<{
       id: number
       optionSummary: string | null
       price: number
-      stock: number
+      wholesalePrice: number | null
     }>
     options: Array<{
       id: number
@@ -177,16 +173,6 @@ export default function CollectedProductDetailPage({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {product.products.length === 0 && (
-                <Button
-                  variant="primary"
-                  onClick={() => router.push(`/product/list?collectedProductId=${product.id}`)}
-                  className="!px-4 !py-2"
-                >
-                  <ArrowRight size={16} />
-                  <span className="hidden sm:inline">상품으로 변환</span>
-                </Button>
-              )}
               <Button
                 variant="danger"
                 onClick={() => setShowDeleteConfirm(true)}
@@ -269,16 +255,7 @@ export default function CollectedProductDetailPage({
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-100">
-                <div className="flex items-center gap-2 text-sm">
-                  <DollarSign size={16} className="text-slate-400" />
-                  <span className="text-slate-500">도매가:</span>
-                  <span className="font-semibold text-emerald-600">{formatPrice(product.wholesalePrice)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Tag size={16} className="text-slate-400" />
-                  <span className="text-slate-500">판매가:</span>
-                  <span className="font-semibold text-slate-700">{formatPrice(product.price)}</span>
-                </div>
+                
                 <div className="flex items-center gap-2 text-sm col-span-2">
                   <Calendar size={16} className="text-slate-400" />
                   <span className="text-slate-500">수집일:</span>
@@ -318,6 +295,119 @@ export default function CollectedProductDetailPage({
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* AI 추출 옵션/변형상품 카드 */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-amber-100 rounded-lg">
+                    <Layers size={18} className="text-amber-600" />
+                  </div>
+                  <span className="font-semibold text-slate-900">AI 추출 옵션/변형상품</span>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* 옵션 그룹 */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Grid3X3 size={16} className="text-slate-400" />
+                    <label className="text-sm font-semibold text-slate-700">옵션</label>
+                  </div>
+                  {product.rawMetadata?.options && product.rawMetadata.options.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {product.rawMetadata.options.flatMap((option: { groupName: string; values: string[] }, idx: number) =>
+                        option.values.map((value: string, vIdx: number) => (
+                          <span
+                            key={`${idx}-${vIdx}`}
+                            className="inline-flex items-center px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-sm font-medium border border-amber-200"
+                          >
+                            {value}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">옵션 없음</p>
+                  )}
+                </div>
+
+                {/* 변형상품 */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Layers size={16} className="text-slate-400" />
+                    <label className="text-sm font-semibold text-slate-700">변형상품</label>
+                    {product.rawMetadata?.variants && product.rawMetadata.variants.length > 0 && (
+                      <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {product.rawMetadata.variants.length}개
+                      </span>
+                    )}
+                  </div>
+                  {product.rawMetadata?.variants && product.rawMetadata.variants.length > 0 ? (
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50">
+                            <th className="text-left py-2.5 px-3 font-medium text-slate-600 border-b border-slate-200">옵션</th>
+                            <th className="text-right py-2.5 px-3 font-medium text-slate-600 border-b border-slate-200 w-24">도매가</th>
+                            <th className="text-right py-2.5 px-3 font-medium text-slate-600 border-b border-slate-200 w-24">판매가</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {product.rawMetadata.variants.map((variant: { optionSummary: string; wholesalePrice?: number; price?: number }, idx: number) => (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="py-2 px-3 text-slate-900">
+                                {variant.optionSummary || '-'}
+                              </td>
+                              <td className="py-2 px-3 text-right text-emerald-600 font-medium tabular-nums">
+                                {variant.wholesalePrice ? `₩${variant.wholesalePrice.toLocaleString()}` : '-'}
+                              </td>
+                              <td className="py-2 px-3 text-right text-slate-700 font-medium tabular-nums">
+                                {variant.price ? `₩${variant.price.toLocaleString()}` : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">변형상품 없음</p>
+                  )}
+                </div>
+
+                {/* 배송비 */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Truck size={16} className="text-slate-400" />
+                    <label className="text-sm font-semibold text-slate-700">배송비</label>
+                  </div>
+                  {product.rawMetadata?.shippingFee !== undefined && product.rawMetadata?.shippingFee !== null ? (
+                    <p className="text-slate-900 font-medium">
+                      {product.rawMetadata.shippingFee === 0 ? '무료배송' : `₩${product.rawMetadata.shippingFee.toLocaleString()}`}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-slate-400">배송비 정보 없음</p>
+                  )}
+                </div>
+
+                {/* 배송정보 */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Truck size={16} className="text-slate-400" />
+                    <label className="text-sm font-semibold text-slate-700">배송정보</label>
+                  </div>
+                  {product.rawMetadata?.shippingInfo ? (
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                      <p className="text-slate-700 whitespace-pre-wrap text-sm leading-relaxed">
+                        {product.rawMetadata.shippingInfo}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">배송정보 없음</p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -386,11 +476,13 @@ export default function CollectedProductDetailPage({
                         <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-slate-900 truncate">{p.name}</p>
-                            <div className="flex items-center gap-3 mt-1 text-sm">
-                              <span className="text-emerald-600 font-medium">{formatPrice(p.wholesalePrice)}</span>
-                              <span className="text-slate-300">→</span>
-                              <span className="text-slate-700 font-medium">{formatPrice(p.price)}</span>
-                            </div>
+                            {p.variants.length > 0 && (
+                              <div className="flex items-center gap-3 mt-1 text-sm">
+                                <span className="text-emerald-600 font-medium">{formatPrice(p.variants[0]?.wholesalePrice)}</span>
+                                <span className="text-slate-300">→</span>
+                                <span className="text-slate-700 font-medium">{formatPrice(p.variants[0]?.price)}</span>
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-3">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${

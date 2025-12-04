@@ -161,9 +161,8 @@ export async function GET(request: NextRequest) {
         name: product.name,
         description: product.description,
         thumbnailUrl: mainImage,
-        price: mainVariant?.price || product.price,
+        price: mainVariant?.price || 0,
         wholesalePrice: mainVariant?.wholesalePrice || null,
-        stock: mainVariant?.stock || 0,
         channel: product.collectedProduct?.post?.channel,
         // 발행 상태 (유형별)
         publishStatus: {

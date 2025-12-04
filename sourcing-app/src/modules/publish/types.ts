@@ -58,7 +58,11 @@ export interface ProductForPublish {
   id: number
   name: string
   description: string | null
-  price: number | null
+  variants: Array<{
+    id: number
+    price: number
+    wholesalePrice: number | null
+  }>
   collectedProduct?: {
     post?: {
       content: string | null

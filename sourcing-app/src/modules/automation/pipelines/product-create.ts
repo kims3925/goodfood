@@ -134,6 +134,11 @@ export async function runProductCreatePipeline(
       const metadata = collectedProduct.rawMetadata as any || {}
       const options = metadata.options || []
       const variants = metadata.variants || []
+      // shipping 객체 또는 직접 shippingFee/shippingInfo 필드 둘 다 지원
+      const shipping = metadata.shipping || {
+        shippingFee: metadata.shippingFee ?? null,
+        shippingInfo: metadata.shippingInfo ?? null,
+      }
 
       // 게시물 이미지 URL 수집
       const imageUrls = collectedProduct.post.images.map((img) => img.url)
@@ -147,7 +152,8 @@ export async function runProductCreatePipeline(
           description: collectedProduct.description || null,
           categoryId: metadata.category || null,
           currency: collectedProduct.currency || 'KRW',
-          price: collectedProduct.price || null,
+          shippingFee: typeof shipping.shippingFee === 'number' ? shipping.shippingFee : null,
+          shippingInfo: typeof shipping.shippingInfo === 'string' ? shipping.shippingInfo : null,
           thumbnailUrl: collectedProduct.post.images[0]?.url || null,
           options: options.length
             ? {
@@ -163,10 +169,9 @@ export async function runProductCreatePipeline(
           variants: variants.length
             ? {
                 create: variants.map((v: any) => ({
-                  sku: v.sku || null,
                   optionSummary: v.optionSummary || null,
-                  price: v.price || collectedProduct.price || 0,
-                  stock: v.stock || 0,
+                  wholesalePrice: v.wholesalePrice || null,
+                  price: v.price || 0,
                 })),
               }
             : undefined,

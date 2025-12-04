@@ -148,12 +148,62 @@ export class ChannelService {
       })
     }
 
+    // 자동화 설정에서 삭제되는 채널 ID 제거
+    await this.removeChannelFromAutomationConfigs(id, existing.kind)
+
     // 채널 이미지 파일 삭제 (있는 경우)
     if (existing.coverUrl) {
       await deleteChannelImageFile(existing.coverUrl)
     }
 
     return channelRepository.delete(id)
+  }
+
+  // 자동화 설정에서 채널 ID 제거
+  private async removeChannelFromAutomationConfigs(channelId: number, kind: ChannelKind) {
+    // 모든 자동화 설정 조회
+    const automationConfigs = await prisma.automationConfig.findMany()
+
+    for (const config of automationConfigs) {
+      let updated = false
+      const updateData: { channelIds?: string; retailChannelIds?: string } = {}
+
+      // WHOLESALE 채널인 경우 channelIds에서 제거
+      if (kind === ChannelKind.WHOLESALE && config.channelIds) {
+        try {
+          const channelIds: number[] = JSON.parse(config.channelIds)
+          const filteredIds = channelIds.filter((id) => id !== channelId)
+          if (filteredIds.length !== channelIds.length) {
+            updateData.channelIds = JSON.stringify(filteredIds)
+            updated = true
+          }
+        } catch (e) {
+          console.error('channelIds 파싱 오류:', e)
+        }
+      }
+
+      // RETAIL 채널인 경우 retailChannelIds에서 제거
+      if (kind === ChannelKind.RETAIL && config.retailChannelIds) {
+        try {
+          const retailChannelIds: number[] = JSON.parse(config.retailChannelIds)
+          const filteredIds = retailChannelIds.filter((id) => id !== channelId)
+          if (filteredIds.length !== retailChannelIds.length) {
+            updateData.retailChannelIds = JSON.stringify(filteredIds)
+            updated = true
+          }
+        } catch (e) {
+          console.error('retailChannelIds 파싱 오류:', e)
+        }
+      }
+
+      if (updated) {
+        await prisma.automationConfig.update({
+          where: { id: config.id },
+          data: updateData,
+        })
+        console.log(`자동화 설정(${config.id})에서 채널 ID(${channelId}) 제거 완료`)
+      }
+    }
   }
 
   // Wholesale 채널 전용 메서드

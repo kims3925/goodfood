@@ -90,7 +90,15 @@ async function main() {
         name: productNames[i],
         description: `${productNames[i]} 상품 설명입니다. 고품질의 제품으로 만족스러운 쇼핑을 약속드립니다.`,
         thumbnailUrl: `https://picsum.photos/seed/product${i}/300`,
-        price: price,
+        variants: {
+          create: {
+            optionSummary: '기본',
+            price: price,
+          }
+        }
+      },
+      include: {
+        variants: true,
       }
     })
     products.push(product)
@@ -149,7 +157,7 @@ async function main() {
 
       for (const pp of selectedPPs) {
         const quantity = Math.floor(Math.random() * 3) + 1
-        const unitPrice = pp.product.price || 15000
+        const unitPrice = (pp.product as any).variants?.[0]?.price || 15000
         const totalPrice = unitPrice * quantity
         subtotal += totalPrice
 

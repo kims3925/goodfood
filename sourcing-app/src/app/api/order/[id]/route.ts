@@ -52,7 +52,13 @@ export async function GET(
                     id: true,
                     name: true,
                     thumbnailUrl: true,
-                    price: true,
+                    variants: {
+                      select: {
+                        id: true,
+                        price: true,
+                      },
+                      take: 1,
+                    },
                   },
                 },
                 channel: {

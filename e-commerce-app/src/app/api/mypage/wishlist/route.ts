@@ -28,8 +28,12 @@ export async function GET(request: NextRequest) {
             name: true,
             description: true,
             thumbnailUrl: true,
-            price: true,
             currency: true,
+            variants: {
+              orderBy: { id: 'asc' },
+              take: 1,
+              select: { price: true },
+            },
           },
         },
       },
@@ -38,9 +42,23 @@ export async function GET(request: NextRequest) {
       },
     })
 
+    // 응답 형식 변환 (price를 variants에서 가져오기)
+    const formattedWishlists = wishlists.map((w) => ({
+      id: w.id,
+      addedAt: w.addedAt,
+      product: {
+        id: w.product.id,
+        name: w.product.name,
+        description: w.product.description,
+        thumbnailUrl: w.product.thumbnailUrl,
+        price: w.product.variants[0]?.price || null,
+        currency: w.product.currency,
+      },
+    }))
+
     return NextResponse.json({
       success: true,
-      wishlists,
+      wishlists: formattedWishlists,
     })
   } catch (error) {
     console.error('Failed to fetch wishlists:', error)

@@ -24,13 +24,11 @@ interface PublishedProductDetail {
     name: string
     description: string | null
     thumbnailUrl: string | null
-    price: number | null
     status: string
     variants: Array<{
       id: number
       optionSummary: string | null
       price: number
-      stock: number
     }>
     options: Array<{
       id: number
@@ -91,12 +89,10 @@ export default function PublishedProductDetailPage({
   const [productChanged, setProductChanged] = useState(false)
   const [editForm, setEditForm] = useState({
     name: '',
-    price: '',
     description: '',
   })
   const [originalForm, setOriginalForm] = useState({
     name: '',
-    price: '',
     description: '',
   })
 
@@ -111,7 +107,6 @@ export default function PublishedProductDetailPage({
         setProduct(data.data)
         const formData = {
           name: data.data.product.name || '',
-          price: data.data.product.price?.toString() || '',
           description: data.data.product.description || '',
         }
         setEditForm(formData)
@@ -158,9 +153,14 @@ export default function PublishedProductDetailPage({
     }
   }
 
-  const formatPrice = (price: number | null) => {
-    if (!price) return '-'
+  const formatPrice = (price: number | null | undefined) => {
+    if (price === null || price === undefined) return '-'
     return `₩${price.toLocaleString()}`
+  }
+
+  // variant에서 대표 가격 추출
+  const getMainPrice = () => {
+    return product?.product?.variants?.[0]?.price ?? null
   }
 
   const startEditingProduct = () => {
@@ -179,7 +179,6 @@ export default function PublishedProductDetailPage({
     setEditForm(newForm)
     const hasChanged =
       newForm.name !== originalForm.name ||
-      newForm.price !== originalForm.price ||
       newForm.description !== originalForm.description
     setProductChanged(hasChanged)
   }
@@ -196,7 +195,6 @@ export default function PublishedProductDetailPage({
         },
         body: JSON.stringify({
           name: editForm.name,
-          price: editForm.price ? parseInt(editForm.price) : null,
           description: editForm.description || null,
         }),
       })
@@ -438,16 +436,6 @@ export default function PublishedProductDetailPage({
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">판매가</label>
-                      <Input
-                        type="number"
-                        value={editForm.price}
-                        onChange={(e) => handleFormChange('price', e.target.value)}
-                        placeholder="판매가를 입력하세요"
-                        className="!rounded-xl"
-                      />
-                    </div>
-                    <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">설명</label>
                       <textarea
                         className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
@@ -471,7 +459,7 @@ export default function PublishedProductDetailPage({
                       </div>
                       <div>
                         <p className="text-slate-500 text-xs">판매가</p>
-                        <p className="text-xl font-bold text-slate-900">{formatPrice(product.product.price)}</p>
+                        <p className="text-xl font-bold text-slate-900">{formatPrice(getMainPrice())}</p>
                       </div>
                     </div>
 

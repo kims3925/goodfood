@@ -167,12 +167,15 @@ export async function runTransformPipeline(
           name: draft.name,
           description: draft.description || null,
           currency: draft.currency || 'KRW',
-          price: draft.price || null,
           // AI 분석 결과를 rawMetadata에 저장 (JSON 직렬화)
           rawMetadata: JSON.parse(JSON.stringify({
             category: draft.categoryId,
             options: draft.options,
             variants: draft.variants,
+            shipping: {
+              shippingFee: draft.shippingFee ?? null,
+              shippingInfo: draft.shippingInfo ?? null,
+            },
           })),
         },
       })

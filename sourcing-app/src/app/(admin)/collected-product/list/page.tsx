@@ -72,10 +72,8 @@ interface ProductDraft {
     values: string[]
   }>
   variants: Array<{
-    sku: string | null
     optionSummary: string | null
     price: number | null
-    stock: number
   }>
 }
 
@@ -433,6 +431,30 @@ export default function CollectedProductListPage() {
     }
   }
 
+  // 전체 선택/해제
+  const handleSelectAllPosts = () => {
+    const allPostIds = availablePosts.map(post => post.id)
+    const isAllSelected = allPostIds.length > 0 && allPostIds.every(id => selectedPostIds.includes(id))
+
+    if (isAllSelected) {
+      // 현재 플랫폼의 게시물만 선택 해제
+      setSelectedPostIds(prev => prev.filter(id => !allPostIds.includes(id)))
+      setSelectedPosts(prev => prev.filter(p => !allPostIds.includes(p.id)))
+    } else {
+      // 현재 플랫폼의 게시물 전체 선택
+      setSelectedPostIds(prev => Array.from(new Set([...prev, ...allPostIds])))
+      setSelectedPosts(prev => {
+        const existingIds = new Set(prev.map(p => p.id))
+        const newPosts = availablePosts.filter(p => !existingIds.has(p.id))
+        return [...prev, ...newPosts]
+      })
+    }
+  }
+
+  // 전체 선택 여부 확인
+  const isAllPostsSelected = availablePosts.length > 0 &&
+    availablePosts.every(post => selectedPostIds.includes(post.id))
+
   // 게시물 펼치기/접기 토글
   const handleTogglePostExpand = (postId: number) => {
     setExpandedPostIds((prev) =>
@@ -476,7 +498,7 @@ export default function CollectedProductListPage() {
         const data = await response.json()
 
         if (data.success) {
-          const draft = data.draft as ProductDraft
+          const draft = data.draft as ProductDraft & { shippingFee?: number; shippingInfo?: string }
 
           // 바로 상품 등록
           const saveResponse = await fetch('/api/collected-product', {
@@ -488,7 +510,14 @@ export default function CollectedProductListPage() {
               description: draft.description,
               price: draft.price,
               currency: 'KRW',
-              rawMetadata: draft,
+              rawMetadata: {
+                ...draft,
+                // shipping 객체로 정리 (product-create.ts와 호환)
+                shipping: {
+                  shippingFee: draft.shippingFee ?? null,
+                  shippingInfo: draft.shippingInfo ?? null,
+                },
+              },
             }),
           })
 
@@ -726,11 +755,10 @@ export default function CollectedProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[36%]">상품명 / 게시물</TableHead>
-                  <TableHead className="w-[16%]">출처 채널</TableHead>
-                  <TableHead className="w-[14%]">가격</TableHead>
-                  <TableHead className="w-[16%]">변환상태</TableHead>
-                  <TableHead className="w-[14%]">수집일</TableHead>
+                  <TableHead className="w-[40%]">상품명 / 게시물</TableHead>
+                  <TableHead className="w-[20%]">출처 채널</TableHead>
+                  <TableHead className="w-[20%]">변환상태</TableHead>
+                  <TableHead className="w-[16%]">수집일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -779,18 +807,6 @@ export default function CollectedProductListPage() {
                     <TableCell>
                       <div className="text-gray-600 truncate">
                         {product.post?.channel?.name || '-'}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-0.5">
-                        <div className="font-medium text-gray-900">
-                          {formatPrice(product.price)}
-                        </div>
-                        {product.wholesalePrice && (
-                          <div className="text-xs text-gray-500">
-                            도매 {formatPrice(product.wholesalePrice)}
-                          </div>
-                        )}
                       </div>
                     </TableCell>
                     <TableCell>{getProductStatusSummary(product)}</TableCell>
@@ -1071,8 +1087,25 @@ export default function CollectedProductListPage() {
                   </div>
                 </div>
               ) : (
-                <div className="h-full flex flex-col overflow-y-auto p-2">
+                <div className="h-full flex flex-col">
+                  {/* 전체 선택 버튼 헤더 */}
+                  <div className="flex-shrink-0 p-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                    <span className="text-sm text-gray-600">
+                      총 {availablePosts.length}개 게시물
+                    </span>
+                    <button
+                      onClick={handleSelectAllPosts}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                        isAllPostsSelected
+                          ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                    >
+                      {isAllPostsSelected ? '전체 해제' : '전체 선택'}
+                    </button>
+                  </div>
                   {/* 게시물 목록 */}
+                  <div className="flex-1 overflow-y-auto p-2">
                   <div className="space-y-2">
                     {availablePosts.map((post) => {
                       const isSelected = selectedPostIds.includes(post.id)
@@ -1179,6 +1212,7 @@ export default function CollectedProductListPage() {
                         </div>
                       )
                     })}
+                  </div>
                   </div>
                 </div>
               )}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, DollarSign, Layers, History } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -23,7 +23,6 @@ interface Product {
   name: string
   description: string | null
   thumbnailUrl: string | null
-  price: number | null
   categoryId: string | null
   currency: string
   createdAt: string
@@ -54,10 +53,9 @@ interface Product {
   }>
   variants: Array<{
     id: number
-    sku: string | null
     optionSummary: string | null
     price: number
-    stock: number
+    wholesalePrice: number | null
   }>
 }
 
@@ -95,7 +93,6 @@ export default function ProductDetailPage() {
     name: '',
     description: '',
     categoryId: '',
-    price: '',
   })
 
   // 이미지 관련 상태
@@ -110,6 +107,16 @@ export default function ProductDetailPage() {
   // 발행현황 상태
   const [publishHistory, setPublishHistory] = useState<PublishHistory[]>([])
   const [isLoadingPublish, setIsLoadingPublish] = useState(false)
+
+  // 옵션 편집 상태
+  const [isEditingOptions, setIsEditingOptions] = useState(false)
+  const [editingOptions, setEditingOptions] = useState<Array<{ groupName: string; values: string[] }>>([])
+  const [isSavingOptions, setIsSavingOptions] = useState(false)
+
+  // 변형상품 편집 상태
+  const [isEditingVariants, setIsEditingVariants] = useState(false)
+  const [editingVariants, setEditingVariants] = useState<Array<{ id?: number; selectedOptions: Record<string, string>; price: number }>>([])
+  const [isSavingVariants, setIsSavingVariants] = useState(false)
 
   useEffect(() => {
     if (productId) {
@@ -137,7 +144,6 @@ export default function ProductDetailPage() {
           name: data.data.name || '',
           description: data.data.description || '',
           categoryId: data.data.categoryId || '',
-          price: data.data.price?.toString() || '',
         })
         if (data.data.images) {
           setImages(data.data.images.map((img: any) => ({
@@ -187,7 +193,6 @@ export default function ProductDetailPage() {
           name: formData.name.trim(),
           description: formData.description.trim() || null,
           categoryId: formData.categoryId.trim() || null,
-          price: formData.price ? parseInt(formData.price) : null,
         }),
       })
 
@@ -204,6 +209,166 @@ export default function ProductDetailPage() {
       toast.error('상품 저장에 실패했습니다.')
     } finally {
       setIsSavingInfo(false)
+    }
+  }
+
+  // 옵션 편집 시작
+  const handleStartEditOptions = () => {
+    const grouped = (product?.options || []).reduce((acc, option) => {
+      const existing = acc.find(g => g.groupName === option.groupName)
+      if (existing) {
+        existing.values.push(option.value)
+      } else {
+        acc.push({ groupName: option.groupName, values: [option.value] })
+      }
+      return acc
+    }, [] as Array<{ groupName: string; values: string[] }>)
+    setEditingOptions(grouped.length > 0 ? grouped : [{ groupName: '', values: [''] }])
+    setIsEditingOptions(true)
+  }
+
+  // 옵션 저장
+  const handleSaveOptions = async () => {
+    if (!product) return
+
+    setIsSavingOptions(true)
+    try {
+      // 옵션을 flat 구조로 변환
+      const options = editingOptions
+        .filter(g => g.groupName.trim())
+        .flatMap((group, gIdx) =>
+          group.values
+            .filter(v => v.trim())
+            .map((value, vIdx) => ({
+              groupName: group.groupName.trim(),
+              value: value.trim(),
+              sortOrder: gIdx * 100 + vIdx,
+            }))
+        )
+
+      const response = await fetch('/api/product', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: product.id,
+          options,
+        }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        toast.success('옵션이 저장되었습니다.')
+        loadProduct()
+        setIsEditingOptions(false)
+      } else {
+        toast.error('옵션 저장에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('옵션 저장 실패:', error)
+      toast.error('옵션 저장에 실패했습니다.')
+    } finally {
+      setIsSavingOptions(false)
+    }
+  }
+
+  // 옵션 요약 문자열 파싱 (예: "빨강/L" → { 색상: "빨강", 사이즈: "L" })
+  const parseOptionSummary = (summary: string | null): Record<string, string> => {
+    if (!summary) return {}
+    const values = summary.split('/')
+    const result: Record<string, string> = {}
+    const optionGroups = Object.keys(groupedOptions)
+    values.forEach((value, idx) => {
+      if (optionGroups[idx]) {
+        result[optionGroups[idx]] = value.trim()
+      }
+    })
+    return result
+  }
+
+  // selectedOptions를 옵션 요약 문자열로 변환
+  const buildOptionSummary = (selectedOptions: Record<string, string>): string => {
+    const optionGroups = Object.keys(groupedOptions)
+    return optionGroups
+      .map(group => selectedOptions[group] || '')
+      .filter(v => v)
+      .join('/')
+  }
+
+  // 변형상품 편집 시작
+  const handleStartEditVariants = () => {
+    const variants = (product?.variants || []).map(v => ({
+      id: v.id,
+      selectedOptions: parseOptionSummary(v.optionSummary),
+      price: v.price,
+    }))
+    setEditingVariants(variants.length > 0 ? variants : [{ selectedOptions: {}, price: 0 }])
+    setIsEditingVariants(true)
+  }
+
+  // 모든 옵션 조합 자동 생성
+  const handleGenerateAllVariants = () => {
+    const optionGroups = Object.entries(groupedOptions)
+    if (optionGroups.length === 0) {
+      toast.error('먼저 옵션을 추가해주세요.')
+      return
+    }
+
+    // 모든 조합 생성
+    const generateCombinations = (groups: [string, string[]][], current: Record<string, string> = {}): Record<string, string>[] => {
+      if (groups.length === 0) return [current]
+      const [groupName, values] = groups[0]
+      const remaining = groups.slice(1)
+      return values.flatMap(value =>
+        generateCombinations(remaining, { ...current, [groupName]: value })
+      )
+    }
+
+    const combinations = generateCombinations(optionGroups)
+    const newVariants = combinations.map(selectedOptions => ({
+      selectedOptions,
+      price: 0,
+    }))
+
+    setEditingVariants(newVariants)
+    toast.success(`${newVariants.length}개의 변형상품이 생성되었습니다.`)
+  }
+
+  // 변형상품 저장
+  const handleSaveVariants = async () => {
+    if (!product) return
+
+    setIsSavingVariants(true)
+    try {
+      const variants = editingVariants
+        .filter(v => Object.keys(v.selectedOptions).length > 0 || v.price > 0)
+        .map(v => ({
+          id: v.id,
+          optionSummary: buildOptionSummary(v.selectedOptions) || null,
+          price: v.price,
+        }))
+
+      const response = await fetch('/api/product', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: product.id,
+          variants,
+        }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        toast.success('변형상품이 저장되었습니다.')
+        loadProduct()
+        setIsEditingVariants(false)
+      } else {
+        toast.error('변형상품 저장에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('변형상품 저장 실패:', error)
+      toast.error('변형상품 저장에 실패했습니다.')
+    } finally {
+      setIsSavingVariants(false)
     }
   }
 
@@ -602,7 +767,6 @@ export default function ProductDetailPage() {
                               name: product?.name || '',
                               description: product?.description || '',
                               categoryId: product?.categoryId || '',
-                              price: product?.price?.toString() || '',
                             })
                           }}
                         >
@@ -652,15 +816,6 @@ export default function ProductDetailPage() {
                           rows={6}
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">판매가</label>
-                        <Input
-                          type="number"
-                          value={formData.price}
-                          onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                          className="!rounded-xl"
-                        />
-                      </div>
                     </div>
                   ) : (
                     <div className="space-y-5">
@@ -680,47 +835,143 @@ export default function ProductDetailPage() {
                         </div>
                       )}
 
-                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-xl">
-                            <DollarSign size={18} className="text-emerald-600" />
+                      {product.categoryId && (
+                        <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
+                          <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
+                            <Tag size={18} className="text-slate-500" />
                           </div>
                           <div>
-                            <p className="text-slate-500 text-xs">판매가</p>
-                            <p className="text-xl font-bold text-slate-900">{formatPrice(product.price)}</p>
+                            <p className="text-slate-500 text-xs">카테고리</p>
+                            <p className="font-medium text-slate-900">{product.categoryId}</p>
                           </div>
                         </div>
-                        {product.categoryId && (
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                              <Tag size={18} className="text-slate-500" />
-                            </div>
-                            <div>
-                              <p className="text-slate-500 text-xs">카테고리</p>
-                              <p className="font-medium text-slate-900">{product.categoryId}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
 
               {/* 옵션 정보 */}
-              {Object.keys(groupedOptions).length > 0 && (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="p-2 bg-violet-100 rounded-lg">
                         <Layers size={18} className="text-violet-600" />
                       </div>
                       <span className="font-semibold text-slate-900">옵션</span>
                     </div>
+                    {isEditingOptions ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setIsEditingOptions(false)}
+                        >
+                          <X size={14} className="mr-1" />
+                          취소
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={handleSaveOptions}
+                          disabled={isSavingOptions}
+                        >
+                          <Save size={14} className="mr-1" />
+                          {isSavingOptions ? '저장중...' : '저장'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleStartEditOptions}
+                      >
+                        <Edit size={14} className="mr-1" />
+                        수정
+                      </Button>
+                    )}
                   </div>
+                </div>
 
-                  <div className="p-6 space-y-4">
-                    {Object.entries(groupedOptions).map(([groupName, values]) => (
+                <div className="p-6 space-y-4">
+                  {isEditingOptions ? (
+                    <div className="space-y-4">
+                      {editingOptions.map((group, gIdx) => (
+                        <div key={gIdx} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Input
+                              value={group.groupName}
+                              onChange={(e) => {
+                                const newOptions = [...editingOptions]
+                                newOptions[gIdx].groupName = e.target.value
+                                setEditingOptions(newOptions)
+                              }}
+                              placeholder="옵션 그룹명 (예: 색상, 사이즈)"
+                              className="flex-1 !rounded-lg"
+                            />
+                            <button
+                              onClick={() => {
+                                const newOptions = editingOptions.filter((_, i) => i !== gIdx)
+                                setEditingOptions(newOptions.length > 0 ? newOptions : [{ groupName: '', values: [''] }])
+                              }}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            {group.values.map((value, vIdx) => (
+                              <div key={vIdx} className="flex items-center gap-2">
+                                <Input
+                                  value={value}
+                                  onChange={(e) => {
+                                    const newOptions = [...editingOptions]
+                                    newOptions[gIdx].values[vIdx] = e.target.value
+                                    setEditingOptions(newOptions)
+                                  }}
+                                  placeholder="옵션 값"
+                                  className="flex-1 !rounded-lg"
+                                />
+                                <button
+                                  onClick={() => {
+                                    const newOptions = [...editingOptions]
+                                    newOptions[gIdx].values = newOptions[gIdx].values.filter((_, i) => i !== vIdx)
+                                    if (newOptions[gIdx].values.length === 0) {
+                                      newOptions[gIdx].values = ['']
+                                    }
+                                    setEditingOptions(newOptions)
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                  <Minus size={16} />
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              onClick={() => {
+                                const newOptions = [...editingOptions]
+                                newOptions[gIdx].values.push('')
+                                setEditingOptions(newOptions)
+                              }}
+                              className="flex items-center gap-1 text-sm text-violet-600 hover:text-violet-700 font-medium"
+                            >
+                              <Plus size={14} />
+                              옵션 값 추가
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => setEditingOptions([...editingOptions, { groupName: '', values: [''] }])}
+                        className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 hover:border-violet-300 hover:text-violet-600 transition-colors"
+                      >
+                        <Plus size={18} />
+                        옵션 그룹 추가
+                      </button>
+                    </div>
+                  ) : Object.keys(groupedOptions).length > 0 ? (
+                    Object.entries(groupedOptions).map(([groupName, values]) => (
                       <div key={groupName}>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">{groupName}</label>
                         <div className="flex flex-wrap gap-2">
@@ -734,10 +985,187 @@ export default function ProductDetailPage() {
                           ))}
                         </div>
                       </div>
-                    ))}
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-400">옵션 없음</p>
+                  )}
+                </div>
+              </div>
+
+              {/* 변형상품 (Variants) */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-emerald-100 rounded-lg">
+                        <Layers size={18} className="text-emerald-600" />
+                      </div>
+                      <span className="font-semibold text-slate-900">변형상품</span>
+                      {!isEditingVariants && product.variants && product.variants.length > 0 && (
+                        <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                          {product.variants.length}개
+                        </span>
+                      )}
+                    </div>
+                    {isEditingVariants ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setIsEditingVariants(false)}
+                        >
+                          <X size={14} className="mr-1" />
+                          취소
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={handleSaveVariants}
+                          disabled={isSavingVariants}
+                        >
+                          <Save size={14} className="mr-1" />
+                          {isSavingVariants ? '저장중...' : '저장'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleStartEditVariants}
+                      >
+                        <Edit size={14} className="mr-1" />
+                        수정
+                      </Button>
+                    )}
                   </div>
                 </div>
-              )}
+
+                <div className="p-4">
+                  {isEditingVariants ? (
+                    <div className="space-y-4">
+                      {/* 자동 생성 버튼 */}
+                      {Object.keys(groupedOptions).length > 0 && (
+                        <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                          <div className="text-sm text-emerald-700">
+                            <span className="font-medium">옵션 조합 자동 생성</span>
+                            <span className="text-emerald-600 ml-2">
+                              ({Object.values(groupedOptions).reduce((acc, vals) => acc * vals.length, 1)}개 조합 가능)
+                            </span>
+                          </div>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={handleGenerateAllVariants}
+                            className="!bg-emerald-600 hover:!bg-emerald-700"
+                          >
+                            <Layers size={14} className="mr-1" />
+                            모든 조합 생성
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* 변형 목록 */}
+                      <div className="space-y-3">
+                        {editingVariants.map((variant, idx) => (
+                          <div key={idx} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-1 space-y-3">
+                                {/* 옵션 선택 드롭다운 */}
+                                {Object.keys(groupedOptions).length > 0 ? (
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                    {Object.entries(groupedOptions).map(([groupName, values]) => (
+                                      <div key={groupName}>
+                                        <label className="block text-xs font-medium text-slate-500 mb-1">{groupName}</label>
+                                        <select
+                                          value={variant.selectedOptions[groupName] || ''}
+                                          onChange={(e) => {
+                                            const newVariants = [...editingVariants]
+                                            newVariants[idx].selectedOptions = {
+                                              ...newVariants[idx].selectedOptions,
+                                              [groupName]: e.target.value,
+                                            }
+                                            setEditingVariants(newVariants)
+                                          }}
+                                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white"
+                                        >
+                                          <option value="">선택</option>
+                                          {values.map((value) => (
+                                            <option key={value} value={value}>{value}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-slate-400">먼저 옵션을 추가해주세요</p>
+                                )}
+
+                                {/* 가격 */}
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-500 mb-1">가격</label>
+                                  <Input
+                                    type="number"
+                                    value={variant.price || ''}
+                                    onChange={(e) => {
+                                      const newVariants = [...editingVariants]
+                                      newVariants[idx].price = parseInt(e.target.value) || 0
+                                      setEditingVariants(newVariants)
+                                    }}
+                                    placeholder="0"
+                                    className="!rounded-lg w-40"
+                                  />
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const newVariants = editingVariants.filter((_, i) => i !== idx)
+                                  setEditingVariants(newVariants.length > 0 ? newVariants : [{ selectedOptions: {}, price: 0 }])
+                                }}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors mt-4"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => setEditingVariants([...editingVariants, { selectedOptions: {}, price: 0 }])}
+                        className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 hover:border-emerald-300 hover:text-emerald-600 transition-colors"
+                      >
+                        <Plus size={18} />
+                        변형상품 추가
+                      </button>
+                    </div>
+                  ) : product.variants && product.variants.length > 0 ? (
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50">
+                            <th className="text-left py-2.5 px-3 font-medium text-slate-600 border-b border-slate-200">옵션</th>
+                            <th className="text-right py-2.5 px-3 font-medium text-slate-600 border-b border-slate-200 w-24">가격</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {product.variants.map((variant) => (
+                            <tr key={variant.id} className="hover:bg-slate-50/50">
+                              <td className="py-2 px-3 text-slate-900">
+                                {variant.optionSummary || '-'}
+                              </td>
+                              <td className="py-2 px-3 text-right text-slate-700 font-medium tabular-nums">
+                                {formatPrice(variant.price)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400 px-2">변형상품 없음</p>
+                  )}
+                </div>
+              </div>
 
               {/* 원본 게시물 정보 */}
               {product.collectedProduct?.post && (

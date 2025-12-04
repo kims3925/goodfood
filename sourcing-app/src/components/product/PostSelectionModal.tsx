@@ -125,6 +125,41 @@ export default function PostSelectionModal({
   // 게시물이 제외 대상인지 확인
   const isExcluded = (postId: number) => excludePostIds.includes(postId)
 
+  // 선택 가능한 게시물 (제외된 게시물 제외)
+  const selectablePosts = posts.filter(post => !isExcluded(post.id))
+  const selectablePostIds = selectablePosts.map(post => post.id)
+
+  // 전체 선택 여부 확인
+  const isAllSelected = selectablePostIds.length > 0 &&
+    selectablePostIds.every(id => selectedPostIds.includes(id))
+
+  // 전체 선택/해제
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedPostIds([])
+    } else {
+      setSelectedPostIds(selectablePostIds)
+    }
+  }
+
+  // 채널별 전체 선택/해제
+  const handleSelectAllInChannel = (channelKey: string) => {
+    const channelPosts = posts.filter(
+      post => post.channel.channelKey === channelKey && !isExcluded(post.id)
+    )
+    const channelPostIds = channelPosts.map(post => post.id)
+
+    const allChannelSelected = channelPostIds.every(id => selectedPostIds.includes(id))
+
+    if (allChannelSelected) {
+      // 채널 게시물 선택 해제
+      setSelectedPostIds(prev => prev.filter(id => !channelPostIds.includes(id)))
+    } else {
+      // 채널 게시물 전체 선택
+      setSelectedPostIds(prev => Array.from(new Set([...prev, ...channelPostIds])))
+    }
+  }
+
   // 게시물 선택/해제 토글
   const handleToggleSelect = (postId: number) => {
     // 제외 대상이면 선택 불가
@@ -184,11 +219,23 @@ export default function PostSelectionModal({
         </div>
       ) : (
         <div className="flex flex-col h-[calc(75vh-12rem)]">
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
             <p className="text-sm text-blue-800">
               💡 게시물을 선택하면 AI가 자동으로 상품 정보를 생성합니다.
               <strong className="ml-1">여러 게시물을 선택하여 한 번에 등록할 수 있습니다.</strong>
             </p>
+            {selectablePosts.length > 0 && (
+              <button
+                onClick={handleSelectAll}
+                className={`ml-4 px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
+                  isAllSelected
+                    ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                {isAllSelected ? '전체 해제' : '전체 선택'}
+              </button>
+            )}
           </div>
 
           {/* 선택된 게시물 수 표시 */}
@@ -210,8 +257,11 @@ export default function PostSelectionModal({
             <div className="space-y-3">
               {Object.entries(groupedPosts).map(([channelKey, group]) => {
                 const isChannelExpanded = expandedChannelKeys.includes(channelKey)
-                const channelPostIds = group.posts.map(p => p.id)
-                const selectedInChannel = channelPostIds.filter(id => selectedPostIds.includes(id)).length
+                const selectableChannelPosts = group.posts.filter(p => !isExcluded(p.id))
+                const selectableChannelPostIds = selectableChannelPosts.map(p => p.id)
+                const selectedInChannel = selectableChannelPostIds.filter(id => selectedPostIds.includes(id)).length
+                const isAllChannelSelected = selectableChannelPostIds.length > 0 &&
+                  selectableChannelPostIds.every(id => selectedPostIds.includes(id))
                 return (
                   <div key={channelKey} className="border rounded-lg bg-white">
                     {/* 채널 헤더 */}
@@ -227,7 +277,25 @@ export default function PostSelectionModal({
                             <ChevronRight size={20} className="text-gray-600" />
                           )}
                           <h3 className="font-semibold text-gray-900">{group.channel.name}</h3>
+                          <span className="text-sm text-gray-500">
+                            ({selectedInChannel}/{selectableChannelPostIds.length})
+                          </span>
                         </div>
+                        {selectableChannelPostIds.length > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSelectAllInChannel(channelKey)
+                            }}
+                            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                              isAllChannelSelected
+                                ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                          >
+                            {isAllChannelSelected ? '선택해제' : '전체선택'}
+                          </button>
+                        )}
                       </div>
                     </div>
 

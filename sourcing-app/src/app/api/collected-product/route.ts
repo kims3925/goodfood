@@ -69,7 +69,16 @@ export async function GET(request: NextRequest) {
     const [data, total] = await Promise.all([
       prisma.collectedProduct.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          userId: true,
+          postId: true,
+          name: true,
+          description: true,
+          currency: true,
+          rawMetadata: true,
+          createdAt: true,
+          updatedAt: true,
           post: {
             include: {
               channel: {
@@ -177,9 +186,7 @@ export async function POST(request: NextRequest) {
         postId,
         name: name || null,
         description: description || null,
-        price: price || null,
         currency: currency || 'KRW',
-        wholesalePrice: wholesalePrice || null,
         rawMetadata: rawMetadata || null,
       },
       include: {

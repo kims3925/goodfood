@@ -37,6 +37,9 @@ export interface CartItemResponse {
   price: number
   quantity: number
   stock: number
+  // 배송 정보
+  shippingFee: number | null
+  freeShippingAmount: number | null
 }
 
 export interface CartResponse {
@@ -90,6 +93,16 @@ const cartIncludeOptions = {
     },
     orderBy: { createdAt: 'desc' as const },
   },
+}
+
+// 배송 정보 파싱 헬퍼
+function parseShippingInfo(shippingInfoStr: string | null): { freeShippingAmount?: number } {
+  if (!shippingInfoStr) return {}
+  try {
+    return JSON.parse(shippingInfoStr)
+  } catch {
+    return {}
+  }
 }
 
 /**
@@ -260,6 +273,7 @@ export class CartService {
       const variant = item.variant
       const mainVariant = product.variants[0]
       const image = product.collectedProduct?.post?.images?.[0]?.url || product.thumbnailUrl || '/placeholder.jpg'
+      const shippingInfo = parseShippingInfo(product.shippingInfo)
 
       return {
         id: item.id,
@@ -274,9 +288,12 @@ export class CartService {
         name: product.name,
         optionSummary: variant?.optionSummary || null,
         image,
-        price: variant?.price || mainVariant?.price || product.price || 0,
+        price: variant?.price || mainVariant?.price || 0,
         quantity: item.quantity,
         stock: variant?.stock || mainVariant?.stock || 100,
+        // 배송 정보
+        shippingFee: product.shippingFee,
+        freeShippingAmount: shippingInfo.freeShippingAmount ?? null,
       }
     })
 
@@ -286,7 +303,27 @@ export class CartService {
 
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-    const shippingFee = subtotal >= 30000 ? 0 : 3000
+
+    // 배송비 계산: 상품별 배송비 중 가장 높은 값 사용
+    // 각 상품의 무료배송 기준을 만족하면 해당 상품 배송비는 0
+    let shippingFee = 0
+    for (const item of items) {
+      const itemTotal = item.price * item.quantity
+      const itemShippingFee = item.shippingFee ?? 0
+      const freeShippingAmount = item.freeShippingAmount
+
+      // 무료배송 조건 충족 여부 확인
+      if (freeShippingAmount != null && itemTotal >= freeShippingAmount) {
+        // 무료배송 조건 충족 - 배송비 0
+        continue
+      }
+
+      // 배송비가 있는 경우, 가장 높은 배송비 적용
+      if (itemShippingFee > shippingFee) {
+        shippingFee = itemShippingFee
+      }
+    }
+
     const total = subtotal + shippingFee
 
     return {
@@ -336,7 +373,7 @@ export class CartService {
     }
 
     const cart = await this.getOrCreateCart(sessionId, userId)
-    const price = publishedProduct.product.variants[0]?.price || publishedProduct.product.price || 0
+    const price = publishedProduct.product.variants[0]?.price || 0
 
     const newSessionId = (cart as any).__newSessionId
 

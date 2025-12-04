@@ -161,7 +161,7 @@ export class OrderService {
       const product = publishedProduct.product
       const variant = item.variant
       const mainVariant = product.variants[0]
-      const unitPrice = variant?.price || mainVariant?.price || product.price || 0
+      const unitPrice = variant?.price || mainVariant?.price || 0
 
       return {
         publishedProductId: publishedProduct.id,
@@ -278,7 +278,7 @@ export class OrderService {
 
       const product = publishedProduct.product
       const mainVariant = product.variants[0]
-      const unitPrice = variant?.price || mainVariant?.price || product.price || 0
+      const unitPrice = variant?.price || mainVariant?.price || 0
 
       orderItems.push({
         publishedProductId: publishedProduct.id,

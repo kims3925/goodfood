@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     let publishedProductId: number | null = null
     let matchedPublish: {
       id: number
-      product: { id: number; name: string; price: number | null }
+      product: { id: number; name: string; variants: Array<{ id: number; price: number }> }
     } | null = null
 
     if (channelId) {
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
         select: {
           id: true,
           product: {
-            select: { id: true, name: true, price: true },
+            select: { id: true, name: true, variants: { select: { id: true, price: true }, take: 1 } },
           },
         },
       })
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             product: {
-              select: { id: true, name: true, price: true },
+              select: { id: true, name: true, variants: { select: { id: true, price: true }, take: 1 } },
             },
           },
         })
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             product: {
-              select: { id: true, name: true, price: true },
+              select: { id: true, name: true, variants: { select: { id: true, price: true }, take: 1 } },
             },
           },
         })
@@ -185,9 +185,10 @@ export async function POST(request: NextRequest) {
     let unitPrice: number | null = null
     let calculatedTotalPrice: number | null = null
 
-    // 1순위: 매칭된 상품의 가격으로 자동 계산
-    if (matchedPublish?.product?.price) {
-      unitPrice = matchedPublish.product.price
+    // 1순위: 매칭된 상품의 variants에서 가격 추출
+    const firstVariantPrice = matchedPublish?.product?.variants?.[0]?.price
+    if (firstVariantPrice) {
+      unitPrice = firstVariantPrice
       calculatedTotalPrice = unitPrice * quantity
     }
 
@@ -223,7 +224,7 @@ export async function POST(request: NextRequest) {
               select: { id: true, name: true },
             },
             product: {
-              select: { id: true, name: true, price: true, thumbnailUrl: true },
+              select: { id: true, name: true, thumbnailUrl: true },
             },
           },
         },
@@ -231,7 +232,7 @@ export async function POST(request: NextRequest) {
     })
 
     const channelSource = rawChannelId ? '직접전달' : '미분류'
-    const priceSource = matchedPublish?.product?.price ? '자동계산' : totalPrice ? '직접입력' : '없음'
+    const priceSource = firstVariantPrice ? '자동계산' : totalPrice ? '직접입력' : '없음'
     console.log(`[Webhook] 주문 생성: ID=${order.id}, 고객=${customerName}, 상품=${productName}(${quantity}개), 단가=${unitPrice || '?'}원, 총액=${calculatedTotalPrice || '?'}원(${priceSource}), PublishedProduct=${publishedProductId || '없음'}, 채널ID=${channelId || '없음'}(${channelSource})`)
 
     return NextResponse.json(

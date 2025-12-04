@@ -42,7 +42,6 @@ export class ProductService {
           name: data.name,
           description: data.description,
           currency: data.currency,
-          price: data.price,
         })
         collectedProductId = collected.id
         thumbnailUrl = thumbnailUrl || post.images[0]?.url || null

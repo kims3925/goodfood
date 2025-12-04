@@ -35,7 +35,8 @@ interface ProductFormData {
   name: string
   description: string
   categoryId: string
-  price: number | ''
+  shippingFee: number | ''
+  shippingInfo: string
   options: OptionGroup[]
   variants: GeneratedVariant[]
   images: SortableImage[] // 이미지 목록
@@ -48,7 +49,8 @@ const createEmptyProductData = (id: string): ProductFormData => ({
   name: '',
   description: '',
   categoryId: '',
-  price: '',
+  shippingFee: '',
+  shippingInfo: '',
   options: [],
   variants: [],
   images: [],
@@ -118,7 +120,8 @@ export default function ProductFormModal({
               name: item.draft?.name || '',
               description: item.draft?.description || '',
               categoryId: item.draft?.categoryId || '',
-              price: item.draft?.price || '' as number | '',
+              shippingFee: item.draft?.shippingFee || '' as number | '',
+              shippingInfo: item.draft?.shippingInfo || '',
               options: item.draft?.options || [],
               variants: item.draft?.variants || [],
               images,
@@ -137,7 +140,8 @@ export default function ProductFormModal({
           name: initialData.name || '',
           description: initialData.description || '',
           categoryId: initialData.categoryId || '',
-          price: initialData.price || '',
+          shippingFee: initialData.shippingFee || '',
+          shippingInfo: initialData.shippingInfo || '',
           options: initialData.options || [],
           variants: initialData.variants || [],
           images,
@@ -186,8 +190,10 @@ export default function ProductFormModal({
   const setDescription = (value: string) => updateCurrentProduct({ description: value })
   const categoryId = currentProduct.categoryId
   const setCategoryId = (value: string) => updateCurrentProduct({ categoryId: value })
-  const price = currentProduct.price
-  const setPrice = (value: number | '') => updateCurrentProduct({ price: value })
+  const shippingFee = currentProduct.shippingFee
+  const setShippingFee = (value: number | '') => updateCurrentProduct({ shippingFee: value })
+  const shippingInfo = currentProduct.shippingInfo
+  const setShippingInfo = (value: string) => updateCurrentProduct({ shippingInfo: value })
   const options = currentProduct.options
   const setOptions = (value: OptionGroup[]) => updateCurrentProduct({ options: value })
   const variants = currentProduct.variants
@@ -248,7 +254,7 @@ export default function ProductFormModal({
     setOptions(options.filter((_, i) => i !== index))
   }
 
-  const handleUpdateVariant = (index: number, field: 'price' | 'stock', value: number) => {
+  const handleUpdateVariant = (index: number, field: 'price', value: number) => {
     const updated = [...variants]
     updated[index] = { ...updated[index], [field]: value }
     setVariants(updated)
@@ -313,11 +319,14 @@ export default function ProductFormModal({
   // 단일 상품 저장 함수
   const saveSingleProduct = async (product: ProductFormData & { postId?: number }, silent = false): Promise<boolean> => {
     try {
-      // 가격 계산
-      const calculatedPrice = typeof product.price === 'number' ? product.price : 0
-
       // 각 상품의 postId 사용 (없으면 props의 postId 사용)
       const targetPostId = product.postId || postId
+
+      // 이미지 URL 추출 (상품 생성 시 이미지 복사용)
+      const imageUrls = product.images?.map((img) => img.url).filter(Boolean) || []
+
+      // 배송비 계산
+      const calculatedShippingFee = typeof product.shippingFee === 'number' ? product.shippingFee : undefined
 
       // Create or update product
       const response = await fetch('/api/product', {
@@ -330,7 +339,13 @@ export default function ProductFormModal({
           description: product.description.trim() || null,
           categoryId: product.categoryId.trim() || null,
           currency: 'KRW',
-          price: calculatedPrice,
+          shippingFee: calculatedShippingFee,
+          shippingInfo: product.shippingInfo?.trim() || null,
+          // options와 variants 전송
+          options: product.options,
+          variants: product.variants,
+          // 이미지 URL 전송 (상품 생성 시 이미지 복사)
+          imageUrls: !isEditMode ? imageUrls : undefined,
         }),
       })
 
@@ -540,22 +555,27 @@ export default function ProductFormModal({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    판매가 (원)
-                  </label>
-                  <Input
-                    type="number"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value ? parseInt(e.target.value) : '')}
-                    placeholder="0"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    변형이 있으면 최소 변형 가격이 자동 설정됩니다
-                  </p>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  배송비 (원)
+                </label>
+                <Input
+                  type="number"
+                  value={shippingFee}
+                  onChange={(e) => setShippingFee(e.target.value ? parseInt(e.target.value) : '')}
+                  placeholder="0 (무료배송)"
+                />
+              </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  배송 정보
+                </label>
+                <Input
+                  value={shippingInfo}
+                  onChange={(e) => setShippingInfo(e.target.value)}
+                  placeholder="예: 3일 이내 발송, 제주/도서산간 추가비용"
+                />
               </div>
             </div>
           )}
@@ -707,9 +727,6 @@ export default function ProductFormModal({
                           <th className="px-3 py-2 text-left font-medium text-gray-700">
                             판매가 (원) <span className="text-red-500">*</span>
                           </th>
-                          <th className="px-3 py-2 text-left font-medium text-gray-700">
-                            재고
-                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -726,16 +743,6 @@ export default function ProductFormModal({
                                   handleUpdateVariant(index, 'price', parseInt(e.target.value) || 0)
                                 }
                                 className="w-24"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input
-                                type="number"
-                                value={variant.stock || 0}
-                                onChange={(e) =>
-                                  handleUpdateVariant(index, 'stock', parseInt(e.target.value) || 0)
-                                }
-                                className="w-20"
                               />
                             </td>
                           </tr>
