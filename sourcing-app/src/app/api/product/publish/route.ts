@@ -75,7 +75,13 @@ export async function GET(request: NextRequest) {
             id: true,
             name: true,
             thumbnailUrl: true,
-            price: true,
+            variants: {
+              select: {
+                id: true,
+                price: true,
+              },
+              take: 1,
+            },
           },
         },
         channel: {

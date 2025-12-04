@@ -7,6 +7,7 @@ import prisma, { WorkflowType, WorkflowStatus, TriggerType } from '@bandauto/db'
 import { setBatchContext, clearBatchContext, createBatchContextFromUserId } from './context'
 import { runCollectionPipeline } from './pipelines/collection'
 import { runTransformPipeline } from './pipelines/transform'
+import { runProductCreatePipeline } from './pipelines/product-create'
 import { runPublishPipeline } from './pipelines/publish'
 import {
   createWorkflowLog,
@@ -19,6 +20,7 @@ import {
   FullPipelineResult,
   CollectionResult,
   TransformResult,
+  ProductCreateResult,
   PublishResult,
 } from './types'
 
@@ -156,6 +158,53 @@ export async function executeTransformPipeline(
 }
 
 /**
+ * 상품 생성 파이프라인 실행 (with logging)
+ * CollectedProduct에서 Product 생성
+ */
+export async function executeProductCreatePipeline(
+  userId: number,
+  config?: Partial<FullPipelineConfig['productCreate']>,
+  triggerType: TriggerType = TriggerType.MANUAL
+): Promise<ProductCreateResult> {
+  const context = await createBatchContextFromUserId(userId)
+
+  const logId = await createWorkflowLog({
+    userId,
+    workflowType: WorkflowType.TRANSFORM, // PRODUCT_CREATE 타입이 없으면 TRANSFORM 사용
+    triggerType,
+  })
+
+  // context에 workflowLogId 설정
+  context.workflowLogId = logId
+  setBatchContext(context)
+
+  try {
+    const productCreateConfig = {
+      collectedProductIds: config?.collectedProductIds,
+      createPendingOnly: config?.createPendingOnly ?? true,
+    }
+
+    const result = await runProductCreatePipeline(productCreateConfig)
+
+    await completeWorkflowLog(
+      logId,
+      result.success,
+      result.totalItems,
+      result.successCount,
+      result.failedCount,
+      result.details
+    )
+
+    return result
+  } catch (error: any) {
+    await failWorkflowLog(logId, error.message)
+    throw error
+  } finally {
+    clearBatchContext()
+  }
+}
+
+/**
  * 발행 파이프라인 실행 (with logging)
  */
 export async function executePublishPipeline(
@@ -220,13 +269,14 @@ export async function executePublishPipeline(
 
 /**
  * 전체 파이프라인 실행
- * 수집 → 변환 → 발행 순서로 실행
+ * 수집 → 변환 → 상품생성 → 발행 순서로 실행
  */
 export async function executeFullPipeline(
   userId: number,
   options?: {
     skipCollection?: boolean
     skipTransform?: boolean
+    skipProductCreate?: boolean
     skipPublish?: boolean
   },
   triggerType: TriggerType = TriggerType.MANUAL
@@ -243,6 +293,7 @@ export async function executeFullPipeline(
 
   let collectionResult: CollectionResult | undefined
   let transformResult: TransformResult | undefined
+  let productCreateResult: ProductCreateResult | undefined
   let publishResult: PublishResult | undefined
 
   try {
@@ -297,14 +348,30 @@ export async function executeFullPipeline(
       failedCount += transformResult.failedCount
       await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
 
-      console.log(`[FullPipeline] Transform completed: ${transformResult.successCount} products created`)
+      console.log(`[FullPipeline] Transform completed: ${transformResult.successCount} collected products created`)
     }
 
-    // 3. 발행 단계 (autoPublish가 true인 경우에만)
+    // 3. 상품 생성 단계 (autoProductCreate 설정에 따라)
+    if (!options?.skipProductCreate && automationConfig.autoProductCreate) {
+      console.log('[FullPipeline] Step 3: Product Create')
+      productCreateResult = await runProductCreatePipeline({
+        createPendingOnly: true,
+      })
+
+      // 진행 상황 업데이트
+      totalItems += productCreateResult.totalItems
+      successCount += productCreateResult.successCount
+      failedCount += productCreateResult.failedCount
+      await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+
+      console.log(`[FullPipeline] Product Create completed: ${productCreateResult.successCount} products created`)
+    }
+
+    // 4. 발행 단계 (autoPublish가 true인 경우에만)
     if (!options?.skipPublish && automationConfig.autoPublish) {
       const channelIdsForPublish = parseNumberArray(automationConfig.retailChannelIds)
       if (channelIdsForPublish.length) {
-        console.log('[FullPipeline] Step 3: Publish')
+        console.log('[FullPipeline] Step 4: Publish')
         publishResult = await runPublishPipeline({
           channelIds: channelIdsForPublish,
           publishReadyOnly: true,
@@ -335,6 +402,7 @@ export async function executeFullPipeline(
     await completeWorkflowLog(logId, overallStatus === WorkflowStatus.COMPLETED, totalItems, successCount, failedCount, {
       collection: collectionResult?.details,
       transform: transformResult?.details,
+      productCreate: productCreateResult?.details,
       publish: publishResult?.details,
     })
 
@@ -358,6 +426,7 @@ export async function executeFullPipeline(
       completedAt,
       collection: collectionResult,
       transform: transformResult,
+      productCreate: productCreateResult,
       publish: publishResult,
       overallStatus,
     }
@@ -366,6 +435,7 @@ export async function executeFullPipeline(
     await failWorkflowLog(logId, error.message, {
       collection: collectionResult?.details,
       transform: transformResult?.details,
+      productCreate: productCreateResult?.details,
       publish: publishResult?.details,
     })
 
@@ -375,6 +445,7 @@ export async function executeFullPipeline(
       completedAt: new Date(),
       collection: collectionResult,
       transform: transformResult,
+      productCreate: productCreateResult,
       publish: publishResult,
       overallStatus: WorkflowStatus.FAILED,
     }

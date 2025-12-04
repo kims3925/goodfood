@@ -221,7 +221,6 @@ export class ProductRepository {
     name?: string
     description?: string
     currency?: string
-    price?: number
   }) {
     return prisma.collectedProduct.create({
       data: {
@@ -230,13 +229,12 @@ export class ProductRepository {
         name: params.name || null,
         description: params.description || null,
         currency: params.currency || 'KRW',
-        price: params.price || null,
       },
     })
   }
 
   async create(data: ProductCreateInput & { thumbnailUrl?: string | null; imageUrls?: string[] }) {
-    // 1. 상품 생성
+    // 1. 상품 생성 (options와 variants 포함)
     const product = await prisma.product.create({
       data: {
         userId: data.userId,
@@ -245,8 +243,45 @@ export class ProductRepository {
         description: data.description || null,
         categoryId: data.categoryId || null,
         currency: data.currency || 'KRW',
-        price: data.price || null,
+        shippingFee: data.shippingFee || null,
+        shippingInfo: data.shippingInfo || null,
         thumbnailUrl: data.thumbnailUrl || null,
+        // ProductOption 생성: 두 가지 형태 지원
+        // 1. 그룹 형태: [{ groupName: '사이즈', values: ['S', 'M'] }]
+        // 2. 개별 형태: [{ groupName: '사이즈', value: 'S' }, { groupName: '사이즈', value: 'M' }]
+        options: data.options?.length
+          ? {
+              create: data.options.flatMap((opt: any, groupIndex: number) => {
+                // 개별 형태 (value 필드가 있는 경우)
+                if ('value' in opt && typeof opt.value === 'string') {
+                  return [{
+                    groupName: opt.groupName,
+                    value: opt.value,
+                    sortOrder: groupIndex,
+                  }]
+                }
+                // 그룹 형태 (values 배열이 있는 경우)
+                if (Array.isArray(opt.values)) {
+                  return opt.values.map((value: string, valueIndex: number) => ({
+                    groupName: opt.groupName,
+                    value,
+                    sortOrder: groupIndex * 100 + valueIndex,
+                  }))
+                }
+                return []
+              }),
+            }
+          : undefined,
+        // ProductVariant 생성
+        variants: data.variants?.length
+          ? {
+              create: data.variants.map((v) => ({
+                optionSummary: v.optionSummary || null,
+                wholesalePrice: v.wholesalePrice || null,
+                price: v.price || 0,
+              })),
+            }
+          : undefined,
       },
     })
 
@@ -299,7 +334,38 @@ export class ProductRepository {
     if (data.name !== undefined) updateData.name = data.name
     if (data.description !== undefined) updateData.description = data.description
     if (data.categoryId !== undefined) updateData.categoryId = data.categoryId
-    if (data.price !== undefined) updateData.price = data.price
+    if (data.shippingFee !== undefined) updateData.shippingFee = data.shippingFee
+    if (data.shippingInfo !== undefined) updateData.shippingInfo = data.shippingInfo
+
+    // 옵션 업데이트: 기존 삭제 후 새로 생성
+    if (data.options !== undefined) {
+      await prisma.productOption.deleteMany({ where: { productId: id } })
+      if (data.options.length > 0) {
+        await prisma.productOption.createMany({
+          data: data.options.map((opt: any, idx: number) => ({
+            productId: id,
+            groupName: opt.groupName,
+            value: opt.value,
+            sortOrder: opt.sortOrder ?? idx,
+          })),
+        })
+      }
+    }
+
+    // 변형상품 업데이트: 기존 삭제 후 새로 생성
+    if (data.variants !== undefined) {
+      await prisma.productVariant.deleteMany({ where: { productId: id } })
+      if (data.variants.length > 0) {
+        await prisma.productVariant.createMany({
+          data: data.variants.map((v: any) => ({
+            productId: id,
+            optionSummary: v.optionSummary || null,
+            wholesalePrice: v.wholesalePrice || null,
+            price: v.price || 0,
+          })),
+        })
+      }
+    }
 
     return prisma.product.update({
       where: { id },

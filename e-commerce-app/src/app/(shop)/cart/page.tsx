@@ -17,6 +17,8 @@ interface CartItem {
   price: number
   quantity: number
   stock: number
+  shippingFee: number | null
+  freeShippingAmount: number | null
 }
 
 interface Cart {
@@ -138,6 +140,27 @@ export default function CartPage() {
     return price?.toLocaleString('ko-KR') || '0'
   }
 
+  // 배송비 계산 헬퍼 함수
+  const calculateShippingFee = (items: CartItem[]) => {
+    let shippingFee = 0
+    for (const item of items) {
+      const itemTotal = item.price * item.quantity
+      const itemShippingFee = item.shippingFee ?? 0
+      const freeShippingAmount = item.freeShippingAmount
+
+      // 무료배송 조건 충족 여부 확인
+      if (freeShippingAmount != null && itemTotal >= freeShippingAmount) {
+        continue
+      }
+
+      // 배송비가 있는 경우, 가장 높은 배송비 적용
+      if (itemShippingFee > shippingFee) {
+        shippingFee = itemShippingFee
+      }
+    }
+    return shippingFee
+  }
+
   // Optimistic Update: UI 즉시 업데이트, 백그라운드에서 API 호출
   const handleQuantityChange = async (itemId: number, newQuantity: number) => {
     if (newQuantity < 1 || !cart) return
@@ -152,7 +175,7 @@ export default function CartPage() {
         item.id === itemId ? { ...item, quantity: newQuantity } : item
       )
       const newSubtotal = newItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-      const newShippingFee = newSubtotal >= 30000 ? 0 : 3000
+      const newShippingFee = calculateShippingFee(newItems)
       return {
         ...prev,
         items: newItems,
@@ -201,7 +224,7 @@ export default function CartPage() {
     // UI 즉시 업데이트
     const newItems = cart.items.filter(item => item.id !== itemId)
     const newSubtotal = newItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-    const newShippingFee = newSubtotal >= 30000 ? 0 : (newSubtotal > 0 ? 3000 : 0)
+    const newShippingFee = newItems.length > 0 ? calculateShippingFee(newItems) : 0
 
     setCart({
       ...cart,
@@ -289,9 +312,16 @@ export default function CartPage() {
   // 선택된 항목만 계산
   const selectedCartItems = cart?.items?.filter(item => selectedItems.includes(item.id)) || []
   const subtotal = selectedCartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-  const shippingFee = subtotal >= 30000 ? 0 : (subtotal > 0 ? 3000 : 0)
+  const shippingFee = selectedCartItems.length > 0 ? calculateShippingFee(selectedCartItems) : 0
   const totalAmount = subtotal + shippingFee
   const discountAmount = 0 // 할인 금액 (추후 구현 시 사용)
+
+  // 무료배송까지 남은 금액 계산 (선택된 상품 중 무료배송 기준이 있는 경우)
+  const freeShippingAmounts = selectedCartItems
+    .map(item => item.freeShippingAmount)
+    .filter((amount): amount is number => amount != null)
+  const minFreeShippingAmount = freeShippingAmounts.length > 0 ? Math.min(...freeShippingAmounts) : null
+  const remainingForFreeShipping = minFreeShippingAmount != null ? minFreeShippingAmount - subtotal : null
 
   // 커스텀 체크박스 컴포넌트
   const CustomCheckbox = ({ checked, onChange, className = '' }: { checked: boolean; onChange: () => void; className?: string }) => (
@@ -453,19 +483,19 @@ export default function CartPage() {
             </div>
 
             {/* 무료배송 안내 */}
-            {subtotal > 0 && subtotal < 30000 && (
+            {subtotal > 0 && remainingForFreeShipping != null && remainingForFreeShipping > 0 && (
               <div className="mt-4 bg-[#fef5f5] rounded-md p-4">
                 <div className="flex items-center gap-2">
                   <Truck className="w-5 h-5 text-[#FF6B6B]" />
                   <span className="text-sm text-gray-700">
-                    <span className="font-bold text-[#FF6B6B]">{formatPrice(30000 - subtotal)}원</span> 더 담으면
+                    <span className="font-bold text-[#FF6B6B]">{formatPrice(remainingForFreeShipping)}원</span> 더 담으면
                     <span className="font-bold text-[#FF6B6B]"> 무료배송</span>
                   </span>
                 </div>
                 <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
                   <div
                     className="bg-[#FF6B6B] h-1.5 rounded-full transition-all"
-                    style={{ width: `${Math.min((subtotal / 30000) * 100, 100)}%` }}
+                    style={{ width: `${Math.min((subtotal / (minFreeShippingAmount || 1)) * 100, 100)}%` }}
                   ></div>
                 </div>
               </div>

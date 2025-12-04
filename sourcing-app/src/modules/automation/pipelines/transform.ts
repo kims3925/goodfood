@@ -1,13 +1,15 @@
 /**
  * Transform Pipeline
- * AI를 사용하여 수집된 게시물을 CollectedProduct로 변환 후 Product로 생성
+ * AI를 사용하여 수집된 게시물(CollectedPost)을 수집상품(CollectedProduct)으로 변환
+ *
+ * Note: Product 생성은 이 파이프라인에서 하지 않음
+ * Product는 사용자가 수집상품 관리 페이지에서 수동으로 생성함
  */
 
 import prisma, { AiProvider } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { transformPostToProduct } from '@/modules/transformation'
-import { downloadAndSaveProductImages } from '@/modules/utils/imageUtils'
 import {
   TransformConfig,
   TransformResult,
@@ -26,8 +28,7 @@ const PIPELINE_TIMEOUT_MS = 10 * 60 * 1000
 
 /**
  * AI 변환 파이프라인 실행
- * 1. CollectedPost에서 CollectedProduct 생성
- * 2. CollectedProduct에서 Product 생성
+ * CollectedPost에서 AI를 사용하여 CollectedProduct 생성
  */
 export async function runTransformPipeline(
   config: TransformConfig
@@ -158,7 +159,7 @@ export async function runTransformPipeline(
         policyContent: pricingPolicyContent || undefined,
       })
 
-      // CollectedProduct 생성 (원본 수집 상품)
+      // CollectedProduct 생성 (수집상품)
       const collectedProduct = await prisma.collectedProduct.create({
         data: {
           userId,
@@ -166,80 +167,18 @@ export async function runTransformPipeline(
           name: draft.name,
           description: draft.description || null,
           currency: draft.currency || 'KRW',
-          price: draft.price || null,
+          // AI 분석 결과를 rawMetadata에 저장 (JSON 직렬화)
+          rawMetadata: JSON.parse(JSON.stringify({
+            category: draft.categoryId,
+            options: draft.options,
+            variants: draft.variants,
+            shipping: {
+              shippingFee: draft.shippingFee ?? null,
+              shippingInfo: draft.shippingInfo ?? null,
+            },
+          })),
         },
       })
-
-      // 게시물 이미지 URL 수집
-      const imageUrls = post.images.map((img) => img.url)
-
-      // Product 생성 (내부 기준 상품 - collectedProduct와 연결)
-      const product = await prisma.product.create({
-        data: {
-          userId,
-          collectedProductId: collectedProduct.id, // 외래키 연결
-          name: draft.name,
-          description: draft.description || null,
-          categoryId: draft.categoryId || null,
-          currency: draft.currency || 'KRW',
-          price: draft.price || null,
-          thumbnailUrl: post.images[0]?.url || null,
-          options: draft.options?.length
-            ? {
-                create: draft.options.flatMap((opt, groupIndex) =>
-                  opt.values.map((value, valueIndex) => ({
-                    groupName: opt.groupName,
-                    value,
-                    sortOrder: groupIndex * 100 + valueIndex,
-                  }))
-                ),
-              }
-            : undefined,
-          variants: draft.variants?.length
-            ? {
-                create: draft.variants.map((v) => ({
-                  sku: v.sku || null,
-                  optionSummary: v.optionSummary || null,
-                  price: v.price || draft.price || 0,
-                  stock: v.stock || 0,
-                })),
-              }
-            : undefined,
-        },
-      })
-
-      // 이미지 다운로드 및 ProductImage 저장
-      if (imageUrls.length > 0) {
-        try {
-          console.log(`[Transform] 이미지 다운로드 시작: ${imageUrls.length}개`)
-          const downloadedImages = await downloadAndSaveProductImages(imageUrls)
-
-          if (downloadedImages.length > 0) {
-            // ProductImage 레코드 생성
-            await prisma.productImage.createMany({
-              data: downloadedImages.map((img, index) => ({
-                productId: product.id,
-                url: img.url,
-                fileHash: img.fileHash,
-                fileName: img.fileName,
-                fileSize: img.fileSize,
-                sortOrder: index,
-              })),
-            })
-
-            // 첫 번째 이미지를 썸네일로 업데이트 (다운로드된 로컬 URL로)
-            await prisma.product.update({
-              where: { id: product.id },
-              data: { thumbnailUrl: downloadedImages[0].url },
-            })
-
-            console.log(`[Transform] 이미지 저장 완료: ${downloadedImages.length}개`)
-          }
-        } catch (imageError) {
-          console.error(`[Transform] 이미지 다운로드/저장 실패 (상품은 생성됨):`, imageError)
-          // 이미지 실패해도 상품 생성은 성공으로 처리
-        }
-      }
 
       // AI 사용량 업데이트
       await prisma.aiApiConfig.update({
@@ -251,11 +190,11 @@ export async function runTransformPipeline(
       })
 
       transformedPost.status = 'success'
-      transformedPost.productId = product.id
+      transformedPost.collectedProductId = collectedProduct.id
       createdProducts++
       consecutiveFailures = 0 // 성공 시 연속 실패 카운터 리셋
 
-      console.log(`[Transform] Created product ${product.id} for post ${post.id}`)
+      console.log(`[Transform] Created collectedProduct ${collectedProduct.id} for post ${post.id}`)
     } catch (postError: any) {
       console.error(`[Transform] Error transforming post ${post.id}:`, postError)
       transformedPost.status = 'failed'

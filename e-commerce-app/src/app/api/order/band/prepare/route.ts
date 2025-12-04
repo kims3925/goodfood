@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
     // 5. 금액 계산
     const product = productPublish.product
     const mainVariant = product.variants[0]
-    const unitPrice = mainVariant?.price || product.price || 0
+    const unitPrice = mainVariant?.price || 0
     const subtotal = Number(unitPrice) * quantity
 
     // 배송비 계산 (50,000원 이상 무료)

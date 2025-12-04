@@ -55,7 +55,15 @@ async function main() {
         name,
         description: `${name} 상품 설명`,
         thumbnailUrl: `https://picsum.photos/seed/${name.replace(/\s/g, '')}/300`,
-        price,
+        variants: {
+          create: {
+            optionSummary: '기본',
+            price,
+          }
+        }
+      },
+      include: {
+        variants: true,
       }
     })
     products.push(product)
@@ -100,7 +108,7 @@ async function main() {
       if (!selectedPP) continue
 
       const quantity = Math.floor(Math.random() * 3) + 1
-      const unitPrice = selectedPP.product.price || 15000
+      const unitPrice = (selectedPP.product as any).variants?.[0]?.price || 15000
       const totalPrice = unitPrice * quantity
       const shippingFee = totalPrice >= 50000 ? 0 : 3000
 

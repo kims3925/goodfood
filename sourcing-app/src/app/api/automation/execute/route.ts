@@ -9,6 +9,7 @@ import { getCurrentUser } from '@/modules/auth/auth.service'
 import {
   executeCollectionPipeline,
   executeTransformPipeline,
+  executeProductCreatePipeline,
   executePublishPipeline,
   executeFullPipeline,
   getRunningWorkflow,
@@ -181,9 +182,9 @@ export async function POST(request: NextRequest) {
         break
 
       case 'register':
-        // register는 transform과 동일한 파이프라인 (AI 변환 + 상품 등록)
-        console.log(`[Execute] Register (transform) for user ${currentUser.userId}`)
-        result = await executeTransformPipeline(currentUser.userId, config)
+        // register는 CollectedProduct에서 Product를 생성하는 파이프라인
+        console.log(`[Execute] Product Create for user ${currentUser.userId}`)
+        result = await executeProductCreatePipeline(currentUser.userId, config)
         break
 
       case 'publish':

@@ -72,10 +72,14 @@ export async function POST(request: NextRequest) {
       description,
       categoryId,
       currency,
-      price,
+      shippingFee,
+      shippingInfo,
+      options,
+      variants,
+      imageUrls,
     } = body
 
-    console.log('[Product Create] Request:', { postId, name })
+    console.log('[Product Create] Request:', { postId, name, optionsCount: options?.length, variantsCount: variants?.length, imageUrlsCount: imageUrls?.length })
 
     if (!name) {
       return NextResponse.json(
@@ -99,7 +103,11 @@ export async function POST(request: NextRequest) {
       description,
       categoryId,
       currency,
-      price,
+      shippingFee,
+      shippingInfo,
+      options,
+      variants,
+      imageUrls,
     })
 
     console.log('[Product Create] Success:', product.id)
@@ -140,7 +148,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, name, description, categoryId, price } = body
+    const { id, name, description, categoryId, shippingFee, shippingInfo, options, variants } = body
 
     if (!id) {
       return NextResponse.json(
@@ -153,7 +161,10 @@ export async function PUT(request: NextRequest) {
       name,
       description,
       categoryId,
-      price,
+      shippingFee,
+      shippingInfo,
+      options,
+      variants,
     })
 
     return NextResponse.json({ success: true, data: product })

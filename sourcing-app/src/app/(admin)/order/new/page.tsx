@@ -20,13 +20,23 @@ import {
   ChevronDown,
 } from 'lucide-react'
 
+interface ProductVariant {
+  id: number
+  price: number
+  wholesalePrice: number | null
+}
+
 interface Product {
   id: number
   name: string
-  price: number | null
-  wholesalePrice: number | null
   thumbnailUrl: string | null
   status: string
+  variants: ProductVariant[]
+}
+
+// 상품에서 첫 번째 variant 가격 추출
+const getProductPrice = (product: Product | null): number | null => {
+  return product?.variants?.[0]?.price ?? null
 }
 
 type PaymentMethod = 'CARD' | 'BANK_TRANSFER' | 'VIRTUAL_ACCOUNT'
@@ -102,8 +112,9 @@ export default function NewOrderPage() {
 
   // 금액 계산
   const productTotal = useMemo(() => {
-    if (!selectedProduct?.price) return 0
-    return selectedProduct.price * quantity
+    const price = getProductPrice(selectedProduct)
+    if (!price) return 0
+    return price * quantity
   }, [selectedProduct, quantity])
 
   const shippingFee = useMemo(() => {
@@ -141,7 +152,7 @@ export default function NewOrderPage() {
           productId: selectedProduct.id,
           productName: selectedProduct.name,
           quantity,
-          unitPrice: selectedProduct.price || 0,
+          unitPrice: getProductPrice(selectedProduct) || 0,
           shippingFee,
           totalPrice: totalAmount,
           customerName: customerName.trim(),
@@ -373,7 +384,7 @@ export default function NewOrderPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-text-primary mb-1">{selectedProduct.name}</p>
                     <p className="text-lg font-bold text-primary-color mb-3">
-                      {formatPrice(selectedProduct.price)}
+                      {formatPrice(getProductPrice(selectedProduct))}
                     </p>
 
                     {/* 수량 선택 */}
@@ -647,7 +658,7 @@ export default function NewOrderPage() {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-text-primary truncate">{product.name}</p>
                         <p className="text-sm text-primary-color font-medium mt-0.5">
-                          {formatPrice(product.price)}
+                          {formatPrice(getProductPrice(product))}
                         </p>
                       </div>
 

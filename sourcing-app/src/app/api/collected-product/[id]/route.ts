@@ -136,8 +136,6 @@ export async function PUT(
       data: {
         name,
         description,
-        price,
-        wholesalePrice,
       },
     })
 

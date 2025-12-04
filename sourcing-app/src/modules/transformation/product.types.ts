@@ -50,12 +50,20 @@ export interface OptionPrice {
 }
 
 /**
- * Shipping information for wholesale products
+ * Shipping information for wholesale products (legacy)
  */
 export interface ShippingInfo {
   shippingIncluded: boolean        // 배송비 포함 여부
   bundleDiscount?: string | null   // 묶음 할인 정보 (예: "2세트이상 4000원 차감")
   maxBundle?: number | null        // 합배송 최대 수량
+}
+
+/**
+ * Shipping information extracted by AI
+ */
+export interface ShippingExtracted {
+  shippingFee: number | null       // 배송비 금액 (null이면 정보 없음)
+  shippingInfo: string | null      // 배송 관련 원문 정보
 }
 
 /**
@@ -73,9 +81,8 @@ export interface WholesaleInfo {
 export interface GeneratedVariant {
   optionSummary: string                    // "색상:빨강, 사이즈:L"
   options: Record<string, string>          // { "색상": "빨강", "사이즈": "L" }
-  price?: number                           // Optional price (판매가)
-  stock?: number                           // Optional stock
-  sku?: string                             // Optional SKU
+  wholesalePrice?: number                  // 도매가
+  price?: number                           // 판매가
 }
 
 /**
@@ -92,7 +99,12 @@ export interface ProductDraft {
 
   // Pricing
   currency: string
+  wholesalePrice?: number // 도매가 (wholesale price)
   price?: number         // 판매가 (selling price)
+
+  // Shipping
+  shippingFee?: number   // 배송비 금액
+  shippingInfo?: string  // 배송 관련 원문 정보
 
   // Options & Variants
   options: OptionGroup[]
@@ -111,6 +123,9 @@ export interface AiProductAnalysis {
   // Extracted options
   options: OptionGroup[]
 
+  // AI가 직접 추출한 variants (옵션별 가격이 다른 경우)
+  variants?: GeneratedVariant[]
+
   // Pricing information
   pricing: {
     basePrice?: number       // 도매가 (가장 낮은 옵션 가격)
@@ -124,8 +139,8 @@ export interface AiProductAnalysis {
     }
   }
 
-  // Shipping information (wholesale)
-  shipping?: ShippingInfo
+  // Shipping information (extracted by AI)
+  shipping?: ShippingExtracted
 
   // Wholesale-specific information
   wholesale?: WholesaleInfo

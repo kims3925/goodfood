@@ -56,7 +56,7 @@ export class GeminiClient extends BaseAiClient {
 
       const generationConfig = {
         temperature: this.config.temperature ?? 0.7,
-        maxOutputTokens: this.config.maxTokens ?? 4096, // 프롬프트가 상세해서 응답도 길어질 수 있음
+        maxOutputTokens: this.config.maxTokens ?? 4096,
       }
 
       // 타임아웃이 있는 Promise.race 사용

@@ -65,10 +65,6 @@ export async function GET(
     const mainVariant = product.variants[0]
     const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
 
-    const salePrice = mainVariant?.price || product.price || 0
-    const originalPrice = salePrice
-    const discount = 0
-
     // 옵션 그룹화
     const optionGroups = product.options.reduce((acc: Record<string, string[]>, option) => {
       if (!acc[option.groupName]) {
@@ -78,12 +74,12 @@ export async function GET(
       return acc
     }, {})
 
-    // 옵션별 가격
-    const formattedOptions = product.variants.map((variant) => ({
-      name: variant.optionSummary || product.name,
+    // variants 정보 (id 포함)
+    const formattedVariants = product.variants.map((variant) => ({
+      id: variant.id,
+      optionSummary: variant.optionSummary || product.name,
       price: variant.price,
-      stock: variant.stock,
-      sku: variant.sku,
+      wholesalePrice: variant.wholesalePrice,
     }))
 
     // 채널 정보 가져오기 (published_product -> channel)
@@ -96,18 +92,25 @@ export async function GET(
     // 판매자 정보 가져오기 (collectedProduct -> post -> channel)
     const sellerName = product.collectedProduct?.post?.channel?.name || null
 
+    // 배송 정보 파싱
+    let parsedShippingInfo: any = {}
+    if (product.shippingInfo) {
+      try {
+        parsedShippingInfo = JSON.parse(product.shippingInfo)
+      } catch {
+        // JSON 파싱 실패 시 텍스트 그대로 사용
+        parsedShippingInfo = { info: product.shippingInfo }
+      }
+    }
+
     const formattedProduct = {
       id: product.id.toString(),
       publishedProductId: publishedProductId?.toString() || null, // 추가: 장바구니/주문에 필요
       title: product.name,
       description: product.description || '',
-      originalPrice,
-      salePrice,
-      discount,
       images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
       detailImages: images.length > 1 ? images.slice(1) : [],
       category: product.categoryId || '',
-      stock: mainVariant?.stock || 100,
       rating: 4.5,
       reviews: 100,
       channelName,
@@ -116,11 +119,14 @@ export async function GET(
       bandName: channelName,
       retailBandId: publishChannelId,
       sellerName,
+      shippingFee: product.shippingFee,
       shippingInfo: {
-        defaultShippingFee: 3000,
-        freeShippingAmount: 30000,
+        defaultShippingFee: product.shippingFee,
+        freeShippingAmount: parsedShippingInfo.freeShippingAmount,
+        ...parsedShippingInfo,
       },
-      options: formattedOptions.length > 1 ? formattedOptions : undefined,
+      // variants 정보 (가격은 variant에서 가져옴)
+      variants: formattedVariants,
       optionGroups: Object.keys(optionGroups).length > 0 ? optionGroups : undefined,
     }
 

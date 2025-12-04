@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
             const mainVariant = product.variants[0]
             const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
 
-            const salePrice = mainVariant?.price || product.price || 0
+            const salePrice = mainVariant?.price || 0
             const originalPrice = salePrice
             const discount = 0
 
@@ -81,7 +81,6 @@ export async function GET(req: NextRequest) {
               category: product.categoryId || '',
               rating: 4.5,
               reviews: 100,
-              stock: mainVariant?.stock || 100,
             }
           })
 
@@ -160,7 +159,7 @@ export async function GET(req: NextRequest) {
             const mainVariant = product.variants[0]
             const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
 
-            const salePrice = mainVariant?.price || product.price || 0
+            const salePrice = mainVariant?.price || 0
             const originalPrice = salePrice
             const discount = 0
 
@@ -176,7 +175,6 @@ export async function GET(req: NextRequest) {
               category: product.categoryId || '',
               rating: 4.5,
               reviews: 100,
-              stock: mainVariant?.stock || 100,
             }
           })
 

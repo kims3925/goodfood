@@ -65,7 +65,6 @@ interface Product {
   variants: Array<{
     id: number
     price: number
-    stock: number
   }>
   // 발행 상태
   publishStatus?: {
@@ -85,6 +84,21 @@ interface CollectedProduct {
   price: number | null
   wholesalePrice: number | null
   createdAt: string
+  rawMetadata: {
+    options?: Array<{
+      groupName: string
+      values: string[]
+    }>
+    variants?: Array<{
+      optionSummary?: string
+      wholesalePrice?: number
+      price?: number
+    }>
+    shipping?: {
+      shippingFee?: number
+      shippingInfo?: string
+    }
+  } | null
   post: {
     id: number
     title: string
@@ -223,6 +237,25 @@ export default function ProductListPage() {
         }
 
         try {
+          // rawMetadata에서 options, variants, shipping 추출
+          const rawMetadata = selectedCP.rawMetadata as any
+          const options = rawMetadata?.options?.flatMap((opt: { groupName: string; values: string[] }) =>
+            opt.values.map((value: string) => ({
+              groupName: opt.groupName,
+              value,
+            }))
+          ) || []
+          const variants = rawMetadata?.variants?.map((v: { optionSummary?: string; wholesalePrice?: number; price?: number }) => ({
+            optionSummary: v.optionSummary || null,
+            price: v.price || selectedCP.price || 0,
+            wholesalePrice: v.wholesalePrice || selectedCP.wholesalePrice || null,
+          })) || []
+          // shipping 객체 또는 직접 shippingFee/shippingInfo 필드 둘 다 지원
+          const shipping = rawMetadata?.shipping || {
+            shippingFee: rawMetadata?.shippingFee ?? null,
+            shippingInfo: rawMetadata?.shippingInfo ?? null,
+          }
+
           const response = await fetch('/api/product', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -232,6 +265,10 @@ export default function ProductListPage() {
               description: selectedCP.description || '',
               price: selectedCP.price || null,
               currency: selectedCP.currency || 'KRW',
+              shippingFee: typeof shipping.shippingFee === 'number' ? shipping.shippingFee : undefined,
+              shippingInfo: typeof shipping.shippingInfo === 'string' ? shipping.shippingInfo : undefined,
+              options,
+              variants,
             }),
           })
 
@@ -869,11 +906,10 @@ export default function ProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[36%]">상품명</TableHead>
-                  <TableHead className="w-[16%]">출처 채널</TableHead>
-                  <TableHead className="w-[14%]">판매가</TableHead>
-                  <TableHead className="w-[16%]">발행현황</TableHead>
-                  <TableHead className="w-[14%]">생성일</TableHead>
+                  <TableHead className="w-[40%]">상품명</TableHead>
+                  <TableHead className="w-[20%]">출처 채널</TableHead>
+                  <TableHead className="w-[20%]">발행현황</TableHead>
+                  <TableHead className="w-[16%]">생성일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -924,11 +960,6 @@ export default function ProductListPage() {
                     <TableCell>
                       <div className="text-gray-600 truncate">
                         {product.collectedProduct?.post?.channel?.name || '-'}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium text-gray-900">
-                        {formatPrice(product.price)}
                       </div>
                     </TableCell>
                     <TableCell>{getPublishStatusBadge(product)}</TableCell>

@@ -16,6 +16,7 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<any>(null)
   const [quantity, setQuantity] = useState(1)
   const [selectedImage, setSelectedImage] = useState(0)
+  const [selectedVariant, setSelectedVariant] = useState<any>(null)
   const [activeTab, setActiveTab] = useState('detail')
   const [isLoading, setIsLoading] = useState(true)
   const [isWishlisted, setIsWishlisted] = useState(false)
@@ -61,6 +62,10 @@ export default function ProductDetailPage() {
 
       if (data.success) {
         setProduct(data.product)
+        // 첫 번째 variant를 기본 선택
+        if (data.product.variants && data.product.variants.length > 0) {
+          setSelectedVariant(data.product.variants[0])
+        }
       } else {
         console.error('Failed to load product:', data.error)
         setProduct(null)
@@ -222,7 +227,7 @@ export default function ProductDetailPage() {
   }
 
   const handleAddToCart = async () => {
-    if (!product?.publishedProductId) {
+    if (!product?.publishedProductId || !selectedVariant) {
       return
     }
 
@@ -237,6 +242,7 @@ export default function ProductDetailPage() {
       const cartData = {
         sessionId,
         publishedProductId: product.publishedProductId,
+        variantId: selectedVariant.id,
         quantity
       }
 
@@ -271,18 +277,22 @@ export default function ProductDetailPage() {
       return
     }
 
-    // publishedProductId를 체크아웃 페이지로 전달
-    if (!product?.publishedProductId) {
+    // publishedProductId와 variantId를 체크아웃 페이지로 전달
+    if (!product?.publishedProductId || !selectedVariant) {
       return
     }
-    const checkoutUrl = `/checkout?publishedProductId=${product.publishedProductId}&quantity=${quantity}`
+    const checkoutUrl = `/checkout?publishedProductId=${product.publishedProductId}&variantId=${selectedVariant.id}&quantity=${quantity}`
     window.location.href = checkoutUrl
   }
 
   const handleShare = () => {
-    const shareText = `${product.title}\n${formatPrice(product.salePrice)}원\n${window.location.href}`
+    const currentPrice = selectedVariant?.price || 0
+    const shareText = `${product.title}\n${formatPrice(currentPrice)}원\n${window.location.href}`
     navigator.clipboard.writeText(shareText)
   }
+
+  // 선택된 variant의 가격
+  const currentPrice = selectedVariant?.price || 0
 
   if (isLoading) {
     return (
@@ -357,129 +367,156 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Product Info */}
-          <div className="flex-1 space-y-5">
+          <div className="flex-1 space-y-6">
             {/* Category & Title */}
             <div>
-              <p className="text-xs text-[#FF6B6B] font-medium mb-1">{product.category}</p>
-              <h1 className="text-xl font-bold text-gray-900 leading-tight">{product.title}</h1>
-              <p className="text-sm text-gray-500 mt-2">{product.description}</p>
+              <span className="inline-block px-2 py-1 text-xs font-medium text-[#FF6B6B] bg-[#FFF5F5] rounded-md mb-3">
+                {product.category}
+              </span>
+              <h1 className="text-2xl font-bold text-gray-900 leading-snug mb-2">{product.title}</h1>
+              <p className="text-sm text-gray-500 leading-relaxed">{product.description}</p>
             </div>
 
-
-            {/* Price - 마켓컬리 스타일 */}
-            <div className="border-t border-b py-5">
-              <div className="flex items-baseline gap-2">
-                {product.discount > 0 && (
-                  <span className="text-2xl font-bold text-[#FF6B6B]">{product.discount}%</span>
-                )}
-                <span className="text-2xl font-bold text-gray-900">{formatPrice(product.salePrice)}</span>
-                <span className="text-lg text-gray-900">원</span>
+            {/* Shipping & Seller Info */}
+            <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900">
+                    택배배송 {product.shippingInfo?.defaultShippingFee != null && `· ${formatPrice(product.shippingInfo.defaultShippingFee)}원`}
+                  </p>
+                  {product.shippingInfo?.freeShippingAmount != null && (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {formatPrice(product.shippingInfo.freeShippingAmount)}원 이상 무료배송
+                    </p>
+                  )}
+                </div>
               </div>
-              {product.discount > 0 && (
-                <p className="text-sm text-gray-400 line-through mt-1">{formatPrice(product.originalPrice)}원</p>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <p className="text-sm text-gray-700">{product.sellerName || product.bandName || '판매자'}</p>
+              </div>
+            </div>
+
+            {/* Option & Quantity Selection */}
+            <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
+              {/* Variant 선택 */}
+              {product.variants && product.variants.length > 1 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">옵션 선택</label>
+                    <span className="text-lg font-bold text-gray-900">{formatPrice(currentPrice)}원</span>
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={selectedVariant?.id || ''}
+                      onChange={(e) => {
+                        const variant = product.variants.find((v: any) => v.id === parseInt(e.target.value))
+                        setSelectedVariant(variant)
+                        setQuantity(1)
+                      }}
+                      className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-3.5 pr-10 text-gray-900 bg-gray-50 hover:border-gray-300 focus:border-[#FF6B6B] focus:ring-2 focus:ring-[#FF6B6B]/20 outline-none transition-all cursor-pointer"
+                    >
+                      {product.variants.map((variant: any) => (
+                        <option key={variant.id} value={variant.id}>
+                          {variant.optionSummary} - {formatPrice(variant.price)}원
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
               )}
-            </div>
 
-            {/* Shipping Info - 마켓컬리 스타일 리스트 */}
-            <dl className="space-y-3 text-sm">
-              <div className="flex">
-                <dt className="w-20 text-gray-500 flex-shrink-0">배송</dt>
-                <dd className="text-gray-900">
-                  <p className="font-medium">
-                    택배배송 {formatPrice(product.shippingInfo?.defaultShippingFee || 3000)}원
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {formatPrice(product.shippingInfo?.freeShippingAmount || 30000)}원 이상 무료배송
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    제주 추가 3,000원, 제주 외 도서지역 추가 5,000원
-                  </p>
-                </dd>
-              </div>
-              <div className="flex">
-                <dt className="w-20 text-gray-500 flex-shrink-0">판매자</dt>
-                <dd className="text-gray-900">{product.sellerName || product.bandName || '판매자'}</dd>
-              </div>
-              <div className="flex">
-                <dt className="w-20 text-gray-500 flex-shrink-0">포장타입</dt>
-                <dd className="text-gray-900">상온</dd>
-              </div>
-            </dl>
+              {/* 단일 옵션일 때 가격 표시 */}
+              {product.variants && product.variants.length === 1 && (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">상품 가격</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{product.variants[0].optionSummary}</p>
+                  </div>
+                  <span className="text-xl font-bold text-gray-900">{formatPrice(currentPrice)}원</span>
+                </div>
+              )}
 
-            {/* Options */}
-            {product.options && product.options.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">옵션 선택</label>
-                <select className="w-full border border-gray-300 rounded-lg px-3 py-2">
-                  {product.options.map((option: any, index: number) => (
-                    <option key={index} value={option.name}>
-                      {option.name} - {formatPrice(option.price)}원
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Quantity */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">수량</label>
-              <div className="flex items-center border border-gray-300 rounded-lg w-fit">
-                <button
-                  onClick={() => handleQuantityChange('decrease')}
-                  className="p-2 hover:bg-gray-100"
-                >
-                  <Minus className="h-4 w-4" />
-                </button>
-                <input
-                  type="text"
-                  value={quantity}
-                  readOnly
-                  className="w-12 text-center border-x border-gray-300"
-                />
-                <button
-                  onClick={() => handleQuantityChange('increase')}
-                  className="p-2 hover:bg-gray-100"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Total Price - 마켓컬리 스타일 */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">총 상품금액 :</span>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-bold text-gray-900">{formatPrice(product.salePrice * quantity)}</span>
-                  <span className="text-sm text-gray-900">원</span>
+              {/* Quantity */}
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                <label className="text-sm font-medium text-gray-700">수량</label>
+                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
+                  <button
+                    onClick={() => handleQuantityChange('decrease')}
+                    className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                  >
+                    <Minus className="h-4 w-4 text-gray-600" />
+                  </button>
+                  <span className="w-14 text-center font-semibold text-gray-900">{quantity}</span>
+                  <button
+                    onClick={() => handleQuantityChange('increase')}
+                    className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                  >
+                    <Plus className="h-4 w-4 text-gray-600" />
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* Action Buttons - 마켓컬리 스타일 */}
-            <div className="flex gap-2">
+            {/* Price Summary */}
+            <div className="bg-gradient-to-r from-[#FFF5F5] to-[#FFF0F0] rounded-xl p-5">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-500">
+                    {formatPrice(currentPrice)}원 × {quantity}개
+                  </p>
+                  <p className="text-sm font-medium text-gray-600">총 상품금액</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-3xl font-bold text-[#FF6B6B]">{formatPrice(currentPrice * quantity)}</span>
+                  <span className="text-lg text-[#FF6B6B] ml-1">원</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-2">
               <button
                 onClick={handleToggleWishlist}
                 disabled={wishlistLoading}
-                className="w-12 h-12 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center flex-shrink-0"
+                className="w-14 h-14 border border-gray-200 rounded-xl hover:bg-gray-50 flex items-center justify-center flex-shrink-0 transition-colors"
               >
                 <Heart
-                  className={`h-5 w-5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-500'}`}
+                  className={`h-6 w-6 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
                 />
               </button>
               <button
                 onClick={handleAddToCart}
-                className="flex-1 h-12 border-2 border-[#FF6B6B] text-[#FF6B6B] rounded-lg hover:bg-[#FFF5F5] font-medium"
+                disabled={!selectedVariant}
+                className={`flex-1 h-14 rounded-xl font-semibold text-base transition-all ${
+                  selectedVariant
+                    ? 'bg-white border-2 border-[#FF6B6B] text-[#FF6B6B] hover:bg-[#FFF5F5]'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
               >
-                장바구니 담기
+                장바구니
               </button>
-              {/* 비로그인 시 구매하기 버튼 숨김 (컬리 스타일) */}
               {session && (
                 <button
                   onClick={handleBuyNow}
-                  className="flex-1 h-12 bg-[#FF6B6B] text-white rounded-lg hover:bg-[#FF5252] font-medium"
+                  disabled={!selectedVariant}
+                  className={`flex-1 h-14 rounded-xl font-semibold text-base transition-all ${
+                    selectedVariant
+                      ? 'bg-[#FF6B6B] text-white hover:bg-[#FF5252] shadow-lg shadow-[#FF6B6B]/25'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
                 >
-                  구매하기
+                  바로 구매
                 </button>
               )}
             </div>
@@ -682,7 +719,9 @@ export default function ProductDetailPage() {
                 <div>
                   <h3 className="font-medium mb-2">배송 안내</h3>
                   <ul className="space-y-1 text-gray-600">
-                    <li>• 배송비: {formatPrice(product.shippingInfo?.defaultShippingFee || 3000)}원 ({formatPrice(product.shippingInfo?.freeShippingAmount || 30000)}원 이상 무료)</li>
+                    {product.shippingInfo?.defaultShippingFee != null && (
+                      <li>• 배송비: {formatPrice(product.shippingInfo.defaultShippingFee)}원{product.shippingInfo?.freeShippingAmount != null && ` (${formatPrice(product.shippingInfo.freeShippingAmount)}원 이상 무료)`}</li>
+                    )}
                     <li>• 배송기간: 결제 후 2-3일 이내</li>
                     <li>• 택배사: CJ대한통운</li>
                   </ul>
@@ -703,30 +742,39 @@ export default function ProductDetailPage() {
       </div>
 
       {/* Mobile Bottom Fixed Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 lg:hidden z-40">
-        <div className="flex gap-2">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-[0_-4px_20px_rgba(0,0,0,0.08)] p-4 lg:hidden z-40">
+        <div className="flex gap-3">
           <button
             onClick={handleToggleWishlist}
             disabled={wishlistLoading}
-            className="w-12 h-12 border border-gray-300 rounded-lg flex items-center justify-center flex-shrink-0"
+            className="w-12 h-12 border border-gray-200 rounded-xl flex items-center justify-center flex-shrink-0"
           >
             <Heart
-              className={`h-5 w-5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-500'}`}
+              className={`h-5 w-5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
             />
           </button>
           <button
             onClick={handleAddToCart}
-            className="flex-1 h-12 border-2 border-[#FF6B6B] text-[#FF6B6B] rounded-lg text-sm font-medium hover:bg-[#FFF5F5]"
+            disabled={!selectedVariant}
+            className={`flex-1 h-12 rounded-xl font-semibold transition-all ${
+              selectedVariant
+                ? 'bg-white border-2 border-[#FF6B6B] text-[#FF6B6B]'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            }`}
           >
-            장바구니 담기
+            장바구니
           </button>
-          {/* 비로그인 시 구매하기 버튼 숨김 (컬리 스타일) */}
           {session && (
             <button
               onClick={handleBuyNow}
-              className="flex-1 h-12 bg-[#FF6B6B] text-white rounded-lg text-sm font-medium hover:bg-[#FF5252]"
+              disabled={!selectedVariant}
+              className={`flex-1 h-12 rounded-xl font-semibold transition-all ${
+                selectedVariant
+                  ? 'bg-[#FF6B6B] text-white shadow-lg shadow-[#FF6B6B]/25'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
             >
-              구매하기
+              바로 구매
             </button>
           )}
         </div>

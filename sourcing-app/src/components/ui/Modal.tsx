@@ -8,6 +8,7 @@ interface ModalProps {
   onClose: () => void
   title?: string
   children: ReactNode
+  footer?: ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
   closeOnOverlay?: boolean
 }
@@ -17,6 +18,7 @@ export default function Modal({
   onClose,
   title,
   children,
+  footer,
   size = 'md',
   closeOnOverlay = true,
 }: ModalProps) {
@@ -85,9 +87,16 @@ export default function Modal({
           )}
 
           {/* Content */}
-          <div className="px-6 pt-4 pb-2 overflow-y-auto max-h-[calc(95vh-8rem)]">
+          <div className={`px-6 pt-4 pb-2 overflow-y-auto ${footer ? 'max-h-[calc(95vh-12rem)]' : 'max-h-[calc(95vh-8rem)]'}`}>
             {children}
           </div>
+
+          {/* Footer - 스크롤 영역 외부에 고정 */}
+          {footer && (
+            <div className="px-6 py-4 border-t border-divider bg-white">
+              {footer}
+            </div>
+          )}
         </div>
       </div>
     </Fragment>

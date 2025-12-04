@@ -30,8 +30,12 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
-            price: true,
             thumbnailUrl: true,
+            variants: {
+              orderBy: { id: 'asc' },
+              take: 1,
+              select: { price: true },
+            },
           },
         },
       },
@@ -45,7 +49,7 @@ export async function GET(request: NextRequest) {
       id: pp.id,
       productId: pp.product.id,
       name: pp.product.name,
-      price: pp.product.price,
+      price: pp.product.variants[0]?.price || 0,
       thumbnailUrl: pp.product.thumbnailUrl,
       status: pp.status,
     }))

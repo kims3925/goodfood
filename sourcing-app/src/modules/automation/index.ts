@@ -49,6 +49,9 @@ export type {
   TransformConfig,
   TransformResult,
   TransformedPost,
+  ProductCreateConfig,
+  ProductCreateResult,
+  CreatedProductResult,
   PublishConfig,
   PublishResult,
   PublishedProductResult,
@@ -97,6 +100,7 @@ export {
 export {
   executeCollectionPipeline,
   executeTransformPipeline,
+  executeProductCreatePipeline,
   executePublishPipeline,
   executeFullPipeline,
 } from './executor'
@@ -104,6 +108,7 @@ export {
 // Individual Pipelines (for advanced usage)
 export { runCollectionPipeline } from './pipelines/collection'
 export { runTransformPipeline } from './pipelines/transform'
+export { runProductCreatePipeline } from './pipelines/product-create'
 export { runPublishPipeline } from './pipelines/publish'
 
 // Scheduler

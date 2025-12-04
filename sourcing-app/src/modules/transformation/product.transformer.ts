@@ -12,6 +12,7 @@ import {
   TransformationErrorCode,
   OptionGroup,
   OptionPrice,
+  GeneratedVariant,
 } from './product.types'
 import { createAiClient, AiResponse } from './ai.client'
 import { generateVariants } from './variant.generator'
@@ -21,7 +22,7 @@ import { generateVariants } from './variant.generator'
 // =============================================
 
 /**
- * Generate AI prompt for product extraction (optimized for Korean wholesale band posts)
+ * Generate AI prompt for product extraction (simplified version)
  */
 function buildProductExtractionPrompt(input: ProductTransformationInput): string {
   const { post, policyContent } = input
@@ -30,213 +31,158 @@ function buildProductExtractionPrompt(input: ProductTransformationInput): string
   // 정책 섹션 생성
   const policySection = policyContent
     ? `
-# 가격 정책 (중요! 판매가 계산에 반드시 적용)
-아래 정책을 참고하여 도매가(basePrice)에서 판매가(sellingPrice)를 계산해주세요.
-
+# 가격 정책
 ${policyContent}
-
-**판매가 계산 규칙:**
-- basePrice: 게시물에서 추출한 원래 가격 (도매가)
-- sellingPrice: 위 가격정책을 적용하여 계산한 최종 판매가
-- 정책에 마진율, 마크업 등이 있으면 그에 따라 판매가 계산
-- 옵션별 가격도 각각 정책 적용하여 sellingPrice 계산
 `
     : ''
 
-  return `당신은 한국 도매 커뮤니티(네이버 밴드) 게시물에서 상품 정보를 추출하는 전문가입니다.
-밴드 도매 게시물은 특수한 형식을 가지고 있으며, 다음 규칙을 따라 정보를 추출해주세요.
+  // 가격 추출 규칙
+  const pricingRule = policyContent
+    ? `5. **가격**: 도매가(wholesalePrice)와 판매가(price)를 추출합니다.
+   - 도매가: 게시물에서 추출한 원래 가격
+   - 판매가: 위 가격정책을 적용한 최종 가격`
+    : `5. **가격**: 상품의 가격을 추출합니다.
+   - 도매가(wholesalePrice): 공급가, 도매가
+   - 판매가(price): 소비자 판매 가격 (없으면 도매가와 동일)`
 
-# 밴드 도매 게시물 특성
-1. **이모지 패턴**: 가격/상품/배송 정보 앞에 이모지 사용 (이모지는 무시하고 텍스트만 추출)
-2. **가격 형식**: "30,000원", "₩30,000원", "➡️ 17,000원", "33,000원" 등 다양한 형식
-3. **용량/크기 옵션**: "250~300g 소", "500g(250g×2팩포장)", "1.2kg(8미)" 등 무게/용량 기반
-4. **배송 정보**: "배송비포함", "2세트이상 주문시 4천원씩 차감", "합배송 10팩"
-5. **복수 옵션**: 한 게시물에 크기별/용량별 여러 상품-가격 조합 존재
+  return `당신은 한국 도매 쇼핑몰 상품 정보 추출 전문가입니다.
 
-# 게시물 정보
+# 게시물
 제목: ${post.title}
-
-내용:
-${post.content}
-
-이미지: ${imageCount}개
+내용: ${post.content || ''}
 ${policySection}
 # 추출 규칙
 
-## 1. 상품명 (productName)
-- 제목과 본문에서 핵심 상품명 추출
-- 브랜드/등급/원산지 정보 포함 (예: "국내산 생물 참홍어 날개살 필렛", "암소한우1등급 꽃등심")
-- 프로모션 문구 제외 ("초특가", "행사", "한정수량", "긴급", "공구" 등)
-- 이모지 제거
-- 품질 표현은 포함 (예: "파지", "파품", "특대")
+## 1. 상품명
+원산지/지역 + 품질키워드 + 상품명 조합
+- 수산물: "싱싱한 통영산 활돌문어", "당일조업 고흥 활 산낙지"
+- 농산물: "꿀달수 무안 황토 고구마", "햇 충주 국내산 참깨"
+- 가공식품: "30년전통 울산 수제 치즈설기", "50년전통 부산 프리미엄 꼬치어묵"
 
-## 2. 상품 설명 (description)
-- 상품의 특징, 원산지, 품질 정보
-- 구매 혜택, 배송 특이사항
-- 150-300자 내외로 간결하게
+## 2. 설명 (200-500자)
+게시물에서 상품 특징, 효능, 맛 설명 부분을 추출하여 작성
 
-## 3. 카테고리 (category)
-- 수산물, 축산물, 농산물, 가공식품, 생활용품, 의류, 잡화 중 선택
+## 3. 카테고리
+수산물, 농산물, 가공식품, 장류, 음료/차, 절임류
 
-## 4. 옵션 추출 (options)
-도매 게시물의 옵션은 주로 **용량/크기** 기반입니다.
+## 4. 옵션/variants 추출 (핵심!)
+가격이 다른 상품 구성을 찾아 추출:
 
-**단일 상품 (옵션 없음):**
-"파지 반건조 오징어 1.2kg(8미) 30,000원" → options: []
+**가격 패턴 인식:**
+- "➡️ 공급가 18,500원", "⏩⏩ 39,000원"
+- "₩12,900원", "￦19,900원", "1키로: 35,000원"
 
-**복수 옵션 (크기/용량별 가격 다름):**
-\`\`\`
-참홍어 필렛 250~300g 소 → 17,000원
-참홍어 필렛 350~400g 중 → 21,500원
-참홍어 필렛 450~500g 대 → 25,500원
-\`\`\`
-→ options: [{ "groupName": "용량", "values": ["소(250~300g)", "중(350~400g)", "대(450~500g)"] }]
+**옵션 유형:**
+- 수량: 5미, 10미, 20마리
+- 중량: 500g, 1kg, 2키로, 반말(3키로), 한말(6키로)
+- 크기: 소짜/세발/얼치기/소/중/대 (낙지), 소/중/대/특 (농산물)
+- 구성: A세트, B세트, 단품, 야채세트
+- 팩: 1팩, 2팩, 30팩, 50팩
 
-**옵션명 형식**: "크기명(용량)" 또는 "용량(패키지구성)"
-예: "소(250~300g)", "500g(250g×2팩)", "1.2kg(8미)"
+${pricingRule}
 
-## 5. 가격 추출 (pricing)
-- **basePrice**: 게시물에서 추출한 원래 가격 (도매가). 단일 상품이면 그 가격, 복수 옵션이면 가장 낮은 가격
-- **sellingPrice**: 가격정책이 있으면 정책 적용한 판매가, 없으면 basePrice와 동일
-- **optionPrices**: 옵션별 가격이 다른 경우 각각 명시 (basePrice, sellingPrice 모두 포함)
-- 가격에서 쉼표(,), 원(원), ₩, 화살표 등 모두 제거하고 숫자만 추출
-- "30,000원" → 30000, "➡️ 17,000원" → 17000
+# 예시1 - 수산물(낙지)
+입력: "세발낙지 10마리 48,000원 (5미 29,000원)
+얼치기 10마리 55,000원 (5미 32,500원)
+소낙지 10마리 70,000원"
 
-## 6. 배송 정보 (shipping)
-- **shippingIncluded**: "배송비포함", "배송비 포함" 문구가 있으면 true
-- **bundleDiscount**: "2세트이상 4000원 차감", "3팩이상 3000원 할인" 등
-- **maxBundle**: "합배송 10팩", "묶음 5개까지" 등에서 숫자 추출, "묶음무제한"이면 null
+출력:
+{
+  "productName": "싱싱한 서해안 국내산 활낙지 (세발/얼치기/소)",
+  "description": "무안 신안 등 서해안에서 조업된 100% 국내산 뻘낙지입니다. 보들보들한 식감으로 연포탕, 탕탕이, 볶음에 최고! 산소포장으로 신선하게 배송됩니다.",
+  "category": "수산물",
+  "options": [{ "groupName": "규격", "values": ["세발낙지 10미", "세발낙지 5미", "얼치기 10미", "얼치기 5미", "소낙지 10미"] }],
+  "pricing": { "wholesalePrice": 29000, "price": 29000, "currency": "KRW" },
+  "variants": [
+    { "optionSummary": "세발낙지 10미", "wholesalePrice": 48000, "price": 48000 },
+    { "optionSummary": "세발낙지 5미", "wholesalePrice": 29000, "price": 29000 },
+    { "optionSummary": "얼치기 10미", "wholesalePrice": 55000, "price": 55000 },
+    { "optionSummary": "얼치기 5미", "wholesalePrice": 32500, "price": 32500 },
+    { "optionSummary": "소낙지 10미", "wholesalePrice": 70000, "price": 70000 }
+  ]
+}
 
-## 7. 도매 정보 (wholesale)
-- **origin**: "국내산", "구룡포", "서해안", "원양" 등
-- **orderDeadline**: "발주마감: 오후 2시", "마감 2시30분" 등
-- **deliveryCompany**: "롯데택배", "대한통운", "우체국택배" 등
+# 예시2 - 가공식품(떡/호빵)
+입력: "통팥 호빵 1팩 4,900원
+야채 호빵 1팩 5,800원
+통팥 2팩+야채 1팩 14,900원"
+
+출력:
+{
+  "productName": "26년전통 국산재료 통팥/야채 쌀호빵",
+  "description": "국내산 야채와 통팥으로 속을 가득 채운 수제 호빵입니다. 전자레인지나 찜기에 쪄먹으면 겨울 대표 간식으로 최고!",
+  "category": "가공식품",
+  "options": [{ "groupName": "구성", "values": ["통팥 1팩", "야채 1팩", "통팥2+야채1"] }],
+  "pricing": { "wholesalePrice": 4900, "price": 4900, "currency": "KRW" },
+  "variants": [
+    { "optionSummary": "통팥 1팩", "wholesalePrice": 4900, "price": 4900 },
+    { "optionSummary": "야채 1팩", "wholesalePrice": 5800, "price": 5800 },
+    { "optionSummary": "통팥2+야채1", "wholesalePrice": 14900, "price": 14900 }
+  ]
+}
+
+# 예시3 - 농산물(단일규격)
+입력: "무안달수 상중 10키로 39,000원"
+
+출력:
+{
+  "productName": "꿀달수 무안 황토 고구마 (베니하루카)",
+  "description": "유기농이라 껍질째 먹는 꿀고구마입니다. 무안현경면에서 재배한 달달한 고구마로 재주문 200%! 믿고 찾는 황토 달수고구마입니다.",
+  "category": "농산물",
+  "options": [{ "groupName": "규격", "values": ["상중 10키로"] }],
+  "pricing": { "wholesalePrice": 39000, "price": 39000, "currency": "KRW" },
+  "variants": [
+    { "optionSummary": "상중 10키로", "wholesalePrice": 39000, "price": 39000 }
+  ]
+}
+
+# 6. 배송비 정보 추출
+게시물에서 배송비 관련 정보를 찾아 추출합니다:
+- "택배비 포함", "배송비 별도", "무료배송" 등의 패턴
+- "배송비 3,000원", "택배비 4,000원" 등 구체적인 금액
+- "2박스 이상 무료배송", "합배송 가능" 등 조건부 배송 정보
 
 # 응답 형식
-반드시 다음 JSON 형식으로만 응답하세요. 다른 텍스트나 설명은 포함하지 마세요.
-
 \`\`\`json
 {
   "productName": "상품명",
-  "description": "상품 설명",
+  "description": "설명 (200-500자, 필수)",
   "category": "카테고리",
-  "options": [
-    {
-      "groupName": "옵션그룹명",
-      "values": ["옵션값1", "옵션값2"]
-    }
-  ],
-  "pricing": {
-    "basePrice": 도매가_숫자,
-    "sellingPrice": 판매가_숫자,
-    "currency": "KRW",
-    "optionPrices": [
-      { "option": "옵션값1", "basePrice": 도매가1, "sellingPrice": 판매가1 },
-      { "option": "옵션값2", "basePrice": 도매가2, "sellingPrice": 판매가2 }
-    ]
-  },
-  "shipping": {
-    "shippingIncluded": true,
-    "bundleDiscount": "할인정보_또는_null",
-    "maxBundle": 숫자_또는_null
-  },
-  "wholesale": {
-    "origin": "원산지_또는_null",
-    "orderDeadline": "발주마감_또는_null",
-    "deliveryCompany": "택배사_또는_null"
-  }
+  "options": [{ "groupName": "규격", "values": ["값1", "값2"] }],
+  "pricing": { "wholesalePrice": 숫자, "price": 숫자, "currency": "KRW" },
+  "variants": [{ "optionSummary": "값1", "wholesalePrice": 숫자, "price": 숫자 }],
+  "shipping": { "shippingFee": 숫자또는null, "shippingInfo": "배송관련원문정보" }
 }
 \`\`\`
 
-# 예제
-
-## 예제 1: 단일 상품
-입력:
-제목: 특대 파지 반건조오징어
-내용: 파품(파지) 특대 반건조 오징어 1.2kg(8미) 내외 ㄴ₩30,000원
-배송비포함 2세트이상 주문시 4천원씩 차감 묶음무제한
-발주마감: 오후 2시30분 / 택배사: 롯데택배
-
-출력:
-{
-  "productName": "구룡포 특대 파지 반건조오징어 1.2kg",
-  "description": "구룡포 덕장에서 대량작업 후 준비된 파품(파지) 특대 반건조 오징어입니다. 1.2kg(8미) 내외 구성입니다.",
-  "category": "수산물",
-  "options": [],
-  "pricing": {
-    "basePrice": 30000,
-    "sellingPrice": 30000,
-    "currency": "KRW",
-    "optionPrices": []
-  },
-  "shipping": {
-    "shippingIncluded": true,
-    "bundleDiscount": "2세트이상 4000원 차감",
-    "maxBundle": null
-  },
-  "wholesale": {
-    "origin": "구룡포",
-    "orderDeadline": "오후 2시30분",
-    "deliveryCompany": "롯데택배"
-  }
-}
-
-## 예제 2: 복수 옵션 (크기별 가격 다름)
-입력:
-제목: 국내산 생물 참홍어 날개살 필렛
-내용:
-참홍어 날개살 필렛 한팩 250~300g 소 ➡️ 17,000원
-참홍어 날개살 필렛 한팩 350~400g 중 ➡️ 21,500원
-참홍어 날개살 필렛 한팩 450~500g 대 ➡️ 25,500원
-배송비포함 2세트이상 주문시 4000원씩 차감 / 합배송 10팩
-
-출력:
-{
-  "productName": "국내산 생물 참홍어 날개살 필렛",
-  "description": "국내산 생물 참홍어 날개살을 필렛으로 손질한 상품입니다. 소/중/대 3가지 사이즈로 선택 가능합니다.",
-  "category": "수산물",
-  "options": [
-    {
-      "groupName": "용량",
-      "values": ["소(250~300g)", "중(350~400g)", "대(450~500g)"]
-    }
-  ],
-  "pricing": {
-    "basePrice": 17000,
-    "sellingPrice": 17000,
-    "currency": "KRW",
-    "optionPrices": [
-      { "option": "소(250~300g)", "basePrice": 17000, "sellingPrice": 17000 },
-      { "option": "중(350~400g)", "basePrice": 21500, "sellingPrice": 21500 },
-      { "option": "대(450~500g)", "basePrice": 25500, "sellingPrice": 25500 }
-    ]
-  },
-  "shipping": {
-    "shippingIncluded": true,
-    "bundleDiscount": "2세트이상 4000원 차감",
-    "maxBundle": 10
-  },
-  "wholesale": {
-    "origin": "국내산",
-    "orderDeadline": null,
-    "deliveryCompany": null
-  }
-}
-
-# 중요 주의사항
-- JSON 형식을 엄격히 준수하세요
-- 가격은 반드시 숫자만 (쉼표, ₩, 원, 화살표 제외)
-- 정보가 없는 필드는 null로 설정
-- 옵션이 없으면 options: [], optionPrices: []
-- 이모지는 모두 무시하고 텍스트만 추출
-- 옵션별 가격이 다르면 반드시 optionPrices에 각각 명시
-- **가격정책이 제공된 경우 반드시 sellingPrice에 정책 적용된 판매가 계산**
-- 가격정책이 없으면 sellingPrice = basePrice (동일하게)`
+# 주의사항
+- JSON만 응답
+- 가격은 숫자만 (18500)
+- 배송비는 shipping 객체에 별도로 추출 (shippingFee: 배송비 금액, shippingInfo: 배송 관련 원문 정보)
+- 단일 규격이어도 반드시 options, variants 배열에 포함 (빈 배열 금지)
+- 설명은 반드시 작성 (빈 문자열 금지)`
 }
 
 // =============================================
 // AI RESPONSE PARSING
 // =============================================
+
+/**
+ * Parse AI-extracted variants from raw response
+ * Returns only variants with at least one price (wholesalePrice or price)
+ */
+function parseAiVariants(rawVariants: any[]): GeneratedVariant[] {
+  if (!rawVariants || !Array.isArray(rawVariants)) return []
+
+  return rawVariants
+    .filter(v => v && (v.wholesalePrice !== undefined || v.price !== undefined))
+    .map(v => ({
+      optionSummary: v.optionSummary || '',
+      options: v.options || {},
+      wholesalePrice: typeof v.wholesalePrice === 'number' ? v.wholesalePrice : undefined,
+      price: typeof v.price === 'number' ? v.price : undefined,
+    }))
+}
 
 /**
  * Attempt to repair truncated JSON by closing open brackets/braces
@@ -252,14 +198,59 @@ function repairTruncatedJson(jsonText: string): string {
 
   console.log('🔧 JSON 복구 시도 중...')
 
-  // Remove trailing comma if present
-  jsonText = jsonText.replace(/,\s*$/, '')
+  // 1. Remove incomplete string at the end (truncated mid-string)
+  // Find the last complete JSON structure
+  let lastValidIndex = jsonText.length - 1
 
-  // Count open brackets and braces
-  let openBraces = 0
-  let openBrackets = 0
+  // Check if we're in an unclosed string
   let inString = false
   let escapeNext = false
+  let lastStringStart = -1
+
+  for (let i = 0; i < jsonText.length; i++) {
+    const char = jsonText[i]
+    if (escapeNext) {
+      escapeNext = false
+      continue
+    }
+    if (char === '\\') {
+      escapeNext = true
+      continue
+    }
+    if (char === '"') {
+      if (!inString) {
+        lastStringStart = i
+      }
+      inString = !inString
+    }
+  }
+
+  // If still in string, truncate to before the string started
+  if (inString && lastStringStart > 0) {
+    // Find the comma or bracket before the incomplete string
+    let cutPoint = lastStringStart
+    while (cutPoint > 0 && jsonText[cutPoint - 1] !== ',' && jsonText[cutPoint - 1] !== '[' && jsonText[cutPoint - 1] !== '{') {
+      cutPoint--
+    }
+    if (cutPoint > 0) {
+      jsonText = jsonText.substring(0, cutPoint).trim()
+    }
+  }
+
+  // 2. Remove trailing incomplete objects/arrays
+  // Pattern: incomplete object like { "key": "value", "key2":
+  jsonText = jsonText.replace(/,?\s*"[^"]*":\s*("[^"]*)?$/m, '')
+  jsonText = jsonText.replace(/,?\s*"[^"]*":\s*\d*$/m, '')
+  jsonText = jsonText.replace(/,?\s*"[^"]*":\s*$/m, '')
+
+  // 3. Remove trailing comma
+  jsonText = jsonText.replace(/,\s*$/, '')
+
+  // 4. Count and close open brackets/braces
+  let openBraces = 0
+  let openBrackets = 0
+  inString = false
+  escapeNext = false
 
   for (const char of jsonText) {
     if (escapeNext) {
@@ -282,17 +273,7 @@ function repairTruncatedJson(jsonText: string): string {
     else if (char === ']') openBrackets--
   }
 
-  // Close any unclosed string (if we're still in a string)
-  if (inString) {
-    jsonText += '"'
-  }
-
-  // Remove incomplete key-value pair at the end
-  // Pattern: "key": or "key": "incomplete or "key": 123
-  jsonText = jsonText.replace(/,?\s*"[^"]*":\s*("[^"]*)?$/m, '')
-  jsonText = jsonText.replace(/,?\s*"[^"]*":\s*\d*$/m, '')
-
-  // Close open brackets and braces
+  // 5. Close open structures
   for (let i = 0; i < openBrackets; i++) {
     jsonText += ']'
   }
@@ -300,7 +281,13 @@ function repairTruncatedJson(jsonText: string): string {
     jsonText += '}'
   }
 
-  console.log('🔧 JSON 복구 완료')
+  // 6. Final attempt to parse and validate
+  try {
+    JSON.parse(jsonText)
+    console.log('🔧 JSON 복구 완료')
+  } catch (e) {
+    console.log('🔧 JSON 복구 시도 (일부 데이터 손실 가능)')
+  }
 
   return jsonText
 }
@@ -355,64 +342,56 @@ function parseAiResponse(aiResponse: AiResponse): AiProductAnalysis {
       throw new Error('Product name is required')
     }
 
-    // Calculate priceRange if optionPrices exist
-    let priceRange = undefined
-    const optionPrices: OptionPrice[] = parsed.pricing?.optionPrices || []
-    if (optionPrices.length > 0) {
-      const prices = optionPrices.map((op: OptionPrice) => op.price).filter((p): p is number => typeof p === 'number')
-      if (prices.length > 0) {
-        priceRange = {
-          min: Math.min(...prices),
-          max: Math.max(...prices)
-        }
-      }
-    }
-
-    // Determine base price (도매가)
-    const basePrice = parsed.pricing?.basePrice ||
-                      (priceRange?.min) ||
+    // 간단한 형식: wholesalePrice, price 사용
+    // 도매가 (wholesalePrice 또는 basePrice)
+    const basePrice = parsed.pricing?.wholesalePrice ||
+                      parsed.pricing?.basePrice ||
                       parsed.pricing?.price
 
-    // Determine selling price (판매가 - 정책 적용된 가격)
-    const sellingPrice = parsed.pricing?.sellingPrice ||
-                         parsed.pricing?.price ||
+    // 판매가 (price 또는 sellingPrice)
+    const sellingPrice = parsed.pricing?.price ||
+                         parsed.pricing?.sellingPrice ||
                          basePrice
 
-    // Build analysis result with new fields
+    // AI가 직접 추출한 variants 파싱
+    const aiVariants = parseAiVariants(parsed.variants)
+
+    // 배송비 정보 파싱
+    const shippingFee = typeof parsed.shipping?.shippingFee === 'number'
+      ? parsed.shipping.shippingFee
+      : null
+    const shippingInfo = typeof parsed.shipping?.shippingInfo === 'string'
+      ? parsed.shipping.shippingInfo
+      : null
+
+    // Build analysis result
     const analysis: AiProductAnalysis = {
       productName: parsed.productName,
       description: parsed.description || '',
       category: parsed.category || undefined,
       options: parsed.options || [],
+      variants: aiVariants,
       pricing: {
         basePrice: basePrice,
         sellingPrice: sellingPrice,
         price: sellingPrice, // Legacy compatibility
         currency: parsed.pricing?.currency || 'KRW',
-        optionPrices: optionPrices,
-        priceRange: priceRange,
+        optionPrices: [],
+        priceRange: undefined,
       },
-      // New wholesale fields
-      shipping: parsed.shipping ? {
-        shippingIncluded: parsed.shipping.shippingIncluded ?? false,
-        bundleDiscount: parsed.shipping.bundleDiscount || null,
-        maxBundle: parsed.shipping.maxBundle || null,
-      } : undefined,
-      wholesale: parsed.wholesale ? {
-        origin: parsed.wholesale.origin || null,
-        orderDeadline: parsed.wholesale.orderDeadline || null,
-        deliveryCompany: parsed.wholesale.deliveryCompany || null,
-      } : undefined,
+      shipping: {
+        shippingFee,
+        shippingInfo,
+      },
       rawResponse: aiResponse.content,
     }
 
     console.log('✅ 파싱 완료:', {
       productName: analysis.productName,
       optionsCount: analysis.options.length,
+      aiVariantsCount: aiVariants.length,
       basePrice: analysis.pricing.basePrice,
-      optionPricesCount: analysis.pricing.optionPrices?.length || 0,
-      hasShipping: !!analysis.shipping,
-      hasWholesale: !!analysis.wholesale,
+      sellingPrice: analysis.pricing.sellingPrice,
     })
 
     return analysis
@@ -490,11 +469,6 @@ function buildProductDraft(
   // Get thumbnail from first image
   const thumbnailUrl = post.images?.[0]?.url || null
 
-  // Generate variants from options
-  let variants = analysis.options.length > 0
-    ? generateVariants(analysis.options)
-    : []
-
   // Determine selling price (정책 적용된 판매가 우선, 없으면 basePrice)
   const sellingPrice = analysis.pricing.sellingPrice ||
                        analysis.pricing.basePrice ||
@@ -506,25 +480,49 @@ function buildProductDraft(
     finalPrice: sellingPrice,
   })
 
-  // If variants exist, set their prices (with option-specific pricing support)
-  if (variants.length > 0) {
+  // Determine variants: AI-extracted vs Cartesian product generation
+  let variants: GeneratedVariant[]
+
+  if (analysis.variants && analysis.variants.length > 0) {
+    // Case 1: AI가 직접 추출한 variants 사용 (도매가 + 판매가)
+    console.log('🤖 AI가 추출한 variants 사용:', analysis.variants.length, '개')
+
+    variants = analysis.variants.map(v => ({
+      optionSummary: v.optionSummary,
+      options: v.options,
+      wholesalePrice: v.wholesalePrice,
+      price: v.price || v.wholesalePrice || sellingPrice,
+    }))
+
+    console.log('📦 AI Variants:', variants.map(v => ({
+      summary: v.optionSummary,
+      wholesalePrice: v.wholesalePrice,
+      price: v.price,
+    })))
+
+  } else if (analysis.options.length > 0) {
+    // Case 2: 옵션 조합으로 variants 자동 생성 (기존 로직)
+    console.log('📦 옵션 조합으로 variants 자동 생성')
+
+    variants = generateVariants(analysis.options)
     const optionPrices = analysis.pricing.optionPrices || []
 
     variants = variants.map((variant) => {
-      // Try to find option-specific selling price (정책 적용된 가격)
       const optionPrice = findOptionPriceForVariant(variant, optionPrices)
-
       return {
         ...variant,
-        price: optionPrice || sellingPrice, // Use option selling price if available, else base selling price
-        stock: 0, // Default stock
+        price: optionPrice || sellingPrice,
       }
     })
 
-    console.log('📦 Variants 생성 (판매가 적용):', variants.map(v => ({
+    console.log('📦 Generated Variants:', variants.map(v => ({
       summary: v.optionSummary,
-      price: v.price
+      price: v.price,
     })))
+
+  } else {
+    // Case 3: 옵션 없음
+    variants = []
   }
 
   // Build product draft
@@ -534,7 +532,10 @@ function buildProductDraft(
     categoryId: analysis.category,
     thumbnailUrl: thumbnailUrl || undefined,
     currency: analysis.pricing.currency || 'KRW',
+    wholesalePrice: analysis.pricing.basePrice, // 도매가 (원가)
     price: sellingPrice, // 판매가 (정책 적용된 가격)
+    shippingFee: analysis.shipping?.shippingFee ?? undefined,
+    shippingInfo: analysis.shipping?.shippingInfo ?? undefined,
     options: analysis.options,
     variants,
   }

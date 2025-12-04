@@ -7,7 +7,8 @@ model Product {
   thumbnailUrl       String?            @map("thumbnail_url") @db.VarChar(1000)
   categoryId         String?            @map("category_id") @db.VarChar(100)
   currency           String             @default("KRW") @db.VarChar(10)
-  price              Int?
+  shippingFee        Int?               @map("shipping_fee")
+  shippingInfo       String?            @map("shipping_info") @db.Text
   createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamp(0)
   collectedProduct   CollectedProduct?  @relation(fields: [collectedProductId], references: [id])
@@ -28,13 +29,9 @@ model Product {
 model ProductVariant {
   id             Int         @id @default(autoincrement())
   productId      Int         @map("product_id")
-  sku            String?     @db.VarChar(100)
   optionSummary  String?     @map("option_summary") @db.VarChar(500)
   price          Int
   wholesalePrice Int?        @map("wholesale_price")
-  stock          Int         @default(0)
-  weight         Float?
-  barcode        String?     @db.VarChar(50)
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamp(0)
   cartItems      CartItem[]
@@ -42,7 +39,6 @@ model ProductVariant {
   product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
-  @@index([sku])
   @@map("product_variant")
 }
 

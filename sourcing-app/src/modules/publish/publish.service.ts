@@ -36,12 +36,6 @@ function buildPostContent(product: ProductForPublish): string {
   lines.push(`🛍️ ${product.name}`)
   lines.push('')
 
-  // 가격 정보 (판매가만 노출)
-  if (product.price) {
-    lines.push(`💰 판매가: ${product.price.toLocaleString()}원`)
-    lines.push('')
-  }
-
   // 상품 설명
   if (product.description) {
     lines.push(product.description)
@@ -89,6 +83,13 @@ export class PublishService {
           userId,
         },
         include: {
+          variants: {
+            select: {
+              id: true,
+              price: true,
+              wholesalePrice: true,
+            },
+          },
           collectedProduct: {
             include: {
               post: {
