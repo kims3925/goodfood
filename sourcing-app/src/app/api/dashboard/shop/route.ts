@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@bandauto/db'
+import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 // 기간별 날짜 범위 계산
