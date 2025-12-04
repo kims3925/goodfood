@@ -27,6 +27,8 @@ import {
   PanelRight,
   Grid3X3,
   Minimize2,
+  Target,
+  FlaskConical,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -166,8 +168,20 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     },
     {
       label: '정산 관리',
-      href: '/settlement/list',
       icon: <Calculator size={20} />,
+      children: [
+        {
+          label: '정산 목록',
+          href: '/settlement/list',
+          icon: <Calculator size={16} />,
+        },
+        {
+          label: 'Referrer 테스트',
+          href: '/settlement/referrer-test',
+          icon: <Target size={16} />,
+          badge: 'NEW',
+        },
+      ],
     },
     {
       label: '고객 문의',
