@@ -6,12 +6,7 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { ArrowLeft, Package, User, MapPin, CreditCard, Truck, Plus, Check, Building2, Wallet } from 'lucide-react'
 import TossPaymentWidget from '@/modules/payments/components/TossPaymentWidget'
-
-interface BankInfo {
-  bankName: string
-  bankAccount: string
-  accountHolder: string
-}
+import { useChannel } from '@/contexts/ChannelContext'
 
 declare global {
   interface Window {
@@ -60,20 +55,17 @@ function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: session, status } = useSession()
+  const { channel } = useChannel() // 서브도메인 채널 정보
   const fromCart = searchParams.get('fromCart') === 'true'
   const publishedProductId = searchParams.get('publishedProductId') // productId → publishedProductId로 변경
   const quantity = parseInt(searchParams.get('quantity') || '1')
 
   const [product, setProduct] = useState<any>(null)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
-  const [cartChannelId, setCartChannelId] = useState<number | null>(null)
-  const [productChannelId, setProductChannelId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   // 결제 방식 관련
   const [paymentMethod, setPaymentMethod] = useState<'TOSS' | 'BANK_TRANSFER'>('TOSS')
-  const [channelBankInfo, setChannelBankInfo] = useState<BankInfo | null>(null)
-  const [bankInfoLoading, setBankInfoLoading] = useState(false)
 
   // 회원 배송지 관련
   const [addresses, setAddresses] = useState<Address[]>([])
@@ -218,7 +210,6 @@ function CheckoutContent() {
 
       if (data.success && data.cart?.items?.length > 0) {
         setCartItems(data.cart.items)
-        setCartChannelId(data.cart.channelId || data.cart.retailBandId || null)
       } else {
         // 장바구니가 비어있으면 장바구니 페이지로 이동
         window.location.href = '/cart'
@@ -241,11 +232,6 @@ function CheckoutContent() {
         const product = pp.product
         const mainVariant = product.variants?.[0]
         const images = product.post?.images?.map((img: any) => img.url) || []
-
-        // 채널 ID 저장
-        if (pp.channelId) {
-          setProductChannelId(pp.channelId)
-        }
 
         setProduct({
           id: product.id,
@@ -294,36 +280,6 @@ function CheckoutContent() {
     const shippingFee = 3000
     return subtotal >= freeShippingAmount ? 0 : shippingFee
   }
-
-  // 채널 입금정보 로드
-  const loadBankInfo = async (channelId: number) => {
-    try {
-      setBankInfoLoading(true)
-      const response = await fetch(`/api/shop/channel/${channelId}/bank-info`)
-      const data = await response.json()
-      if (data.success) {
-        setChannelBankInfo(data.bankInfo)
-      } else {
-        setChannelBankInfo(null)
-        console.error('입금정보 로드 실패:', data.error)
-      }
-    } catch (error) {
-      console.error('입금정보 로드 오류:', error)
-      setChannelBankInfo(null)
-    } finally {
-      setBankInfoLoading(false)
-    }
-  }
-
-  // 무통장입금 선택 시 입금정보 로드
-  useEffect(() => {
-    if (paymentMethod === 'BANK_TRANSFER') {
-      const channelId = fromCart ? cartChannelId : productChannelId
-      if (channelId) {
-        loadBankInfo(channelId)
-      }
-    }
-  }, [paymentMethod, cartChannelId, productChannelId, fromCart])
 
   const handleFormChange = (field: string, value: string | boolean) => {
     if (field.startsWith('shippingAddress.')) {
@@ -964,6 +920,33 @@ function CheckoutContent() {
                         </p>
                       </div>
                       
+                      {/* 입금 계좌 정보 */}
+                      {channel?.bankInfo ? (
+                        <div className="bg-white rounded-lg p-4 border border-gray-200">
+                          <p className="text-sm font-medium text-gray-800 mb-3">입금 계좌 안내</p>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">은행</span>
+                              <span className="font-medium text-gray-900">{channel.bankInfo.bankName}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">계좌번호</span>
+                              <span className="font-mono font-medium text-gray-900">{channel.bankInfo.bankAccount}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">예금주</span>
+                              <span className="font-medium text-gray-900">{channel.bankInfo.accountHolder}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-red-50 rounded-lg p-4 border border-red-100">
+                          <p className="text-sm text-red-600">
+                            채널에 계좌정보가 등록되어 있지 않습니다. 관리자에게 문의해주세요.
+                          </p>
+                        </div>
+                      )}
+
                       {/* 주의사항 */}
                       <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
                         <p className="text-sm font-medium text-amber-800 mb-2">안내사항</p>
@@ -981,13 +964,6 @@ function CheckoutContent() {
                             <span>입금 기한 내 미입금 시 주문이 자동 취소됩니다</span>
                           </li>
                         </ul>
-                      </div>
-
-                      {/* 계좌 안내 예고 */}
-                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                        <p className="text-sm text-gray-600">
-                          주문 완료 후 입금 계좌 정보가 안내됩니다.
-                        </p>
                       </div>
                     </div>
                   )}
@@ -1035,7 +1011,7 @@ function CheckoutContent() {
                     <div className="p-5 pb-4">
                       <button
                         onClick={handleSubmit}
-                        disabled={isSubmitting || (paymentMethod === 'BANK_TRANSFER' && !channelBankInfo)}
+                        disabled={isSubmitting || (paymentMethod === 'BANK_TRANSFER' && !channel?.bankInfo)}
                         className="w-full py-4 rounded-lg text-center font-semibold text-base transition-colors bg-[#FF6B6B] text-white hover:bg-[#FF5252] disabled:bg-gray-300 disabled:cursor-not-allowed"
                       >
                         {isSubmitting

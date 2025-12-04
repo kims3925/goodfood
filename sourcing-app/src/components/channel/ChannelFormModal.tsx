@@ -99,6 +99,8 @@ export default function ChannelFormModal({
     accountHolder: '',
     bankAccount: '',
     bankName: '',
+    // SHOP 플랫폼 전용 필드
+    subdomain: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -197,6 +199,7 @@ export default function ChannelFormModal({
           accountHolder: channel.accountHolder || '',
           bankAccount: channel.bankAccount || '',
           bankName: channel.bankName || '',
+          subdomain: '',
         })
       } else {
         // 등록 모드: 초기 플랫폼은 API 설정 조회 후 설정
@@ -210,6 +213,7 @@ export default function ChannelFormModal({
           accountHolder: '',
           bankAccount: '',
           bankName: '',
+          subdomain: '',
         })
         // API 설정 조회
         fetchConfiguredPlatforms()
@@ -304,14 +308,44 @@ export default function ChannelFormModal({
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    // BAND 플랫폼: 다중 선택 확인
+    // BAND 플랫폼 검증
     if (formData.platform === 'BAND' && !isEditMode) {
-      if (selectedBands.length === 0) {
-        newErrors.channelKey = '밴드를 선택해주세요.'
+      // 도매 채널: 다중 선택 확인
+      if (formData.kind === 'WHOLESALE') {
+        if (selectedBands.length === 0) {
+          newErrors.channelKey = '밴드를 선택해주세요.'
+        }
+      }
+      // 소매 채널: 단일 선택 + 필수값 확인
+      else if (formData.kind === 'RETAIL') {
+        if (!formData.channelKey.trim()) {
+          newErrors.channelKey = '밴드를 선택해주세요.'
+        }
+        if (!formData.name.trim()) {
+          newErrors.name = '쇼핑몰명을 입력해주세요.'
+        }
+        if (!formData.subdomain.trim()) {
+          newErrors.subdomain = '서브도메인을 입력해주세요.'
+        }
+        if (!formData.coverUrl.trim()) {
+          newErrors.coverUrl = '쇼핑몰 로고를 업로드해주세요.'
+        }
       }
     }
-    // SHOP 플랫폼은 channelKey가 자동 생성되므로 검증 제외
-    else if (!formData.channelKey.trim() && formData.platform !== 'SHOP') {
+    // SHOP 플랫폼 검증 (channelKey는 자동 생성되므로 제외)
+    if (formData.platform === 'SHOP' && !isEditMode) {
+      if (!formData.name.trim()) {
+        newErrors.name = '쇼핑몰명을 입력해주세요.'
+      }
+      if (!formData.subdomain.trim()) {
+        newErrors.subdomain = '서브도메인을 입력해주세요.'
+      }
+      if (!formData.coverUrl.trim()) {
+        newErrors.coverUrl = '쇼핑몰 로고를 업로드해주세요.'
+      }
+    }
+    // 기타 플랫폼 channelKey 검증
+    else if (!formData.channelKey.trim() && formData.platform !== 'SHOP' && formData.platform !== 'BAND') {
       if (formData.platform === 'NAVER_CAFE') {
         newErrors.channelKey = '네이버 카페를 선택해주세요.'
       } else if (formData.platform === 'ALIEXPRESS') {
@@ -325,14 +359,16 @@ export default function ChannelFormModal({
       }
     }
 
-    // 채널명 검사: 수정 모드 또는 등록 모드일 때 필수 (BAND 다중 선택 제외)
+    // 채널명 검사: 수정 모드 또는 등록 모드일 때 필수 (BAND 다중 선택 및 소매 밴드 제외 - 이미 위에서 검증)
     if (!formData.name.trim()) {
       if (isEditMode) {
         newErrors.name = '채널명을 입력해주세요.'
       } else if (formData.platform === 'SHOP') {
         newErrors.name = '쇼핑몰명을 입력해주세요.'
-      } else if (formData.platform === 'BAND' && selectedBands.length > 0) {
-        // BAND 다중 선택 시 name은 각 밴드에서 가져오므로 검증 제외
+      } else if (formData.platform === 'BAND' && formData.kind === 'WHOLESALE' && selectedBands.length > 0) {
+        // 도매 BAND 다중 선택 시 name은 각 밴드에서 가져오므로 검증 제외
+      } else if (formData.platform === 'BAND' && formData.kind === 'RETAIL') {
+        // 소매 BAND는 위에서 이미 검증됨
       } else if (formData.platform === 'BAND' && selectedBands.length === 0) {
         // BAND는 밴드 선택 시 name이 자동 설정되므로, 선택이 없을 때는 channelKey 에러가 우선
       } else if (!formData.channelKey) {
@@ -442,6 +478,8 @@ export default function ChannelFormModal({
           accountHolder: formData.accountHolder || null,
           bankAccount: formData.bankAccount || null,
           bankName: formData.bankName || null,
+          // SHOP 플랫폼 전용 필드
+          subdomain: formData.subdomain || null,
         }
 
         const response = await fetch(url, {
@@ -726,146 +764,412 @@ export default function ChannelFormModal({
         {/* 밴드 선택 (등록 시, 플랫폼이 BAND일 때만) */}
         {!isEditMode && formData.platform === 'BAND' && (
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="block text-sm font-medium text-gray-700">
-                밴드 선택 <span className="text-red-500">*</span>
-                {selectedBands.length > 0 && (
-                  <span className="ml-2 text-purple-600">({selectedBands.length}개 선택됨)</span>
+            {/* 도매 채널: 다중 선택 방식 */}
+            {formData.kind === 'WHOLESALE' && (
+              <>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    밴드 선택 <span className="text-red-500">*</span>
+                    {selectedBands.length > 0 && (
+                      <span className="ml-2 text-purple-600">({selectedBands.length}개 선택됨)</span>
+                    )}
+                  </label>
+                  {bandList.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleSelectAllBands}
+                      className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                    >
+                      {selectedBands.length === bandList.length ? '전체 해제' : '전체 선택'}
+                    </button>
+                  )}
+                </div>
+                {errors.channelKey && selectedBands.length === 0 && (
+                  <p className="text-sm text-red-500 mb-2">{errors.channelKey}</p>
                 )}
-              </label>
-              {bandList.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleSelectAllBands}
-                  className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-                >
-                  {selectedBands.length === bandList.length ? '전체 해제' : '전체 선택'}
-                </button>
-              )}
-            </div>
-            {errors.channelKey && selectedBands.length === 0 && (
-              <p className="text-sm text-red-500 mb-2">{errors.channelKey}</p>
+
+                {isLoadingBands ? (
+                  <div className="flex items-center justify-center py-8 text-gray-500">
+                    <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    밴드 목록을 불러오는 중...
+                  </div>
+                ) : bandError ? (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-red-800">{bandError}</p>
+                        {bandError.includes('API 설정') ? (
+                          <div className="mt-3">
+                            <p className="text-xs text-red-600 mb-2">
+                              Band API 연동을 위해 먼저 Access Token을 설정해야 합니다.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onClose()
+                                router.push('/admin/settings/api')
+                              }}
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              API 설정 페이지로 이동
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={fetchBandList}
+                            className="mt-2 inline-flex items-center gap-1 text-sm text-red-700 hover:text-red-800 font-medium"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            다시 시도
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : bandList.length === 0 ? (
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
+                    <p className="text-sm text-gray-500">등록된 밴드가 없습니다.</p>
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 rounded-lg h-96 overflow-y-auto">
+                    <div className="grid grid-cols-1 gap-2 p-2">
+                      {bandList.map((band) => {
+                        const isSelected = selectedBands.some((b) => b.bandKey === band.bandKey)
+                        return (
+                          <button
+                            key={band.bandKey}
+                            type="button"
+                            onClick={() => handleBandSelect(band)}
+                            className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
+                              isSelected
+                                ? 'border-purple-500 bg-purple-50'
+                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {band.coverUrl ? (
+                              <img
+                                src={band.coverUrl}
+                                alt={band.name}
+                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                                  />
+                                </svg>
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-gray-900 truncate">{band.name}</div>
+                              <div className="text-xs text-gray-500 truncate">{band.bandKey}</div>
+                            </div>
+                            {isSelected && (
+                              <svg className="w-5 h-5 text-purple-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path
+                                  fillRule="evenodd"
+                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
-            {isLoadingBands ? (
-              <div className="flex items-center justify-center py-8 text-gray-500">
-                <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                밴드 목록을 불러오는 중...
-              </div>
-            ) : bandError ? (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-red-800">{bandError}</p>
-                    {bandError.includes('API 설정') ? (
-                      <div className="mt-3">
-                        <p className="text-xs text-red-600 mb-2">
-                          Band API 연동을 위해 먼저 Access Token을 설정해야 합니다.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onClose()
-                            router.push('/admin/settings/api')
-                          }}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          API 설정 페이지로 이동
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={fetchBandList}
-                        className="mt-2 inline-flex items-center gap-1 text-sm text-red-700 hover:text-red-800 font-medium"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        다시 시도
-                      </button>
-                    )}
+            {/* 소매 채널: 단일 선택 + 로고/서브도메인 입력 */}
+            {formData.kind === 'RETAIL' && (
+              <>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  밴드 선택 <span className="text-red-500">*</span>
+                </label>
+                {errors.channelKey && !formData.channelKey && (
+                  <p className="text-sm text-red-500 mb-2">{errors.channelKey}</p>
+                )}
+
+                {isLoadingBands ? (
+                  <div className="flex items-center justify-center py-8 text-gray-500">
+                    <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    밴드 목록을 불러오는 중...
                   </div>
-                </div>
-              </div>
-            ) : bandList.length === 0 ? (
-              <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
-                <p className="text-sm text-gray-500">등록된 밴드가 없습니다.</p>
-              </div>
-            ) : (
-              <div className="border border-gray-200 rounded-lg h-96 overflow-y-auto">
-                <div className="grid grid-cols-1 gap-2 p-2">
-                  {bandList.map((band) => {
-                    const isSelected = selectedBands.some((b) => b.bandKey === band.bandKey)
-                    return (
-                      <button
-                        key={band.bandKey}
-                        type="button"
-                        onClick={() => handleBandSelect(band)}
-                        className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
-                          isSelected
-                            ? 'border-purple-500 bg-purple-50'
-                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        {band.coverUrl ? (
-                          <img
-                            src={band.coverUrl}
-                            alt={band.name}
-                            className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
-                              />
-                            </svg>
+                ) : bandError ? (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-red-800">{bandError}</p>
+                        {bandError.includes('API 설정') ? (
+                          <div className="mt-3">
+                            <p className="text-xs text-red-600 mb-2">
+                              Band API 연동을 위해 먼저 Access Token을 설정해야 합니다.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onClose()
+                                router.push('/admin/settings/api')
+                              }}
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              API 설정 페이지로 이동
+                            </button>
                           </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={fetchBandList}
+                            className="mt-2 inline-flex items-center gap-1 text-sm text-red-700 hover:text-red-800 font-medium"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            다시 시도
+                          </button>
                         )}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 truncate">{band.name}</div>
-                          <div className="text-xs text-gray-500 truncate">{band.bandKey}</div>
-                        </div>
-                        {isSelected && (
-                          <svg className="w-5 h-5 text-purple-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                              fillRule="evenodd"
-                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                              clipRule="evenodd"
+                      </div>
+                    </div>
+                  </div>
+                ) : bandList.length === 0 ? (
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
+                    <p className="text-sm text-gray-500">등록된 밴드가 없습니다.</p>
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
+                    <div className="grid grid-cols-1 gap-2 p-2">
+                      {bandList.map((band) => {
+                        const isSelected = formData.channelKey === band.bandKey
+                        return (
+                          <button
+                            key={band.bandKey}
+                            type="button"
+                            onClick={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                channelKey: band.bandKey,
+                                name: band.name, // 밴드 이름 자동 반영
+                              }))
+                              // 에러 제거
+                              setErrors((prev) => {
+                                const newErrors = { ...prev }
+                                delete newErrors.channelKey
+                                delete newErrors.name
+                                return newErrors
+                              })
+                            }}
+                            className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
+                              isSelected
+                                ? 'border-purple-500 bg-purple-50'
+                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {band.coverUrl ? (
+                              <img
+                                src={band.coverUrl}
+                                alt={band.name}
+                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                                  />
+                                </svg>
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-gray-900 truncate">{band.name}</div>
+                              <div className="text-xs text-gray-500 truncate">{band.bandKey}</div>
+                            </div>
+                            {isSelected && (
+                              <svg className="w-5 h-5 text-purple-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path
+                                  fillRule="evenodd"
+                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 소매 밴드 - 쇼핑몰 정보 입력 (밴드 선택 후 표시) */}
+                {formData.channelKey && (
+                  <div className="mt-4 border border-gray-200 rounded-lg p-4 space-y-4 bg-gray-50">
+                    <div className="flex items-center gap-3 pb-4 border-b border-gray-200">
+                      <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">밴드 쇼핑몰 정보</div>
+                        <div className="text-xs text-gray-500">쇼핑몰 정보를 입력해주세요</div>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        쇼핑몰명 <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        placeholder="쇼핑몰 이름을 입력하세요"
+                        value={formData.name}
+                        onChange={(e) => handleChange('name', e.target.value)}
+                        error={errors.name}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        서브도메인 <span className="text-red-500">*</span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="myshop"
+                          value={formData.subdomain}
+                          onChange={(e) => {
+                            const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+                            setFormData((prev) => ({ ...prev, subdomain: value }))
+                            if (errors.subdomain) {
+                              setErrors((prev) => {
+                                const newErrors = { ...prev }
+                                delete newErrors.subdomain
+                                return newErrors
+                              })
+                            }
+                          }}
+                          error={errors.subdomain}
+                        />
+                        <span className="text-gray-500 text-sm whitespace-nowrap">.shop.com</span>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        영문 소문자, 숫자, 하이픈만 사용 가능
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        쇼핑몰 로고 <span className="text-red-500">*</span>
+                      </label>
+                      {logoPreview || formData.coverUrl ? (
+                        <div className="flex items-center gap-4">
+                          <div className="relative">
+                            <img
+                              src={logoPreview || formData.coverUrl}
+                              alt="쇼핑몰 로고"
+                              className="w-20 h-20 rounded-lg object-cover border border-gray-200"
                             />
-                          </svg>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
+                            <button
+                              type="button"
+                              onClick={handleLogoRemove}
+                              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                          <span className="text-sm text-gray-500">로고가 업로드되었습니다.</span>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-gray-50 transition-colors">
+                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            {isUploadingLogo ? (
+                              <>
+                                <svg className="animate-spin h-8 w-8 text-purple-500 mb-2" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                <p className="text-sm text-gray-500">업로드 중...</p>
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-8 h-8 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <p className="text-sm text-gray-500">
+                                  <span className="font-semibold text-purple-600">클릭하여 업로드</span>
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">PNG, JPG, GIF, WEBP (최대 5MB)</p>
+                              </>
+                            )}
+                          </div>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            onChange={handleLogoUpload}
+                            disabled={isUploadingLogo}
+                          />
+                        </label>
+                      )}
+                      {errors.coverUrl && (
+                        <p className="text-sm text-red-500 mt-1">{errors.coverUrl}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -992,7 +1296,36 @@ export default function ChannelFormModal({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">쇼핑몰 로고</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  서브도메인 <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="myshop"
+                    value={formData.subdomain}
+                    onChange={(e) => {
+                      const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+                      setFormData((prev) => ({ ...prev, subdomain: value }))
+                      if (errors.subdomain) {
+                        setErrors((prev) => {
+                          const newErrors = { ...prev }
+                          delete newErrors.subdomain
+                          return newErrors
+                        })
+                      }
+                    }}
+                    error={errors.subdomain}
+                  />
+                  <span className="text-gray-500 text-sm whitespace-nowrap">.shop.com</span>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  영문 소문자, 숫자, 하이픈만 사용 가능
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  쇼핑몰 로고 <span className="text-red-500">*</span>
+                </label>
                 {logoPreview || formData.coverUrl ? (
                   <div className="flex items-center gap-4">
                     <div className="relative">
@@ -1044,6 +1377,9 @@ export default function ChannelFormModal({
                       disabled={isUploadingLogo}
                     />
                   </label>
+                )}
+                {errors.coverUrl && (
+                  <p className="text-sm text-red-500 mt-1">{errors.coverUrl}</p>
                 )}
               </div>
             </div>

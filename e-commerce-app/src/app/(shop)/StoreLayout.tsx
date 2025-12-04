@@ -6,6 +6,7 @@ import { useSession, signOut } from 'next-auth/react'
 import { Search, ShoppingCart, User, MapPin, Menu, ChevronDown, Phone, HelpCircle, MessageSquare, LogOut } from 'lucide-react'
 import { CartNotificationProvider } from '@/contexts/CartNotificationContext'
 import CartNotificationBubble from '@/components/cart/CartNotificationBubble'
+import { useChannel } from '@/contexts/ChannelContext'
 
 function StoreLayoutContent({
   children,
@@ -13,11 +14,34 @@ function StoreLayoutContent({
   children: React.ReactNode
 }) {
   const { data: session, status } = useSession()
+  const { channel } = useChannel()
   const [cartCount, setCartCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
   const [isCustomerServiceOpen, setIsCustomerServiceOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+
+  // 채널 정보
+  const channelName = channel?.displayName || channel?.name || 'ABC마켓'
+  const logoUrl = channel?.theme?.logoUrl
+  const primaryColor = channel?.theme?.primaryColor || '#FF6B6B'
+  const contactPhone = channel?.contactPhone || '1234-5678'
+  const footerText = channel?.theme?.footerText
+  const relatedChannels = channel?.relatedChannels || []
+
+  // 서브도메인 기반 URL 생성
+  const getChannelUrl = (subdomain: string) => {
+    // 개발 환경에서는 lvh.me 사용
+    const isDev = process.env.NODE_ENV !== 'production'
+
+    if (isDev) {
+      return `http://${subdomain}.lvh.me:3000/main`
+    }
+
+    // 프로덕션: 환경변수에서 루트 도메인 사용
+    const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'shop.com'
+    return `https://${subdomain}.${rootDomain}/main`
+  }
 
   useEffect(() => {
     // Load cart count from localStorage
@@ -61,8 +85,11 @@ function StoreLayoutContent({
       {/* Header */}
       <header className="kurly-header border-b border-gray-200">
         {/* Top Banner */}
-        <div className="bg-gradient-to-r from-[#FF6B6B] to-[#FF8C42] text-white text-center py-2 text-sm">
-          <span>ABC마켓 오픈 기념! 전 상품 무료배송</span>
+        <div
+          className="text-white text-center py-2 text-sm"
+          style={{ background: `linear-gradient(to right, ${primaryColor}, ${primaryColor}dd)` }}
+        >
+          <span>{channelName} 오픈 기념! 전 상품 무료배송</span>
         </div>
 
         {/* Top Utility Bar */}
@@ -157,7 +184,7 @@ function StoreLayoutContent({
                     />
                     <div className="absolute top-full right-0 w-[200px] bg-white border border-gray-200 shadow-lg z-50 py-2 mt-1 rounded-md">
                       <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="font-bold text-[#FF6B6B] text-lg">1234-5678</p>
+                        <p className="font-bold text-lg" style={{ color: primaryColor }}>{contactPhone}</p>
                         <p className="text-gray-500 text-xs mt-1">월~토 오전 7시 ~ 오후 6시</p>
                       </div>
                       <Link
@@ -195,9 +222,14 @@ function StoreLayoutContent({
         {/* Main Header */}
         <div className="kurly-container">
           <div className="kurly-header-top">
-            {/* Logo */}
+            {/* Logo - 항상 채널 이름으로 표시 */}
             <Link href="/main" className="kurly-logo flex items-center gap-2">
-              <span className="text-xl md:text-2xl lg:text-3xl font-black text-[#FF6B6B]">ABC마켓</span>
+              <span
+                className="text-xl md:text-2xl lg:text-3xl font-black"
+                style={{ color: primaryColor }}
+              >
+                {channelName}
+              </span>
             </Link>
 
             {/* Search Bar */}
@@ -311,44 +343,71 @@ function StoreLayoutContent({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
             <div>
               <h4 className="font-bold text-gray-900 mb-3 md:mb-4">고객행복센터</h4>
-              <p className="text-xl md:text-2xl font-bold text-[#FF6B6B] mb-2">1234-5678</p>
+              <p className="text-xl md:text-2xl font-bold mb-2" style={{ color: primaryColor }}>{contactPhone}</p>
               <p className="text-xs md:text-sm text-gray-600">월~토 오전 7시 ~ 오후 6시</p>
             </div>
             <div>
-              <h4 className="font-bold text-gray-900 mb-3 md:mb-4">ABC마켓</h4>
+              <h4 className="font-bold text-gray-900 mb-3 md:mb-4">{channelName}</h4>
               <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-600">
-                <li><Link href="/about" className="hover:text-[#FF6B6B]">회사소개</Link></li>
-                <li><Link href="/careers" className="hover:text-[#FF6B6B]">채용정보</Link></li>
-                <li><Link href="/terms" className="hover:text-[#FF6B6B]">이용약관</Link></li>
-                <li><Link href="/privacy" className="hover:text-[#FF6B6B]">개인정보처리방침</Link></li>
+                <li><Link href="/about" className="hover:opacity-70">회사소개</Link></li>
+                <li><Link href="/careers" className="hover:opacity-70">채용정보</Link></li>
+                <li><Link href="/terms" className="hover:opacity-70">이용약관</Link></li>
+                <li><Link href="/privacy" className="hover:opacity-70">개인정보처리방침</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-bold text-gray-900 mb-3 md:mb-4">고객센터</h4>
               <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-600">
-                <li><Link href="/cs" className="hover:text-[#FF6B6B]">고객센터</Link></li>
-                <li><Link href="/cs/faq" className="hover:text-[#FF6B6B]">자주묻는질문</Link></li>
-                <li><Link href="/cs/inquiry" className="hover:text-[#FF6B6B]">1:1문의</Link></li>
+                <li><Link href="/cs" className="hover:opacity-70">고객센터</Link></li>
+                <li><Link href="/cs/faq" className="hover:opacity-70">자주묻는질문</Link></li>
+                <li><Link href="/cs/inquiry" className="hover:opacity-70">1:1문의</Link></li>
               </ul>
             </div>
-            <div>
-              <h4 className="font-bold text-gray-900 mb-3 md:mb-4">SNS</h4>
-              <div className="flex gap-3 md:gap-4">
-                <a href="#" className="w-8 h-8 md:w-10 md:h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
-                  <span className="text-gray-600 text-sm md:text-base">f</span>
-                </a>
-                <a href="#" className="w-8 h-8 md:w-10 md:h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
-                  <span className="text-gray-600 text-sm md:text-base">in</span>
-                </a>
-                <a href="#" className="w-8 h-8 md:w-10 md:h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
-                  <span className="text-gray-600 text-sm md:text-base">yt</span>
-                </a>
+            {relatedChannels.length > 0 ? (
+              <div>
+                <h4 className="font-bold text-gray-900 mb-3 md:mb-4">관련 쇼핑몰</h4>
+                <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-600">
+                  {relatedChannels.map((ch) => (
+                    <li key={ch.id}>
+                      <a
+                        href={getChannelUrl(ch.subdomain)}
+                        className="flex items-center gap-2 hover:opacity-70"
+                      >
+                        {ch.logoUrl ? (
+                          <img src={ch.logoUrl} alt={ch.name} className="h-4 w-auto" />
+                        ) : null}
+                        <span>{ch.displayName || ch.name}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
+            ) : (
+              <div>
+                <h4 className="font-bold text-gray-900 mb-3 md:mb-4">SNS</h4>
+                <div className="flex gap-3 md:gap-4">
+                  <a href="#" className="w-8 h-8 md:w-10 md:h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
+                    <span className="text-gray-600 text-sm md:text-base">f</span>
+                  </a>
+                  <a href="#" className="w-8 h-8 md:w-10 md:h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
+                    <span className="text-gray-600 text-sm md:text-base">in</span>
+                  </a>
+                  <a href="#" className="w-8 h-8 md:w-10 md:h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
+                    <span className="text-gray-600 text-sm md:text-base">yt</span>
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
           <div className="mt-6 md:mt-8 pt-6 md:pt-8 border-t border-gray-200 text-center text-xs md:text-sm text-gray-500">
-            <p>ABC마켓 | 대표: 홍길동 | 사업자등록번호: 123-45-67890</p>
-            <p className="mt-2">Copyright &copy; 2024 ABC마켓. All rights reserved.</p>
+            {footerText ? (
+              <p dangerouslySetInnerHTML={{ __html: footerText }} />
+            ) : (
+              <>
+                <p>{channelName} | 대표: 홍길동 | 사업자등록번호: 123-45-67890</p>
+                <p className="mt-2">Copyright &copy; 2024 {channelName}. All rights reserved.</p>
+              </>
+            )}
           </div>
         </div>
       </footer>

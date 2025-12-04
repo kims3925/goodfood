@@ -4,8 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import prisma from '@bandauto/db'
-import { ChannelKind, CustomerOrderStatus, TossPaymentMethod, TossPaymentStatus } from '@bandauto/db'
+import { CustomerOrderStatus, TossPaymentMethod, TossPaymentStatus } from '@bandauto/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
 
@@ -46,6 +47,13 @@ function getDepositDeadline(): Date {
   deadline.setDate(deadline.getDate() + 3)
   deadline.setHours(23, 59, 59, 999)
   return deadline
+}
+
+// 요청 헤더에서 채널 ID 가져오기
+async function getChannelIdFromHeaders(): Promise<number | null> {
+  const headersList = await headers()
+  const channelId = headersList.get('x-channel-id')
+  return channelId ? parseInt(channelId) : null
 }
 
 /**
@@ -102,9 +110,46 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // 서브도메인 채널 ID 가져오기 (헤더에서)
+    const channelId = await getChannelIdFromHeaders()
+    if (!channelId) {
+      return NextResponse.json(
+        { success: false, error: '채널 정보를 찾을 수 없습니다' },
+        { status: 400 }
+      )
+    }
+
+    // 채널 계좌정보 조회
+    const channel = await prisma.channel.findFirst({
+      where: {
+        id: channelId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        bankName: true,
+        bankAccount: true,
+        accountHolder: true,
+      },
+    })
+
+    if (!channel) {
+      return NextResponse.json(
+        { success: false, error: '채널을 찾을 수 없습니다' },
+        { status: 404 }
+      )
+    }
+
+    if (!channel.bankName || !channel.bankAccount || !channel.accountHolder) {
+      return NextResponse.json(
+        { success: false, error: '채널에 입금정보가 등록되어 있지 않습니다. 관리자에게 문의해주세요.' },
+        { status: 400 }
+      )
+    }
+
     // 주문 아이템 검증 및 금액 계산
     let orderItems: any[] = []
-    let channelId: number | null = null
 
     if (fromCart) {
       // 장바구니에서 주문
@@ -122,7 +167,6 @@ export async function POST(req: NextRequest) {
                     product: {
                       include: { variants: { take: 1 } },
                     },
-                    channel: true,
                   },
                 },
                 variant: true,
@@ -141,7 +185,6 @@ export async function POST(req: NextRequest) {
                     product: {
                       include: { variants: { take: 1 } },
                     },
-                    channel: true,
                   },
                 },
                 variant: true,
@@ -157,9 +200,6 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         )
       }
-
-      // 첫 번째 상품의 채널 ID 가져오기
-      channelId = cart.items[0]?.publishedProduct?.channelId || null
 
       orderItems = cart.items.map((item) => {
         const publishedProduct = item.publishedProduct
@@ -196,7 +236,6 @@ export async function POST(req: NextRequest) {
             product: {
               include: { variants: { take: 1 } },
             },
-            channel: true,
           },
         })
 
@@ -205,11 +244,6 @@ export async function POST(req: NextRequest) {
             { success: false, error: `상품을 찾을 수 없거나 판매 중인 상품이 아닙니다` },
             { status: 404 }
           )
-        }
-
-        // 첫 번째 상품의 채널 ID
-        if (!channelId) {
-          channelId = publishedProduct.channelId
         }
 
         let variant = null
@@ -233,43 +267,6 @@ export async function POST(req: NextRequest) {
           unitPrice: Number(unitPrice),
         })
       }
-    }
-
-    // 채널(소매밴드) 입금정보 조회
-    if (!channelId) {
-      return NextResponse.json(
-        { success: false, error: '상품의 채널 정보를 찾을 수 없습니다' },
-        { status: 400 }
-      )
-    }
-
-    const channel = await prisma.channel.findFirst({
-      where: {
-        id: channelId,
-        kind: ChannelKind.RETAIL,
-        isActive: true,
-      },
-      select: {
-        id: true,
-        name: true,
-        bankName: true,
-        bankAccount: true,
-        accountHolder: true,
-      },
-    })
-
-    if (!channel) {
-      return NextResponse.json(
-        { success: false, error: '소매 채널을 찾을 수 없습니다' },
-        { status: 404 }
-      )
-    }
-
-    if (!channel.bankName || !channel.bankAccount || !channel.accountHolder) {
-      return NextResponse.json(
-        { success: false, error: '채널에 입금정보가 등록되어 있지 않습니다. 관리자에게 문의해주세요.' },
-        { status: 400 }
-      )
     }
 
     // 금액 계산

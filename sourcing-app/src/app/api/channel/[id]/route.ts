@@ -8,6 +8,7 @@ export async function GET(
 ) {
   try {
     const id = parseInt(params.id)
+    console.log('[Channel API] GET 요청 - ID:', id)
 
     if (isNaN(id)) {
       return NextResponse.json(
@@ -17,6 +18,7 @@ export async function GET(
     }
 
     const channel = await channelService.getById(id)
+    console.log('[Channel API] 조회 결과:', channel ? '성공' : '채널 없음')
 
     if (!channel) {
       return NextResponse.json(
@@ -27,7 +29,7 @@ export async function GET(
 
     return NextResponse.json({ success: true, data: channel })
   } catch (error) {
-    console.error('채널 조회 실패:', error)
+    console.error('[Channel API] 채널 조회 실패:', error)
     return NextResponse.json(
       { success: false, error: '채널 조회에 실패했습니다.' },
       { status: 500 }
@@ -51,7 +53,24 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, isActive, coverUrl, accountHolder, bankAccount, bankName } = body
+    const {
+      name,
+      isActive,
+      coverUrl,
+      accountHolder,
+      bankAccount,
+      bankName,
+      // 서브도메인 쇼핑몰 필드
+      subdomain,
+      displayName,
+      enableToss,
+      enableBankTransfer,
+      freeShippingAmount,
+      defaultShippingFee,
+      contactPhone,
+      contactEmail,
+      theme,
+    } = body
 
     const channel = await channelService.update(id, {
       name,
@@ -60,6 +79,16 @@ export async function PUT(
       accountHolder,
       bankAccount,
       bankName,
+      // 서브도메인 쇼핑몰 필드
+      subdomain,
+      displayName,
+      enableToss,
+      enableBankTransfer,
+      freeShippingAmount,
+      defaultShippingFee,
+      contactPhone,
+      contactEmail,
+      theme,
     })
 
     return NextResponse.json({ success: true, data: channel })

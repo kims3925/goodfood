@@ -156,7 +156,64 @@ async function handleOAuthSignIn(
   }
 }
 
+// 쿠키 도메인 설정 (서브도메인 간 세션 공유)
+function getCookieDomain(): string | undefined {
+  // 환경변수에서 명시적으로 설정된 경우 사용
+  if (process.env.COOKIE_DOMAIN) {
+    return process.env.COOKIE_DOMAIN
+  }
+
+  // 로컬 개발 환경에서 lvh.me 사용 시 서브도메인 간 세션 공유
+  if (process.env.NODE_ENV !== 'production') {
+    // lvh.me를 사용하는 경우 .lvh.me 도메인 설정
+    return '.lvh.me'
+  }
+
+  // 프로덕션: 환경변수에서 루트 도메인 가져오기 (예: .shop.com)
+  return undefined
+}
+
 export const authOptions: NextAuthOptions = {
+  // 서브도메인 간 세션 공유를 위한 쿠키 설정
+  cookies: {
+    sessionToken: {
+      name:
+        process.env.NODE_ENV === 'production'
+          ? '__Secure-next-auth.session-token'
+          : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        domain: getCookieDomain(),
+      },
+    },
+    callbackUrl: {
+      name:
+        process.env.NODE_ENV === 'production'
+          ? '__Secure-next-auth.callback-url'
+          : 'next-auth.callback-url',
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        domain: getCookieDomain(),
+      },
+    },
+    csrfToken: {
+      name:
+        process.env.NODE_ENV === 'production'
+          ? '__Host-next-auth.csrf-token'
+          : 'next-auth.csrf-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
   providers: [
     KakaoProvider({
       clientId: process.env.KAKAO_CLIENT_ID!,

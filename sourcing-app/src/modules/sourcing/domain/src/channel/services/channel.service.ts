@@ -92,6 +92,7 @@ export class ChannelService {
       accountHolder: data.accountHolder || null,
       bankAccount: data.bankAccount || null,
       bankName: data.bankName || null,
+      subdomain: data.subdomain || null,
     })
   }
 
@@ -113,6 +114,12 @@ export class ChannelService {
     const existing = await channelRepository.findById(id)
     if (!existing) {
       throw new Error('채널을 찾을 수 없습니다.')
+    }
+
+    // RETAIL 채널인 경우, 삭제 전에 먼저 isActive를 false로 설정
+    // 이렇게 하면 e-commerce-app에서 캐시된 데이터가 있어도 즉시 접속 차단됨
+    if (existing.kind === ChannelKind.RETAIL && existing.isActive) {
+      await channelRepository.update(id, { isActive: false })
     }
 
     // 채널에 연결된 PublishedProduct 조회
@@ -156,7 +163,38 @@ export class ChannelService {
       await deleteChannelImageFile(existing.coverUrl)
     }
 
+    // e-commerce-app 채널 캐시 무효화 (RETAIL 채널만, subdomain이 있는 경우)
+    if (existing.kind === ChannelKind.RETAIL && existing.subdomain) {
+      await this.invalidateEcommerceChannelCache(existing.subdomain)
+    }
+
     return channelRepository.delete(id)
+  }
+
+  // e-commerce-app 채널 캐시 무효화
+  private async invalidateEcommerceChannelCache(subdomain: string) {
+    try {
+      const ecommerceUrl = process.env.ECOMMERCE_APP_URL || 'http://localhost:3000'
+      const internalKey = process.env.INTERNAL_API_KEY || 'dev-internal-key'
+
+      const res = await fetch(`${ecommerceUrl}/api/internal/channel/invalidate-cache`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-key': internalKey,
+        },
+        body: JSON.stringify({ subdomain }),
+      })
+
+      if (res.ok) {
+        console.log(`[Channel] e-commerce-app 캐시 무효화 성공: ${subdomain}`)
+      } else {
+        console.warn(`[Channel] e-commerce-app 캐시 무효화 실패 (HTTP ${res.status}): ${subdomain}`)
+      }
+    } catch (error) {
+      // 캐시 무효화 실패해도 삭제는 진행 (1분 후 자동 만료됨)
+      console.warn(`[Channel] e-commerce-app 캐시 무효화 요청 실패: ${subdomain}`, error)
+    }
   }
 
   // 자동화 설정에서 채널 ID 제거

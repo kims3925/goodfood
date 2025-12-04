@@ -1,6 +1,10 @@
 /**
  * Shop Sections API
  * 채널별 상품 섹션 조회
+ *
+ * 멀티채널 지원:
+ * - x-channel-id 헤더가 있으면 해당 채널 상품만 반환
+ * - 없으면 기존처럼 전체 소매채널 섹션 반환
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -9,8 +13,18 @@ import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
-    const limit = parseInt(searchParams.get('limit') || '8') // 각 섹션당 상품 개수
+    const limit = parseInt(searchParams.get('limit') || '20') // 상품 개수 (채널별 상품은 더 많이)
 
+    // 현재 채널 확인 (middleware에서 설정)
+    const channelIdHeader = req.headers.get('x-channel-id')
+    const currentChannelId = channelIdHeader ? parseInt(channelIdHeader) : null
+
+    // 특정 채널이 지정된 경우: 해당 채널 상품만 반환
+    if (currentChannelId) {
+      return await getChannelProducts(currentChannelId, limit)
+    }
+
+    // 채널 미지정: 기존 로직 (전체 소매채널 섹션)
     // 1. 활성화된 소매채널 목록 조회
     const retailChannels = await prisma.channel.findMany({
       where: {
@@ -204,4 +218,103 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+/**
+ * 특정 채널의 상품만 조회
+ * 멀티채널 쇼핑몰에서 현재 접속 채널의 상품 반환
+ */
+async function getChannelProducts(channelId: number, limit: number) {
+  // 채널 정보 조회
+  const channel = await prisma.channel.findUnique({
+    where: { id: channelId },
+  })
+
+  if (!channel || !channel.isActive) {
+    return NextResponse.json({
+      success: true,
+      channelProducts: [],
+      channel: null,
+    })
+  }
+
+  // 해당 채널에 발행된 상품 조회
+  const publishedProducts = await prisma.publishedProduct.findMany({
+    where: {
+      channelId: channelId,
+    },
+    include: {
+      product: {
+        include: {
+          variants: {
+            orderBy: { id: 'asc' },
+            take: 1,
+          },
+          collectedProduct: {
+            include: {
+              post: {
+                include: {
+                  images: {
+                    orderBy: { sortOrder: 'asc' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  })
+
+  // 상품 포맷팅
+  const products = publishedProducts
+    .filter((pp) => pp.product)
+    .map((pp) => {
+      const product = pp.product
+      const mainVariant = product.variants[0]
+      const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
+
+      const salePrice = mainVariant?.price || 0
+      const originalPrice = salePrice
+      const discount = 0
+
+      return {
+        id: product.id.toString(),
+        publishedProductId: pp.id.toString(),
+        title: product.name,
+        description: product.description,
+        originalPrice,
+        salePrice,
+        discount,
+        images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
+        category: product.categoryId || '',
+        rating: 4.5,
+        reviews: 100,
+      }
+    })
+
+  return NextResponse.json({
+    success: true,
+    channelProducts: products,
+    channel: {
+      id: channel.id,
+      name: channel.name,
+      displayName: channel.displayName,
+      coverUrl: channel.coverUrl,
+    },
+    // 기존 호환성을 위해 retailSections도 포함
+    retailSections: products.length > 0
+      ? [
+          {
+            id: channel.id,
+            name: channel.name,
+            coverUrl: channel.coverUrl,
+            platform: channel.platform,
+            products,
+          },
+        ]
+      : [],
+  })
 }

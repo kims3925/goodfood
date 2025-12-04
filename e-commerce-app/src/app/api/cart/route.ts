@@ -1,6 +1,6 @@
 /**
  * Cart API
- * 세션 + 사용자 기반 장바구니 CRUD
+ * 세션 + 사용자 + 채널 기반 장바구니 CRUD
  * CartService 사용
  */
 
@@ -15,6 +15,15 @@ const SESSION_EXPIRY_DAYS = 7
 
 function getSessionId(req: NextRequest): string | null {
   return req.cookies.get('cart_session')?.value || null
+}
+
+function getChannelId(req: NextRequest): number | null {
+  const channelIdHeader = req.headers.get('x-channel-id')
+  if (channelIdHeader) {
+    const parsed = parseInt(channelIdHeader)
+    return isNaN(parsed) ? null : parsed
+  }
+  return null
 }
 
 function createSessionResponse(response: NextResponse, sessionId: string): NextResponse {
@@ -47,17 +56,19 @@ export async function GET(req: NextRequest) {
   try {
     let sessionId = getSessionId(req)
     const userId = await getCurrentUserId()
+    const channelId = getChannelId(req)
 
     if (!sessionId) {
       sessionId = uuidv4()
     }
 
-    const result = await cartService.getCart(sessionId, userId)
+    const result = await cartService.getCart(sessionId, userId, channelId)
 
     const response = NextResponse.json({
       success: true,
       cart: result.cart,
       isLoggedIn: !!userId,
+      channelId,
     })
 
     if ((!getSessionId(req) || result.newSessionId) && sessionId) {
@@ -93,6 +104,7 @@ export async function POST(req: NextRequest) {
     let sessionId = getSessionId(req) || bodySessionId
     const isNewSession = !getSessionId(req)
     const userId = await getCurrentUserId()
+    const channelId = getChannelId(req)
 
     if (!sessionId) {
       sessionId = uuidv4()
@@ -105,7 +117,8 @@ export async function POST(req: NextRequest) {
         variantId: variantId ? parseInt(variantId) : undefined,
         quantity: parseInt(quantity),
       },
-      userId
+      userId,
+      channelId
     )
 
     const response = NextResponse.json({
@@ -137,6 +150,7 @@ export async function PUT(req: NextRequest) {
   try {
     const sessionId = getSessionId(req)
     const userId = await getCurrentUserId()
+    const channelId = getChannelId(req)
 
     if (!sessionId && !userId) {
       return NextResponse.json(
@@ -159,7 +173,8 @@ export async function PUT(req: NextRequest) {
       sessionId || '',
       parseInt(itemId),
       parseInt(quantity),
-      userId
+      userId,
+      channelId
     )
 
     return NextResponse.json({
@@ -183,6 +198,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const sessionId = getSessionId(req)
     const userId = await getCurrentUserId()
+    const channelId = getChannelId(req)
 
     if (!sessionId && !userId) {
       return NextResponse.json({
@@ -191,7 +207,7 @@ export async function DELETE(req: NextRequest) {
       })
     }
 
-    await cartService.clearCart(sessionId, userId)
+    await cartService.clearCart(sessionId, userId, channelId)
 
     return NextResponse.json({
       success: true,
