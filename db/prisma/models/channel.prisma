@@ -15,8 +15,11 @@ model Channel {
   updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   apiConfig         SourcingApiConfig? @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  collectedPosts    CollectedPost[]
-  publishedProducts PublishedProduct[]
+  collectedPosts     CollectedPost[]
+  publishedProducts  PublishedProduct[]
+  referredOrders     Order[]            @relation("ReferrerOrders") // 해당 채널을 통해 유입된 주문
+  referredCartItems  CartItem[]         @relation("CartItemReferrer") // 해당 채널을 통해 담긴 장바구니 상품
+  referredOrderItems OrderItem[]        @relation("OrderItemReferrer") // 해당 채널을 통해 주문된 상품 (정산용)
 
   @@unique([userId, channelKey])
   @@index([userId])

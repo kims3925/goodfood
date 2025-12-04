@@ -1,6 +1,7 @@
 # 쇼핑몰 Referrer 기반 정산 시스템
 작성일 : 2025.12.4
 중요도 : 높음
+
 ## 개요
 
 쇼핑몰의 상품 구조를 **채널별 분리 방식**에서 **통합 상품 + Referrer 기반 정산** 방식으로 변경합니다.
@@ -95,26 +96,148 @@ model PublishedProduct {
 }
 ```
 
-### 2. Order 테이블에 Referrer 추가
+### 2. CartItem 테이블에 Referrer 추가 (상품별 추적)
+
+```prisma
+model CartItem {
+  id                  Int       @id @default(autoincrement())
+  cartId              Int       @map("cart_id")
+  publishedProductId  Int       @map("published_product_id")
+  quantity            Int
+  referrerChannelId   Int?      @map("referrer_channel_id")  // 장바구니 담을 때의 유입 경로
+  // ... 기존 필드들
+
+  referrerChannel     Channel?  @relation("CartItemReferrer", fields: [referrerChannelId], references: [id])
+}
+```
+
+### 3. Order 테이블에 Referrer 추가 (주문 전체 대표 referrer)
 
 ```prisma
 model Order {
   id                 Int                 @id @default(autoincrement())
   userId             Int                 @map("user_id")
-  referrerChannelId  Int?                @map("referrer_channel_id")  // 유입 경로 채널
+  referrerChannelId  Int?                @map("referrer_channel_id")  // 주문 전체 대표 유입 경로
   // ... 기존 필드들
 
   referrerChannel    Channel?            @relation("ReferrerOrders", fields: [referrerChannelId], references: [id])
 }
 ```
 
-### 3. Channel 테이블 관계 추가
+### 4. OrderItem 테이블에 Referrer 추가 (상품별 정산용)
+
+```prisma
+model OrderItem {
+  id                  Int       @id @default(autoincrement())
+  orderId             Int       @map("order_id")
+  publishedProductId  Int       @map("published_product_id")
+  quantity            Int
+  totalPrice          Int       @map("total_price")
+  referrerChannelId   Int?      @map("referrer_channel_id")  // 상품별 유입 경로 (정산용)
+  // ... 기존 필드들
+
+  referrerChannel     Channel?  @relation("OrderItemReferrer", fields: [referrerChannelId], references: [id])
+}
+```
+
+### 5. Channel 테이블 관계 추가
 
 ```prisma
 model Channel {
   // ... 기존 필드들
-  referredOrders    Order[]             @relation("ReferrerOrders")  // 해당 채널을 통해 유입된 주문
+  referredOrders      Order[]      @relation("ReferrerOrders")
+  referredCartItems   CartItem[]   @relation("CartItemReferrer")
+  referredOrderItems  OrderItem[]  @relation("OrderItemReferrer")
 }
+```
+
+---
+
+## Attribution 정책 (정산 귀속 규칙)
+
+### 채택 방식: Last Click Attribution (7일)
+
+| 정책 항목 | 적용 값 | 설명 |
+|----------|--------|------|
+| Attribution 모델 | **Last Click** | 마지막으로 클릭한 채널에 정산 |
+| 유효 기간 | **7일** | 쿠키 만료 기간 |
+| 저장 위치 | **쿠키 + 장바구니** | 쿠키 차단 시에도 추적 가능 |
+
+### Attribution 충돌 시나리오
+
+| 시나리오 | 결과 | 이유 |
+|----------|------|------|
+| A밴드 클릭 → 이탈 → B밴드 클릭 → 구매 | **B에 정산** | Last Click |
+| A밴드 클릭 → 7일 후 직접 접속 → 구매 | **자체 수익** | 쿠키 만료 |
+| A밴드로 상품1 담기 → B밴드로 상품2 담기 → 동시 주문 | **상품1→A, 상품2→B** | 상품별 정산 |
+| 쿠키 차단 상태에서 A밴드 클릭 → 장바구니 담기 → 구매 | **A에 정산** | CartItem에 저장됨 |
+
+### 정책 선택 이유
+
+1. **Last Click**: 분쟁 최소화 - "마지막에 클릭한 곳"이라는 명확한 기준
+2. **7일**: 합리적 기간 - 너무 짧으면 정산 누락, 너무 길면 관련 없는 채널에 정산
+3. **상품별 추적**: 공정한 정산 - 여러 채널 상품 동시 구매 시 각각 정산
+
+---
+
+## Referrer 보안
+
+### 1. Referrer 조작 방지
+
+**문제:** 악의적 사용자가 URL에 `?ref=자기채널ID`를 직접 입력할 수 있음
+
+**해결책 A: 유효성 검증 (권장)**
+```typescript
+// 장바구니 담기 시 검증
+async function addToCart(productId: number, referrerChannelId: number | null) {
+  if (referrerChannelId) {
+    // 해당 채널에 해당 상품이 실제로 발행되었는지 확인
+    const publishRecord = await prisma.publishedProduct.findFirst({
+      where: {
+        productId,
+        channelId: referrerChannelId,
+        status: 'PUBLISHED'
+      }
+    });
+
+    if (!publishRecord) {
+      // 유효하지 않은 referrer → 무시
+      referrerChannelId = null;
+    }
+  }
+  // ... 장바구니 추가 로직
+}
+```
+
+**해결책 B: 서명된 토큰 (고도화 시)**
+```typescript
+// 발행 시 서명된 토큰 생성
+const token = jwt.sign(
+  { channelId: 5, productId: 123, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 },
+  SECRET_KEY
+);
+// URL: ?ref=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+// 검증 시
+try {
+  const decoded = jwt.verify(token, SECRET_KEY);
+  referrerChannelId = decoded.channelId;
+} catch {
+  referrerChannelId = null;
+}
+```
+
+### 2. 쿠키 보안 설정
+
+```typescript
+// 쿠키 설정 시 보안 옵션
+setCookie('referrer', channelId, {
+  maxAge: 7 * 24 * 60 * 60,  // 7일
+  httpOnly: false,           // 클라이언트에서 읽어야 함
+  secure: true,              // HTTPS만
+  sameSite: 'lax',           // CSRF 방지
+  path: '/'
+});
 ```
 
 ---
@@ -155,62 +278,119 @@ model Channel {
 /product/[productId]?ref=[channelId]  // ref는 유입 경로용
 ```
 
-### 3. 장바구니/주문 API
-
-장바구니 추가 및 주문 시 `referrerChannelId` 전달:
+### 3. 장바구니 API (상품별 referrer 저장)
 
 ```typescript
 // POST /api/cart
 {
   publishedProductId: 123,
   quantity: 1,
-  referrerChannelId: 5  // 유입 경로 (optional)
+  referrerChannelId: 5  // 이 상품을 담을 때의 유입 경로
 }
 
+// GET /api/cart 응답
+{
+  items: [
+    {
+      id: 1,
+      publishedProductId: 123,
+      quantity: 1,
+      referrerChannelId: 5  // 상품별로 저장됨
+    },
+    {
+      id: 2,
+      publishedProductId: 456,
+      quantity: 2,
+      referrerChannelId: 8  // 다른 채널
+    }
+  ]
+}
+```
+
+### 4. 주문 API (상품별 referrer 전달)
+
+```typescript
 // POST /api/orders
 {
-  items: [...],
-  referrerChannelId: 5  // 세션에서 가져오거나 쿠키에서 추적
+  items: [
+    { cartItemId: 1 },  // CartItem의 referrerChannelId가 OrderItem으로 복사됨
+    { cartItemId: 2 }
+  ]
 }
+
+// 서버 처리
+items.forEach(item => {
+  const cartItem = await prisma.cartItem.findUnique({ where: { id: item.cartItemId } });
+  await prisma.orderItem.create({
+    data: {
+      orderId,
+      publishedProductId: cartItem.publishedProductId,
+      quantity: cartItem.quantity,
+      referrerChannelId: cartItem.referrerChannelId  // 상품별 referrer 복사
+    }
+  });
+});
 ```
 
 ---
 
-## Referrer 추적 방식
+## Referrer 추적 구현
 
 ### 1. URL 파라미터 방식
 ```
 https://shop.example.com/product/123?ref=5
 ```
 - 소매밴드 게시물에 `?ref=channelId` 파라미터 포함
-- 쇼핑몰에서 해당 파라미터를 세션/쿠키에 저장
+- 쇼핑몰에서 해당 파라미터를 쿠키에 저장
 
-### 2. 세션 저장
+### 2. 쿠키 저장 (7일 유지)
 ```typescript
-// 상품 페이지 접근 시
-if (searchParams.ref) {
-  sessionStorage.setItem('referrerChannelId', searchParams.ref)
-  // 또는 쿠키에 저장 (서버 사이드 추적용)
-}
+// 상품 페이지 접근 시 (클라이언트)
+useEffect(() => {
+  const ref = searchParams.get('ref');
+  if (ref) {
+    // Last Click: 항상 최신 referrer로 덮어씀
+    setCookie('referrer', ref, {
+      maxAge: 7 * 24 * 60 * 60,  // 7일
+      path: '/'
+    });
+  }
+}, [searchParams]);
 ```
 
-### 3. 주문 시 적용
+### 3. 장바구니 담기 시 저장
 ```typescript
-// 주문 생성 시
-const referrerChannelId = sessionStorage.getItem('referrerChannelId')
-// → Order 테이블에 저장
+// 장바구니 담기 버튼 클릭 시
+const handleAddToCart = async () => {
+  const referrerChannelId = getCookie('referrer') || null;
+
+  await fetch('/api/cart', {
+    method: 'POST',
+    body: JSON.stringify({
+      publishedProductId,
+      quantity,
+      referrerChannelId  // 상품별로 저장
+    })
+  });
+};
 ```
 
-### 4. Referrer 유효 기간
-- 옵션 1: 세션 동안만 유지
-- 옵션 2: 쿠키로 N일간 유지 (예: 7일)
-- 옵션 3: 마지막 클릭 기준 (Last Click Attribution)
+### 4. 주문 생성 시 복사
+```typescript
+// 주문 생성 API
+const orderItems = cartItems.map(cartItem => ({
+  publishedProductId: cartItem.publishedProductId,
+  quantity: cartItem.quantity,
+  price: cartItem.price,
+  referrerChannelId: cartItem.referrerChannelId  // CartItem → OrderItem 복사
+}));
+```
 
 ---
 
 ## 정산 로직 변경
 
-### 현재 정산
+### 현재 정산 (채널별 PublishedProduct 기준)
 ```sql
 -- 채널별 판매 금액 집계
 SELECT
@@ -221,26 +401,42 @@ JOIN published_product pp ON oi.published_product_id = pp.id
 GROUP BY pp.channel_id
 ```
 
-### 변경 후 정산
+### 변경 후 정산 (OrderItem의 referrer 기준)
 ```sql
--- Referrer 채널별 판매 금액 집계
+-- Referrer 채널별 판매 금액 집계 (상품별 정산)
 SELECT
-  o.referrer_channel_id,
+  oi.referrer_channel_id,
   SUM(oi.total_price) as total_sales
-FROM order o
-JOIN order_item oi ON o.id = oi.order_id
-WHERE o.referrer_channel_id IS NOT NULL
-GROUP BY o.referrer_channel_id
+FROM order_item oi
+WHERE oi.referrer_channel_id IS NOT NULL
+GROUP BY oi.referrer_channel_id
 ```
 
 ### 정산 시나리오
 
 | 유입 경로 | 정산 대상 | 비고 |
 |----------|----------|------|
-| A밴드 게시물 클릭 | A업체에 정산 | referrer_channel_id = A |
-| B밴드 게시물 클릭 | B업체에 정산 | referrer_channel_id = B |
-| 직접 접근 | 자체 수익 | referrer_channel_id = NULL |
-| 쇼핑몰 내 검색 | 최초 유입 기준 | 세션/쿠키 기반 |
+| A밴드 게시물 클릭 → 상품1 구매 | A업체에 정산 | OrderItem.referrer_channel_id = A |
+| B밴드 게시물 클릭 → 상품2 구매 | B업체에 정산 | OrderItem.referrer_channel_id = B |
+| 직접 접근 → 구매 | 자체 수익 | referrer_channel_id = NULL |
+| A밴드로 상품1, B밴드로 상품2 동시 주문 | 상품1→A, 상품2→B | 상품별로 분리 정산 |
+
+### 정산 리포트 쿼리 예시
+```sql
+-- 기간별 채널 정산 리포트
+SELECT
+  c.name as channel_name,
+  DATE(o.created_at) as order_date,
+  COUNT(DISTINCT o.id) as order_count,
+  SUM(oi.quantity) as total_quantity,
+  SUM(oi.total_price) as total_sales
+FROM order_item oi
+JOIN "order" o ON oi.order_id = o.id
+LEFT JOIN channel c ON oi.referrer_channel_id = c.id
+WHERE o.created_at BETWEEN '2025-01-01' AND '2025-01-31'
+GROUP BY c.name, DATE(o.created_at)
+ORDER BY order_date, total_sales DESC
+```
 
 ---
 
@@ -273,8 +469,10 @@ GROUP BY o.referrer_channel_id
 ## 마이그레이션 계획
 
 ### Phase 1: 스키마 변경
-1. `Order` 테이블에 `referrer_channel_id` 컬럼 추가
-2. `PublishedProduct` 테이블에 `is_shop_product` 컬럼 추가
+1. `CartItem` 테이블에 `referrer_channel_id` 컬럼 추가
+2. `Order` 테이블에 `referrer_channel_id` 컬럼 추가
+3. `OrderItem` 테이블에 `referrer_channel_id` 컬럼 추가
+4. `PublishedProduct` 테이블에 `is_shop_product` 컬럼 추가
 
 ### Phase 2: 발행 로직 변경
 1. 쇼핑몰 발행 시 `isShopProduct = true`, `channelId = null`로 생성
@@ -283,11 +481,13 @@ GROUP BY o.referrer_channel_id
 ### Phase 3: 쇼핑몰 UI 변경
 1. 채널별 섹션 제거
 2. 통합 상품 목록으로 변경
-3. Referrer 파라미터 처리 로직 추가
+3. Referrer 파라미터 처리 로직 추가 (쿠키 저장)
+4. 장바구니 담기 시 referrer 전달 로직 추가
 
 ### Phase 4: 정산 로직 변경
-1. Referrer 기반 정산 쿼리로 변경
+1. OrderItem 레벨 Referrer 기반 정산 쿼리로 변경
 2. 정산 관리 UI 수정
+3. 정산 리포트에 Referrer 출처 표시 추가
 
 ### Phase 5: 데이터 마이그레이션
 1. 기존 채널별 PublishedProduct → 통합 쇼핑몰 상품으로 변환
@@ -301,6 +501,7 @@ GROUP BY o.referrer_channel_id
 
 **DB 스키마:**
 - `db/prisma/models/order.prisma`
+- `db/prisma/models/cart.prisma`
 - `db/prisma/models/publish.prisma`
 - `db/prisma/models/channel.prisma`
 
@@ -323,7 +524,7 @@ GROUP BY o.referrer_channel_id
 ---
 
 ## 작성일
-- 2024-12-04
+- 2025-12-04
 
 ## 상태
 - [ ] Phase 1: 스키마 변경
