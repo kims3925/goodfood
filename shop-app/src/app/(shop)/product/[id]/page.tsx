@@ -11,7 +11,7 @@ export default function ProductDetailPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const { data: session } = useSession()
-  const { showNotification } = useCartNotification()
+  const { showNotification, refreshCartCount } = useCartNotification()
   const bandId = searchParams.get('bandId')
   const [product, setProduct] = useState<any>(null)
   const [quantity, setQuantity] = useState(1)
@@ -257,6 +257,9 @@ export default function ProductDetailPage() {
       const data = await response.json()
 
       if (data.success) {
+        // 장바구니 수량 업데이트
+        await refreshCartCount()
+
         // 알림 버블 표시
         showNotification({
           title: product.title,

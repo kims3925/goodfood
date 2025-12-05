@@ -31,6 +31,7 @@ const Decimal = Prisma.Decimal
 export interface OrderPrepareData {
   orderId: string
   userId: number
+  shopId?: number | null
   fromCart: boolean
   items?: { publishedProductId: number; variantId?: number; quantity: number }[]
   customerInfo: {
@@ -311,7 +312,7 @@ export class PaymentService {
 
     if (prepareData.fromCart) {
       // 장바구니에서 주문 아이템 조회
-      const cart = await this.cartService.getCartByUserId(prepareData.userId)
+      const cart = await this.cartService.getCartByUserId(prepareData.userId, prepareData.shopId ?? null)
 
       if (!cart || cart.items.length === 0) {
         throw new BusinessLogicError('장바구니가 비어있습니다')
@@ -385,6 +386,7 @@ export class PaymentService {
     const order = await prisma.order.create({
       data: {
         userId: prepareData.userId,
+        shopId: prepareData.shopId ?? null,
         orderNumber: prepareData.orderId,
         status: 'PENDING',
         recipientName: prepareData.shippingAddress.recipientName,
@@ -414,6 +416,7 @@ export class PaymentService {
         payment: true,
         user: true,
         items: true,
+        shop: true,
       },
     })
 

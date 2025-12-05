@@ -200,15 +200,9 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
       ],
     },
     {
-      label: '정산 관리',
+      label: '정산 목록',
+      href: '/settlement/list',
       icon: <Calculator size={20} />,
-      children: [
-        {
-          label: '정산 목록',
-          href: '/settlement/list',
-          icon: <Calculator size={16} />,
-        },
-      ],
     },
     {
       label: '고객 문의',
