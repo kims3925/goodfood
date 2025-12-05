@@ -10,6 +10,7 @@ import prisma, { AiProvider } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { transformPostToProduct } from '@/modules/transformation'
+import { settingsService } from '@/modules/config/domain/src/settings'
 import {
   TransformConfig,
   TransformResult,
@@ -21,6 +22,54 @@ import {
 const MAX_CONSECUTIVE_FAILURES = 5
 // 전체 파이프라인 타임아웃 (10분)
 const PIPELINE_TIMEOUT_MS = 10 * 60 * 1000
+// 재시도 설정
+const MAX_RETRIES = 3
+const BASE_DELAY_MS = 1000 // 1초
+
+// =============================================
+// RETRY UTILITY
+// =============================================
+
+/**
+ * 지수 백오프 재시도 래퍼
+ * @param fn 실행할 비동기 함수
+ * @param maxRetries 최대 재시도 횟수
+ * @param baseDelayMs 기본 대기 시간 (밀리초)
+ * @returns 함수 실행 결과
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = MAX_RETRIES,
+  baseDelayMs: number = BASE_DELAY_MS
+): Promise<T> {
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (error: any) {
+      lastError = error
+      const isLastAttempt = attempt === maxRetries
+
+      // 재시도하지 않을 에러 타입 확인
+      const isNonRetryableError =
+        error.message?.includes('API key') ||
+        error.message?.includes('Invalid') ||
+        error.message?.includes('필수')
+
+      if (isNonRetryableError || isLastAttempt) {
+        throw error
+      }
+
+      // 지수 백오프 대기 (1s, 2s, 4s, ...)
+      const delay = baseDelayMs * Math.pow(2, attempt)
+      console.log(`[Transform] 재시도 ${attempt + 1}/${maxRetries} (${delay}ms 후): ${error.message}`)
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
+  }
+
+  throw lastError || new Error('Max retries exceeded')
+}
 
 // =============================================
 // TRANSFORM PIPELINE
@@ -70,6 +119,9 @@ export async function runTransformPipeline(
     whereClause.id = { in: config.postIds }
   }
 
+  // 배치 크기 설정 (기본값: 50)
+  const batchSize = config.batchSize ?? 50
+
   const posts = await prisma.collectedPost.findMany({
     where: whereClause,
     include: {
@@ -77,7 +129,7 @@ export async function runTransformPipeline(
         orderBy: { sortOrder: 'asc' },
       },
     },
-    take: 50, // 배치당 최대 50개
+    take: batchSize,
   })
 
   if (posts.length === 0) {
@@ -116,6 +168,11 @@ export async function runTransformPipeline(
     pricingPolicyContent = policy?.content || null
   }
 
+  // 커스텀 프롬프트 조회
+  const promptConfig = await settingsService.getPromptByType(userId, 'product_extraction')
+  const customPrompt = promptConfig?.prompt || undefined
+  console.log(`[Transform] Custom prompt: ${customPrompt ? '사용자 정의 프롬프트 사용' : '기본 프롬프트 사용'}`)
+
   // 각 게시물 변환
   for (const post of posts) {
     // 파이프라인 타임아웃 체크
@@ -148,16 +205,19 @@ export async function runTransformPipeline(
     try {
       console.log(`[Transform] Processing post ${post.id}: ${post.title.substring(0, 50)}...`)
 
-      // AI 변환 실행
-      const draft = await transformPostToProduct({
-        post: post as any,
-        aiProvider: config.aiProvider,
-        aiConfig: {
-          apiKey: aiConfig.apiKey,
-          model: aiConfig.model,
-        },
-        policyContent: pricingPolicyContent || undefined,
-      })
+      // AI 변환 실행 (재시도 로직 포함)
+      const draft = await withRetry(() =>
+        transformPostToProduct({
+          post: post as any,
+          aiProvider: config.aiProvider,
+          aiConfig: {
+            apiKey: aiConfig.apiKey,
+            model: aiConfig.model,
+          },
+          policyContent: pricingPolicyContent || undefined,
+          customPrompt,
+        })
+      )
 
       // CollectedProduct 생성 (수집상품)
       const collectedProduct = await prisma.collectedProduct.create({

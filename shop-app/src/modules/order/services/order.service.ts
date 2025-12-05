@@ -63,16 +63,21 @@ export interface OrderResponse {
   id: number
   orderNumber: string
   status: string
+  // 주문자 정보
   customer: {
     name: string
-    email: string
-    phone: string | null
+    phone: string
+    email: string | null
   }
-  recipientName: string
-  recipientPhone: string
-  address: string
-  postalCode: string
-  deliveryMemo: string | null
+  // 배송지 정보 (별도 테이블에서 조회)
+  shippingAddress: {
+    recipientName: string
+    recipientPhone: string
+    postalCode: string
+    address: string
+    addressDetail: string | null
+    deliveryMemo: string | null
+  } | null
   subtotalAmount: number
   shippingFee: number
   discountAmount: number
@@ -190,12 +195,19 @@ export class OrderService {
       userId,
       shopId,  // Shop 기반 주문 필터링
       orderNumber: this.generateOrderNumber(),
-      recipientName: shippingAddress.recipientName || customerInfo.name,
-      recipientPhone: shippingAddress.recipientPhone || customerInfo.phone,
-      postalCode: shippingAddress.postalCode,
-      address: shippingAddress.address,
-      addressDetail: shippingAddress.addressDetail,
-      deliveryMemo: shippingAddress.deliveryMemo,
+      // 주문자 정보
+      customerName: customerInfo.name,
+      customerPhone: customerInfo.phone,
+      customerEmail: customerInfo.email,
+      // 배송지 정보 (별도 테이블)
+      shippingAddress: {
+        recipientName: shippingAddress.recipientName || customerInfo.name,
+        recipientPhone: shippingAddress.recipientPhone || customerInfo.phone,
+        postalCode: shippingAddress.postalCode,
+        address: shippingAddress.address,
+        addressDetail: shippingAddress.addressDetail,
+        deliveryMemo: shippingAddress.deliveryMemo,
+      },
       subtotalAmount: subtotal,
       shippingFee,
       discountAmount,
@@ -213,8 +225,8 @@ export class OrderService {
           ? `${orderItems[0].productName} 외 ${orderItems.length - 1}건`
           : orderItems[0].productName,
       amount: totalAmount,
-      customerName: user.name || '고객',
-      customerEmail: user.email || '',
+      customerName: customerInfo.name || '고객',
+      customerEmail: customerInfo.email || '',
       successUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/success`,
       failUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/fail`,
     }
@@ -308,12 +320,19 @@ export class OrderService {
       userId,
       shopId,  // Shop 기반 주문 필터링
       orderNumber: this.generateOrderNumber(),
-      recipientName: shippingAddress.recipientName || customerInfo.name,
-      recipientPhone: shippingAddress.recipientPhone || customerInfo.phone,
-      postalCode: shippingAddress.postalCode,
-      address: shippingAddress.address,
-      addressDetail: shippingAddress.addressDetail,
-      deliveryMemo: shippingAddress.deliveryMemo,
+      // 주문자 정보
+      customerName: customerInfo.name,
+      customerPhone: customerInfo.phone,
+      customerEmail: customerInfo.email,
+      // 배송지 정보 (별도 테이블)
+      shippingAddress: {
+        recipientName: shippingAddress.recipientName || customerInfo.name,
+        recipientPhone: shippingAddress.recipientPhone || customerInfo.phone,
+        postalCode: shippingAddress.postalCode,
+        address: shippingAddress.address,
+        addressDetail: shippingAddress.addressDetail,
+        deliveryMemo: shippingAddress.deliveryMemo,
+      },
       subtotalAmount: subtotal,
       shippingFee,
       discountAmount,
@@ -331,8 +350,8 @@ export class OrderService {
           ? `${orderItems[0].productName} 외 ${orderItems.length - 1}건`
           : orderItems[0].productName,
       amount: totalAmount,
-      customerName: user.name || '고객',
-      customerEmail: user.email || '',
+      customerName: customerInfo.name || '고객',
+      customerEmail: customerInfo.email || '',
       successUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/success`,
       failUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/fail`,
     }
@@ -483,16 +502,23 @@ export class OrderService {
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status,
+      // 주문자 정보
       customer: {
-        name: order.user.name,
-        email: order.user.email,
-        phone: order.user.phone,
+        name: order.customerName,
+        phone: order.customerPhone,
+        email: order.customerEmail,
       },
-      recipientName: order.recipientName,
-      recipientPhone: order.recipientPhone,
-      address: `${order.address} ${order.addressDetail || ''}`.trim(),
-      postalCode: order.postalCode,
-      deliveryMemo: order.deliveryMemo,
+      // 배송지 정보 (별도 테이블)
+      shippingAddress: order.shippingAddress
+        ? {
+            recipientName: order.shippingAddress.recipientName,
+            recipientPhone: order.shippingAddress.recipientPhone,
+            postalCode: order.shippingAddress.postalCode,
+            address: order.shippingAddress.address,
+            addressDetail: order.shippingAddress.addressDetail,
+            deliveryMemo: order.shippingAddress.deliveryMemo,
+          }
+        : null,
       subtotalAmount: Number(order.subtotalAmount),
       shippingFee: Number(order.shippingFee),
       discountAmount: Number(order.discountAmount),

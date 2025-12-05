@@ -53,7 +53,7 @@ export async function createBatchContextFromUserId(userId: number): Promise<Batc
       id: true,
       email: true,
       automationConfig: {
-        select: { id: true }
+        select: { id: true, shopIds: true }
       }
     }
   })
@@ -62,10 +62,19 @@ export async function createBatchContextFromUserId(userId: number): Promise<Batc
     throw new Error(`User not found: ${userId}`)
   }
 
+  // Parse shopIds from JSON string
+  let shopIds: number[] = []
+  try {
+    shopIds = user.automationConfig?.shopIds
+      ? JSON.parse(user.automationConfig.shopIds)
+      : []
+  } catch { shopIds = [] }
+
   return {
     userId: user.id,
     email: user.email,
-    automationConfigId: user.automationConfig?.id
+    automationConfigId: user.automationConfig?.id,
+    shopIds
   }
 }
 
@@ -87,11 +96,20 @@ export async function getActiveAutomationContexts(): Promise<BatchContext[]> {
     }
   })
 
-  return configs.map(config => ({
-    userId: config.user.id,
-    email: config.user.email,
-    automationConfigId: config.id
-  }))
+  return configs.map(config => {
+    // Parse shopIds from JSON string
+    let shopIds: number[] = []
+    try {
+      shopIds = config.shopIds ? JSON.parse(config.shopIds) : []
+    } catch { shopIds = [] }
+
+    return {
+      userId: config.user.id,
+      email: config.user.email,
+      automationConfigId: config.id,
+      shopIds
+    }
+  })
 }
 
 // =============================================

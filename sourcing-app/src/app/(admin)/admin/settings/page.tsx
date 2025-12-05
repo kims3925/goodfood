@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Settings, Key, CreditCard, Bell, ChevronRight, Store, Share2, Bot } from 'lucide-react'
+import { Settings, Key, CreditCard, Bell, ChevronRight, Store, Share2, Bot, FileText } from 'lucide-react'
 
 interface SettingsItem {
   title: string
@@ -29,6 +29,12 @@ export default function SettingsPage() {
       description: 'Gemini AI 연동 설정 및 상품 분석 옵션을 관리합니다.',
       href: '/admin/settings/ai',
       icon: <Bot className="h-6 w-6 text-purple-600" />
+    },
+    {
+      title: '프롬프트 설정',
+      description: 'AI가 게시물을 상품으로 변환할 때 사용하는 프롬프트를 커스터마이징합니다.',
+      href: '/admin/settings/prompt',
+      icon: <FileText className="h-6 w-6 text-indigo-600" />
     },
     {
       title: '알림 설정',

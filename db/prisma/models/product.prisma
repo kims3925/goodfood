@@ -27,16 +27,17 @@ model Product {
 }
 
 model ProductVariant {
-  id             Int         @id @default(autoincrement())
-  productId      Int         @map("product_id")
-  optionSummary  String?     @map("option_summary") @db.VarChar(500)
-  price          Int
-  wholesalePrice Int?        @map("wholesale_price")
-  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamp(0)
-  cartItems      CartItem[]
-  orderItems     OrderItem[]
-  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id              Int              @id @default(autoincrement())
+  productId       Int              @map("product_id")
+  optionSummary   String?          @map("option_summary") @db.VarChar(500)
+  price           Int
+  wholesalePrice  Int?             @map("wholesale_price")
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamp(0)
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
+  guestOrderItems GuestOrderItem[]
+  product         Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@map("product_variant")

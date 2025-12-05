@@ -8,6 +8,53 @@ export class SettingsRepository {
     })
   }
 
+  // AI Prompt Config
+  async findPromptConfigs(userId: number) {
+    return prisma.aiPromptConfig.findMany({
+      where: { userId },
+    })
+  }
+
+  async findPromptConfigByType(userId: number, promptType: string) {
+    return prisma.aiPromptConfig.findFirst({
+      where: { userId, promptType },
+    })
+  }
+
+  async upsertPromptConfig(userId: number, promptType: string, data: {
+    name: string
+    prompt: string
+    description?: string | null
+    isActive?: boolean
+  }) {
+    const existing = await this.findPromptConfigByType(userId, promptType)
+
+    if (existing) {
+      return prisma.aiPromptConfig.update({
+        where: { id: existing.id },
+        data,
+      })
+    }
+
+    return prisma.aiPromptConfig.create({
+      data: {
+        userId,
+        promptType,
+        ...data,
+      },
+    })
+  }
+
+  async deletePromptConfig(userId: number, promptType: string) {
+    const existing = await this.findPromptConfigByType(userId, promptType)
+    if (existing) {
+      return prisma.aiPromptConfig.delete({
+        where: { id: existing.id },
+      })
+    }
+    return null
+  }
+
   async findApiConfigByPlatform(userId: number, platform: string) {
     return prisma.sourcingApiConfig.findFirst({
       where: { userId, platform: platform as any },

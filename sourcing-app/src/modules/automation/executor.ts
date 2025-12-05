@@ -10,6 +10,7 @@ import { runTransformPipeline } from './pipelines/transform'
 import { runProductCreatePipeline } from './pipelines/product-create'
 import { runPublishPipeline } from './pipelines/publish'
 import {
+  acquireExecutionLock,
   createWorkflowLog,
   completeWorkflowLog,
   failWorkflowLog,
@@ -351,8 +352,8 @@ export async function executeFullPipeline(
       console.log(`[FullPipeline] Transform completed: ${transformResult.successCount} collected products created`)
     }
 
-    // 3. 상품 생성 단계 (autoProductCreate 설정에 따라)
-    if (!options?.skipProductCreate && automationConfig.autoProductCreate) {
+    // 3. 상품 생성 단계
+    if (!options?.skipProductCreate) {
       console.log('[FullPipeline] Step 3: Product Create')
       productCreateResult = await runProductCreatePipeline({
         createPendingOnly: true,
@@ -367,8 +368,8 @@ export async function executeFullPipeline(
       console.log(`[FullPipeline] Product Create completed: ${productCreateResult.successCount} products created`)
     }
 
-    // 4. 발행 단계 (autoPublish가 true인 경우에만)
-    if (!options?.skipPublish && automationConfig.autoPublish) {
+    // 4. 발행 단계
+    if (!options?.skipPublish) {
       const channelIdsForPublish = parseNumberArray(automationConfig.retailChannelIds)
       if (channelIdsForPublish.length) {
         console.log('[FullPipeline] Step 4: Publish')
@@ -506,4 +507,197 @@ function calculateNextRunTime(cronExpression: string): Date {
 
   // 기본값: 1시간 후
   return new Date(now.getTime() + 60 * 60 * 1000)
+}
+
+// =============================================
+// LOCK-BASED PIPELINE EXECUTION
+// =============================================
+
+/**
+ * Lock 기반 전체 파이프라인 실행
+ * 중복 실행을 원자적으로 방지하고 파이프라인 실행
+ *
+ * @returns 성공 시 FullPipelineResult, Lock 획득 실패 시 null
+ */
+export async function executeFullPipelineWithLock(
+  userId: number,
+  options?: {
+    skipCollection?: boolean
+    skipTransform?: boolean
+    skipProductCreate?: boolean
+    skipPublish?: boolean
+  },
+  triggerType: TriggerType = TriggerType.MANUAL
+): Promise<FullPipelineResult | null> {
+  // 1. Lock 획득 시도 (워크플로우 생성과 중복 체크를 원자적으로 수행)
+  const logId = await acquireExecutionLock(userId, WorkflowType.FULL_PIPELINE1, triggerType)
+
+  if (!logId) {
+    console.log(`[Executor] Lock 획득 실패 - 이미 실행 중인 작업이 있음 (user: ${userId})`)
+    return null
+  }
+
+  const context = await createBatchContextFromUserId(userId)
+  context.workflowLogId = logId
+  setBatchContext(context)
+
+  const startedAt = new Date()
+
+  let collectionResult: CollectionResult | undefined
+  let transformResult: TransformResult | undefined
+  let productCreateResult: ProductCreateResult | undefined
+  let publishResult: PublishResult | undefined
+
+  try {
+    console.log(`[FullPipeline] Starting for user ${userId} (workflow: ${logId})`)
+
+    // 자동화 설정 조회
+    const automationConfig = await prisma.automationConfig.findUnique({
+      where: { userId },
+      include: {
+        pricingPolicy: true,
+      },
+    })
+
+    if (!automationConfig) {
+      throw new Error('자동화 설정이 없습니다')
+    }
+
+    // 누적 카운터
+    let totalItems = 0
+    let successCount = 0
+    let failedCount = 0
+
+    // 1. 수집 단계
+    if (!options?.skipCollection) {
+      console.log('[FullPipeline] Step 1: Collection')
+      collectionResult = await runCollectionPipeline({
+        channelIds: parseNumberArray(automationConfig.channelIds),
+      })
+
+      totalItems += collectionResult.totalItems
+      successCount += collectionResult.successCount
+      failedCount += collectionResult.failedCount
+      await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+
+      console.log(`[FullPipeline] Collection completed: ${collectionResult.successCount} new posts`)
+    }
+
+    // 2. 변환 단계
+    if (!options?.skipTransform) {
+      console.log('[FullPipeline] Step 2: Transform')
+      transformResult = await runTransformPipeline({
+        aiProvider: automationConfig.aiProvider,
+        pricingPolicyId: automationConfig.pricingPolicyId,
+        pricingPolicyContent: automationConfig.pricingPolicy?.content,
+        transformPendingOnly: true,
+      })
+
+      totalItems += transformResult.totalItems
+      successCount += transformResult.successCount
+      failedCount += transformResult.failedCount
+      await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+
+      console.log(`[FullPipeline] Transform completed: ${transformResult.successCount} collected products created`)
+    }
+
+    // 3. 상품 생성 단계
+    if (!options?.skipProductCreate) {
+      console.log('[FullPipeline] Step 3: Product Create')
+      productCreateResult = await runProductCreatePipeline({
+        createPendingOnly: true,
+      })
+
+      totalItems += productCreateResult.totalItems
+      successCount += productCreateResult.successCount
+      failedCount += productCreateResult.failedCount
+      await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+
+      console.log(`[FullPipeline] Product Create completed: ${productCreateResult.successCount} products created`)
+    }
+
+    // 4. 발행 단계
+    if (!options?.skipPublish) {
+      const channelIdsForPublish = parseNumberArray(automationConfig.retailChannelIds)
+      if (channelIdsForPublish.length) {
+        console.log('[FullPipeline] Step 4: Publish')
+        publishResult = await runPublishPipeline({
+          channelIds: channelIdsForPublish,
+          publishReadyOnly: true,
+        })
+
+        totalItems += publishResult.totalItems
+        successCount += publishResult.successCount
+        failedCount += publishResult.failedCount
+        await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+
+        console.log(`[FullPipeline] Publish completed: ${publishResult.successCount} published`)
+      }
+    }
+
+    const completedAt = new Date()
+
+    // 상태 결정
+    let overallStatus: WorkflowStatus
+    if (failedCount === 0) {
+      overallStatus = WorkflowStatus.COMPLETED
+    } else if (successCount > 0) {
+      overallStatus = WorkflowStatus.PARTIAL_SUCCESS
+    } else {
+      overallStatus = WorkflowStatus.FAILED
+    }
+
+    await completeWorkflowLog(logId, overallStatus === WorkflowStatus.COMPLETED, totalItems, successCount, failedCount, {
+      collection: collectionResult?.details,
+      transform: transformResult?.details,
+      productCreate: productCreateResult?.details,
+      publish: publishResult?.details,
+    })
+
+    // 다음 실행 시간 업데이트
+    if (automationConfig.cronExpression) {
+      const nextRunAt = calculateNextRunTime(automationConfig.cronExpression)
+      await prisma.automationConfig.update({
+        where: { userId },
+        data: {
+          lastRunAt: new Date(),
+          nextRunAt,
+        },
+      })
+    }
+
+    console.log(`[FullPipeline] Completed with status: ${overallStatus}`)
+
+    return {
+      success: overallStatus === WorkflowStatus.COMPLETED,
+      startedAt,
+      completedAt,
+      collection: collectionResult,
+      transform: transformResult,
+      productCreate: productCreateResult,
+      publish: publishResult,
+      overallStatus,
+    }
+  } catch (error: any) {
+    console.error('[FullPipeline] Error:', error)
+    await failWorkflowLog(logId, error.message, {
+      collection: collectionResult?.details,
+      transform: transformResult?.details,
+      productCreate: productCreateResult?.details,
+      publish: publishResult?.details,
+    })
+
+    return {
+      success: false,
+      startedAt,
+      completedAt: new Date(),
+      collection: collectionResult,
+      transform: transformResult,
+      productCreate: productCreateResult,
+      publish: publishResult,
+      overallStatus: WorkflowStatus.FAILED,
+    }
+  } finally {
+    clearBatchContext()
+  }
 }

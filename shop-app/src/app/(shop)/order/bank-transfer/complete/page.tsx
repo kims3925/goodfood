@@ -16,6 +16,10 @@ function BankTransferCompleteContent() {
   const bankAccount = searchParams.get('bankAccount') || ''
   const accountHolder = searchParams.get('accountHolder') || ''
   const depositDeadline = searchParams.get('depositDeadline') || ''
+  // 비회원 관련 파라미터
+  const isGuest = searchParams.get('isGuest') === 'true'
+  const accessToken = searchParams.get('accessToken') || ''
+  const orderId = searchParams.get('orderId') || ''
 
   const formatPrice = (price: number) => {
     return price.toLocaleString('ko-KR')
@@ -158,6 +162,22 @@ function BankTransferCompleteContent() {
               </div>
             </div>
 
+            {/* 비회원 주문 조회 안내 */}
+            {isGuest && (
+              <div className="p-6 bg-green-50 border-b border-green-100">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-green-800">
+                    <p className="font-medium mb-2">비회원 주문 조회 안내</p>
+                    <p className="text-green-700">
+                      주문번호 <span className="font-mono font-semibold">{orderNumber}</span>와 휴대폰 번호로<br />
+                      주문 조회 페이지에서 언제든 주문 현황을 확인하실 수 있습니다.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 액션 버튼 */}
             <div className="p-6 space-y-3">
               <Link
@@ -167,13 +187,23 @@ function BankTransferCompleteContent() {
                 <ShoppingBag className="w-5 h-5" />
                 쇼핑 계속하기
               </Link>
-              <Link
-                href="/mypage/orders"
-                className="w-full py-4 bg-gray-100 text-gray-700 rounded-xl font-semibold text-center flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
-              >
-                <FileText className="w-5 h-5" />
-                주문 내역 보기
-              </Link>
+              {isGuest ? (
+                <Link
+                  href={`/order/guest/${orderId}?token=${encodeURIComponent(accessToken)}`}
+                  className="w-full py-4 bg-gray-100 text-gray-700 rounded-xl font-semibold text-center flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
+                >
+                  <FileText className="w-5 h-5" />
+                  주문 상세 보기
+                </Link>
+              ) : (
+                <Link
+                  href="/mypage/orders"
+                  className="w-full py-4 bg-gray-100 text-gray-700 rounded-xl font-semibold text-center flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
+                >
+                  <FileText className="w-5 h-5" />
+                  주문 내역 보기
+                </Link>
+              )}
             </div>
           </div>
         </div>

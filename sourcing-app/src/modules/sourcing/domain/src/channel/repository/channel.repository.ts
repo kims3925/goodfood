@@ -4,9 +4,10 @@ import type { ChannelListParams, ChannelCreateInput, ChannelUpdateInput } from '
 
 export class ChannelRepository {
   async findMany(params: ChannelListParams) {
-    const { kind, platform, search = '', page = 1, limit = 10 } = params
+    const { userId, kind, platform, search = '', page = 1, limit = 10 } = params
 
     const where = {
+      ...(userId && { userId }),
       ...(kind && { kind }),
       ...(platform && { platform }),
       ...(search && {

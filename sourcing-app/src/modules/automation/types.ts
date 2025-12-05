@@ -16,6 +16,7 @@ export interface BatchContext {
   email: string
   automationConfigId?: number
   workflowLogId?: number
+  shopIds?: number[]
 }
 
 // =============================================
@@ -44,7 +45,8 @@ export interface PipelineError {
 
 export interface CollectionConfig {
   channelIds?: number[]  // 필수 (비어있으면 수집 안함)
-  limit?: number
+  limit?: number  // 채널당 수집 제한 (기본값: 50)
+  batchSize?: number  // 배치당 처리 채널 수
 }
 
 export interface CollectionResult extends PipelineResult {
@@ -78,6 +80,7 @@ export interface TransformConfig {
   pricingPolicyContent?: string | null
   postIds?: number[]
   transformPendingOnly?: boolean
+  batchSize?: number  // 배치당 처리 항목 수 (기본값: 50)
 }
 
 export interface TransformResult extends PipelineResult {

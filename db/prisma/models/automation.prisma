@@ -21,14 +21,13 @@ model AutomationConfig {
   cronExpression    String?        @map("cron_expression") @db.VarChar(50)
   aiProvider        AiProvider     @default(GEMINI) @map("ai_provider")
   pricingPolicyId   Int?           @map("pricing_policy_id")
-  autoProductCreate Boolean        @default(false) @map("auto_product_create")
-  autoPublish       Boolean        @default(false) @map("auto_publish")
   lastRunAt         DateTime?      @map("last_run_at") @db.Timestamp(0)
   nextRunAt         DateTime?      @map("next_run_at") @db.Timestamp(0)
   createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamp(0)
   channelIds        String?        @map("channel_ids") @db.LongText
   retailChannelIds  String?        @map("retail_channel_ids") @db.LongText
+  shopIds           String?        @map("shop_ids") @db.LongText
   pricingPolicy     PricingPolicy? @relation(fields: [pricingPolicyId], references: [id])
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 

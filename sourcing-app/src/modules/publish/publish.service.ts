@@ -33,8 +33,17 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 /**
  * 게시글 내용 생성
  */
-function buildPostContent(product: ProductForPublish): string {
+function buildPostContent(
+  product: ProductForPublish,
+  options?: { orderLink?: string }
+): string {
   const lines: string[] = []
+
+  // 상단 주문 링크 (Shop 연결된 경우)
+  if (options?.orderLink) {
+    lines.push(`🛒 주문하기 👉 ${options.orderLink}`)
+    lines.push('')
+  }
 
   // 상품명
   lines.push(`🛍️ ${product.name}`)
@@ -45,6 +54,12 @@ function buildPostContent(product: ProductForPublish): string {
     lines.push(product.description)
   } else if (product.collectedProduct?.post?.content) {
     lines.push(product.collectedProduct.post.content)
+  }
+
+  // 하단 주문 링크 (Shop 연결된 경우)
+  if (options?.orderLink) {
+    lines.push('')
+    lines.push(`🛒 주문하기 👉 ${options.orderLink}`)
   }
 
   return lines.join('\n')
@@ -172,15 +187,24 @@ export class PublishService {
         }
       }
 
-      // 5. Band API로 게시물 작성
+      // 5. 주문 링크 생성 (연결된 Shop이 있는 경우)
+      let orderLink: string | undefined
+      if (channel.shop?.subdomain && channel.shop.isActive) {
+        const baseDomain = process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'
+        const protocol = baseDomain.includes('lvh.me') || baseDomain.includes('localhost') ? 'http' : 'https'
+        const shopUrl = `${protocol}://${channel.shop.subdomain}.${baseDomain}`
+        orderLink = `${shopUrl}/product/${productId}`
+      }
+
+      // 6. Band API로 게시물 작성 (본문에 링크 포함)
       const bandClient = new NaverBandClient(apiConfig.accessToken)
-      const postContent = buildPostContent(product)
+      const postContent = buildPostContent(product, { orderLink })
 
       const { postKey } = await bandClient.createPost(channel.channelKey, postContent, {
         doPush: false, // 푸시 알림 비활성화
       })
 
-      // 6. PublishedProduct 레코드 생성
+      // 7. PublishedProduct 레코드 생성
       const publishedProduct = await prisma.publishedProduct.create({
         data: {
           userId,
@@ -190,29 +214,8 @@ export class PublishService {
         },
       })
 
-      // 7. 장바구니 링크 댓글 작성 (연결된 Shop이 있는 경우만)
-      if (channel.shop?.subdomain && channel.shop.isActive) {
-        try {
-          // 서브도메인 기반 Shop URL 생성 (.env의 NEXT_PUBLIC_DOMAIN 사용)
-          const baseDomain = process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'
-          const protocol = baseDomain.includes('lvh.me') || baseDomain.includes('localhost') ? 'http' : 'https'
-          const shopUrl = `${protocol}://${channel.shop.subdomain}.${baseDomain}`
-
-          const cartLink = `${shopUrl}/cart?add=${publishedProduct.id}`
-          const commentContent = `🛒 장바구니에 담기 👉 ${cartLink}`
-
-          await bandClient.createComment(channel.channelKey, postKey, commentContent)
-          console.log(`[PublishService] Added cart comment for product ${productId} -> ${channel.shop.subdomain}`)
-        } catch (commentError) {
-          // 댓글 실패해도 발행 자체는 성공으로 처리
-          console.error(`[PublishService] Failed to create cart comment:`, commentError)
-        }
-      } else {
-        console.log(`[PublishService] No shop linked to channel ${channel.name}, skipping cart comment`)
-      }
-
       console.log(
-        `[PublishService] Published product ${productId} to channel ${channel.name} -> post_key: ${postKey}`
+        `[PublishService] Published product ${productId} to channel ${channel.name} -> post_key: ${postKey}${orderLink ? ` with order link` : ''}`
       )
 
       return {

@@ -4,9 +4,9 @@
  */
 
 import * as cron from 'node-cron'
-import prisma, { TriggerType } from '@bandauto/db'
-import { executeFullPipeline } from './executor'
-import { getRunningWorkflow } from './workflow-service'
+import prisma, { TriggerType, WorkflowType } from '@bandauto/db'
+import { executeFullPipelineWithLock } from './executor'
+import { acquireExecutionLock, getRunningWorkflow } from './workflow-service'
 
 // 활성 스케줄러 저장
 const activeSchedulers: Map<number, cron.ScheduledTask> = new Map()
@@ -62,16 +62,15 @@ function registerSchedulerSilent(userId: number, cronExpression: string): void {
   const task = cron.schedule(cronExpression, async () => {
     console.log(`[Scheduler] 자동화 실행 시작 (user: ${userId})`)
 
-    // 중복 실행 방지
-    const runningWorkflow = await getRunningWorkflow(userId)
-    if (runningWorkflow) {
-      console.log(`[Scheduler] 이미 실행 중인 작업이 있어 건너뜀`)
-      return
-    }
-
     try {
-      const result = await executeFullPipeline(userId, undefined, TriggerType.SCHEDULED)
-      console.log(`[Scheduler] 자동화 완료: ${result.overallStatus}`)
+      // Lock 기반 실행 (중복 실행 자동 방지)
+      const result = await executeFullPipelineWithLock(userId, undefined, TriggerType.SCHEDULED)
+
+      if (result) {
+        console.log(`[Scheduler] 자동화 완료: ${result.overallStatus}`)
+      } else {
+        console.log(`[Scheduler] Lock 획득 실패 - 이미 실행 중인 작업이 있음`)
+      }
     } catch (error) {
       console.error(`[Scheduler] 자동화 실패:`, error)
     }
@@ -100,16 +99,15 @@ export function registerScheduler(userId: number, cronExpression: string): void 
   const task = cron.schedule(cronExpression, async () => {
     console.log(`[Scheduler] 자동화 실행 시작 (user: ${userId})`)
 
-    // 중복 실행 방지
-    const runningWorkflow = await getRunningWorkflow(userId)
-    if (runningWorkflow) {
-      console.log(`[Scheduler] 이미 실행 중인 작업이 있어 건너뜀`)
-      return
-    }
-
     try {
-      const result = await executeFullPipeline(userId, undefined, TriggerType.SCHEDULED)
-      console.log(`[Scheduler] 자동화 완료: ${result.overallStatus}`)
+      // Lock 기반 실행 (중복 실행 자동 방지)
+      const result = await executeFullPipelineWithLock(userId, undefined, TriggerType.SCHEDULED)
+
+      if (result) {
+        console.log(`[Scheduler] 자동화 완료: ${result.overallStatus}`)
+      } else {
+        console.log(`[Scheduler] Lock 획득 실패 - 이미 실행 중인 작업이 있음`)
+      }
     } catch (error) {
       console.error(`[Scheduler] 자동화 실패:`, error)
     }

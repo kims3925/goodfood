@@ -25,6 +25,7 @@ export interface ProductTransformationInput {
     maxTokens?: number
   }
   policyContent?: string // 가격 정책 내용
+  customPrompt?: string  // 사용자 정의 프롬프트 (DB에서 가져온 것)
 }
 
 // =============================================

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { transformPostToProduct } from '@/modules/transformation'
+import { settingsService } from '@/modules/config/domain/src/settings'
 import prisma from '@bandauto/db'
 
 /**
@@ -111,6 +112,11 @@ export async function POST(request: NextRequest) {
       model: aiConfig.model,
     })
 
+    // Get custom prompt if exists
+    const promptConfig = await settingsService.getPromptByType(userId, 'product_extraction')
+    const customPrompt = promptConfig?.prompt || undefined
+    console.log('[AI Product Generation] Custom prompt:', customPrompt ? '사용자 정의 프롬프트 사용' : '기본 프롬프트 사용')
+
     // Transform post to product using AI
     const config = aiConfig.config as any
     const draft = await transformPostToProduct({
@@ -123,6 +129,7 @@ export async function POST(request: NextRequest) {
         maxTokens: config?.maxTokens || 2048,
       },
       policyContent: policyContent || undefined,
+      customPrompt,
     })
 
     console.log('[AI Product Generation] Draft generated:', {

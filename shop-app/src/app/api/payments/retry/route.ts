@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
       where: { orderNumber: orderId },
       include: {
         payment: true,
+        shippingAddress: true,  // 배송지 정보 포함
         items: {
           include: {
             publishedProduct: {
@@ -204,16 +205,26 @@ export async function POST(req: NextRequest) {
             orderNumber: newOrderNumber,
             userId: existingOrder.userId,
             status: 'PENDING',
-            recipientName: existingOrder.recipientName,
-            recipientPhone: existingOrder.recipientPhone,
-            postalCode: existingOrder.postalCode,
-            address: existingOrder.address,
-            addressDetail: existingOrder.addressDetail,
-            deliveryMemo: existingOrder.deliveryMemo,
+            // 주문자 정보
+            customerName: existingOrder.customerName,
+            customerPhone: existingOrder.customerPhone,
+            customerEmail: existingOrder.customerEmail,
+            // 금액 정보
             subtotalAmount: existingOrder.subtotalAmount,
             shippingFee: existingOrder.shippingFee,
             discountAmount: existingOrder.discountAmount,
             totalAmount: existingOrder.totalAmount,
+            // 배송지 정보 (별도 테이블)
+            shippingAddress: existingOrder.shippingAddress ? {
+              create: {
+                recipientName: existingOrder.shippingAddress.recipientName,
+                recipientPhone: existingOrder.shippingAddress.recipientPhone,
+                postalCode: existingOrder.shippingAddress.postalCode,
+                address: existingOrder.shippingAddress.address,
+                addressDetail: existingOrder.shippingAddress.addressDetail,
+                deliveryMemo: existingOrder.shippingAddress.deliveryMemo,
+              }
+            } : undefined,
             items: {
               create: existingOrder.items.map(item => ({
                 publishedProductId: item.publishedProductId,
@@ -228,6 +239,7 @@ export async function POST(req: NextRequest) {
           },
           include: {
             items: true,
+            shippingAddress: true,
             user: {
               select: {
                 name: true,

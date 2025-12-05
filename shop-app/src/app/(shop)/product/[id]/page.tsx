@@ -274,16 +274,11 @@ export default function ProductDetailPage() {
   }
 
   const handleBuyNow = () => {
-    // 로그인 체크
-    if (!session) {
-      window.location.href = '/auth/login'
-      return
-    }
-
     // publishedProductId와 variantId를 체크아웃 페이지로 전달
     if (!product?.publishedProductId || !selectedVariant) {
       return
     }
+    // 비회원도 바로구매 가능 (checkout 페이지에서 비회원 주문 처리)
     const checkoutUrl = `/checkout?publishedProductId=${product.publishedProductId}&variantId=${selectedVariant.id}&quantity=${quantity}`
     window.location.href = checkoutUrl
   }
@@ -509,19 +504,17 @@ export default function ProductDetailPage() {
               >
                 장바구니
               </button>
-              {session && (
-                <button
-                  onClick={handleBuyNow}
-                  disabled={!selectedVariant}
-                  className={`flex-1 h-14 rounded-xl font-semibold text-base transition-all ${
-                    selectedVariant
-                      ? 'bg-[#FF6B6B] text-white hover:bg-[#FF5252] shadow-lg shadow-[#FF6B6B]/25'
-                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  }`}
-                >
-                  바로 구매
-                </button>
-              )}
+              <button
+                onClick={handleBuyNow}
+                disabled={!selectedVariant}
+                className={`flex-1 h-14 rounded-xl font-semibold text-base transition-all ${
+                  selectedVariant
+                    ? 'bg-[#FF6B6B] text-white hover:bg-[#FF5252] shadow-lg shadow-[#FF6B6B]/25'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                구매하기
+              </button>
             </div>
           </div>
         </div>
@@ -767,19 +760,17 @@ export default function ProductDetailPage() {
           >
             장바구니
           </button>
-          {session && (
-            <button
-              onClick={handleBuyNow}
-              disabled={!selectedVariant}
-              className={`flex-1 h-12 rounded-xl font-semibold transition-all ${
-                selectedVariant
-                  ? 'bg-[#FF6B6B] text-white shadow-lg shadow-[#FF6B6B]/25'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              바로 구매
-            </button>
-          )}
+          <button
+            onClick={handleBuyNow}
+            disabled={!selectedVariant}
+            className={`flex-1 h-12 rounded-xl font-semibold transition-all ${
+              selectedVariant
+                ? 'bg-[#FF6B6B] text-white shadow-lg shadow-[#FF6B6B]/25'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            구매하기
+          </button>
         </div>
       </div>
 

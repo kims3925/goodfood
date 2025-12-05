@@ -45,3 +45,21 @@ export interface AiSettingsInput {
   temperature?: number
   maxTokens?: number
 }
+
+export interface PromptConfig {
+  promptType: string
+  name: string
+  prompt: string
+  description?: string | null
+  isActive: boolean
+}
+
+export interface PromptSettings {
+  product_extraction: PromptConfig | null
+}
+
+export interface PromptConfigInput {
+  name: string
+  prompt: string
+  description?: string | null
+}

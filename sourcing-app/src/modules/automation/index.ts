@@ -82,6 +82,7 @@ export {
 
 // Workflow Service
 export {
+  acquireExecutionLock,
   createWorkflowLog,
   updateWorkflowLog,
   completeWorkflowLog,
@@ -103,6 +104,7 @@ export {
   executeProductCreatePipeline,
   executePublishPipeline,
   executeFullPipeline,
+  executeFullPipelineWithLock,
 } from './executor'
 
 // Individual Pipelines (for advanced usage)

@@ -228,6 +228,11 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
           href: '/admin/settings/ai',
           icon: <Bot size={16} />,
         },
+        {
+          label: '프롬프트 설정',
+          href: '/admin/settings/prompt',
+          icon: <FileText size={16} />,
+        },
       ],
     },
   ]

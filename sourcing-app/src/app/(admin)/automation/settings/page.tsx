@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLeft, ChevronRight, Clock, Download, Upload, Zap, Settings2 } from 'lucide-react'
+import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLeft, ChevronRight, Clock, Download, Upload, Zap, Settings2, ShoppingBag } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
@@ -25,6 +25,13 @@ interface AiProviderInfo {
   isConfigured: boolean
 }
 
+interface Shop {
+  id: number
+  name: string
+  subdomain: string
+  coverUrl: string | null
+}
+
 interface AutomationConfig {
   isEnabled: boolean
   cronInterval: string
@@ -32,8 +39,8 @@ interface AutomationConfig {
   wholesaleChannelIds: number[]
   aiProvider: string
   pricingPolicyId: number | null
-  autoPublish: boolean
   retailChannelIds: number[]
+  shopIds: number[]
 }
 
 const INTERVAL_OPTIONS = [
@@ -152,8 +159,8 @@ const defaultConfig: AutomationConfig = {
   wholesaleChannelIds: [],
   aiProvider: 'GEMINI',
   pricingPolicyId: null,
-  autoPublish: false,
   retailChannelIds: [],
+  shopIds: [],
 }
 
 export default function AutomationSettingsPage() {
@@ -164,6 +171,7 @@ export default function AutomationSettingsPage() {
   const [retailChannels, setRetailChannels] = useState<Channel[]>([])
   const [pricingPolicies, setPricingPolicies] = useState<PricingPolicy[]>([])
   const [configuredAiProviders, setConfiguredAiProviders] = useState<AiProviderInfo[]>([])
+  const [shops, setShops] = useState<Shop[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [savingSection, setSavingSection] = useState<string | null>(null)
   const [wholesaleStartIndex, setWholesaleStartIndex] = useState(0)
@@ -187,8 +195,11 @@ export default function AutomationSettingsPage() {
   const hasPublishChanges = JSON.stringify((config.retailChannelIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.retailChannelIds || []).slice().sort())
 
+  const hasShopChanges = JSON.stringify((config.shopIds || []).slice().sort()) !==
+    JSON.stringify((initialConfig.shopIds || []).slice().sort())
+
   // 저장되지 않은 변경사항이 있는지 확인
-  const hasUnsavedChanges = hasScheduleChanges || hasCollectionChanges || hasAiChanges || hasPublishChanges
+  const hasUnsavedChanges = hasScheduleChanges || hasCollectionChanges || hasAiChanges || hasPublishChanges || hasShopChanges
 
   // 자동화 활성화 상태 저장
   const saveAutomationState = async (enabled: boolean) => {
@@ -218,6 +229,11 @@ export default function AutomationSettingsPage() {
     // 필수 설정 검증
     const missingSettings: string[] = []
 
+    // 쇼핑몰 선택 확인
+    if (config.shopIds.length === 0) {
+      missingSettings.push('쇼핑몰')
+    }
+
     // 수집할 도매채널 확인
     if (config.wholesaleChannelIds.length === 0) {
       missingSettings.push('수집할 도매채널')
@@ -241,6 +257,7 @@ export default function AutomationSettingsPage() {
 
     const unsavedSections: string[] = []
 
+    if (hasShopChanges) unsavedSections.push('shop')
     if (hasScheduleChanges) unsavedSections.push('schedule')
     if (hasCollectionChanges) unsavedSections.push('collection')
     if (hasAiChanges) unsavedSections.push('ai')
@@ -280,50 +297,96 @@ export default function AutomationSettingsPage() {
 
   const loadData = async () => {
     try {
-      const [configRes, wholesaleRes, retailRes, policyRes, aiSettingsRes] = await Promise.all([
+      const [configRes, wholesaleRes, retailRes, policyRes, aiSettingsRes, shopsRes] = await Promise.all([
         fetch('/api/automation/config'),
         fetch('/api/channel?kind=WHOLESALE'),
         fetch('/api/channel?kind=RETAIL'),
         fetch('/api/policy'),
         fetch('/api/settings/ai'),
+        fetch('/api/shop'),
       ])
 
-      const configData = await configRes.json()
-      const wholesaleData = await wholesaleRes.json()
-      const retailData = await retailRes.json()
-      const policyData = await policyRes.json()
-      const aiSettingsData = await aiSettingsRes.json()
-
-      if (configData.success) {
-        const loadedConfig = {
-          ...defaultConfig,
-          ...configData.data,
-          wholesaleChannelIds: configData.data?.wholesaleChannelIds || [],
-          retailChannelIds: configData.data?.retailChannelIds || [],
+      // 각 응답을 개별적으로 처리 (하나가 실패해도 다른 것들은 처리)
+      try {
+        const configData = await configRes.json()
+        if (configData.success) {
+          const loadedConfig = {
+            ...defaultConfig,
+            ...configData.data,
+            wholesaleChannelIds: configData.data?.wholesaleChannelIds || [],
+            retailChannelIds: configData.data?.retailChannelIds || [],
+            shopIds: configData.data?.shopIds || [],
+          }
+          setConfig(loadedConfig)
+          setInitialConfig(loadedConfig)
+        } else {
+          console.error('자동화 설정 로드 실패:', configData.error)
         }
-        setConfig(loadedConfig)
-        setInitialConfig(loadedConfig)
+      } catch (e) {
+        console.error('자동화 설정 파싱 실패:', e)
       }
-      if (wholesaleData.success) {
-        setWholesaleChannels(wholesaleData.data || [])
+
+      try {
+        const wholesaleData = await wholesaleRes.json()
+        if (wholesaleData.success) {
+          setWholesaleChannels(wholesaleData.data || [])
+        } else {
+          console.error('도매채널 로드 실패:', wholesaleData.error)
+        }
+      } catch (e) {
+        console.error('도매채널 파싱 실패:', e)
       }
-      if (retailData.success) {
-        setRetailChannels(retailData.data || [])
+
+      try {
+        const retailData = await retailRes.json()
+        if (retailData.success) {
+          setRetailChannels(retailData.data || [])
+        } else {
+          console.error('소매채널 로드 실패:', retailData.error)
+        }
+      } catch (e) {
+        console.error('소매채널 파싱 실패:', e)
       }
-      if (policyData.success) {
-        setPricingPolicies(policyData.data || [])
+
+      try {
+        const policyData = await policyRes.json()
+        if (policyData.success) {
+          setPricingPolicies(policyData.data || [])
+        } else {
+          console.error('가격정책 로드 실패:', policyData.error)
+        }
+      } catch (e) {
+        console.error('가격정책 파싱 실패:', e)
+      }
+
+      try {
+        const shopsData = await shopsRes.json()
+        if (shopsData.success) {
+          setShops(shopsData.data || [])
+        } else {
+          console.error('쇼핑몰 로드 실패:', shopsData.error)
+        }
+      } catch (e) {
+        console.error('쇼핑몰 파싱 실패:', e)
       }
 
       // AI 설정 여부 확인
-      if (aiSettingsData.success) {
-        const providers: AiProviderInfo[] = []
-        if (aiSettingsData.settings?.gemini?.apiKey) {
-          providers.push({ provider: 'GEMINI', name: 'Google Gemini', isConfigured: true })
+      try {
+        const aiSettingsData = await aiSettingsRes.json()
+        if (aiSettingsData.success) {
+          const providers: AiProviderInfo[] = []
+          if (aiSettingsData.settings?.gemini?.apiKey) {
+            providers.push({ provider: 'GEMINI', name: 'Google Gemini', isConfigured: true })
+          }
+          if (aiSettingsData.settings?.openai?.apiKey) {
+            providers.push({ provider: 'OPENAI', name: 'OpenAI GPT', isConfigured: true })
+          }
+          setConfiguredAiProviders(providers)
+        } else {
+          console.error('AI 설정 로드 실패:', aiSettingsData.error)
         }
-        if (aiSettingsData.settings?.openai?.apiKey) {
-          providers.push({ provider: 'OPENAI', name: 'OpenAI GPT', isConfigured: true })
-        }
-        setConfiguredAiProviders(providers)
+      } catch (e) {
+        console.error('AI 설정 파싱 실패:', e)
       }
     } catch (error) {
       console.error('데이터 로드 실패:', error)
@@ -333,6 +396,7 @@ export default function AutomationSettingsPage() {
   }
 
   const sectionNames: { [key: string]: string } = {
+    shop: '쇼핑몰 설정',
     schedule: '실행 주기',
     collection: '수집 설정',
     ai: 'AI 변환 설정',
@@ -514,6 +578,120 @@ export default function AutomationSettingsPage() {
           </button>
         </div>
       </div>
+
+      {/* Shop Selection Section - 발행 설정과 동일한 스타일 */}
+      <Card className={`overflow-hidden transition-all ${warningSections.includes('shop') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
+        <div className="p-4 pb-5 flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shadow-rose-200">
+                <ShoppingBag className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-gray-900">쇼핑몰 발행</h2>
+                  {hasShopChanges && (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
+                  )}
+                  {config.shopIds.length > 0 && (
+                    <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-rose-100 text-rose-700">
+                      {config.shopIds.length}개
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500">상품이 발행될 쇼핑몰을 선택하세요 (복수 선택 가능)</p>
+              </div>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => handleSaveSection('shop')}
+              disabled={savingSection === 'shop' || !hasShopChanges}
+              className="flex items-center gap-2 text-sm px-4 shadow-md"
+            >
+              {savingSection === 'shop' ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+              저장
+            </Button>
+          </div>
+
+          {shops.length > 0 ? (
+            <div className="grid grid-cols-4 gap-4">
+              {shops.map((shop) => {
+                const isSelected = config.shopIds.includes(shop.id)
+                return (
+                  <div
+                    key={shop.id}
+                    onClick={() => {
+                      setConfig(prev => ({
+                        ...prev,
+                        shopIds: prev.shopIds.includes(shop.id)
+                          ? prev.shopIds.filter(id => id !== shop.id)
+                          : [...prev.shopIds, shop.id]
+                      }))
+                    }}
+                    className={`
+                      relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all duration-300 group
+                      ${isSelected
+                        ? 'border-rose-500 shadow-lg shadow-rose-100 scale-[1.02]'
+                        : 'border-gray-200 hover:border-rose-300 hover:shadow-md hover:scale-[1.01]'
+                      }
+                    `}
+                  >
+                    <div className="h-28 bg-gradient-to-br from-gray-100 to-gray-50 relative overflow-hidden">
+                      {shop.coverUrl ? (
+                        <img
+                          src={shop.coverUrl}
+                          alt={shop.name}
+                          className={`w-full h-full object-cover transition-transform duration-300 ${isSelected ? '' : 'group-hover:scale-105'}`}
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-gray-300">
+                          <ShoppingBag size={36} />
+                        </div>
+                      )}
+                      {isSelected && (
+                        <div className="absolute inset-0 bg-gradient-to-t from-rose-500/30 to-transparent" />
+                      )}
+                      {!isSelected && (
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
+                      )}
+                    </div>
+                    <div className={`p-2 text-center transition-colors ${isSelected ? 'bg-rose-50' : 'bg-white'}`}>
+                      <span className={`text-sm font-medium line-clamp-1 ${isSelected ? 'text-rose-700' : 'text-gray-700'}`}>{shop.name}</span>
+                      <p className={`text-xs ${isSelected ? 'text-rose-500' : 'text-gray-400'}`}>{shop.subdomain}</p>
+                    </div>
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 w-6 h-6 bg-gradient-to-br from-rose-500 to-pink-600 rounded-full flex items-center justify-center shadow-md">
+                        <Check size={14} className="text-white" />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="p-5 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
+              <p className="text-gray-600 text-sm">
+                등록된 쇼핑몰이 없습니다.
+                <a href="/admin/settings/shop" className="text-blue-600 hover:underline font-medium ml-1">
+                  설정 &gt; 쇼핑몰 설정
+                </a>
+                에서 추가해주세요.
+              </p>
+            </div>
+          )}
+          {config.shopIds.length === 0 && shops.length > 0 && (
+            <div className="flex items-center gap-3 mt-5 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
+              <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+                <ShoppingBag size={16} className="text-amber-600" />
+              </div>
+              <p className="text-sm text-amber-700 font-medium">
+                상품이 발행될 쇼핑몰을 선택해주세요
+              </p>
+            </div>
+          )}
+        </div>
+      </Card>
 
       {/* Row 1: Schedule Settings + AI Settings - 2 Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

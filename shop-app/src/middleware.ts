@@ -46,11 +46,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // 404 페이지는 건너뜀
-  if (pathname === '/not-authorized') {
-    return NextResponse.next()
-  }
-
   // Shop 식별
   const shopInfo = await identifyShop(hostname, url.searchParams, request)
 
@@ -59,7 +54,8 @@ export async function middleware(request: NextRequest) {
     if (isApiRequest) {
       return NextResponse.json({ error: 'Shop not found' }, { status: 404 })
     }
-    return NextResponse.redirect(new URL('/not-authorized', request.url))
+    // Shop이 없으면 404 페이지 표시
+    return new NextResponse('Shop not found', { status: 404 })
   }
 
   // Shop 정보를 request headers에 추가

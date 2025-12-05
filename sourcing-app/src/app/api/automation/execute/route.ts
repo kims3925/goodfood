@@ -4,18 +4,201 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { WorkflowType } from '@bandauto/db'
+import prisma, { WorkflowType, TriggerType } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import {
   executeCollectionPipeline,
   executeTransformPipeline,
   executeProductCreatePipeline,
   executePublishPipeline,
-  executeFullPipeline,
+  executeFullPipelineWithLock,
   getRunningWorkflow,
   cancelWorkflow,
   cleanupStaleWorkflows,
+  PipelineResult,
+  FullPipelineResult,
+  CollectionResult,
+  TransformResult,
+  ProductCreateResult,
+  PublishResult,
 } from '@/modules/automation'
+
+/**
+ * 에러 요약 인터페이스
+ */
+interface ErrorSummaryItem {
+  item?: string | number
+  message: string
+  stage?: string
+}
+
+/**
+ * 구조화된 API 응답 데이터
+ */
+interface ExecuteResponseData {
+  workflowId?: number
+  overallStatus?: string
+  totalItems: number
+  successCount: number
+  failedCount: number
+  errorSummary: ErrorSummaryItem[]
+  stages: {
+    collection?: StageResult
+    transform?: StageResult
+    productCreate?: StageResult
+    publish?: StageResult
+  }
+}
+
+interface StageResult {
+  success: boolean
+  totalItems: number
+  successCount: number
+  failedCount: number
+  message: string
+}
+
+/**
+ * 파이프라인 결과에서 에러 요약 추출
+ */
+function extractErrorSummary(
+  result: PipelineResult | FullPipelineResult,
+  type: 'collect' | 'transform' | 'register' | 'publish' | 'full'
+): ErrorSummaryItem[] {
+  const errors: ErrorSummaryItem[] = []
+
+  if ('errors' in result && Array.isArray(result.errors)) {
+    // 단일 파이프라인 결과
+    errors.push(
+      ...result.errors.slice(0, 5).map((e) => ({
+        item: e.itemId,
+        message: e.message,
+        stage: type,
+      }))
+    )
+  }
+
+  if ('collection' in result && result.collection?.errors) {
+    errors.push(
+      ...result.collection.errors.slice(0, 3).map((e) => ({
+        item: e.itemId,
+        message: e.message,
+        stage: 'collection',
+      }))
+    )
+  }
+
+  if ('transform' in result && result.transform?.errors) {
+    errors.push(
+      ...result.transform.errors.slice(0, 3).map((e) => ({
+        item: e.itemId,
+        message: e.message,
+        stage: 'transform',
+      }))
+    )
+  }
+
+  if ('productCreate' in result && result.productCreate?.errors) {
+    errors.push(
+      ...result.productCreate.errors.slice(0, 3).map((e) => ({
+        item: e.itemId,
+        message: e.message,
+        stage: 'productCreate',
+      }))
+    )
+  }
+
+  if ('publish' in result && result.publish?.errors) {
+    errors.push(
+      ...result.publish.errors.slice(0, 3).map((e) => ({
+        item: e.itemId,
+        message: e.message,
+        stage: 'publish',
+      }))
+    )
+  }
+
+  return errors.slice(0, 10) // 최대 10개 에러
+}
+
+/**
+ * 단계별 결과 생성
+ */
+function createStageResult(result: PipelineResult | undefined, stageName: string): StageResult | undefined {
+  if (!result) return undefined
+
+  return {
+    success: result.success,
+    totalItems: result.totalItems,
+    successCount: result.successCount,
+    failedCount: result.failedCount,
+    message: result.success
+      ? `${stageName} 완료: ${result.successCount}건 성공`
+      : `${stageName} 실패: ${result.failedCount}건 실패 (${result.successCount}건 성공)`,
+  }
+}
+
+/**
+ * 전체 파이프라인 응답 생성
+ */
+function buildFullPipelineResponse(result: FullPipelineResult): ExecuteResponseData {
+  const totalItems =
+    (result.collection?.totalItems || 0) +
+    (result.transform?.totalItems || 0) +
+    (result.productCreate?.totalItems || 0) +
+    (result.publish?.totalItems || 0)
+
+  const successCount =
+    (result.collection?.successCount || 0) +
+    (result.transform?.successCount || 0) +
+    (result.productCreate?.successCount || 0) +
+    (result.publish?.successCount || 0)
+
+  const failedCount =
+    (result.collection?.failedCount || 0) +
+    (result.transform?.failedCount || 0) +
+    (result.productCreate?.failedCount || 0) +
+    (result.publish?.failedCount || 0)
+
+  return {
+    overallStatus: result.overallStatus,
+    totalItems,
+    successCount,
+    failedCount,
+    errorSummary: extractErrorSummary(result, 'full'),
+    stages: {
+      collection: createStageResult(result.collection, '게시물 수집'),
+      transform: createStageResult(result.transform, 'AI 변환'),
+      productCreate: createStageResult(result.productCreate, '상품 등록'),
+      publish: createStageResult(result.publish, '발행'),
+    },
+  }
+}
+
+/**
+ * 단일 파이프라인 응답 생성
+ */
+function buildSinglePipelineResponse(
+  result: PipelineResult,
+  type: 'collect' | 'transform' | 'register' | 'publish'
+): ExecuteResponseData {
+  const stageNames: Record<string, string> = {
+    collect: '게시물 수집',
+    transform: 'AI 변환',
+    register: '상품 등록',
+    publish: '발행',
+  }
+
+  return {
+    totalItems: result.totalItems,
+    successCount: result.successCount,
+    failedCount: result.failedCount,
+    errorSummary: extractErrorSummary(result, type),
+    stages: {
+      [type === 'register' ? 'productCreate' : type]: createStageResult(result, stageNames[type]),
+    },
+  }
+}
 
 /**
  * 자동화 설정 검증 결과
@@ -168,33 +351,51 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let result
+    let result: PipelineResult | FullPipelineResult | null
+    let responseData: ExecuteResponseData
 
     switch (type) {
       case 'collect':
         console.log(`[Execute] Collection for user ${currentUser.userId}`)
         result = await executeCollectionPipeline(currentUser.userId, config)
+        responseData = buildSinglePipelineResponse(result as PipelineResult, 'collect')
         break
 
       case 'transform':
         console.log(`[Execute] Transform for user ${currentUser.userId}`)
         result = await executeTransformPipeline(currentUser.userId, config)
+        responseData = buildSinglePipelineResponse(result as PipelineResult, 'transform')
         break
 
       case 'register':
         // register는 CollectedProduct에서 Product를 생성하는 파이프라인
         console.log(`[Execute] Product Create for user ${currentUser.userId}`)
         result = await executeProductCreatePipeline(currentUser.userId, config)
+        responseData = buildSinglePipelineResponse(result as PipelineResult, 'register')
         break
 
       case 'publish':
         console.log(`[Execute] Publish for user ${currentUser.userId}`)
         result = await executePublishPipeline(currentUser.userId, config)
+        responseData = buildSinglePipelineResponse(result as PipelineResult, 'publish')
         break
 
       case 'full':
         console.log(`[Execute] Full pipeline for user ${currentUser.userId}`)
-        result = await executeFullPipeline(currentUser.userId, config)
+        // Lock 기반 실행으로 중복 실행 방지
+        result = await executeFullPipelineWithLock(currentUser.userId, config, TriggerType.MANUAL)
+
+        if (!result) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: '이미 실행 중인 워크플로우가 있습니다. 완료될 때까지 기다려주세요.',
+            },
+            { status: 409 }
+          )
+        }
+
+        responseData = buildFullPipelineResponse(result as FullPipelineResult)
         break
 
       default:
@@ -204,9 +405,16 @@ export async function POST(request: NextRequest) {
         )
     }
 
+    // 성공 여부 판단 (failedCount가 있더라도 일부 성공하면 success: true)
+    const isSuccess = responseData.successCount > 0 || responseData.failedCount === 0
+
     return NextResponse.json({
-      success: true,
-      data: result,
+      success: isSuccess,
+      data: responseData,
+      // 에러가 있을 경우 최상위에 에러 메시지 추가
+      ...(responseData.errorSummary.length > 0 && {
+        error: `일부 항목 처리 중 오류 발생: ${responseData.errorSummary[0]?.message}`,
+      }),
     })
   } catch (error: any) {
     console.error('파이프라인 실행 실패:', error)

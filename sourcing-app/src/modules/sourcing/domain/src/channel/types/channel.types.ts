@@ -1,6 +1,7 @@
 import { ChannelKind, ChannelPlatform } from '@bandauto/db'
 
 export interface ChannelListParams {
+  userId?: number
   kind?: ChannelKind
   platform?: ChannelPlatform
   search?: string

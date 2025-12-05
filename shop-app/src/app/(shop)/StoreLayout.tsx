@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
-import { Search, ShoppingCart, User, MapPin, Menu, ChevronDown, Phone, HelpCircle, MessageSquare, LogOut } from 'lucide-react'
+import { Search, ShoppingCart, User, MapPin, ChevronDown, Phone, HelpCircle, MessageSquare, LogOut } from 'lucide-react'
 import { CartNotificationProvider, useCartNotification } from '@/contexts/CartNotificationContext'
 import CartNotificationBubble from '@/components/cart/CartNotificationBubble'
 import { useShop } from '@/contexts/ShopContext'
@@ -17,7 +17,6 @@ function StoreLayoutContent({
   const { shop } = useShop()
   const { cartCount } = useCartNotification()
   const [searchQuery, setSearchQuery] = useState('')
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false)
   const [isCustomerServiceOpen, setIsCustomerServiceOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
 
@@ -48,17 +47,6 @@ function StoreLayoutContent({
       window.location.href = `?search=${encodeURIComponent(searchQuery)}`
     }
   }
-
-  const categories = [
-    { name: '채소', icon: '🥬', href: '?category=채소' },
-    { name: '과일', icon: '🍎', href: '?category=과일' },
-    { name: '육류', icon: '🥩', href: '?category=육류' },
-    { name: '수산물', icon: '🐟', href: '?category=수산물' },
-    { name: '김치/반찬', icon: '🥢', href: '?category=김치' },
-    { name: '가공식품', icon: '📦', href: '?category=가공식품' },
-    { name: '냉동/간편식', icon: '🍱', href: '?category=냉동식품' },
-    { name: '건강식품', icon: '💊', href: '?category=건강식품' },
-  ]
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -120,7 +108,7 @@ function StoreLayoutContent({
                           <button
                             onClick={() => {
                               setIsUserMenuOpen(false)
-                              signOut({ callbackUrl: '' })
+                              signOut({ callbackUrl: '/main' })
                             }}
                             className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700 w-full"
                           >
@@ -141,6 +129,10 @@ function StoreLayoutContent({
                   <span className="text-gray-300">|</span>
                   <Link href="/auth/login" className="hover:text-abc-coral px-2">
                     로그인
+                  </Link>
+                  <span className="text-gray-300">|</span>
+                  <Link href="/order/lookup" className="hover:text-abc-coral px-2">
+                    비회원 주문조회
                   </Link>
                 </>
               )}
@@ -264,56 +256,6 @@ function StoreLayoutContent({
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="kurly-nav">
-          <div className="kurly-container">
-            <div className="kurly-nav-inner">
-              {/* Category Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setIsCategoryOpen(!isCategoryOpen)}
-                  className="kurly-nav-category"
-                >
-                  <Menu className="w-5 h-5" />
-                  <span>카테고리</span>
-                  <ChevronDown className={`w-4 h-4 transition-transform ${isCategoryOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {/* Category Dropdown Menu */}
-                {isCategoryOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setIsCategoryOpen(false)}
-                    />
-                    <div className="absolute top-full left-0 w-[240px] bg-white border border-gray-200 shadow-lg z-50 py-2">
-                      {categories.map((cat) => (
-                        <Link
-                          key={cat.name}
-                          href={cat.href}
-                          className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
-                          onClick={() => setIsCategoryOpen(false)}
-                        >
-                          <span className="text-xl">{cat.icon}</span>
-                          <span className="text-gray-700">{cat.name}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Navigation Links */}
-              <div className="kurly-nav-links">
-                <Link href="/main" className="kurly-nav-link">신상품</Link>
-                <Link href="?filter=best" className="kurly-nav-link">베스트</Link>
-                <Link href="?filter=sale" className="kurly-nav-link text-[#fa622f] font-bold">특가/혜택</Link>
-                <Link href="?filter=event" className="kurly-nav-link">이벤트</Link>
-              </div>
-
-            </div>
-          </div>
-        </nav>
       </header>
 
       {/* Main Content */}

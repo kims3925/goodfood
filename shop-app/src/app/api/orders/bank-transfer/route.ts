@@ -285,14 +285,14 @@ export async function POST(req: NextRequest) {
       const order = await tx.order.create({
         data: {
           userId,
+          shopId,
           orderNumber,
           status: CustomerOrderStatus.PENDING,
-          recipientName: shippingAddress.recipientName || customerInfo.name,
-          recipientPhone: shippingAddress.recipientPhone || customerInfo.phone,
-          postalCode: shippingAddress.postalCode,
-          address: shippingAddress.address,
-          addressDetail: shippingAddress.addressDetail || null,
-          deliveryMemo: shippingAddress.deliveryMemo || null,
+          // 주문자 정보
+          customerName: customerInfo.name,
+          customerPhone: customerInfo.phone,
+          customerEmail: customerInfo.email || null,
+          // 금액 정보
           subtotalAmount: subtotal,
           shippingFee,
           discountAmount: 0,
@@ -309,9 +309,21 @@ export async function POST(req: NextRequest) {
               totalPrice: item.unitPrice * item.quantity,
             })),
           },
+          // 배송지 정보 (ShippingAddress 테이블에 저장)
+          shippingAddress: {
+            create: {
+              recipientName: shippingAddress.recipientName || customerInfo.name,
+              recipientPhone: shippingAddress.recipientPhone || customerInfo.phone,
+              postalCode: shippingAddress.postalCode,
+              address: shippingAddress.address,
+              addressDetail: shippingAddress.addressDetail || null,
+              deliveryMemo: shippingAddress.deliveryMemo || null,
+            },
+          },
         },
         include: {
           items: true,
+          shippingAddress: true,
         },
       })
 

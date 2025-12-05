@@ -10,6 +10,7 @@ model PublishedProduct {
   cartItems        CartItem[]
   inquiries        Inquiry[]
   orderItems       OrderItem[]
+  guestOrderItems  GuestOrderItem[]
   publishHistories PublishHistory[]
   channel          Channel?         @relation(fields: [channelId], references: [id], onDelete: Cascade)
   shop             Shop?            @relation(fields: [shopId], references: [id], onDelete: Cascade)

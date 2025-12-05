@@ -6,14 +6,23 @@ import { channelService } from '@/modules/sourcing/domain/src/channel'
 // GET: 채널 목록 조회
 export async function GET(request: NextRequest) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: '로그인이 필요합니다.' },
+        { status: 401 }
+      )
+    }
+
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || ''
     const kind = searchParams.get('kind') as ChannelKind | null
     const platform = searchParams.get('platform') as ChannelPlatform | null
     const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
+    const limit = parseInt(searchParams.get('limit') || '100')
 
     const result = await channelService.getList({
+      userId: currentUser.userId,
       search,
       page,
       limit,

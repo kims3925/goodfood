@@ -24,7 +24,7 @@ import {
 
 /**
  * 발행 파이프라인 실행
- * PublishService를 사용하여 상품을 소매채널에 발행
+ * PublishService를 사용하여 상품을 소매채널 및 쇼핑몰에 발행
  */
 export async function runPublishPipeline(
   config: PublishConfig
@@ -34,7 +34,7 @@ export async function runPublishPipeline(
     throw new Error('Batch context is required')
   }
 
-  const { userId, workflowLogId } = context
+  const { userId, workflowLogId, shopIds } = context
   const errors: PipelineError[] = []
   const publishedProducts: PublishedProductResult[] = []
   const channelResults: ChannelPublishResult[] = []
@@ -96,7 +96,7 @@ export async function runPublishPipeline(
   console.log(`[Publish Pipeline] Publishing to ${retailChannels.length} retail channels`)
 
   // 진행 상황 초기화
-  const totalItems = productIds.length * retailChannels.length
+  let totalItems = productIds.length * retailChannels.length
   let currentSuccess = 0
   let currentFailed = 0
 
@@ -157,12 +157,67 @@ export async function runPublishPipeline(
     }
   }
 
-  const totalSuccess = channelResults.reduce((sum, r) => sum + r.success, 0)
-  const totalFailed = channelResults.reduce((sum, r) => sum + r.failed, 0)
+  let totalSuccess = channelResults.reduce((sum, r) => sum + r.success, 0)
+  let totalFailed = channelResults.reduce((sum, r) => sum + r.failed, 0)
+
+  // 쇼핑몰에도 발행 (shopIds가 설정된 경우)
+  if (shopIds && shopIds.length > 0) {
+    console.log(`[Publish Pipeline] Also publishing to ${shopIds.length} shop(s): ${shopIds.join(', ')}`)
+
+    for (const shopId of shopIds) {
+      const shopResult = await publishService.publishShopBatch({
+        userId,
+        productIds,
+        shopId,
+      })
+
+      // Shop 결과를 channelResults에 추가 (shopId를 음수로 구분)
+      const shopChannelResult: ChannelPublishResult = {
+        channelId: -shopId, // 음수로 표시하여 Shop임을 구분
+        channelName: `Shop: ${shopResult.shopName}`,
+        attempted: shopResult.total,
+        success: shopResult.successCount,
+        failed: shopResult.failedCount,
+        skipped: shopResult.skippedCount,
+        errors: shopResult.errors,
+      }
+      channelResults.push(shopChannelResult)
+
+      // 개별 상품 결과 추가
+      for (const productResult of shopResult.results) {
+        publishedProducts.push({
+          productId: productResult.productId,
+          channelId: -shopId,
+          status: productResult.success
+            ? productResult.skipped
+              ? 'SKIPPED'
+              : 'SUCCESS'
+            : 'FAILED',
+          error: productResult.error,
+        })
+
+        if (!productResult.success && productResult.error) {
+          errors.push({
+            itemId: `${productResult.productId}-shop-${shopId}`,
+            message: productResult.error,
+            timestamp: new Date(),
+          })
+        }
+      }
+
+      totalSuccess += shopResult.successCount
+      totalFailed += shopResult.failedCount
+      totalItems += productIds.length
+
+      if (workflowLogId) {
+        await updateWorkflowProgress(workflowLogId, totalItems, totalSuccess, totalFailed)
+      }
+    }
+  }
 
   return {
     success: totalFailed === 0,
-    totalItems: productIds.length * retailChannels.length,
+    totalItems,
     successCount: totalSuccess,
     failedCount: totalFailed,
     details: {

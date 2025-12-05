@@ -535,31 +535,33 @@ export default function CartPage() {
                 </div>
 
                 {/* 주문 버튼 */}
-                <div className="p-5 pb-4">
-                  {session ? (
-                    <Link
-                      href="/checkout?fromCart=true"
-                      className={`w-full py-4 rounded-md text-center font-semibold text-base block transition-colors ${
-                        selectedItems.length > 0
-                          ? 'bg-[#FF6B6B] text-white hover:bg-[#ff5252]'
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      }`}
-                      onClick={(e) => {
-                        if (selectedItems.length === 0) {
-                          e.preventDefault()
-                        }
-                      }}
-                    >
-                      {selectedItems.length > 0
-                        ? `주문하기`
-                        : '상품을 선택해주세요'}
-                    </Link>
-                  ) : (
+                <div className="p-5 pb-4 space-y-3">
+                  {/* 회원/비회원 공통 주문하기 버튼 */}
+                  <Link
+                    href="/checkout?fromCart=true"
+                    className={`w-full py-4 rounded-md text-center font-semibold text-base block transition-colors ${
+                      selectedItems.length > 0
+                        ? 'bg-[#FF6B6B] text-white hover:bg-[#ff5252]'
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    }`}
+                    onClick={(e) => {
+                      if (selectedItems.length === 0) {
+                        e.preventDefault()
+                      }
+                    }}
+                  >
+                    {selectedItems.length > 0
+                      ? session ? '주문하기' : '비회원 주문하기'
+                      : '상품을 선택해주세요'}
+                  </Link>
+
+                  {/* 비회원인 경우 로그인 버튼 추가 */}
+                  {!session && selectedItems.length > 0 && (
                     <Link
                       href="/auth/login"
-                      className="w-full py-4 rounded-md text-center font-semibold text-base block bg-[#FF6B6B] text-white hover:bg-[#ff5252] transition-colors"
+                      className="w-full py-3 rounded-md text-center font-medium text-sm block border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
                     >
-                      로그인
+                      로그인하고 주문하기
                     </Link>
                   )}
                 </div>
@@ -567,6 +569,12 @@ export default function CartPage() {
                 {/* 안내 문구 */}
                 <div className="px-5 pb-5 pt-2 border-t border-gray-100">
                   <ul className="space-y-1.5 text-[11px] text-gray-500">
+                    {!session && (
+                      <li className="flex items-start gap-1">
+                        <span className="text-[#FF6B6B]">·</span>
+                        <span className="text-[#FF6B6B]">비회원 주문은 무통장입금만 가능합니다</span>
+                      </li>
+                    )}
                     <li className="flex items-start gap-1">
                       <span className="text-gray-400">·</span>
                       <span>쿠폰/적립금은 주문서에서 사용 가능합니다</span>

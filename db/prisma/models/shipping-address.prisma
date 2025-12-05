@@ -1,0 +1,21 @@
+// 주문에 귀속되는 배송지 테이블 (회원/비회원 공용)
+model ShippingAddress {
+  id             Int      @id @default(autoincrement())
+  orderId        Int?     @unique @map("order_id")
+  guestOrderId   Int?     @unique @map("guest_order_id")
+  recipientName  String   @map("recipient_name") @db.VarChar(100)
+  recipientPhone String   @map("recipient_phone") @db.VarChar(20)
+  postalCode     String   @map("postal_code") @db.VarChar(10)
+  address        String   @db.VarChar(500)
+  addressDetail  String?  @map("address_detail") @db.VarChar(500)
+  deliveryMemo   String?  @map("delivery_memo") @db.VarChar(500)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  order      Order?      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  guestOrder GuestOrder? @relation(fields: [guestOrderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([guestOrderId])
+  @@map("shipping_address")
+}

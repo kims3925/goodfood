@@ -798,7 +798,7 @@ export default function CollectedProductListPage() {
                             {product.name || '(상품명 미추출)'}
                           </div>
                           <div className="text-sm text-gray-500 truncate">
-                            {product.post?.title}
+                            {product.description || '-'}
                           </div>
                         </div>
                       </div>

@@ -288,9 +288,9 @@ export class PaymentService {
           orderNumber: result.order.orderNumber,
           status: result.order.status,
           customer: {
-            name: result.order.user.name || '고객',
-            email: result.order.user.email || '',
-            phone: result.order.user.phone || '',
+            name: result.order.customerName || result.order.user?.name || '고객',
+            email: result.order.customerEmail || result.order.user?.email || '',
+            phone: result.order.customerPhone || result.order.user?.phone || '',
           },
           quantity: result.order.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
           subtotal: Number(result.order.subtotalAmount),
@@ -389,12 +389,11 @@ export class PaymentService {
         shopId: prepareData.shopId ?? null,
         orderNumber: prepareData.orderId,
         status: 'PENDING',
-        recipientName: prepareData.shippingAddress.recipientName,
-        recipientPhone: prepareData.shippingAddress.recipientPhone,
-        postalCode: prepareData.shippingAddress.postalCode,
-        address: prepareData.shippingAddress.address,
-        addressDetail: prepareData.shippingAddress.addressDetail || null,
-        deliveryMemo: prepareData.shippingAddress.deliveryMemo || null,
+        // 주문자 정보
+        customerName: prepareData.customerInfo.name,
+        customerPhone: prepareData.customerInfo.phone,
+        customerEmail: prepareData.customerInfo.email || null,
+        // 금액 정보
         subtotalAmount: new Decimal(subtotal),
         shippingFee: new Decimal(shippingFee),
         discountAmount: new Decimal(discountAmount),
@@ -411,12 +410,24 @@ export class PaymentService {
             totalPrice: new Decimal(item.unitPrice * item.quantity),
           })),
         },
+        // 배송지 정보 (ShippingAddress 테이블에 저장)
+        shippingAddress: {
+          create: {
+            recipientName: prepareData.shippingAddress.recipientName,
+            recipientPhone: prepareData.shippingAddress.recipientPhone,
+            postalCode: prepareData.shippingAddress.postalCode,
+            address: prepareData.shippingAddress.address,
+            addressDetail: prepareData.shippingAddress.addressDetail || null,
+            deliveryMemo: prepareData.shippingAddress.deliveryMemo || null,
+          },
+        },
       },
       include: {
         payment: true,
         user: true,
         items: true,
         shop: true,
+        shippingAddress: true,
       },
     })
 

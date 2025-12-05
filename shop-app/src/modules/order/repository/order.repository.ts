@@ -22,21 +22,45 @@ export interface OrderItemInput {
   unitPrice: number
 }
 
-export interface CreateOrderInput {
-  userId: number
-  shopId?: number | null  // Shop 기반 주문 필터링
-  orderNumber: string
+export interface ShippingAddressInput {
   recipientName: string
   recipientPhone: string
   postalCode: string
   address: string
   addressDetail?: string | null
   deliveryMemo?: string | null
+}
+
+export interface CreateOrderInput {
+  userId: number
+  shopId?: number | null  // Shop 기반 주문 필터링
+  orderNumber: string
+  // 주문자 정보
+  customerName: string
+  customerPhone: string
+  customerEmail?: string | null
+  // 배송지 정보 (별도 테이블로 분리)
+  shippingAddress: ShippingAddressInput
+  // 금액 정보
   subtotalAmount: number
   shippingFee: number
   discountAmount?: number
   totalAmount: number
   items: OrderItemInput[]
+}
+
+export interface ShippingAddressWithRelations {
+  id: number
+  orderId: number | null
+  guestOrderId: number | null
+  recipientName: string
+  recipientPhone: string
+  postalCode: string
+  address: string
+  addressDetail: string | null
+  deliveryMemo: string | null
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface OrderWithRelations {
@@ -45,12 +69,11 @@ export interface OrderWithRelations {
   shopId: number | null  // Shop 기반 필터링
   orderNumber: string
   status: string
-  recipientName: string
-  recipientPhone: string
-  postalCode: string
-  address: string
-  addressDetail: string | null
-  deliveryMemo: string | null
+  // 주문자 정보
+  customerName: string
+  customerPhone: string
+  customerEmail: string | null
+  // 금액 정보
   subtotalAmount: any
   shippingFee: any
   discountAmount: any
@@ -70,6 +93,8 @@ export interface OrderWithRelations {
     email: string
     phone: string | null
   }
+  // 배송지 정보 (별도 테이블)
+  shippingAddress: ShippingAddressWithRelations | null
   items: Array<{
     id: number
     orderId: number
@@ -110,6 +135,7 @@ const orderIncludeOptions = {
       phone: true,
     },
   },
+  shippingAddress: true,  // 배송지 정보 포함
   items: {
     include: {
       publishedProduct: {
@@ -138,16 +164,26 @@ export class OrderRepository {
         shopId: data.shopId || null,  // Shop 기반 주문 필터링
         orderNumber: data.orderNumber,
         status: 'PENDING',
-        recipientName: data.recipientName,
-        recipientPhone: data.recipientPhone,
-        postalCode: data.postalCode,
-        address: data.address,
-        addressDetail: data.addressDetail || null,
-        deliveryMemo: data.deliveryMemo || null,
+        // 주문자 정보
+        customerName: data.customerName,
+        customerPhone: data.customerPhone,
+        customerEmail: data.customerEmail || null,
+        // 금액 정보
         subtotalAmount: new Decimal(data.subtotalAmount),
         shippingFee: new Decimal(data.shippingFee),
         discountAmount: new Decimal(data.discountAmount || 0),
         totalAmount: new Decimal(data.totalAmount),
+        // 배송지 정보 (별도 테이블)
+        shippingAddress: {
+          create: {
+            recipientName: data.shippingAddress.recipientName,
+            recipientPhone: data.shippingAddress.recipientPhone,
+            postalCode: data.shippingAddress.postalCode,
+            address: data.shippingAddress.address,
+            addressDetail: data.shippingAddress.addressDetail || null,
+            deliveryMemo: data.shippingAddress.deliveryMemo || null,
+          },
+        },
         items: {
           create: data.items.map((item) => ({
             publishedProductId: item.publishedProductId,

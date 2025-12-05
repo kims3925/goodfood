@@ -417,6 +417,7 @@ export default function PublishPage() {
       let totalSuccess = 0
       let totalSkipped = 0
       let totalFailed = 0
+      const errorMessages: string[] = []
 
       // Shop 발행 처리
       for (const [shopId, productIds] of Object.entries(shopToProducts)) {
@@ -429,7 +430,7 @@ export default function PublishPage() {
 
           const data = await response.json()
 
-          if (data.success && data.results) {
+          if (data.results) {
             for (const result of data.results) {
               if (result.status === 'SUCCESS') {
                 successfulCells.add(cellKey(result.productId, 'shop', Number(shopId)))
@@ -439,10 +440,16 @@ export default function PublishPage() {
                 totalSkipped++
               } else if (result.status === 'FAILED') {
                 totalFailed++
+                if (result.message) {
+                  errorMessages.push(result.message)
+                }
               }
             }
           } else if (!data.success) {
             totalFailed += productIds.length
+            if (data.error) {
+              errorMessages.push(data.error)
+            }
           }
         }
       }
@@ -458,7 +465,7 @@ export default function PublishPage() {
 
           const data = await response.json()
 
-          if (data.success && data.results) {
+          if (data.results) {
             for (const result of data.results) {
               if (result.status === 'SUCCESS') {
                 successfulCells.add(cellKey(result.productId, 'channel', Number(channelId)))
@@ -468,10 +475,16 @@ export default function PublishPage() {
                 totalSkipped++
               } else if (result.status === 'FAILED') {
                 totalFailed++
+                if (result.message) {
+                  errorMessages.push(result.message)
+                }
               }
             }
           } else if (!data.success) {
             totalFailed += productIds.length
+            if (data.error) {
+              errorMessages.push(data.error)
+            }
           }
         }
       }
@@ -485,7 +498,14 @@ export default function PublishPage() {
 
       // 결과 알림
       if (totalFailed > 0) {
-        toast.warning(`발행 결과: 성공 ${totalSuccess}개, 건너뜀 ${totalSkipped}개, 실패 ${totalFailed}개`)
+        // 중복 제거 후 첫 번째 에러 메시지 표시
+        const uniqueErrors = [...new Set(errorMessages)]
+        const firstError = uniqueErrors[0]
+        if (firstError) {
+          toast.error(`발행 실패: ${firstError}`)
+        } else {
+          toast.warning(`발행 결과: 성공 ${totalSuccess}개, 건너뜀 ${totalSkipped}개, 실패 ${totalFailed}개`)
+        }
       } else if (totalSuccess > 0) {
         toast.success(`${totalSuccess}개 상품 발행 완료`)
       } else if (totalSkipped > 0) {

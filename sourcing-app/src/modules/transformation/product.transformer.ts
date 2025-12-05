@@ -22,11 +22,51 @@ import { generateVariants } from './variant.generator'
 // =============================================
 
 /**
+ * 프롬프트 변수 치환
+ */
+function replacePromptVariables(template: string, input: ProductTransformationInput): string {
+  const { post, policyContent } = input
+
+  // 정책 섹션 생성
+  const policySection = policyContent
+    ? `
+# 가격 정책
+${policyContent}
+`
+    : ''
+
+  // 가격 추출 규칙
+  const pricingRule = policyContent
+    ? `5. **가격**: 도매가(wholesalePrice)와 판매가(price)를 추출합니다.
+   - 도매가: 게시물에서 추출한 원래 가격
+   - 판매가: 위 가격정책을 적용한 최종 가격`
+    : `5. **가격**: 상품의 가격을 추출합니다.
+   - 도매가(wholesalePrice): 공급가, 도매가
+   - 판매가(price): 소비자 판매 가격 (없으면 도매가와 동일)`
+
+  // 변수 치환
+  return template
+    .replace(/\{title\}/g, post.title || '')
+    .replace(/\{content\}/g, post.content || '')
+    .replace(/\{policySection\}/g, policySection)
+    .replace(/\{pricingRule\}/g, pricingRule)
+}
+
+/**
  * Generate AI prompt for product extraction (simplified version)
  */
 function buildProductExtractionPrompt(input: ProductTransformationInput): string {
-  const { post, policyContent } = input
+  const { post, policyContent, customPrompt } = input
   const imageCount = post.images?.length || 0
+
+  // 커스텀 프롬프트가 있으면 변수 치환 후 반환
+  if (customPrompt) {
+    console.log('📝 커스텀 프롬프트 사용 중')
+    return replacePromptVariables(customPrompt, input)
+  }
+
+  // 기본 프롬프트 사용
+  console.log('📝 기본 프롬프트 사용 중')
 
   // 정책 섹션 생성
   const policySection = policyContent

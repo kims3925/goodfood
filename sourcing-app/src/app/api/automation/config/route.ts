@@ -43,9 +43,9 @@ export async function GET() {
           retailChannelIds: [],
           aiProvider: 'GEMINI',
           pricingPolicyId: null,
-          autoPublish: false,
           lastRunAt: null,
           nextRunAt: null,
+          shopIds: [],
         },
       })
     }
@@ -56,12 +56,16 @@ export async function GET() {
     // Parse JSON strings back to arrays
     let channelIds: number[] = []
     let retailChannelIds: number[] = []
+    let shopIds: number[] = []
     try {
       channelIds = config.channelIds ? JSON.parse(config.channelIds) : []
     } catch { channelIds = [] }
     try {
       retailChannelIds = config.retailChannelIds ? JSON.parse(config.retailChannelIds) : []
     } catch { retailChannelIds = [] }
+    try {
+      shopIds = config.shopIds ? JSON.parse(config.shopIds) : []
+    } catch { shopIds = [] }
 
     return NextResponse.json({
       success: true,
@@ -71,6 +75,7 @@ export async function GET() {
         channelIds,
         wholesaleChannelIds: channelIds,
         retailChannelIds,
+        shopIds,
       },
     })
   } catch (error) {
@@ -104,13 +109,14 @@ export async function POST(request: NextRequest) {
       wholesaleChannelIds,
       aiProvider,
       pricingPolicyId,
-      autoPublish,
       retailChannelIds,
+      shopIds,
     } = body
 
     // wholesaleChannelIds 또는 channelIds 둘 다 지원 (하위 호환성)
     const finalChannelIds = wholesaleChannelIds || channelIds || []
     const finalRetailChannelIds = retailChannelIds || []
+    const finalShopIds = shopIds || []
 
     // cronInterval을 cronExpression으로 변환
     const cronExpression = cronInterval ? CRON_EXPRESSIONS[cronInterval as CronInterval] : null
@@ -130,8 +136,8 @@ export async function POST(request: NextRequest) {
         channelIds: JSON.stringify(finalChannelIds),
         aiProvider: aiProvider || 'GEMINI',
         pricingPolicyId: pricingPolicyId || null,
-        autoPublish: autoPublish ?? false,
         retailChannelIds: JSON.stringify(finalRetailChannelIds),
+        shopIds: JSON.stringify(finalShopIds),
         nextRunAt,
       },
       update: {
@@ -140,8 +146,8 @@ export async function POST(request: NextRequest) {
         channelIds: JSON.stringify(finalChannelIds),
         aiProvider: aiProvider || 'GEMINI',
         pricingPolicyId: pricingPolicyId || null,
-        autoPublish: autoPublish ?? false,
         retailChannelIds: JSON.stringify(finalRetailChannelIds),
+        shopIds: JSON.stringify(finalShopIds),
         nextRunAt,
       },
     })

@@ -15,6 +15,7 @@ model User {
   signupCompletedAt  DateTime?           @map("signup_completed_at") @db.Timestamp(0)
   tosAgreedAt        DateTime?           @map("tos_agreed_at") @db.Timestamp(0)
   aiApiConfigs       AiApiConfig[]
+  aiPromptConfigs    AiPromptConfig[]
   automationConfig   AutomationConfig?
   carts              Cart[]
   channels           Channel[]
@@ -102,4 +103,23 @@ model AiApiConfig {
   @@index([provider])
   @@index([isActive])
   @@map("ai_api_config")
+}
+
+model AiPromptConfig {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  promptType  String   @map("prompt_type") @db.VarChar(50) // e.g., "product_extraction"
+  name        String   @db.VarChar(100)
+  prompt      String   @db.LongText
+  description String?  @db.VarChar(500)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, promptType])
+  @@index([userId])
+  @@index([promptType])
+  @@index([isActive])
+  @@map("ai_prompt_config")
 }

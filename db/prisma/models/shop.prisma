@@ -15,10 +15,11 @@ model Shop {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
 
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   theme              ShopTheme?
   carts              Cart[]
   orders             Order[]
+  guestOrders        GuestOrder[]
   publishedProducts  PublishedProduct[]
   channels           Channel[]
 

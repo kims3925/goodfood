@@ -7,6 +7,78 @@ import prisma, { WorkflowType, WorkflowStatus, TriggerType } from '@bandauto/db'
 import { WorkflowLogInput, WorkflowLogUpdate, AutomationStats } from './types'
 
 // =============================================
+// EXECUTION LOCK (중복 실행 방지)
+// =============================================
+
+/**
+ * 실행 Lock 획득 (트랜잭션 기반)
+ * 동시 실행 방지를 위해 워크플로우 생성과 중복 체크를 원자적으로 수행
+ *
+ * @returns 성공 시 워크플로우 ID, 실패 시 null
+ */
+export async function acquireExecutionLock(
+  userId: number,
+  workflowType: WorkflowType,
+  triggerType: TriggerType = TriggerType.MANUAL
+): Promise<number | null> {
+  try {
+    // 트랜잭션으로 원자적 Lock 획득
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. 기존 RUNNING 워크플로우 확인 (15분 이상 stuck 체크 포함)
+      const cutoffTime = new Date()
+      cutoffTime.setMinutes(cutoffTime.getMinutes() - 15)
+
+      // 오래된 stuck 워크플로우 자동 정리
+      await tx.workflowLog.updateMany({
+        where: {
+          userId,
+          status: WorkflowStatus.RUNNING,
+          startedAt: { lt: cutoffTime },
+        },
+        data: {
+          status: WorkflowStatus.FAILED,
+          completedAt: new Date(),
+          errorMessage: '워크플로우가 15분 이상 응답이 없어 자동 종료되었습니다.',
+        },
+      })
+
+      // 2. 현재 RUNNING 상태인 워크플로우 확인
+      const existing = await tx.workflowLog.findFirst({
+        where: {
+          userId,
+          status: WorkflowStatus.RUNNING,
+        },
+      })
+
+      // 이미 실행 중이면 null 반환 (Lock 획득 실패)
+      if (existing) {
+        console.log(`[WorkflowService] Lock 획득 실패 - 이미 실행 중 (workflow: ${existing.id})`)
+        return null
+      }
+
+      // 3. 새 워크플로우 생성 (Lock 역할)
+      const log = await tx.workflowLog.create({
+        data: {
+          userId,
+          workflowType,
+          triggerType,
+          status: WorkflowStatus.RUNNING,
+          startedAt: new Date(),
+        },
+      })
+
+      console.log(`[WorkflowService] Lock 획득 성공 (workflow: ${log.id})`)
+      return log.id
+    })
+
+    return result
+  } catch (error: any) {
+    console.error('[WorkflowService] Lock 획득 중 오류:', error)
+    return null
+  }
+}
+
+// =============================================
 // WORKFLOW LOG MANAGEMENT
 // =============================================
 
