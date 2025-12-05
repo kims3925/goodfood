@@ -34,7 +34,6 @@ model Order {
   @@index([status])
   @@index([orderedAt])
   @@index([userId, status])
-  @@index([referrerChannelId])
   @@map("order")
 }
 

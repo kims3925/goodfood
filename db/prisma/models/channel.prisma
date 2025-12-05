@@ -31,6 +31,8 @@ model Channel {
   carts              Cart[]
   orders             Order[]
   theme              ChannelTheme?
+  referredCartItems  CartItem[]         @relation("CartItemReferrer")
+  referredOrderItems OrderItem[]        @relation("OrderItemReferrer")
 
   @@unique([userId, channelKey])
   @@index([userId])
