@@ -2,14 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Store, Trash2, Pencil, X, Save, ImageIcon, Package, Calendar, Globe, History, DollarSign, Clock, AlertCircle, CheckCircle } from 'lucide-react'
-// Pencil, X, Save는 상품 정보 편집에서 사용됨
+import { ArrowLeft, Store, Trash2, ImageIcon, Package, Calendar, Globe, History, DollarSign, Clock, AlertCircle, CheckCircle, Info, ExternalLink } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
-import Input from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toast'
 import ProductImageViewer from '@/components/ui/ProductImageViewer'
+import Link from 'next/link'
 
 interface PublishedProductDetail {
   id: number
@@ -83,19 +82,6 @@ export default function PublishedProductDetailPage({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // 상품 정보 수정 상태
-  const [isEditingProduct, setIsEditingProduct] = useState(false)
-  const [isSavingProduct, setIsSavingProduct] = useState(false)
-  const [productChanged, setProductChanged] = useState(false)
-  const [editForm, setEditForm] = useState({
-    name: '',
-    description: '',
-  })
-  const [originalForm, setOriginalForm] = useState({
-    name: '',
-    description: '',
-  })
-
 
   const loadProduct = useCallback(async () => {
     try {
@@ -105,14 +91,6 @@ export default function PublishedProductDetailPage({
 
       if (data.success) {
         setProduct(data.data)
-        const formData = {
-          name: data.data.product.name || '',
-          description: data.data.product.description || '',
-        }
-        setEditForm(formData)
-        setOriginalForm(formData)
-        setProductChanged(false)
-        setIsEditingProduct(false)
       } else {
         toast.error('발행상품을 불러오는데 실패했습니다.')
         router.push('/published-product/list')
@@ -161,60 +139,6 @@ export default function PublishedProductDetailPage({
   // variant에서 대표 가격 추출
   const getMainPrice = () => {
     return product?.product?.variants?.[0]?.price ?? null
-  }
-
-  const startEditingProduct = () => {
-    setIsEditingProduct(true)
-    setProductChanged(false)
-  }
-
-  const cancelEditingProduct = () => {
-    setEditForm(originalForm)
-    setProductChanged(false)
-    setIsEditingProduct(false)
-  }
-
-  const handleFormChange = (field: string, value: string) => {
-    const newForm = { ...editForm, [field]: value }
-    setEditForm(newForm)
-    const hasChanged =
-      newForm.name !== originalForm.name ||
-      newForm.description !== originalForm.description
-    setProductChanged(hasChanged)
-  }
-
-  const handleSaveProduct = async () => {
-    if (!product) return
-
-    setIsSavingProduct(true)
-    try {
-      const response = await fetch(`/api/product/${product.productId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: editForm.name,
-          description: editForm.description || null,
-        }),
-      })
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success('상품 정보가 저장되었습니다.')
-        setOriginalForm(editForm)
-        setProductChanged(false)
-        setIsEditingProduct(false)
-        loadProduct()
-      } else {
-        toast.error(data.error || '상품 수정에 실패했습니다.')
-      }
-    } catch (error) {
-      console.error('상품 저장 실패:', error)
-      toast.error('상품 저장에 실패했습니다.')
-    } finally {
-      setIsSavingProduct(false)
-    }
   }
 
   const getHistoryStatusBadge = (status: string) => {
@@ -284,6 +208,30 @@ export default function PublishedProductDetailPage({
       </div>
 
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* 안내 문구 */}
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+              <Info size={18} className="text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-900">
+                발행상품의 정보를 수정하려면 원본 상품을 수정해주세요.
+              </p>
+              <p className="text-sm text-blue-700 mt-1">
+                상품 관리에서 원본 상품을 수정하면 이 발행상품에도 자동으로 반영됩니다.
+              </p>
+              <Link
+                href={`/product/detail/${product.productId}`}
+                className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <ExternalLink size={14} />
+                원본 상품 수정하기
+              </Link>
+            </div>
+          </div>
+        </div>
+
         {/* 2컬럼 레이아웃 */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           {/* 왼쪽: 이미지 갤러리 */}
@@ -392,91 +340,44 @@ export default function PublishedProductDetailPage({
             {/* 상품 정보 카드 */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Package size={18} className="text-blue-600" />
-                    </div>
-                    <span className="font-semibold text-slate-900">상품 정보</span>
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Package size={18} className="text-blue-600" />
                   </div>
-                  {isEditingProduct ? (
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="secondary" onClick={cancelEditingProduct}>
-                        <X size={14} />
-                        취소
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleSaveProduct}
-                        disabled={!productChanged || isSavingProduct || !editForm.name}
-                      >
-                        <Save size={14} />
-                        {isSavingProduct ? '저장중...' : '저장'}
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button size="sm" variant="secondary" onClick={startEditingProduct}>
-                      <Pencil size={14} />
-                      수정
-                    </Button>
-                  )}
+                  <span className="font-semibold text-slate-900">상품 정보</span>
                 </div>
               </div>
 
               <div className="p-6">
-                {isEditingProduct ? (
-                  <div className="space-y-5">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">상품명</label>
-                      <Input
-                        value={editForm.name}
-                        onChange={(e) => handleFormChange('name', e.target.value)}
-                        placeholder="상품명을 입력하세요"
-                        className="!rounded-xl"
-                      />
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">상품명</label>
+                    <h1 className="text-xl font-bold text-slate-900">{product.product.name}</h1>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-xl">
+                      <DollarSign size={18} className="text-emerald-600" />
                     </div>
+                    <div>
+                      <p className="text-slate-500 text-xs">판매가</p>
+                      <p className="text-xl font-bold text-slate-900">{formatPrice(getMainPrice())}</p>
+                    </div>
+                  </div>
+
+                  {product.product.description && (
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">설명</label>
-                      <textarea
-                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                        rows={6}
-                        value={editForm.description}
-                        onChange={(e) => handleFormChange('description', e.target.value)}
-                        placeholder="상품 설명을 입력하세요"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-5">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">상품명</label>
-                      <h1 className="text-xl font-bold text-slate-900">{product.product.name}</h1>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-xl">
-                        <DollarSign size={18} className="text-emerald-600" />
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs">판매가</p>
-                        <p className="text-xl font-bold text-slate-900">{formatPrice(getMainPrice())}</p>
+                      <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                        <p className="text-slate-700 whitespace-pre-wrap text-sm leading-relaxed">
+                          {product.product.description.length > 300
+                            ? `${product.product.description.substring(0, 300)}...`
+                            : product.product.description}
+                        </p>
                       </div>
                     </div>
-
-                    {product.product.description && (
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">설명</label>
-                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                          <p className="text-slate-700 whitespace-pre-wrap text-sm leading-relaxed">
-                            {product.product.description.length > 300
-                              ? `${product.product.description.substring(0, 300)}...`
-                              : product.product.description}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
 

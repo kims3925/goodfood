@@ -421,209 +421,136 @@ export default function ShopDetailPage({
           </div>
         </div>
 
-        {/* 상세 정보 그리드 */}
-        <div className="grid grid-cols-2 gap-6">
-          {/* 왼쪽 컬럼 */}
-          <div className="space-y-6">
-            {/* 기본 정보 카드 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Store size={18} className="text-blue-600" />
-                  </div>
-                  <span className="font-semibold text-slate-900">기본 정보</span>
+        {/* 첫 번째 줄: 기본 정보 | 활성화 + 연락처 */}
+        <div className="grid grid-cols-2 gap-6 mb-6">
+          {/* 기본 정보 카드 */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Store size={18} className="text-blue-600" />
                 </div>
+                <span className="font-semibold text-slate-900">기본 정보</span>
               </div>
-              <div className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">서브도메인</label>
-                    {isEditMode ? (
-                      <Input
-                        value={subdomain}
-                        onChange={(e) => setSubdomain(e.target.value.toLowerCase())}
-                        placeholder="myshop"
-                      />
-                    ) : (
-                      <p className="text-gray-900 font-mono">{shop.subdomain}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">쇼핑몰명</label>
-                    {isEditMode ? (
-                      <Input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="내 쇼핑몰"
-                      />
-                    ) : (
-                      <p className="text-gray-900">{shop.name}</p>
-                    )}
-                  </div>
-                </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">상태</label>
-                    {isEditMode ? (
-                      <div className="flex items-center gap-4">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="isActive"
-                            checked={isActive}
-                            onChange={() => setIsActive(true)}
-                            className="w-4 h-4 text-green-600"
-                          />
-                          <span className="text-sm text-gray-700">활성</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="isActive"
-                            checked={!isActive}
-                            onChange={() => setIsActive(false)}
-                            className="w-4 h-4 text-gray-600"
-                          />
-                          <span className="text-sm text-gray-700">비활성</span>
-                        </label>
-                      </div>
-                    ) : (
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          shop.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        {shop.isActive ? <Power size={12} /> : <PowerOff size={12} />}
-                        {shop.isActive ? '활성' : '비활성'}
-                      </span>
-                    )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-2">커버 이미지</label>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">서브도메인</label>
                   {isEditMode ? (
-                    <ImageUpload
-                      value={coverUrl}
-                      onChange={setCoverUrl}
-                      placeholder="쇼핑몰 커버 이미지"
+                    <Input
+                      value={subdomain}
+                      onChange={(e) => setSubdomain(e.target.value.toLowerCase())}
+                      placeholder="myshop"
                     />
                   ) : (
-                    coverUrl ? (
-                      <div className="relative w-full h-32 rounded-lg overflow-hidden border border-gray-200">
-                        <img src={coverUrl} alt="커버 이미지" className="w-full h-full object-cover" />
-                      </div>
-                    ) : (
-                      <div className="w-full h-32 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50">
-                        <span className="text-gray-400 text-sm">이미지 없음</span>
-                      </div>
-                    )
+                    <p className="text-gray-900 font-mono">{shop.subdomain}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">쇼핑몰명</label>
+                  {isEditMode ? (
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="내 쇼핑몰"
+                    />
+                  ) : (
+                    <p className="text-gray-900">{shop.name}</p>
                   )}
                 </div>
               </div>
-            </div>
-
-            {/* 정산 정보 카드 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <CreditCard size={18} className="text-green-600" />
-                  </div>
-                  <span className="font-semibold text-slate-900">정산 정보</span>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">은행명</label>
-                    {isEditMode ? (
-                      <Input
-                        value={bankName}
-                        onChange={(e) => setBankName(e.target.value)}
-                        placeholder="국민은행"
-                      />
-                    ) : (
-                      <p className="text-gray-900">{shop.bankName || '-'}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">계좌번호</label>
-                    {isEditMode ? (
-                      <Input
-                        value={bankAccount}
-                        onChange={(e) => setBankAccount(e.target.value)}
-                        placeholder="123-456-789012"
-                      />
-                    ) : (
-                      <p className="text-gray-900 font-mono">{shop.bankAccount || '-'}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">예금주</label>
-                    {isEditMode ? (
-                      <Input
-                        value={accountHolder}
-                        onChange={(e) => setAccountHolder(e.target.value)}
-                        placeholder="홍길동"
-                      />
-                    ) : (
-                      <p className="text-gray-900">{shop.accountHolder || '-'}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 배송 설정 카드 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <Truck size={18} className="text-orange-600" />
-                  </div>
-                  <span className="font-semibold text-slate-900">배송 설정</span>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">무료배송 기준금액</label>
-                    {isEditMode ? (
-                      <div className="relative">
-                        <Input
-                          type="number"
-                          value={freeShippingAmount || ''}
-                          onChange={(e) => setFreeShippingAmount(e.target.value ? parseInt(e.target.value) : null)}
-                          placeholder="50000"
-                        />
-                      </div>
-                    ) : (
-                      <p className="text-gray-900">
-                        {shop.freeShippingAmount ? `${shop.freeShippingAmount.toLocaleString()}원` : '-'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">기본 배송비</label>
-                    {isEditMode ? (
-                      <Input
-                        type="number"
-                        value={defaultShippingFee || ''}
-                        onChange={(e) => setDefaultShippingFee(e.target.value ? parseInt(e.target.value) : null)}
-                        placeholder="3000"
-                      />
-                    ) : (
-                      <p className="text-gray-900">
-                        {shop.defaultShippingFee ? `${shop.defaultShippingFee.toLocaleString()}원` : '-'}
-                      </p>
-                    )}
-                  </div>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">커버 이미지</label>
+                {isEditMode ? (
+                  <ImageUpload
+                    value={coverUrl}
+                    onChange={setCoverUrl}
+                    placeholder="쇼핑몰 커버 이미지"
+                  />
+                ) : (
+                  coverUrl ? (
+                    <div className="relative w-full h-32 rounded-lg overflow-hidden border border-gray-200">
+                      <img src={coverUrl} alt="커버 이미지" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="w-full h-32 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50">
+                      <span className="text-gray-400 text-sm">이미지 없음</span>
+                    </div>
+                  )
+                )}
               </div>
             </div>
           </div>
 
-          {/* 오른쪽 컬럼 */}
+          {/* 오른쪽: 활성화 + 연락처 */}
           <div className="space-y-6">
+            {/* 활성화 상태 카드 */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center gap-2">
+                  <div className={`p-2 rounded-lg ${isActive ? 'bg-green-100' : 'bg-gray-100'}`}>
+                    {isActive ? (
+                      <Power size={18} className="text-green-600" />
+                    ) : (
+                      <PowerOff size={18} className="text-gray-500" />
+                    )}
+                  </div>
+                  <span className="font-semibold text-slate-900">활성화 상태</span>
+                </div>
+              </div>
+              <div className="p-6">
+                {isEditMode ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">쇼핑몰 활성화 여부를 설정합니다.</p>
+                      <p className="text-xs text-gray-400">비활성화된 쇼핑몰은 고객에게 표시되지 않습니다.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsActive(!isActive)}
+                      className={`relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                        isActive ? 'bg-green-500 focus:ring-green-500' : 'bg-gray-300 focus:ring-gray-500'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          isActive ? 'translate-x-6' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">현재 상태</p>
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
+                          shop.isActive
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {shop.isActive ? <Power size={14} /> : <PowerOff size={14} />}
+                        {shop.isActive ? '활성화됨' : '비활성화됨'}
+                      </span>
+                    </div>
+                    {shop.isActive && (
+                      <a
+                        href={`https://${shop.subdomain}.bandauto.com`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+                      >
+                        쇼핑몰 방문
+                        <ExternalLink size={14} />
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* 연락처 카드 */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-4 border-b border-slate-100 bg-slate-50/50">
@@ -663,18 +590,126 @@ export default function ShopDetailPage({
                 </div>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* 테마 설정 카드 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-pink-100 rounded-lg">
-                    <Palette size={18} className="text-pink-600" />
-                  </div>
-                  <span className="font-semibold text-slate-900">테마 설정</span>
+        {/* 두 번째 줄: 정산 정보 | 배송 설정 */}
+        <div className="grid grid-cols-2 gap-6 mb-6">
+          {/* 정산 정보 카드 */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <CreditCard size={18} className="text-green-600" />
+                </div>
+                <span className="font-semibold text-slate-900">정산 정보</span>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">은행명</label>
+                  {isEditMode ? (
+                    <Input
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      placeholder="국민은행"
+                    />
+                  ) : (
+                    <p className="text-gray-900">{shop.bankName || '-'}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">계좌번호</label>
+                  {isEditMode ? (
+                    <Input
+                      value={bankAccount}
+                      onChange={(e) => setBankAccount(e.target.value)}
+                      placeholder="123-456-789012"
+                    />
+                  ) : (
+                    <p className="text-gray-900 font-mono">{shop.bankAccount || '-'}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">예금주</label>
+                  {isEditMode ? (
+                    <Input
+                      value={accountHolder}
+                      onChange={(e) => setAccountHolder(e.target.value)}
+                      placeholder="홍길동"
+                    />
+                  ) : (
+                    <p className="text-gray-900">{shop.accountHolder || '-'}</p>
+                  )}
                 </div>
               </div>
-              <div className="p-6 space-y-5">
+            </div>
+          </div>
+
+          {/* 배송 설정 카드 */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <Truck size={18} className="text-orange-600" />
+                </div>
+                <span className="font-semibold text-slate-900">배송 설정</span>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">무료배송 기준금액</label>
+                  {isEditMode ? (
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        value={freeShippingAmount || ''}
+                        onChange={(e) => setFreeShippingAmount(e.target.value ? parseInt(e.target.value) : null)}
+                        placeholder="50000"
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-gray-900">
+                      {shop.freeShippingAmount ? `${shop.freeShippingAmount.toLocaleString()}원` : '-'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">기본 배송비</label>
+                  {isEditMode ? (
+                    <Input
+                      type="number"
+                      value={defaultShippingFee || ''}
+                      onChange={(e) => setDefaultShippingFee(e.target.value ? parseInt(e.target.value) : null)}
+                      placeholder="3000"
+                    />
+                  ) : (
+                    <p className="text-gray-900">
+                      {shop.defaultShippingFee ? `${shop.defaultShippingFee.toLocaleString()}원` : '-'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 세 번째 줄: 테마 설정 (전체 너비) */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-pink-100 rounded-lg">
+                <Palette size={18} className="text-pink-600" />
+              </div>
+              <span className="font-semibold text-slate-900">테마 설정</span>
+            </div>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-2 gap-6">
+              {/* 왼쪽: 색상 + 로고/파비콘 */}
+              <div className="space-y-5">
                 {/* 색상 설정 */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -756,28 +791,8 @@ export default function ShopDetailPage({
                     )}
                   </div>
                 </div>
-                {/* 로고 & 파비콘 */}
+                {/* 파비콘 & 로고 */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-2">로고</label>
-                    {isEditMode ? (
-                      <ImageUpload
-                        value={logoUrl}
-                        onChange={setLogoUrl}
-                        placeholder="로고 이미지"
-                      />
-                    ) : (
-                      logoUrl ? (
-                        <div className="relative w-full h-24 rounded-lg overflow-hidden border border-gray-200 bg-white p-2">
-                          <img src={logoUrl} alt="로고" className="w-full h-full object-contain" />
-                        </div>
-                      ) : (
-                        <div className="w-full h-24 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50">
-                          <span className="text-gray-400 text-xs">로고 없음</span>
-                        </div>
-                      )
-                    )}
-                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-500 mb-2">파비콘</label>
                     {isEditMode ? (
@@ -798,28 +813,49 @@ export default function ShopDetailPage({
                       )
                     )}
                   </div>
-                </div>
-                {/* 배너 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-2">배너 이미지</label>
-                  {isEditMode ? (
-                    <ImageUpload
-                      value={bannerUrl}
-                      onChange={setBannerUrl}
-                      placeholder="배너 이미지 (권장: 1200x400)"
-                    />
-                  ) : (
-                    bannerUrl ? (
-                      <div className="relative w-full h-32 rounded-lg overflow-hidden border border-gray-200">
-                        <img src={bannerUrl} alt="배너" className="w-full h-full object-cover" />
-                      </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-2">로고</label>
+                    {isEditMode ? (
+                      <ImageUpload
+                        value={logoUrl}
+                        onChange={setLogoUrl}
+                        placeholder="로고 이미지"
+                      />
                     ) : (
-                      <div className="w-full h-32 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50">
-                        <span className="text-gray-400 text-sm">배너 이미지 없음</span>
-                      </div>
-                    )
-                  )}
+                      logoUrl ? (
+                        <div className="relative w-full h-24 rounded-lg overflow-hidden border border-gray-200 bg-white p-2">
+                          <img src={logoUrl} alt="로고" className="w-full h-full object-contain" />
+                        </div>
+                      ) : (
+                        <div className="w-full h-24 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50">
+                          <span className="text-gray-400 text-xs">로고 없음</span>
+                        </div>
+                      )
+                    )}
+                  </div>
                 </div>
+              </div>
+              {/* 오른쪽: 배너 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">배너 이미지</label>
+                {isEditMode ? (
+                  <ImageUpload
+                    value={bannerUrl}
+                    onChange={setBannerUrl}
+                    placeholder="배너 이미지 (권장: 1200x400)"
+                    className="h-full"
+                  />
+                ) : (
+                  bannerUrl ? (
+                    <div className="relative w-full h-[232px] rounded-lg overflow-hidden border border-gray-200">
+                      <img src={bannerUrl} alt="배너" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="w-full h-[232px] rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50">
+                      <span className="text-gray-400 text-sm">배너 이미지 없음</span>
+                    </div>
+                  )
+                )}
               </div>
             </div>
           </div>

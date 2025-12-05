@@ -386,7 +386,8 @@ export async function POST(request: NextRequest) {
 /**
  * DELETE /api/shop/publish
  *
- * Unpublish products from channels
+ * Unpublish products from channels or shops
+ * 주문이나 문의가 있는 발행 상품은 삭제 불가 (리뷰는 제외)
  */
 export async function DELETE(request: NextRequest) {
   try {
@@ -409,17 +410,76 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Delete publish records that belong to user
-    const deleteResult = await prisma.publishedProduct.deleteMany({
+    // 발행 상품 조회 (주문, 문의 카운트 포함)
+    const publishedProducts = await prisma.publishedProduct.findMany({
       where: {
         id: { in: publishIds },
         userId,
       },
+      include: {
+        product: {
+          select: { name: true },
+        },
+        _count: {
+          select: {
+            orderItems: true,
+            inquiries: true,
+          },
+        },
+      },
     })
+
+    // 삭제 불가한 발행 상품 확인
+    const cannotDelete: { id: number; name: string; reason: string }[] = []
+    const canDelete: number[] = []
+
+    for (const pp of publishedProducts) {
+      const hasOrders = pp._count.orderItems > 0
+      const hasInquiries = pp._count.inquiries > 0
+
+      if (hasOrders || hasInquiries) {
+        const reasons: string[] = []
+        if (hasOrders) reasons.push(`주문 ${pp._count.orderItems}건`)
+        if (hasInquiries) reasons.push(`문의 ${pp._count.inquiries}건`)
+        cannotDelete.push({
+          id: pp.id,
+          name: pp.product.name,
+          reason: reasons.join(', '),
+        })
+      } else {
+        canDelete.push(pp.id)
+      }
+    }
+
+    // 삭제 불가한 상품이 있는 경우
+    if (cannotDelete.length > 0 && canDelete.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: '발행을 취소할 수 없습니다.',
+        reason: '주문 또는 문의가 존재하는 상품은 발행을 취소할 수 없습니다.',
+        cannotDelete,
+      }, { status: 400 })
+    }
+
+    // 삭제 가능한 상품만 삭제
+    let deletedCount = 0
+    if (canDelete.length > 0) {
+      const deleteResult = await prisma.publishedProduct.deleteMany({
+        where: {
+          id: { in: canDelete },
+          userId,
+        },
+      })
+      deletedCount = deleteResult.count
+    }
 
     return NextResponse.json({
       success: true,
-      deletedCount: deleteResult.count,
+      deletedCount,
+      cannotDelete: cannotDelete.length > 0 ? cannotDelete : undefined,
+      message: cannotDelete.length > 0
+        ? `${deletedCount}개 발행 취소 완료, ${cannotDelete.length}개는 주문/문의가 있어 취소 불가`
+        : `${deletedCount}개 발행 취소 완료`,
     })
   } catch (error) {
     console.error('발행 취소 실패:', error)

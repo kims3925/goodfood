@@ -238,9 +238,6 @@ export default function StorePage() {
             <div className="flex items-center gap-2">
               <Package className="w-5 h-5 md:w-6 md:h-6 text-rose-500" />
               <h2 className="text-xl md:text-2xl font-bold text-gray-900">전체 상품</h2>
-              {shopProducts.length > 0 && (
-                <span className="text-sm text-gray-500">({shopProducts.length}개)</span>
-              )}
             </div>
           </div>
 
