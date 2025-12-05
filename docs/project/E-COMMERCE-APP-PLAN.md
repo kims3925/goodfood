@@ -28,7 +28,7 @@
 │   [도매밴드] ──▶ [sourcing-app] ──▶ [소매밴드]              │
 │                       │                                     │
 │                       ▼                                     │
-│               [e-commerce-app] ◀── 고객 주문                │
+│               [shop-app] ◀── 고객 주문                │
 │                       │                                     │
 │                       ▼                                     │
 │               [토스페이먼츠] ──▶ 결제 처리                   │
@@ -301,7 +301,7 @@ model Payment {
 ### 3.1 페이지 구조
 
 ```
-e-commerce-app/
+shop-app/
 ├── / (홈)
 │   ├── 배너 슬라이더
 │   ├── 인기 상품
@@ -677,7 +677,7 @@ NEXT_PUBLIC_BASE_URL="http://localhost:3002"
 | 앱 | 포트 |
 |-----|------|
 | sourcing-app | 3001 |
-| e-commerce-app | 3002 |
+| shop-app | 3002 |
 
 ---
 

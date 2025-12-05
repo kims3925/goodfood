@@ -5,6 +5,33 @@
 /* Pretendard Font Import */
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
 
+/* ============================================
+   Theme CSS Variables
+   기본 테마: ABC마켓 (Coral)
+   Shop별로 ThemeProvider에서 동적 오버라이드
+   ============================================ */
+:root {
+  /* Primary Color - ABC마켓 기본 Coral */
+  --color-primary: #FF6B6B;
+  --color-primary-rgb: 255 107 107;
+  --color-primary-dark: #ee5a5a;
+  --color-primary-light: #ff8585;
+
+  /* Secondary Color */
+  --color-secondary: #10b981;
+  --color-secondary-rgb: 16 185 129;
+
+  /* Accent Colors */
+  --color-accent-orange: #FF8C42;
+  --color-accent-teal: #2EC4B6;
+
+  /* Semantic Colors */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+}
+
 @layer base {
   html {
     font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont,

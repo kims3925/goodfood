@@ -18,11 +18,21 @@ export async function GET(request: NextRequest) {
 
     const userId = typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
 
+    // Shop ID 확인 (middleware에서 설정)
+    const shopIdHeader = request.headers.get('x-shop-id')
+    const shopId = shopIdHeader ? parseInt(shopIdHeader) : null
+
     const { searchParams } = new URL(request.url)
     const tab = searchParams.get('tab') || 'writable' // writable, written
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     const offset = (page - 1) * limit
+
+    // 주문 조건 (userId + shopId)
+    const orderWhere: any = { userId }
+    if (shopId) {
+      orderWhere.shopId = shopId
+    }
 
     if (tab === 'writable') {
       // 작성 가능한 후기: 배송 완료된 주문의 상품 중 리뷰를 작성하지 않은 상품
@@ -30,7 +40,7 @@ export async function GET(request: NextRequest) {
 
       // 디버그: 배송 완료된 주문 확인
       const deliveredOrders = await prisma.order.findMany({
-        where: { userId, status: 'DELIVERED' },
+        where: { ...orderWhere, status: 'DELIVERED' },
         select: { id: true, orderNumber: true, status: true }
       })
       console.log('DEBUG - userId:', userId)
@@ -40,7 +50,7 @@ export async function GET(request: NextRequest) {
       const allOrderItems = await prisma.orderItem.findMany({
         where: {
           order: {
-            userId,
+            ...orderWhere,
             status: 'DELIVERED',
           },
         },
@@ -60,7 +70,7 @@ export async function GET(request: NextRequest) {
         prisma.orderItem.findMany({
           where: {
             order: {
-              userId,
+              ...orderWhere,
               status: 'DELIVERED',
             },
             review: { is: null }, // 리뷰가 없는 상품만
@@ -96,7 +106,7 @@ export async function GET(request: NextRequest) {
         prisma.orderItem.count({
           where: {
             order: {
-              userId,
+              ...orderWhere,
               status: 'DELIVERED',
             },
             review: { is: null },
@@ -155,9 +165,7 @@ export async function GET(request: NextRequest) {
         prisma.review.findMany({
           where: {
             orderItem: {
-              order: {
-                userId,
-              },
+              order: orderWhere,
             },
           },
           include: {
@@ -192,9 +200,7 @@ export async function GET(request: NextRequest) {
         prisma.review.count({
           where: {
             orderItem: {
-              order: {
-                userId,
-              },
+              order: orderWhere,
             },
           },
         }),
@@ -296,6 +302,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: '권한이 없습니다' },
         { status: 403 }
+      )
+    }
+
+    // Shop ID 확인 (middleware에서 설정)
+    const shopIdHeader = request.headers.get('x-shop-id')
+    const shopId = shopIdHeader ? parseInt(shopIdHeader) : null
+
+    // shopId가 있으면 해당 Shop의 주문인지 확인
+    if (shopId && orderItem.order.shopId !== shopId) {
+      return NextResponse.json(
+        { success: false, error: '주문 상품을 찾을 수 없습니다' },
+        { status: 404 }
       )
     }
 

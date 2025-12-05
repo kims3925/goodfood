@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, ShoppingCart, Sparkles, Package } from 'lucide-react'
 import { useCartNotification } from '@/contexts/CartNotificationContext'
-import { useChannel } from '@/contexts/ChannelContext'
+import { useShop } from '@/contexts/ShopContext'
 
 interface Product {
   id: string
@@ -26,8 +26,8 @@ interface Product {
 
 export default function StorePage() {
   const { showNotification } = useCartNotification()
-  const { channel } = useChannel()
-  const [channelProducts, setChannelProducts] = useState<Product[]>([])
+  const { shop } = useShop()
+  const [shopProducts, setShopProducts] = useState<Product[]>([])
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([])
   const [currentSlide, setCurrentSlide] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -36,8 +36,8 @@ export default function StorePage() {
   const totalSlides = Math.max(1, Math.ceil(featuredProducts.length / cardsPerView))
 
   useEffect(() => {
-    loadChannelProducts()
-  }, [channel?.id])
+    loadShopProducts()
+  }, [shop?.id])
 
   // 자동 슬라이드 (3초마다)
   useEffect(() => {
@@ -48,23 +48,23 @@ export default function StorePage() {
     return () => clearInterval(timer)
   }, [featuredProducts.length, totalSlides])
 
-  const loadChannelProducts = async () => {
+  const loadShopProducts = async () => {
     try {
       setIsLoading(true)
       const response = await fetch('/api/shop/sections?limit=50')
       const data = await response.json()
 
       if (data.success) {
-        // 채널 상품 설정
-        const products = data.channelProducts || []
-        setChannelProducts(products)
+        // Shop 상품 설정 (products 우선, channelProducts는 하위 호환)
+        const products = data.products || data.channelProducts || []
+        setShopProducts(products)
 
         // 이미지가 있는 상품을 추천 상품으로 사용 (최대 12개)
         const productsWithImages = products.filter((p: Product) => p.images && p.images.length > 0).slice(0, 12)
         setFeaturedProducts(productsWithImages.length > 0 ? productsWithImages : products.slice(0, 12))
       }
     } catch (error) {
-      console.error('Failed to load channel products:', error)
+      console.error('Failed to load shop products:', error)
     } finally {
       setIsLoading(false)
     }
@@ -107,10 +107,10 @@ export default function StorePage() {
     }
   }
 
-  // 채널 테마 정보
-  const bannerUrl = channel?.theme?.bannerUrl
-  const channelName = channel?.displayName || channel?.name
-  const primaryColor = channel?.theme?.primaryColor || '#FF6B6B'
+  // Shop 테마 정보
+  const bannerUrl = shop?.theme?.bannerUrl
+  const shopName = shop?.name
+  const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
 
   return (
     <div className="bg-white min-h-screen">
@@ -120,7 +120,7 @@ export default function StorePage() {
           <div className="relative w-full aspect-[4/1] md:aspect-[5/1] lg:aspect-[6/1] overflow-hidden">
             <img
               src={bannerUrl}
-              alt={`${channelName || '쇼핑몰'} 배너`}
+              alt={`${shopName || '쇼핑몰'} 배너`}
               className="w-full h-full object-cover"
             />
           </div>
@@ -230,7 +230,7 @@ export default function StorePage() {
         </section>
       )}
 
-      {/* 채널 상품 그리드 */}
+      {/* Shop 상품 그리드 */}
       <section className="py-8 md:py-12 bg-white">
         <div className="kurly-container">
           {/* 섹션 헤더 */}
@@ -238,8 +238,8 @@ export default function StorePage() {
             <div className="flex items-center gap-2">
               <Package className="w-5 h-5 md:w-6 md:h-6 text-rose-500" />
               <h2 className="text-xl md:text-2xl font-bold text-gray-900">전체 상품</h2>
-              {channelProducts.length > 0 && (
-                <span className="text-sm text-gray-500">({channelProducts.length}개)</span>
+              {shopProducts.length > 0 && (
+                <span className="text-sm text-gray-500">({shopProducts.length}개)</span>
               )}
             </div>
           </div>
@@ -248,9 +248,9 @@ export default function StorePage() {
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-rose-500"></div>
             </div>
-          ) : channelProducts.length > 0 ? (
+          ) : shopProducts.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-              {channelProducts.map((product) => (
+              {shopProducts.map((product) => (
                 <Link
                   key={`product-${product.publishedProductId || product.id}`}
                   href={`/product/${product.id}`}

@@ -13,10 +13,10 @@ function getSessionId(req: NextRequest): string | null {
   return req.cookies.get('cart_session')?.value || null
 }
 
-async function getChannelId(): Promise<number | null> {
+async function getShopId(): Promise<number | null> {
   const headersList = await headers()
-  const channelId = headersList.get('x-channel-id')
-  return channelId ? parseInt(channelId) : null
+  const shopId = headersList.get('x-shop-id')
+  return shopId ? parseInt(shopId) : null
 }
 
 async function getCurrentUserId(): Promise<number | null> {
@@ -30,19 +30,19 @@ async function getCurrentUserId(): Promise<number | null> {
 }
 
 /**
- * 사용자 또는 세션으로 장바구니 조회 (채널별)
+ * 사용자 또는 세션으로 장바구니 조회 (Shop별)
  */
-async function findCart(sessionId: string | null, userId: number | null, channelId: number | null) {
-  // 로그인한 경우 userId + channelId로 찾기
+async function findCart(sessionId: string | null, userId: number | null, shopId: number | null) {
+  // 로그인한 경우 userId + shopId로 찾기
   if (userId) {
     return prisma.cart.findFirst({
-      where: { userId, channelId },
+      where: { userId, shopId },
     })
   }
-  // 비로그인은 sessionId + channelId로 찾기
+  // 비로그인은 sessionId + shopId로 찾기
   if (sessionId) {
     return prisma.cart.findFirst({
-      where: { sessionId, channelId, userId: null },
+      where: { sessionId, shopId, userId: null },
     })
   }
   return null
@@ -60,7 +60,7 @@ export async function DELETE(
     const { id } = await params
     const sessionId = getSessionId(req)
     const userId = await getCurrentUserId()
-    const channelId = await getChannelId()
+    const shopId = await getShopId()
 
     if (!sessionId && !userId) {
       return NextResponse.json(
@@ -77,7 +77,7 @@ export async function DELETE(
       )
     }
 
-    const cart = await findCart(sessionId, userId, channelId)
+    const cart = await findCart(sessionId, userId, shopId)
 
     if (!cart) {
       return NextResponse.json(
@@ -115,7 +115,7 @@ export async function PATCH(
     const { id } = await params
     const sessionId = getSessionId(req)
     const userId = await getCurrentUserId()
-    const channelId = await getChannelId()
+    const shopId = await getShopId()
 
     if (!sessionId && !userId) {
       return NextResponse.json(
@@ -142,7 +142,7 @@ export async function PATCH(
       )
     }
 
-    const cart = await findCart(sessionId, userId, channelId)
+    const cart = await findCart(sessionId, userId, shopId)
 
     if (!cart) {
       return NextResponse.json(

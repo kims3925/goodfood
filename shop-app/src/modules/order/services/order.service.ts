@@ -46,12 +46,14 @@ export interface OrderItem {
 
 export interface CreateOrderFromCartDTO {
   userId: number
+  shopId?: number  // Shop 기반 주문 필터링
   customerInfo: CustomerInfo
   shippingAddress: ShippingAddress
 }
 
 export interface CreateOrderFromItemsDTO {
   userId: number
+  shopId?: number  // Shop 기반 주문 필터링
   items: OrderItem[]
   customerInfo: CustomerInfo
   shippingAddress: ShippingAddress
@@ -133,7 +135,7 @@ export class OrderService {
     order: OrderResponse
     payment: PaymentRequestData
   }> {
-    const { userId, customerInfo, shippingAddress } = data
+    const { userId, shopId, customerInfo, shippingAddress } = data
 
     // 입력 검증
     this.validateCustomerInfo(customerInfo)
@@ -186,6 +188,7 @@ export class OrderService {
     // 주문 생성
     const orderInput: CreateOrderInput = {
       userId,
+      shopId,  // Shop 기반 주문 필터링
       orderNumber: this.generateOrderNumber(),
       recipientName: shippingAddress.recipientName || customerInfo.name,
       recipientPhone: shippingAddress.recipientPhone || customerInfo.phone,
@@ -229,7 +232,7 @@ export class OrderService {
     order: OrderResponse
     payment: PaymentRequestData
   }> {
-    const { userId, items, customerInfo, shippingAddress } = data
+    const { userId, shopId, items, customerInfo, shippingAddress } = data
 
     // 입력 검증
     this.validateCustomerInfo(customerInfo)
@@ -303,6 +306,7 @@ export class OrderService {
     // 주문 생성
     const orderInput: CreateOrderInput = {
       userId,
+      shopId,  // Shop 기반 주문 필터링
       orderNumber: this.generateOrderNumber(),
       recipientName: shippingAddress.recipientName || customerInfo.name,
       recipientPhone: shippingAddress.recipientPhone || customerInfo.phone,

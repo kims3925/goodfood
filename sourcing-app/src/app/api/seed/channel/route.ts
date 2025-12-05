@@ -125,19 +125,6 @@ export async function POST() {
         bankAccount: '987-65-432101',
         bankName: 'IBK기업은행',
       },
-      // 자체 쇼핑몰 채널
-      {
-        userId,
-        kind: 'RETAIL' as const,
-        platform: 'SHOP' as const,
-        channelKey: 'myshop_001',
-        name: '마이패션몰',
-        coverUrl: 'https://placehold.co/100x100/9B59B6/ffffff?text=SHOP',
-        isActive: true,
-        accountHolder: '강쇼핑',
-        bankAccount: '111-22-333444',
-        bankName: '카카오뱅크',
-      },
     ]
 
     // 채널 생성

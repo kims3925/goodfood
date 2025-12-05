@@ -1,0 +1,47 @@
+model Shop {
+  id                 Int       @id @default(autoincrement())
+  userId             Int       @map("user_id")
+  subdomain          String    @unique @db.VarChar(63)
+  name               String    @db.VarChar(255)
+  coverUrl           String?   @map("cover_url") @db.VarChar(500)
+  enableToss         Boolean   @default(true) @map("enable_toss")
+  enableBankTransfer Boolean   @default(true) @map("enable_bank_transfer")
+  bankName           String?   @map("bank_name") @db.VarChar(50)
+  bankAccount        String?   @map("bank_account") @db.VarChar(50)
+  accountHolder      String?   @map("account_holder") @db.VarChar(100)
+  freeShippingAmount Int?      @map("free_shipping_amount")
+  defaultShippingFee Int?      @map("default_shipping_fee")
+  contactPhone       String?   @map("contact_phone") @db.VarChar(20)
+  contactEmail       String?   @map("contact_email") @db.VarChar(255)
+  isActive           Boolean   @default(true) @map("is_active")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme              ShopTheme?
+  carts              Cart[]
+  orders             Order[]
+  publishedProducts  PublishedProduct[]
+
+  @@index([userId])
+  @@index([subdomain])
+  @@index([isActive])
+  @@map("shop")
+}
+
+model ShopTheme {
+  id             Int      @id @default(autoincrement())
+  shopId         Int      @unique @map("shop_id")
+  primaryColor   String?  @map("primary_color") @db.VarChar(20)
+  secondaryColor String?  @map("secondary_color") @db.VarChar(20)
+  logoUrl        String?  @map("logo_url") @db.VarChar(500)
+  faviconUrl     String?  @map("favicon_url") @db.VarChar(500)
+  bannerUrl      String?  @map("banner_url") @db.VarChar(500)
+  footerText     String?  @map("footer_text") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  shop           Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@map("shop_theme")
+}

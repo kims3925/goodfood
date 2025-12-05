@@ -10,9 +10,9 @@ datasource db {
 }
 
 enum UserRole {
-  SOURCING_USER // 소싱앱 관리자
-  CUSTOMER      // 쇼핑몰 고객
-  ADMIN         // 슈퍼 관리자
+  USER    // 일반 사용자 (쇼핑몰 접근 불가)
+  MANAGER // 쇼핑몰 관리자 (자신의 채널만 접근)
+  ADMIN   // 슈퍼 관리자 (모든 채널 접근)
 }
 
 enum SourcingPlatform {
@@ -31,7 +31,6 @@ enum ChannelPlatform {
   ALIEXPRESS
   SMARTSTORE
   COUPANG
-  SHOP
   CUSTOM
 }
 

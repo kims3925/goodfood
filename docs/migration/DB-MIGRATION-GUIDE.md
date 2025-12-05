@@ -245,7 +245,7 @@ model Product {
 
 ### 파일 수정
 
-**1. e-commerce-app/.env.local**
+**1. shop-app/.env.local**
 ```env
 # 변경 전
 DATABASE_URL="file:../prisma/dev.db"
@@ -262,7 +262,7 @@ DATABASE_URL="mysql://username:password@aws.connect.psdb.cloud/bandauto?sslaccep
 
 **2. sourcing-app/.env.local**
 ```env
-# e-commerce-app과 동일하게 변경
+# shop-app과 동일하게 변경
 DATABASE_URL="mysql://bandauto_user:bandauto_pass_2025@localhost:3306/bandauto"
 ```
 

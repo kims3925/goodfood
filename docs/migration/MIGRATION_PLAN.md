@@ -9,7 +9,7 @@
 ```
 bandauto/
 ├── apps/
-│   ├── e-commerce-app/              # 고객 쇼핑몰 (BFF + 프론트)
+│   ├── shop-app/              # 고객 쇼핑몰 (BFF + 프론트)
 │   └── sourcing-app/                # 관리자 + Worker (소싱/관리/모니터링)
 │
 └── modules/
@@ -28,7 +28,7 @@ bandauto/
 
 ### ✅ 이미 생성된 것
 ```
-apps/e-commerce-app/     # 빈 디렉토리 (Next.js 설정 없음)
+apps/shop-app/     # 빈 디렉토리 (Next.js 설정 없음)
 apps/sourcing-app/       # 빈 디렉토리 (src/{web 구조 시작)
 modules/common/ui-kit/   # 일부 생성
 ```
@@ -117,7 +117,7 @@ modules/common/ui-kit/   # 일부 생성
 
 ### **Phase 3: 앱 구축** (4일)
 
-#### Day 7 - e-commerce-app 초기화
+#### Day 7 - shop-app 초기화
 - [ ] Next.js 14 초기화
   - `package.json`, `tsconfig.json`, `next.config.js`
 - [ ] `src/app/` 구조 생성
@@ -129,7 +129,7 @@ modules/common/ui-kit/   # 일부 생성
 - [ ] `src/api/` BFF 레이어
   - cart/, order/, payments/ API Routes
 
-#### Day 8 - e-commerce-app UI 구현
+#### Day 8 - shop-app UI 구현
 - [ ] 기존 `src/app/store/` 페이지 마이그레이션
 - [ ] modules/common/ui-kit 통합
 - [ ] modules/catalog/api 연동
@@ -171,7 +171,7 @@ modules/common/ui-kit/   # 일부 생성
   - `@/domain/` → `@modules/{domain}/domain/`
 - [ ] TypeScript 빌드 에러 해결
 - [ ] 환경변수 분리
-  - apps/e-commerce-app/.env.local
+  - apps/shop-app/.env.local
   - apps/sourcing-app/.env.local
 
 #### Day 12 - 통합 테스트 및 문서화
@@ -179,7 +179,7 @@ modules/common/ui-kit/   # 일부 생성
   - `pnpm build` 전체 성공
 - [ ] 개발 서버 실행 테스트
   - `pnpm dev` - 두 앱 동시 실행
-  - e-commerce-app: localhost:3000
+  - shop-app: localhost:3000
   - sourcing-app: localhost:3001
 - [ ] 기능 테스트
   - [ ] 관리자: Band 소싱 → AI 분석 → 상품 등록
@@ -415,7 +415,7 @@ packages:
 ## 📊 모듈 간 의존성
 
 ```
-apps/e-commerce-app
+apps/shop-app
 ├── modules/common/kernel
 ├── modules/common/utils
 ├── modules/common/ui-kit
@@ -459,7 +459,7 @@ modules/{domain}/api
 - [ ] modules/monitoring 완성
 
 ### Phase 3 (Day 7-10)
-- [ ] apps/e-commerce-app 완성
+- [ ] apps/shop-app 완성
 - [ ] apps/sourcing-app 완성
 - [ ] 모든 기존 코드 마이그레이션 완료
 

@@ -29,23 +29,13 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // 사용자의 도매채널 및 API 설정 조회 (해당 플랫폼만)
+    // 사용자의 도매채널 조회 (해당 플랫폼만)
     const wholesaleChannels = await prisma.channel.findMany({
       where: {
         userId: userId,
         isActive: true,
         kind: ChannelKind.WHOLESALE,
         platform: platform,
-      },
-      include: {
-        apiConfig: {
-          select: {
-            id: true,
-            platform: true,
-            accessToken: true,
-            isActive: true,
-          },
-        },
       },
     })
 
@@ -57,12 +47,23 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // 활성화된 API 설정이 있는지 확인
-    const activeApiConfig = wholesaleChannels.find(
-      (channel) => channel.apiConfig?.isActive && channel.apiConfig?.accessToken
-    )
+    // 사용자의 API 설정 조회 (플랫폼 맵핑: BAND -> BAND)
+    const apiPlatform = platform === ChannelPlatform.BAND ? 'BAND' : 'ALIEXPRESS'
+    const apiConfig = await prisma.sourcingApiConfig.findFirst({
+      where: {
+        userId: userId,
+        platform: apiPlatform,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        platform: true,
+        accessToken: true,
+        isActive: true,
+      },
+    })
 
-    if (!activeApiConfig) {
+    if (!apiConfig || !apiConfig.accessToken) {
       return NextResponse.json(
         {
           success: false,
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const accessToken = activeApiConfig.apiConfig?.accessToken
+    const accessToken = apiConfig.accessToken
 
     if (!accessToken) {
       return NextResponse.json(

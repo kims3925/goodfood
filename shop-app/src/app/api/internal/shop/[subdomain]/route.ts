@@ -16,16 +16,14 @@ export async function GET(
   const { subdomain } = await params
 
   try {
-    const channel = await prisma.channel.findFirst({
+    const shop = await prisma.shop.findFirst({
       where: {
         subdomain: subdomain,
-        kind: 'RETAIL', // 소매 채널만
       },
       select: {
         id: true,
         subdomain: true,
         name: true,
-        displayName: true,
         coverUrl: true,
         isActive: true,
         enableToss: true,
@@ -40,9 +38,9 @@ export async function GET(
       },
     })
 
-    return NextResponse.json({ channel })
+    return NextResponse.json({ shop })
   } catch (error) {
-    console.error('Failed to fetch channel by subdomain:', error)
+    console.error('Failed to fetch shop by subdomain:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

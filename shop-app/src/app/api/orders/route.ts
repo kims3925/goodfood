@@ -23,6 +23,11 @@ function getSessionId(req: NextRequest): string | null {
   return req.cookies.get('cart_session')?.value || null
 }
 
+function getShopId(req: NextRequest): number | null {
+  const shopIdHeader = req.headers.get('x-shop-id')
+  return shopIdHeader ? parseInt(shopIdHeader) : null
+}
+
 const orderService = getOrderService()
 
 /**
@@ -39,6 +44,9 @@ export async function POST(req: NextRequest) {
       fromCart = true,
       userId,
     } = body
+
+    // Shop ID 확인 (middleware에서 설정)
+    const shopId = getShopId(req)
 
     // 고객 정보 검증
     if (!customerInfo?.name || !customerInfo?.phone) {
@@ -70,6 +78,7 @@ export async function POST(req: NextRequest) {
       // 장바구니에서 주문 생성
       result = await orderService.createOrderFromCart({
         userId,
+        shopId: shopId || undefined,  // Shop 기반 주문 필터링
         customerInfo,
         shippingAddress,
       })
@@ -84,6 +93,7 @@ export async function POST(req: NextRequest) {
 
       result = await orderService.createOrderFromItems({
         userId,
+        shopId: shopId || undefined,  // Shop 기반 주문 필터링
         items: items.map((item: any) => ({
           publishedProductId: parseInt(item.publishedProductId),
           variantId: item.variantId ? parseInt(item.variantId) : undefined,

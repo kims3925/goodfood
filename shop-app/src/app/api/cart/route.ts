@@ -1,6 +1,6 @@
 /**
  * Cart API
- * 세션 + 사용자 + 채널 기반 장바구니 CRUD
+ * 세션 + 사용자 + Shop 기반 장바구니 CRUD
  * CartService 사용
  */
 
@@ -17,10 +17,10 @@ function getSessionId(req: NextRequest): string | null {
   return req.cookies.get('cart_session')?.value || null
 }
 
-function getChannelId(req: NextRequest): number | null {
-  const channelIdHeader = req.headers.get('x-channel-id')
-  if (channelIdHeader) {
-    const parsed = parseInt(channelIdHeader)
+function getShopId(req: NextRequest): number | null {
+  const shopIdHeader = req.headers.get('x-shop-id')
+  if (shopIdHeader) {
+    const parsed = parseInt(shopIdHeader)
     return isNaN(parsed) ? null : parsed
   }
   return null
@@ -56,19 +56,19 @@ export async function GET(req: NextRequest) {
   try {
     let sessionId = getSessionId(req)
     const userId = await getCurrentUserId()
-    const channelId = getChannelId(req)
+    const shopId = getShopId(req)
 
     if (!sessionId) {
       sessionId = uuidv4()
     }
 
-    const result = await cartService.getCart(sessionId, userId, channelId)
+    const result = await cartService.getCart(sessionId, userId, shopId)
 
     const response = NextResponse.json({
       success: true,
       cart: result.cart,
       isLoggedIn: !!userId,
-      channelId,
+      shopId,
     })
 
     if ((!getSessionId(req) || result.newSessionId) && sessionId) {
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     let sessionId = getSessionId(req) || bodySessionId
     const isNewSession = !getSessionId(req)
     const userId = await getCurrentUserId()
-    const channelId = getChannelId(req)
+    const shopId = getShopId(req)
 
     if (!sessionId) {
       sessionId = uuidv4()
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
         quantity: parseInt(quantity),
       },
       userId,
-      channelId
+      shopId
     )
 
     const response = NextResponse.json({
@@ -150,7 +150,7 @@ export async function PUT(req: NextRequest) {
   try {
     const sessionId = getSessionId(req)
     const userId = await getCurrentUserId()
-    const channelId = getChannelId(req)
+    const shopId = getShopId(req)
 
     if (!sessionId && !userId) {
       return NextResponse.json(
@@ -174,7 +174,7 @@ export async function PUT(req: NextRequest) {
       parseInt(itemId),
       parseInt(quantity),
       userId,
-      channelId
+      shopId
     )
 
     return NextResponse.json({
@@ -198,7 +198,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const sessionId = getSessionId(req)
     const userId = await getCurrentUserId()
-    const channelId = getChannelId(req)
+    const shopId = getShopId(req)
 
     if (!sessionId && !userId) {
       return NextResponse.json({
@@ -207,7 +207,7 @@ export async function DELETE(req: NextRequest) {
       })
     }
 
-    await cartService.clearCart(sessionId, userId, channelId)
+    await cartService.clearCart(sessionId, userId, shopId)
 
     return NextResponse.json({
       success: true,

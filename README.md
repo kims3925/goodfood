@@ -8,7 +8,7 @@ BandAuto는 도매 밴드 상품 자동화부터 AI 상세페이지 생성, 토�
 
 ```
 bandauto/
-├── e-commerce-app/          # 고객용 쇼핑몰 앱 (포트 3000)
+├── shop-app/          # 고객용 쇼핑몰 앱 (포트 3000)
 │   ├── src/
 │   │   ├── app/             # Next.js App Router
 │   │   ├── components/      # 쇼핑몰 UI 컴포넌트
@@ -90,7 +90,7 @@ npx prisma db push
 
 ### 3. 환경변수 설정
 
-**e-commerce-app/.env.local**
+**shop-app/.env.local**
 ```env
 DATABASE_URL="file:../prisma/dev.db"
 NEXTAUTH_URL="http://localhost:3000"
@@ -114,7 +114,7 @@ BAND_CLIENT_SECRET=""
 **각 앱 개별 실행:**
 ```bash
 # E-commerce 앱 (포트 3000)
-npm run dev:ecommerce
+npm run dev:shop
 
 # Sourcing 앱 (포트 3001)
 npm run dev:sourcing
@@ -137,7 +137,7 @@ npm run dev:all
 2. **Sourcing App**
    - ✅ `modules/common/*` 접근 가능 (공통 모듈)
    - ✅ `src/modules/*` 접근 가능 (앱 전용 모듈)
-   - ❌ `e-commerce-app/src/modules/*` 접근 불가
+   - ❌ `shop-app/src/modules/*` 접근 불가
 
 3. **Common Modules**
    - 모든 앱에서 접근 가능
@@ -162,14 +162,14 @@ import { OrderService } from '@modules/order'             // ❌ ERROR (다른 �
 
 ### 개발
 ```bash
-npm run dev:ecommerce      # E-commerce 앱 실행 (포트 3000)
+npm run dev:shop      # E-commerce 앱 실행 (포트 3000)
 npm run dev:sourcing       # Sourcing 앱 실행 (포트 3001)
 npm run dev:all            # 두 앱 동시 실행
 ```
 
 ### 빌드
 ```bash
-npm run build:ecommerce    # E-commerce 앱 빌드
+npm run build:shop    # E-commerce 앱 빌드
 npm run build:sourcing     # Sourcing 앱 빌드
 npm run build:all          # 두 앱 모두 빌드
 ```

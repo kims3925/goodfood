@@ -1,27 +1,24 @@
 import { headers } from 'next/headers'
 import StoreLayout from './StoreLayout'
-import { ChannelProvider, ChannelInfo, RelatedChannel } from '@/contexts/ChannelContext'
+import { ShopProvider, ShopInfo, RelatedShop } from '@/contexts/ShopContext'
+import { ThemeProvider } from '@/components/theme/ThemeProvider'
 import prisma from '@bandauto/db'
-import { ChannelKind } from '@bandauto/db'
 
-// 같은 유저의 다른 채널들 조회
-async function getRelatedChannels(currentChannelId: number, userId: number | null): Promise<RelatedChannel[]> {
+// 같은 유저의 다른 Shop들 조회
+async function getRelatedShops(currentShopId: number, userId: number | null): Promise<RelatedShop[]> {
   if (!userId) return []
 
   try {
-    const channels = await prisma.channel.findMany({
+    const shops = await prisma.shop.findMany({
       where: {
         userId,
-        kind: ChannelKind.RETAIL,
         isActive: true,
-        id: { not: currentChannelId }, // 현재 채널 제외
-        NOT: { subdomain: null }, // subdomain이 null이 아닌 채널만
+        id: { not: currentShopId }, // 현재 Shop 제외
       },
       select: {
         id: true,
         subdomain: true,
         name: true,
-        displayName: true,
         theme: {
           select: {
             logoUrl: true,
@@ -31,35 +28,33 @@ async function getRelatedChannels(currentChannelId: number, userId: number | nul
       orderBy: { name: 'asc' },
     })
 
-    return channels.map((ch) => ({
-      id: ch.id,
-      subdomain: ch.subdomain!,
-      name: ch.name,
-      displayName: ch.displayName || undefined,
-      logoUrl: ch.theme?.logoUrl || undefined,
+    return shops.map((shop) => ({
+      id: shop.id,
+      subdomain: shop.subdomain,
+      name: shop.name,
+      logoUrl: shop.theme?.logoUrl || undefined,
     }))
   } catch (error) {
-    console.error('Failed to get related channels:', error)
+    console.error('Failed to get related shops:', error)
     return []
   }
 }
 
-// 채널 정보 조회
-async function getChannelFromHeaders(): Promise<ChannelInfo | null> {
+// Shop 정보 조회
+async function getShopFromHeaders(): Promise<ShopInfo | null> {
   const headersList = await headers()
-  const channelId = headersList.get('x-channel-id')
+  const shopId = headersList.get('x-shop-id')
 
-  if (!channelId) return null
+  if (!shopId) return null
 
   try {
-    const channel = await prisma.channel.findUnique({
-      where: { id: parseInt(channelId) },
+    const shop = await prisma.shop.findUnique({
+      where: { id: parseInt(shopId) },
       select: {
         id: true,
         userId: true,
         subdomain: true,
         name: true,
-        displayName: true,
         coverUrl: true,
         enableToss: true,
         enableBankTransfer: true,
@@ -83,51 +78,50 @@ async function getChannelFromHeaders(): Promise<ChannelInfo | null> {
       },
     })
 
-    if (!channel || !channel.subdomain) return null
+    if (!shop) return null
 
     return {
-      id: channel.id,
-      subdomain: channel.subdomain,
-      name: channel.name,
-      displayName: channel.displayName || undefined,
-      coverUrl: channel.coverUrl || undefined,
-      enableToss: channel.enableToss,
-      enableBankTransfer: channel.enableBankTransfer,
-      freeShippingAmount: channel.freeShippingAmount || undefined,
-      defaultShippingFee: channel.defaultShippingFee || undefined,
-      contactPhone: channel.contactPhone || undefined,
-      contactEmail: channel.contactEmail || undefined,
-      bankInfo: channel.bankName
+      id: shop.id,
+      subdomain: shop.subdomain,
+      name: shop.name,
+      coverUrl: shop.coverUrl || undefined,
+      enableToss: shop.enableToss,
+      enableBankTransfer: shop.enableBankTransfer,
+      freeShippingAmount: shop.freeShippingAmount || undefined,
+      defaultShippingFee: shop.defaultShippingFee || undefined,
+      contactPhone: shop.contactPhone || undefined,
+      contactEmail: shop.contactEmail || undefined,
+      bankInfo: shop.bankName
         ? {
-            bankName: channel.bankName,
-            bankAccount: channel.bankAccount!,
-            accountHolder: channel.accountHolder!,
+            bankName: shop.bankName,
+            bankAccount: shop.bankAccount!,
+            accountHolder: shop.accountHolder!,
           }
         : undefined,
-      theme: channel.theme
+      theme: shop.theme
         ? {
-            primaryColor: channel.theme.primaryColor || undefined,
-            secondaryColor: channel.theme.secondaryColor || undefined,
-            logoUrl: channel.theme.logoUrl || undefined,
-            faviconUrl: channel.theme.faviconUrl || undefined,
-            bannerUrl: channel.theme.bannerUrl || undefined,
-            footerText: channel.theme.footerText || undefined,
+            primaryColor: shop.theme.primaryColor || undefined,
+            secondaryColor: shop.theme.secondaryColor || undefined,
+            logoUrl: shop.theme.logoUrl || undefined,
+            faviconUrl: shop.theme.faviconUrl || undefined,
+            bannerUrl: shop.theme.bannerUrl || undefined,
+            footerText: shop.theme.footerText || undefined,
           }
         : undefined,
-      relatedChannels: await getRelatedChannels(channel.id, channel.userId),
+      relatedShops: await getRelatedShops(shop.id, shop.userId),
     }
   } catch (error) {
-    console.error('Failed to get channel from headers:', error)
+    console.error('Failed to get shop from headers:', error)
     return null
   }
 }
 
 // 동적 메타데이터 생성
 export async function generateMetadata() {
-  const channel = await getChannelFromHeaders()
+  const shop = await getShopFromHeaders()
 
-  const title = channel
-    ? `${channel.displayName || channel.name} - 신선한 농수산물 직거래 쇼핑몰`
+  const title = shop
+    ? `${shop.name} - 신선한 농수산물 직거래 쇼핑몰`
     : 'ABC마켓 - 신선한 농수산물 직거래 쇼핑몰'
 
   return {
@@ -141,11 +135,13 @@ export default async function ShopLayout({
 }: {
   children: React.ReactNode
 }) {
-  const channel = await getChannelFromHeaders()
+  const shop = await getShopFromHeaders()
 
   return (
-    <ChannelProvider initialChannel={channel}>
-      <StoreLayout>{children}</StoreLayout>
-    </ChannelProvider>
+    <ShopProvider initialShop={shop}>
+      <ThemeProvider>
+        <StoreLayout>{children}</StoreLayout>
+      </ThemeProvider>
+    </ShopProvider>
   )
 }

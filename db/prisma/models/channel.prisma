@@ -1,60 +1,24 @@
+// Channel: 소싱 채널 (BAND, NAVER_CAFE 등) 관리
+// 쇼핑몰 관련 설정은 Shop 테이블로 분리됨
 model Channel {
   id                 Int                @id @default(autoincrement())
   userId             Int                @map("user_id")
-  apiConfigId        Int?               @map("api_config_id")
   kind               ChannelKind
   platform           ChannelPlatform
   channelKey         String             @map("channel_key") @db.VarChar(255)
   name               String             @db.VarChar(255)
   coverUrl           String?            @map("cover_url") @db.VarChar(500)
   isActive           Boolean            @default(true) @map("is_active")
-  accountHolder      String?            @map("account_holder") @db.VarChar(100)
-  bankAccount        String?            @map("bank_account") @db.VarChar(50)
-  bankName           String?            @map("bank_name") @db.VarChar(50)
   createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt          DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
-  // 서브도메인 기반 멀티채널 쇼핑몰 필드
-  subdomain          String?            @unique @db.VarChar(63)
-  displayName        String?            @map("display_name") @db.VarChar(255)
-  enableToss         Boolean            @default(true) @map("enable_toss")
-  enableBankTransfer Boolean            @default(true) @map("enable_bank_transfer")
-  freeShippingAmount Int?               @map("free_shipping_amount")
-  defaultShippingFee Int?               @map("default_shipping_fee")
-  contactPhone       String?            @map("contact_phone") @db.VarChar(20)
-  contactEmail       String?            @map("contact_email") @db.VarChar(255)
-
-  apiConfig          SourcingApiConfig? @relation(fields: [apiConfigId], references: [id], onDelete: Cascade)
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   collectedPosts     CollectedPost[]
   publishedProducts  PublishedProduct[]
-  carts              Cart[]
-  orders             Order[]
-  theme              ChannelTheme?
 
   @@unique([userId, channelKey])
   @@index([userId])
-  @@index([apiConfigId])
   @@index([isActive])
   @@index([kind, platform])
-  @@index([subdomain])
   @@map("channel")
-}
-
-// 채널 테마 설정 (디자인/브랜딩)
-model ChannelTheme {
-  id             Int      @id @default(autoincrement())
-  channelId      Int      @unique @map("channel_id")
-  primaryColor   String?  @map("primary_color") @db.VarChar(20)   // 메인 컬러 (#FF6B6B)
-  secondaryColor String?  @map("secondary_color") @db.VarChar(20) // 보조 컬러
-  logoUrl        String?  @map("logo_url") @db.VarChar(500)       // 로고 URL
-  faviconUrl     String?  @map("favicon_url") @db.VarChar(500)    // 파비콘 URL
-  bannerUrl      String?  @map("banner_url") @db.VarChar(500)     // 메인 배너 URL
-  footerText     String?  @map("footer_text") @db.Text            // 푸터 텍스트
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  channel        Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
-
-  @@map("channel_theme")
 }

@@ -43,6 +43,16 @@ export async function GET(
             phone: true,
           },
         },
+        // Shop 정보 (은행 정보 포함)
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            bankName: true,
+            bankAccount: true,
+            accountHolder: true,
+          },
+        },
         items: {
           include: {
             publishedProduct: {
@@ -58,9 +68,6 @@ export async function GET(
                   select: {
                     id: true,
                     name: true,
-                    bankName: true,
-                    bankAccount: true,
-                    accountHolder: true,
                   },
                 },
               },
@@ -94,6 +101,18 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: '접근 권한이 없습니다' },
         { status: 403 }
+      )
+    }
+
+    // Shop ID 확인 (middleware에서 설정)
+    const shopIdHeader = request.headers.get('x-shop-id')
+    const shopId = shopIdHeader ? parseInt(shopIdHeader) : null
+
+    // shopId가 있으면 해당 Shop의 주문인지 확인
+    if (shopId && order.shopId !== shopId) {
+      return NextResponse.json(
+        { success: false, error: '주문을 찾을 수 없습니다' },
+        { status: 404 }
       )
     }
 
@@ -170,16 +189,16 @@ export async function GET(
       } : null,
       // 무통장입금 정보 (BANK_TRANSFER인 경우)
       bankTransferInfo: order.payment?.method === 'BANK_TRANSFER' ? (() => {
-        // 첫 번째 아이템의 채널에서 입금정보 가져오기
-        const channel = order.items[0]?.publishedProduct?.channel
-        if (channel?.bankName && channel?.bankAccount) {
+        // Shop에서 입금정보 가져오기
+        const shop = order.shop
+        if (shop?.bankName && shop?.bankAccount) {
           // 입금기한: 주문일로부터 3일 후
           const deadline = new Date(order.orderedAt)
           deadline.setDate(deadline.getDate() + 3)
           return {
-            bankName: channel.bankName,
-            bankAccount: channel.bankAccount,
-            accountHolder: channel.accountHolder || '',
+            bankName: shop.bankName,
+            bankAccount: shop.bankAccount,
+            accountHolder: shop.accountHolder || '',
             depositDeadline: deadline.toISOString(),
           }
         }

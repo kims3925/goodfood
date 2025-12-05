@@ -96,6 +96,18 @@ export async function POST(
       )
     }
 
+    // Shop ID 확인 (middleware에서 설정)
+    const shopIdHeader = req.headers.get('x-shop-id')
+    const shopId = shopIdHeader ? parseInt(shopIdHeader) : null
+
+    // shopId가 있으면 해당 Shop의 주문인지 확인
+    if (shopId && order.shopId !== shopId) {
+      return NextResponse.json(
+        { success: false, error: '주문을 찾을 수 없습니다' },
+        { status: 404 }
+      )
+    }
+
     // 취소 가능한 상태인지 확인
     if (!CANCELLABLE_STATUSES.includes(order.status)) {
       return NextResponse.json(

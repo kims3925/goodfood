@@ -21,6 +21,10 @@ export async function GET(request: NextRequest) {
 
     const userId = typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
 
+    // Shop ID 확인 (middleware에서 설정)
+    const shopIdHeader = request.headers.get('x-shop-id')
+    const shopId = shopIdHeader ? parseInt(shopIdHeader) : null
+
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const page = parseInt(searchParams.get('page') || '1')
@@ -29,6 +33,11 @@ export async function GET(request: NextRequest) {
 
     const where: any = {
       userId,
+    }
+
+    // shopId가 있으면 해당 Shop의 주문만 조회
+    if (shopId) {
+      where.shopId = shopId
     }
 
     if (status) {

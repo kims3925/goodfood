@@ -24,6 +24,7 @@ export interface OrderItemInput {
 
 export interface CreateOrderInput {
   userId: number
+  shopId?: number | null  // Shop 기반 주문 필터링
   orderNumber: string
   recipientName: string
   recipientPhone: string
@@ -41,6 +42,7 @@ export interface CreateOrderInput {
 export interface OrderWithRelations {
   id: number
   userId: number
+  shopId: number | null  // Shop 기반 필터링
   orderNumber: string
   status: string
   recipientName: string
@@ -133,6 +135,7 @@ export class OrderRepository {
     const order = await prisma.order.create({
       data: {
         userId: data.userId,
+        shopId: data.shopId || null,  // Shop 기반 주문 필터링
         orderNumber: data.orderNumber,
         status: 'PENDING',
         recipientName: data.recipientName,
@@ -191,10 +194,17 @@ export class OrderRepository {
    */
   async findByUserId(
     userId: number,
-    options?: { take?: number; skip?: number }
+    options?: { take?: number; skip?: number; shopId?: number }
   ): Promise<OrderWithRelations[]> {
+    const where: any = { userId }
+
+    // shopId가 지정된 경우 해당 Shop의 주문만 조회
+    if (options?.shopId) {
+      where.shopId = options.shopId
+    }
+
     const orders = await prisma.order.findMany({
-      where: { userId },
+      where,
       include: orderIncludeOptions,
       orderBy: { orderedAt: 'desc' },
       take: options?.take,

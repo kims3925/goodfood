@@ -53,42 +53,12 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const {
-      name,
-      isActive,
-      coverUrl,
-      accountHolder,
-      bankAccount,
-      bankName,
-      // 서브도메인 쇼핑몰 필드
-      subdomain,
-      displayName,
-      enableToss,
-      enableBankTransfer,
-      freeShippingAmount,
-      defaultShippingFee,
-      contactPhone,
-      contactEmail,
-      theme,
-    } = body
+    const { name, isActive, coverUrl } = body
 
     const channel = await channelService.update(id, {
       name,
       isActive,
       coverUrl,
-      accountHolder,
-      bankAccount,
-      bankName,
-      // 서브도메인 쇼핑몰 필드
-      subdomain,
-      displayName,
-      enableToss,
-      enableBankTransfer,
-      freeShippingAmount,
-      defaultShippingFee,
-      contactPhone,
-      contactEmail,
-      theme,
     })
 
     return NextResponse.json({ success: true, data: channel })

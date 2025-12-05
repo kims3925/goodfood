@@ -53,7 +53,7 @@ async function upsertOAuthUser(profile: OAuthProfile): Promise<User> {
         profile.email ??
         `${profile.provider}_${profile.providerId}@${profile.provider}.local`,
       name: profile.name,
-      role: 'CUSTOMER',
+      role: 'USER',
       oauthProvider: profile.provider,
       oauthProviderId: profile.providerId,
       profileImage: profile.profileImage,

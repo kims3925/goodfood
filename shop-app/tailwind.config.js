@@ -8,7 +8,15 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // ABC Market Brand Colors - Coral/Orange Theme
+        // Theme Colors - CSS Variables 기반 동적 테마
+        // Shop별로 ThemeProvider에서 오버라이드됨
+        'theme-primary': 'rgb(var(--color-primary-rgb) / <alpha-value>)',
+        'theme-primary-dark': 'var(--color-primary-dark)',
+        'theme-primary-light': 'var(--color-primary-light)',
+        'theme-secondary': 'rgb(var(--color-secondary-rgb) / <alpha-value>)',
+
+        // ABC Market Brand Colors - 기본 테마 (Coral/Orange)
+        // 하위 호환성 유지 + fallback
         primary: {
           50: '#fff5f5',
           100: '#ffe0e0',
@@ -20,13 +28,14 @@ module.exports = {
           700: '#dc4a4a',
           800: '#c43a3a',
           900: '#a62d2d',
+          DEFAULT: 'var(--color-primary)', // CSS Variable 연결
         },
         abc: {
-          coral: '#FF6B6B',
-          'coral-dark': '#ee5a5a',
-          'coral-light': '#ff8585',
-          orange: '#FF8C42',
-          teal: '#2EC4B6',
+          coral: 'var(--color-primary)',
+          'coral-dark': 'var(--color-primary-dark)',
+          'coral-light': 'var(--color-primary-light)',
+          orange: 'var(--color-accent-orange)',
+          teal: 'var(--color-accent-teal)',
         },
         secondary: {
           50: '#e3f2fd',
@@ -39,6 +48,7 @@ module.exports = {
           700: '#1976d2',
           800: '#1565c0',
           900: '#0d47a1',
+          DEFAULT: 'var(--color-secondary)', // CSS Variable 연결
         },
         sale: '#ff424d', // Sale/Discount Red
         point: '#ff8a00', // Point Orange

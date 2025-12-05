@@ -1,6 +1,9 @@
 /**
  * Shop Product Detail API
  * 쇼핑몰 상품 상세 조회
+ *
+ * shopId 기반 필터링:
+ * - x-shop-id 헤더로 해당 Shop에 발행된 상품 정보 조회
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -15,11 +18,23 @@ export async function GET(
     const { searchParams } = new URL(req.url)
     const channelId = searchParams.get('channelId') || searchParams.get('bandId') // 하위 호환성
 
+    // Shop ID 확인 (middleware에서 설정)
+    const shopIdHeader = req.headers.get('x-shop-id')
+    const currentShopId = shopIdHeader ? parseInt(shopIdHeader) : null
+
     if (isNaN(productId)) {
       return NextResponse.json(
         { success: false, error: '유효하지 않은 상품 ID' },
         { status: 400 }
       )
+    }
+
+    // publishedProducts 조회 조건: shopId 우선, channelId 하위 호환
+    const publishedProductsWhere: any = {}
+    if (currentShopId) {
+      publishedProductsWhere.shopId = currentShopId
+    } else if (channelId) {
+      publishedProductsWhere.channelId = parseInt(channelId)
     }
 
     const product = await prisma.product.findUnique({
@@ -44,11 +59,10 @@ export async function GET(
           },
         },
         publishedProducts: {
-          where: channelId
-            ? { channelId: parseInt(channelId) }
-            : {},
+          where: publishedProductsWhere,
           include: {
             channel: true,
+            shop: true,
           },
           take: 1,
         },
