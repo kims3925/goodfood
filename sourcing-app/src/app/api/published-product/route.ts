@@ -159,6 +159,7 @@ export async function GET(request: NextRequest) {
 }
 
 // DELETE: 발행상품 삭제
+// 주문이나 문의가 있는 발행 상품은 삭제 불가 (리뷰는 제외)
 export async function DELETE(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
@@ -187,9 +188,20 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // 발행상품 확인
+    // 발행상품 확인 (주문, 문의 카운트 포함)
     const publishedProduct = await prisma.publishedProduct.findFirst({
       where: { id, userId: currentUser.userId },
+      include: {
+        product: {
+          select: { name: true },
+        },
+        _count: {
+          select: {
+            orderItems: true,
+            inquiries: true,
+          },
+        },
+      },
     })
 
     if (!publishedProduct) {
@@ -197,6 +209,27 @@ export async function DELETE(request: NextRequest) {
         { success: false, error: '발행상품을 찾을 수 없습니다.' },
         { status: 404 }
       )
+    }
+
+    // 주문 또는 문의가 있는지 확인
+    const hasOrders = publishedProduct._count.orderItems > 0
+    const hasInquiries = publishedProduct._count.inquiries > 0
+
+    if (hasOrders || hasInquiries) {
+      const reasons: string[] = []
+      if (hasOrders) reasons.push(`주문 ${publishedProduct._count.orderItems}건`)
+      if (hasInquiries) reasons.push(`문의 ${publishedProduct._count.inquiries}건`)
+
+      return NextResponse.json({
+        success: false,
+        error: '발행상품을 삭제할 수 없습니다.',
+        reason: `${reasons.join(', ')}이 존재하는 상품은 삭제할 수 없습니다.`,
+        details: {
+          productName: publishedProduct.product.name,
+          orderCount: publishedProduct._count.orderItems,
+          inquiryCount: publishedProduct._count.inquiries,
+        },
+      }, { status: 400 })
     }
 
     await prisma.publishedProduct.delete({ where: { id } })

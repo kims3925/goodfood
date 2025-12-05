@@ -87,6 +87,10 @@ export default function ChannelFormModal({
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
 
+  // 기존 채널 키 목록 (DB에서 조회)
+  const [existingWholesaleKeys, setExistingWholesaleKeys] = useState<string[]>([])
+  const [existingRetailKeys, setExistingRetailKeys] = useState<string[]>([])
+
   // 16자리 UUID 생성 함수
   const generateShortUUID = () => {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
@@ -120,6 +124,20 @@ export default function ChannelFormModal({
       setConfiguredPlatforms([])
     } finally {
       setIsLoadingApiSettings(false)
+    }
+  }, [])
+
+  // 기존 채널 키 조회 (DB에서)
+  const fetchExistingChannelKeys = useCallback(async () => {
+    try {
+      const response = await fetch('/api/channel/keys')
+      const data = await response.json()
+      if (data.success) {
+        setExistingWholesaleKeys(data.data.wholesale || [])
+        setExistingRetailKeys(data.data.retail || [])
+      }
+    } catch (error) {
+      console.error('기존 채널 키 조회 실패:', error)
     }
   }, [])
 
@@ -172,6 +190,8 @@ export default function ChannelFormModal({
         })
         // API 설정 조회
         fetchConfiguredPlatforms()
+        // 기존 채널 키 조회
+        fetchExistingChannelKeys()
       }
       setErrors({})
       setBandList([])
@@ -180,7 +200,7 @@ export default function ChannelFormModal({
       setLogoPreview(null)
       setSelectedBands([])
     }
-  }, [isOpen, channel, fetchConfiguredPlatforms])
+  }, [isOpen, channel, fetchConfiguredPlatforms, fetchExistingChannelKeys])
 
   // 즉시 밴드 목록 조회 (초기 로드용)
   const fetchBandListImmediate = async () => {
@@ -413,7 +433,21 @@ export default function ChannelFormModal({
   }
 
   const handleChange = (field: string, value: string | boolean) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+    // kind 변경 시 관련 상태 초기화
+    if (field === 'kind') {
+      setSelectedBands([])
+      setLogoPreview(null)
+      setFormData((prev) => ({
+        ...prev,
+        kind: value as ChannelKind,
+        channelKey: '',
+        name: '',
+        coverUrl: '',
+      }))
+    } else {
+      setFormData((prev) => ({ ...prev, [field]: value }))
+    }
+
     if (errors[field]) {
       setErrors((prev) => {
         const newErrors = { ...prev }
@@ -540,12 +574,12 @@ export default function ChannelFormModal({
     }
   }
 
-  // 전체 선택/해제 핸들러
-  const handleSelectAllBands = () => {
-    if (selectedBands.length === bandList.length) {
+  // 전체 선택/해제 핸들러 (필터링된 목록 기준)
+  const handleSelectAllBands = (filteredList: BandInfo[]) => {
+    if (selectedBands.length === filteredList.length) {
       setSelectedBands([])
     } else {
-      setSelectedBands([...bandList])
+      setSelectedBands([...filteredList])
     }
   }
 
@@ -554,6 +588,10 @@ export default function ChannelFormModal({
   const availablePlatforms = isEditMode
     ? PLATFORM_OPTIONS.filter((p) => p.kinds.includes(formData.kind))
     : PLATFORM_OPTIONS.filter((p) => p.kinds.includes(formData.kind) && configuredPlatforms.includes(p.value))
+
+  // 이미 등록된 채널 키를 제외한 밴드 목록 (kind에 따라 다른 목록 사용)
+  const existingChannelKeys = formData.kind === 'WHOLESALE' ? existingWholesaleKeys : existingRetailKeys
+  const filteredBandList = bandList.filter((band) => !existingChannelKeys.includes(band.bandKey))
 
   return (
     <Modal
@@ -667,13 +705,13 @@ export default function ChannelFormModal({
                       <span className="ml-2 text-purple-600">({selectedBands.length}개 선택됨)</span>
                     )}
                   </label>
-                  {bandList.length > 0 && (
+                  {filteredBandList.length > 0 && (
                     <button
                       type="button"
-                      onClick={handleSelectAllBands}
+                      onClick={() => handleSelectAllBands(filteredBandList)}
                       className="text-sm text-purple-600 hover:text-purple-700 font-medium"
                     >
-                      {selectedBands.length === bandList.length ? '전체 해제' : '전체 선택'}
+                      {selectedBands.length === filteredBandList.length ? '전체 해제' : '전체 선택'}
                     </button>
                   )}
                 </div>
@@ -744,14 +782,14 @@ export default function ChannelFormModal({
                       </div>
                     </div>
                   </div>
-                ) : bandList.length === 0 ? (
+                ) : filteredBandList.length === 0 ? (
                   <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
-                    <p className="text-sm text-gray-500">등록된 밴드가 없습니다.</p>
+                    <p className="text-sm text-gray-500">{bandList.length === 0 ? '등록된 밴드가 없습니다.' : '등록 가능한 밴드가 없습니다. (모든 밴드가 이미 등록됨)'}</p>
                   </div>
                 ) : (
-                  <div className="border border-gray-200 rounded-lg h-96 overflow-y-auto">
+                  <div className="border border-gray-200 rounded-lg h-[450px] overflow-y-auto">
                     <div className="grid grid-cols-1 gap-2 p-2">
-                      {bandList.map((band) => {
+                      {filteredBandList.map((band) => {
                         const isSelected = selectedBands.some((b) => b.bandKey === band.bandKey)
                         return (
                           <button
@@ -877,14 +915,16 @@ export default function ChannelFormModal({
                       </div>
                     </div>
                   </div>
-                ) : bandList.length === 0 ? (
+                ) : filteredBandList.length === 0 ? (
                   <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
-                    <p className="text-sm text-gray-500">등록된 밴드가 없습니다.</p>
+                    <p className="text-sm text-gray-500">
+                      {bandList.length === 0 ? '등록된 밴드가 없습니다.' : '모든 밴드가 이미 등록되어 있습니다.'}
+                    </p>
                   </div>
                 ) : (
-                  <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
+                  <div className="border border-gray-200 rounded-lg h-[450px] overflow-y-auto">
                     <div className="grid grid-cols-1 gap-2 p-2">
-                      {bandList.map((band) => {
+                      {filteredBandList.map((band) => {
                         const isSelected = formData.channelKey === band.bandKey
                         return (
                           <button

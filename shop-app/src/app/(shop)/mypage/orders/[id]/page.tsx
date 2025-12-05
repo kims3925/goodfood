@@ -197,19 +197,46 @@ export default function OrderDetailPage() {
     return new Intl.NumberFormat('ko-KR').format(price) + '원'
   }
 
+  const copyToClipboard = async (text: string): Promise<boolean> => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text)
+        return true
+      }
+      // Fallback for non-secure contexts (HTTP)
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      const success = document.execCommand('copy')
+      document.body.removeChild(textArea)
+      return success
+    } catch (error) {
+      console.error('Failed to copy:', error)
+      return false
+    }
+  }
+
   const copyOrderNumber = async () => {
     if (order?.orderNumber) {
-      await navigator.clipboard.writeText(order.orderNumber)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      const success = await copyToClipboard(order.orderNumber)
+      if (success) {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }
     }
   }
 
   const copyBankAccount = async () => {
     if (order?.bankTransferInfo?.bankAccount) {
-      await navigator.clipboard.writeText(order.bankTransferInfo.bankAccount)
-      setBankAccountCopied(true)
-      setTimeout(() => setBankAccountCopied(false), 2000)
+      const success = await copyToClipboard(order.bankTransferInfo.bankAccount)
+      if (success) {
+        setBankAccountCopied(true)
+        setTimeout(() => setBankAccountCopied(false), 2000)
+      }
     }
   }
 

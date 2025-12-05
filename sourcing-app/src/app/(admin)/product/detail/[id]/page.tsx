@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus, Upload, Info } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -117,6 +117,10 @@ export default function ProductDetailPage() {
   const [isEditingVariants, setIsEditingVariants] = useState(false)
   const [editingVariants, setEditingVariants] = useState<Array<{ id?: number; selectedOptions: Record<string, string>; price: number }>>([])
   const [isSavingVariants, setIsSavingVariants] = useState(false)
+
+  // 이미지 업로드 상태
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (productId) {
@@ -404,6 +408,42 @@ export default function ProductDetailPage() {
     setImageOrderChanged(true)
   }
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!product || !e.target.files || e.target.files.length === 0) return
+
+    const files = Array.from(e.target.files)
+    setIsUploading(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('productId', product.id.toString())
+      files.forEach((file) => {
+        formData.append('files', file)
+      })
+
+      const response = await fetch('/api/images/product', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        toast.success(`${files.length}개의 이미지가 업로드되었습니다.`)
+        loadProduct()
+      } else {
+        toast.error(data.error || '이미지 업로드에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('이미지 업로드 실패:', error)
+      toast.error('이미지 업로드에 실패했습니다.')
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
   const handleSaveImageOrder = async () => {
     if (!product || images.length === 0) return
 
@@ -609,6 +649,23 @@ export default function ProductDetailPage() {
       </div>
 
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* 안내 문구 */}
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-amber-100 rounded-lg flex-shrink-0">
+              <Info size={18} className="text-amber-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-amber-900">
+                상품 정보 수정 시 쇼핑몰에만 자동으로 반영됩니다.
+              </p>
+              <p className="text-sm text-amber-700 mt-1">
+                밴드, 알리익스프레스 등 외부 플랫폼에 발행된 상품은 재발행이 필요합니다.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {activeTab === 'info' ? (
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
             {/* 왼쪽: 이미지 갤러리 */}
@@ -637,6 +694,40 @@ export default function ProductDetailPage() {
                         <p className="text-sm text-slate-500 mt-2">드래그하여 순서를 변경하거나, 호버하여 삭제할 수 있습니다.</p>
                       </div>
                       <div className="p-4">
+                        {/* 이미지 업로드 영역 */}
+                        <div className="mb-4">
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handleImageUpload}
+                            className="hidden"
+                            id="image-upload"
+                          />
+                          <label
+                            htmlFor="image-upload"
+                            className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+                              isUploading
+                                ? 'border-blue-300 bg-blue-50'
+                                : 'border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50'
+                            }`}
+                          >
+                            {isUploading ? (
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                <span className="text-sm text-blue-600 font-medium">업로드 중...</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-2">
+                                <Upload size={24} className="text-slate-400" />
+                                <span className="text-sm text-slate-600 font-medium">클릭하여 이미지 업로드</span>
+                                <span className="text-xs text-slate-400">여러 이미지를 한 번에 선택할 수 있습니다</span>
+                              </div>
+                            )}
+                          </label>
+                        </div>
+
                         {images.length > 0 ? (
                           <>
                             <ImageSortable
@@ -659,8 +750,8 @@ export default function ProductDetailPage() {
                             )}
                           </>
                         ) : (
-                          <div className="flex items-center justify-center h-48 bg-slate-50 rounded-xl">
-                            <Package size={48} className="text-slate-300" />
+                          <div className="flex items-center justify-center h-24 bg-slate-50 rounded-xl border border-slate-200">
+                            <p className="text-sm text-slate-400">업로드된 이미지가 없습니다</p>
                           </div>
                         )}
                       </div>
@@ -731,11 +822,21 @@ export default function ProductDetailPage() {
                           )}
                         </>
                       ) : (
-                        <div className="p-12 text-center">
-                          <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
-                            <ImageIcon size={32} className="text-slate-400" />
+                        <div className="p-6">
+                          <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                            <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                              <ImageIcon size={32} className="text-slate-400" />
+                            </div>
+                            <p className="text-slate-500 font-medium mb-4">이미지가 없습니다</p>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => setIsEditingImages(true)}
+                            >
+                              <Upload size={14} className="mr-1" />
+                              이미지 업로드
+                            </Button>
                           </div>
-                          <p className="text-slate-500 font-medium">이미지가 없습니다</p>
                         </div>
                       )}
                     </>

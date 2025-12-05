@@ -34,6 +34,11 @@ export async function GET(request: NextRequest) {
               take: 1,
               select: { price: true },
             },
+            images: {
+              orderBy: { sortOrder: 'asc' },
+              take: 1,
+              select: { url: true },
+            },
           },
         },
       },
@@ -42,19 +47,26 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // 응답 형식 변환 (price를 variants에서 가져오기)
-    const formattedWishlists = wishlists.map((w) => ({
-      id: w.id,
-      addedAt: w.addedAt,
-      product: {
-        id: w.product.id,
-        name: w.product.name,
-        description: w.product.description,
-        thumbnailUrl: w.product.thumbnailUrl,
-        price: w.product.variants[0]?.price || null,
-        currency: w.product.currency,
-      },
-    }))
+    // 응답 형식 변환 (price를 variants에서, thumbnailUrl을 images에서 가져오기)
+    const formattedWishlists = wishlists.map((w) => {
+      const thumbnailUrl = w.product.thumbnailUrl || w.product.images[0]?.url || null
+      console.log('[Wishlist] Product:', w.product.id, w.product.name)
+      console.log('[Wishlist] thumbnailUrl:', w.product.thumbnailUrl)
+      console.log('[Wishlist] images:', w.product.images)
+      console.log('[Wishlist] final thumbnailUrl:', thumbnailUrl)
+      return {
+        id: w.id,
+        addedAt: w.addedAt,
+        product: {
+          id: w.product.id,
+          name: w.product.name,
+          description: w.product.description,
+          thumbnailUrl,
+          price: w.product.variants[0]?.price || null,
+          currency: w.product.currency,
+        },
+      }
+    })
 
     return NextResponse.json({
       success: true,

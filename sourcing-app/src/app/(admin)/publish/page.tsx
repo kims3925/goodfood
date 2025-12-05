@@ -15,6 +15,7 @@ import {
   ShoppingCart,
   AlertTriangle,
   ExternalLink,
+  Trash2,
 } from 'lucide-react'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -107,6 +108,17 @@ export default function PublishPage() {
   // 가격 미설정 상품 경고 모달
   const [showPriceWarning, setShowPriceWarning] = useState(false)
   const [warningProduct, setWarningProduct] = useState<Product | null>(null)
+
+  // 발행 취소 확인 모달
+  const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false)
+  const [unpublishTarget, setUnpublishTarget] = useState<{
+    productId: number
+    productName: string
+    shopId: number
+    shopName: string
+    publishId: number
+  } | null>(null)
+  const [isUnpublishing, setIsUnpublishing] = useState(false)
 
   // 초기 로드
   useEffect(() => {
@@ -262,6 +274,13 @@ export default function PublishPage() {
     return products.find((p) => p.id === productId)
   }
 
+  // Shop 발행의 publishId 조회
+  const getShopPublishId = (productId: number, shopId: number) => {
+    const product = products.find((p) => p.id === productId)
+    const publishedShop = product?.publishedShops?.find((ps) => ps.shopId === shopId)
+    return publishedShop?.publishId
+  }
+
   // 셀 키 생성 (type-productId-targetId)
   const cellKey = (productId: number, targetType: 'shop' | 'channel', targetId: number) =>
     `${targetType}-${productId}-${targetId}`
@@ -273,8 +292,27 @@ export default function PublishPage() {
   }
 
   const handleCellClick = (productId: number, targetType: 'shop' | 'channel', targetId: number) => {
-    // 이미 발행된 셀은 선택할 수 없음
-    if (isPublished(productId, targetType, targetId)) return
+    // 발행된 Shop 셀 클릭 시 취소 확인 모달 표시
+    if (isPublished(productId, targetType, targetId)) {
+      // Shop 발행만 취소 가능
+      if (targetType === 'shop') {
+        const product = getProduct(productId)
+        const shop = shops.find((s) => s.id === targetId)
+        const publishId = getShopPublishId(productId, targetId)
+
+        if (product && shop && publishId) {
+          setUnpublishTarget({
+            productId,
+            productName: product.name,
+            shopId: targetId,
+            shopName: shop.name,
+            publishId,
+          })
+          setShowUnpublishConfirm(true)
+        }
+      }
+      return
+    }
 
     // 가격이 설정되지 않은 상품은 발행 불가
     if (!hasPrice(productId)) {
@@ -460,6 +498,41 @@ export default function PublishPage() {
       toast.error('발행 중 오류가 발생했습니다. 다시 시도해주세요.')
     } finally {
       setIsPublishing(false)
+    }
+  }
+
+  // 발행 취소 처리
+  const handleUnpublish = async () => {
+    if (!unpublishTarget) return
+    if (isUnpublishing) return
+
+    setIsUnpublishing(true)
+    try {
+      const response = await fetch(`/api/shop/publish?ids=${unpublishTarget.publishId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success('발행이 취소되었습니다.')
+        setShowUnpublishConfirm(false)
+        setUnpublishTarget(null)
+        loadProducts()
+      } else {
+        // 주문/문의가 있어서 삭제 불가한 경우
+        if (data.cannotDelete && data.cannotDelete.length > 0) {
+          const item = data.cannotDelete[0]
+          toast.error(`발행 취소 불가: ${item.reason}이 있습니다.`)
+        } else {
+          toast.error(data.error || '발행 취소에 실패했습니다.')
+        }
+      }
+    } catch (error) {
+      console.error('발행 취소 실패:', error)
+      toast.error('발행 취소 중 오류가 발생했습니다.')
+    } finally {
+      setIsUnpublishing(false)
     }
   }
 
@@ -728,6 +801,7 @@ export default function PublishPage() {
                           const published = isPublished(product.id, group.type, item.id)
                           const selected = selectedCells.has(cellKey(product.id, group.type, item.id))
                           const priceSet = hasPrice(product.id)
+                          const isShopPublished = published && group.type === 'shop'
 
                           return (
                             <td
@@ -739,6 +813,8 @@ export default function PublishPage() {
                                 className={`w-8 h-8 rounded transition-all ${
                                   selected
                                     ? 'bg-purple-500 hover:bg-purple-600 cursor-pointer'
+                                    : isShopPublished
+                                    ? 'bg-green-500 hover:bg-green-600 cursor-pointer'
                                     : published
                                     ? 'bg-green-500 cursor-not-allowed'
                                     : !priceSet
@@ -746,7 +822,7 @@ export default function PublishPage() {
                                     : 'bg-gray-200 hover:bg-gray-300 cursor-pointer'
                                 }`}
                                 title={`${product.name} → ${item.name}: ${
-                                  published ? '발행됨 (선택 불가)' : !priceSet ? '가격 미설정 (설정 필요)' : '미발행'
+                                  isShopPublished ? '발행됨 (클릭하여 취소)' : published ? '발행됨' : !priceSet ? '가격 미설정 (설정 필요)' : '미발행'
                                 }`}
                               >
                                 {published && <Check size={16} className="text-white mx-auto" />}
@@ -895,7 +971,80 @@ export default function PublishPage() {
                   }}
                 >
                   <ExternalLink size={16} className="mr-2" />
-                  상품 설정하기
+                  가격 설정하기
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 발행 취소 확인 모달 */}
+      {showUnpublishConfirm && unpublishTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => {
+              if (!isUnpublishing) {
+                setShowUnpublishConfirm(false)
+                setUnpublishTarget(null)
+              }
+            }}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            {/* 헤더 */}
+            <div className="bg-red-50 p-6 border-b border-red-100">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-red-100 rounded-full">
+                  <Trash2 size={24} className="text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">발행 취소</h3>
+                  <p className="text-sm text-gray-600">쇼핑몰에서 상품을 제거합니다</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 콘텐츠 */}
+            <div className="p-6">
+              <div className="p-4 bg-gray-50 rounded-xl mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-500">상품</span>
+                  <span className="font-medium text-gray-900 truncate max-w-[200px]">{unpublishTarget.productName}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">쇼핑몰</span>
+                  <span className="font-medium text-gray-900">{unpublishTarget.shopName}</span>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-6">
+                이 상품의 발행을 취소하시겠습니까?
+                <br />
+                <span className="text-red-500">
+                  주문 또는 문의가 있는 상품은 취소할 수 없습니다.
+                </span>
+              </p>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowUnpublishConfirm(false)
+                    setUnpublishTarget(null)
+                  }}
+                  disabled={isUnpublishing}
+                >
+                  닫기
+                </Button>
+                <Button
+                  className="flex-1 bg-red-600 hover:bg-red-700"
+                  onClick={handleUnpublish}
+                  loading={isUnpublishing}
+                >
+                  <Trash2 size={16} className="mr-2" />
+                  발행 취소
                 </Button>
               </div>
             </div>
