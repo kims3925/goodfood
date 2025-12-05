@@ -79,3 +79,38 @@ export interface ChannelForPublish {
     accessToken: string
   } | null
 }
+
+// Shop 발행 관련 타입
+export interface PublishToShopParams {
+  userId: number
+  productId: number
+  shopId: number
+}
+
+export interface PublishToShopResult {
+  success: boolean
+  productId: number
+  shopId: number
+  publishedProductId?: number
+  error?: string
+  skipped?: boolean
+  skipReason?: string
+}
+
+export interface PublishShopBatchParams {
+  userId: number
+  productIds: number[]
+  shopId: number
+}
+
+export interface PublishShopBatchResult {
+  success: boolean
+  shopId: number
+  shopName: string
+  total: number
+  successCount: number
+  failedCount: number
+  skippedCount: number
+  results: PublishToShopResult[]
+  errors: string[]
+}

@@ -173,7 +173,7 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
       icon: <Send size={20} />,
     },
     {
-      label: '주문 목록',
+      label: '주문 관리',
       href: '/order/list',
       icon: <ClipboardList size={20} />,
     },

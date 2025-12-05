@@ -25,7 +25,6 @@ function StoreLayoutContent({
   const shopName = shop?.name || 'ABC마켓'
   const logoUrl = shop?.theme?.logoUrl
   const contactPhone = shop?.contactPhone || '1234-5678'
-  const footerText = shop?.theme?.footerText
   const relatedShops = shop?.relatedShops || []
 
   // 서브도메인 기반 URL 생성
@@ -221,8 +220,15 @@ function StoreLayoutContent({
         {/* Main Header */}
         <div className="kurly-container">
           <div className="kurly-header-top">
-            {/* Logo - 항상 Shop 이름으로 표시 */}
+            {/* Logo - 로고 이미지 + Shop 이름 */}
             <Link href="/main" className="kurly-logo flex items-center gap-2">
+              {logoUrl && (
+                <img
+                  src={logoUrl}
+                  alt={`${shopName} 로고`}
+                  className="h-8 md:h-10 lg:h-12 w-auto object-contain"
+                />
+              )}
               <span className="text-xl md:text-2xl lg:text-3xl font-black text-abc-coral">
                 {shopName}
               </span>
@@ -396,14 +402,8 @@ function StoreLayoutContent({
             )}
           </div>
           <div className="mt-6 md:mt-8 pt-6 md:pt-8 border-t border-gray-200 text-center text-xs md:text-sm text-gray-500">
-            {footerText ? (
-              <p dangerouslySetInnerHTML={{ __html: footerText }} />
-            ) : (
-              <>
-                <p>{shopName} | 대표: 홍길동 | 사업자등록번호: 123-45-67890</p>
-                <p className="mt-2">Copyright &copy; 2024 {shopName}. All rights reserved.</p>
-              </>
-            )}
+            <p>{shopName} | 대표: 홍길동 | 사업자등록번호: 123-45-67890</p>
+            <p className="mt-2">Copyright &copy; 2024 {shopName}. All rights reserved.</p>
           </div>
         </div>
       </footer>

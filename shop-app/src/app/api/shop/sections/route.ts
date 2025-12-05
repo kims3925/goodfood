@@ -225,7 +225,15 @@ async function getShopProducts(shopId: number, limit: number) {
   const shop = await prisma.shop.findUnique({
     where: { id: shopId },
     include: {
-      theme: true,
+      theme: {
+        select: {
+          primaryColor: true,
+          secondaryColor: true,
+          logoUrl: true,
+          faviconUrl: true,
+          bannerUrl: true,
+        },
+      },
     },
   })
 

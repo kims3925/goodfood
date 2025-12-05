@@ -56,8 +56,6 @@ async function getShopFromHeaders(): Promise<ShopInfo | null> {
         subdomain: true,
         name: true,
         coverUrl: true,
-        enableToss: true,
-        enableBankTransfer: true,
         freeShippingAmount: true,
         defaultShippingFee: true,
         contactPhone: true,
@@ -72,7 +70,6 @@ async function getShopFromHeaders(): Promise<ShopInfo | null> {
             logoUrl: true,
             faviconUrl: true,
             bannerUrl: true,
-            footerText: true,
           },
         },
       },
@@ -85,8 +82,6 @@ async function getShopFromHeaders(): Promise<ShopInfo | null> {
       subdomain: shop.subdomain,
       name: shop.name,
       coverUrl: shop.coverUrl || undefined,
-      enableToss: shop.enableToss,
-      enableBankTransfer: shop.enableBankTransfer,
       freeShippingAmount: shop.freeShippingAmount || undefined,
       defaultShippingFee: shop.defaultShippingFee || undefined,
       contactPhone: shop.contactPhone || undefined,
@@ -105,7 +100,6 @@ async function getShopFromHeaders(): Promise<ShopInfo | null> {
             logoUrl: shop.theme.logoUrl || undefined,
             faviconUrl: shop.theme.faviconUrl || undefined,
             bannerUrl: shop.theme.bannerUrl || undefined,
-            footerText: shop.theme.footerText || undefined,
           }
         : undefined,
       relatedShops: await getRelatedShops(shop.id, shop.userId),
@@ -124,9 +118,20 @@ export async function generateMetadata() {
     ? `${shop.name} - 신선한 농수산물 직거래 쇼핑몰`
     : 'ABC마켓 - 신선한 농수산물 직거래 쇼핑몰'
 
+  // favicon 설정
+  const faviconUrl = shop?.theme?.faviconUrl
+  const icons = faviconUrl
+    ? {
+        icon: faviconUrl,
+        shortcut: faviconUrl,
+        apple: faviconUrl,
+      }
+    : undefined
+
   return {
     title,
     description: '신선한 농수산물을 합리적인 가격에 만나보세요!',
+    icons,
   }
 }
 

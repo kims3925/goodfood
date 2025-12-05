@@ -120,7 +120,6 @@ export default function ImageUpload({
           >
             <X size={14} />
           </button>
-          <div className="mt-2 text-xs text-gray-500 truncate">{value}</div>
         </div>
       ) : (
         // 업로드 영역

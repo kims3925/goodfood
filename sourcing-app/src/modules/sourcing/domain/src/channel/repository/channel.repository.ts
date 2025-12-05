@@ -49,6 +49,16 @@ export class ChannelRepository {
       console.log('[ChannelRepository] findById 호출 - ID:', id)
       const channel = await prisma.channel.findFirst({
         where: { id },
+        include: {
+          shop: {
+            select: {
+              id: true,
+              name: true,
+              subdomain: true,
+              isActive: true,
+            },
+          },
+        },
       })
 
       if (!channel) {
@@ -93,10 +103,21 @@ export class ChannelRepository {
     if (data.name) channelData.name = data.name
     if (data.isActive !== undefined) channelData.isActive = data.isActive
     if (data.coverUrl !== undefined) channelData.coverUrl = data.coverUrl
+    if (data.shopId !== undefined) channelData.shopId = data.shopId
 
     return prisma.channel.update({
       where: { id },
       data: channelData,
+      include: {
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            subdomain: true,
+            isActive: true,
+          },
+        },
+      },
     })
   }
 

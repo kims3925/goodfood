@@ -12,16 +12,11 @@ import {
   Calendar,
   Globe,
   CreditCard,
-  Building2,
-  User,
   Power,
   PowerOff,
   Palette,
-  Mail,
   Phone,
   Truck,
-  Image,
-  FileText,
   ExternalLink,
   Package,
   ShoppingCart,
@@ -31,6 +26,7 @@ import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
+import ImageUpload from '@/components/ui/ImageUpload'
 
 interface ShopTheme {
   id: number
@@ -40,7 +36,6 @@ interface ShopTheme {
   logoUrl: string | null
   faviconUrl: string | null
   bannerUrl: string | null
-  footerText: string | null
 }
 
 interface Shop {
@@ -49,8 +44,6 @@ interface Shop {
   subdomain: string
   name: string
   coverUrl: string | null
-  enableToss: boolean
-  enableBankTransfer: boolean
   bankName: string | null
   bankAccount: string | null
   accountHolder: string | null
@@ -65,7 +58,6 @@ interface Shop {
   _count: {
     publishedProducts: number
     orders: number
-    carts: number
   }
 }
 
@@ -91,9 +83,7 @@ export default function ShopDetailPage({
   const [coverUrl, setCoverUrl] = useState('')
   const [isActive, setIsActive] = useState(true)
 
-  // 결제 설정 필드
-  const [enableToss, setEnableToss] = useState(true)
-  const [enableBankTransfer, setEnableBankTransfer] = useState(true)
+  // 정산 정보 필드
   const [bankName, setBankName] = useState('')
   const [bankAccount, setBankAccount] = useState('')
   const [accountHolder, setAccountHolder] = useState('')
@@ -112,7 +102,6 @@ export default function ShopDetailPage({
   const [logoUrl, setLogoUrl] = useState('')
   const [faviconUrl, setFaviconUrl] = useState('')
   const [bannerUrl, setBannerUrl] = useState('')
-  const [footerText, setFooterText] = useState('')
 
   const loadShop = useCallback(async () => {
     try {
@@ -128,9 +117,7 @@ export default function ShopDetailPage({
         setName(s.name)
         setCoverUrl(s.coverUrl || '')
         setIsActive(s.isActive)
-        // 결제 설정
-        setEnableToss(s.enableToss)
-        setEnableBankTransfer(s.enableBankTransfer)
+        // 정산 정보
         setBankName(s.bankName || '')
         setBankAccount(s.bankAccount || '')
         setAccountHolder(s.accountHolder || '')
@@ -147,14 +134,12 @@ export default function ShopDetailPage({
           setLogoUrl(s.theme.logoUrl || '')
           setFaviconUrl(s.theme.faviconUrl || '')
           setBannerUrl(s.theme.bannerUrl || '')
-          setFooterText(s.theme.footerText || '')
         } else {
           setPrimaryColor('')
           setSecondaryColor('')
           setLogoUrl('')
           setFaviconUrl('')
           setBannerUrl('')
-          setFooterText('')
         }
       } else {
         toast.error(data.error || '쇼핑몰을 불러오는데 실패했습니다.')
@@ -197,8 +182,6 @@ export default function ShopDetailPage({
         name,
         coverUrl: coverUrl || null,
         isActive,
-        enableToss,
-        enableBankTransfer,
         bankName: bankName || null,
         bankAccount: bankAccount || null,
         accountHolder: accountHolder || null,
@@ -212,7 +195,6 @@ export default function ShopDetailPage({
           logoUrl: logoUrl || null,
           faviconUrl: faviconUrl || null,
           bannerUrl: bannerUrl || null,
-          footerText: footerText || null,
         },
       }
 
@@ -269,8 +251,6 @@ export default function ShopDetailPage({
       setName(shop.name)
       setCoverUrl(shop.coverUrl || '')
       setIsActive(shop.isActive)
-      setEnableToss(shop.enableToss)
-      setEnableBankTransfer(shop.enableBankTransfer)
       setBankName(shop.bankName || '')
       setBankAccount(shop.bankAccount || '')
       setAccountHolder(shop.accountHolder || '')
@@ -284,7 +264,6 @@ export default function ShopDetailPage({
         setLogoUrl(shop.theme.logoUrl || '')
         setFaviconUrl(shop.theme.faviconUrl || '')
         setBannerUrl(shop.theme.bannerUrl || '')
-        setFooterText(shop.theme.footerText || '')
       }
     }
     setIsEditMode(false)
@@ -520,68 +499,39 @@ export default function ShopDetailPage({
                     )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">커버 이미지 URL</label>
+                  <label className="block text-sm font-medium text-gray-500 mb-2">커버 이미지</label>
                   {isEditMode ? (
-                    <Input
+                    <ImageUpload
                       value={coverUrl}
-                      onChange={(e) => setCoverUrl(e.target.value)}
-                      placeholder="https://..."
+                      onChange={setCoverUrl}
+                      placeholder="쇼핑몰 커버 이미지"
                     />
                   ) : (
-                    <p className="text-gray-900 truncate">{shop.coverUrl || '-'}</p>
+                    coverUrl ? (
+                      <div className="relative w-full h-32 rounded-lg overflow-hidden border border-gray-200">
+                        <img src={coverUrl} alt="커버 이미지" className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-full h-32 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50">
+                        <span className="text-gray-400 text-sm">이미지 없음</span>
+                      </div>
+                    )
                   )}
                 </div>
               </div>
             </div>
 
-            {/* 결제 설정 카드 */}
+            {/* 정산 정보 카드 */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-green-100 rounded-lg">
                     <CreditCard size={18} className="text-green-600" />
                   </div>
-                  <span className="font-semibold text-slate-900">결제 설정</span>
+                  <span className="font-semibold text-slate-900">정산 정보</span>
                 </div>
               </div>
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-2">결제 수단</label>
-                  {isEditMode ? (
-                    <div className="flex items-center gap-6">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={enableToss}
-                          onChange={(e) => setEnableToss(e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600"
-                        />
-                        <span className="text-sm text-gray-700">토스페이먼츠</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={enableBankTransfer}
-                          onChange={(e) => setEnableBankTransfer(e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600"
-                        />
-                        <span className="text-sm text-gray-700">계좌이체</span>
-                      </label>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      {shop.enableToss && (
-                        <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-700">토스페이먼츠</span>
-                      )}
-                      {shop.enableBankTransfer && (
-                        <span className="px-2 py-1 rounded text-xs bg-purple-100 text-purple-700">계좌이체</span>
-                      )}
-                      {!shop.enableToss && !shop.enableBankTransfer && (
-                        <span className="text-gray-400 text-sm">없음</span>
-                      )}
-                    </div>
-                  )}
-                </div>
+              <div className="p-6">
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-500 mb-1">은행명</label>
@@ -724,115 +674,150 @@ export default function ShopDetailPage({
                   <span className="font-semibold text-slate-900">테마 설정</span>
                 </div>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-5">
+                {/* 색상 설정 */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">메인 컬러</label>
+                    <label className="block text-sm font-medium text-gray-500 mb-2">메인 컬러</label>
                     {isEditMode ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={primaryColor || '#3B82F6'}
-                          onChange={(e) => setPrimaryColor(e.target.value)}
-                          className="w-10 h-10 rounded cursor-pointer"
-                        />
-                        <Input
-                          value={primaryColor}
-                          onChange={(e) => setPrimaryColor(e.target.value)}
-                          placeholder="#3B82F6"
-                          className="flex-1"
-                        />
+                      <div className="relative">
+                        <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                          <div className="relative">
+                            <input
+                              type="color"
+                              value={primaryColor || '#3B82F6'}
+                              onChange={(e) => setPrimaryColor(e.target.value)}
+                              className="w-10 h-10 rounded-lg cursor-pointer border-0 p-0"
+                              style={{ appearance: 'none' }}
+                            />
+                            <div
+                              className="absolute inset-0 rounded-lg border-2 border-white shadow-sm pointer-events-none"
+                              style={{ backgroundColor: primaryColor || '#3B82F6' }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              value={primaryColor}
+                              onChange={(e) => setPrimaryColor(e.target.value)}
+                              placeholder="#3B82F6"
+                              className="w-full bg-transparent border-none focus:outline-none text-sm font-mono text-gray-700"
+                            />
+                          </div>
+                        </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2">
-                        {shop.theme?.primaryColor && (
-                          <div
-                            className="w-6 h-6 rounded border border-gray-200"
-                            style={{ backgroundColor: shop.theme.primaryColor }}
-                          />
-                        )}
-                        <span className="text-gray-900 font-mono">{shop.theme?.primaryColor || '-'}</span>
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                        <div
+                          className="w-8 h-8 rounded-lg shadow-sm border border-gray-200"
+                          style={{ backgroundColor: shop.theme?.primaryColor || '#3B82F6' }}
+                        />
+                        <span className="text-gray-700 font-mono text-sm">{shop.theme?.primaryColor || '-'}</span>
                       </div>
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">보조 컬러</label>
+                    <label className="block text-sm font-medium text-gray-500 mb-2">보조 컬러</label>
                     {isEditMode ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={secondaryColor || '#6B7280'}
-                          onChange={(e) => setSecondaryColor(e.target.value)}
-                          className="w-10 h-10 rounded cursor-pointer"
-                        />
-                        <Input
-                          value={secondaryColor}
-                          onChange={(e) => setSecondaryColor(e.target.value)}
-                          placeholder="#6B7280"
-                          className="flex-1"
-                        />
+                      <div className="relative">
+                        <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                          <div className="relative">
+                            <input
+                              type="color"
+                              value={secondaryColor || '#6B7280'}
+                              onChange={(e) => setSecondaryColor(e.target.value)}
+                              className="w-10 h-10 rounded-lg cursor-pointer border-0 p-0"
+                              style={{ appearance: 'none' }}
+                            />
+                            <div
+                              className="absolute inset-0 rounded-lg border-2 border-white shadow-sm pointer-events-none"
+                              style={{ backgroundColor: secondaryColor || '#6B7280' }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              value={secondaryColor}
+                              onChange={(e) => setSecondaryColor(e.target.value)}
+                              placeholder="#6B7280"
+                              className="w-full bg-transparent border-none focus:outline-none text-sm font-mono text-gray-700"
+                            />
+                          </div>
+                        </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2">
-                        {shop.theme?.secondaryColor && (
-                          <div
-                            className="w-6 h-6 rounded border border-gray-200"
-                            style={{ backgroundColor: shop.theme.secondaryColor }}
-                          />
-                        )}
-                        <span className="text-gray-900 font-mono">{shop.theme?.secondaryColor || '-'}</span>
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                        <div
+                          className="w-8 h-8 rounded-lg shadow-sm border border-gray-200"
+                          style={{ backgroundColor: shop.theme?.secondaryColor || '#6B7280' }}
+                        />
+                        <span className="text-gray-700 font-mono text-sm">{shop.theme?.secondaryColor || '-'}</span>
                       </div>
                     )}
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">로고 URL</label>
-                  {isEditMode ? (
-                    <Input
-                      value={logoUrl}
-                      onChange={(e) => setLogoUrl(e.target.value)}
-                      placeholder="https://..."
-                    />
-                  ) : (
-                    <p className="text-gray-900 truncate">{shop.theme?.logoUrl || '-'}</p>
-                  )}
+                {/* 로고 & 파비콘 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-2">로고</label>
+                    {isEditMode ? (
+                      <ImageUpload
+                        value={logoUrl}
+                        onChange={setLogoUrl}
+                        placeholder="로고 이미지"
+                      />
+                    ) : (
+                      logoUrl ? (
+                        <div className="relative w-full h-24 rounded-lg overflow-hidden border border-gray-200 bg-white p-2">
+                          <img src={logoUrl} alt="로고" className="w-full h-full object-contain" />
+                        </div>
+                      ) : (
+                        <div className="w-full h-24 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50">
+                          <span className="text-gray-400 text-xs">로고 없음</span>
+                        </div>
+                      )
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-2">파비콘</label>
+                    {isEditMode ? (
+                      <ImageUpload
+                        value={faviconUrl}
+                        onChange={setFaviconUrl}
+                        placeholder="파비콘 이미지"
+                      />
+                    ) : (
+                      faviconUrl ? (
+                        <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 bg-white p-1">
+                          <img src={faviconUrl} alt="파비콘" className="w-full h-full object-contain" />
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50">
+                          <span className="text-gray-400 text-xs">없음</span>
+                        </div>
+                      )
+                    )}
+                  </div>
                 </div>
+                {/* 배너 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">파비콘 URL</label>
+                  <label className="block text-sm font-medium text-gray-500 mb-2">배너 이미지</label>
                   {isEditMode ? (
-                    <Input
-                      value={faviconUrl}
-                      onChange={(e) => setFaviconUrl(e.target.value)}
-                      placeholder="https://..."
-                    />
-                  ) : (
-                    <p className="text-gray-900 truncate">{shop.theme?.faviconUrl || '-'}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">배너 URL</label>
-                  {isEditMode ? (
-                    <Input
+                    <ImageUpload
                       value={bannerUrl}
-                      onChange={(e) => setBannerUrl(e.target.value)}
-                      placeholder="https://..."
+                      onChange={setBannerUrl}
+                      placeholder="배너 이미지 (권장: 1200x400)"
                     />
                   ) : (
-                    <p className="text-gray-900 truncate">{shop.theme?.bannerUrl || '-'}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">푸터 텍스트</label>
-                  {isEditMode ? (
-                    <textarea
-                      value={footerText}
-                      onChange={(e) => setFooterText(e.target.value)}
-                      placeholder="쇼핑몰 하단에 표시될 텍스트"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                      rows={3}
-                    />
-                  ) : (
-                    <p className="text-gray-900 whitespace-pre-wrap">{shop.theme?.footerText || '-'}</p>
+                    bannerUrl ? (
+                      <div className="relative w-full h-32 rounded-lg overflow-hidden border border-gray-200">
+                        <img src={bannerUrl} alt="배너" className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-full h-32 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50">
+                        <span className="text-gray-400 text-sm">배너 이미지 없음</span>
+                      </div>
+                    )
                   )}
                 </div>
               </div>
