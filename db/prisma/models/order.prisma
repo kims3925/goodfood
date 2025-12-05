@@ -42,7 +42,6 @@ model OrderItem {
   orderId            Int              @map("order_id")
   publishedProductId Int              @map("published_product_id")
   variantId          Int?             @map("variant_id")
-  referrerChannelId  Int?             @map("referrer_channel_id") // 상품별 유입 경로 (정산용)
   productName        String           @map("product_name") @db.VarChar(500)
   optionSummary      String?          @map("option_summary") @db.VarChar(500)
   thumbnailUrl       String?          @map("thumbnail_url") @db.VarChar(1000)
@@ -53,12 +52,10 @@ model OrderItem {
   order              Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
   publishedProduct   PublishedProduct @relation(fields: [publishedProductId], references: [id])
   variant            ProductVariant?  @relation(fields: [variantId], references: [id])
-  referrerChannel    Channel?         @relation("OrderItemReferrer", fields: [referrerChannelId], references: [id])
   review             Review?
 
   @@index([orderId])
   @@index([publishedProductId])
   @@index([variantId])
-  @@index([referrerChannelId])
   @@map("order_item")
 }

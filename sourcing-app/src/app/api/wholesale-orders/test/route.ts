@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
                 name: true,
               },
             },
-            channel: {
+            shop: {
               select: {
                 id: true,
                 name: true,
@@ -78,12 +78,6 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             wholesalePrice: true,
-          },
-        },
-        referrerChannel: {
-          select: {
-            id: true,
-            name: true,
           },
         },
       },
@@ -152,8 +146,8 @@ export async function GET(request: NextRequest) {
         orderNumber: item.order.orderNumber,
         orderedAt: item.order.orderedAt.toISOString(),
         paidAt: item.order.paidAt?.toISOString() || null,
-        retailChannelId: item.referrerChannel?.id || item.order.channel?.id || null,
-        retailChannelName: item.referrerChannel?.name || item.order.channel?.name || null,
+        retailChannelId: item.order.shop?.id || null,
+        retailChannelName: item.order.shop?.name || null,
         productId: item.publishedProduct?.product?.id || 0,
         productName: item.productName,
         optionSummary: item.optionSummary,
