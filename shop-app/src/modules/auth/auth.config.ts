@@ -231,6 +231,7 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.log('[Auth] 이메일 또는 비밀번호 누락')
           return null
         }
 
@@ -238,15 +239,23 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email },
         })
 
-        if (!user || !user.password) {
+        if (!user) {
+          console.log('[Auth] 사용자를 찾을 수 없음:', credentials.email)
+          return null
+        }
+
+        if (!user.password) {
+          console.log('[Auth] 비밀번호가 NULL임:', credentials.email)
           return null
         }
 
         const isValid = await bcrypt.compare(credentials.password, user.password)
         if (!isValid) {
+          console.log('[Auth] 비밀번호 불일치:', credentials.email)
           return null
         }
 
+        console.log('[Auth] 로그인 성공:', credentials.email)
         return {
           id: user.id.toString(),
           email: user.email,

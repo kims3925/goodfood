@@ -208,12 +208,6 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
           href: '/settlement/list',
           icon: <Calculator size={16} />,
         },
-        {
-          label: 'Referrer 테스트',
-          href: '/settlement/referrer-test',
-          icon: <Target size={16} />,
-          badge: 'NEW',
-        },
       ],
     },
     {

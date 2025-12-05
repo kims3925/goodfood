@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -102,6 +102,18 @@ export default function ShopDetailPage({
   const [logoUrl, setLogoUrl] = useState('')
   const [faviconUrl, setFaviconUrl] = useState('')
   const [bannerUrl, setBannerUrl] = useState('')
+
+  // Shop URL 도메인 (개발: lvh.me:3000, 프로덕션: bandauto.com)
+  const shopBaseDomain = useMemo(() => {
+    if (typeof window === 'undefined') return 'bandauto.com'
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname.includes('lvh.me')
+    return isDev ? 'lvh.me:3000' : 'bandauto.com'
+  }, [])
+
+  const getShopUrl = useCallback((subdomainValue: string) => {
+    const protocol = shopBaseDomain.includes('lvh.me') ? 'http' : 'https'
+    return `${protocol}://${subdomainValue}.${shopBaseDomain}`
+  }, [shopBaseDomain])
 
   const loadShop = useCallback(async () => {
     try {
@@ -329,12 +341,12 @@ export default function ShopDetailPage({
                 <div className="flex items-center gap-2 mt-1">
                   <Globe size={14} className="text-gray-400" />
                   <a
-                    href={`https://${shop.subdomain}.bandauto.com`}
+                    href={getShopUrl(shop.subdomain)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1"
                   >
-                    {shop.subdomain}.bandauto.com
+                    {shop.subdomain}.{shopBaseDomain}
                     <ExternalLink size={12} />
                   </a>
                 </div>

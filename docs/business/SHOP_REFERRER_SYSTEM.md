@@ -510,12 +510,12 @@ ORDER BY order_date, total_sales DESC
 - `sourcing-app/src/app/(admin)/product/publish/` 관련 파일들
 
 **쇼핑몰 (UI 및 API):**
-- `e-commerce-app/src/app/(shop)/main/page.tsx`
-- `e-commerce-app/src/app/api/shop/sections/route.ts`
-- `e-commerce-app/src/app/api/shop/products/route.ts`
-- `e-commerce-app/src/app/(shop)/product/[id]/page.tsx`
-- `e-commerce-app/src/modules/cart/services/cart.service.ts`
-- `e-commerce-app/src/modules/order/services/order.service.ts`
+- `shop-app/src/app/(shop)/main/page.tsx`
+- `shop-app/src/app/api/shop/sections/route.ts`
+- `shop-app/src/app/api/shop/products/route.ts`
+- `shop-app/src/app/(shop)/product/[id]/page.tsx`
+- `shop-app/src/modules/cart/services/cart.service.ts`
+- `shop-app/src/modules/order/services/order.service.ts`
 
 **정산:**
 - `sourcing-app/src/app/api/settlement/route.ts`

@@ -55,7 +55,7 @@ bandauto/
 
 ## 🎯 2-App 아키텍처
 
-### E-Commerce App (고객용 쇼핑몰)
+### Shop App (고객용 쇼핑몰)
 - **포트**: 3000
 - **역할**: 고객이 상품을 보고 구매하는 프론트엔드
 - **핵심 기능**:
@@ -129,7 +129,7 @@ npm run dev:all
 
 ### 앱별 모듈 접근 규칙
 
-1. **E-commerce App**
+1. **Shop App**
    - ✅ `modules/common/*` 접근 가능 (공통 모듈)
    - ✅ `src/modules/*` 접근 가능 (앱 전용 모듈)
    - ❌ `sourcing-app/src/modules/*` 접근 불가
@@ -146,7 +146,7 @@ npm run dev:all
 ### Import 경로 예시
 
 ```typescript
-// E-commerce App에서
+// Shop App에서
 import { Button } from '@common/ui-kit'                   // ✅ 공통 모듈
 import { OrderService } from '@modules/order'             // ✅ 앱 전용 모듈
 import { SourcingService } from '@modules/sourcing'       // ❌ ERROR (다른 앱)
@@ -209,7 +209,7 @@ npm run test:ui            # 테스트 UI 모드
 
 ## 🚀 구현된 API 엔드포인트
 
-E-Commerce App에 **11개의 REST API**가 완전히 구현되어 있습니다:
+Shop App에 **11개의 REST API**가 완전히 구현되어 있습니다:
 
 ### 🛒 Cart API (5개)
 ```
@@ -296,7 +296,7 @@ POST   /api/payments/webhook  # 웹훅 수신
 - `NEXTAUTH_SECRET`: 세션 암호화 키
 - `NEXTAUTH_URL`: 앱 URL
 
-**E-commerce App 전용:**
+**Shop App 전용:**
 - `TOSS_PAYMENTS_CLIENT_KEY`: 토스페이먼츠 클라이언트 키
 - `TOSS_PAYMENTS_SECRET_KEY`: 토스페이먼츠 시크릿 키
 - `TOSS_PAYMENTS_WEBHOOK_SECRET`: 웹훅 검증 시크릿
