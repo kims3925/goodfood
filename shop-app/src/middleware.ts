@@ -1,25 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// 채널 정보 인메모리 캐시 (1분 TTL - 채널 삭제 시 빠른 반영을 위해)
-const channelCache = new Map<string, { data: ChannelData | null; timestamp: number }>()
-const CACHE_TTL = 60 * 1000 // 1분 (삭제된 채널 빠른 반영)
+// Shop 정보 인메모리 캐시 (1분 TTL - 삭제 시 빠른 반영을 위해)
+const shopCache = new Map<string, { data: ShopData | null; timestamp: number }>()
+const CACHE_TTL = 60 * 1000 // 1분 (삭제된 Shop 빠른 반영)
 
 // 캐시 무효화를 위한 전역 참조
 declare global {
-  var channelCacheRef: Map<string, { data: ChannelData | null; timestamp: number }> | null
+  var shopCacheRef: Map<string, { data: ShopData | null; timestamp: number }> | null
 }
-global.channelCacheRef = channelCache
+global.shopCacheRef = shopCache
 
 // 캐시 무효화 함수 (외부에서 호출 가능)
-export function invalidateChannelCache(subdomain: string) {
-  channelCache.delete(subdomain)
+export function invalidateShopCache(subdomain: string) {
+  shopCache.delete(subdomain)
 }
 
-interface ChannelData {
+interface ShopData {
   id: number
   subdomain: string
   name: string
-  displayName: string | null
   isActive: boolean
 }
 
@@ -39,32 +38,35 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // API 요청도 채널 헤더가 필요 (채널별 상품/장바구니 분리)
+  // API 요청도 Shop 헤더가 필요 (Shop별 상품/장바구니 분리)
   const isApiRequest = pathname.startsWith('/api')
 
-  // 채널 선택 페이지는 채널 식별 없이 접근 가능
-  if (pathname === '/channel-select') {
+  // 인증 관련 페이지는 건너뜀
+  if (pathname.startsWith('/auth') || pathname.startsWith('/api/auth')) {
     return NextResponse.next()
   }
 
-  // 채널 식별
-  const channelInfo = await identifyChannel(hostname, url.searchParams, request)
+  // 404 페이지는 건너뜀
+  if (pathname === '/not-authorized') {
+    return NextResponse.next()
+  }
 
-  // 채널 미식별 시 채널 선택 페이지로 리다이렉트
-  if (!channelInfo.channelId) {
-    // 루트 페이지 접근 시에만 리다이렉트
-    if (pathname === '/' || pathname === '/main') {
-      return NextResponse.redirect(new URL('/channel-select', request.url))
+  // Shop 식별
+  const shopInfo = await identifyShop(hostname, url.searchParams, request)
+
+  // Shop 미식별 시 접근 불가
+  if (!shopInfo.shopId) {
+    if (isApiRequest) {
+      return NextResponse.json({ error: 'Shop not found' }, { status: 404 })
     }
-    // 그 외 페이지는 일단 접근 허용 (개발 편의를 위해)
-    return NextResponse.next()
+    return NextResponse.redirect(new URL('/not-authorized', request.url))
   }
 
-  // 채널 정보를 request headers에 추가
+  // Shop 정보를 request headers에 추가
   // 주의: HTTP 헤더는 ASCII만 지원하므로 한글 이름은 제외 (layout에서 DB 조회)
   const requestHeaders = new Headers(request.headers)
-  requestHeaders.set('x-channel-id', String(channelInfo.channelId))
-  requestHeaders.set('x-channel-subdomain', channelInfo.subdomain || '')
+  requestHeaders.set('x-shop-id', String(shopInfo.shopId))
+  requestHeaders.set('x-shop-subdomain', shopInfo.subdomain || '')
 
   return NextResponse.next({
     request: {
@@ -73,26 +75,26 @@ export async function middleware(request: NextRequest) {
   })
 }
 
-interface ChannelIdentifyResult {
-  channelId: number | null
+interface ShopIdentifyResult {
+  shopId: number | null
   subdomain: string | null
-  channelName: string | null
+  shopName: string | null
 }
 
-async function identifyChannel(
+async function identifyShop(
   hostname: string,
   searchParams: URLSearchParams,
   request: NextRequest
-): Promise<ChannelIdentifyResult> {
-  // 1. 개발 환경: 쿼리 파라미터 우선 (?channel=xxx)
-  const queryChannel = searchParams.get('channel')
-  if (queryChannel) {
-    const channel = await fetchChannelBySubdomain(queryChannel, request)
-    if (channel && channel.isActive) {
+): Promise<ShopIdentifyResult> {
+  // 1. 개발 환경: 쿼리 파라미터 우선 (?shop=xxx)
+  const queryShop = searchParams.get('shop') || searchParams.get('channel') // 하위호환
+  if (queryShop) {
+    const shop = await fetchShopBySubdomain(queryShop, request)
+    if (shop && shop.isActive) {
       return {
-        channelId: channel.id,
-        subdomain: channel.subdomain,
-        channelName: channel.displayName || channel.name,
+        shopId: shop.id,
+        subdomain: shop.subdomain,
+        shopName: shop.name,
       }
     }
   }
@@ -102,20 +104,20 @@ async function identifyChannel(
 
   // 루트 도메인 접속 (서브도메인 없음)
   if (!subdomain || subdomain === 'www') {
-    return { channelId: null, subdomain: null, channelName: null }
+    return { shopId: null, subdomain: null, shopName: null }
   }
 
-  // 3. 서브도메인으로 채널 조회
-  const channel = await fetchChannelBySubdomain(subdomain, request)
+  // 3. 서브도메인으로 Shop 조회
+  const shop = await fetchShopBySubdomain(subdomain, request)
 
-  if (!channel || !channel.isActive) {
-    return { channelId: null, subdomain: null, channelName: null }
+  if (!shop || !shop.isActive) {
+    return { shopId: null, subdomain: null, shopName: null }
   }
 
   return {
-    channelId: channel.id,
-    subdomain: channel.subdomain,
-    channelName: channel.displayName || channel.name,
+    shopId: shop.id,
+    subdomain: shop.subdomain,
+    shopName: shop.name,
   }
 }
 
@@ -129,7 +131,7 @@ function extractSubdomain(hostname: string): string | null {
   }
 
   // lvh.me 사용 (로컬 개발용)
-  // 예: channel1.lvh.me:3000 -> channel1
+  // 예: shop1.lvh.me:3000 -> shop1
   if (hostWithoutPort.includes('lvh.me')) {
     const parts = hostWithoutPort.split('.')
     if (parts.length >= 3 && parts[0] !== 'www') {
@@ -139,7 +141,7 @@ function extractSubdomain(hostname: string): string | null {
   }
 
   // 프로덕션 도메인
-  // 예: channel1.shop.com -> channel1
+  // 예: shop1.shop.com -> shop1
   const parts = hostWithoutPort.split('.')
   if (parts.length >= 3 && parts[0] !== 'www') {
     return parts[0]
@@ -148,12 +150,12 @@ function extractSubdomain(hostname: string): string | null {
   return null
 }
 
-async function fetchChannelBySubdomain(
+async function fetchShopBySubdomain(
   subdomain: string,
   request: NextRequest
-): Promise<ChannelData | null> {
+): Promise<ShopData | null> {
   // 캐시 확인
-  const cached = channelCache.get(subdomain)
+  const cached = shopCache.get(subdomain)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data
   }
@@ -168,7 +170,7 @@ async function fetchChannelBySubdomain(
 
     const internalKey = process.env.INTERNAL_API_KEY || 'dev-internal-key'
 
-    const res = await fetch(`${baseUrl}/api/internal/channel/${subdomain}`, {
+    const res = await fetch(`${baseUrl}/api/internal/shop/${subdomain}`, {
       headers: {
         'x-internal-key': internalKey,
       },
@@ -176,19 +178,19 @@ async function fetchChannelBySubdomain(
     })
 
     if (!res.ok) {
-      channelCache.set(subdomain, { data: null, timestamp: Date.now() })
+      shopCache.set(subdomain, { data: null, timestamp: Date.now() })
       return null
     }
 
     const data = await res.json()
-    const channel = data.channel as ChannelData | null
+    const shop = data.shop as ShopData | null
 
     // 캐시 저장
-    channelCache.set(subdomain, { data: channel, timestamp: Date.now() })
+    shopCache.set(subdomain, { data: shop, timestamp: Date.now() })
 
-    return channel
+    return shop
   } catch (error) {
-    console.error('Failed to fetch channel:', error)
+    console.error('Failed to fetch shop:', error)
     return null
   }
 }

@@ -27,7 +27,6 @@ const PLATFORM_LABELS: Record<string, string> = {
   'BAND': '밴드',
   'NAVER_CAFE': '네이버 카페',
   'ALIEXPRESS': '알리익스프레스',
-  'SHOP': '쇼핑몰',
   'OTHER': '기타',
 }
 

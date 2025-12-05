@@ -2,6 +2,7 @@
  * Cart Service
  * 장바구니 비즈니스 로직 레이어
  * PublishedProduct 기반 스키마 지원
+ * Shop 기반 장바구니 관리
  */
 
 import prisma from '@bandauto/db'
@@ -26,11 +27,10 @@ export interface CartItemResponse {
   publishedProductId: number
   productId: number
   variantId: number | null
+  shopId: number | null
+  shopName: string | null
   channelId: number | null
   channelName: string | null
-  // 하위 호환성
-  retailBandId: number | null
-  retailBandName: string | null
   name: string
   optionSummary: string | null
   image: string
@@ -45,9 +45,7 @@ export interface CartItemResponse {
 export interface CartResponse {
   id: number
   sessionId: string
-  channelId: number | null
-  // 하위 호환성
-  retailBandId: number | null
+  shopId: number | null
   items: CartItemResponse[]
   totalItems: number
   subtotal: number
@@ -86,6 +84,7 @@ const cartIncludeOptions = {
               },
             },
           },
+          shop: true,
           channel: true,
         },
       },
@@ -120,34 +119,34 @@ export class CartService {
    * 장바구니 조회 또는 생성
    *
    * 핵심 로직:
-   * - 채널별로 장바구니 분리 (channelId 파라미터)
-   * - 로그인 사용자: userId + channelId로 장바구니 관리
-   * - 비로그인 사용자: sessionId + channelId로 장바구니 관리
-   * - 로그인 시: 동일 채널의 비로그인 세션 카트가 있으면 → 사용자 카트로 이전
+   * - Shop별로 장바구니 분리 (shopId 파라미터)
+   * - 로그인 사용자: userId + shopId로 장바구니 관리
+   * - 비로그인 사용자: sessionId + shopId로 장바구니 관리
+   * - 로그인 시: 동일 Shop의 비로그인 세션 카트가 있으면 → 사용자 카트로 이전
    * - 로그아웃 시: 사용자 카트는 그대로 유지, 새 세션 카트 시작
    */
   async getOrCreateCart(
     sessionId: string,
     userId: number | null = null,
-    channelId: number | null = null
+    shopId: number | null = null
   ): Promise<any> {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + (userId ? USER_CART_EXPIRY_DAYS : SESSION_EXPIRY_DAYS))
 
     // ========== 로그인 사용자인 경우 ==========
     if (userId) {
-      // 1. 사용자 ID + 채널ID로 기존 장바구니 찾기
+      // 1. 사용자 ID + shopId로 기존 장바구니 찾기
       let userCart = await prisma.cart.findFirst({
-        where: { userId, channelId },
+        where: { userId, shopId },
         include: cartIncludeOptions,
       })
 
-      // 2. 비로그인 세션 카트 찾기 (동일 채널, userId가 null인 세션 카트만)
+      // 2. 비로그인 세션 카트 찾기 (동일 Shop, userId가 null인 세션 카트만)
       const sessionCart = await prisma.cart.findFirst({
         where: {
           sessionId,
           userId: null,
-          channelId,
+          shopId,
         },
         include: cartIncludeOptions,
       })
@@ -164,17 +163,17 @@ export class CartService {
           return userCart
         } else {
           // 새 사용자 장바구니 생성 (새로운 sessionId로)
-          const newSessionId = `user_${userId}_ch${channelId || 0}_${Date.now()}`
+          const newSessionId = `user_${userId}_shop${shopId || 0}_${Date.now()}`
           try {
             userCart = await prisma.cart.create({
-              data: { sessionId: newSessionId, userId, channelId, expiresAt },
+              data: { sessionId: newSessionId, userId, shopId, expiresAt },
               include: cartIncludeOptions,
             })
             return userCart
           } catch (error: any) {
             if (error.code === 'P2002') {
               userCart = await prisma.cart.findFirst({
-                where: { userId, channelId },
+                where: { userId, shopId },
                 include: cartIncludeOptions,
               })
               if (userCart) return userCart
@@ -223,13 +222,13 @@ export class CartService {
       return userCart!
     }
 
-    // ========== 비로그인 사용자 - 세션 + 채널 기반 ==========
+    // ========== 비로그인 사용자 - 세션 + Shop 기반 ==========
     try {
       let cart = await prisma.cart.findFirst({
         where: {
           sessionId,
           userId: null,
-          channelId,
+          shopId,
         },
         include: cartIncludeOptions,
       })
@@ -243,7 +242,7 @@ export class CartService {
       }
 
       cart = await prisma.cart.create({
-        data: { sessionId, expiresAt, userId: null, channelId },
+        data: { sessionId, expiresAt, userId: null, shopId },
         include: cartIncludeOptions,
       })
       return cart
@@ -253,7 +252,7 @@ export class CartService {
           where: {
             sessionId,
             userId: null,
-            channelId,
+            shopId,
           },
           include: cartIncludeOptions,
         })
@@ -261,7 +260,7 @@ export class CartService {
 
         const newSessionId = uuidv4()
         const newCart = await prisma.cart.create({
-          data: { sessionId: newSessionId, expiresAt, userId: null, channelId },
+          data: { sessionId: newSessionId, expiresAt, userId: null, shopId },
           include: cartIncludeOptions,
         })
         ;(newCart as any).__newSessionId = newSessionId
@@ -288,11 +287,11 @@ export class CartService {
         publishedProductId: publishedProduct.id,
         productId: product.id,
         variantId: variant?.id || null,
+        shopId: publishedProduct.shopId || null,
+        shopName: publishedProduct.shop?.name || null,
+        // 하위 호환성 (채널 정보)
         channelId: publishedProduct.channelId,
         channelName: publishedProduct.channel?.name || null,
-        // 하위 호환성
-        retailBandId: publishedProduct.channelId,
-        retailBandName: publishedProduct.channel?.name || null,
         name: product.name,
         optionSummary: variant?.optionSummary || null,
         image,
@@ -305,10 +304,7 @@ export class CartService {
       }
     })
 
-    const channelIds = items.map((item) => item.channelId).filter(Boolean)
-    const uniqueChannelIds = [...new Set(channelIds)]
-    const channelId = uniqueChannelIds.length === 1 ? uniqueChannelIds[0] : null
-
+    const shopId = cart.shopId || null
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
@@ -337,9 +333,7 @@ export class CartService {
     return {
       id: cart.id,
       sessionId: cart.sessionId,
-      channelId,
-      // 하위 호환성
-      retailBandId: channelId,
+      shopId,
       items,
       totalItems,
       subtotal,
@@ -355,7 +349,7 @@ export class CartService {
     sessionId: string,
     data: AddToCartDTO,
     userId: number | null = null,
-    channelId: number | null = null
+    shopId: number | null = null
   ): Promise<{ cart: CartResponse; isExisting: boolean; newSessionId?: string }> {
     const { publishedProductId, variantId, quantity = 1 } = data
 
@@ -381,7 +375,7 @@ export class CartService {
       throw new NotFoundError('상품', String(publishedProductId))
     }
 
-    const cart = await this.getOrCreateCart(sessionId, userId, channelId)
+    const cart = await this.getOrCreateCart(sessionId, userId, shopId)
     const price = publishedProduct.product.variants[0]?.price || 0
 
     const newSessionId = (cart as any).__newSessionId
@@ -414,7 +408,7 @@ export class CartService {
       })
     }
 
-    const updatedCart = await this.getOrCreateCart(newSessionId || sessionId, userId, channelId)
+    const updatedCart = await this.getOrCreateCart(newSessionId || sessionId, userId, shopId)
     return {
       cart: this.formatCart(updatedCart),
       isExisting,
@@ -430,24 +424,24 @@ export class CartService {
     itemId: number,
     quantity: number,
     userId: number | null = null,
-    channelId: number | null = null
+    shopId: number | null = null
   ): Promise<CartResponse> {
     if (!itemId) {
       throw new ValidationError('아이템 ID는 필수입니다')
     }
 
-    // 로그인 여부 및 채널에 따라 다른 카트 찾기
+    // 로그인 여부 및 Shop에 따라 다른 카트 찾기
     let cart
     if (userId) {
       cart = await prisma.cart.findFirst({
-        where: { userId, channelId },
+        where: { userId, shopId },
       })
     } else if (sessionId) {
       cart = await prisma.cart.findFirst({
         where: {
           sessionId,
           userId: null,
-          channelId,
+          shopId,
         },
       })
     }
@@ -467,7 +461,7 @@ export class CartService {
       })
     }
 
-    const updatedCart = await this.getOrCreateCart(sessionId || cart.sessionId, userId, channelId)
+    const updatedCart = await this.getOrCreateCart(sessionId || cart.sessionId, userId, shopId)
     return this.formatCart(updatedCart)
   }
 
@@ -478,9 +472,9 @@ export class CartService {
     sessionId: string,
     itemId: number,
     userId: number | null = null,
-    channelId: number | null = null
+    shopId: number | null = null
   ): Promise<CartResponse> {
-    return this.updateItemQuantity(sessionId, itemId, 0, userId, channelId)
+    return this.updateItemQuantity(sessionId, itemId, 0, userId, shopId)
   }
 
   /**
@@ -489,19 +483,19 @@ export class CartService {
   async clearCart(
     sessionId: string | null,
     userId: number | null = null,
-    channelId: number | null = null
+    shopId: number | null = null
   ): Promise<void> {
     let cart
     if (userId) {
       cart = await prisma.cart.findFirst({
-        where: { userId, channelId },
+        where: { userId, shopId },
       })
     } else if (sessionId) {
       cart = await prisma.cart.findFirst({
         where: {
           sessionId,
           userId: null,
-          channelId,
+          shopId,
         },
       })
     }
@@ -519,12 +513,12 @@ export class CartService {
   async getCart(
     sessionId: string,
     userId: number | null = null,
-    channelId: number | null = null
+    shopId: number | null = null
   ): Promise<{
     cart: CartResponse
     newSessionId?: string
   }> {
-    const cart = await this.getOrCreateCart(sessionId, userId, channelId)
+    const cart = await this.getOrCreateCart(sessionId, userId, shopId)
     const newSessionId = (cart as any).__newSessionId
     return {
       cart: this.formatCart(cart),
@@ -535,9 +529,9 @@ export class CartService {
   /**
    * userId로 카트 조회 (결제 처리용)
    */
-  async getCartByUserId(userId: number, channelId: number | null = null): Promise<any> {
+  async getCartByUserId(userId: number, shopId: number | null = null): Promise<any> {
     return prisma.cart.findFirst({
-      where: { userId, channelId },
+      where: { userId, shopId },
       include: {
         items: {
           include: {
@@ -558,12 +552,12 @@ export class CartService {
   /**
    * sessionId로 비로그인 카트 조회 (결제 처리용)
    */
-  async getCartBySessionId(sessionId: string, channelId: number | null = null): Promise<any> {
+  async getCartBySessionId(sessionId: string, shopId: number | null = null): Promise<any> {
     return prisma.cart.findFirst({
       where: {
         sessionId,
         userId: null,
-        channelId,
+        shopId,
       },
       include: {
         items: {

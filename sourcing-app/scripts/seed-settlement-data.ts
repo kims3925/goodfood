@@ -23,7 +23,7 @@ async function main() {
 
   console.log(`사용자: ${user.name} (ID: ${user.id})`)
 
-  // 2. 소매채널 3개 생성 (BAND, SHOP, ALIEXPRESS)
+  // 2. 소매채널 3개 생성 (BAND, SMARTSTORE, ALIEXPRESS)
   const channelConfigs = [
     {
       name: '패션몰 밴드',
@@ -32,10 +32,10 @@ async function main() {
       coverUrl: 'https://picsum.photos/seed/band1/200',
     },
     {
-      name: '마이 쇼핑몰',
-      platform: ChannelPlatform.SHOP,
-      channelKey: `shop_main_${Date.now()}`,
-      coverUrl: 'https://picsum.photos/seed/shop1/200',
+      name: '스마트스토어 패션',
+      platform: ChannelPlatform.SMARTSTORE,
+      channelKey: `smartstore_main_${Date.now()}`,
+      coverUrl: 'https://picsum.photos/seed/smartstore1/200',
     },
     {
       name: '알리 직구몰',
@@ -56,9 +56,6 @@ async function main() {
         name: config.name,
         coverUrl: config.coverUrl,
         isActive: true,
-        accountHolder: '홍길동',
-        bankName: '국민은행',
-        bankAccount: '123-456-789012',
       }
     })
     channels.push(channel)
@@ -71,7 +68,7 @@ async function main() {
     '프리미엄 니트 가디건',
     '캐시미어 터틀넥 스웨터',
     '울 블렌드 코트',
-    // SHOP 채널용
+    // SMARTSTORE 채널용
     '스마트 무선 이어폰',
     '초고속 충전 케이블',
     '미니 블루투스 스피커',

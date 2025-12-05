@@ -49,18 +49,16 @@ export class ChannelService {
     return channelRepository.findById(id)
   }
 
-  async create(userId: number, data: Omit<ChannelCreateInput, 'userId' | 'apiConfigId'>) {
-    // SHOP 플랫폼은 외부 API가 필요 없음
+  async create(userId: number, data: Omit<ChannelCreateInput, 'userId'>) {
+    // SMARTSTORE, COUPANG, CUSTOM 플랫폼은 외부 API가 필요 없음
     const platformsRequiringApi: ChannelPlatform[] = [
       ChannelPlatform.BAND,
       ChannelPlatform.ALIEXPRESS,
       ChannelPlatform.NAVER_CAFE,
     ]
 
-    let apiConfigId: number | null = null
-
     if (platformsRequiringApi.includes(data.platform)) {
-      // 사용자의 API 설정 조회 (Platform 기준)
+      // 사용자의 API 설정이 있는지 검증 (userId + platform으로 조회 가능)
       const apiConfig = await prisma.sourcingApiConfig.findFirst({
         where: {
           userId,
@@ -72,7 +70,6 @@ export class ChannelService {
       if (!apiConfig) {
         throw new Error('API 설정을 먼저 등록해주세요.')
       }
-      apiConfigId = apiConfig.id
     }
 
     // 중복 체크
@@ -83,16 +80,11 @@ export class ChannelService {
 
     return channelRepository.create({
       userId,
-      apiConfigId,
       kind: data.kind,
       platform: data.platform,
       channelKey: data.channelKey,
       name: data.name,
       coverUrl: data.coverUrl || null,
-      accountHolder: data.accountHolder || null,
-      bankAccount: data.bankAccount || null,
-      bankName: data.bankName || null,
-      subdomain: data.subdomain || null,
     })
   }
 
@@ -117,6 +109,7 @@ export class ChannelService {
     }
 
     // RETAIL 채널인 경우, 삭제 전에 먼저 isActive를 false로 설정
+    // 이렇게 하면 shop-app에서 캐시된 데이터가 있어도 즉시 접속 차단됨
     // 이렇게 하면 shop-app에서 캐시된 데이터가 있어도 즉시 접속 차단됨
     if (existing.kind === ChannelKind.RETAIL && existing.isActive) {
       await channelRepository.update(id, { isActive: false })

@@ -1,6 +1,9 @@
 /**
  * Shop Products API
  * 쇼핑몰 상품 목록 조회
+ *
+ * shopId 기반 필터링:
+ * - x-shop-id 헤더로 해당 Shop에 발행된 상품만 조회
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -16,10 +19,17 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search')
     const channelId = searchParams.get('channelId') || searchParams.get('bandId') // 하위 호환성
 
+    // Shop ID 확인 (middleware에서 설정)
+    const shopIdHeader = req.headers.get('x-shop-id')
+    const currentShopId = shopIdHeader ? parseInt(shopIdHeader) : null
+
     // 기본 조건: 발행된 상품만 (published_product 테이블을 통해)
     const where: any = {
       publishedProducts: {
         some: {
+          // shopId 기반 필터링 (우선)
+          ...(currentShopId ? { shopId: currentShopId } : {}),
+          // channelId 하위 호환
           ...(channelId ? { channelId: parseInt(channelId) } : {}),
         },
       },
@@ -91,7 +101,7 @@ export async function GET(req: NextRequest) {
         category: product.categoryId || '',
         rating: 4.5,
         reviews: 100,
-        stock: mainVariant?.stock || 100,
+        stock: 100, // 재고 정보 별도 관리
         isTimeSale: filter === 'sale' || discount >= 30,
         isBest: filter === 'best',
         isNew: filter === 'new',

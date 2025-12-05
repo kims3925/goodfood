@@ -18,6 +18,10 @@ import type {
   PublishMultiChannelResult,
   ProductForPublish,
   ChannelForPublish,
+  PublishToShopParams,
+  PublishToShopResult,
+  PublishShopBatchParams,
+  PublishShopBatchResult,
 } from './types'
 
 // Band API 쿨다운 지연 시간 (10초)
@@ -54,7 +58,7 @@ export class PublishService {
     const { userId, productId, channelId } = params
 
     try {
-      // 1. 채널 정보 조회
+      // 1. 채널 정보 조회 (연결된 Shop 정보 포함)
       const channel = await prisma.channel.findFirst({
         where: {
           id: channelId,
@@ -63,7 +67,14 @@ export class PublishService {
           isActive: true,
         },
         include: {
-          apiConfig: true,
+          shop: {
+            select: {
+              id: true,
+              subdomain: true,
+              name: true,
+              isActive: true,
+            },
+          },
         },
       })
 
@@ -75,6 +86,15 @@ export class PublishService {
           error: '채널을 찾을 수 없거나 발행 권한이 없습니다.',
         }
       }
+
+      // 사용자의 Band API 설정 조회
+      const apiConfig = await prisma.sourcingApiConfig.findFirst({
+        where: {
+          userId,
+          platform: 'BAND',
+          isActive: true,
+        },
+      })
 
       // 2. 상품 정보 조회
       const product = await prisma.product.findFirst({
@@ -131,7 +151,7 @@ export class PublishService {
       }
 
       // 4. API 토큰 확인
-      if (!channel.apiConfig?.accessToken) {
+      if (!apiConfig?.accessToken) {
         // API 토큰이 없으면 DB 기록만 생성 (수동 발행용)
         const publishedProduct = await prisma.publishedProduct.create({
           data: {
@@ -153,7 +173,7 @@ export class PublishService {
       }
 
       // 5. Band API로 게시물 작성
-      const bandClient = new NaverBandClient(channel.apiConfig.accessToken)
+      const bandClient = new NaverBandClient(apiConfig.accessToken)
       const postContent = buildPostContent(product)
 
       const { postKey } = await bandClient.createPost(channel.channelKey, postContent, {
@@ -170,17 +190,27 @@ export class PublishService {
         },
       })
 
-      // 7. 장바구니 링크 댓글 작성
-      try {
-        const shopUrl = process.env.SHOP_URL || 'http://localhost:3000'
-        const cartLink = `${shopUrl}/cart?add=${publishedProduct.id}`
-        const commentContent = `🛒 장바구니에 담기 👉 ${cartLink}`
+      // 7. 장바구니 링크 댓글 작성 (연결된 Shop이 있는 경우만)
+      if (channel.shop?.subdomain && channel.shop.isActive) {
+        try {
+          // 서브도메인 기반 Shop URL 생성
+          const isDev = process.env.NODE_ENV !== 'production'
+          const rootDomain = process.env.SHOP_ROOT_DOMAIN || 'bandauto.com'
+          const shopUrl = isDev
+            ? `http://${channel.shop.subdomain}.lvh.me:3000`
+            : `https://${channel.shop.subdomain}.${rootDomain}`
 
-        await bandClient.createComment(channel.channelKey, postKey, commentContent)
-        console.log(`[PublishService] Added cart comment for product ${productId}`)
-      } catch (commentError) {
-        // 댓글 실패해도 발행 자체는 성공으로 처리
-        console.error(`[PublishService] Failed to create cart comment:`, commentError)
+          const cartLink = `${shopUrl}/cart?add=${publishedProduct.id}`
+          const commentContent = `🛒 장바구니에 담기 👉 ${cartLink}`
+
+          await bandClient.createComment(channel.channelKey, postKey, commentContent)
+          console.log(`[PublishService] Added cart comment for product ${productId} -> ${channel.shop.subdomain}`)
+        } catch (commentError) {
+          // 댓글 실패해도 발행 자체는 성공으로 처리
+          console.error(`[PublishService] Failed to create cart comment:`, commentError)
+        }
+      } else {
+        console.log(`[PublishService] No shop linked to channel ${channel.name}, skipping cart comment`)
       }
 
       console.log(
@@ -220,8 +250,14 @@ export class PublishService {
         kind: ChannelKind.RETAIL,
         isActive: true,
       },
-      include: {
-        apiConfig: true,
+    })
+
+    // 사용자의 Band API 설정 조회
+    const apiConfig = await prisma.sourcingApiConfig.findFirst({
+      where: {
+        userId,
+        platform: 'BAND',
+        isActive: true,
       },
     })
 
@@ -254,7 +290,7 @@ export class PublishService {
       const productId = productIds[i]
 
       // 첫 번째가 아니면 쿨다운 대기 (Band API 제한)
-      if (i > 0 && channel.apiConfig) {
+      if (i > 0 && apiConfig) {
         console.log(`[PublishService] Waiting ${DEFAULT_COOLDOWN_MS / 1000}s for Band API cooldown...`)
         await delay(DEFAULT_COOLDOWN_MS)
       }
@@ -315,6 +351,170 @@ export class PublishService {
       failedCount: totalFailed,
       skippedCount: totalSkipped,
       channelResults,
+    }
+  }
+
+  /**
+   * 단일 상품을 Shop에 발행
+   */
+  async publishToShop(params: PublishToShopParams): Promise<PublishToShopResult> {
+    const { userId, productId, shopId } = params
+
+    try {
+      // 1. Shop 정보 조회
+      const shop = await prisma.shop.findFirst({
+        where: {
+          id: shopId,
+          userId,
+          isActive: true,
+        },
+      })
+
+      if (!shop) {
+        return {
+          success: false,
+          productId,
+          shopId,
+          error: 'Shop을 찾을 수 없거나 권한이 없습니다.',
+        }
+      }
+
+      // 2. 상품 정보 조회
+      const product = await prisma.product.findFirst({
+        where: {
+          id: productId,
+          userId,
+        },
+      })
+
+      if (!product) {
+        return {
+          success: false,
+          productId,
+          shopId,
+          error: '상품을 찾을 수 없습니다.',
+        }
+      }
+
+      // 3. 이미 발행 여부 확인
+      const existingPublish = await prisma.publishedProduct.findFirst({
+        where: {
+          productId,
+          shopId,
+        },
+      })
+
+      if (existingPublish) {
+        return {
+          success: true,
+          productId,
+          shopId,
+          publishedProductId: existingPublish.id,
+          skipped: true,
+          skipReason: '이미 발행된 상품입니다.',
+        }
+      }
+
+      // 4. PublishedProduct 레코드 생성
+      const publishedProduct = await prisma.publishedProduct.create({
+        data: {
+          userId,
+          productId,
+          shopId,
+          publishedAt: new Date(),
+        },
+      })
+
+      console.log(
+        `[PublishService] Published product ${productId} to shop ${shop.name} (id: ${shop.id})`
+      )
+
+      return {
+        success: true,
+        productId,
+        shopId,
+        publishedProductId: publishedProduct.id,
+      }
+    } catch (error: any) {
+      console.error(`[PublishService] Error publishing product ${productId} to shop ${shopId}:`, error)
+
+      return {
+        success: false,
+        productId,
+        shopId,
+        error: error.message || '발행 중 오류가 발생했습니다.',
+      }
+    }
+  }
+
+  /**
+   * 여러 상품을 단일 Shop에 발행 (배치)
+   */
+  async publishShopBatch(params: PublishShopBatchParams): Promise<PublishShopBatchResult> {
+    const { userId, productIds, shopId } = params
+
+    // Shop 정보 조회
+    const shop = await prisma.shop.findFirst({
+      where: {
+        id: shopId,
+        userId,
+        isActive: true,
+      },
+    })
+
+    if (!shop) {
+      return {
+        success: false,
+        shopId,
+        shopName: 'Unknown',
+        total: productIds.length,
+        successCount: 0,
+        failedCount: productIds.length,
+        skippedCount: 0,
+        results: productIds.map((productId) => ({
+          success: false,
+          productId,
+          shopId,
+          error: 'Shop을 찾을 수 없습니다.',
+        })),
+        errors: ['Shop을 찾을 수 없습니다.'],
+      }
+    }
+
+    const results: PublishToShopResult[] = []
+    const errors: string[] = []
+    let successCount = 0
+    let failedCount = 0
+    let skippedCount = 0
+
+    for (const productId of productIds) {
+      const result = await this.publishToShop({ userId, productId, shopId })
+      results.push(result)
+
+      if (result.success) {
+        if (result.skipped) {
+          skippedCount++
+        } else {
+          successCount++
+        }
+      } else {
+        failedCount++
+        if (result.error) {
+          errors.push(`Product ${productId}: ${result.error}`)
+        }
+      }
+    }
+
+    return {
+      success: failedCount === 0,
+      shopId,
+      shopName: shop.name,
+      total: productIds.length,
+      successCount,
+      failedCount,
+      skippedCount,
+      results,
+      errors,
     }
   }
 }

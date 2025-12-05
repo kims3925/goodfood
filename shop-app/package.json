@@ -2,7 +2,7 @@
   "name": "shop-app",
   "version": "1.0.0",
   "private": true,
-  "description": "BandAuto Shop Frontend - 고객용 쇼핑몰",
+  "description": "BandAuto Shop - 고객용 쇼핑몰",
   "scripts": {
     "dev": "next dev --port 3000",
     "dev:https": "node server.js",

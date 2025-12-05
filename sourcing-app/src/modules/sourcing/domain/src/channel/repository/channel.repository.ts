@@ -19,11 +19,6 @@ export class ChannelRepository {
     const channels = await prisma.channel.findMany({
       where,
       include: {
-        apiConfig: {
-          select: {
-            platform: true,
-          },
-        },
         user: {
           select: {
             email: true,
@@ -52,13 +47,15 @@ export class ChannelRepository {
   async findById(id: number) {
     try {
       console.log('[ChannelRepository] findById 호출 - ID:', id)
-      // 먼저 기본 채널 조회
       const channel = await prisma.channel.findFirst({
         where: { id },
         include: {
-          apiConfig: {
+          shop: {
             select: {
-              platform: true,
+              id: true,
+              name: true,
+              subdomain: true,
+              isActive: true,
             },
           },
         },
@@ -69,19 +66,8 @@ export class ChannelRepository {
         return null
       }
 
-      // 테마 별도 조회
-      let theme = null
-      try {
-        theme = await prisma.channelTheme.findFirst({
-          where: { channelId: id },
-        })
-      } catch (themeError) {
-        console.log('[ChannelRepository] 테마 조회 실패 (무시):', themeError)
-      }
-
-      const result = { ...channel, theme }
-      console.log('[ChannelRepository] findById 결과:', result ? `ID: ${result.id}` : 'null')
-      return result
+      console.log('[ChannelRepository] findById 결과:', channel ? `ID: ${channel.id}` : 'null')
+      return channel
     } catch (error) {
       console.error('[ChannelRepository] findById 에러:', error)
       throw error
@@ -101,24 +87,11 @@ export class ChannelRepository {
     return prisma.channel.create({
       data: {
         userId: data.userId,
-        apiConfigId: data.apiConfigId,
         kind: data.kind,
         platform: data.platform,
         channelKey: data.channelKey,
         name: data.name,
         coverUrl: data.coverUrl,
-        accountHolder: data.accountHolder,
-        bankAccount: data.bankAccount,
-        bankName: data.bankName,
-        subdomain: data.subdomain,
-      },
-      include: {
-        apiConfig: {
-          select: {
-            platform: true,
-          },
-        },
-        theme: true,
       },
     })
   }
@@ -130,54 +103,20 @@ export class ChannelRepository {
     if (data.name) channelData.name = data.name
     if (data.isActive !== undefined) channelData.isActive = data.isActive
     if (data.coverUrl !== undefined) channelData.coverUrl = data.coverUrl
-    if (data.accountHolder !== undefined) channelData.accountHolder = data.accountHolder
-    if (data.bankAccount !== undefined) channelData.bankAccount = data.bankAccount
-    if (data.bankName !== undefined) channelData.bankName = data.bankName
-
-    // 서브도메인 쇼핑몰 필드
-    if (data.subdomain !== undefined) channelData.subdomain = data.subdomain
-    if (data.displayName !== undefined) channelData.displayName = data.displayName
-    if (data.enableToss !== undefined) channelData.enableToss = data.enableToss
-    if (data.enableBankTransfer !== undefined) channelData.enableBankTransfer = data.enableBankTransfer
-    if (data.freeShippingAmount !== undefined) channelData.freeShippingAmount = data.freeShippingAmount
-    if (data.defaultShippingFee !== undefined) channelData.defaultShippingFee = data.defaultShippingFee
-    if (data.contactPhone !== undefined) channelData.contactPhone = data.contactPhone
-    if (data.contactEmail !== undefined) channelData.contactEmail = data.contactEmail
-
-    // 테마가 포함된 경우 upsert 처리
-    if (data.theme) {
-      channelData.theme = {
-        upsert: {
-          create: {
-            primaryColor: data.theme.primaryColor ?? null,
-            secondaryColor: data.theme.secondaryColor ?? null,
-            logoUrl: data.theme.logoUrl ?? null,
-            faviconUrl: data.theme.faviconUrl ?? null,
-            bannerUrl: data.theme.bannerUrl ?? null,
-            footerText: data.theme.footerText ?? null,
-          },
-          update: {
-            primaryColor: data.theme.primaryColor ?? null,
-            secondaryColor: data.theme.secondaryColor ?? null,
-            logoUrl: data.theme.logoUrl ?? null,
-            faviconUrl: data.theme.faviconUrl ?? null,
-            bannerUrl: data.theme.bannerUrl ?? null,
-            footerText: data.theme.footerText ?? null,
-          },
-        },
-      }
-    }
+    if (data.shopId !== undefined) channelData.shopId = data.shopId
 
     return prisma.channel.update({
       where: { id },
       data: channelData,
       include: {
-        apiConfig: {
+        shop: {
           select: {
-            platform: true,
+            id: true,
+            name: true,
+            subdomain: true,
+            isActive: true,
           },
         },
-        theme: true,
       },
     })
   }

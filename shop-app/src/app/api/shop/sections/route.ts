@@ -1,25 +1,33 @@
 /**
  * Shop Sections API
- * 채널별 상품 섹션 조회
+ * Shop별 상품 섹션 조회
  *
- * 멀티채널 지원:
- * - x-channel-id 헤더가 있으면 해당 채널 상품만 반환
- * - 없으면 기존처럼 전체 소매채널 섹션 반환
+ * Shop 기반 필터링:
+ * - x-shop-id 헤더가 있으면 해당 Shop에 발행된 상품만 반환
+ * - 없으면 기존처럼 전체 섹션 반환 (하위 호환)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
+import prisma, { ChannelKind } from '@bandauto/db'
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
-    const limit = parseInt(searchParams.get('limit') || '20') // 상품 개수 (채널별 상품은 더 많이)
+    const limit = parseInt(searchParams.get('limit') || '20')
 
-    // 현재 채널 확인 (middleware에서 설정)
+    // Shop ID 확인 (middleware에서 설정)
+    const shopIdHeader = req.headers.get('x-shop-id')
+    const currentShopId = shopIdHeader ? parseInt(shopIdHeader) : null
+
+    // Shop이 지정된 경우: 해당 Shop의 상품만 반환
+    if (currentShopId) {
+      return await getShopProducts(currentShopId, limit)
+    }
+
+    // 채널 ID 확인 (하위 호환)
     const channelIdHeader = req.headers.get('x-channel-id')
     const currentChannelId = channelIdHeader ? parseInt(channelIdHeader) : null
 
-    // 특정 채널이 지정된 경우: 해당 채널 상품만 반환
     if (currentChannelId) {
       return await getChannelProducts(currentChannelId, limit)
     }
@@ -37,14 +45,10 @@ export async function GET(req: NextRequest) {
     // 2. 각 소매채널별로 발행된 상품 조회
     const sections = await Promise.all(
       retailChannels.map(async (channel) => {
-        const includeLegacyShopPublishes = channel.platform === ChannelPlatform.SHOP
-
         // 해당 채널에 발행된 상품 조회 (published_product 테이블 사용)
         const publishedProducts = await prisma.publishedProduct.findMany({
           where: {
-            ...(includeLegacyShopPublishes
-              ? { OR: [{ channelId: channel.id }, { channelId: null }] } // 채널 도입 이전 null 데이터 호환
-              : { channelId: channel.id }),
+            channelId: channel.id,
           },
           include: {
             product: {
@@ -102,21 +106,13 @@ export async function GET(req: NextRequest) {
           id: channel.id,
           name: channel.name,
           coverUrl: channel.coverUrl,
-          formUrl: channel.formUrl,
-          platform: channel.platform, // SHOP, BAND 등 플랫폼 정보
           products,
         }
       })
     )
 
-    // SHOP 플랫폼(자사 제품)을 맨 앞으로 정렬
-    const filteredSections = sections
-      .filter((section) => section.products.length > 0)
-      .sort((a, b) => {
-        if (a.platform === ChannelPlatform.SHOP && b.platform !== ChannelPlatform.SHOP) return -1
-        if (a.platform !== ChannelPlatform.SHOP && b.platform === ChannelPlatform.SHOP) return 1
-        return 0
-      })
+    // 상품이 있는 섹션만 필터링
+    const filteredSections = sections.filter((section) => section.products.length > 0)
 
     // 3. 도매채널별 섹션 (발행된 상품만 포함)
     // 쇼핑몰에서는 product_publish를 통해서만 상품을 판매할 수 있음
@@ -221,6 +217,106 @@ export async function GET(req: NextRequest) {
 }
 
 /**
+ * 특정 Shop의 상품만 조회
+ * shopId 기반으로 발행된 상품 반환
+ */
+async function getShopProducts(shopId: number, limit: number) {
+  // Shop 정보 조회
+  const shop = await prisma.shop.findUnique({
+    where: { id: shopId },
+    include: {
+      theme: {
+        select: {
+          primaryColor: true,
+          secondaryColor: true,
+          logoUrl: true,
+          faviconUrl: true,
+          bannerUrl: true,
+        },
+      },
+    },
+  })
+
+  if (!shop || !shop.isActive) {
+    return NextResponse.json({
+      success: true,
+      products: [],
+      shop: null,
+    })
+  }
+
+  // 해당 Shop에 발행된 상품 조회
+  const publishedProducts = await prisma.publishedProduct.findMany({
+    where: {
+      shopId: shopId,
+    },
+    include: {
+      product: {
+        include: {
+          variants: {
+            orderBy: { id: 'asc' },
+            take: 1,
+          },
+          collectedProduct: {
+            include: {
+              post: {
+                include: {
+                  images: {
+                    orderBy: { sortOrder: 'asc' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  })
+
+  // 상품 포맷팅
+  const products = publishedProducts
+    .filter((pp) => pp.product)
+    .map((pp) => {
+      const product = pp.product
+      const mainVariant = product.variants[0]
+      const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
+
+      const salePrice = mainVariant?.price || 0
+      const originalPrice = salePrice
+      const discount = 0
+
+      return {
+        id: product.id.toString(),
+        publishedProductId: pp.id.toString(),
+        title: product.name,
+        description: product.description,
+        originalPrice,
+        salePrice,
+        discount,
+        images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
+        category: product.categoryId || '',
+        rating: 4.5,
+        reviews: 100,
+      }
+    })
+
+  return NextResponse.json({
+    success: true,
+    products,
+    // 기존 호환성을 위해 channelProducts도 포함
+    channelProducts: products,
+    shop: {
+      id: shop.id,
+      name: shop.name,
+      subdomain: shop.subdomain,
+      theme: shop.theme,
+    },
+  })
+}
+
+/**
  * 특정 채널의 상품만 조회
  * 멀티채널 쇼핑몰에서 현재 접속 채널의 상품 반환
  */
@@ -301,7 +397,6 @@ async function getChannelProducts(channelId: number, limit: number) {
     channel: {
       id: channel.id,
       name: channel.name,
-      displayName: channel.displayName,
       coverUrl: channel.coverUrl,
     },
     // 기존 호환성을 위해 retailSections도 포함
@@ -311,7 +406,6 @@ async function getChannelProducts(channelId: number, limit: number) {
             id: channel.id,
             name: channel.name,
             coverUrl: channel.coverUrl,
-            platform: channel.platform,
             products,
           },
         ]

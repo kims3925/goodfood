@@ -32,7 +32,6 @@ import { useToast } from '@/components/ui/Toast'
 interface Channel {
   id: number
   userId: number
-  apiConfigId: number | null
   kind: 'WHOLESALE' | 'RETAIL'
   platform: string
   channelKey: string
@@ -230,7 +229,6 @@ function ChannelListContent() {
       ALIEXPRESS: '알리익스프레스',
       SMARTSTORE: '스마트스토어',
       COUPANG: '쿠팡',
-      SHOP: '쇼핑몰',
       CUSTOM: '커스텀',
     }
     return platformMap[platform] || platform

@@ -31,9 +31,6 @@ export async function GET(request: NextRequest) {
 
     const channels = await prisma.channel.findMany({
       where: channelWhere,
-      include: {
-        apiConfig: true,
-      },
     })
 
     // 날짜 필터
@@ -67,7 +64,7 @@ export async function GET(request: NextRequest) {
         id: channel.id,
         name: channel.name,
         coverUrl: channel.coverUrl,
-        platform: channel.platform || channel.apiConfig?.platform || 'BAND',
+        platform: channel.platform,
         items: [],
         itemCount: 0,
         shopCount: 0,
@@ -192,7 +189,8 @@ export async function GET(request: NextRequest) {
           platform: channel.platform,
           platformName: channel.platform === 'BAND' ? '네이버 밴드' :
                         channel.platform === 'ALIEXPRESS' ? '알리익스프레스' :
-                        channel.platform === 'SHOP' ? '쇼핑몰' : channel.platform,
+                        channel.platform === 'SMARTSTORE' ? '스마트스토어' :
+                        channel.platform === 'COUPANG' ? '쿠팡' : channel.platform,
           channels: [],
           itemCount: 0,
           totalQuantity: 0,

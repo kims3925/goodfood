@@ -49,11 +49,11 @@ function getDepositDeadline(): Date {
   return deadline
 }
 
-// 요청 헤더에서 채널 ID 가져오기
-async function getChannelIdFromHeaders(): Promise<number | null> {
+// 요청 헤더에서 Shop ID 가져오기
+async function getShopIdFromHeaders(): Promise<number | null> {
   const headersList = await headers()
-  const channelId = headersList.get('x-channel-id')
-  return channelId ? parseInt(channelId) : null
+  const shopId = headersList.get('x-shop-id')
+  return shopId ? parseInt(shopId) : null
 }
 
 /**
@@ -110,19 +110,19 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 서브도메인 채널 ID 가져오기 (헤더에서)
-    const channelId = await getChannelIdFromHeaders()
-    if (!channelId) {
+    // Shop ID 가져오기 (헤더에서)
+    const shopId = await getShopIdFromHeaders()
+    if (!shopId) {
       return NextResponse.json(
-        { success: false, error: '채널 정보를 찾을 수 없습니다' },
+        { success: false, error: 'Shop 정보를 찾을 수 없습니다' },
         { status: 400 }
       )
     }
 
-    // 채널 계좌정보 조회
-    const channel = await prisma.channel.findFirst({
+    // Shop 계좌정보 조회
+    const shop = await prisma.shop.findFirst({
       where: {
-        id: channelId,
+        id: shopId,
         isActive: true,
       },
       select: {
@@ -134,16 +134,16 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    if (!channel) {
+    if (!shop) {
       return NextResponse.json(
-        { success: false, error: '채널을 찾을 수 없습니다' },
+        { success: false, error: 'Shop을 찾을 수 없습니다' },
         { status: 404 }
       )
     }
 
-    if (!channel.bankName || !channel.bankAccount || !channel.accountHolder) {
+    if (!shop.bankName || !shop.bankAccount || !shop.accountHolder) {
       return NextResponse.json(
-        { success: false, error: '채널에 입금정보가 등록되어 있지 않습니다. 관리자에게 문의해주세요.' },
+        { success: false, error: 'Shop에 입금정보가 등록되어 있지 않습니다. 관리자에게 문의해주세요.' },
         { status: 400 }
       )
     }
@@ -325,8 +325,8 @@ export async function POST(req: NextRequest) {
           method: TossPaymentMethod.BANK_TRANSFER,
           status: TossPaymentStatus.WAITING_FOR_DEPOSIT,
           amount: totalAmount,
-          virtualAccountBank: channel.bankName,
-          virtualAccountNumber: channel.bankAccount,
+          virtualAccountBank: shop.bankName,
+          virtualAccountNumber: shop.bankAccount,
           virtualAccountDueDate: depositDeadline,
         },
       })
@@ -363,9 +363,9 @@ export async function POST(req: NextRequest) {
         })),
       },
       bankInfo: {
-        bankName: channel.bankName,
-        bankAccount: channel.bankAccount,
-        accountHolder: channel.accountHolder,
+        bankName: shop.bankName,
+        bankAccount: shop.bankAccount,
+        accountHolder: shop.accountHolder,
         depositDeadline: depositDeadline.toISOString(),
       },
       message: '무통장입금 주문이 완료되었습니다. 입금 확인 후 배송이 시작됩니다.',
