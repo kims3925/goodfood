@@ -64,8 +64,14 @@ export async function runCollectionPipeline(
 
   const wholesaleChannels = await prisma.channel.findMany({
     where: whereClause,
-    include: {
-      apiConfig: true,
+  })
+
+  // 사용자의 Band API 설정 조회
+  const apiConfig = await prisma.sourcingApiConfig.findFirst({
+    where: {
+      userId,
+      platform: 'BAND',
+      isActive: true,
     },
   })
 
@@ -113,13 +119,13 @@ export async function runCollectionPipeline(
       console.log(`[Collection] Collecting from channel: ${channel.name}`)
 
       // API 토큰 확인
-      if (!channel.apiConfig?.accessToken) {
+      if (!apiConfig?.accessToken) {
         throw new Error('API 토큰이 설정되지 않았습니다')
       }
 
       // Band API 호출하여 게시물 가져오기
       const bandPosts = await fetchBandPosts(
-        channel.apiConfig.accessToken,
+        apiConfig.accessToken,
         channel.channelKey,
         config.limit || 20
       )

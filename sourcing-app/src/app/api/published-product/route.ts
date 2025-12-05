@@ -40,12 +40,8 @@ export async function GET(request: NextRequest) {
 
     // 발행 채널 플랫폼 필터 (쇼핑몰, Band 등)
     if (onlyShoppingMall) {
-      // 쇼핑몰 필터: channel.platform이 SHOP인 상품만
-      publishedProductsFilter.channel = {
-        is: {
-          platform: 'SHOP',
-        },
-      }
+      // 쇼핑몰 필터: channelId가 null인 상품만
+      publishedProductsFilter.channelId = null
     } else if (sourcePlatform) {
       // Band 등 다른 플랫폼 필터: 해당 플랫폼에 발행된 상품
       publishedProductsFilter.channel = {

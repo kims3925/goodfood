@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { channelKey, name, kind, platform, coverUrl, accountHolder, bankAccount, bankName, subdomain } = body
+    const { channelKey, name, kind, platform, coverUrl } = body
 
     if (!channelKey || !name || !kind || !platform) {
       return NextResponse.json(
@@ -62,10 +62,6 @@ export async function POST(request: NextRequest) {
       kind,
       platform,
       coverUrl: coverUrl || null,
-      accountHolder: accountHolder || null,
-      bankAccount: bankAccount || null,
-      bankName: bankName || null,
-      subdomain: subdomain || null, // 빈 문자열도 null로 처리 (unique 제약 대응)
     })
 
     return NextResponse.json({ success: true, data: channel })
@@ -85,15 +81,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Prisma unique constraint violation (subdomain 중복 등)
+    // Prisma unique constraint violation
     if (error.code === 'P2002') {
-      const target = error.meta?.target
-      if (target?.includes('subdomain')) {
-        return NextResponse.json(
-          { success: false, error: '이미 사용 중인 서브도메인입니다.' },
-          { status: 409 }
-        )
-      }
       return NextResponse.json(
         { success: false, error: '중복된 데이터가 존재합니다.' },
         { status: 409 }
@@ -111,7 +100,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, name, isActive, coverUrl, accountHolder, bankAccount, bankName } = body
+    const { id, name, isActive, coverUrl } = body
 
     if (!id) {
       return NextResponse.json(
@@ -124,9 +113,6 @@ export async function PUT(request: NextRequest) {
       name,
       isActive,
       coverUrl,
-      accountHolder,
-      bankAccount,
-      bankName,
     })
 
     return NextResponse.json({ success: true, data: channel })

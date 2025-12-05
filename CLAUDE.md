@@ -45,14 +45,14 @@ db/prisma/
 ## Project Structure
 
 - **db/**: 공유 Prisma 데이터베이스 클라이언트 (@bandauto/db)
-- **e-commerce-app/**: 쇼핑몰 Next.js 앱 (포트 3000)
+- **shop-app/**: 쇼핑몰 Next.js 앱 (포트 3000)
 - **sourcing-app/**: 소싱 Next.js 앱
 
 ## Development Commands
 
 ```bash
 # 쇼핑몰 앱 실행
-cd e-commerce-app && npm run dev
+cd shop-app && npm run dev
 
 # 소싱 앱 실행
 cd sourcing-app && npm run dev

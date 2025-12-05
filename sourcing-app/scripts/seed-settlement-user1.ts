@@ -18,7 +18,7 @@ async function main() {
   if (existingChannels.length === 0) {
     const channelConfigs = [
       { name: '패션몰 밴드', platform: ChannelPlatform.BAND, channelKey: `band_${Date.now()}` },
-      { name: '마이 쇼핑몰', platform: ChannelPlatform.SHOP, channelKey: `shop_${Date.now()}` },
+      { name: '스마트스토어 패션', platform: ChannelPlatform.SMARTSTORE, channelKey: `smartstore_${Date.now()}` },
       { name: '알리 직구몰', platform: ChannelPlatform.ALIEXPRESS, channelKey: `ali_${Date.now()}` },
     ]
 

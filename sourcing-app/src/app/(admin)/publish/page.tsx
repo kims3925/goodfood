@@ -103,7 +103,6 @@ export default function PublishPage() {
   const groupedChannels = useMemo(() => {
     const groups: { platform: string; label: string; icon: React.ReactNode; channels: Channel[] }[] = [
       { platform: 'BAND', label: '밴드', icon: <BandIcon size={14} />, channels: [] },
-      { platform: 'SHOP', label: '쇼핑몰', icon: <ShoppingBag size={14} />, channels: [] },
       { platform: 'OTHER', label: '기타', icon: <Store size={14} />, channels: [] },
     ]
 

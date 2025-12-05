@@ -1,7 +1,7 @@
 model Order {
   id             Int                 @id @default(autoincrement())
   userId         Int                 @map("user_id")
-  channelId      Int?                @map("channel_id")
+  shopId         Int?                @map("shop_id")
   orderNumber    String              @unique @map("order_number") @db.VarChar(50)
   status         CustomerOrderStatus @default(PENDING)
   recipientName  String              @map("recipient_name") @db.VarChar(100)
@@ -24,12 +24,12 @@ model Order {
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamp(0)
   user           User                @relation(fields: [userId], references: [id])
-  channel        Channel?            @relation(fields: [channelId], references: [id])
+  shop           Shop?               @relation(fields: [shopId], references: [id])
   items          OrderItem[]
   payment        Payment?
 
   @@index([userId])
-  @@index([channelId])
+  @@index([shopId])
   @@index([orderNumber])
   @@index([status])
   @@index([orderedAt])
@@ -63,4 +63,3 @@ model OrderItem {
   @@index([referrerChannelId])
   @@map("order_item")
 }
-

@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 
 type ChannelKind = 'WHOLESALE' | 'RETAIL'
-type ChannelPlatform = 'BAND' | 'NAVER_CAFE' | 'ALIEXPRESS' | 'SMARTSTORE' | 'COUPANG' | 'SHOP' | 'CUSTOM'
+type ChannelPlatform = 'BAND' | 'NAVER_CAFE' | 'ALIEXPRESS' | 'SMARTSTORE' | 'COUPANG' | 'CUSTOM'
 
 interface BandInfo {
   bandKey: string
@@ -19,16 +19,12 @@ interface BandInfo {
 interface Channel {
   id: number
   userId: number
-  apiConfigId: number | null
   kind: ChannelKind
   platform: ChannelPlatform
   channelKey: string
   name: string
   coverUrl: string | null
   isActive: boolean
-  accountHolder: string | null
-  bankAccount: string | null
-  bankName: string | null
   createdAt: string
   updatedAt: string
 }
@@ -51,30 +47,6 @@ const PLATFORM_OPTIONS: { value: ChannelPlatform; label: string; kinds: ChannelK
   { value: 'ALIEXPRESS', label: '알리익스프레스', kinds: ['WHOLESALE'] },
   { value: 'SMARTSTORE', label: '스마트스토어', kinds: ['RETAIL'] },
   { value: 'COUPANG', label: '쿠팡', kinds: ['RETAIL'] },
-  { value: 'SHOP', label: '쇼핑몰', kinds: ['RETAIL'] },
-]
-
-const BANK_OPTIONS = [
-  '국민은행',
-  '신한은행',
-  '우리은행',
-  '하나은행',
-  '농협은행',
-  '기업은행',
-  '카카오뱅크',
-  '토스뱅크',
-  '케이뱅크',
-  '새마을금고',
-  '우체국',
-  '수협은행',
-  '부산은행',
-  '대구은행',
-  '경남은행',
-  '광주은행',
-  '전북은행',
-  '제주은행',
-  'SC제일은행',
-  '씨티은행',
 ]
 
 export default function ChannelFormModal({
@@ -95,12 +67,6 @@ export default function ChannelFormModal({
     name: '',
     coverUrl: '',
     isActive: true,
-    // Retail 전용 필드
-    accountHolder: '',
-    bankAccount: '',
-    bankName: '',
-    // SHOP 플랫폼 전용 필드
-    subdomain: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -147,14 +113,11 @@ export default function ChannelFormModal({
         if (data.settings.aliexpress?.apiKey || data.settings.aliexpress?.accessToken) {
           platforms.push('ALIEXPRESS')
         }
-        // SHOP은 API 설정 없이 사용 가능
-        platforms.push('SHOP')
         setConfiguredPlatforms(platforms)
       }
     } catch (error) {
       console.error('API 설정 조회 실패:', error)
-      // 실패 시 기본적으로 SHOP만 허용
-      setConfiguredPlatforms(['SHOP'])
+      setConfiguredPlatforms([])
     } finally {
       setIsLoadingApiSettings(false)
     }
@@ -196,10 +159,6 @@ export default function ChannelFormModal({
           name: channel.name,
           coverUrl: channel.coverUrl || '',
           isActive: channel.isActive,
-          accountHolder: channel.accountHolder || '',
-          bankAccount: channel.bankAccount || '',
-          bankName: channel.bankName || '',
-          subdomain: '',
         })
       } else {
         // 등록 모드: 초기 플랫폼은 API 설정 조회 후 설정
@@ -210,10 +169,6 @@ export default function ChannelFormModal({
           name: '',
           coverUrl: '',
           isActive: true,
-          accountHolder: '',
-          bankAccount: '',
-          bankName: '',
-          subdomain: '',
         })
         // API 설정 조회
         fetchConfiguredPlatforms()
@@ -259,12 +214,7 @@ export default function ChannelFormModal({
       )
       if (availableConfigured.length > 0) {
         const firstPlatform = availableConfigured[0].value
-        // SHOP인 경우 channelKey 자동 생성
-        if (firstPlatform === 'SHOP') {
-          setFormData((prev) => ({ ...prev, platform: firstPlatform, channelKey: generateShortUUID() }))
-        } else {
-          setFormData((prev) => ({ ...prev, platform: firstPlatform }))
-        }
+        setFormData((prev) => ({ ...prev, platform: firstPlatform }))
         // BAND인 경우 밴드 목록 조회
         if (firstPlatform === 'BAND') {
           fetchBandListImmediate()
@@ -284,24 +234,13 @@ export default function ChannelFormModal({
 
     if (!currentPlatformAvailable && availableConfigured.length > 0) {
       const newPlatform = availableConfigured[0].value
-      // SHOP인 경우 channelKey 자동 생성
-      if (newPlatform === 'SHOP') {
-        setFormData((prev) => ({
-          ...prev,
-          platform: newPlatform,
-          channelKey: generateShortUUID(),
-          name: '',
-          coverUrl: ''
-        }))
-      } else {
-        setFormData((prev) => ({
-          ...prev,
-          platform: newPlatform,
-          channelKey: '',
-          name: '',
-          coverUrl: ''
-        }))
-      }
+      setFormData((prev) => ({
+        ...prev,
+        platform: newPlatform,
+        channelKey: '',
+        name: '',
+        coverUrl: ''
+      }))
     }
   }, [formData.kind, configuredPlatforms, isEditMode])
 
@@ -316,36 +255,18 @@ export default function ChannelFormModal({
           newErrors.channelKey = '밴드를 선택해주세요.'
         }
       }
-      // 소매 채널: 단일 선택 + 필수값 확인
+      // 소매 채널: 단일 선택 확인
       else if (formData.kind === 'RETAIL') {
         if (!formData.channelKey.trim()) {
           newErrors.channelKey = '밴드를 선택해주세요.'
         }
         if (!formData.name.trim()) {
-          newErrors.name = '쇼핑몰명을 입력해주세요.'
+          newErrors.name = '채널명을 입력해주세요.'
         }
-        if (!formData.subdomain.trim()) {
-          newErrors.subdomain = '서브도메인을 입력해주세요.'
-        }
-        if (!formData.coverUrl.trim()) {
-          newErrors.coverUrl = '쇼핑몰 로고를 업로드해주세요.'
-        }
-      }
-    }
-    // SHOP 플랫폼 검증 (channelKey는 자동 생성되므로 제외)
-    if (formData.platform === 'SHOP' && !isEditMode) {
-      if (!formData.name.trim()) {
-        newErrors.name = '쇼핑몰명을 입력해주세요.'
-      }
-      if (!formData.subdomain.trim()) {
-        newErrors.subdomain = '서브도메인을 입력해주세요.'
-      }
-      if (!formData.coverUrl.trim()) {
-        newErrors.coverUrl = '쇼핑몰 로고를 업로드해주세요.'
       }
     }
     // 기타 플랫폼 channelKey 검증
-    else if (!formData.channelKey.trim() && formData.platform !== 'SHOP' && formData.platform !== 'BAND') {
+    if (!formData.channelKey.trim() && formData.platform !== 'BAND') {
       if (formData.platform === 'NAVER_CAFE') {
         newErrors.channelKey = '네이버 카페를 선택해주세요.'
       } else if (formData.platform === 'ALIEXPRESS') {
@@ -359,16 +280,12 @@ export default function ChannelFormModal({
       }
     }
 
-    // 채널명 검사: 수정 모드 또는 등록 모드일 때 필수 (BAND 다중 선택 및 소매 밴드 제외 - 이미 위에서 검증)
+    // 채널명 검사: 수정 모드 또는 등록 모드일 때 필수
     if (!formData.name.trim()) {
       if (isEditMode) {
         newErrors.name = '채널명을 입력해주세요.'
-      } else if (formData.platform === 'SHOP') {
-        newErrors.name = '쇼핑몰명을 입력해주세요.'
       } else if (formData.platform === 'BAND' && formData.kind === 'WHOLESALE' && selectedBands.length > 0) {
         // 도매 BAND 다중 선택 시 name은 각 밴드에서 가져오므로 검증 제외
-      } else if (formData.platform === 'BAND' && formData.kind === 'RETAIL') {
-        // 소매 BAND는 위에서 이미 검증됨
       } else if (formData.platform === 'BAND' && selectedBands.length === 0) {
         // BAND는 밴드 선택 시 name이 자동 설정되므로, 선택이 없을 때는 channelKey 에러가 우선
       } else if (!formData.channelKey) {
@@ -396,9 +313,6 @@ export default function ChannelFormModal({
           name: formData.name,
           isActive: formData.isActive,
           coverUrl: formData.coverUrl || null,
-          accountHolder: formData.accountHolder || null,
-          bankAccount: formData.bankAccount || null,
-          bankName: formData.bankName || null,
         }
 
         const response = await fetch(url, {
@@ -430,9 +344,6 @@ export default function ChannelFormModal({
               channelKey: band.bandKey,
               name: band.name,
               coverUrl: band.coverUrl || null,
-              accountHolder: formData.accountHolder || null,
-              bankAccount: formData.bankAccount || null,
-              bankName: formData.bankName || null,
             }
 
             const response = await fetch(url, {
@@ -475,11 +386,6 @@ export default function ChannelFormModal({
           channelKey: formData.channelKey,
           name: formData.name,
           coverUrl: formData.coverUrl || null,
-          accountHolder: formData.accountHolder || null,
-          bankAccount: formData.bankAccount || null,
-          bankName: formData.bankName || null,
-          // SHOP 플랫폼 전용 필드
-          subdomain: formData.subdomain || null,
         }
 
         const response = await fetch(url, {
@@ -524,26 +430,14 @@ export default function ChannelFormModal({
     // 선택된 밴드 초기화
     setSelectedBands([])
 
-    // SHOP 플랫폼인 경우 자동으로 16자리 UUID 생성
-    if (platform === 'SHOP') {
-      const generatedKey = generateShortUUID()
-      setFormData((prev) => ({
-        ...prev,
-        platform,
-        channelKey: generatedKey,
-        name: '',
-        coverUrl: '',
-      }))
-    } else {
-      // 플랫폼 변경 시 채널 관련 필드 초기화
-      setFormData((prev) => ({
-        ...prev,
-        platform,
-        channelKey: '',
-        name: '',
-        coverUrl: '',
-      }))
-    }
+    // 플랫폼 변경 시 채널 관련 필드 초기화
+    setFormData((prev) => ({
+      ...prev,
+      platform,
+      channelKey: '',
+      name: '',
+      coverUrl: '',
+    }))
 
     // 밴드 플랫폼 선택 시 밴드 목록 조회
     if (platform === 'BAND') {
@@ -660,7 +554,6 @@ export default function ChannelFormModal({
   const availablePlatforms = isEditMode
     ? PLATFORM_OPTIONS.filter((p) => p.kinds.includes(formData.kind))
     : PLATFORM_OPTIONS.filter((p) => p.kinds.includes(formData.kind) && configuredPlatforms.includes(p.value))
-  const isRetail = formData.kind === 'RETAIL'
 
   return (
     <Modal
@@ -1082,33 +975,6 @@ export default function ChannelFormModal({
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        서브도메인 <span className="text-red-500">*</span>
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          placeholder="myshop"
-                          value={formData.subdomain}
-                          onChange={(e) => {
-                            const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
-                            setFormData((prev) => ({ ...prev, subdomain: value }))
-                            if (errors.subdomain) {
-                              setErrors((prev) => {
-                                const newErrors = { ...prev }
-                                delete newErrors.subdomain
-                                return newErrors
-                              })
-                            }
-                          }}
-                          error={errors.subdomain}
-                        />
-                        <span className="text-gray-500 text-sm whitespace-nowrap">.shop.com</span>
-                      </div>
-                      <p className="mt-1 text-xs text-gray-500">
-                        영문 소문자, 숫자, 하이픈만 사용 가능
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         쇼핑몰 로고 <span className="text-red-500">*</span>
                       </label>
                       {logoPreview || formData.coverUrl ? (
@@ -1266,170 +1132,6 @@ export default function ChannelFormModal({
           </div>
         )}
 
-        {/* 쇼핑몰 (등록 시, 플랫폼이 SHOP일 때) - 자체 쇼핑몰 */}
-        {!isEditMode && formData.platform === 'SHOP' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              자체 쇼핑몰 정보 <span className="text-red-500">*</span>
-            </label>
-            <div className="border border-gray-200 rounded-lg p-4 space-y-4">
-              <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
-                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-900">자체 운영 쇼핑몰</div>
-                  <div className="text-xs text-gray-500">쇼핑몰 정보를 입력해주세요</div>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  쇼핑몰명 <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  placeholder="쇼핑몰 이름을 입력하세요"
-                  value={formData.name}
-                  onChange={(e) => handleChange('name', e.target.value)}
-                  error={errors.name}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  서브도메인 <span className="text-red-500">*</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="myshop"
-                    value={formData.subdomain}
-                    onChange={(e) => {
-                      const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
-                      setFormData((prev) => ({ ...prev, subdomain: value }))
-                      if (errors.subdomain) {
-                        setErrors((prev) => {
-                          const newErrors = { ...prev }
-                          delete newErrors.subdomain
-                          return newErrors
-                        })
-                      }
-                    }}
-                    error={errors.subdomain}
-                  />
-                  <span className="text-gray-500 text-sm whitespace-nowrap">.shop.com</span>
-                </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  영문 소문자, 숫자, 하이픈만 사용 가능
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  쇼핑몰 로고 <span className="text-red-500">*</span>
-                </label>
-                {logoPreview || formData.coverUrl ? (
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      <img
-                        src={logoPreview || formData.coverUrl}
-                        alt="쇼핑몰 로고"
-                        className="w-20 h-20 rounded-lg object-cover border border-gray-200"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleLogoRemove}
-                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                    <span className="text-sm text-gray-500">로고가 업로드되었습니다.</span>
-                  </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      {isUploadingLogo ? (
-                        <>
-                          <svg className="animate-spin h-8 w-8 text-purple-500 mb-2" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          <p className="text-sm text-gray-500">업로드 중...</p>
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-8 h-8 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          <p className="text-sm text-gray-500">
-                            <span className="font-semibold text-purple-600">클릭하여 업로드</span>
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">PNG, JPG, GIF, WEBP (최대 5MB)</p>
-                        </>
-                      )}
-                    </div>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept="image/jpeg,image/png,image/gif,image/webp"
-                      onChange={handleLogoUpload}
-                      disabled={isUploadingLogo}
-                    />
-                  </label>
-                )}
-                {errors.coverUrl && (
-                  <p className="text-sm text-red-500 mt-1">{errors.coverUrl}</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 소매 채널 전용 필드 (등록 시) */}
-        {!isEditMode && isRetail && (
-          <div className="border-t pt-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">소매 채널 정보</h3>
-
-            <div className="space-y-4">
-              {/* 정산 계좌 정보 */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">은행명</label>
-                  <select
-                    value={formData.bankName}
-                    onChange={(e) => handleChange('bankName', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">선택하세요</option>
-                    {BANK_OPTIONS.map((bank) => (
-                      <option key={bank} value={bank}>
-                        {bank}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Input
-                    label="계좌번호"
-                    placeholder="000-0000-0000"
-                    value={formData.bankAccount}
-                    onChange={(e) => handleChange('bankAccount', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Input
-                    label="예금주"
-                    placeholder="홍길동"
-                    value={formData.accountHolder}
-                    onChange={(e) => handleChange('accountHolder', e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* 수정 모드일 때 유형/플랫폼 표시 */}
         {isEditMode && (
           <div className="grid grid-cols-2 gap-4">
@@ -1500,50 +1202,6 @@ export default function ChannelFormModal({
             <label htmlFor="isActive" className="text-sm font-medium text-gray-700">
               채널 활성화
             </label>
-          </div>
-        )}
-
-        {/* 수정 모드 - 소매 채널 전용 필드 */}
-        {isEditMode && isRetail && (
-          <div className="border-t pt-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">소매 채널 정보</h3>
-
-            <div className="space-y-4">
-              {/* 정산 계좌 정보 */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">은행명</label>
-                  <select
-                    value={formData.bankName}
-                    onChange={(e) => handleChange('bankName', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">선택하세요</option>
-                    {BANK_OPTIONS.map((bank) => (
-                      <option key={bank} value={bank}>
-                        {bank}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Input
-                    label="계좌번호"
-                    placeholder="000-0000-0000"
-                    value={formData.bankAccount}
-                    onChange={(e) => handleChange('bankAccount', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Input
-                    label="예금주"
-                    placeholder="홍길동"
-                    value={formData.accountHolder}
-                    onChange={(e) => handleChange('accountHolder', e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </div>

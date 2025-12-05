@@ -9,8 +9,8 @@
 ### 1.1 빌드 캐시 파일 (.old) - 즉시 삭제 가능
 
 ```
-e-commerce-app/.next/cache/webpack/client-development/index.pack.gz.old
-e-commerce-app/.next/cache/webpack/server-development/index.pack.gz.old
+shop-app/.next/cache/webpack/client-development/index.pack.gz.old
+shop-app/.next/cache/webpack/server-development/index.pack.gz.old
 sourcing-app/.next/cache/webpack/client-development/index.pack.gz.old
 sourcing-app/.next/cache/webpack/client-production/index.pack.old
 sourcing-app/.next/cache/webpack/edge-server-development/index.pack.gz.old
@@ -28,7 +28,7 @@ find . -name "*.old" -path "*/.next/*" -delete
 
 | 경로 | 크기 | 설명 |
 |------|------|------|
-| `e-commerce-app/.next` | ~96MB | 빌드 시 자동 생성 |
+| `shop-app/.next` | ~96MB | 빌드 시 자동 생성 |
 | `sourcing-app/.next` | ~265MB | 빌드 시 자동 생성 |
 
 **총 361MB 절감 가능** (git에는 이미 .gitignore로 제외됨)
@@ -68,11 +68,11 @@ const userId = currentUser.userId
 ```
 
 **영향 파일:**
-- `e-commerce-app/src/app/api/cart/route.ts`
-- `e-commerce-app/src/app/api/cart/items/[id]/route.ts`
-- `e-commerce-app/src/app/api/orders/route.ts`
-- `e-commerce-app/src/app/api/orders/[id]/route.ts`
-- `e-commerce-app/src/app/api/mypage/*/route.ts` (6개)
+- `shop-app/src/app/api/cart/route.ts`
+- `shop-app/src/app/api/cart/items/[id]/route.ts`
+- `shop-app/src/app/api/orders/route.ts`
+- `shop-app/src/app/api/orders/[id]/route.ts`
+- `shop-app/src/app/api/mypage/*/route.ts` (6개)
 - `sourcing-app/src/app/api/*/route.ts` (10개 이상)
 
 **개선안:**
@@ -105,7 +105,7 @@ export const GET = withAuth(async (req, { userId }) => {
 
 | 앱 | 파일 | 줄 수 | 패턴 |
 |----|------|-------|------|
-| e-commerce-app | `modules/auth/services/auth.service.ts` | 163줄 | 클래스 기반 |
+| shop-app | `modules/auth/services/auth.service.ts` | 163줄 | 클래스 기반 |
 | sourcing-app | `modules/auth/auth.service.ts` | 90줄 | 함수 기반 |
 
 **개선안:** 공유 라이브러리로 통합
@@ -122,7 +122,7 @@ db/src/shared/auth/
 
 | 앱 | 파일 | 내용 |
 |----|------|------|
-| e-commerce-app | `modules/order/services/order.service.ts` | 주문 생성, 결제, 환불 등 복합 로직 |
+| shop-app | `modules/order/services/order.service.ts` | 주문 생성, 결제, 환불 등 복합 로직 |
 | sourcing-app | `modules/sourcing/domain/src/order/services/order.service.ts` | 단순 조회/생성 (33줄) |
 
 **개선안:** 공통 조회 로직 분리
@@ -135,16 +135,16 @@ db/src/shared/auth/
 
 | 앱 | 총 개수 | 정리 대상 (log/debug) |
 |----|--------|----------------------|
-| e-commerce-app | 187개 | ~60개 |
+| shop-app | 187개 | ~60개 |
 | sourcing-app | 308개 | ~69개 |
 | **합계** | 495개 | ~129개 |
 
 **주요 파일:**
 ```
-e-commerce-app/src/app/api/cart/route.ts
-e-commerce-app/src/app/api/orders/route.ts
-e-commerce-app/src/modules/payments/services/payment.service.ts
-e-commerce-app/src/app/store/payment/success/page.tsx
+shop-app/src/app/api/cart/route.ts
+shop-app/src/app/api/orders/route.ts
+shop-app/src/modules/payments/services/payment.service.ts
+shop-app/src/app/store/payment/success/page.tsx
 sourcing-app/src/app/(admin)/product/list/page.tsx
 sourcing-app/src/modules/automation/executor.ts
 sourcing-app/src/modules/automation/pipelines/publish.ts
@@ -153,7 +153,7 @@ sourcing-app/src/components/product/ProductFormModal.tsx
 
 **개선안:**
 ```typescript
-// 기존 logger 활용 (e-commerce-app/src/modules/common/utils/src/helpers/logger.ts)
+// 기존 logger 활용 (shop-app/src/modules/common/utils/src/helpers/logger.ts)
 import { logger } from '@/modules/common/utils/src/helpers/logger'
 
 // 변경 전
@@ -169,10 +169,10 @@ logger.debug('Order created:', orderId)
 
 | 파일 | 라인 | 내용 | 우선순위 |
 |------|------|------|----------|
-| `e-commerce-app/.../webhook-handler.service.ts` | 366 | 이메일 발송 로직 구현 (결제 완료 알림) | **높음** |
-| `e-commerce-app/.../webhook-handler.service.ts` | 396 | 관리자 이메일 발송 구현 | **높음** |
+| `shop-app/.../webhook-handler.service.ts` | 366 | 이메일 발송 로직 구현 (결제 완료 알림) | **높음** |
+| `shop-app/.../webhook-handler.service.ts` | 396 | 관리자 이메일 발송 구현 | **높음** |
 | `sourcing-app/.../post/list/page.tsx` | 207 | userId를 세션에서 가져와야 함 | **높음** |
-| `e-commerce-app/.../logger.ts` | 72 | 외부 로깅 서비스 연동 (Sentry 등) | 중간 |
+| `shop-app/.../logger.ts` | 72 | 외부 로깅 서비스 연동 (Sentry 등) | 중간 |
 
 ---
 
@@ -180,8 +180,8 @@ logger.debug('Order created:', orderId)
 
 | 파일 | 라인 | 문제 |
 |------|------|------|
-| `e-commerce-app/.../order.service.ts` | 213-214 | localhost URL |
-| `e-commerce-app/.../toss-payments.service.ts` | 189-190 | localhost URL |
+| `shop-app/.../order.service.ts` | 213-214 | localhost URL |
+| `shop-app/.../toss-payments.service.ts` | 189-190 | localhost URL |
 | `sourcing-app/.../shopping-mall/page.tsx` | 660 | `href="http://localhost:3000/store"` |
 
 **개선안:**

@@ -23,7 +23,6 @@ interface ChannelTheme {
 interface Channel {
   id: number
   userId: number
-  apiConfigId: number | null
   kind: 'WHOLESALE' | 'RETAIL'
   platform: string
   channelKey: string
@@ -53,7 +52,6 @@ const PLATFORM_LABELS: { [key: string]: string } = {
   ALIEXPRESS: '알리익스프레스',
   SMARTSTORE: '스마트스토어',
   COUPANG: '쿠팡',
-  SHOP: '쇼핑몰',
   CUSTOM: '커스텀',
 }
 
@@ -184,9 +182,9 @@ export default function ChannelDetailPage({
         bankName: bankName || null,
       }
 
-      // SHOP 플랫폼 또는 소매 밴드인 경우 쇼핑몰/테마 필드 포함
+      // 소매 밴드인 경우 쇼핑몰/테마 필드 포함
       const isRetailBand = channel?.kind === 'RETAIL' && channel?.platform === 'BAND'
-      if (channel?.platform === 'SHOP' || isRetailBand) {
+      if (isRetailBand) {
         updateData.subdomain = subdomain || null
         updateData.displayName = displayName || null
         updateData.enableToss = enableToss
@@ -674,8 +672,8 @@ export default function ChannelDetailPage({
               </div>
             </div>
 
-            {/* 쇼핑몰 설정 카드 (SHOP 플랫폼 또는 소매 밴드) */}
-            {(channel.platform === 'SHOP' || (channel.kind === 'RETAIL' && channel.platform === 'BAND')) && (
+            {/* 쇼핑몰 설정 카드 (소매 밴드) */}
+            {(channel.kind === 'RETAIL' && channel.platform === 'BAND') && (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                   <div className="flex items-center gap-2">
@@ -933,8 +931,8 @@ export default function ChannelDetailPage({
               </div>
             )}
 
-            {/* 테마 설정 카드 (SHOP 플랫폼 또는 소매 밴드) */}
-            {(channel.platform === 'SHOP' || (channel.kind === 'RETAIL' && channel.platform === 'BAND')) && (
+            {/* 테마 설정 카드 (소매 밴드) */}
+            {(channel.kind === 'RETAIL' && channel.platform === 'BAND') && (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                   <div className="flex items-center gap-2">

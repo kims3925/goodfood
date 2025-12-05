@@ -62,9 +62,6 @@ export class PublishService {
           kind: ChannelKind.RETAIL,
           isActive: true,
         },
-        include: {
-          apiConfig: true,
-        },
       })
 
       if (!channel) {
@@ -75,6 +72,15 @@ export class PublishService {
           error: '채널을 찾을 수 없거나 발행 권한이 없습니다.',
         }
       }
+
+      // 사용자의 Band API 설정 조회
+      const apiConfig = await prisma.sourcingApiConfig.findFirst({
+        where: {
+          userId,
+          platform: 'BAND',
+          isActive: true,
+        },
+      })
 
       // 2. 상품 정보 조회
       const product = await prisma.product.findFirst({
@@ -131,7 +137,7 @@ export class PublishService {
       }
 
       // 4. API 토큰 확인
-      if (!channel.apiConfig?.accessToken) {
+      if (!apiConfig?.accessToken) {
         // API 토큰이 없으면 DB 기록만 생성 (수동 발행용)
         const publishedProduct = await prisma.publishedProduct.create({
           data: {
@@ -153,7 +159,7 @@ export class PublishService {
       }
 
       // 5. Band API로 게시물 작성
-      const bandClient = new NaverBandClient(channel.apiConfig.accessToken)
+      const bandClient = new NaverBandClient(apiConfig.accessToken)
       const postContent = buildPostContent(product)
 
       const { postKey } = await bandClient.createPost(channel.channelKey, postContent, {
@@ -220,8 +226,14 @@ export class PublishService {
         kind: ChannelKind.RETAIL,
         isActive: true,
       },
-      include: {
-        apiConfig: true,
+    })
+
+    // 사용자의 Band API 설정 조회
+    const apiConfig = await prisma.sourcingApiConfig.findFirst({
+      where: {
+        userId,
+        platform: 'BAND',
+        isActive: true,
       },
     })
 
@@ -254,7 +266,7 @@ export class PublishService {
       const productId = productIds[i]
 
       // 첫 번째가 아니면 쿨다운 대기 (Band API 제한)
-      if (i > 0 && channel.apiConfig) {
+      if (i > 0 && apiConfig) {
         console.log(`[PublishService] Waiting ${DEFAULT_COOLDOWN_MS / 1000}s for Band API cooldown...`)
         await delay(DEFAULT_COOLDOWN_MS)
       }

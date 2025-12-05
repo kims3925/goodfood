@@ -356,7 +356,7 @@ export default function PublishedProductDetailPage({
                   </div>
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                    {product.channel?.platform || 'SHOP'}
+                    {product.channel?.platform || '쇼핑몰'}
                   </span>
                 </div>
 

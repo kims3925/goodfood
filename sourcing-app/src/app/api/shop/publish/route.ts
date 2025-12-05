@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
+import prisma, { ChannelKind } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { publishService } from '@/modules/publish'
 
@@ -63,9 +63,9 @@ export async function GET(request: NextRequest) {
     let retailBandPublishedCount = 0
 
     for (const product of allProducts) {
-      // 쇼핑몰 발행: channelId가 없거나 SHOP 플랫폼 채널에 발행된 경우
+      // 쇼핑몰 발행: channelId가 없는 경우
       const hasShoppingMall = product.publishedProducts.some(
-        (pp) => pp.channelId === null || pp.channel?.platform === ChannelPlatform.SHOP
+        (pp) => pp.channelId === null
       )
       // 채널 발행: channelId가 있는 모든 발행 (채널 삭제되어도 카운트)
       const hasChannelPublish = product.publishedProducts.some(
@@ -137,13 +137,13 @@ export async function GET(request: NextRequest) {
       const mainVariant = product.variants?.[0]
 
       // 발행 유형별 분류:
-      // - channelPublishes: 모든 채널 발행 (매트릭스 UI에서 사용, SHOP 포함)
-      // - shoppingMallPublishes: 쇼핑몰 발행 (레거시 null 또는 SHOP 플랫폼)
+      // - channelPublishes: 모든 채널 발행 (매트릭스 UI에서 사용)
+      // - shoppingMallPublishes: 쇼핑몰 발행 (channelId가 null인 경우)
       const channelPublishes = product.publishedProducts.filter(
         (pp) => pp.channelId !== null
       )
       const shoppingMallPublishes = product.publishedProducts.filter(
-        (pp) => pp.channelId === null || pp.channel?.platform === ChannelPlatform.SHOP
+        (pp) => pp.channelId === null
       )
 
       const hasChannelPublish = channelPublishes.length > 0
