@@ -1,4 +1,4 @@
-# e-commerce-app Alert/Confirm 정리 TODO
+# shop-app Alert/Confirm 정리 TODO
 
 ## 요약
 - **alert()**: 1건 -> **완료**

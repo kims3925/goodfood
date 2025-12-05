@@ -525,7 +525,7 @@ const firstImages = await prisma.productImage.findMany({
 ---
 
 #### Issue 11: Order Stats Query Inefficiency
-**File:** `e-commerce-app/src/modules/order/repository/order.repository.ts` (Line 321-345)
+**File:** `shop-app/src/modules/order/repository/order.repository.ts` (Line 321-345)
 
 ```typescript
 // Current - loads ALL orders then filters in JS
@@ -820,7 +820,7 @@ unitPrice          Decimal(10, 2)  ✓ Max: 99,999.99 (sufficient)
 2. `/db/prisma/models/inquiry.prisma` - FK constraints
 3. `/db/prisma/models/automation.prisma` - Unique constraint
 4. `/sourcing-app/src/modules/catalog/domain/src/product/repository/product.repository.ts` - Query optimization
-5. `/e-commerce-app/src/modules/order/repository/order.repository.ts` - Stats query
+5. `/shop-app/src/modules/order/repository/order.repository.ts` - Stats query
 
 ### Documentation to Add
 1. Schema decisions document (why denormalization exists)

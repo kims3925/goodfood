@@ -155,7 +155,7 @@ Code Quality:
 
 **Supporting (Update Next Month):**
 7. `sourcing-app/src/modules/catalog/domain/src/product/repository/product.repository.ts` - Query optimization
-8. `e-commerce-app/src/modules/order/repository/order.repository.ts` - Stats query optimization
+8. `shop-app/src/modules/order/repository/order.repository.ts` - Stats query optimization
 
 ---
 

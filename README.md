@@ -8,7 +8,7 @@ BandAuto는 도매 밴드 상품 자동화부터 AI 상세페이지 생성, 토�
 
 ```
 bandauto/
-├── e-commerce-app/          # 고객용 쇼핑몰 앱 (포트 3000)
+├── shop-app/          # 고객용 쇼핑몰 앱 (포트 3000)
 │   ├── src/
 │   │   ├── app/             # Next.js App Router
 │   │   ├── components/      # 쇼핑몰 UI 컴포넌트
@@ -55,7 +55,7 @@ bandauto/
 
 ## 🎯 2-App 아키텍처
 
-### E-Commerce App (고객용 쇼핑몰)
+### Shop App (고객용 쇼핑몰)
 - **포트**: 3000
 - **역할**: 고객이 상품을 보고 구매하는 프론트엔드
 - **핵심 기능**:
@@ -90,7 +90,7 @@ npx prisma db push
 
 ### 3. 환경변수 설정
 
-**e-commerce-app/.env.local**
+**shop-app/.env.local**
 ```env
 DATABASE_URL="file:../prisma/dev.db"
 NEXTAUTH_URL="http://localhost:3000"
@@ -114,7 +114,7 @@ BAND_CLIENT_SECRET=""
 **각 앱 개별 실행:**
 ```bash
 # E-commerce 앱 (포트 3000)
-npm run dev:ecommerce
+npm run dev:shop
 
 # Sourcing 앱 (포트 3001)
 npm run dev:sourcing
@@ -129,7 +129,7 @@ npm run dev:all
 
 ### 앱별 모듈 접근 규칙
 
-1. **E-commerce App**
+1. **Shop App**
    - ✅ `modules/common/*` 접근 가능 (공통 모듈)
    - ✅ `src/modules/*` 접근 가능 (앱 전용 모듈)
    - ❌ `sourcing-app/src/modules/*` 접근 불가
@@ -137,7 +137,7 @@ npm run dev:all
 2. **Sourcing App**
    - ✅ `modules/common/*` 접근 가능 (공통 모듈)
    - ✅ `src/modules/*` 접근 가능 (앱 전용 모듈)
-   - ❌ `e-commerce-app/src/modules/*` 접근 불가
+   - ❌ `shop-app/src/modules/*` 접근 불가
 
 3. **Common Modules**
    - 모든 앱에서 접근 가능
@@ -146,7 +146,7 @@ npm run dev:all
 ### Import 경로 예시
 
 ```typescript
-// E-commerce App에서
+// Shop App에서
 import { Button } from '@common/ui-kit'                   // ✅ 공통 모듈
 import { OrderService } from '@modules/order'             // ✅ 앱 전용 모듈
 import { SourcingService } from '@modules/sourcing'       // ❌ ERROR (다른 앱)
@@ -162,14 +162,14 @@ import { OrderService } from '@modules/order'             // ❌ ERROR (다른 �
 
 ### 개발
 ```bash
-npm run dev:ecommerce      # E-commerce 앱 실행 (포트 3000)
+npm run dev:shop      # E-commerce 앱 실행 (포트 3000)
 npm run dev:sourcing       # Sourcing 앱 실행 (포트 3001)
 npm run dev:all            # 두 앱 동시 실행
 ```
 
 ### 빌드
 ```bash
-npm run build:ecommerce    # E-commerce 앱 빌드
+npm run build:shop    # E-commerce 앱 빌드
 npm run build:sourcing     # Sourcing 앱 빌드
 npm run build:all          # 두 앱 모두 빌드
 ```
@@ -209,7 +209,7 @@ npm run test:ui            # 테스트 UI 모드
 
 ## 🚀 구현된 API 엔드포인트
 
-E-Commerce App에 **11개의 REST API**가 완전히 구현되어 있습니다:
+Shop App에 **11개의 REST API**가 완전히 구현되어 있습니다:
 
 ### 🛒 Cart API (5개)
 ```
@@ -296,7 +296,7 @@ POST   /api/payments/webhook  # 웹훅 수신
 - `NEXTAUTH_SECRET`: 세션 암호화 키
 - `NEXTAUTH_URL`: 앱 URL
 
-**E-commerce App 전용:**
+**Shop App 전용:**
 - `TOSS_PAYMENTS_CLIENT_KEY`: 토스페이먼츠 클라이언트 키
 - `TOSS_PAYMENTS_SECRET_KEY`: 토스페이먼츠 시크릿 키
 - `TOSS_PAYMENTS_WEBHOOK_SECRET`: 웹훅 검증 시크릿

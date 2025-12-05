@@ -117,7 +117,7 @@ export class ChannelService {
     }
 
     // RETAIL 채널인 경우, 삭제 전에 먼저 isActive를 false로 설정
-    // 이렇게 하면 e-commerce-app에서 캐시된 데이터가 있어도 즉시 접속 차단됨
+    // 이렇게 하면 shop-app에서 캐시된 데이터가 있어도 즉시 접속 차단됨
     if (existing.kind === ChannelKind.RETAIL && existing.isActive) {
       await channelRepository.update(id, { isActive: false })
     }
@@ -163,7 +163,7 @@ export class ChannelService {
       await deleteChannelImageFile(existing.coverUrl)
     }
 
-    // e-commerce-app 채널 캐시 무효화 (RETAIL 채널만, subdomain이 있는 경우)
+    // shop-app 채널 캐시 무효화 (RETAIL 채널만, subdomain이 있는 경우)
     if (existing.kind === ChannelKind.RETAIL && existing.subdomain) {
       await this.invalidateEcommerceChannelCache(existing.subdomain)
     }
@@ -171,7 +171,7 @@ export class ChannelService {
     return channelRepository.delete(id)
   }
 
-  // e-commerce-app 채널 캐시 무효화
+  // shop-app 채널 캐시 무효화
   private async invalidateEcommerceChannelCache(subdomain: string) {
     try {
       const ecommerceUrl = process.env.ECOMMERCE_APP_URL || 'http://localhost:3000'
@@ -187,13 +187,13 @@ export class ChannelService {
       })
 
       if (res.ok) {
-        console.log(`[Channel] e-commerce-app 캐시 무효화 성공: ${subdomain}`)
+        console.log(`[Channel] shop-app 캐시 무효화 성공: ${subdomain}`)
       } else {
-        console.warn(`[Channel] e-commerce-app 캐시 무효화 실패 (HTTP ${res.status}): ${subdomain}`)
+        console.warn(`[Channel] shop-app 캐시 무효화 실패 (HTTP ${res.status}): ${subdomain}`)
       }
     } catch (error) {
       // 캐시 무효화 실패해도 삭제는 진행 (1분 후 자동 만료됨)
-      console.warn(`[Channel] e-commerce-app 캐시 무효화 요청 실패: ${subdomain}`, error)
+      console.warn(`[Channel] shop-app 캐시 무효화 요청 실패: ${subdomain}`, error)
     }
   }
 

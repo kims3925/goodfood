@@ -28,7 +28,7 @@
 
 ### 1.2 프로젝트 구조
 ```
-e-commerce-app/
+shop-app/
 ├── src/
 │   ├── app/                    # Next.js App Router 페이지
 │   │   ├── (shop)/             # 쇼핑몰 레이아웃 그룹

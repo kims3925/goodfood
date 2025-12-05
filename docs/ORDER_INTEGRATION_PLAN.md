@@ -111,7 +111,7 @@ enum OrderSource {
 
 ## 주의사항
 
-- Order 테이블의 배송 관련 필드 nullable 변경 시, 기존 e-commerce-app 코드에서 null 체크 필요
+- Order 테이블의 배송 관련 필드 nullable 변경 시, 기존 shop-app 코드에서 null 체크 필요
 - 마이그레이션 전 OrderTest 데이터 백업 필수
 - 정산 로직이 OrderTest 참조하는 경우 사전 확인 필요
 
