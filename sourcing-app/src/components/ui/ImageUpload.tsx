@@ -10,6 +10,7 @@ interface ImageUploadProps {
   label?: string
   placeholder?: string
   className?: string
+  required?: boolean
 }
 
 export default function ImageUpload({
@@ -19,6 +20,7 @@ export default function ImageUpload({
   label,
   placeholder = '이미지를 업로드하세요',
   className = '',
+  required = false,
 }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -96,7 +98,7 @@ export default function ImageUpload({
     <div className={className}>
       {label && (
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          {label}
+          {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}
 

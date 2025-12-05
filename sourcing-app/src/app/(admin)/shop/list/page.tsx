@@ -226,17 +226,6 @@ function ShopListContent() {
     )
   }
 
-  const getBankInfo = (shop: Shop) => {
-    if (shop.bankName && shop.bankAccount) {
-      return (
-        <span className="text-sm text-gray-600">
-          {shop.bankName}
-        </span>
-      )
-    }
-    return <span className="text-gray-400 text-xs">-</span>
-  }
-
   // 통계
   const activeCount = shops.filter((s) => s.isActive).length
   const inactiveCount = shops.filter((s) => !s.isActive).length
@@ -412,8 +401,7 @@ function ShopListContent() {
                   </TableHead>
                   <TableHead className="w-[5%]">순서</TableHead>
                   <TableHead className="w-[20%]">쇼핑몰명</TableHead>
-                  <TableHead className="w-[12%]">서브도메인</TableHead>
-                  <TableHead className="w-[10%]">계좌</TableHead>
+                  <TableHead className="w-[20%]">도메인</TableHead>
                   <TableHead className="w-[8%]">상품수</TableHead>
                   <TableHead className="w-[8%]">주문수</TableHead>
                   <TableHead className="w-[8%]">상태</TableHead>
@@ -465,11 +453,10 @@ function ShopListContent() {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Globe size={14} className="text-gray-400" />
-                          <span className="text-sm font-mono text-blue-600">{shop.subdomain}</span>
+                          <span className="text-sm font-mono text-blue-600">
+                            {shop.subdomain}.{process.env.NEXT_PUBLIC_DOMAIN}
+                          </span>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {getBankInfo(shop)}
                       </TableCell>
                       <TableCell>
                         <span className="text-gray-600">{shop._count.publishedProducts}</span>

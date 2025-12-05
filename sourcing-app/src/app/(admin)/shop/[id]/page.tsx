@@ -103,11 +103,9 @@ export default function ShopDetailPage({
   const [faviconUrl, setFaviconUrl] = useState('')
   const [bannerUrl, setBannerUrl] = useState('')
 
-  // Shop URL 도메인 (개발: lvh.me:3000, 프로덕션: bandauto.com)
+  // Shop URL 도메인 (.env의 NEXT_PUBLIC_DOMAIN 사용)
   const shopBaseDomain = useMemo(() => {
-    if (typeof window === 'undefined') return 'bandauto.com'
-    const isDev = window.location.hostname === 'localhost' || window.location.hostname.includes('lvh.me')
-    return isDev ? 'lvh.me:3000' : 'bandauto.com'
+    return process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'
   }, [])
 
   const getShopUrl = useCallback((subdomainValue: string) => {
@@ -450,13 +448,19 @@ export default function ShopDetailPage({
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-1">서브도메인</label>
                   {isEditMode ? (
-                    <Input
-                      value={subdomain}
-                      onChange={(e) => setSubdomain(e.target.value.toLowerCase())}
-                      placeholder="myshop"
-                    />
+                    <div className="flex items-center">
+                      <Input
+                        value={subdomain}
+                        onChange={(e) => setSubdomain(e.target.value.toLowerCase())}
+                        placeholder="myshop"
+                        className="rounded-r-none"
+                      />
+                      <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-500 text-sm whitespace-nowrap">
+                        .{shopBaseDomain}
+                      </span>
+                    </div>
                   ) : (
-                    <p className="text-gray-900 font-mono">{shop.subdomain}</p>
+                    <p className="text-gray-900 font-mono">{shop.subdomain}<span className="text-gray-400">.{shopBaseDomain}</span></p>
                   )}
                 </div>
                 <div>
@@ -547,17 +551,6 @@ export default function ShopDetailPage({
                         {shop.isActive ? '활성화됨' : '비활성화됨'}
                       </span>
                     </div>
-                    {shop.isActive && (
-                      <a
-                        href={`https://${shop.subdomain}.bandauto.com`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        쇼핑몰 방문
-                        <ExternalLink size={14} />
-                      </a>
-                    )}
                   </div>
                 )}
               </div>

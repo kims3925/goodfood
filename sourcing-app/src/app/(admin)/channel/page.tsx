@@ -419,13 +419,12 @@ function ChannelListContent() {
                     />
                   </TableHead>
                   <TableHead className="w-[5%]">순서</TableHead>
-                  <TableHead className="w-[22%]">채널명</TableHead>
-                  <TableHead className="w-[10%]">유형</TableHead>
-                  <TableHead className="w-[10%]">플랫폼</TableHead>
-                  <TableHead className="w-[12%]">채널키</TableHead>
+                  <TableHead className="w-[26%]">채널명</TableHead>
+                  <TableHead className="w-[12%]">플랫폼</TableHead>
+                  <TableHead className="w-[12%]">유형</TableHead>
                   <TableHead className="w-[8%]">상태</TableHead>
-                  <TableHead className="w-[14%]">생성일</TableHead>
-                  <TableHead className="w-[14%]">수정일</TableHead>
+                  <TableHead className="w-[16%]">생성일</TableHead>
+                  <TableHead className="w-[16%]">수정일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -469,15 +468,10 @@ function ChannelListContent() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{getKindBadge(channel.kind)}</TableCell>
                       <TableCell>
                         <span className="text-gray-600">{getPlatformLabel(channel.platform)}</span>
                       </TableCell>
-                      <TableCell>
-                        <span className="text-gray-500 text-sm font-mono truncate block max-w-[120px]">
-                          {channel.channelKey}
-                        </span>
-                      </TableCell>
+                      <TableCell>{getKindBadge(channel.kind)}</TableCell>
                       <TableCell>{getStatusBadge(channel.isActive)}</TableCell>
                       <TableCell>
                         <span className="text-sm text-gray-600">

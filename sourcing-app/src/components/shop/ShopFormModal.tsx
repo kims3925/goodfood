@@ -83,7 +83,7 @@ export default function ShopFormModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validation
+    // Validation - 기본 정보
     if (!subdomain.trim()) {
       toast.error('서브도메인을 입력해주세요.')
       return
@@ -98,6 +98,56 @@ export default function ShopFormModal({
     const subdomainRegex = /^[a-z0-9-]+$/
     if (!subdomainRegex.test(subdomain)) {
       toast.error('서브도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.')
+      return
+    }
+
+    if (!coverUrl.trim()) {
+      toast.error('커버 이미지를 업로드해주세요.')
+      return
+    }
+
+    // Validation - 계좌 정보
+    if (!bankName.trim()) {
+      toast.error('은행명을 입력해주세요.')
+      return
+    }
+
+    if (!bankAccount.trim()) {
+      toast.error('계좌번호를 입력해주세요.')
+      return
+    }
+
+    if (!accountHolder.trim()) {
+      toast.error('예금주를 입력해주세요.')
+      return
+    }
+
+    // Validation - 배송 설정
+    if (!freeShippingAmount.trim()) {
+      toast.error('무료배송 기준금액을 입력해주세요.')
+      return
+    }
+
+    if (!defaultShippingFee.trim()) {
+      toast.error('기본 배송비를 입력해주세요.')
+      return
+    }
+
+    // Validation - 연락처 정보
+    if (!contactPhone.trim()) {
+      toast.error('연락처를 입력해주세요.')
+      return
+    }
+
+    if (!contactEmail.trim()) {
+      toast.error('이메일을 입력해주세요.')
+      return
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(contactEmail)) {
+      toast.error('올바른 이메일 형식을 입력해주세요.')
       return
     }
 
@@ -196,7 +246,7 @@ export default function ShopFormModal({
                       placeholder="myshop"
                       className="flex-1"
                     />
-                    <span className="text-gray-500 text-sm whitespace-nowrap">.bandauto.com</span>
+                    <span className="text-gray-500 text-sm whitespace-nowrap">.{process.env.NEXT_PUBLIC_DOMAIN}</span>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">영문 소문자, 숫자, 하이픈만 사용</p>
                 </div>
@@ -217,6 +267,7 @@ export default function ShopFormModal({
                     value={coverUrl}
                     onChange={(url) => setCoverUrl(url)}
                     placeholder="커버 이미지를 업로드하세요"
+                    required
                   />
                 </div>
               </div>
@@ -231,7 +282,7 @@ export default function ShopFormModal({
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    은행명
+                    은행명 <span className="text-red-500">*</span>
                   </label>
                   <Input
                     type="text"
@@ -242,7 +293,7 @@ export default function ShopFormModal({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    계좌번호
+                    계좌번호 <span className="text-red-500">*</span>
                   </label>
                   <Input
                     type="text"
@@ -253,7 +304,7 @@ export default function ShopFormModal({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    예금주
+                    예금주 <span className="text-red-500">*</span>
                   </label>
                   <Input
                     type="text"
@@ -274,7 +325,7 @@ export default function ShopFormModal({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    무료배송 기준금액
+                    무료배송 기준금액 <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <Input
@@ -289,7 +340,7 @@ export default function ShopFormModal({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    기본 배송비
+                    기본 배송비 <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <Input
@@ -314,7 +365,7 @@ export default function ShopFormModal({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    연락처
+                    연락처 <span className="text-red-500">*</span>
                   </label>
                   <Input
                     type="text"
@@ -325,7 +376,7 @@ export default function ShopFormModal({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    이메일
+                    이메일 <span className="text-red-500">*</span>
                   </label>
                   <Input
                     type="email"

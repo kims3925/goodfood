@@ -193,12 +193,10 @@ export class PublishService {
       // 7. 장바구니 링크 댓글 작성 (연결된 Shop이 있는 경우만)
       if (channel.shop?.subdomain && channel.shop.isActive) {
         try {
-          // 서브도메인 기반 Shop URL 생성
-          const isDev = process.env.NODE_ENV !== 'production'
-          const rootDomain = process.env.SHOP_ROOT_DOMAIN || 'bandauto.com'
-          const shopUrl = isDev
-            ? `http://${channel.shop.subdomain}.lvh.me:3000`
-            : `https://${channel.shop.subdomain}.${rootDomain}`
+          // 서브도메인 기반 Shop URL 생성 (.env의 NEXT_PUBLIC_DOMAIN 사용)
+          const baseDomain = process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'
+          const protocol = baseDomain.includes('lvh.me') || baseDomain.includes('localhost') ? 'http' : 'https'
+          const shopUrl = `${protocol}://${channel.shop.subdomain}.${baseDomain}`
 
           const cartLink = `${shopUrl}/cart?add=${publishedProduct.id}`
           const commentContent = `🛒 장바구니에 담기 👉 ${cartLink}`

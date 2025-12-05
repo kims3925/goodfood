@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Store, Save, Trash2, Edit, X, Calendar, Link2, CreditCard, Building2, User, Power, Globe, Tag, Palette, Mail, Phone, Truck, ShoppingCart, Image, FileText } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -111,6 +111,11 @@ export default function ChannelDetailPage({
   const [faviconUrl, setFaviconUrl] = useState('')
   const [bannerUrl, setBannerUrl] = useState('')
   const [footerText, setFooterText] = useState('')
+
+  // Shop URL 도메인 (.env의 NEXT_PUBLIC_DOMAIN 사용)
+  const shopBaseDomain = useMemo(() => {
+    return process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'
+  }, [])
 
   // Shop 목록 로드
   const loadShops = useCallback(async () => {
@@ -437,216 +442,203 @@ export default function ChannelDetailPage({
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* 2컬럼 레이아웃 */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* 왼쪽: 채널 프로필 */}
-          <div className="lg:col-span-4">
-            <div className="lg:sticky lg:top-24 space-y-6">
-              {/* 프로필 카드 */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                {/* 커버 이미지 */}
-                <div className="relative">
-                  {channel.coverUrl ? (
-                    <img
-                      src={channel.coverUrl}
-                      alt={channel.name}
-                      className="w-full aspect-video object-cover"
-                    />
-                  ) : (
-                    <div className="w-full aspect-video bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
-                      <Store size={64} className="text-slate-400" />
+          {/* 채널 정보 카드 - 전체 통합 */}
+          <div className="lg:col-span-12">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              {/* 헤더 영역 */}
+              <div className="p-5 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-blue-100 rounded-xl">
+                      <Store size={22} className="text-blue-600" />
                     </div>
+                    <div>
+                      <h2 className="font-bold text-lg text-slate-900">채널 정보</h2>
+                      <p className="text-sm text-slate-500">채널의 기본 정보와 설정을 관리합니다</p>
+                    </div>
+                  </div>
+                  {/* 활성화 토글 */}
+                  {isEditMode ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsActive(!isActive)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all shadow-sm ${
+                        isActive
+                          ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                          : 'bg-slate-400 text-white hover:bg-slate-500'
+                      }`}
+                    >
+                      <Power size={16} />
+                      {isActive ? '활성' : '비활성'}
+                    </button>
+                  ) : (
+                    getStatusBadge(channel.isActive)
                   )}
-                  {/* 상태 오버레이 */}
-                  <div className="absolute top-3 right-3">
-                    {isEditMode ? (
-                      <button
-                        type="button"
-                        onClick={() => setIsActive(!isActive)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all shadow-lg ${
-                          isActive
-                            ? 'bg-emerald-500 text-white hover:bg-emerald-600'
-                            : 'bg-slate-500 text-white hover:bg-slate-600'
-                        }`}
-                      >
-                        <Power size={14} />
-                        {isActive ? '활성' : '비활성'}
-                      </button>
-                    ) : (
-                      getStatusBadge(channel.isActive)
+                </div>
+              </div>
+
+              <div className="p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                  {/* 왼쪽: 커버 이미지 & 기본 정보 */}
+                  <div className="lg:col-span-4">
+                    {/* 채널명 */}
+                    <div className="flex items-start justify-between gap-3 mb-5">
+                      <div className="flex-1 min-w-0">
+                        {isEditMode ? (
+                          <Input
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="채널명을 입력하세요"
+                            className="!text-lg !font-bold !rounded-xl"
+                          />
+                        ) : (
+                          <h1 className="text-xl font-bold text-slate-900 truncate">{channel.name}</h1>
+                        )}
+                      </div>
+                      {getKindBadge(channel.kind)}
+                    </div>
+
+                    {/* 커버 이미지 */}
+                    <div className="rounded-xl overflow-hidden mb-5">
+                      {channel.coverUrl ? (
+                        <img
+                          src={channel.coverUrl}
+                          alt={channel.name}
+                          className="w-full aspect-video object-cover"
+                        />
+                      ) : (
+                        <div className="w-full aspect-video bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
+                          <Store size={48} className="text-slate-400" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 날짜 정보 */}
+                    <div className="bg-slate-50 rounded-xl p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Calendar size={14} className="text-slate-400" />
+                          <div>
+                            <p className="text-slate-400 text-xs">생성일</p>
+                            <p className="text-slate-600 text-xs">{formatDateTimeKST(channel.createdAt)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Calendar size={14} className="text-slate-400" />
+                          <div>
+                            <p className="text-slate-400 text-xs">수정일</p>
+                            <p className="text-slate-600 text-xs">{formatDateTimeKST(channel.updatedAt)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 오른쪽: 상세 설정 */}
+                  <div className={`lg:col-span-8 flex flex-col gap-6 ${channel.kind === 'WHOLESALE' ? 'justify-center' : ''}`}>
+                    {/* 채널 메타 정보 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
+                        <div className="flex items-center justify-center w-10 h-10 bg-white rounded-lg shadow-sm">
+                          <Globe size={18} className="text-slate-500" />
+                        </div>
+                        <div>
+                          <p className="text-slate-500 text-xs">플랫폼</p>
+                          <p className="font-semibold text-slate-900">{PLATFORM_LABELS[channel.platform] || channel.platform}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
+                        <div className="flex items-center justify-center w-10 h-10 bg-white rounded-lg shadow-sm">
+                          <Link2 size={18} className="text-slate-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-slate-500 text-xs">채널키</p>
+                          <p className="font-mono text-sm text-slate-700 truncate">{channel.channelKey}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 커버 이미지 URL */}
+                    <div className="p-4 bg-slate-50 rounded-xl">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        <div className="flex items-center gap-2">
+                          <Image size={16} className="text-slate-500" />
+                          커버 이미지 URL
+                        </div>
+                      </label>
+                      {isEditMode ? (
+                        <>
+                          <Input
+                            type="text"
+                            value={coverUrl}
+                            onChange={(e) => setCoverUrl(e.target.value)}
+                            placeholder="https://example.com/image.jpg"
+                            className="!rounded-xl !bg-white"
+                          />
+                          <p className="mt-2 text-xs text-slate-500">
+                            채널 목록과 상세 페이지에 표시되는 대표 이미지입니다.
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-slate-700 text-sm break-all font-mono bg-white rounded-lg p-3 border border-slate-100">
+                          {channel.coverUrl || '(설정되지 않음)'}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Shop 연결 (소매 채널만) */}
+                    {channel.kind === 'RETAIL' && (
+                      <div className="p-4 bg-indigo-50 rounded-xl">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Store size={16} className="text-indigo-600" />
+                          <span className="text-sm font-semibold text-slate-700">Shop 연결</span>
+                          <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                            소매 채널
+                          </span>
+                        </div>
+                        {isEditMode ? (
+                          <>
+                            <select
+                              value={selectedShopId || ''}
+                              onChange={(e) => setSelectedShopId(e.target.value ? parseInt(e.target.value) : null)}
+                              className="w-full px-4 py-3 border border-indigo-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                            >
+                              <option value="">Shop을 선택하세요</option>
+                              {shops.map((shop) => (
+                                <option key={shop.id} value={shop.id}>
+                                  {shop.name} ({shop.subdomain}.{shopBaseDomain})
+                                </option>
+                              ))}
+                            </select>
+                            <p className="mt-2 text-xs text-slate-500">
+                              이 채널에서 발행할 때 연결될 Shop을 선택합니다.
+                            </p>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-3 bg-white rounded-lg p-3 border border-indigo-100">
+                            <div className="flex items-center justify-center w-10 h-10 bg-indigo-100 rounded-lg">
+                              <Store size={18} className="text-indigo-600" />
+                            </div>
+                            <div>
+                              {channel.shop ? (
+                                <>
+                                  <p className="font-medium text-slate-900">{channel.shop.name}</p>
+                                  <p className="text-sm text-indigo-600 font-mono">{channel.shop.subdomain}.{shopBaseDomain}</p>
+                                </>
+                              ) : (
+                                <p className="text-slate-400">연결된 Shop이 없습니다</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
-
-                {/* 채널 기본 정보 */}
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-3 mb-4">
-                    <div className="flex-1 min-w-0">
-                      {isEditMode ? (
-                        <Input
-                          type="text"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder="채널명을 입력하세요"
-                          className="!text-lg !font-bold !rounded-xl"
-                        />
-                      ) : (
-                        <h1 className="text-xl font-bold text-slate-900 truncate">{channel.name}</h1>
-                      )}
-                    </div>
-                    {getKindBadge(channel.kind)}
-                  </div>
-
-                  {/* 메타 정보 */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 text-sm">
-                      <div className="flex items-center justify-center w-8 h-8 bg-slate-100 rounded-lg">
-                        <Globe size={16} className="text-slate-500" />
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs">플랫폼</p>
-                        <p className="font-medium text-slate-900">{PLATFORM_LABELS[channel.platform] || channel.platform}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 text-sm">
-                      <div className="flex items-center justify-center w-8 h-8 bg-slate-100 rounded-lg">
-                        <Link2 size={16} className="text-slate-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-slate-500 text-xs">채널키</p>
-                        <p className="font-mono text-xs text-slate-700 truncate">{channel.channelKey}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 날짜 정보 */}
-                <div className="px-5 py-4 bg-slate-50/50 border-t border-slate-100">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar size={14} className="text-slate-400" />
-                      <div>
-                        <p className="text-slate-400 text-xs">생성일</p>
-                        <p className="text-slate-600 text-xs">{formatDateTimeKST(channel.createdAt)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar size={14} className="text-slate-400" />
-                      <div>
-                        <p className="text-slate-400 text-xs">수정일</p>
-                        <p className="text-slate-600 text-xs">{formatDateTimeKST(channel.updatedAt)}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
-          </div>
-
-          {/* 오른쪽: 상세 설정 */}
-          <div className="lg:col-span-8 space-y-6">
-            {/* 기본 설정 카드 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Tag size={18} className="text-blue-600" />
-                  </div>
-                  <span className="font-semibold text-slate-900">기본 설정</span>
-                </div>
-              </div>
-
-              <div className="p-6 space-y-5">
-                {/* 커버 이미지 URL */}
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    커버 이미지 URL
-                  </label>
-                  {isEditMode ? (
-                    <Input
-                      type="text"
-                      value={coverUrl}
-                      onChange={(e) => setCoverUrl(e.target.value)}
-                      placeholder="https://example.com/image.jpg"
-                      className="!rounded-xl"
-                    />
-                  ) : (
-                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                      <p className="text-slate-700 text-sm break-all font-mono">
-                        {channel.coverUrl || '(설정되지 않음)'}
-                      </p>
-                    </div>
-                  )}
-                  {isEditMode && (
-                    <p className="mt-2 text-xs text-slate-500">
-                      채널 목록과 상세 페이지에 표시되는 대표 이미지입니다.
-                    </p>
-                  )}
-                </div>
-
-              </div>
-            </div>
-
-            {/* Shop 연결 카드 (소매 채널만) */}
-            {channel.kind === 'RETAIL' && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-indigo-100 rounded-lg">
-                      <Store size={18} className="text-indigo-600" />
-                    </div>
-                    <span className="font-semibold text-slate-900">Shop 연결</span>
-                    <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
-                      소매 채널
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-6">
-                  {isEditMode ? (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                          연결할 Shop 선택
-                        </label>
-                        <select
-                          value={selectedShopId || ''}
-                          onChange={(e) => setSelectedShopId(e.target.value ? parseInt(e.target.value) : null)}
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
-                        >
-                          <option value="">Shop을 선택하세요</option>
-                          {shops.map((shop) => (
-                            <option key={shop.id} value={shop.id}>
-                              {shop.name} ({shop.subdomain}.lvh.me)
-                            </option>
-                          ))}
-                        </select>
-                        <p className="mt-2 text-xs text-slate-500">
-                          이 채널에서 발행할 때 연결될 Shop을 선택합니다. 발행 시 이 Shop의 장바구니 링크가 댓글로 추가됩니다.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-start gap-3">
-                      <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                        <Store size={18} className="text-slate-500" />
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs mb-1">연결된 Shop</p>
-                        {channel.shop ? (
-                          <div>
-                            <p className="font-medium text-slate-900">{channel.shop.name}</p>
-                            <p className="text-sm text-indigo-600 font-mono">{channel.shop.subdomain}.lvh.me</p>
-                          </div>
-                        ) : (
-                          <p className="text-slate-400">연결된 Shop이 없습니다</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
           </div>
         </div>
       </div>
