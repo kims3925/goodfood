@@ -22,6 +22,10 @@ export interface UnifiedOrder {
   deliveryMemo?: string
   // 결제 정보
   paymentMethod?: string
+  // Shop 정보
+  shopId?: number | null
+  shopName?: string | null
+  shopSubdomain?: string | null
 }
 
 // 상태 라벨 매핑
@@ -55,10 +59,23 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const source = searchParams.get('source') as OrderSource | 'ALL' | null // ALL, SHOPPING_MALL, GOOGLE_FORM
     const status = searchParams.get('status') || ''
+    const shopId = searchParams.get('shopId')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
 
     const unifiedOrders: UnifiedOrder[] = []
+
+    // 상태별 카운트 (필터 무관하게 전체 카운트)
+    const statusCounts = {
+      total: 0,
+      PENDING: 0,
+      PAID: 0,
+      PREPARING: 0,
+      SHIPPED: 0,
+      DELIVERED: 0,
+      CANCELLED: 0, // CANCELLED + REFUNDED
+      RECEIVED: 0, // 밴드 주문
+    }
 
     // 1. 쇼핑몰 주문 조회 (source가 ALL 또는 SHOPPING_MALL인 경우)
     // Order.userId는 고객 ID이므로, PublishedProduct를 통해 관리자의 상품이 포함된 주문을 조회
@@ -72,6 +89,46 @@ export async function GET(request: NextRequest) {
         const publishedProductIds = userPublishedProducts.map(pp => pp.id)
 
         if (publishedProductIds.length > 0) {
+          // 상태별 카운트 조회 (shopId, search 필터 적용, status 필터 제외)
+          const countBaseWhere: any = {
+            items: {
+              some: {
+                publishedProductId: { in: publishedProductIds },
+              },
+            },
+          }
+          if (shopId) {
+            countBaseWhere.shopId = parseInt(shopId)
+          }
+          if (search) {
+            countBaseWhere.OR = [
+              { orderNumber: { contains: search } },
+              { recipientName: { contains: search } },
+              { recipientPhone: { contains: search } },
+            ]
+          }
+
+          try {
+            const [pendingCount, paidCount, preparingCount, shippedCount, deliveredCount, cancelledCount, refundedCount] = await Promise.all([
+              prisma.order.count({ where: { ...countBaseWhere, status: 'PENDING' } }),
+              prisma.order.count({ where: { ...countBaseWhere, status: 'PAID' } }),
+              prisma.order.count({ where: { ...countBaseWhere, status: 'PREPARING' } }),
+              prisma.order.count({ where: { ...countBaseWhere, status: 'SHIPPED' } }),
+              prisma.order.count({ where: { ...countBaseWhere, status: 'DELIVERED' } }),
+              prisma.order.count({ where: { ...countBaseWhere, status: 'CANCELLED' } }),
+              prisma.order.count({ where: { ...countBaseWhere, status: 'REFUNDED' } }),
+            ])
+
+            statusCounts.PENDING = pendingCount
+            statusCounts.PAID = paidCount
+            statusCounts.PREPARING = preparingCount
+            statusCounts.SHIPPED = shippedCount
+            statusCounts.DELIVERED = deliveredCount
+            statusCounts.CANCELLED = cancelledCount + refundedCount
+          } catch (countError) {
+            console.error('상태별 카운트 조회 실패:', countError)
+          }
+
           const shopOrders = await prisma.order.findMany({
             where: {
               // 관리자가 발행한 상품이 포함된 주문 조회
@@ -80,6 +137,7 @@ export async function GET(request: NextRequest) {
                   publishedProductId: { in: publishedProductIds },
                 },
               },
+              ...(shopId && { shopId: parseInt(shopId) }),
               ...(search && {
                 OR: [
                   { orderNumber: { contains: search } },
@@ -87,9 +145,18 @@ export async function GET(request: NextRequest) {
                   { recipientPhone: { contains: search } },
                 ],
               }),
-              ...(status && { status: status as any }),
+              ...(status && status === 'CANCELLED'
+                ? { status: { in: ['CANCELLED', 'REFUNDED'] } }
+                : status ? { status: status as any } : {}),
             },
             include: {
+              shop: {
+                select: {
+                  id: true,
+                  name: true,
+                  subdomain: true,
+                },
+              },
               items: {
                 select: {
                   productName: true,
@@ -125,6 +192,9 @@ export async function GET(request: NextRequest) {
               address: `${order.address} ${order.addressDetail || ''}`.trim(),
               deliveryMemo: order.deliveryMemo || undefined,
               paymentMethod: order.payment?.method || undefined,
+              shopId: order.shop?.id || null,
+              shopName: order.shop?.name || null,
+              shopSubdomain: order.shop?.subdomain || null,
             })
           }
         }
@@ -134,48 +204,57 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 2. 구글폼 주문 조회 (source가 ALL 또는 GOOGLE_FORM인 경우)
-    if (!source || source === 'ALL' || source === 'GOOGLE_FORM') {
+    // 2. 구글폼 주문 조회 (source가 ALL 또는 GOOGLE_FORM인 경우, shopId 필터가 없을 때만)
+    if ((!source || source === 'ALL' || source === 'GOOGLE_FORM') && !shopId) {
       try {
-        const formOrders = await prisma.orderTest.findMany({
-          where: {
-            userId: user.userId,
-            ...(search && {
-              OR: [
-                { productName: { contains: search } },
-                { customerName: { contains: search } },
-              ],
-            }),
-          },
-          include: {
-            publishedProduct: {
-              include: {
-                product: {
-                  select: {
-                    name: true,
-                    thumbnailUrl: true,
+        const bandOrderBaseWhere = {
+          userId: user.userId,
+          ...(search && {
+            OR: [
+              { productName: { contains: search } },
+              { customerName: { contains: search } },
+            ],
+          }),
+        }
+
+        // 밴드 주문 카운트 (status 필터와 무관)
+        const bandOrderCount = await prisma.orderTest.count({ where: bandOrderBaseWhere })
+        statusCounts.RECEIVED = bandOrderCount
+
+        // status 필터가 없거나 RECEIVED인 경우에만 밴드 주문 조회
+        if (!status || status === 'RECEIVED') {
+          const formOrders = await prisma.orderTest.findMany({
+            where: bandOrderBaseWhere,
+            include: {
+              publishedProduct: {
+                include: {
+                  product: {
+                    select: {
+                      name: true,
+                      thumbnailUrl: true,
+                    },
                   },
                 },
               },
             },
-          },
-          orderBy: { createdAt: 'desc' },
-        })
-
-        for (const order of formOrders) {
-          unifiedOrders.push({
-            id: order.id,
-            source: 'GOOGLE_FORM',
-            orderNumber: `BAND-${String(order.id).padStart(6, '0')}`,
-            customerName: order.customerName,
-            customerPhone: null,
-            productSummary: order.publishedProduct?.product?.name || order.productName,
-            itemCount: 1,
-            totalAmount: order.totalPrice || 0,
-            status: 'RECEIVED',
-            statusLabel: '주문접수',
-            createdAt: order.createdAt.toISOString(),
+            orderBy: { createdAt: 'desc' },
           })
+
+          for (const order of formOrders) {
+            unifiedOrders.push({
+              id: order.id,
+              source: 'GOOGLE_FORM',
+              orderNumber: `BAND-${String(order.id).padStart(6, '0')}`,
+              customerName: order.customerName,
+              customerPhone: null,
+              productSummary: order.publishedProduct?.product?.name || order.productName,
+              itemCount: 1,
+              totalAmount: order.totalPrice || 0,
+              status: 'RECEIVED',
+              statusLabel: '주문접수',
+              createdAt: order.createdAt.toISOString(),
+            })
+          }
         }
       } catch (formOrderError) {
         console.error('밴드 주문 조회 실패:', formOrderError)
@@ -188,6 +267,11 @@ export async function GET(request: NextRequest) {
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
 
+    // 전체 카운트 계산
+    statusCounts.total = statusCounts.PENDING + statusCounts.PAID + statusCounts.PREPARING +
+                         statusCounts.SHIPPED + statusCounts.DELIVERED + statusCounts.CANCELLED +
+                         statusCounts.RECEIVED
+
     // 페이지네이션
     const total = unifiedOrders.length
     const totalPages = Math.ceil(total / limit) || 1
@@ -197,6 +281,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         orders: paginatedOrders,
+        statusCounts,
         pagination: {
           page,
           limit,

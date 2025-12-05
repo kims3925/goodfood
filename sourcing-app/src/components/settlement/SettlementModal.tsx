@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button'
 interface SettlementModalProps {
   channelId: number
   channelName: string
+  shopId?: number  // Shop ID (Shop 기준 정산용)
   onClose: () => void
   onSuccess: () => void
 }
@@ -14,6 +15,7 @@ interface SettlementModalProps {
 export default function SettlementModal({
   channelId,
   channelName,
+  shopId,
   onClose,
   onSuccess,
 }: SettlementModalProps) {
@@ -43,6 +45,7 @@ export default function SettlementModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          shopId: shopId || channelId,  // Shop ID 우선 사용
           channelId,
           periodStart,
           periodEnd,
@@ -105,10 +108,10 @@ export default function SettlementModal({
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {/* 소매밴드 */}
+          {/* 쇼핑몰 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              소매밴드
+              쇼핑몰
             </label>
             <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700">
               {channelName}

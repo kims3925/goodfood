@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@bandauto/db'
+import { prisma, ChannelKind } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 // GET: 발행상품 목록 조회 (Product 기준 그룹핑)
@@ -77,6 +77,30 @@ export async function GET(request: NextRequest) {
     console.log('Published Product API - where:', JSON.stringify(where, null, 2))
     console.log('Published Product API - page:', page, 'limit:', limit, 'skip:', skip)
 
+    // Shop → Channel 매핑을 위해 RETAIL 채널 조회
+    const retailChannels = await prisma.channel.findMany({
+      where: {
+        userId: currentUser.userId,
+        kind: ChannelKind.RETAIL,
+        shopId: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        coverUrl: true,
+        platform: true,
+        shopId: true,
+      },
+    })
+
+    // Shop ID → Channel 매핑 생성
+    const shopToChannelMap = new Map<number, typeof retailChannels[0]>()
+    for (const channel of retailChannels) {
+      if (channel.shopId && !shopToChannelMap.has(channel.shopId)) {
+        shopToChannelMap.set(channel.shopId, channel)
+      }
+    }
+
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
@@ -106,6 +130,13 @@ export async function GET(request: NextRequest) {
                   platform: true,
                 },
               },
+              shop: {
+                select: {
+                  id: true,
+                  name: true,
+                  subdomain: true,
+                },
+              },
             },
             orderBy: { createdAt: 'desc' },
           },
@@ -126,16 +157,37 @@ export async function GET(request: NextRequest) {
         thumbnailUrl: product.thumbnailUrl,
         collectedProduct: product.collectedProduct,
       },
-      publishedChannels: product.publishedProducts.map((pp) => ({
-        publishId: pp.id,
-        channelId: pp.channelId,
-        channelName: pp.channel?.name || null,
-        channelCoverUrl: pp.channel?.coverUrl || null,
-        platform: pp.channel?.platform || null,
-        publishedAt: pp.publishedAt,
-        createdAt: pp.createdAt,
-        updatedAt: pp.updatedAt,
-      })),
+      publishedChannels: product.publishedProducts.map((pp) => {
+        // channelId가 있으면 직접 channel 사용
+        // 없으면 shopId로 연결된 channel 조회
+        let channelInfo = pp.channel
+        if (!channelInfo && pp.shopId) {
+          const linkedChannel = shopToChannelMap.get(pp.shopId)
+          if (linkedChannel) {
+            channelInfo = {
+              id: linkedChannel.id,
+              name: linkedChannel.name,
+              coverUrl: linkedChannel.coverUrl,
+              platform: linkedChannel.platform,
+            }
+          }
+        }
+
+        return {
+          publishId: pp.id,
+          channelId: channelInfo?.id || pp.channelId,
+          channelName: channelInfo?.name || null,
+          channelCoverUrl: channelInfo?.coverUrl || null,
+          platform: channelInfo?.platform || null,
+          // Shop 정보도 함께 반환
+          shopId: pp.shopId,
+          shopName: pp.shop?.name || null,
+          shopSubdomain: pp.shop?.subdomain || null,
+          publishedAt: pp.publishedAt,
+          createdAt: pp.createdAt,
+          updatedAt: pp.updatedAt,
+        }
+      }),
       latestPublishedAt: product.publishedProducts[0]?.publishedAt || product.publishedProducts[0]?.createdAt,
       createdAt: product.createdAt,
     }))

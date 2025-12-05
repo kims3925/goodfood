@@ -68,6 +68,7 @@ enum PublishStatus {
 enum CustomerOrderStatus {
   PENDING
   PAID
+  PREPARING
   SHIPPED
   DELIVERED
   CANCELLED
