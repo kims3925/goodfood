@@ -151,7 +151,7 @@ export class OrderService {
     }
 
     // 장바구니 조회
-    const cart = await this.cartService.getCartByUserId(userId)
+    const cart = await this.cartService.getCartByUserId(userId, shopId ?? null)
 
     if (!cart || cart.items.length === 0) {
       throw new BusinessLogicError('장바구니가 비어있습니다')

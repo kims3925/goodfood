@@ -36,6 +36,7 @@ function getSessionId(req: NextRequest): string | null {
 interface OrderPrepareData {
   orderId: string
   userId: number
+  shopId?: number | null
   fromCart: boolean
   items?: { publishedProductId: number; variantId?: number; quantity: number }[]
   customerInfo: {
@@ -51,6 +52,12 @@ interface OrderPrepareData {
     addressDetail?: string
     deliveryMemo?: string
   }
+}
+
+// Shop ID 가져오기 (미들웨어에서 설정)
+function getShopId(req: NextRequest): number | null {
+  const shopIdHeader = req.headers.get('x-shop-id')
+  return shopIdHeader ? parseInt(shopIdHeader) : null
 }
 
 /**
@@ -111,6 +118,9 @@ export async function POST(req: NextRequest) {
     let orderItems: any[] = []
     let totalAmount = 0
 
+    // Shop ID 가져오기
+    const shopId = getShopId(req)
+
     if (fromCart) {
       // 장바구니에서 주문
       const sessionId = getSessionId(req)
@@ -118,7 +128,7 @@ export async function POST(req: NextRequest) {
       let cart = null
       if (currentUserId) {
         cart = await prisma.cart.findFirst({
-          where: { userId: currentUserId },
+          where: { userId: currentUserId, shopId },
           include: {
             items: {
               include: {
@@ -136,7 +146,7 @@ export async function POST(req: NextRequest) {
         })
       } else if (sessionId) {
         cart = await prisma.cart.findFirst({
-          where: { sessionId, userId: null },
+          where: { sessionId, userId: null, shopId },
           include: {
             items: {
               include: {
@@ -244,6 +254,7 @@ export async function POST(req: NextRequest) {
     const prepareData: OrderPrepareData = {
       orderId,
       userId,
+      shopId,
       fromCart,
       items: fromCart ? undefined : items,
       customerInfo: {

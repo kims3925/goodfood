@@ -891,7 +891,7 @@ export default function PublishPage() {
                 <Button
                   className="flex-1"
                   onClick={() => {
-                    router.push(`/product/${warningProduct.id}`)
+                    router.push(`/product/detail/${warningProduct.id}`)
                   }}
                 >
                   <ExternalLink size={16} className="mr-2" />

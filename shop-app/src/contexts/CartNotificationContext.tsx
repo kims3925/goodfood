@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
 
 interface NotificationProduct {
   title: string
@@ -12,8 +12,10 @@ interface NotificationProduct {
 interface CartNotificationContextType {
   isVisible: boolean
   product: NotificationProduct | null
+  cartCount: number
   showNotification: (product: NotificationProduct) => void
   hideNotification: () => void
+  refreshCartCount: () => Promise<void>
 }
 
 const CartNotificationContext = createContext<CartNotificationContextType | undefined>(undefined)
@@ -22,6 +24,32 @@ export function CartNotificationProvider({ children }: { children: ReactNode }) 
   const [isVisible, setIsVisible] = useState(false)
   const [product, setProduct] = useState<NotificationProduct | null>(null)
   const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null)
+  const [cartCount, setCartCount] = useState(0)
+
+  // 장바구니 수량 조회
+  const refreshCartCount = useCallback(async () => {
+    try {
+      const sessionId = localStorage.getItem('sessionId')
+      if (sessionId) {
+        const response = await fetch(`/api/cart?sessionId=${sessionId}`)
+        const data = await response.json()
+        if (data.success && data.cart?.items) {
+          // 상품 종류 수가 아닌 전체 수량 합계로 변경
+          const totalCount = data.cart.items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0)
+          setCartCount(totalCount)
+        } else {
+          setCartCount(0)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load cart count:', error)
+    }
+  }, [])
+
+  // 초기 로드 시 장바구니 수량 가져오기
+  useEffect(() => {
+    refreshCartCount()
+  }, [refreshCartCount])
 
   const showNotification = useCallback((productInfo: NotificationProduct) => {
     // 기존 타이머가 있으면 제거
@@ -50,7 +78,7 @@ export function CartNotificationProvider({ children }: { children: ReactNode }) 
   }, [timeoutId])
 
   return (
-    <CartNotificationContext.Provider value={{ isVisible, product, showNotification, hideNotification }}>
+    <CartNotificationContext.Provider value={{ isVisible, product, cartCount, showNotification, hideNotification, refreshCartCount }}>
       {children}
     </CartNotificationContext.Provider>
   )

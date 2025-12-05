@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
 import { Search, ShoppingCart, User, MapPin, Menu, ChevronDown, Phone, HelpCircle, MessageSquare, LogOut } from 'lucide-react'
-import { CartNotificationProvider } from '@/contexts/CartNotificationContext'
+import { CartNotificationProvider, useCartNotification } from '@/contexts/CartNotificationContext'
 import CartNotificationBubble from '@/components/cart/CartNotificationBubble'
 import { useShop } from '@/contexts/ShopContext'
 
@@ -15,7 +15,7 @@ function StoreLayoutContent({
 }) {
   const { data: session, status } = useSession()
   const { shop } = useShop()
-  const [cartCount, setCartCount] = useState(0)
+  const { cartCount } = useCartNotification()
   const [searchQuery, setSearchQuery] = useState('')
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
   const [isCustomerServiceOpen, setIsCustomerServiceOpen] = useState(false)
@@ -41,25 +41,7 @@ function StoreLayoutContent({
     return `https://${subdomain}.${rootDomain}/main`
   }
 
-  useEffect(() => {
-    // Load cart count from localStorage
-    const loadCartCount = async () => {
-      try {
-        const sessionId = localStorage.getItem('sessionId')
-        if (sessionId) {
-          const response = await fetch(`/api/cart?sessionId=${sessionId}`)
-          const data = await response.json()
-          if (data.success && data.cart?.items) {
-            setCartCount(data.cart.items.length)
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load cart:', error)
-      }
-    }
-    loadCartCount()
-  }, [])
-
+  
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     if (searchQuery.trim()) {

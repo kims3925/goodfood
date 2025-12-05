@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { ArrowLeft, Package, User, MapPin, CreditCard, Truck, Plus, Check, Building2, Wallet } from 'lucide-react'
+import { ArrowLeft, Package, User, MapPin, CreditCard, Truck, Plus, Check, Building2, Wallet, AlertCircle } from 'lucide-react'
 import TossPaymentWidget from '@/modules/payments/components/TossPaymentWidget'
 import { useShop } from '@/contexts/ShopContext'
 
@@ -88,6 +88,14 @@ function CheckoutContent() {
   const [tempOrderId, setTempOrderId] = useState<string>('') // 주문번호
   const [showPaymentWidget, setShowPaymentWidget] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // 에러 상태 및 섹션 ref
+  const [errors, setErrors] = useState<{
+    customerInfo?: string
+    shippingAddress?: string
+  }>({})
+  const customerInfoRef = useRef<HTMLDivElement>(null)
+  const shippingAddressRef = useRef<HTMLDivElement>(null)
 
   // Daum 우편번호 API (레이어 방식)
   const openAddressSearch = () => {
@@ -306,21 +314,43 @@ function CheckoutContent() {
       return
     }
 
-    // 폼 검증
+    // 에러 초기화
+    const newErrors: { customerInfo?: string; shippingAddress?: string } = {}
+
+    // 폼 검증 - 주문자 정보
     if (!formData.customerName || !formData.customerPhone) {
-      return
+      newErrors.customerInfo = '주문자 이름과 휴대폰 번호를 입력해주세요.'
     }
 
+    // 폼 검증 - 배송지 정보
     if (!formData.shippingAddress.address) {
-      return
+      newErrors.shippingAddress = '배송지 주소를 입력해주세요.'
     }
 
     const recipientName = formData.sameAsCustomer ? formData.customerName : formData.recipientName
     const recipientPhone = formData.sameAsCustomer ? formData.customerPhone : formData.recipientPhone
 
     if (!recipientName || !recipientPhone) {
+      if (!newErrors.shippingAddress) {
+        newErrors.shippingAddress = '수령인 정보를 입력해주세요.'
+      }
+    }
+
+    // 에러가 있으면 상태 업데이트 후 첫 번째 에러 섹션으로 스크롤
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+
+      // 첫 번째 에러 섹션으로 스크롤
+      if (newErrors.customerInfo && customerInfoRef.current) {
+        customerInfoRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      } else if (newErrors.shippingAddress && shippingAddressRef.current) {
+        shippingAddressRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
       return
     }
+
+    // 에러가 없으면 에러 상태 초기화
+    setErrors({})
 
     try {
       setIsSubmitting(true)
@@ -625,11 +655,17 @@ function CheckoutContent() {
                 </div>
 
                 {/* 주문자 정보 */}
-                <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+                <div ref={customerInfoRef} className="bg-white rounded-lg shadow-sm p-6 mb-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <User className="w-5 h-5 text-gray-600" />
                     주문자 정보
                   </h2>
+                  {errors.customerInfo && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <span className="text-sm">{errors.customerInfo}</span>
+                    </div>
+                  )}
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -671,11 +707,17 @@ function CheckoutContent() {
                 </div>
 
                 {/* 배송지 정보 */}
-                <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+                <div ref={shippingAddressRef} className="bg-white rounded-lg shadow-sm p-6 mb-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <MapPin className="w-5 h-5 text-gray-600" />
                     배송지 정보
                   </h2>
+                  {errors.shippingAddress && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <span className="text-sm">{errors.shippingAddress}</span>
+                    </div>
+                  )}
 
                   {/* 회원: 배송지 선택 */}
                   {session && addresses.length > 0 && (
