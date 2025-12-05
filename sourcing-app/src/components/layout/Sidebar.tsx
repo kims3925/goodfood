@@ -32,6 +32,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Target,
+  Truck,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -70,8 +71,9 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
       '/order': '주문서 관리',
       '/automation': '자동화 관리',
       '/settlement': '정산 관리',
-      '/cs': '고객 문의',
-      '/user': '사용자 관리',
+      '/cs': '고객 관리',
+      '/user': '고객 관리',
+      '/policy': '환경 설정',
       '/admin/settings': '환경 설정',
     }
 
@@ -179,9 +181,9 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
       icon: <ClipboardList size={20} />,
     },
     {
-      label: '정책 관리',
-      href: '/policy/list',
-      icon: <ScrollText size={20} />,
+      label: '도매처 발주',
+      href: '/wholesale-orders',
+      icon: <Truck size={20} />,
     },
     {
       label: '자동화 관리',
@@ -205,19 +207,30 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
       icon: <Calculator size={20} />,
     },
     {
-      label: '고객 문의',
-      href: '/cs/inquiry',
-      icon: <MessageSquare size={20} />,
-    },
-    {
-      label: '사용자 관리',
-      href: '/user/list',
+      label: '고객 관리',
       icon: <Users size={20} />,
+      children: [
+        {
+          label: '사용자 관리',
+          href: '/user/list',
+          icon: <Users size={16} />,
+        },
+        {
+          label: '고객 문의',
+          href: '/cs/inquiry',
+          icon: <MessageSquare size={16} />,
+        },
+      ],
     },
     {
       label: '환경 설정',
       icon: <Settings size={20} />,
       children: [
+        {
+          label: '정책 설정',
+          href: '/policy/list',
+          icon: <ScrollText size={16} />,
+        },
         {
           label: 'API 설정',
           href: '/admin/settings/api',

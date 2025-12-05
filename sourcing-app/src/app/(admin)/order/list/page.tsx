@@ -118,7 +118,6 @@ export default function UnifiedOrderListPage() {
       const data = await res.json()
 
       if (data.success) {
-        console.log('API 응답 statusCounts:', data.data.statusCounts)
         setOrders(data.data.orders)
         setTotalPages(data.data.pagination.totalPages)
         setTotal(data.data.pagination.total)

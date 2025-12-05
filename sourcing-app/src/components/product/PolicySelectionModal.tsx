@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ScrollText, Check, Sparkles, CircleOff } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ScrollText, Check, Sparkles, CircleOff, Settings } from 'lucide-react'
 import Modal, { ModalFooter } from '../ui/Modal'
 import Button from '../ui/Button'
 import Loading from '../ui/Loading'
@@ -27,6 +28,7 @@ export default function PolicySelectionModal({
   onPolicySelected,
   selectedPostCount,
 }: PolicySelectionModalProps) {
+  const router = useRouter()
   const [policies, setPolicies] = useState<PricingPolicy[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [selectedPolicyId, setSelectedPolicyId] = useState<number | null>(null)
@@ -169,7 +171,21 @@ export default function PolicySelectionModal({
             })}
           </div>
 
-          <ModalFooter className="mt-4">
+          {/* 정책 설정 페이지 이동 버튼 */}
+          <div className="border-t border-gray-200 pt-4 mb-4">
+            <button
+              onClick={() => {
+                onClose()
+                router.push('/policy/list')
+              }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg border border-gray-200 transition-colors"
+            >
+              <Settings size={16} />
+              정책 설정 페이지로 이동
+            </button>
+          </div>
+
+          <ModalFooter>
             <Button variant="secondary" onClick={onClose}>
               취소
             </Button>

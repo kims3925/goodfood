@@ -165,11 +165,14 @@ export class OrderService {
       const mainVariant = product.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || 0
 
+      // variant가 있으면 해당 옵션 사용, 없으면 첫 번째 variant의 옵션 사용
+      const optionSummary = variant?.optionSummary || mainVariant?.optionSummary || null
+
       return {
         publishedProductId: publishedProduct.id,
         variantId: variant?.id || null,
         productName: product.name,
-        optionSummary: variant?.optionSummary || null,
+        optionSummary,
         thumbnailUrl: product.thumbnailUrl,
         quantity: item.quantity,
         unitPrice: Number(unitPrice),
@@ -283,11 +286,14 @@ export class OrderService {
       const mainVariant = product.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || 0
 
+      // variant가 있으면 해당 옵션 사용, 없으면 첫 번째 variant의 옵션 사용
+      const optionSummary = variant?.optionSummary || mainVariant?.optionSummary || null
+
       orderItems.push({
         publishedProductId: publishedProduct.id,
         variantId: variant?.id || null,
         productName: product.name,
-        optionSummary: variant?.optionSummary || null,
+        optionSummary,
         thumbnailUrl: product.thumbnailUrl,
         quantity: item.quantity || 1,
         unitPrice: Number(unitPrice),
