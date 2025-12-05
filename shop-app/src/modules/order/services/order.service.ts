@@ -191,14 +191,16 @@ export class OrderService {
     // 주문 생성
     const orderInput: CreateOrderInput = {
       userId,
-      shopId,  // Shop 기반 주문 필터링
+      shopId,
       orderNumber: this.generateOrderNumber(),
-      recipientName: shippingAddress.recipientName || customerInfo.name,
-      recipientPhone: shippingAddress.recipientPhone || customerInfo.phone,
-      postalCode: shippingAddress.postalCode,
-      address: shippingAddress.address,
-      addressDetail: shippingAddress.addressDetail,
-      deliveryMemo: shippingAddress.deliveryMemo,
+      shippingAddress: {
+        recipient: shippingAddress.recipientName || customerInfo.name,
+        phone: shippingAddress.recipientPhone || customerInfo.phone,
+        postalCode: shippingAddress.postalCode,
+        address: shippingAddress.address,
+        addressDetail: shippingAddress.addressDetail,
+        deliveryMemo: shippingAddress.deliveryMemo,
+      },
       subtotalAmount: subtotal,
       shippingFee,
       discountAmount,
@@ -312,14 +314,16 @@ export class OrderService {
     // 주문 생성
     const orderInput: CreateOrderInput = {
       userId,
-      shopId,  // Shop 기반 주문 필터링
+      shopId,
       orderNumber: this.generateOrderNumber(),
-      recipientName: shippingAddress.recipientName || customerInfo.name,
-      recipientPhone: shippingAddress.recipientPhone || customerInfo.phone,
-      postalCode: shippingAddress.postalCode,
-      address: shippingAddress.address,
-      addressDetail: shippingAddress.addressDetail,
-      deliveryMemo: shippingAddress.deliveryMemo,
+      shippingAddress: {
+        recipient: shippingAddress.recipientName || customerInfo.name,
+        phone: shippingAddress.recipientPhone || customerInfo.phone,
+        postalCode: shippingAddress.postalCode,
+        address: shippingAddress.address,
+        addressDetail: shippingAddress.addressDetail,
+        deliveryMemo: shippingAddress.deliveryMemo,
+      },
       subtotalAmount: subtotal,
       shippingFee,
       discountAmount,
@@ -482,9 +486,26 @@ export class OrderService {
   }
 
   /**
+   * 배송 주소 정보 가져오기
+   */
+  private getShippingInfo(order: OrderWithRelations) {
+    const addr = order.shippingAddress
+    return {
+      recipientName: addr?.recipient || '',
+      recipientPhone: addr?.phone || '',
+      postalCode: addr?.postalCode || '',
+      address: addr?.address || '',
+      addressDetail: addr?.addressDetail || null,
+      deliveryMemo: addr?.deliveryMemo || null,
+    }
+  }
+
+  /**
    * 주문 응답 포맷팅
    */
   private formatOrderResponse(order: OrderWithRelations): OrderResponse {
+    const shipping = this.getShippingInfo(order)
+
     return {
       id: order.id,
       orderNumber: order.orderNumber,
@@ -494,11 +515,11 @@ export class OrderService {
         email: order.user.email,
         phone: order.user.phone,
       },
-      recipientName: order.recipientName,
-      recipientPhone: order.recipientPhone,
-      address: `${order.address} ${order.addressDetail || ''}`.trim(),
-      postalCode: order.postalCode,
-      deliveryMemo: order.deliveryMemo,
+      recipientName: shipping.recipientName,
+      recipientPhone: shipping.recipientPhone,
+      address: `${shipping.address} ${shipping.addressDetail || ''}`.trim(),
+      postalCode: shipping.postalCode,
+      deliveryMemo: shipping.deliveryMemo,
       subtotalAmount: Number(order.subtotalAmount),
       shippingFee: Number(order.shippingFee),
       discountAmount: Number(order.discountAmount),

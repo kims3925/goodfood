@@ -71,11 +71,15 @@ export async function GET(
               id: true,
               orderNumber: true,
               orderedAt: true,
-              recipientName: true,
-              recipientPhone: true,
-              postalCode: true,
-              address: true,
-              addressDetail: true,
+              shippingAddress: {
+                select: {
+                  recipient: true,
+                  phone: true,
+                  postalCode: true,
+                  address: true,
+                  addressDetail: true,
+                },
+              },
               shop: {
                 select: {
                   id: true,
@@ -193,9 +197,10 @@ export async function GET(
         }
       }
 
-      const fullAddress = item.order.addressDetail
-        ? `${item.order.address} ${item.order.addressDetail}`
-        : item.order.address
+      const addr = item.order.shippingAddress
+      const fullAddress = addr?.addressDetail
+        ? `${addr.address} ${addr.addressDetail}`
+        : addr?.address || ''
       // optionSummary 결정: item → variant → product의 첫 번째 variant
       let optionSummary = item.optionSummary || item.variant?.optionSummary || null
       if (!optionSummary && item.publishedProduct?.product?.variants?.length) {
@@ -212,10 +217,10 @@ export async function GET(
         quantity: item.quantity,
         wholesalePrice: Number(wholesalePrice),
         totalAmount: Number(wholesalePrice) * item.quantity,
-        customerName: item.order.recipientName,
-        customerPhone: maskPhone(item.order.recipientPhone),
+        customerName: addr?.recipient || '',
+        customerPhone: maskPhone(addr?.phone || ''),
         customerAddress: fullAddress,
-        postalCode: item.order.postalCode,
+        postalCode: addr?.postalCode || '',
       }
     })
 

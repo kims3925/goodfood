@@ -65,7 +65,6 @@ export async function GET(request: NextRequest) {
             id: true,
             orderNumber: true,
             orderedAt: true,
-            recipientName: true,
           },
         },
         publishedProduct: {

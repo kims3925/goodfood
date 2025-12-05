@@ -53,6 +53,8 @@ export async function GET(
             accountHolder: true,
           },
         },
+        // 배송 주소
+        shippingAddress: true,
         items: {
           include: {
             publishedProduct: {
@@ -116,18 +118,21 @@ export async function GET(
       )
     }
 
+    // 배송 주소 정보
+    const addr = order.shippingAddress
+
     // 응답 형식 변환
     const formattedOrder = {
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status,
       // 배송 정보
-      recipientName: order.recipientName,
-      recipientPhone: order.recipientPhone,
-      postalCode: order.postalCode,
-      address: order.address,
-      addressDetail: order.addressDetail,
-      deliveryMemo: order.deliveryMemo,
+      recipientName: addr?.recipient || '',
+      recipientPhone: addr?.phone || '',
+      postalCode: addr?.postalCode || '',
+      address: addr?.address || '',
+      addressDetail: addr?.addressDetail || null,
+      deliveryMemo: addr?.deliveryMemo || null,
       // 금액 정보
       subtotalAmount: Number(order.subtotalAmount),
       shippingFee: Number(order.shippingFee),

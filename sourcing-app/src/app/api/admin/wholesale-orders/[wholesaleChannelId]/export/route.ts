@@ -79,11 +79,15 @@ export async function GET(
           select: {
             orderNumber: true,
             orderedAt: true,
-            recipientName: true,
-            recipientPhone: true,
-            postalCode: true,
-            address: true,
-            addressDetail: true,
+            shippingAddress: {
+              select: {
+                recipient: true,
+                phone: true,
+                postalCode: true,
+                address: true,
+                addressDetail: true,
+              },
+            },
           },
         },
         publishedProduct: {
@@ -197,9 +201,10 @@ export async function GET(
       totalAmount += supplyAmount
 
       // 주소 합치기
-      const fullAddress = item.order.addressDetail
-        ? `(${item.order.postalCode}) ${item.order.address} ${item.order.addressDetail}`
-        : `(${item.order.postalCode}) ${item.order.address}`
+      const addr = item.order.shippingAddress
+      const fullAddress = addr?.addressDetail
+        ? `(${addr.postalCode}) ${addr.address} ${addr.addressDetail}`
+        : `(${addr?.postalCode || ''}) ${addr?.address || ''}`
 
       // 주문일시 포맷
       const orderedAt = new Date(item.order.orderedAt).toLocaleString('ko-KR', {
@@ -223,8 +228,8 @@ export async function GET(
         item.quantity,
         wholesalePrice,
         supplyAmount,
-        item.order.recipientName,
-        item.order.recipientPhone,
+        addr?.recipient || '',
+        addr?.phone || '',
         fullAddress,
         orderedAt,
       ]

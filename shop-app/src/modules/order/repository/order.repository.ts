@@ -22,16 +22,20 @@ export interface OrderItemInput {
   unitPrice: number
 }
 
-export interface CreateOrderInput {
-  userId: number
-  shopId?: number | null  // Shop 기반 주문 필터링
-  orderNumber: string
-  recipientName: string
-  recipientPhone: string
+export interface ShippingAddressInput {
+  recipient: string
+  phone: string
   postalCode: string
   address: string
   addressDetail?: string | null
   deliveryMemo?: string | null
+}
+
+export interface CreateOrderInput {
+  userId: number
+  shopId?: number | null  // Shop 기반 주문 필터링
+  orderNumber: string
+  shippingAddress: ShippingAddressInput
   subtotalAmount: number
   shippingFee: number
   discountAmount?: number
@@ -45,12 +49,15 @@ export interface OrderWithRelations {
   shopId: number | null  // Shop 기반 필터링
   orderNumber: string
   status: string
-  recipientName: string
-  recipientPhone: string
-  postalCode: string
-  address: string
-  addressDetail: string | null
-  deliveryMemo: string | null
+  shippingAddress: {
+    id: number
+    recipient: string
+    phone: string
+    postalCode: string
+    address: string
+    addressDetail: string | null
+    deliveryMemo: string | null
+  } | null
   subtotalAmount: any
   shippingFee: any
   discountAmount: any
@@ -122,6 +129,7 @@ const orderIncludeOptions = {
     },
   },
   payment: true,
+  shippingAddress: true,
 }
 
 /**
@@ -135,15 +143,9 @@ export class OrderRepository {
     const order = await prisma.order.create({
       data: {
         userId: data.userId,
-        shopId: data.shopId || null,  // Shop 기반 주문 필터링
+        shopId: data.shopId || null,
         orderNumber: data.orderNumber,
         status: 'PENDING',
-        recipientName: data.recipientName,
-        recipientPhone: data.recipientPhone,
-        postalCode: data.postalCode,
-        address: data.address,
-        addressDetail: data.addressDetail || null,
-        deliveryMemo: data.deliveryMemo || null,
         subtotalAmount: new Decimal(data.subtotalAmount),
         shippingFee: new Decimal(data.shippingFee),
         discountAmount: new Decimal(data.discountAmount || 0),
@@ -159,6 +161,16 @@ export class OrderRepository {
             unitPrice: new Decimal(item.unitPrice),
             totalPrice: new Decimal(item.unitPrice * item.quantity),
           })),
+        },
+        shippingAddress: {
+          create: {
+            recipient: data.shippingAddress.recipient,
+            phone: data.shippingAddress.phone,
+            postalCode: data.shippingAddress.postalCode,
+            address: data.shippingAddress.address,
+            addressDetail: data.shippingAddress.addressDetail || null,
+            deliveryMemo: data.shippingAddress.deliveryMemo || null,
+          },
         },
       },
       include: orderIncludeOptions,

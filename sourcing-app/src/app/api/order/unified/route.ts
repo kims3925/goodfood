@@ -103,8 +103,8 @@ export async function GET(request: NextRequest) {
           if (search) {
             countBaseWhere.OR = [
               { orderNumber: { contains: search } },
-              { recipientName: { contains: search } },
-              { recipientPhone: { contains: search } },
+              { shippingAddress: { recipient: { contains: search } } },
+              { shippingAddress: { phone: { contains: search } } },
             ]
           }
 
@@ -141,8 +141,8 @@ export async function GET(request: NextRequest) {
               ...(search && {
                 OR: [
                   { orderNumber: { contains: search } },
-                  { recipientName: { contains: search } },
-                  { recipientPhone: { contains: search } },
+                  { shippingAddress: { recipient: { contains: search } } },
+                  { shippingAddress: { phone: { contains: search } } },
                 ],
               }),
               ...(status && status === 'CANCELLED'
@@ -157,6 +157,7 @@ export async function GET(request: NextRequest) {
                   subdomain: true,
                 },
               },
+              shippingAddress: true,
               items: {
                 select: {
                   productName: true,
@@ -177,20 +178,21 @@ export async function GET(request: NextRequest) {
               ? `${productNames[0]} 외 ${productNames.length - 1}개`
               : productNames[0] || '상품 없음'
 
+            const addr = order.shippingAddress
             unifiedOrders.push({
               id: order.id,
               source: 'SHOPPING_MALL',
               orderNumber: order.orderNumber,
-              customerName: order.recipientName,
-              customerPhone: order.recipientPhone,
+              customerName: addr?.recipient || '',
+              customerPhone: addr?.phone || null,
               productSummary,
               itemCount: order.items.length,
               totalAmount: Number(order.totalAmount),
               status: order.status,
               statusLabel: statusLabels[order.status] || order.status,
               createdAt: order.orderedAt.toISOString(),
-              address: `${order.address} ${order.addressDetail || ''}`.trim(),
-              deliveryMemo: order.deliveryMemo || undefined,
+              address: addr ? `${addr.address} ${addr.addressDetail || ''}`.trim() : '',
+              deliveryMemo: addr?.deliveryMemo || undefined,
               paymentMethod: order.payment?.method || undefined,
               shopId: order.shop?.id || null,
               shopName: order.shop?.name || null,
