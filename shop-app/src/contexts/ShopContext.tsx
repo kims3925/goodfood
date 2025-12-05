@@ -14,7 +14,6 @@ export interface ShopThemeInfo {
   logoUrl?: string
   faviconUrl?: string
   bannerUrl?: string
-  footerText?: string
 }
 
 export interface RelatedShop {
@@ -29,8 +28,6 @@ export interface ShopInfo {
   subdomain: string
   name: string
   coverUrl?: string
-  enableToss: boolean
-  enableBankTransfer: boolean
   freeShippingAmount?: number
   defaultShippingFee?: number
   contactPhone?: string

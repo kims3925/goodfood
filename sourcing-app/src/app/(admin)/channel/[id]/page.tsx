@@ -20,6 +20,13 @@ interface ChannelTheme {
   footerText: string | null
 }
 
+interface Shop {
+  id: number
+  name: string
+  subdomain: string
+  isActive: boolean
+}
+
 interface Channel {
   id: number
   userId: number
@@ -34,11 +41,12 @@ interface Channel {
   bankName: string | null
   createdAt: string
   updatedAt: string
+  // Shop 연결
+  shopId: number | null
+  shop: Shop | null
   // 서브도메인 멀티채널 쇼핑몰 필드
   subdomain: string | null
   displayName: string | null
-  enableToss: boolean
-  enableBankTransfer: boolean
   freeShippingAmount: number | null
   defaultShippingFee: number | null
   contactPhone: string | null
@@ -76,6 +84,10 @@ export default function ChannelDetailPage({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // Shop 목록
+  const [shops, setShops] = useState<Shop[]>([])
+  const [selectedShopId, setSelectedShopId] = useState<number | null>(null)
+
   // 수정 가능한 필드
   const [name, setName] = useState('')
   const [isActive, setIsActive] = useState(true)
@@ -87,8 +99,6 @@ export default function ChannelDetailPage({
   // 서브도메인 쇼핑몰 필드
   const [subdomain, setSubdomain] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [enableToss, setEnableToss] = useState(true)
-  const [enableBankTransfer, setEnableBankTransfer] = useState(true)
   const [freeShippingAmount, setFreeShippingAmount] = useState<number | null>(null)
   const [defaultShippingFee, setDefaultShippingFee] = useState<number | null>(null)
   const [contactPhone, setContactPhone] = useState('')
@@ -101,6 +111,19 @@ export default function ChannelDetailPage({
   const [faviconUrl, setFaviconUrl] = useState('')
   const [bannerUrl, setBannerUrl] = useState('')
   const [footerText, setFooterText] = useState('')
+
+  // Shop 목록 로드
+  const loadShops = useCallback(async () => {
+    try {
+      const response = await fetch('/api/shop?limit=100')
+      const data = await response.json()
+      if (data.success) {
+        setShops(data.data.filter((s: Shop) => s.isActive))
+      }
+    } catch (error) {
+      console.error('Shop 목록 로드 실패:', error)
+    }
+  }, [])
 
   const loadChannel = useCallback(async () => {
     try {
@@ -120,11 +143,11 @@ export default function ChannelDetailPage({
         setAccountHolder(ch.accountHolder || '')
         setBankAccount(ch.bankAccount || '')
         setBankName(ch.bankName || '')
+        // Shop 연결
+        setSelectedShopId(ch.shopId || null)
         // 서브도메인 쇼핑몰 필드
         setSubdomain(ch.subdomain || '')
         setDisplayName(ch.displayName || '')
-        setEnableToss(ch.enableToss ?? true)
-        setEnableBankTransfer(ch.enableBankTransfer ?? true)
         setFreeShippingAmount(ch.freeShippingAmount)
         setDefaultShippingFee(ch.defaultShippingFee)
         setContactPhone(ch.contactPhone || '')
@@ -162,7 +185,8 @@ export default function ChannelDetailPage({
 
   useEffect(() => {
     loadChannel()
-  }, [loadChannel])
+    loadShops()
+  }, [loadChannel, loadShops])
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -182,13 +206,16 @@ export default function ChannelDetailPage({
         bankName: bankName || null,
       }
 
+      // 소매 채널인 경우 Shop 연결
+      if (channel?.kind === 'RETAIL') {
+        updateData.shopId = selectedShopId || null
+      }
+
       // 소매 밴드인 경우 쇼핑몰/테마 필드 포함
       const isRetailBand = channel?.kind === 'RETAIL' && channel?.platform === 'BAND'
       if (isRetailBand) {
         updateData.subdomain = subdomain || null
         updateData.displayName = displayName || null
-        updateData.enableToss = enableToss
-        updateData.enableBankTransfer = enableBankTransfer
         updateData.freeShippingAmount = freeShippingAmount || null
         updateData.defaultShippingFee = defaultShippingFee || null
         updateData.contactPhone = contactPhone || null
@@ -256,11 +283,11 @@ export default function ChannelDetailPage({
       setAccountHolder(channel.accountHolder || '')
       setBankAccount(channel.bankAccount || '')
       setBankName(channel.bankName || '')
+      // Shop 연결 복원
+      setSelectedShopId(channel.shopId || null)
       // 서브도메인 쇼핑몰 필드 복원
       setSubdomain(channel.subdomain || '')
       setDisplayName(channel.displayName || '')
-      setEnableToss(channel.enableToss ?? true)
-      setEnableBankTransfer(channel.enableBankTransfer ?? true)
       setFreeShippingAmount(channel.freeShippingAmount)
       setDefaultShippingFee(channel.defaultShippingFee)
       setContactPhone(channel.contactPhone || '')
@@ -559,565 +586,60 @@ export default function ChannelDetailPage({
               </div>
             </div>
 
-            {/* 정산 정보 카드 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-emerald-100 rounded-lg">
-                    <CreditCard size={18} className="text-emerald-600" />
-                  </div>
-                  <span className="font-semibold text-slate-900">정산 정보</span>
-                  {channel.kind === 'WHOLESALE' && (
-                    <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                      도매 전용
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-6">
-                {isEditMode ? (
-                  <div className="space-y-5">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                          <span className="flex items-center gap-1.5">
-                            <User size={14} className="text-slate-400" />
-                            예금주
-                          </span>
-                        </label>
-                        <Input
-                          type="text"
-                          value={accountHolder}
-                          onChange={(e) => setAccountHolder(e.target.value)}
-                          placeholder="홍길동"
-                          className="!rounded-xl"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                          <span className="flex items-center gap-1.5">
-                            <Building2 size={14} className="text-slate-400" />
-                            은행명
-                          </span>
-                        </label>
-                        <Input
-                          type="text"
-                          value={bankName}
-                          onChange={(e) => setBankName(e.target.value)}
-                          placeholder="국민은행"
-                          className="!rounded-xl"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                          <span className="flex items-center gap-1.5">
-                            <CreditCard size={14} className="text-slate-400" />
-                            계좌번호
-                          </span>
-                        </label>
-                        <Input
-                          type="text"
-                          value={bankAccount}
-                          onChange={(e) => setBankAccount(e.target.value)}
-                          placeholder="123-456-789012"
-                          className="!rounded-xl"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl border border-amber-100">
-                      <div className="text-amber-500 mt-0.5">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10"/>
-                          <line x1="12" y1="8" x2="12" y2="12"/>
-                          <line x1="12" y1="16" x2="12.01" y2="16"/>
-                        </svg>
-                      </div>
-                      <p className="text-sm text-amber-800">
-                        도매 채널의 경우 정산 정보를 입력하면 정산 관리에서 사용할 수 있습니다.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="flex items-start gap-3">
-                      <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                        <User size={18} className="text-slate-500" />
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs mb-1">예금주</p>
-                        <p className="font-medium text-slate-900">{channel.accountHolder || '-'}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                        <Building2 size={18} className="text-slate-500" />
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs mb-1">은행명</p>
-                        <p className="font-medium text-slate-900">{channel.bankName || '-'}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                        <CreditCard size={18} className="text-slate-500" />
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs mb-1">계좌번호</p>
-                        <p className="font-medium text-slate-900 font-mono">{channel.bankAccount || '-'}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* 쇼핑몰 설정 카드 (소매 밴드) */}
-            {(channel.kind === 'RETAIL' && channel.platform === 'BAND') && (
+            {/* Shop 연결 카드 (소매 채널만) */}
+            {channel.kind === 'RETAIL' && (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <ShoppingCart size={18} className="text-purple-600" />
+                    <div className="p-2 bg-indigo-100 rounded-lg">
+                      <Store size={18} className="text-indigo-600" />
                     </div>
-                    <span className="font-semibold text-slate-900">
-                      {channel.platform === 'BAND' ? '밴드 쇼핑몰 설정' : '쇼핑몰 설정'}
+                    <span className="font-semibold text-slate-900">Shop 연결</span>
+                    <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                      소매 채널
                     </span>
-                    {channel.platform === 'BAND' && (
-                      <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
-                        소매 밴드
-                      </span>
-                    )}
                   </div>
                 </div>
 
                 <div className="p-6">
                   {isEditMode ? (
-                    <div className="space-y-5">
-                      {/* 서브도메인 및 표시명 */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            <span className="flex items-center gap-1.5">
-                              <Globe size={14} className="text-slate-400" />
-                              서브도메인
-                            </span>
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="text"
-                              value={subdomain}
-                              onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                              placeholder="myshop"
-                              className="!rounded-xl"
-                            />
-                            <span className="text-slate-500 text-sm whitespace-nowrap">.shop.com</span>
-                          </div>
-                          <p className="mt-1 text-xs text-slate-500">
-                            영문 소문자, 숫자, 하이픈만 사용 가능
-                          </p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            <span className="flex items-center gap-1.5">
-                              <Tag size={14} className="text-slate-400" />
-                              표시명
-                            </span>
-                          </label>
-                          <Input
-                            type="text"
-                            value={displayName}
-                            onChange={(e) => setDisplayName(e.target.value)}
-                            placeholder="내 쇼핑몰"
-                            className="!rounded-xl"
-                          />
-                        </div>
-                      </div>
-
-                      {/* 결제 수단 */}
+                    <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">결제 수단</label>
-                        <div className="flex items-center gap-6">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={enableToss}
-                              onChange={(e) => setEnableToss(e.target.checked)}
-                              className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
-                            />
-                            <span className="text-sm text-slate-700">토스페이먼츠</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={enableBankTransfer}
-                              onChange={(e) => setEnableBankTransfer(e.target.checked)}
-                              className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
-                            />
-                            <span className="text-sm text-slate-700">무통장입금</span>
-                          </label>
-                        </div>
-                      </div>
-
-                      {/* 배송비 설정 */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            <span className="flex items-center gap-1.5">
-                              <Truck size={14} className="text-slate-400" />
-                              기본 배송비
-                            </span>
-                          </label>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              value={defaultShippingFee ?? ''}
-                              onChange={(e) => setDefaultShippingFee(e.target.value ? parseInt(e.target.value) : null)}
-                              placeholder="3000"
-                              className="!rounded-xl !pr-10"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">원</span>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            <span className="flex items-center gap-1.5">
-                              <Truck size={14} className="text-slate-400" />
-                              무료배송 기준
-                            </span>
-                          </label>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              value={freeShippingAmount ?? ''}
-                              onChange={(e) => setFreeShippingAmount(e.target.value ? parseInt(e.target.value) : null)}
-                              placeholder="50000"
-                              className="!rounded-xl !pr-14"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">원 이상</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 연락처 */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            <span className="flex items-center gap-1.5">
-                              <Phone size={14} className="text-slate-400" />
-                              고객센터 전화
-                            </span>
-                          </label>
-                          <Input
-                            type="tel"
-                            value={contactPhone}
-                            onChange={(e) => setContactPhone(e.target.value)}
-                            placeholder="010-0000-0000"
-                            className="!rounded-xl"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            <span className="flex items-center gap-1.5">
-                              <Mail size={14} className="text-slate-400" />
-                              고객센터 이메일
-                            </span>
-                          </label>
-                          <Input
-                            type="email"
-                            value={contactEmail}
-                            onChange={(e) => setContactEmail(e.target.value)}
-                            placeholder="support@example.com"
-                            className="!rounded-xl"
-                          />
-                        </div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                          연결할 Shop 선택
+                        </label>
+                        <select
+                          value={selectedShopId || ''}
+                          onChange={(e) => setSelectedShopId(e.target.value ? parseInt(e.target.value) : null)}
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                        >
+                          <option value="">Shop을 선택하세요</option>
+                          {shops.map((shop) => (
+                            <option key={shop.id} value={shop.id}>
+                              {shop.name} ({shop.subdomain}.lvh.me)
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-2 text-xs text-slate-500">
+                          이 채널에서 발행할 때 연결될 Shop을 선택합니다. 발행 시 이 Shop의 장바구니 링크가 댓글로 추가됩니다.
+                        </p>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-6">
-                      {/* 서브도메인 및 표시명 */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="flex items-start gap-3">
-                          <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                            <Globe size={18} className="text-slate-500" />
-                          </div>
-                          <div>
-                            <p className="text-slate-500 text-xs mb-1">서브도메인</p>
-                            <p className="font-medium text-slate-900">
-                              {channel.subdomain ? `${channel.subdomain}.shop.com` : '-'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                            <Tag size={18} className="text-slate-500" />
-                          </div>
-                          <div>
-                            <p className="text-slate-500 text-xs mb-1">표시명</p>
-                            <p className="font-medium text-slate-900">{channel.displayName || '-'}</p>
-                          </div>
-                        </div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
+                        <Store size={18} className="text-slate-500" />
                       </div>
-
-                      {/* 결제 수단 */}
                       <div>
-                        <p className="text-slate-500 text-xs mb-2">결제 수단</p>
-                        <div className="flex items-center gap-3">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-                            channel.enableToss ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${channel.enableToss ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                            토스페이먼츠
-                          </span>
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-                            channel.enableBankTransfer ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${channel.enableBankTransfer ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                            무통장입금
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* 배송비 */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="flex items-start gap-3">
-                          <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                            <Truck size={18} className="text-slate-500" />
-                          </div>
+                        <p className="text-slate-500 text-xs mb-1">연결된 Shop</p>
+                        {channel.shop ? (
                           <div>
-                            <p className="text-slate-500 text-xs mb-1">기본 배송비</p>
-                            <p className="font-medium text-slate-900">
-                              {channel.defaultShippingFee ? `${channel.defaultShippingFee.toLocaleString()}원` : '-'}
-                            </p>
+                            <p className="font-medium text-slate-900">{channel.shop.name}</p>
+                            <p className="text-sm text-indigo-600 font-mono">{channel.shop.subdomain}.lvh.me</p>
                           </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                            <Truck size={18} className="text-slate-500" />
-                          </div>
-                          <div>
-                            <p className="text-slate-500 text-xs mb-1">무료배송 기준</p>
-                            <p className="font-medium text-slate-900">
-                              {channel.freeShippingAmount ? `${channel.freeShippingAmount.toLocaleString()}원 이상` : '-'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 연락처 */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="flex items-start gap-3">
-                          <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                            <Phone size={18} className="text-slate-500" />
-                          </div>
-                          <div>
-                            <p className="text-slate-500 text-xs mb-1">고객센터 전화</p>
-                            <p className="font-medium text-slate-900">{channel.contactPhone || '-'}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                            <Mail size={18} className="text-slate-500" />
-                          </div>
-                          <div>
-                            <p className="text-slate-500 text-xs mb-1">고객센터 이메일</p>
-                            <p className="font-medium text-slate-900">{channel.contactEmail || '-'}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 테마 설정 카드 (소매 밴드) */}
-            {(channel.kind === 'RETAIL' && channel.platform === 'BAND') && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-pink-100 rounded-lg">
-                      <Palette size={18} className="text-pink-600" />
-                    </div>
-                    <span className="font-semibold text-slate-900">테마 설정</span>
-                  </div>
-                </div>
-
-                <div className="p-6">
-                  {isEditMode ? (
-                    <div className="space-y-5">
-                      {/* 색상 설정 */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">메인 컬러</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="color"
-                              value={primaryColor || '#6366f1'}
-                              onChange={(e) => setPrimaryColor(e.target.value)}
-                              className="w-10 h-10 rounded-lg border border-slate-200 cursor-pointer"
-                            />
-                            <Input
-                              type="text"
-                              value={primaryColor}
-                              onChange={(e) => setPrimaryColor(e.target.value)}
-                              placeholder="#6366f1"
-                              className="!rounded-xl flex-1"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">보조 컬러</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="color"
-                              value={secondaryColor || '#f43f5e'}
-                              onChange={(e) => setSecondaryColor(e.target.value)}
-                              className="w-10 h-10 rounded-lg border border-slate-200 cursor-pointer"
-                            />
-                            <Input
-                              type="text"
-                              value={secondaryColor}
-                              onChange={(e) => setSecondaryColor(e.target.value)}
-                              placeholder="#f43f5e"
-                              className="!rounded-xl flex-1"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 이미지 URL */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            <span className="flex items-center gap-1.5">
-                              <Image size={14} className="text-slate-400" />
-                              로고 URL
-                            </span>
-                          </label>
-                          <Input
-                            type="text"
-                            value={logoUrl}
-                            onChange={(e) => setLogoUrl(e.target.value)}
-                            placeholder="https://example.com/logo.png"
-                            className="!rounded-xl"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            <span className="flex items-center gap-1.5">
-                              <Image size={14} className="text-slate-400" />
-                              파비콘 URL
-                            </span>
-                          </label>
-                          <Input
-                            type="text"
-                            value={faviconUrl}
-                            onChange={(e) => setFaviconUrl(e.target.value)}
-                            placeholder="https://example.com/favicon.ico"
-                            className="!rounded-xl"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                          <span className="flex items-center gap-1.5">
-                            <Image size={14} className="text-slate-400" />
-                            메인 배너 URL
-                          </span>
-                        </label>
-                        <Input
-                          type="text"
-                          value={bannerUrl}
-                          onChange={(e) => setBannerUrl(e.target.value)}
-                          placeholder="https://example.com/banner.jpg"
-                          className="!rounded-xl"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                          <span className="flex items-center gap-1.5">
-                            <FileText size={14} className="text-slate-400" />
-                            푸터 텍스트
-                          </span>
-                        </label>
-                        <textarea
-                          value={footerText}
-                          onChange={(e) => setFooterText(e.target.value)}
-                          placeholder="© 2024 My Shop. All rights reserved."
-                          rows={3}
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      {/* 색상 */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="flex items-start gap-3">
-                          <div
-                            className="w-10 h-10 rounded-xl border border-slate-200"
-                            style={{ backgroundColor: channel.theme?.primaryColor || '#6366f1' }}
-                          />
-                          <div>
-                            <p className="text-slate-500 text-xs mb-1">메인 컬러</p>
-                            <p className="font-medium text-slate-900 font-mono">{channel.theme?.primaryColor || '-'}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <div
-                            className="w-10 h-10 rounded-xl border border-slate-200"
-                            style={{ backgroundColor: channel.theme?.secondaryColor || '#f43f5e' }}
-                          />
-                          <div>
-                            <p className="text-slate-500 text-xs mb-1">보조 컬러</p>
-                            <p className="font-medium text-slate-900 font-mono">{channel.theme?.secondaryColor || '-'}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 이미지 */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="flex items-start gap-3">
-                          <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                            <Image size={18} className="text-slate-500" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-slate-500 text-xs mb-1">로고 URL</p>
-                            <p className="font-medium text-slate-900 truncate text-sm">{channel.theme?.logoUrl || '-'}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                            <Image size={18} className="text-slate-500" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-slate-500 text-xs mb-1">파비콘 URL</p>
-                            <p className="font-medium text-slate-900 truncate text-sm">{channel.theme?.faviconUrl || '-'}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3">
-                        <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                          <Image size={18} className="text-slate-500" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-slate-500 text-xs mb-1">메인 배너 URL</p>
-                          <p className="font-medium text-slate-900 truncate text-sm">{channel.theme?.bannerUrl || '-'}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3">
-                        <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
-                          <FileText size={18} className="text-slate-500" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-slate-500 text-xs mb-1">푸터 텍스트</p>
-                          <p className="font-medium text-slate-900 text-sm whitespace-pre-line">{channel.theme?.footerText || '-'}</p>
-                        </div>
+                        ) : (
+                          <p className="text-slate-400">연결된 Shop이 없습니다</p>
+                        )}
                       </div>
                     </div>
                   )}

@@ -4,8 +4,6 @@ model Shop {
   subdomain          String    @unique @db.VarChar(63)
   name               String    @db.VarChar(255)
   coverUrl           String?   @map("cover_url") @db.VarChar(500)
-  enableToss         Boolean   @default(true) @map("enable_toss")
-  enableBankTransfer Boolean   @default(true) @map("enable_bank_transfer")
   bankName           String?   @map("bank_name") @db.VarChar(50)
   bankAccount        String?   @map("bank_account") @db.VarChar(50)
   accountHolder      String?   @map("account_holder") @db.VarChar(100)
@@ -22,6 +20,7 @@ model Shop {
   carts              Cart[]
   orders             Order[]
   publishedProducts  PublishedProduct[]
+  channels           Channel[]
 
   @@index([userId])
   @@index([subdomain])
@@ -37,7 +36,6 @@ model ShopTheme {
   logoUrl        String?  @map("logo_url") @db.VarChar(500)
   faviconUrl     String?  @map("favicon_url") @db.VarChar(500)
   bannerUrl      String?  @map("banner_url") @db.VarChar(500)
-  footerText     String?  @map("footer_text") @db.Text
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 

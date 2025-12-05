@@ -12,8 +12,6 @@ interface Shop {
   subdomain: string
   name: string
   coverUrl: string | null
-  enableToss: boolean
-  enableBankTransfer: boolean
   bankName: string | null
   bankAccount: string | null
   accountHolder: string | null
@@ -43,8 +41,6 @@ export default function ShopFormModal({
   const [subdomain, setSubdomain] = useState('')
   const [name, setName] = useState('')
   const [coverUrl, setCoverUrl] = useState('')
-  const [enableToss, setEnableToss] = useState(true)
-  const [enableBankTransfer, setEnableBankTransfer] = useState(true)
   const [bankName, setBankName] = useState('')
   const [bankAccount, setBankAccount] = useState('')
   const [accountHolder, setAccountHolder] = useState('')
@@ -59,8 +55,6 @@ export default function ShopFormModal({
       setSubdomain(shop.subdomain)
       setName(shop.name)
       setCoverUrl(shop.coverUrl || '')
-      setEnableToss(shop.enableToss)
-      setEnableBankTransfer(shop.enableBankTransfer)
       setBankName(shop.bankName || '')
       setBankAccount(shop.bankAccount || '')
       setAccountHolder(shop.accountHolder || '')
@@ -77,8 +71,6 @@ export default function ShopFormModal({
     setSubdomain('')
     setName('')
     setCoverUrl('')
-    setEnableToss(true)
-    setEnableBankTransfer(true)
     setBankName('')
     setBankAccount('')
     setAccountHolder('')
@@ -116,8 +108,6 @@ export default function ShopFormModal({
         subdomain,
         name,
         coverUrl: coverUrl || null,
-        enableToss,
-        enableBankTransfer,
         bankName: bankName || null,
         bankAccount: bankAccount || null,
         accountHolder: accountHolder || null,
@@ -232,70 +222,46 @@ export default function ShopFormModal({
               </div>
             </div>
 
-            {/* 결제 설정 */}
+            {/* 계좌 정보 */}
             <div>
               <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <CreditCard size={16} className="text-gray-500" />
-                결제 설정
+                계좌 정보
               </h3>
-              <div className="space-y-4">
-                <div className="flex items-center gap-6">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={enableToss}
-                      onChange={(e) => setEnableToss(e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700">토스페이먼츠 결제</span>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    은행명
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={enableBankTransfer}
-                      onChange={(e) => setEnableBankTransfer(e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700">계좌이체</span>
-                  </label>
+                  <Input
+                    type="text"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    placeholder="국민은행"
+                  />
                 </div>
-                {enableBankTransfer && (
-                  <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        은행명
-                      </label>
-                      <Input
-                        type="text"
-                        value={bankName}
-                        onChange={(e) => setBankName(e.target.value)}
-                        placeholder="국민은행"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        계좌번호
-                      </label>
-                      <Input
-                        type="text"
-                        value={bankAccount}
-                        onChange={(e) => setBankAccount(e.target.value)}
-                        placeholder="123-456-789012"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        예금주
-                      </label>
-                      <Input
-                        type="text"
-                        value={accountHolder}
-                        onChange={(e) => setAccountHolder(e.target.value)}
-                        placeholder="홍길동"
-                      />
-                    </div>
-                  </div>
-                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    계좌번호
+                  </label>
+                  <Input
+                    type="text"
+                    value={bankAccount}
+                    onChange={(e) => setBankAccount(e.target.value)}
+                    placeholder="123-456-789012"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    예금주
+                  </label>
+                  <Input
+                    type="text"
+                    value={accountHolder}
+                    onChange={(e) => setAccountHolder(e.target.value)}
+                    placeholder="홍길동"
+                  />
+                </div>
               </div>
             </div>
 

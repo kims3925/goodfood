@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Store,
   Search,
@@ -11,10 +12,14 @@ import {
   ShoppingBag,
   Check,
   XCircle,
+  ShoppingCart,
+  AlertTriangle,
+  ExternalLink,
 } from 'lucide-react'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
+import Button from '@/components/ui/Button'
 
 const BandIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -31,6 +36,14 @@ interface Channel {
   isActive: boolean
 }
 
+interface Shop {
+  id: number
+  name: string
+  subdomain: string
+  coverUrl: string | null
+  isActive: boolean
+}
+
 interface PublishedChannel {
   publishId: number
   channelId: number | null
@@ -39,16 +52,33 @@ interface PublishedChannel {
   createdAt: string
 }
 
+interface PublishedShop {
+  publishId: number
+  shopId: number | null
+  shopName: string | null
+  subdomain: string | null
+  status: string
+  createdAt: string
+}
+
+interface WholesaleChannel {
+  id: number
+  name: string
+}
+
 interface Product {
   id: number
   name: string
   thumbnailUrl: string | null
   price: number | null
+  channel: WholesaleChannel | null
   publishedChannels: PublishedChannel[]
+  publishedShops: PublishedShop[]
 }
 
 export default function PublishPage() {
   const toast = useToast()
+  const router = useRouter()
 
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -56,15 +86,38 @@ export default function PublishPage() {
   const [channels, setChannels] = useState<Channel[]>([])
   const [isLoadingChannels, setIsLoadingChannels] = useState(true)
 
+  const [shops, setShops] = useState<Shop[]>([])
+  const [isLoadingShops, setIsLoadingShops] = useState(true)
+
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
   const [isPublishing, setIsPublishing] = useState(false)
 
   const [searchTerm, setSearchTerm] = useState('')
 
+  // 도매밴드 필터
+  const [selectedWholesaleChannel, setSelectedWholesaleChannel] = useState<number | null>(null)
+  const [wholesaleChannels, setWholesaleChannels] = useState<WholesaleChannel[]>([])
+
+  // 페이징
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalProducts, setTotalProducts] = useState(0)
+  const pageSize = 20
+
+  // 가격 미설정 상품 경고 모달
+  const [showPriceWarning, setShowPriceWarning] = useState(false)
+  const [warningProduct, setWarningProduct] = useState<Product | null>(null)
+
+  // 초기 로드
   useEffect(() => {
     loadChannels()
-    loadProducts()
+    loadShops()
   }, [])
+
+  // 페이지/필터 변경 시 상품 로드
+  useEffect(() => {
+    loadProducts()
+  }, [currentPage, selectedWholesaleChannel])
 
   const loadChannels = async () => {
     try {
@@ -81,16 +134,58 @@ export default function PublishPage() {
     }
   }
 
-  const loadProducts = async () => {
+  const loadShops = async () => {
+    try {
+      setIsLoadingShops(true)
+      const response = await fetch('/api/shop?isActive=true&limit=100')
+      const data = await response.json()
+      if (data.success) {
+        setShops(data.data as Shop[])
+      }
+    } catch (error) {
+      console.error('Shop 조회 실패:', error)
+    } finally {
+      setIsLoadingShops(false)
+    }
+  }
+
+  const loadProducts = async (resetPage = false) => {
     try {
       setIsLoading(true)
-      const params = new URLSearchParams({ limit: '50' })
+      const page = resetPage ? 1 : currentPage
+      if (resetPage) setCurrentPage(1)
+
+      const params = new URLSearchParams({
+        limit: String(pageSize),
+        page: String(page),
+      })
       if (searchTerm) params.append('search', searchTerm)
+      if (selectedWholesaleChannel) params.append('channelId', String(selectedWholesaleChannel))
 
       const response = await fetch(`/api/shop/publish?${params.toString()}`)
       const data = await response.json()
       if (data.success) {
         setProducts(data.data)
+        setTotalPages(data.pagination?.totalPages || 1)
+        setTotalProducts(data.pagination?.total || 0)
+
+        // 도매밴드 목록 추출 (전체 상품에서 중복 제거)
+        const channelMap = new Map<number, WholesaleChannel>()
+        data.data.forEach((product: Product) => {
+          if (product.channel && product.channel.id) {
+            channelMap.set(product.channel.id, product.channel)
+          }
+        })
+
+        // 기존 wholesaleChannels와 병합 (필터가 변경되지 않으면 유지)
+        if (!selectedWholesaleChannel) {
+          setWholesaleChannels((prev) => {
+            const merged = new Map<number, WholesaleChannel>()
+            prev.forEach((ch) => merged.set(ch.id, ch))
+            channelMap.forEach((ch, id) => merged.set(id, ch))
+            return Array.from(merged.values())
+          })
+        }
       }
     } catch (error) {
       console.error('상품 조회 실패:', error)
@@ -99,38 +194,99 @@ export default function PublishPage() {
     }
   }
 
-  // 플랫폼별 채널 그룹
-  const groupedChannels = useMemo(() => {
-    const groups: { platform: string; label: string; icon: React.ReactNode; channels: Channel[] }[] = [
-      { platform: 'BAND', label: '밴드', icon: <BandIcon size={14} />, channels: [] },
-      { platform: 'OTHER', label: '기타', icon: <Store size={14} />, channels: [] },
+  // 플랫폼별 채널 그룹 (Shop 포함)
+  const groupedTargets = useMemo(() => {
+    const groups: {
+      type: 'shop' | 'channel'
+      platform: string
+      label: string
+      icon: React.ReactNode
+      items: (Channel | Shop)[]
+    }[] = [
+      { type: 'shop', platform: 'SHOP', label: 'Shop', icon: <ShoppingCart size={14} />, items: [] },
+      { type: 'channel', platform: 'BAND', label: '밴드', icon: <BandIcon size={14} />, items: [] },
+      { type: 'channel', platform: 'OTHER', label: '기타', icon: <Store size={14} />, items: [] },
     ]
 
-    channels.forEach((ch) => {
-      const group = groups.find((g) => g.platform === (ch.platform || 'OTHER'))
-      if (group) group.channels.push(ch)
+    // Shop 추가
+    shops.forEach((shop) => {
+      const group = groups.find((g) => g.platform === 'SHOP')
+      if (group) group.items.push(shop)
     })
 
-    return groups.filter((g) => g.channels.length > 0)
-  }, [channels])
+    // 채널 추가
+    channels.forEach((ch) => {
+      const group = groups.find((g) => g.platform === (ch.platform || 'OTHER'))
+      if (group) group.items.push(ch)
+    })
 
-  const isPublished = (productId: number, channelId: number) => {
+    return groups.filter((g) => g.items.length > 0)
+  }, [channels, shops])
+
+  // 총 타겟 수 (채널 + Shop)
+  const allTargets = useMemo(() => {
+    const targets: { type: 'shop' | 'channel'; id: number; name: string }[] = []
+    shops.forEach((shop) => targets.push({ type: 'shop', id: shop.id, name: shop.name }))
+    channels.forEach((ch) => targets.push({ type: 'channel', id: ch.id, name: ch.name }))
+    return targets
+  }, [channels, shops])
+
+  // 채널 발행 여부 확인
+  const isPublishedToChannel = (productId: number, channelId: number) => {
     const product = products.find((p) => p.id === productId)
     return product?.publishedChannels?.some((pc) => pc.channelId === channelId)
   }
 
-  const getPublishInfo = (productId: number, channelId: number) => {
+  // Shop 발행 여부 확인
+  const isPublishedToShop = (productId: number, shopId: number) => {
     const product = products.find((p) => p.id === productId)
-    return product?.publishedChannels?.find((pc) => pc.channelId === channelId)
+    return product?.publishedShops?.some((ps) => ps.shopId === shopId)
   }
 
-  const cellKey = (productId: number, channelId: number) => `${productId}-${channelId}`
+  // 타겟에 발행되었는지 확인 (type으로 구분)
+  const isPublished = (productId: number, targetType: 'shop' | 'channel', targetId: number) => {
+    if (targetType === 'shop') {
+      return isPublishedToShop(productId, targetId)
+    }
+    return isPublishedToChannel(productId, targetId)
+  }
 
-  const handleCellClick = (productId: number, channelId: number) => {
+  // 가격이 설정되어 있는지 확인
+  const hasPrice = (productId: number) => {
+    const product = products.find((p) => p.id === productId)
+    return product?.price && product.price > 0
+  }
+
+  // 상품 객체 가져오기
+  const getProduct = (productId: number) => {
+    return products.find((p) => p.id === productId)
+  }
+
+  // 셀 키 생성 (type-productId-targetId)
+  const cellKey = (productId: number, targetType: 'shop' | 'channel', targetId: number) =>
+    `${targetType}-${productId}-${targetId}`
+
+  // 셀 키 파싱
+  const parseCellKey = (key: string) => {
+    const [type, productId, targetId] = key.split('-')
+    return { type: type as 'shop' | 'channel', productId: Number(productId), targetId: Number(targetId) }
+  }
+
+  const handleCellClick = (productId: number, targetType: 'shop' | 'channel', targetId: number) => {
     // 이미 발행된 셀은 선택할 수 없음
-    if (isPublished(productId, channelId)) return
+    if (isPublished(productId, targetType, targetId)) return
 
-    const key = cellKey(productId, channelId)
+    // 가격이 설정되지 않은 상품은 발행 불가
+    if (!hasPrice(productId)) {
+      const product = getProduct(productId)
+      if (product) {
+        setWarningProduct(product)
+        setShowPriceWarning(true)
+      }
+      return
+    }
+
+    const key = cellKey(productId, targetType, targetId)
     setSelectedCells((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
@@ -140,10 +296,32 @@ export default function PublishPage() {
   }
 
   const handleSelectRow = (productId: number) => {
-    // 미발행 셀만 선택 가능
-    const rowKeys = channels
-      .filter((ch) => !isPublished(productId, ch.id))
-      .map((ch) => cellKey(productId, ch.id))
+    // 가격이 설정되지 않은 상품은 발행 불가
+    if (!hasPrice(productId)) {
+      const product = getProduct(productId)
+      if (product) {
+        setWarningProduct(product)
+        setShowPriceWarning(true)
+      }
+      return
+    }
+
+    // 미발행 셀만 선택 가능 (Shop + 채널)
+    const rowKeys: string[] = []
+
+    // Shop 셀
+    shops.forEach((shop) => {
+      if (!isPublished(productId, 'shop', shop.id)) {
+        rowKeys.push(cellKey(productId, 'shop', shop.id))
+      }
+    })
+
+    // 채널 셀
+    channels.forEach((ch) => {
+      if (!isPublished(productId, 'channel', ch.id)) {
+        rowKeys.push(cellKey(productId, 'channel', ch.id))
+      }
+    })
 
     setSelectedCells((prev) => {
       const allSelected = rowKeys.every((k) => prev.has(k))
@@ -156,11 +334,11 @@ export default function PublishPage() {
     })
   }
 
-  const handleSelectColumn = (channelId: number) => {
-    // 미발행 셀만 선택 가능
+  const handleSelectColumn = (targetType: 'shop' | 'channel', targetId: number) => {
+    // 미발행 셀 + 가격 있는 상품만 선택 가능
     const colKeys = products
-      .filter((p) => !isPublished(p.id, channelId))
-      .map((p) => cellKey(p.id, channelId))
+      .filter((p) => !isPublished(p.id, targetType, targetId) && hasPrice(p.id))
+      .map((p) => cellKey(p.id, targetType, targetId))
 
     setSelectedCells((prev) => {
       const allSelected = colKeys.every((k) => prev.has(k))
@@ -179,13 +357,20 @@ export default function PublishPage() {
     setIsPublishing(true)
 
     try {
-      // 선택된 셀을 채널별로 그룹화
+      // 선택된 셀을 타입별로 그룹화 (Shop / 채널)
+      const shopToProducts: Record<number, number[]> = {}
       const channelToProducts: Record<number, number[]> = {}
+
       selectedCells.forEach((key) => {
-        const [productId, channelId] = key.split('-').map(Number)
-        if (!isPublished(productId, channelId)) {
-          if (!channelToProducts[channelId]) channelToProducts[channelId] = []
-          channelToProducts[channelId].push(productId)
+        const { type, productId, targetId } = parseCellKey(key)
+        if (!isPublished(productId, type, targetId)) {
+          if (type === 'shop') {
+            if (!shopToProducts[targetId]) shopToProducts[targetId] = []
+            shopToProducts[targetId].push(productId)
+          } else {
+            if (!channelToProducts[targetId]) channelToProducts[targetId] = []
+            channelToProducts[targetId].push(productId)
+          }
         }
       })
 
@@ -195,6 +380,36 @@ export default function PublishPage() {
       let totalSkipped = 0
       let totalFailed = 0
 
+      // Shop 발행 처리
+      for (const [shopId, productIds] of Object.entries(shopToProducts)) {
+        if (productIds.length > 0) {
+          const response = await fetch('/api/shop/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productIds, shopId: Number(shopId) }),
+          })
+
+          const data = await response.json()
+
+          if (data.success && data.results) {
+            for (const result of data.results) {
+              if (result.status === 'SUCCESS') {
+                successfulCells.add(cellKey(result.productId, 'shop', Number(shopId)))
+                totalSuccess++
+              } else if (result.status === 'SKIPPED') {
+                successfulCells.add(cellKey(result.productId, 'shop', Number(shopId)))
+                totalSkipped++
+              } else if (result.status === 'FAILED') {
+                totalFailed++
+              }
+            }
+          } else if (!data.success) {
+            totalFailed += productIds.length
+          }
+        }
+      }
+
+      // 채널 발행 처리
       for (const [channelId, productIds] of Object.entries(channelToProducts)) {
         if (productIds.length > 0) {
           const response = await fetch('/api/shop/publish', {
@@ -206,21 +421,18 @@ export default function PublishPage() {
           const data = await response.json()
 
           if (data.success && data.results) {
-            // API 응답의 각 결과를 확인하여 성공한 것만 처리
             for (const result of data.results) {
               if (result.status === 'SUCCESS') {
-                successfulCells.add(cellKey(result.productId, Number(channelId)))
+                successfulCells.add(cellKey(result.productId, 'channel', Number(channelId)))
                 totalSuccess++
               } else if (result.status === 'SKIPPED') {
-                // 이미 발행된 경우도 선택 해제
-                successfulCells.add(cellKey(result.productId, Number(channelId)))
+                successfulCells.add(cellKey(result.productId, 'channel', Number(channelId)))
                 totalSkipped++
               } else if (result.status === 'FAILED') {
                 totalFailed++
               }
             }
           } else if (!data.success) {
-            // 전체 요청 실패 시 해당 채널의 모든 상품을 실패로 처리
             totalFailed += productIds.length
           }
         }
@@ -258,12 +470,20 @@ export default function PublishPage() {
   // 통계 계산
   const stats = useMemo(() => {
     const totalProducts = products.length
-    const totalCells = products.length * channels.length
+    const totalTargets = channels.length + shops.length
+    const totalCells = products.length * totalTargets
     let publishedCells = 0
 
     products.forEach((product) => {
+      // Shop 발행 카운트
+      shops.forEach((shop) => {
+        if (isPublished(product.id, 'shop', shop.id)) {
+          publishedCells++
+        }
+      })
+      // 채널 발행 카운트
       channels.forEach((channel) => {
-        if (isPublished(product.id, channel.id)) {
+        if (isPublished(product.id, 'channel', channel.id)) {
           publishedCells++
         }
       })
@@ -271,11 +491,13 @@ export default function PublishPage() {
 
     return {
       totalProducts,
+      totalTargets,
+      totalShops: shops.length,
       totalChannels: channels.length,
       publishedCells,
       unpublishedCells: totalCells - publishedCells,
     }
-  }, [products, channels])
+  }, [products, channels, shops])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -349,7 +571,8 @@ export default function PublishPage() {
 
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 space-y-4">
+            {/* 첫 번째 줄: 범례 + 검색 */}
             <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
               {/* 왼쪽: 범례 */}
               <div className="flex items-center gap-1">
@@ -363,6 +586,10 @@ export default function PublishPage() {
                 <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-gray-100 text-gray-700 flex items-center gap-1.5">
                   <div className="w-3 h-3 rounded bg-gray-300" />
                   미발행
+                </span>
+                <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-amber-100 text-amber-700 flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-amber-200 border border-dashed border-amber-400" />
+                  가격미설정
                 </span>
                 <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-purple-100 text-purple-700 flex items-center gap-1.5">
                   <div className="w-3 h-3 rounded bg-purple-500" />
@@ -379,12 +606,12 @@ export default function PublishPage() {
                     placeholder="상품 검색..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && loadProducts()}
+                    onKeyPress={(e) => e.key === 'Enter' && loadProducts(true)}
                     className="pl-10 w-64"
                   />
                 </div>
                 <button
-                  onClick={loadProducts}
+                  onClick={() => loadProducts(true)}
                   disabled={isLoading}
                   className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
@@ -392,10 +619,46 @@ export default function PublishPage() {
                 </button>
               </div>
             </div>
+
+            {/* 두 번째 줄: 도매밴드 필터 */}
+            {wholesaleChannels.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-gray-500">도매밴드:</span>
+                <button
+                  onClick={() => {
+                    setSelectedWholesaleChannel(null)
+                    setCurrentPage(1)
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    selectedWholesaleChannel === null
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  전체
+                </button>
+                {wholesaleChannels.map((channel) => (
+                  <button
+                    key={channel.id}
+                    onClick={() => {
+                      setSelectedWholesaleChannel(channel.id)
+                      setCurrentPage(1)
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      selectedWholesaleChannel === channel.id
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {channel.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 매트릭스 테이블 */}
-          {isLoading || isLoadingChannels ? (
+          {isLoading || isLoadingChannels || isLoadingShops ? (
             <div className="p-12">
               <Loading />
             </div>
@@ -408,10 +671,10 @@ export default function PublishPage() {
                     <th className="sticky left-0 z-20 bg-gray-50 border-b border-r border-gray-200 p-2 text-left min-w-[100px]">
                       <span className="text-xs font-medium text-gray-500 uppercase">상품</span>
                     </th>
-                    {groupedChannels.map((group) => (
+                    {groupedTargets.map((group) => (
                       <th
                         key={group.platform}
-                        colSpan={group.channels.length}
+                        colSpan={group.items.length}
                         className="border-b border-gray-200 p-2 text-center"
                       >
                         <div className="flex items-center justify-center gap-1 text-xs font-medium text-gray-700">
@@ -423,16 +686,16 @@ export default function PublishPage() {
                   </tr>
                   <tr className="bg-gray-50">
                     <th className="sticky left-0 z-20 bg-gray-50 border-b border-r border-gray-200 p-2" />
-                    {groupedChannels.map((group) =>
-                      group.channels.map((ch) => (
+                    {groupedTargets.map((group) =>
+                      group.items.map((item) => (
                         <th
-                          key={ch.id}
+                          key={`${group.type}-${item.id}`}
                           className="border-b border-gray-200 p-1 min-w-[80px] cursor-pointer hover:bg-gray-100"
-                          onClick={() => handleSelectColumn(ch.id)}
-                          title={`${ch.name} 전체 선택/해제`}
+                          onClick={() => handleSelectColumn(group.type, item.id)}
+                          title={`${item.name} 전체 선택/해제`}
                         >
-                          <div className="text-xs text-gray-600 truncate max-w-[80px] mx-auto" title={ch.name}>
-                            {ch.name.length > 8 ? ch.name.slice(0, 8) + '...' : ch.name}
+                          <div className="text-xs text-gray-600 truncate max-w-[80px] mx-auto" title={item.name}>
+                            {item.name.length > 8 ? item.name.slice(0, 8) + '...' : item.name}
                           </div>
                         </th>
                       ))
@@ -460,28 +723,34 @@ export default function PublishPage() {
                           </div>
                         </div>
                       </td>
-                      {groupedChannels.map((group) =>
-                        group.channels.map((ch) => {
-                          const published = isPublished(product.id, ch.id)
-                          const selected = selectedCells.has(cellKey(product.id, ch.id))
+                      {groupedTargets.map((group) =>
+                        group.items.map((item) => {
+                          const published = isPublished(product.id, group.type, item.id)
+                          const selected = selectedCells.has(cellKey(product.id, group.type, item.id))
+                          const priceSet = hasPrice(product.id)
 
                           return (
                             <td
-                              key={ch.id}
+                              key={`${group.type}-${item.id}`}
                               className="border-b border-gray-200 p-1 text-center"
                             >
                               <button
-                                onClick={() => handleCellClick(product.id, ch.id)}
+                                onClick={() => handleCellClick(product.id, group.type, item.id)}
                                 className={`w-8 h-8 rounded transition-all ${
                                   selected
                                     ? 'bg-purple-500 hover:bg-purple-600 cursor-pointer'
                                     : published
                                     ? 'bg-green-500 cursor-not-allowed'
+                                    : !priceSet
+                                    ? 'bg-amber-100 hover:bg-amber-200 cursor-pointer border-2 border-dashed border-amber-300'
                                     : 'bg-gray-200 hover:bg-gray-300 cursor-pointer'
                                 }`}
-                                title={`${product.name} → ${ch.name}: ${published ? '발행됨 (선택 불가)' : '미발행'}`}
+                                title={`${product.name} → ${item.name}: ${
+                                  published ? '발행됨 (선택 불가)' : !priceSet ? '가격 미설정 (설정 필요)' : '미발행'
+                                }`}
                               >
                                 {published && <Check size={16} className="text-white mx-auto" />}
+                                {!published && !priceSet && <AlertTriangle size={12} className="text-amber-500 mx-auto" />}
                               </button>
                             </td>
                           )
@@ -499,10 +768,140 @@ export default function PublishPage() {
               상품이 없습니다.
             </div>
           )}
+
+          {/* 페이징 */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-gray-200 flex items-center justify-between">
+              <p className="text-sm text-gray-600">
+                총 {totalProducts}개 중 {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, totalProducts)}개 표시
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  이전
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = currentPage - 2 + i
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === pageNum
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  })}
+                </div>
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  다음
+                </button>
+              </div>
+            </div>
+          )}
             </>
           )}
         </div>
       </div>
+
+      {/* 가격 미설정 경고 모달 */}
+      {showPriceWarning && warningProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => {
+              setShowPriceWarning(false)
+              setWarningProduct(null)
+            }}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            {/* 헤더 */}
+            <div className="bg-amber-50 p-6 border-b border-amber-100">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-100 rounded-full">
+                  <AlertTriangle size={24} className="text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">가격 정보 필요</h3>
+                  <p className="text-sm text-gray-600">상품 발행을 위해 가격 설정이 필요합니다</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 콘텐츠 */}
+            <div className="p-6">
+              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl mb-4">
+                {warningProduct.thumbnailUrl ? (
+                  <img
+                    src={warningProduct.thumbnailUrl}
+                    alt={warningProduct.name}
+                    className="w-16 h-16 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center">
+                    <Package size={24} className="text-gray-400" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 truncate">{warningProduct.name}</p>
+                  <p className="text-sm text-red-500 flex items-center gap-1 mt-1">
+                    <XCircle size={14} />
+                    가격 미설정
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-6">
+                이 상품은 가격 정보가 설정되어 있지 않아 발행할 수 없습니다.
+                상품 상세 페이지에서 옵션과 가격을 설정해주세요.
+              </p>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowPriceWarning(false)
+                    setWarningProduct(null)
+                  }}
+                >
+                  닫기
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    router.push(`/product/${warningProduct.id}`)
+                  }}
+                >
+                  <ExternalLink size={16} className="mr-2" />
+                  상품 설정하기
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

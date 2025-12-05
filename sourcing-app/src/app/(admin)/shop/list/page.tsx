@@ -38,8 +38,6 @@ interface Shop {
   subdomain: string
   name: string
   coverUrl: string | null
-  enableToss: boolean
-  enableBankTransfer: boolean
   bankName: string | null
   bankAccount: string | null
   accountHolder: string | null
@@ -228,23 +226,15 @@ function ShopListContent() {
     )
   }
 
-  const getPaymentBadges = (shop: Shop) => {
-    const badges = []
-    if (shop.enableToss) {
-      badges.push(
-        <span key="toss" className="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">
-          토스
+  const getBankInfo = (shop: Shop) => {
+    if (shop.bankName && shop.bankAccount) {
+      return (
+        <span className="text-sm text-gray-600">
+          {shop.bankName}
         </span>
       )
     }
-    if (shop.enableBankTransfer) {
-      badges.push(
-        <span key="bank" className="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700">
-          계좌이체
-        </span>
-      )
-    }
-    return badges.length > 0 ? badges : <span className="text-gray-400 text-xs">없음</span>
+    return <span className="text-gray-400 text-xs">-</span>
   }
 
   // 통계
@@ -423,7 +413,7 @@ function ShopListContent() {
                   <TableHead className="w-[5%]">순서</TableHead>
                   <TableHead className="w-[20%]">쇼핑몰명</TableHead>
                   <TableHead className="w-[12%]">서브도메인</TableHead>
-                  <TableHead className="w-[10%]">결제수단</TableHead>
+                  <TableHead className="w-[10%]">계좌</TableHead>
                   <TableHead className="w-[8%]">상품수</TableHead>
                   <TableHead className="w-[8%]">주문수</TableHead>
                   <TableHead className="w-[8%]">상태</TableHead>
@@ -479,9 +469,7 @@ function ShopListContent() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {getPaymentBadges(shop)}
-                        </div>
+                        {getBankInfo(shop)}
                       </TableCell>
                       <TableCell>
                         <span className="text-gray-600">{shop._count.publishedProducts}</span>

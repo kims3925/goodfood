@@ -76,7 +76,6 @@ export async function GET(
           select: {
             publishedProducts: true,
             orders: true,
-            carts: true,
           },
         },
       },
@@ -149,8 +148,6 @@ export async function PUT(
       subdomain,
       name,
       coverUrl,
-      enableToss,
-      enableBankTransfer,
       bankName,
       bankAccount,
       accountHolder,
@@ -195,8 +192,6 @@ export async function PUT(
     if (subdomain !== undefined) updateData.subdomain = subdomain
     if (name !== undefined) updateData.name = name
     if (coverUrl !== undefined) updateData.coverUrl = coverUrl || null
-    if (enableToss !== undefined) updateData.enableToss = enableToss
-    if (enableBankTransfer !== undefined) updateData.enableBankTransfer = enableBankTransfer
     if (bankName !== undefined) updateData.bankName = bankName || null
     if (bankAccount !== undefined) updateData.bankAccount = bankAccount || null
     if (accountHolder !== undefined) updateData.accountHolder = accountHolder || null
@@ -240,7 +235,6 @@ export async function PUT(
               logoUrl: theme.logoUrl || null,
               faviconUrl: theme.faviconUrl || null,
               bannerUrl: theme.bannerUrl || null,
-              footerText: theme.footerText || null,
             },
           })
         } else {
@@ -252,7 +246,6 @@ export async function PUT(
               logoUrl: theme.logoUrl || null,
               faviconUrl: theme.faviconUrl || null,
               bannerUrl: theme.bannerUrl || null,
-              footerText: theme.footerText || null,
             },
           })
         }
@@ -267,7 +260,6 @@ export async function PUT(
             select: {
               publishedProducts: true,
               orders: true,
-              carts: true,
             },
           },
         },

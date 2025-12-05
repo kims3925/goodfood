@@ -53,12 +53,13 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, isActive, coverUrl } = body
+    const { name, isActive, coverUrl, shopId } = body
 
     const channel = await channelService.update(id, {
       name,
       isActive,
       coverUrl,
+      shopId,
     })
 
     return NextResponse.json({ success: true, data: channel })
