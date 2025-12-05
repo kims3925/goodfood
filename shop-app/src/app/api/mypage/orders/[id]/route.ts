@@ -118,17 +118,19 @@ export async function GET(
       )
     }
 
+    // 배송 주소 정보
+    const addr = order.shippingAddress
+
     // 응답 형식 변환
     const formattedOrder = {
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status,
-      // 주문자 정보
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       customerEmail: order.customerEmail,
-      // 배송지 정보 (별도 테이블)
-      shippingAddress: order.shippingAddress ? {
+      // 배송 정보
+shippingAddress: order.shippingAddress ? {
         recipientName: order.shippingAddress.recipientName,
         recipientPhone: order.shippingAddress.recipientPhone,
         postalCode: order.shippingAddress.postalCode,

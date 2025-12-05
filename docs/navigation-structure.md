@@ -8,9 +8,43 @@
 | **sourcing-app** | 소싱 + 쇼핑몰 백오피스 (하이브리드) | 3001 |
 | **shop-app** | 고객용 쇼핑몰 | 3000 |
 
+### 현재 sourcing-app 메뉴 구조 (Sidebar.tsx 기준)
+```
+대시보드
+├── 쇼핑몰              /dashboard/shop
+└── 자동화              /dashboard/automation
+
+채널 관리               /channel
+쇼핑몰 관리             /shop/list
+게시물 관리             /post/list
+
+상품 관리
+├── 수집상품            /collected-product/list
+├── 상품                /product/list
+└── 발행상품            /published-product/list
+
+발행                    /publish
+주문 관리               /order/list
+정책 관리               /policy/list
+
+자동화 관리
+├── 자동화 설정         /automation/settings
+└── 실행 로그           /automation/logs
+
+정산 목록               /settlement/list
+고객 문의               /cs/inquiry
+사용자 관리             /user/list
+
+환경 설정
+├── API 설정            /admin/settings/api
+├── AI 설정             /admin/settings/ai
+└── 프롬프트 설정       /admin/settings/prompt
+```
+
 ### 현재 sourcing-app에 섞여있는 기능들
 - **소싱**: 채널, 게시물, 수집상품, 상품가공, 발행, 자동화
-- **쇼핑몰 백오피스**: 주문관리, 정산, 고객문의
+- **쇼핑몰 백오피스**: 쇼핑몰 관리, 주문관리, 정산, 고객문의
+- **시스템**: 사용자 관리, 환경 설정
 
 ### 문제점
 1. 소싱과 쇼핑몰 백오피스가 같은 메뉴 레벨에 혼재
@@ -34,7 +68,9 @@
 
 ### 소싱 탭 메뉴
 ```
-대시보드           /sourcing/dashboard
+대시보드
+├── 쇼핑몰         /sourcing/dashboard/shop
+└── 자동화         /sourcing/dashboard/automation
 
 수집
 ├── 채널 관리      /sourcing/channel
@@ -45,9 +81,7 @@
 ├── 가공상품       /sourcing/product/list
 └── 발행상품       /sourcing/published-product/list
 
-발행
-├── 소매밴드       /sourcing/publish/retail-band
-└── 쇼핑몰         /sourcing/publish/shopping-mall
+발행               /sourcing/publish
 
 자동화
 ├── 설정           /sourcing/automation/settings
@@ -56,12 +90,15 @@
 설정
 ├── 정책 관리      /sourcing/policy/list
 ├── API 설정       /sourcing/settings/api
-└── AI 설정        /sourcing/settings/ai
+├── AI 설정        /sourcing/settings/ai
+└── 프롬프트 설정  /sourcing/settings/prompt
 ```
 
 ### 쇼핑몰 탭 메뉴 (현재 + 확장 예정)
 ```
 대시보드           /shop/dashboard        (신규)
+
+쇼핑몰 관리        /shop/mall/list        (현재: /shop/list)
 
 주문
 ├── 주문 목록      /shop/order/list
@@ -70,12 +107,14 @@
 
 정산
 ├── 정산 목록      /shop/settlement/list
-└── 정산 이력      /shop/settlement/history
+└── 정산 이력      /shop/settlement/history (신규)
 
 고객
 ├── 고객 목록      /shop/customer/list    (신규)
 ├── 고객 문의      /shop/cs/inquiry
 └── 리뷰 관리      /shop/review/list      (신규)
+
+사용자 관리        /shop/user/list        (현재: /user/list)
 
 프로모션                                   (신규)
 ├── 쿠폰 관리      /shop/coupon/list
@@ -211,19 +250,24 @@ const menuItems = currentSection === 'shop' ? shopMenuItems : sourcingMenuItems
 
 | 현재 경로 | 변경 경로 | 비고 |
 |-----------|-----------|------|
-| `/automation/dashboard` | `/sourcing/dashboard` | 소싱 대시보드 |
+| `/dashboard/shop` | `/sourcing/dashboard/shop` | 쇼핑몰 대시보드 |
+| `/dashboard/automation` | `/sourcing/dashboard/automation` | 자동화 대시보드 |
 | `/channel` | `/sourcing/channel` | |
 | `/post/list` | `/sourcing/post/list` | |
 | `/collected-product/list` | `/sourcing/collected-product/list` | |
 | `/product/list` | `/sourcing/product/list` | |
 | `/published-product/list` | `/sourcing/published-product/list` | |
-| `/publish/*` | `/sourcing/publish/*` | |
+| `/publish` | `/sourcing/publish` | |
 | `/automation/*` | `/sourcing/automation/*` | |
 | `/policy/list` | `/sourcing/policy/list` | |
-| `/admin/settings/*` | `/sourcing/settings/*` | |
+| `/admin/settings/api` | `/sourcing/settings/api` | |
+| `/admin/settings/ai` | `/sourcing/settings/ai` | |
+| `/admin/settings/prompt` | `/sourcing/settings/prompt` | 신규 메뉴 |
+| `/shop/list` | `/shop/mall/list` | 쇼핑몰 관리 |
 | `/order/list` | `/shop/order/list` | 쇼핑몰로 이동 |
-| `/settlement/*` | `/shop/settlement/*` | 쇼핑몰로 이동 |
+| `/settlement/list` | `/shop/settlement/list` | 쇼핑몰로 이동 |
 | `/cs/inquiry` | `/shop/cs/inquiry` | 쇼핑몰로 이동 |
+| `/user/list` | `/shop/user/list` | 쇼핑몰로 이동 |
 
 ### Step 6: 리다이렉트 설정 (호환성)
 **파일**: `next.config.js` 또는 미들웨어

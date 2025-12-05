@@ -36,6 +36,7 @@ export async function GET(
           },
         },
         include: {
+          shippingAddress: true,
           items: {
             include: {
               publishedProduct: {

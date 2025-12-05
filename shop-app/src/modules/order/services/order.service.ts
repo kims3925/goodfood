@@ -170,11 +170,14 @@ export class OrderService {
       const mainVariant = product.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || 0
 
+      // variant가 있으면 해당 옵션 사용, 없으면 첫 번째 variant의 옵션 사용
+      const optionSummary = variant?.optionSummary || mainVariant?.optionSummary || null
+
       return {
         publishedProductId: publishedProduct.id,
         variantId: variant?.id || null,
         productName: product.name,
-        optionSummary: variant?.optionSummary || null,
+        optionSummary,
         thumbnailUrl: product.thumbnailUrl,
         quantity: item.quantity,
         unitPrice: Number(unitPrice),
@@ -193,7 +196,7 @@ export class OrderService {
     // 주문 생성
     const orderInput: CreateOrderInput = {
       userId,
-      shopId,  // Shop 기반 주문 필터링
+      shopId,
       orderNumber: this.generateOrderNumber(),
       // 주문자 정보
       customerName: customerInfo.name,
@@ -295,11 +298,14 @@ export class OrderService {
       const mainVariant = product.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || 0
 
+      // variant가 있으면 해당 옵션 사용, 없으면 첫 번째 variant의 옵션 사용
+      const optionSummary = variant?.optionSummary || mainVariant?.optionSummary || null
+
       orderItems.push({
         publishedProductId: publishedProduct.id,
         variantId: variant?.id || null,
         productName: product.name,
-        optionSummary: variant?.optionSummary || null,
+        optionSummary,
         thumbnailUrl: product.thumbnailUrl,
         quantity: item.quantity || 1,
         unitPrice: Number(unitPrice),
@@ -318,7 +324,7 @@ export class OrderService {
     // 주문 생성
     const orderInput: CreateOrderInput = {
       userId,
-      shopId,  // Shop 기반 주문 필터링
+      shopId,
       orderNumber: this.generateOrderNumber(),
       // 주문자 정보
       customerName: customerInfo.name,
@@ -495,9 +501,26 @@ export class OrderService {
   }
 
   /**
+   * 배송 주소 정보 가져오기
+   */
+  private getShippingInfo(order: OrderWithRelations) {
+    const addr = order.shippingAddress
+    return {
+      recipientName: addr?.recipient || '',
+      recipientPhone: addr?.phone || '',
+      postalCode: addr?.postalCode || '',
+      address: addr?.address || '',
+      addressDetail: addr?.addressDetail || null,
+      deliveryMemo: addr?.deliveryMemo || null,
+    }
+  }
+
+  /**
    * 주문 응답 포맷팅
    */
   private formatOrderResponse(order: OrderWithRelations): OrderResponse {
+    const shipping = this.getShippingInfo(order)
+
     return {
       id: order.id,
       orderNumber: order.orderNumber,

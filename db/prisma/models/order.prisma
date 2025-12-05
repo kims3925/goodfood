@@ -1,37 +1,29 @@
 model Order {
-  id          Int                 @id @default(autoincrement())
-  userId      Int                 @map("user_id")
-  shopId      Int?                @map("shop_id")
-  orderNumber String              @unique @map("order_number") @db.VarChar(50)
-  status      CustomerOrderStatus @default(PENDING)
-
-  // 주문자 정보
+  id             Int                 @id @default(autoincrement())
+  userId         Int                 @map("user_id")
+  shopId         Int?                @map("shop_id")
+  orderNumber    String              @unique @map("order_number") @db.VarChar(50)
+  status         CustomerOrderStatus @default(PENDING)
   customerName  String  @map("customer_name") @db.VarChar(100)
   customerPhone String  @map("customer_phone") @db.VarChar(20)
   customerEmail String? @map("customer_email") @db.VarChar(200)
-
-  // 금액 정보
-  subtotalAmount Decimal @map("subtotal_amount") @db.Decimal(12, 2)
-  shippingFee    Decimal @default(0.00) @map("shipping_fee") @db.Decimal(10, 2)
-  discountAmount Decimal @default(0.00) @map("discount_amount") @db.Decimal(10, 2)
-  totalAmount    Decimal @map("total_amount") @db.Decimal(12, 2)
-
-  // 날짜 정보
-  orderedAt    DateTime  @default(now()) @map("ordered_at") @db.Timestamp(0)
-  paidAt       DateTime? @map("paid_at") @db.Timestamp(0)
-  shippedAt    DateTime? @map("shipped_at") @db.Timestamp(0)
-  deliveredAt  DateTime? @map("delivered_at") @db.Timestamp(0)
-  cancelledAt  DateTime? @map("cancelled_at") @db.Timestamp(0)
-  cancelReason String?   @map("cancel_reason") @db.VarChar(500)
-  cancelledBy  String?   @map("cancelled_by") @db.VarChar(20)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  // 관계
-  user            User             @relation(fields: [userId], references: [id])
-  shop            Shop?            @relation(fields: [shopId], references: [id])
-  items           OrderItem[]
-  payment         Payment?
+  subtotalAmount Decimal             @map("subtotal_amount") @db.Decimal(12, 2)
+  shippingFee    Decimal             @default(0.00) @map("shipping_fee") @db.Decimal(10, 2)
+  discountAmount Decimal             @default(0.00) @map("discount_amount") @db.Decimal(10, 2)
+  totalAmount    Decimal             @map("total_amount") @db.Decimal(12, 2)
+  orderedAt      DateTime            @default(now()) @map("ordered_at") @db.Timestamp(0)
+  paidAt         DateTime?           @map("paid_at") @db.Timestamp(0)
+  shippedAt      DateTime?           @map("shipped_at") @db.Timestamp(0)
+  deliveredAt    DateTime?           @map("delivered_at") @db.Timestamp(0)
+  cancelledAt    DateTime?           @map("cancelled_at") @db.Timestamp(0)
+  cancelReason   String?             @map("cancel_reason") @db.VarChar(500)
+  cancelledBy    String?             @map("cancelled_by") @db.VarChar(20)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamp(0)
+  user           User                @relation(fields: [userId], references: [id])
+  shop           Shop?               @relation(fields: [shopId], references: [id])
+  items          OrderItem[]
+  payment        Payment?
   shippingAddress ShippingAddress?
 
   @@index([userId])
@@ -41,6 +33,21 @@ model Order {
   @@index([orderedAt])
   @@index([userId, status])
   @@map("order")
+}
+
+model ShippingAddress {
+  id            Int     @id @default(autoincrement())
+  orderId       Int     @unique @map("order_id")
+  recipient     String  @db.VarChar(100)
+  phone         String  @db.VarChar(20)
+  postalCode    String  @map("postal_code") @db.VarChar(10)
+  address       String  @db.VarChar(500)
+  addressDetail String? @map("address_detail") @db.VarChar(500)
+  deliveryMemo  String? @map("delivery_memo") @db.VarChar(500)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("shipping_address")
 }
 
 model OrderItem {
