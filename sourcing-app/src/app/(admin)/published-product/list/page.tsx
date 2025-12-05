@@ -237,33 +237,42 @@ export default function PublishedProductListPage() {
           method: 'DELETE',
         })
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: '알 수 없는 오류' }))
+        const data = await response.json().catch(() => ({ error: '알 수 없는 오류' }))
 
+        if (!response.ok) {
           if (response.status === 404) {
             toast.error('발행상품을 찾을 수 없습니다.')
-            console.error('발행상품 미존재:', errorData)
+            console.error('발행상품 미존재:', data)
             return
           }
 
-          toast.error(errorData.error || '발행상품 삭제에 실패했습니다.')
-          console.error('삭제 API 오류:', errorData)
+          // 주문/문의가 있어서 삭제 불가한 경우
+          if (data.reason) {
+            toast.error(data.reason)
+          } else {
+            toast.error(data.error || '발행상품 삭제에 실패했습니다.')
+          }
+          console.error('삭제 API 오류:', data)
           return
         }
-
-        const data = await response.json()
 
         if (data.success) {
           toast.success('발행상품이 삭제되었습니다.')
           loadProducts()
         } else {
-          toast.error(data.error || '발행상품 삭제에 실패했습니다.')
+          // 주문/문의가 있어서 삭제 불가한 경우
+          if (data.reason) {
+            toast.error(data.reason)
+          } else {
+            toast.error(data.error || '발행상품 삭제에 실패했습니다.')
+          }
           console.error('삭제 응답 오류:', data)
         }
       } else {
         // 일괄 삭제
         let successCount = 0
         let failCount = 0
+        let blockedCount = 0
 
         for (const id of selectedIds) {
           try {
@@ -271,17 +280,27 @@ export default function PublishedProductListPage() {
               method: 'DELETE',
             })
 
+            const data = await response.json().catch(() => ({ error: '알 수 없는 오류' }))
+
             if (!response.ok) {
-              failCount++
-              console.error(`발행상품 삭제 실패 (ID: ${id}), 상태 코드:`, response.status)
+              // 주문/문의가 있어서 삭제 불가한 경우
+              if (data.reason) {
+                blockedCount++
+              } else {
+                failCount++
+              }
+              console.error(`발행상품 삭제 실패 (ID: ${id}):`, data)
               continue
             }
 
-            const data = await response.json()
             if (data.success) {
               successCount++
             } else {
-              failCount++
+              if (data.reason) {
+                blockedCount++
+              } else {
+                failCount++
+              }
               console.error(`발행상품 삭제 실패 (ID: ${id}):`, data)
             }
           } catch (error) {
@@ -294,8 +313,10 @@ export default function PublishedProductListPage() {
         setSelectAll(false)
         loadProducts()
 
-        if (successCount > 0 && failCount === 0) {
+        if (successCount > 0 && failCount === 0 && blockedCount === 0) {
           toast.success(`${successCount}개의 발행상품이 삭제되었습니다.`)
+        } else if (blockedCount > 0) {
+          toast.warning(`${successCount}개 삭제 성공, ${blockedCount}개는 주문/문의가 있어 삭제가 불가능합니다.`)
         } else if (successCount > 0 && failCount > 0) {
           toast.warning(`${successCount}개 삭제 성공, ${failCount}개 삭제 실패`)
         } else {

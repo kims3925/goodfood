@@ -31,6 +31,7 @@ import {
   ShoppingBag,
   PanelLeftClose,
   PanelLeftOpen,
+  Target,
 } from 'lucide-react'
 
 interface SidebarProps {
