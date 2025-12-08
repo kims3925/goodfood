@@ -38,7 +38,7 @@ export async function GET(
 ) {
   try {
     const { path: pathParts } = await params
-    if (!pathParts || pathParts.length < 2) {
+    if (!pathParts || pathParts.length < 1) {
       return NextResponse.json(
         { success: false, error: '잘못된 경로입니다.' },
         { status: 400 }
@@ -49,7 +49,7 @@ export async function GET(
     const basePath = process.env.SHOP_IMAGE_STORAGE_PATH || '~/assets/images/shop'
     const expandedBasePath = expandPath(basePath)
 
-    // 전체 파일 경로
+    // 전체 파일 경로 (shop/ 폴더에 직접 저장된 파일)
     const filePath = path.join(expandedBasePath, ...pathParts)
 
     // 경로 순회 공격 방지
