@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -9,7 +9,6 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
-  ChevronLeft,
   Store,
   FileText,
   Bot,
@@ -25,58 +24,119 @@ import {
   Calculator,
   MessageSquare,
   Users,
-  PanelRight,
-  Grid3X3,
-  Minimize2,
   ShoppingBag,
   PanelLeftClose,
   PanelLeftOpen,
-  Target,
   Truck,
+  RotateCcw,
+  Star,
+  Gift,
+  Ticket,
+  Calendar,
+  CreditCard,
 } from 'lucide-react'
+import {
+  AppSection,
+  MenuItem,
+  getMenuBySection,
+  getPathToMenuMap,
+  getSectionLabel,
+} from '@/config/navigation'
 
 interface SidebarProps {
   isOpen?: boolean
   onClose?: () => void
   collapsed?: boolean
   onToggleCollapse?: () => void
+  currentSection: AppSection
+  onSectionChange: (section: AppSection) => void
 }
 
-interface MenuItem {
-  label: string
-  href?: string
-  icon: React.ReactNode
-  children?: MenuItem[]
-  badge?: string
-  onClick?: (e: React.MouseEvent) => void
+// 아이콘 컴포넌트 매핑
+const iconMap: Record<string, React.ReactNode> = {
+  LayoutDashboard: <LayoutDashboard size={20} />,
+  Store: <Store size={20} />,
+  Zap: <Zap size={20} />,
+  Package: <Package size={20} />,
+  FileText: <FileText size={20} />,
+  Send: <Send size={20} />,
+  Database: <Database size={20} />,
+  ClipboardList: <ClipboardList size={20} />,
+  Truck: <Truck size={20} />,
+  Cog: <Cog size={20} />,
+  History: <History size={20} />,
+  Calculator: <Calculator size={20} />,
+  Users: <Users size={20} />,
+  MessageSquare: <MessageSquare size={20} />,
+  Settings: <Settings size={20} />,
+  ScrollText: <ScrollText size={20} />,
+  Link2: <Link2 size={20} />,
+  Bot: <Bot size={20} />,
+  ShoppingBag: <ShoppingBag size={20} />,
+  RotateCcw: <RotateCcw size={20} />,
+  Star: <Star size={20} />,
+  Gift: <Gift size={20} />,
+  Ticket: <Ticket size={20} />,
+  Calendar: <Calendar size={20} />,
+  CreditCard: <CreditCard size={20} />,
 }
 
-export default function Sidebar({ isOpen = true, onClose, collapsed = false, onToggleCollapse }: SidebarProps) {
+const smallIconMap: Record<string, React.ReactNode> = {
+  LayoutDashboard: <LayoutDashboard size={16} />,
+  Store: <Store size={16} />,
+  Zap: <Zap size={16} />,
+  Package: <Package size={16} />,
+  FileText: <FileText size={16} />,
+  Send: <Send size={16} />,
+  Database: <Database size={16} />,
+  ClipboardList: <ClipboardList size={16} />,
+  Truck: <Truck size={16} />,
+  Cog: <Cog size={16} />,
+  History: <History size={16} />,
+  Calculator: <Calculator size={16} />,
+  Users: <Users size={16} />,
+  MessageSquare: <MessageSquare size={16} />,
+  Settings: <Settings size={16} />,
+  ScrollText: <ScrollText size={16} />,
+  Link2: <Link2 size={16} />,
+  Bot: <Bot size={16} />,
+  ShoppingBag: <ShoppingBag size={16} />,
+  RotateCcw: <RotateCcw size={16} />,
+  Star: <Star size={16} />,
+  Gift: <Gift size={16} />,
+  Ticket: <Ticket size={16} />,
+  Calendar: <Calendar size={16} />,
+  CreditCard: <CreditCard size={16} />,
+}
+
+function getIcon(iconComponent: unknown, small = false): React.ReactNode {
+  if (!iconComponent) return null
+  const iconName = (iconComponent as { displayName?: string })?.displayName ||
+                   (iconComponent as { name?: string })?.name ||
+                   iconComponent.toString().match(/function (\w+)/)?.[1] ||
+                   ''
+  return small ? smallIconMap[iconName] || null : iconMap[iconName] || null
+}
+
+export default function Sidebar({
+  isOpen = true,
+  onClose,
+  collapsed = false,
+  onToggleCollapse,
+  currentSection,
+  onSectionChange
+}: SidebarProps) {
   const pathname = usePathname()
   const [expandedItems, setExpandedItems] = useState<string[]>([])
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [clickedItem, setClickedItem] = useState<string | null>(null)
 
+  // 현재 섹션의 메뉴 아이템
+  const menuItems = useMemo(() => getMenuBySection(currentSection), [currentSection])
+  const pathToMenuMap = useMemo(() => getPathToMenuMap(currentSection), [currentSection])
+
   // 경로에 따라 해당 메뉴 그룹 자동 확장
   useEffect(() => {
-    const pathToMenuMap: Record<string, string> = {
-      '/dashboard/shop': '대시보드',
-      '/dashboard/automation': '대시보드',
-      '/channel': '채널 관리',
-      '/shop': '쇼핑몰 관리',
-      '/collected-product': '상품 관리',
-      '/product': '상품 관리',
-      '/published-product': '상품 관리',
-      '/publish': '발행',
-      '/order': '주문서 관리',
-      '/automation': '자동화 관리',
-      '/settlement': '정산 관리',
-      '/cs': '고객 관리',
-      '/user': '고객 관리',
-      '/policy': '환경 설정',
-      '/admin/settings': '환경 설정',
-    }
-
     const matchedMenus: string[] = []
     for (const [path, menu] of Object.entries(pathToMenuMap)) {
       if (pathname.startsWith(path)) {
@@ -95,7 +155,7 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
         return newItems
       })
     }
-  }, [pathname])
+  }, [pathname, pathToMenuMap])
 
   // collapsed 상태 변경 시 clickedItem 리셋
   useEffect(() => {
@@ -117,139 +177,6 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
     }
   }, [clickedItem])
 
-  const menuItems: MenuItem[] = [
-    {
-      label: '대시보드',
-      icon: <LayoutDashboard size={20} />,
-      children: [
-        {
-          label: '쇼핑몰',
-          href: '/dashboard/shop',
-          icon: <Store size={16} />,
-        },
-        {
-          label: '자동화',
-          href: '/dashboard/automation',
-          icon: <Zap size={16} />,
-        },
-      ],
-    },
-    {
-      label: '채널 관리',
-      href: '/channel',
-      icon: <Store size={20} />,
-    },
-    {
-      label: '쇼핑몰 관리',
-      href: '/shop/list',
-      icon: <ShoppingBag size={20} />,
-    },
-    {
-      label: '게시물 관리',
-      href: '/post/list',
-      icon: <FileText size={20} />,
-    },
-    {
-      label: '상품 관리',
-      icon: <Package size={20} />,
-      children: [
-        {
-          label: '수집상품',
-          href: '/collected-product/list',
-          icon: <Database size={16} />,
-        },
-        {
-          label: '상품',
-          href: '/product/list',
-          icon: <Package size={16} />,
-        },
-        {
-          label: '발행상품',
-          href: '/published-product/list',
-          icon: <Send size={16} />,
-        },
-      ],
-    },
-    {
-      label: '발행',
-      href: '/publish',
-      icon: <Send size={20} />,
-    },
-    {
-      label: '주문 관리',
-      href: '/order/list',
-      icon: <ClipboardList size={20} />,
-    },
-    {
-      label: '도매처 발주',
-      href: '/wholesale-orders',
-      icon: <Truck size={20} />,
-    },
-    {
-      label: '자동화 관리',
-      icon: <Zap size={20} />,
-      children: [
-        {
-          label: '자동화 설정',
-          href: '/automation/settings',
-          icon: <Cog size={16} />,
-        },
-        {
-          label: '실행 로그',
-          href: '/automation/logs',
-          icon: <History size={16} />,
-        },
-      ],
-    },
-    {
-      label: '정산 목록',
-      href: '/settlement/list',
-      icon: <Calculator size={20} />,
-    },
-    {
-      label: '고객 관리',
-      icon: <Users size={20} />,
-      children: [
-        {
-          label: '사용자 관리',
-          href: '/user/list',
-          icon: <Users size={16} />,
-        },
-        {
-          label: '고객 문의',
-          href: '/cs/inquiry',
-          icon: <MessageSquare size={16} />,
-        },
-      ],
-    },
-    {
-      label: '환경 설정',
-      icon: <Settings size={20} />,
-      children: [
-        {
-          label: '정책 설정',
-          href: '/policy/list',
-          icon: <ScrollText size={16} />,
-        },
-        {
-          label: 'API 설정',
-          href: '/admin/settings/api',
-          icon: <Link2 size={16} />,
-        },
-        {
-          label: 'AI 설정',
-          href: '/admin/settings/ai',
-          icon: <Bot size={16} />,
-        },
-        {
-          label: '프롬프트 설정',
-          href: '/admin/settings/prompt',
-          icon: <FileText size={16} />,
-        },
-      ],
-    },
-  ]
-
   const toggleExpanded = (label: string) => {
     setExpandedItems((prev) =>
       prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
@@ -258,16 +185,16 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
 
   const isActive = (href?: string) => {
     if (!href) return false
-    // /channel 페이지는 /channel?type=xxx 형태도 활성화
-    if (href === '/channel' && pathname.startsWith('/channel')) {
-      return true
-    }
-    // /shop/list 페이지는 /shop/* 형태도 활성화
-    if (href === '/shop/list' && pathname.startsWith('/shop')) {
-      return true
-    }
-    // 정확한 경로 매칭만 활성화 (하위 경로 제외)
-    return pathname === href
+    // 정확한 경로 매칭 또는 하위 경로 매칭
+    if (pathname === href) return true
+    if (pathname.startsWith(href + '/')) return true
+    return false
+  }
+
+  const renderIcon = (item: MenuItem, small = false) => {
+    const Icon = item.icon
+    const size = small ? 16 : 20
+    return <Icon size={size} />
   }
 
   const renderMenuItem = (item: MenuItem, depth = 0) => {
@@ -292,8 +219,6 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
       const handleMouseLeave = () => {
         if (collapsed) {
           setHoveredItem(null)
-          // 클릭으로 열린 게 아닌 경우에만 닫기
-          // 클릭으로 열린 경우는 유지
         }
       }
 
@@ -317,7 +242,7 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
             title={collapsed ? item.label : undefined}
           >
             <div className={`flex items-center ${collapsed ? '' : 'gap-3'}`}>
-              {item.icon}
+              {renderIcon(item)}
               {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
             </div>
             {!collapsed && (isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />)}
@@ -340,10 +265,7 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
                 <Link
                   key={child.label}
                   href={child.href || '#'}
-                  onClick={(e) => {
-                    setClickedItem(null)
-                    child.onClick?.(e)
-                  }}
+                  onClick={() => setClickedItem(null)}
                   className={`
                     flex items-center gap-3
                     px-4 py-2
@@ -356,7 +278,7 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
                     }
                   `}
                 >
-                  {child.icon}
+                  {renderIcon(child, true)}
                   <span>{child.label}</span>
                 </Link>
               ))}
@@ -375,7 +297,6 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
       >
         <Link
           href={item.href || '#'}
-          onClick={item.onClick}
           className={`
             flex items-center
             ${collapsed ? 'justify-center px-2' : 'gap-3 px-4'}
@@ -391,7 +312,7 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
           `}
           title={collapsed ? item.label : undefined}
         >
-          {item.icon}
+          {renderIcon(item)}
           {!collapsed && <span>{item.label}</span>}
           {!collapsed && item.badge && (
             <span className="ml-auto px-2 py-0.5 text-xs font-semibold text-white bg-red-500 rounded-full">
@@ -437,13 +358,78 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
         <div className="h-full flex flex-col overflow-y-auto">
           {/* Mobile header */}
           <div className="flex items-center justify-between p-4 border-b border-divider lg:hidden">
-            <h2 className="text-xl font-bold text-primary-color">BandAuto release-1</h2>
+            <h2 className="text-xl font-bold text-primary-color">BandAuto</h2>
             <button
               onClick={onClose}
               className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface"
             >
               <X size={20} />
             </button>
+          </div>
+
+          {/* Section tabs */}
+          <div className={`border-b border-border ${collapsed ? 'px-1 py-2' : 'px-2 py-3'}`}>
+            {collapsed ? (
+              // Collapsed: 아이콘만 표시
+              <div className="flex flex-col gap-1">
+                <button
+                  onClick={() => onSectionChange('sourcing')}
+                  className={`
+                    w-full flex items-center justify-center p-2 rounded-md transition-colors
+                    ${currentSection === 'sourcing'
+                      ? 'bg-primary-light text-primary-color'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                    }
+                  `}
+                  title="소싱"
+                >
+                  <Package size={20} />
+                </button>
+                <button
+                  onClick={() => onSectionChange('shop')}
+                  className={`
+                    w-full flex items-center justify-center p-2 rounded-md transition-colors
+                    ${currentSection === 'shop'
+                      ? 'bg-primary-light text-primary-color'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                    }
+                  `}
+                  title="쇼핑몰"
+                >
+                  <ShoppingBag size={20} />
+                </button>
+              </div>
+            ) : (
+              // Expanded: 탭 버튼
+              <div className="flex gap-1">
+                <button
+                  onClick={() => onSectionChange('sourcing')}
+                  className={`
+                    flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors
+                    ${currentSection === 'sourcing'
+                      ? 'bg-primary-light text-primary-color'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                    }
+                  `}
+                >
+                  <Package size={16} />
+                  소싱
+                </button>
+                <button
+                  onClick={() => onSectionChange('shop')}
+                  className={`
+                    flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors
+                    ${currentSection === 'shop'
+                      ? 'bg-primary-light text-primary-color'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                    }
+                  `}
+                >
+                  <ShoppingBag size={16} />
+                  쇼핑몰
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Menu items */}

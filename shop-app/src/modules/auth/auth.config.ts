@@ -1,88 +1,8 @@
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import KakaoProvider from 'next-auth/providers/kakao'
-import NaverProvider from 'next-auth/providers/naver'
 import { prisma } from '@/modules/common/utils/src/database/client'
 import bcrypt from 'bcryptjs'
-import { User } from '@bandauto/db'
 import { headers } from 'next/headers'
-
-type OAuthProvider = 'kakao' | 'naver'
-
-type OAuthProfile = {
-  provider: OAuthProvider
-  providerId: string
-  email: string | null
-  name: string | null
-  profileImage: string | null
-}
-
-async function upsertOAuthUser(profile: OAuthProfile): Promise<User> {
-  // 1) provider id로 우선 탐색
-  const existingByProvider = await prisma.user.findFirst({
-    where: {
-      oauthProvider: profile.provider,
-      oauthProviderId: profile.providerId,
-    },
-  })
-  if (existingByProvider) {
-    return existingByProvider
-  }
-
-  // 2) 이메일 기반으로 기존 계정 연결 (기존 로컬 가입자도 OAuth로 전환)
-  if (profile.email) {
-    const existingByEmail = await prisma.user.findUnique({
-      where: { email: profile.email },
-    })
-    if (existingByEmail) {
-      return await prisma.user.update({
-        where: { id: existingByEmail.id },
-        data: {
-          oauthProvider: profile.provider,
-          oauthProviderId: profile.providerId,
-          profileImage: profile.profileImage ?? existingByEmail.profileImage,
-        },
-      })
-    }
-  }
-
-  // 3) 신규 가입 (JIT provisioning)
-  return prisma.user.create({
-    data: {
-      email:
-        profile.email ??
-        `${profile.provider}_${profile.providerId}@${profile.provider}.local`,
-      name: profile.name,
-      role: 'USER',
-      oauthProvider: profile.provider,
-      oauthProviderId: profile.providerId,
-      profileImage: profile.profileImage,
-    },
-  })
-}
-
-function getCompleteUrl() {
-  const base = process.env.NEXTAUTH_URL?.replace(/\/$/, '') || ''
-  return `${base}/auth/complete`
-}
-
-// OAuth 프로필 매핑 함수들
-const profileMappers: Record<OAuthProvider, (raw: any) => OAuthProfile> = {
-  kakao: (raw) => ({
-    provider: 'kakao',
-    providerId: raw.id?.toString() ?? '',
-    email: raw.kakao_account?.email ?? null,
-    name: raw.kakao_account?.profile?.nickname ?? null,
-    profileImage: raw.kakao_account?.profile?.profile_image_url ?? null,
-  }),
-  naver: (raw) => ({
-    provider: 'naver',
-    providerId: raw.response?.id ?? '',
-    email: raw.response?.email ?? null,
-    name: raw.response?.name ?? raw.response?.nickname ?? null,
-    profileImage: raw.response?.profile_image ?? null,
-  }),
-}
 
 function getRequestMeta() {
   try {
@@ -113,47 +33,6 @@ async function logSignIn(opts: {
       success: opts.success,
     },
   })
-}
-
-// 공통 OAuth 로그인 처리 함수
-async function handleOAuthSignIn(
-  provider: OAuthProvider,
-  profile: any,
-  user: any
-): Promise<string | boolean> {
-  const mapper = profileMappers[provider]
-  let oauthProfile: OAuthProfile | null = null
-
-  try {
-    oauthProfile = mapper(profile)
-    if (!oauthProfile.providerId) return false
-
-    const dbUser = await upsertOAuthUser(oauthProfile)
-    user.id = dbUser.id.toString()
-    user.email = dbUser.email
-    user.name = dbUser.name || dbUser.email
-
-    await logSignIn({
-      userId: dbUser.id,
-      provider,
-      email: dbUser.email,
-      success: true,
-    })
-
-    // 온보딩 미완료 시 동의 화면으로 이동
-    if (!dbUser.signupCompletedAt) {
-      return getCompleteUrl()
-    }
-    return true
-  } catch (error) {
-    console.error(`${provider} 로그인 처리 오류:`, error)
-    await logSignIn({
-      provider,
-      email: oauthProfile?.email,
-      success: false,
-    })
-    return false
-  }
 }
 
 // 쿠키 도메인 설정 (서브도메인 간 세션 공유)
@@ -215,14 +94,6 @@ export const authOptions: NextAuthOptions = {
     },
   },
   providers: [
-    KakaoProvider({
-      clientId: process.env.KAKAO_CLIENT_ID!,
-      clientSecret: process.env.KAKAO_CLIENT_SECRET!,
-    }),
-    NaverProvider({
-      clientId: process.env.NAVER_CLIENT_ID!,
-      clientSecret: process.env.NAVER_CLIENT_SECRET!,
-    }),
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
@@ -274,13 +145,8 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/error',
   },
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
       const provider = account?.provider ?? 'unknown'
-
-      // OAuth 로그인 처리 (Kakao, Naver)
-      if (provider === 'kakao' || provider === 'naver') {
-        return handleOAuthSignIn(provider, profile, user)
-      }
 
       // Credentials 로그인
       if (provider === 'credentials' && user?.id) {
