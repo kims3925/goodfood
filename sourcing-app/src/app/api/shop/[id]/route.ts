@@ -21,14 +21,14 @@ function expandPath(filePath: string): string {
 async function deleteImageFromUrl(imageUrl: string): Promise<void> {
   if (!imageUrl) return
 
-  // /api/image/shop/{userId}/{fileName} 형태의 URL에서 파일 경로 추출
-  const match = imageUrl.match(/\/api\/image\/shop\/(\d+)\/(.+)$/)
+  // /api/image/shop/{fileName} 형태의 URL에서 파일명 추출
+  const match = imageUrl.match(/\/api\/image\/shop\/(.+)$/)
   if (!match) return
 
-  const [, userId, fileName] = match
-  const basePath = process.env.SHOP_IMAGE_STORAGE_PATH || '~/assets/shop'
+  const [, fileName] = match
+  const basePath = process.env.SHOP_IMAGE_STORAGE_PATH || '~/assets/images/shop'
   const expandedBasePath = expandPath(basePath)
-  const filePath = path.join(expandedBasePath, userId, fileName)
+  const filePath = path.join(expandedBasePath, fileName)
 
   try {
     await unlink(filePath)

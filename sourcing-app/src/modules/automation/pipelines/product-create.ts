@@ -68,7 +68,7 @@ export async function runProductCreatePipeline(
         },
       },
     },
-    take: 50, // 배치당 최대 50개
+    // 제한 없음 - 상품 등록이 안된 수집상품 전부 처리
   })
 
   if (collectedProducts.length === 0) {
@@ -213,6 +213,7 @@ export async function runProductCreatePipeline(
 
       result.status = 'success'
       result.productId = product.id
+      result.productName = product.name
       totalCreated++
       consecutiveFailures = 0
 
@@ -231,11 +232,17 @@ export async function runProductCreatePipeline(
 
     createdProducts.push(result)
 
-    // 진행 상황 업데이트
+    // 진행 상황 및 details 실시간 업데이트
     if (workflowLogId) {
       const currentSuccess = createdProducts.filter((p) => p.status === 'success').length
       const currentFailed = createdProducts.filter((p) => p.status === 'failed').length
-      await updateWorkflowProgress(workflowLogId, collectedProducts.length, currentSuccess, currentFailed)
+      await updateWorkflowProgress(workflowLogId, collectedProducts.length, currentSuccess, currentFailed, {
+        productCreate: {
+          createdProducts: createdProducts.slice(-10), // 최근 10개만 저장 (메모리 절약)
+          totalCreated,
+          errors: errors.slice(-5), // 최근 5개 에러만
+        },
+      })
     }
   }
 

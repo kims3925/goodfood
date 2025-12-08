@@ -78,177 +78,298 @@ ${policyContent}
 
   // 가격 추출 규칙
   const pricingRule = policyContent
-    ? `5. **가격**: 도매가(wholesalePrice)와 판매가(price)를 추출합니다.
-   - 도매가: 게시물에서 추출한 원래 가격
-   - 판매가: 위 가격정책을 적용한 최종 가격`
-    : `5. **가격**: 상품의 가격을 추출합니다.
-   - 도매가(wholesalePrice): 공급가, 도매가
-   - 판매가(price): 소비자 판매 가격 (없으면 도매가와 동일)`
+    ? `## 가격 추출
+도매가(wholesalePrice)와 판매가(price)를 추출합니다.
+- 도매가: 게시물에서 추출한 원래 가격
+- 판매가: 위 가격정책을 적용한 최종 가격`
+    : `## 가격 추출
+상품의 가격을 추출합니다.
+- 도매가(wholesalePrice): 공급가, 도매가
+- 판매가(price): 소비자 판매 가격 (없으면 도매가와 동일)`
 
   return `당신은 한국 도매 쇼핑몰 상품 정보 추출 전문가입니다.
 
-# 게시물
+# 입력 데이터
 제목: ${post.title}
 내용: ${post.content || ''}
 ${policySection}
 
-# 추출 규칙
+---
 
-## 1. 상품명 (카피형 네이밍)
-원산지/지역 + 품질키워드 + 상품명 조합으로, 쇼핑몰 메인에 걸려도 눈에 확 들어오는 "카피형 상품명"으로 작성
+# 🚫 수집 제외 규칙 (최우선 적용)
 
-**예시:**
-- 수산물: "싱싱한 통영산 활돌문어", "당일조업 고흥 활 산낙지"
-- 농산물: "꿀달수 무안 황토 고구마", "햇 충주 국내산 참깨"
-- 가공식품: "30년전통 울산 수제 치즈설기", "50년전통 부산 프리미엄 꼬치어묵"
+## 이미지 검증 (반드시 확인!)
+다음 이미지는 **상품 이미지로 사용 불가**:
+- ❌ 가격표, 가격 텍스트가 포함된 이미지
+- ❌ 주문서, 입금 안내, 계좌번호 이미지
+- ❌ 배송 안내문, 공지사항 이미지
+- ❌ 프로필 사진, 로고, 배너 이미지
+- ❌ 리뷰/후기 캡처 이미지
+- ❌ 카카오톡/문자 대화 캡처
+- ❌ 상품과 무관한 풍경, 인물 사진
 
-**상품명 스타일 규칙:**
-- 첫 단어/앞부분에 임팩트 있는 형용사·키워드 사용 (예: 극강, 미친 가성비, 역대급, 찐맛보장, 꿀맛, 싱싱, 프리미엄, 명품 등)
-- 한 줄에 읽기 쉬운 1문장형 네이밍 (대략 20~30자 내외)
-- "국내산/수입산/지역명" 등 신뢰 키워드 포함
-- 느낌표는 0~1개까지만 사용 (과도한 반복 금지)
+✅ 사용 가능한 이미지:
+- 상품 자체 사진 (원물, 포장 상태)
+- 상품 활용 예시 (요리 완성 사진 등)
+- 상품 상세 컷 (단면, 크기 비교 등)
 
-## 2. 설명 (200-500자, 마케팅 카피 스타일)
-게시물에서 상품 특징, 효능, 맛 설명 부분을 추출하여, 광고 문구처럼 팡팡 튀는 마케팅 카피 스타일로 재구성
+## 게시물 검증
+다음 게시물은 **상품 변환 불가**:
+- ❌ 가격 정보가 전혀 없는 게시물
+- ❌ 단순 홍보/인사 게시물
+- ❌ 상품 없이 입금/배송 안내만 있는 글
+- ❌ 품절/마감 공지
+- ❌ 구인/구직 게시물
 
-**설명 스타일 규칙:**
-- 200~500자 사이로 작성
-- 1문단 또는 2문단 정도로 자연스럽게 구성
-- 첫 문장은 훅(Hook) 역할을 하도록 강렬하게 시작 (예: "한 번 먹으면 다시 찾게 되는 찐맛 고구마입니다.")
-- 중간에는 아래 요소들을 섞어 서술:
-  * 원산지/재배 환경/제조 방식 등 신뢰 포인트
-  * 맛·식감·향에 대한 감성적인 표현 (쫀득쫀득, 촉촉, 진득한 국물, 바삭바삭 등)
-  * 활용 요리 (예: 구이, 찜, 탕, 반찬, 간식 등)
-  * 재구매/후기/인기 강조 (예: 재구매 폭주, 판매자 강력 추천 등) — 사실이 아니라면 "느낌" 정도로 순화
-- 문장은 부드러운 구어체 + 판매페이지 문구 느낌으로 작성
-- 과장 표현은 쓰되, 명백한 허위·의학적 효능 단정 표현은 피하기 (예: "당뇨 완치" → "당분이 적어 부담 없이 즐기기 좋습니다")
+**상품 변환 불가 시 응답:**
+{
+  "error": "INVALID_POST",
+  "reason": "상품 정보 없음 - 단순 공지 게시물",
+  "extractable": false
+}
 
-## 3. 카테고리
-수산물, 농산물, 가공식품, 장류, 음료/차, 절임류
+---
 
-## 4. 옵션/variants 추출 (핵심!)
-가격이 다른 상품 구성을 찾아 추출:
+# 📦 상품 정보 추출 규칙
 
-**가격 패턴 인식:**
-- "➡️ 공급가 18,500원", "⏩⏩ 39,000원"
-- "₩12,900원", "￦19,900원", "1키로: 35,000원"
+## 1. 상품명 (카피형 네이밍, 20-35자)
 
-**옵션 유형:**
-- 수량: 5미, 10미, 20마리
-- 중량: 500g, 1kg, 2키로, 반말(3키로), 한말(6키로)
-- 크기: 소짜/세발/얼치기/소/중/대 (낙지), 소/중/대/특 (농산물)
-- 구성: A세트, B세트, 단품, 야채세트
-- 팩: 1팩, 2팩, 30팩, 50팩
+### 네이밍 공식
+[임팩트 키워드] + [원산지/브랜드] + [품질 수식어] + [상품명] + (옵션 요약)
+
+### 임팩트 키워드 예시
+| 카테고리 | 추천 키워드 |
+|---------|-----------|
+| 수산물 | 싱싱한, 통통한, 당일조업, 자연산, 활 |
+| 농산물 | 꿀맛, 햇, 유기농, 무농약, 산지직송 |
+| 가공식품 | N년전통, 수제, 프리미엄, 명품, 홈메이드 |
+| 축산물 | 신선한, 1등급, 프리미엄, 한우, 국내산 |
+
+### 작성 규칙
+- 첫 단어에 임팩트 있는 형용사 배치
+- 원산지/지역명으로 신뢰도 확보
+- 느낌표는 최대 1개 (없어도 됨)
+- 20~35자 이내로 간결하게
+
+### 예시
+✅ "싱싱한 통영산 활돌문어 (대/특대)"
+✅ "꿀달수 무안 황토 고구마 10kg"
+✅ "30년전통 울산 수제 치즈설기"
+❌ "낙지" (너무 짧음)
+❌ "최고급!!! 완전 맛있는!!!! 대박 고구마!!!!" (느낌표 과다)
+
+---
+
+## 2. 상품 설명 (200-500자, 마케팅 카피)
+
+### 구조
+[훅 문장 - 강렬한 첫인상]
++ [신뢰 포인트 - 원산지/제조방식/인증]
++ [감성 표현 - 맛/식감/향 묘사]
++ [활용법 - 요리/섭취 방법]
++ [마무리 - 추천/인기 강조]
+
+### 감성 표현 사전
+| 카테고리 | 표현 예시 |
+|---------|---------|
+| 식감 | 쫀득쫀득, 탱글탱글, 바삭바삭, 촉촉, 부드러운 |
+| 맛 | 달콤한, 고소한, 감칠맛 나는, 깊은 맛, 시원한 |
+| 신선도 | 싱싱한, 살아있는, 펄떡펄떡, 통통한 |
+| 품질 | 엄선된, 정성껏, 직접 고른, 프리미엄 |
+
+### 금지 표현
+- ❌ 의학적 효능 단정 ("당뇨 치료", "암 예방")
+- ❌ 허위 과장 ("세계 최고", "100% 완치")
+- ❌ 경쟁사 비방
+
+---
+
+## 3. 카테고리 분류
+
+| 카테고리 | 포함 품목 |
+|---------|---------|
+| 수산물 | 생선, 조개, 갑각류, 해조류, 젓갈 |
+| 농산물 | 채소, 과일, 버섯, 곡물, 견과류 |
+| 축산물 | 소고기, 돼지고기, 닭고기, 계란 |
+| 가공식품 | 떡, 빵, 반찬, 면류, 즉석식품 |
+| 장류 | 된장, 고추장, 간장, 청국장 |
+| 음료/차 | 전통차, 음료, 식혜, 수정과 |
+| 절임류 | 김치, 장아찌, 피클 |
+
+---
+
+## 4. 옵션 및 가격 추출 (핵심!)
+
+### 가격 패턴 인식
+일반: 48,000원, 48000원, ₩48,000, ￦48000
+화살표: ➡️ 공급가 18,500원, ⏩ 39,000원
+슬래시: 1키로: 35,000원, 10미/48,000
+괄호: (5미 29,000원)
+
+### 옵션 유형별 그룹명
+| 옵션 유형 | groupName | values 예시 |
+|----------|-----------|------------|
+| 수량 | 수량 | 5미, 10마리, 20미 |
+| 중량 | 중량 | 500g, 1kg, 3kg |
+| 크기 | 크기/규격 | 소, 중, 대, 특대 |
+| 구성 | 구성/세트 | A세트, 단품, 야채세트 |
+| 맛/종류 | 종류 | 통팥, 야채, 김치 |
+
+### 복합 옵션 처리
+크기 + 수량이 결합된 경우:
+"세발낙지 10미", "세발낙지 5미", "얼치기 10미"
+→ groupName: "규격" (크기+수량 통합)
 
 ${pricingRule}
 
-# 데이터 구조 규칙 (필수 준수!)
+---
 
-## 가격 타입 규칙 (매우 중요!)
-- 모든 가격은 반드시 **숫자 타입**으로 응답
-- 올바른 예: "wholesalePrice": 48000
-- 잘못된 예: "wholesalePrice": "48000" ← 문자열 금지!
-- 잘못된 예: "wholesalePrice": "48,000원" ← 콤마, 원 금지!
+## 5. 배송비 추출
 
-## options와 variants 관계
-- options: 옵션 그룹 정의 (groupName과 가능한 values 목록)
-- variants: 각 옵션에 대한 실제 가격 정보
-- **중요**: options.values의 모든 값은 variants에 1:1 대응되어야 함
-- **중요**: 각 variant에는 options 객체가 포함되어야 함
+### 인식 패턴
+포함: "택배비 포함", "배송비 포함", "무료배송"
+별도: "배송비 별도 3,000원", "택배비 4,000원"
+조건: "2박스 이상 무료", "5만원 이상 무배"
 
-## 빈 배열 금지
-- variants: [] (빈 배열) 금지
-- 단일 규격 상품도 반드시 1개의 variant 포함
+### 추출 규칙
+- 금액이 명시되면 숫자로 추출
+- "포함/무료"면 shippingFee: 0
+- 정보 없으면 null
 
-# 예시1 - 수산물(낙지) - 다중 옵션
-입력: "세발낙지 10마리 48,000원 (5미 29,000원)
+---
+
+# 📋 데이터 구조 규칙 (필수!)
+
+## 타입 규칙
+| 필드 | 타입 | 예시 |
+|-----|-----|-----|
+| wholesalePrice | number | 48000 ✅ / "48000" ❌ |
+| price | number | 48000 ✅ / "48,000원" ❌ |
+| shippingFee | number 또는 null | 3000, 0, null |
+
+## 필수 검증 항목
+- variants 배열이 비어있지 않음 (최소 1개)
+- 각 variant에 options 객체 포함
+- options.values와 variants가 1:1 대응
+- description이 200자 이상
+- 모든 가격이 숫자 타입
+
+---
+
+# 📝 응답 형식
+
+## 정상 응답 (순수 JSON, 마크다운 금지)
+{
+  "productName": "string (20-35자)",
+  "description": "string (200-500자)",
+  "category": "string",
+  "options": [
+    { "groupName": "string", "values": ["string"] }
+  ],
+  "pricing": {
+    "wholesalePrice": number,
+    "price": number,
+    "currency": "KRW"
+  },
+  "variants": [
+    {
+      "optionSummary": "string",
+      "options": { "groupName": "value" },
+      "wholesalePrice": number,
+      "price": number
+    }
+  ],
+  "shipping": {
+    "shippingFee": number 또는 null,
+    "shippingInfo": "string 또는 null"
+  },
+  "validImages": ["사용 가능한 이미지 URL 목록"],
+  "excludedImages": [
+    { "url": "제외된 이미지 URL", "reason": "제외 사유" }
+  ]
+}
+
+## 오류 응답
+{
+  "error": "INVALID_POST | NO_PRICE | NO_PRODUCT",
+  "reason": "구체적인 사유",
+  "extractable": false
+}
+
+---
+
+# 💡 예시
+
+## 예시1: 수산물 다중 옵션
+입력:
+제목: 고흥 활낙지
+내용: 세발낙지 10마리 48,000원 (5미 29,000원)
 얼치기 10마리 55,000원 (5미 32,500원)
-소낙지 10마리 70,000원"
+소낙지 10마리 70,000원
+택배비 별도 5,000원
 
 출력:
 {
-  "productName": "싱싱한 서해안 국내산 활낙지 (세발/얼치기/소)",
-  "description": "무안 신안 등 서해안에서 조업된 100% 국내산 뻘낙지입니다. 보들보들한 식감으로 연포탕, 탕탕이, 볶음에 최고! 산소포장으로 신선하게 배송됩니다.",
+  "productName": "당일조업 고흥 활낙지 (세발/얼치기/소)",
+  "description": "펄떡펄떡 살아있는 고흥산 뻘낙지입니다! 서해안 청정 갯벌에서 당일 조업한 낙지를 산소포장으로 싱싱하게 보내드립니다. 세발낙지는 부드러운 식감으로 탕탕이와 연포탕에 제격이고, 얼치기는 적당한 씹는 맛으로 볶음 요리에 딱입니다. 소낙지는 통통하게 오른 살이 일품으로 회나 숙회로 즐기기 좋습니다. 산지 어부가 직접 선별해 크기와 신선도 모두 만족스러우실 거예요.",
   "category": "수산물",
-  "options": [{ "groupName": "규격", "values": ["세발낙지 10미", "세발낙지 5미", "얼치기 10미", "얼치기 5미", "소낙지 10미"] }],
+  "options": [
+    { "groupName": "규격", "values": ["세발 10미", "세발 5미", "얼치기 10미", "얼치기 5미", "소낙지 10미"] }
+  ],
   "pricing": { "wholesalePrice": 29000, "price": 29000, "currency": "KRW" },
   "variants": [
-    { "optionSummary": "세발낙지 10미", "options": { "규격": "세발낙지 10미" }, "wholesalePrice": 48000, "price": 48000 },
-    { "optionSummary": "세발낙지 5미", "options": { "규격": "세발낙지 5미" }, "wholesalePrice": 29000, "price": 29000 },
+    { "optionSummary": "세발 10미", "options": { "규격": "세발 10미" }, "wholesalePrice": 48000, "price": 48000 },
+    { "optionSummary": "세발 5미", "options": { "규격": "세발 5미" }, "wholesalePrice": 29000, "price": 29000 },
     { "optionSummary": "얼치기 10미", "options": { "규격": "얼치기 10미" }, "wholesalePrice": 55000, "price": 55000 },
     { "optionSummary": "얼치기 5미", "options": { "규격": "얼치기 5미" }, "wholesalePrice": 32500, "price": 32500 },
     { "optionSummary": "소낙지 10미", "options": { "규격": "소낙지 10미" }, "wholesalePrice": 70000, "price": 70000 }
   ],
-  "shipping": { "shippingFee": null, "shippingInfo": null }
+  "shipping": { "shippingFee": 5000, "shippingInfo": "택배비 별도 5,000원" },
+  "validImages": [],
+  "excludedImages": []
 }
 
-# 예시2 - 가공식품(떡/호빵) - 세트 구성
-입력: "통팥 호빵 1팩 4,900원
-야채 호빵 1팩 5,800원
-통팥 2팩+야채 1팩 14,900원"
+## 예시2: 변환 불가 게시물
+입력:
+제목: 공지사항
+내용: 이번 주 금요일은 휴무입니다. 주문은 토요일부터 가능합니다.
 
 출력:
 {
-  "productName": "26년전통 국산재료 통팥/야채 쌀호빵",
-  "description": "국내산 야채와 통팥으로 속을 가득 채운 수제 호빵입니다. 전자레인지나 찜기에 쪄먹으면 겨울 대표 간식으로 최고!",
-  "category": "가공식품",
-  "options": [{ "groupName": "구성", "values": ["통팥 1팩", "야채 1팩", "통팥2+야채1"] }],
-  "pricing": { "wholesalePrice": 4900, "price": 4900, "currency": "KRW" },
-  "variants": [
-    { "optionSummary": "통팥 1팩", "options": { "구성": "통팥 1팩" }, "wholesalePrice": 4900, "price": 4900 },
-    { "optionSummary": "야채 1팩", "options": { "구성": "야채 1팩" }, "wholesalePrice": 5800, "price": 5800 },
-    { "optionSummary": "통팥2+야채1", "options": { "구성": "통팥2+야채1" }, "wholesalePrice": 14900, "price": 14900 }
-  ],
-  "shipping": { "shippingFee": null, "shippingInfo": null }
+  "error": "INVALID_POST",
+  "reason": "상품 정보 없음 - 휴무 공지 게시물",
+  "extractable": false
 }
 
-# 예시3 - 농산물(단일규격)
-입력: "무안달수 상중 10키로 39,000원"
+## 예시3: 농산물 단일 규격
+입력:
+제목: 무안 고구마
+내용: 꿀고구마 10kg 39,000원
 
 출력:
 {
-  "productName": "꿀달수 무안 황토 고구마 (베니하루카)",
-  "description": "유기농이라 껍질째 먹는 꿀고구마입니다. 무안현경면에서 재배한 달달한 고구마로 재주문 200%! 믿고 찾는 황토 달수고구마입니다.",
+  "productName": "꿀달수 무안 황토 고구마 10kg",
+  "description": "한 입 베어물면 입안 가득 퍼지는 달콤함! 무안 황토밭에서 정성껏 키운 베니하루카 품종 고구마입니다. 해풍과 황토의 미네랄을 듬뿍 머금어 당도가 남다릅니다. 에어프라이어에 구우면 꿀이 흘러내리고, 쪄서 먹으면 밤고구마 부럽지 않은 포슬포슬 식감! 아이 간식부터 다이어트 식단까지 두루 활용하기 좋습니다. 산지에서 당일 수확 후 바로 발송해 신선함이 다릅니다.",
   "category": "농산물",
-  "options": [{ "groupName": "규격", "values": ["상중 10키로"] }],
+  "options": [{ "groupName": "규격", "values": ["10kg"] }],
   "pricing": { "wholesalePrice": 39000, "price": 39000, "currency": "KRW" },
   "variants": [
-    { "optionSummary": "상중 10키로", "options": { "규격": "상중 10키로" }, "wholesalePrice": 39000, "price": 39000 }
+    { "optionSummary": "10kg", "options": { "규격": "10kg" }, "wholesalePrice": 39000, "price": 39000 }
   ],
-  "shipping": { "shippingFee": null, "shippingInfo": null }
+  "shipping": { "shippingFee": null, "shippingInfo": null },
+  "validImages": [],
+  "excludedImages": []
 }
 
-# 5. 배송비 정보 추출
-게시물에서 배송비 관련 정보를 찾아 추출합니다:
-- "택배비 포함", "배송비 별도", "무료배송" 등의 패턴
-- "배송비 3,000원", "택배비 4,000원" 등 구체적인 금액
-- "2박스 이상 무료배송", "합배송 가능" 등 조건부 배송 정보
+---
 
-# 응답 형식 (반드시 아래 형식 준수!)
-순수 JSON만 응답 (마크다운 코드블록 금지)
-
-{
-  "productName": "상품명 (필수)",
-  "description": "설명 200-500자 (필수, 빈 문자열 금지)",
-  "category": "카테고리",
-  "options": [
-    { "groupName": "옵션그룹명", "values": ["값1", "값2"] }
-  ],
-  "pricing": { "wholesalePrice": 숫자, "price": 숫자, "currency": "KRW" },
-  "variants": [
-    { "optionSummary": "값1", "options": { "옵션그룹명": "값1" }, "wholesalePrice": 숫자, "price": 숫자 }
-  ],
-  "shipping": { "shippingFee": 숫자또는null, "shippingInfo": "원문정보또는null" }
-}
-
-# 주의사항 체크리스트 (필수!)
-- JSON만 응답 (마크다운 코드블록 없이)
-- 모든 가격은 숫자 타입 (48000, 문자열 "48000" 금지)
-- variants 배열 비어있지 않음 (최소 1개)
-- 각 variant에 options 객체 포함
-- options.values와 variants가 1:1 대응
-- description 빈 문자열 아님
-- shipping 객체 포함`
+# ⚠️ 최종 체크리스트
+- JSON만 응답 (마크다운 코드블록 사용 금지)
+- 모든 가격 숫자 타입
+- variants 최소 1개 이상
+- description 200자 이상
+- 이미지 검증 완료
+- 상품 아닌 게시물은 error 응답`
 }
 
 // =============================================
@@ -465,14 +586,11 @@ function repairTruncatedJson(jsonText: string): string {
 
   console.log('🔧 JSON 복구 시도 중...')
 
-  // 1. Remove incomplete string at the end (truncated mid-string)
-  // Find the last complete JSON structure
-  let lastValidIndex = jsonText.length - 1
-
-  // Check if we're in an unclosed string
+  // 1. Check if we're in an unclosed string
   let inString = false
   let escapeNext = false
   let lastStringStart = -1
+  let lastCompleteElement = -1 // 마지막으로 완전한 요소의 위치
 
   for (let i = 0; i < jsonText.length; i++) {
     const char = jsonText[i]
@@ -489,6 +607,10 @@ function repairTruncatedJson(jsonText: string): string {
         lastStringStart = i
       }
       inString = !inString
+    }
+    // 문자열 밖에서 }, ] 를 만나면 완전한 요소로 기록
+    if (!inString && (char === '}' || char === ']')) {
+      lastCompleteElement = i
     }
   }
 
@@ -509,6 +631,8 @@ function repairTruncatedJson(jsonText: string): string {
   jsonText = jsonText.replace(/,?\s*"[^"]*":\s*("[^"]*)?$/m, '')
   jsonText = jsonText.replace(/,?\s*"[^"]*":\s*\d*$/m, '')
   jsonText = jsonText.replace(/,?\s*"[^"]*":\s*$/m, '')
+  // 불완전한 배열 요소 제거 (예: [1, 2, )
+  jsonText = jsonText.replace(/,?\s*\{[^}]*$/m, '')
 
   // 3. Remove trailing comma
   jsonText = jsonText.replace(/,\s*$/, '')
@@ -552,10 +676,91 @@ function repairTruncatedJson(jsonText: string): string {
   try {
     JSON.parse(jsonText)
     console.log('🔧 JSON 복구 완료')
-  } catch (e) {
-    console.log('🔧 JSON 복구 시도 (일부 데이터 손실 가능)')
+    return jsonText
+  } catch (e: any) {
+    console.log('🔧 1차 복구 실패, 2차 시도 중...', e.message)
   }
 
+  // 7. 2차 복구 시도: 마지막 완전한 배열 요소까지만 사용
+  // 에러 메시지에서 위치 추출 시도
+  try {
+    JSON.parse(jsonText)
+  } catch (e: any) {
+    const positionMatch = e.message.match(/position (\d+)/)
+    if (positionMatch) {
+      const errorPosition = parseInt(positionMatch[1], 10)
+      console.log(`🔧 에러 위치: ${errorPosition}`)
+
+      // 에러 위치 이전의 마지막 완전한 객체 찾기
+      let lastGoodPosition = errorPosition - 1
+      let braceCount = 0
+      let bracketCount = 0
+      inString = false
+      escapeNext = false
+
+      // 에러 위치에서 역방향으로 탐색하여 완전한 구조 찾기
+      for (let i = errorPosition - 1; i >= 0; i--) {
+        const char = jsonText[i]
+        if (char === '}' && !inString) {
+          // } 발견 시 이전의 쉼표까지 찾아서 자르기
+          let cutPoint = i + 1
+          // 다음 쉼표 확인
+          for (let j = i + 1; j < Math.min(i + 10, jsonText.length); j++) {
+            if (jsonText[j] === ',') {
+              cutPoint = j
+              break
+            }
+            if (jsonText[j] !== ' ' && jsonText[j] !== '\n' && jsonText[j] !== '\r' && jsonText[j] !== '\t') {
+              break
+            }
+          }
+
+          const truncated = jsonText.substring(0, cutPoint).trim().replace(/,\s*$/, '')
+
+          // 괄호 균형 확인
+          let testBraces = 0
+          let testBrackets = 0
+          let testInString = false
+          let testEscapeNext = false
+
+          for (const c of truncated) {
+            if (testEscapeNext) {
+              testEscapeNext = false
+              continue
+            }
+            if (c === '\\') {
+              testEscapeNext = true
+              continue
+            }
+            if (c === '"') {
+              testInString = !testInString
+              continue
+            }
+            if (testInString) continue
+
+            if (c === '{') testBraces++
+            else if (c === '}') testBraces--
+            else if (c === '[') testBrackets++
+            else if (c === ']') testBrackets--
+          }
+
+          let repaired = truncated
+          for (let k = 0; k < testBrackets; k++) repaired += ']'
+          for (let k = 0; k < testBraces; k++) repaired += '}'
+
+          try {
+            JSON.parse(repaired)
+            console.log(`🔧 2차 복구 성공 (위치 ${i}에서 절단)`)
+            return repaired
+          } catch {
+            // 이 위치에서 실패하면 계속 역방향 탐색
+          }
+        }
+      }
+    }
+  }
+
+  console.log('🔧 JSON 복구 시도 완료 (일부 데이터 손실 가능)')
   return jsonText
 }
 
@@ -946,12 +1151,14 @@ ${policyContent}
 
   // 가격 추출 규칙
   const pricingRule = policyContent
-    ? `5. **가격**: 도매가(wholesalePrice)와 판매가(price)를 추출합니다.
-   - 도매가: 게시물에서 추출한 원래 가격
-   - 판매가: 위 가격정책을 적용한 최종 가격`
-    : `5. **가격**: 상품의 가격을 추출합니다.
-   - 도매가(wholesalePrice): 공급가, 도매가
-   - 판매가(price): 소비자 판매 가격 (없으면 도매가와 동일)`
+    ? `## 가격 추출
+도매가(wholesalePrice)와 판매가(price)를 추출합니다.
+- 도매가: 게시물에서 추출한 원래 가격
+- 판매가: 위 가격정책을 적용한 최종 가격`
+    : `## 가격 추출
+상품의 가격을 추출합니다.
+- 도매가(wholesalePrice): 공급가, 도매가
+- 판매가(price): 소비자 판매 가격 (없으면 도매가와 동일)`
 
   return `당신은 한국 도매 쇼핑몰 상품 정보 추출 전문가입니다.
 
@@ -961,86 +1168,203 @@ ${policyContent}
 ${postsSection}
 ${policySection}
 
-# 추출 규칙
+---
 
-## 1. 상품명 (카피형 네이밍)
-원산지/지역 + 품질키워드 + 상품명 조합으로, 쇼핑몰 메인에 걸려도 눈에 확 들어오는 "카피형 상품명"으로 작성
+# 🚫 수집 제외 규칙 (최우선 적용)
 
-**예시:**
-- 수산물: "싱싱한 통영산 활돌문어", "당일조업 고흥 활 산낙지"
-- 농산물: "꿀달수 무안 황토 고구마", "햇 충주 국내산 참깨"
-- 가공식품: "30년전통 울산 수제 치즈설기", "50년전통 부산 프리미엄 꼬치어묵"
+## 이미지 검증
+다음 이미지는 **상품 이미지로 사용 불가**:
+- ❌ 가격표, 가격 텍스트가 포함된 이미지
+- ❌ 주문서, 입금 안내, 계좌번호 이미지
+- ❌ 배송 안내문, 공지사항 이미지
+- ❌ 프로필 사진, 로고, 배너 이미지
+- ❌ 리뷰/후기 캡처 이미지
+- ❌ 카카오톡/문자 대화 캡처
+- ❌ 상품과 무관한 풍경, 인물 사진
 
-**상품명 스타일 규칙:**
-- 첫 단어/앞부분에 임팩트 있는 형용사·키워드 사용 (예: 극강, 미친 가성비, 역대급, 찐맛보장, 꿀맛, 싱싱, 프리미엄, 명품 등)
-- 한 줄에 읽기 쉬운 1문장형 네이밍 (대략 20~30자 내외)
-- "국내산/수입산/지역명" 등 신뢰 키워드 포함
-- 느낌표는 0~1개까지만 사용 (과도한 반복 금지)
+## 게시물 검증
+다음 게시물은 **상품 변환 불가** (error 응답 반환):
+- ❌ 가격 정보가 전혀 없는 게시물
+- ❌ 단순 홍보/인사 게시물
+- ❌ 상품 없이 입금/배송 안내만 있는 글
+- ❌ 품절/마감 공지
+- ❌ 구인/구직 게시물
 
-## 2. 설명 (200-500자, 마케팅 카피 스타일)
-게시물에서 상품 특징, 효능, 맛 설명 부분을 추출하여, 광고 문구처럼 팡팡 튀는 마케팅 카피 스타일로 재구성
+---
 
-**설명 스타일 규칙:**
-- 200~500자 사이로 작성
-- 1문단 또는 2문단 정도로 자연스럽게 구성
-- 첫 문장은 훅(Hook) 역할을 하도록 강렬하게 시작 (예: "한 번 먹으면 다시 찾게 되는 찐맛 고구마입니다.")
-- 중간에는 아래 요소들을 섞어 서술:
-  * 원산지/재배 환경/제조 방식 등 신뢰 포인트
-  * 맛·식감·향에 대한 감성적인 표현 (쫀득쫀득, 촉촉, 진득한 국물, 바삭바삭 등)
-  * 활용 요리 (예: 구이, 찜, 탕, 반찬, 간식 등)
-  * 재구매/후기/인기 강조 (예: 재구매 폭주, 판매자 강력 추천 등) — 사실이 아니라면 "느낌" 정도로 순화
-- 문장은 부드러운 구어체 + 판매페이지 문구 느낌으로 작성
-- 과장 표현은 쓰되, 명백한 허위·의학적 효능 단정 표현은 피하기 (예: "당뇨 완치" → "당분이 적어 부담 없이 즐기기 좋습니다")
+# 📦 상품 정보 추출 규칙
 
-## 3. 카테고리
-수산물, 농산물, 가공식품, 장류, 음료/차, 절임류
+## 1. 상품명 (카피형 네이밍, 20-35자)
 
-## 4. 옵션/variants 추출 (핵심!)
-가격이 다른 상품 구성을 찾아 추출
+### 네이밍 공식
+[임팩트 키워드] + [원산지/브랜드] + [품질 수식어] + [상품명] + (옵션 요약)
+
+### 임팩트 키워드 예시
+| 카테고리 | 추천 키워드 |
+|---------|-----------|
+| 수산물 | 싱싱한, 통통한, 당일조업, 자연산, 활 |
+| 농산물 | 꿀맛, 햇, 유기농, 무농약, 산지직송 |
+| 가공식품 | N년전통, 수제, 프리미엄, 명품, 홈메이드 |
+| 축산물 | 신선한, 1등급, 프리미엄, 한우, 국내산 |
+
+### 작성 규칙
+- 첫 단어에 임팩트 있는 형용사 배치
+- 원산지/지역명으로 신뢰도 확보
+- 느낌표는 최대 1개 (없어도 됨)
+- 20~35자 이내로 간결하게
+
+---
+
+## 2. 상품 설명 (200-500자, 마케팅 카피)
+
+### 구조
+[훅 문장 - 강렬한 첫인상]
++ [신뢰 포인트 - 원산지/제조방식/인증]
++ [감성 표현 - 맛/식감/향 묘사]
++ [활용법 - 요리/섭취 방법]
++ [마무리 - 추천/인기 강조]
+
+### 감성 표현 사전
+| 카테고리 | 표현 예시 |
+|---------|---------|
+| 식감 | 쫀득쫀득, 탱글탱글, 바삭바삭, 촉촉, 부드러운 |
+| 맛 | 달콤한, 고소한, 감칠맛 나는, 깊은 맛, 시원한 |
+| 신선도 | 싱싱한, 살아있는, 펄떡펄떡, 통통한 |
+| 품질 | 엄선된, 정성껏, 직접 고른, 프리미엄 |
+
+### 금지 표현
+- ❌ 의학적 효능 단정 ("당뇨 치료", "암 예방")
+- ❌ 허위 과장 ("세계 최고", "100% 완치")
+- ❌ 경쟁사 비방
+
+---
+
+## 3. 카테고리 분류
+
+| 카테고리 | 포함 품목 |
+|---------|---------|
+| 수산물 | 생선, 조개, 갑각류, 해조류, 젓갈 |
+| 농산물 | 채소, 과일, 버섯, 곡물, 견과류 |
+| 축산물 | 소고기, 돼지고기, 닭고기, 계란 |
+| 가공식품 | 떡, 빵, 반찬, 면류, 즉석식품 |
+| 장류 | 된장, 고추장, 간장, 청국장 |
+| 음료/차 | 전통차, 음료, 식혜, 수정과 |
+| 절임류 | 김치, 장아찌, 피클 |
+
+---
+
+## 4. 옵션 및 가격 추출
+
+### 가격 패턴 인식
+일반: 48,000원, 48000원, ₩48,000, ￦48000
+화살표: ➡️ 공급가 18,500원, ⏩ 39,000원
+슬래시: 1키로: 35,000원, 10미/48,000
+괄호: (5미 29,000원)
+
+### 옵션 유형별 그룹명
+| 옵션 유형 | groupName | values 예시 |
+|----------|-----------|------------|
+| 수량 | 수량 | 5미, 10마리, 20미 |
+| 중량 | 중량 | 500g, 1kg, 3kg |
+| 크기 | 크기/규격 | 소, 중, 대, 특대 |
+| 구성 | 구성/세트 | A세트, 단품, 야채세트 |
+| 맛/종류 | 종류 | 통팥, 야채, 김치 |
+
+### 복합 옵션 처리
+크기 + 수량이 결합된 경우:
+"세발낙지 10미", "세발낙지 5미", "얼치기 10미"
+→ groupName: "규격" (크기+수량 통합)
 
 ${pricingRule}
 
-# 데이터 구조 규칙 (필수 준수!)
+---
 
-## 가격 타입 규칙 (매우 중요!)
-- 모든 가격은 반드시 **숫자 타입**으로 응답
-- 올바른 예: "wholesalePrice": 48000
-- 잘못된 예: "wholesalePrice": "48000" ← 문자열 금지!
+## 5. 배송비 추출
 
-## options와 variants 관계
-- options: 옵션 그룹 정의 (groupName과 가능한 values 목록)
-- variants: 각 옵션에 대한 실제 가격 정보
-- **중요**: 각 variant에는 options 객체가 포함되어야 함
+### 인식 패턴
+포함: "택배비 포함", "배송비 포함", "무료배송"
+별도: "배송비 별도 3,000원", "택배비 4,000원"
+조건: "2박스 이상 무료", "5만원 이상 무배"
 
-## 빈 배열 금지
-- variants: [] (빈 배열) 금지
-- 단일 규격 상품도 반드시 1개의 variant 포함
+### 추출 규칙
+- 금액이 명시되면 숫자로 추출
+- "포함/무료"면 shippingFee: 0
+- 정보 없으면 null
 
-# 응답 형식 (필수!)
-각 게시물에 대한 분석 결과를 JSON 배열로 응답해주세요.
-순수 JSON만 응답 (마크다운 코드블록 금지)
+---
 
+# 📋 데이터 구조 규칙 (필수!)
+
+## 타입 규칙
+| 필드 | 타입 | 예시 |
+|-----|-----|-----|
+| wholesalePrice | number | 48000 ✅ / "48000" ❌ |
+| price | number | 48000 ✅ / "48,000원" ❌ |
+| shippingFee | number 또는 null | 3000, 0, null |
+
+## 필수 검증 항목
+- variants 배열이 비어있지 않음 (최소 1개)
+- 각 variant에 options 객체 포함
+- options.values와 variants가 1:1 대응
+- description이 200자 이상
+- 모든 가격이 숫자 타입
+
+---
+
+# 📝 응답 형식
+
+## 정상 응답 (순수 JSON 배열, 마크다운 금지)
 [
   {
     "postId": 게시물ID숫자,
-    "productName": "상품명",
-    "description": "설명 200-500자",
-    "category": "카테고리",
-    "options": [{ "groupName": "규격", "values": ["값1", "값2"] }],
-    "pricing": { "wholesalePrice": 숫자, "price": 숫자, "currency": "KRW" },
-    "variants": [
-      { "optionSummary": "값1", "options": { "규격": "값1" }, "wholesalePrice": 숫자, "price": 숫자 }
+    "productName": "string (20-35자)",
+    "description": "string (200-500자)",
+    "category": "string",
+    "options": [
+      { "groupName": "string", "values": ["string"] }
     ],
-    "shipping": { "shippingFee": 숫자또는null, "shippingInfo": "원문정보또는null" }
+    "pricing": {
+      "wholesalePrice": number,
+      "price": number,
+      "currency": "KRW"
+    },
+    "variants": [
+      {
+        "optionSummary": "string",
+        "options": { "groupName": "value" },
+        "wholesalePrice": number,
+        "price": number
+      }
+    ],
+    "shipping": {
+      "shippingFee": number 또는 null,
+      "shippingInfo": "string 또는 null"
+    },
+    "validImages": ["사용 가능한 이미지 URL 목록"],
+    "excludedImages": [
+      { "url": "제외된 이미지 URL", "reason": "제외 사유" }
+    ]
   }
 ]
 
-# 주의사항 체크리스트 (필수!)
-- JSON 배열만 응답 (마크다운 코드블록 없이)
+## 변환 불가 게시물 응답
+{
+  "postId": 게시물ID숫자,
+  "error": "INVALID_POST | NO_PRICE | NO_PRODUCT",
+  "reason": "구체적인 사유",
+  "extractable": false
+}
+
+---
+
+# ⚠️ 최종 체크리스트
+- JSON 배열만 응답 (마크다운 코드블록 사용 금지)
 - 각 객체에 postId 포함 (게시물 ID와 일치)
-- 모든 가격은 숫자 타입
-- variants 배열 비어있지 않음 (최소 1개)
-- 각 variant에 options 객체 포함`
+- 모든 가격 숫자 타입
+- variants 최소 1개 이상
+- description 200자 이상
+- 이미지 검증 완료
+- 상품 아닌 게시물은 error 응답`
 }
 
 /**
@@ -1211,7 +1535,7 @@ export async function transformPostsToProductsBatch(
     }))
   }
 
-  // AI 클라이언트 생성
+  // AI 클라이언트 생성 (배치 처리 - 토큰 제한 없음)
   const aiClient = createAiClient({
     provider: aiConfig.provider,
     apiKey: aiConfig.apiKey,

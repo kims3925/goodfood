@@ -10,7 +10,6 @@ interface AISettings {
   geminiModel: string
   openaiModel: string
   temperature: number
-  maxTokens: number
   isValid?: boolean
 }
 
@@ -22,7 +21,6 @@ export default function AISettingsPage() {
     geminiModel: 'gemini-2.5-flash-lite',
     openaiModel: 'o3-mini',
     temperature: 0.7,
-    maxTokens: 2048
   })
   const [isSaving, setIsSaving] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
@@ -46,7 +44,6 @@ export default function AISettingsPage() {
           geminiModel: data.settings.gemini?.model || 'gemini-2.5-flash',
           openaiModel: data.settings.openai?.model || 'gpt-4o-mini',
           temperature: data.settings.gemini?.temperature || 0.7,
-          maxTokens: data.settings.gemini?.maxTokens || 2048,
         })
       }
     } catch (error) {
@@ -69,7 +66,6 @@ export default function AISettingsPage() {
             apiKey: settings.provider === 'gemini' ? settings.geminiApiKey : settings.openaiApiKey,
             model: settings.provider === 'gemini' ? settings.geminiModel : settings.openaiModel,
             temperature: settings.temperature,
-            maxTokens: settings.maxTokens,
           }
         })
       })
@@ -363,24 +359,6 @@ export default function AISettingsPage() {
                 </p>
               </div>
 
-              {/* Max Tokens */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  최대 토큰 수
-                </label>
-                <input
-                  type="number"
-                  min="256"
-                  max="8192"
-                  step="256"
-                  value={settings.maxTokens}
-                  onChange={(e) => setSettings(prev => ({ ...prev, maxTokens: parseInt(e.target.value) }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  AI가 생성할 수 있는 최대 텍스트 길이 (권장: 2048)
-                </p>
-              </div>
             </div>
 
             {/* Action Buttons */}

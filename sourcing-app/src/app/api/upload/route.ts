@@ -67,8 +67,8 @@ export async function POST(request: NextRequest) {
     const basePath = process.env.SHOP_IMAGE_STORAGE_PATH || '~/assets/images/shop'
     const expandedBasePath = expandPath(basePath)
 
-    // 기본 디렉토리 및 사용자별 폴더 생성
-    const uploadDir = path.join(expandedBasePath, currentUser.userId.toString())
+    // 기본 디렉토리 생성 (shop/ 폴더에 직접 저장)
+    const uploadDir = expandedBasePath
     try {
       await mkdir(uploadDir, { recursive: true })
     } catch (mkdirError: any) {
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 반환할 URL (이미지 서빙용 API 경로)
-    const fileUrl = `/api/image/shop/${currentUser.userId}/${fileName}`
+    const fileUrl = `/api/image/shop/${fileName}`
 
     return NextResponse.json({
       success: true,

@@ -91,13 +91,11 @@ export class SettingsService {
         apiKey: '',
         model: 'gemini-2.5-flash',
         temperature: 0.7,
-        maxTokens: 2048,
       },
       openai: {
         apiKey: '',
         model: 'gpt-4o-mini',
         temperature: 0.7,
-        maxTokens: 2048,
       },
     }
 
@@ -108,7 +106,6 @@ export class SettingsService {
         apiKey: geminiConfig.apiKey || '',
         model: geminiConfig.model || 'gemini-2.5-flash',
         temperature: config?.temperature || 0.7,
-        maxTokens: config?.maxTokens || 2048,
       }
     }
 
@@ -119,7 +116,6 @@ export class SettingsService {
         apiKey: openaiConfig.apiKey || '',
         model: openaiConfig.model || 'gpt-4o-mini',
         temperature: config?.temperature || 0.7,
-        maxTokens: config?.maxTokens || 2048,
       }
     }
 
@@ -143,7 +139,6 @@ export class SettingsService {
       model: settings.model,
       config: JSON.stringify({
         temperature: settings.temperature || 0.7,
-        maxTokens: settings.maxTokens || 2048,
       }),
       isActive: true,
     }

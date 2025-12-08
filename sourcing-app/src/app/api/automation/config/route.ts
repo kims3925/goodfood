@@ -253,10 +253,13 @@ function calculateNextRunTime(cronExpression: string): Date {
   // 콤마로 구분된 여러 시간 (예: 9,14,18)
   if (minute === '0' && hour.includes(',')) {
     const hours = hour.split(',').map(h => parseInt(h)).sort((a, b) => a - b)
+    const currentMinute = now.getMinutes()
 
     // 오늘 남은 시간 중 가장 가까운 것 찾기
+    // 현재 시간이 14:30이면 14시는 이미 지났으므로 다음 시간(18시)을 찾아야 함
     for (const h of hours) {
-      if (h > currentHour) {
+      // 해당 시간이 현재 시간보다 크거나, 같은 시간이지만 아직 정각이 안 됐으면
+      if (h > currentHour || (h === currentHour && currentMinute < 1)) {
         const next = new Date(now)
         next.setHours(h, 0, 0, 0)
         return next

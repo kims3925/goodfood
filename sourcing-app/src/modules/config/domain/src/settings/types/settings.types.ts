@@ -18,13 +18,11 @@ export interface AiSettings {
     apiKey: string
     model: string
     temperature: number
-    maxTokens: number
   }
   openai: {
     apiKey: string
     model: string
     temperature: number
-    maxTokens: number
   }
 }
 
@@ -43,7 +41,6 @@ export interface AiSettingsInput {
   apiKey: string
   model: string
   temperature?: number
-  maxTokens?: number
 }
 
 export interface PromptConfig {

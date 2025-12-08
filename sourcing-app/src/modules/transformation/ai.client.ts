@@ -18,7 +18,7 @@ export interface AiClientConfig {
   model: string
   temperature?: number
   maxTokens?: number
-  timeout?: number // milliseconds, default 60000 (60s)
+  timeout?: number // milliseconds, default 120000 (120s)
 }
 
 export interface AiResponse {
@@ -45,7 +45,7 @@ export class GeminiClient extends BaseAiClient {
   constructor(config: AiClientConfig) {
     super(config)
     this.client = new GoogleGenerativeAI(config.apiKey)
-    this.timeout = config.timeout ?? 60000 // default 60 seconds
+    this.timeout = config.timeout ?? 120000 // default 120 seconds
   }
 
   async generateContent(prompt: string): Promise<AiResponse> {
@@ -54,9 +54,12 @@ export class GeminiClient extends BaseAiClient {
         model: this.config.model || 'gemini-2.5-flash',
       })
 
-      const generationConfig = {
+      const generationConfig: any = {
         temperature: this.config.temperature ?? 0.7,
-        maxOutputTokens: this.config.maxTokens ?? 4096,
+      }
+      // maxOutputTokens는 명시적으로 설정된 경우에만 적용 (기본값 없음 - Gemini가 자동 결정)
+      if (this.config.maxTokens) {
+        generationConfig.maxOutputTokens = this.config.maxTokens
       }
 
       // 타임아웃이 있는 Promise.race 사용
@@ -169,7 +172,7 @@ export class OpenAiClient extends BaseAiClient {
 
   constructor(config: AiClientConfig) {
     super(config)
-    this.timeout = config.timeout ?? 60000 // default 60 seconds
+    this.timeout = config.timeout ?? 120000 // default 120 seconds
   }
 
   async generateContent(prompt: string): Promise<AiResponse> {

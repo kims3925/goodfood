@@ -99,6 +99,63 @@ const getSelectedHoursSummary = (selectedHours: number[] | undefined): string =>
   return `${sortedHours.length}개 시간대`
 }
 
+// 다음 실행까지 남은 시간을 계산하는 함수
+const calculateNextExecution = (selectedHours: number[] | undefined): { countdown: string; nextTime: string } => {
+  if (!selectedHours || selectedHours.length === 0) {
+    return { countdown: '', nextTime: '' }
+  }
+
+  const now = new Date()
+  const currentHour = now.getHours()
+  const currentMinute = now.getMinutes()
+
+  const sortedHours = [...selectedHours].sort((a, b) => a - b)
+
+  let nextHour: number | null = null
+  let isToday = true
+
+  // 오늘 남은 시간 중 가장 가까운 것 찾기
+  for (const hour of sortedHours) {
+    if (hour > currentHour || (hour === currentHour && currentMinute < 1)) {
+      nextHour = hour
+      break
+    }
+  }
+
+  // 오늘 남은 시간이 없으면 내일 첫 번째 시간
+  if (nextHour === null) {
+    nextHour = sortedHours[0]
+    isToday = false
+  }
+
+  // 남은 시간 계산
+  const nextDate = new Date()
+  if (!isToday) {
+    nextDate.setDate(nextDate.getDate() + 1)
+  }
+  nextDate.setHours(nextHour, 0, 0, 0)
+
+  const diffMs = nextDate.getTime() - now.getTime()
+  const diffMinutes = Math.floor(diffMs / (1000 * 60))
+  const hours = Math.floor(diffMinutes / 60)
+  const minutes = diffMinutes % 60
+
+  let countdown = ''
+  if (hours > 0 && minutes > 0) {
+    countdown = `${hours}시간 ${minutes}분`
+  } else if (hours > 0) {
+    countdown = `${hours}시간`
+  } else if (minutes > 0) {
+    countdown = `${minutes}분`
+  } else {
+    countdown = '곧 실행'
+  }
+
+  const nextTime = `${nextHour.toString().padStart(2, '0')}:00`
+
+  return { countdown, nextTime }
+}
+
 export default function AutomationDashboardPage() {
   const toast = useToast()
   const [stats, setStats] = useState<AutomationStats | null>(null)
@@ -170,40 +227,22 @@ export default function AutomationDashboardPage() {
     }
   }
 
-  // 카운트다운 타이머
+  // 카운트다운 타이머 - selectedHours 기반으로 클라이언트에서 계산
   useEffect(() => {
-    if (!config?.nextRunAt || !config?.isEnabled) {
+    if (!config?.selectedHours || config.selectedHours.length === 0 || !config?.isEnabled) {
       setCountdown('')
       return
     }
 
     const updateCountdown = () => {
-      const next = new Date(config.nextRunAt!).getTime()
-      const now = Date.now()
-      const diff = next - now
-
-      if (diff <= 0) {
-        setCountdown('곧 실행')
-        return
-      }
-
-      const hours = Math.floor(diff / (1000 * 60 * 60))
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000)
-
-      if (hours > 0) {
-        setCountdown(`${hours}시간 ${minutes}분`)
-      } else if (minutes > 0) {
-        setCountdown(`${minutes}분 ${seconds}초`)
-      } else {
-        setCountdown(`${seconds}초`)
-      }
+      const { countdown: newCountdown } = calculateNextExecution(config.selectedHours)
+      setCountdown(newCountdown)
     }
 
     updateCountdown()
     const timer = setInterval(updateCountdown, 1000)
     return () => clearInterval(timer)
-  }, [config?.nextRunAt, config?.isEnabled])
+  }, [config?.selectedHours, config?.isEnabled])
 
   const handleExecute = async (type: 'collect' | 'transform' | 'register' | 'publish' | 'full') => {
     if (isExecuting || runningWorkflow) return
@@ -384,10 +423,10 @@ export default function AutomationDashboardPage() {
                     <span className="font-medium">실행 중</span>
                     <span className="mx-2">•</span>
                     {getSelectedHoursSummary(config.selectedHours)}
-                    {countdown && (
+                    {config.selectedHours && config.selectedHours.length > 0 && (
                       <>
                         <span className="mx-2">•</span>
-                        다음 실행까지 <span className="font-semibold">{countdown}</span>
+                        다음 실행 <span className="font-semibold">{calculateNextExecution(config.selectedHours).nextTime}</span>
                       </>
                     )}
                   </>
@@ -834,59 +873,162 @@ export default function AutomationDashboardPage() {
         </Card>
       </div>
 
-      {/* Recent Logs */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <History size={20} className="text-gray-500" />
-            최근 실행 기록
-          </h2>
-          <Link href="/automation/logs" className="text-sm text-blue-600 hover:text-blue-800">
-            전체보기 →
+      {/* Recent Logs - Timeline Style */}
+      <Card className="p-6 bg-gradient-to-br from-slate-50 to-white">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200">
+              <History size={20} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">최근 실행 기록</h2>
+              <p className="text-sm text-gray-500">최근 5개의 실행 내역</p>
+            </div>
+          </div>
+          <Link
+            href="/automation/logs"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+          >
+            전체보기
+            <ArrowRight size={16} />
           </Link>
         </div>
 
         {recentLogs.length > 0 ? (
-          <div className="space-y-2">
-            {recentLogs.map((log) => (
-              <div
-                key={log.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                    log.status === 'SUCCESS' ? 'bg-green-100' :
-                    log.status === 'FAILED' ? 'bg-red-100' : 'bg-yellow-100'
-                  }`}>
-                    {log.status === 'SUCCESS' ? (
-                      <CheckCircle size={16} className="text-green-600" />
-                    ) : log.status === 'FAILED' ? (
-                      <AlertCircle size={16} className="text-red-600" />
-                    ) : (
-                      <RefreshCw size={16} className="text-yellow-600 animate-spin" />
-                    )}
+          <div className="space-y-3">
+            {recentLogs.map((log, index) => {
+              const isSuccess = log.status === 'SUCCESS'
+              const isFailed = log.status === 'FAILED'
+              const isRunning = log.status === 'RUNNING'
+
+              // 타입별 아이콘 및 색상
+              const typeConfig: Record<string, { icon: JSX.Element; gradient: string; bgLight: string }> = {
+                collect: {
+                  icon: <Package size={16} />,
+                  gradient: 'from-green-500 to-emerald-600',
+                  bgLight: 'bg-green-50'
+                },
+                transform: {
+                  icon: <Zap size={16} />,
+                  gradient: 'from-yellow-500 to-amber-600',
+                  bgLight: 'bg-yellow-50'
+                },
+                register: {
+                  icon: <ShoppingBag size={16} />,
+                  gradient: 'from-orange-500 to-red-600',
+                  bgLight: 'bg-orange-50'
+                },
+                publish: {
+                  icon: <Upload size={16} />,
+                  gradient: 'from-blue-500 to-cyan-600',
+                  bgLight: 'bg-blue-50'
+                },
+                full: {
+                  icon: <Play size={16} />,
+                  gradient: 'from-purple-500 to-pink-600',
+                  bgLight: 'bg-purple-50'
+                },
+              }
+
+              const config = typeConfig[log.type] || typeConfig.full
+
+              // 상대 시간 계산
+              const getRelativeTime = (dateStr: string) => {
+                const date = new Date(dateStr)
+                const now = new Date()
+                const diffMs = now.getTime() - date.getTime()
+                const diffMinutes = Math.floor(diffMs / (1000 * 60))
+                const diffHours = Math.floor(diffMinutes / 60)
+                const diffDays = Math.floor(diffHours / 24)
+
+                if (diffMinutes < 1) return '방금 전'
+                if (diffMinutes < 60) return `${diffMinutes}분 전`
+                if (diffHours < 24) return `${diffHours}시간 전`
+                if (diffDays < 7) return `${diffDays}일 전`
+                return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
+              }
+
+              return (
+                <div
+                  key={log.id}
+                  className={`relative flex items-center gap-4 p-4 rounded-xl border-2 transition-all hover:shadow-md ${
+                    isSuccess ? 'border-green-200 bg-gradient-to-r from-green-50/80 to-white hover:border-green-300' :
+                    isFailed ? 'border-red-200 bg-gradient-to-r from-red-50/80 to-white hover:border-red-300' :
+                    'border-yellow-200 bg-gradient-to-r from-yellow-50/80 to-white hover:border-yellow-300'
+                  }`}
+                >
+                  {/* Timeline connector */}
+                  {index < recentLogs.length - 1 && (
+                    <div className="absolute left-[1.875rem] top-full w-0.5 h-3 bg-gray-200 z-0" />
+                  )}
+
+                  {/* Type Icon */}
+                  <div className={`relative z-10 w-8 h-8 rounded-lg bg-gradient-to-br ${config.gradient} flex items-center justify-center shadow-md flex-shrink-0`}>
+                    <span className="text-white">{config.icon}</span>
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900 text-sm">{getTypeName(log.type)}</p>
-                    <p className="text-xs text-gray-500">{formatDate(log.startedAt)}</p>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-gray-900">{getTypeName(log.type)}</span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        isSuccess ? 'bg-green-100 text-green-700' :
+                        isFailed ? 'bg-red-100 text-red-700' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {isSuccess ? (
+                          <><CheckCircle size={12} /> 성공</>
+                        ) : isFailed ? (
+                          <><AlertCircle size={12} /> 실패</>
+                        ) : (
+                          <><RefreshCw size={12} className="animate-spin" /> 실행중</>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <Clock size={14} />
+                        {getRelativeTime(log.startedAt)}
+                      </span>
+                      <span className="text-gray-300">•</span>
+                      <span className="text-gray-400 text-xs">
+                        {new Date(log.startedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Item Count Badge */}
+                  <div className={`flex-shrink-0 flex flex-col items-center px-4 py-2 rounded-xl ${
+                    isSuccess ? 'bg-green-100' :
+                    isFailed ? 'bg-red-100' :
+                    'bg-yellow-100'
+                  }`}>
+                    <span className={`text-xl font-bold ${
+                      isSuccess ? 'text-green-700' :
+                      isFailed ? 'text-red-700' :
+                      'text-yellow-700'
+                    }`}>
+                      {log.itemCount}
+                    </span>
+                    <span className={`text-xs ${
+                      isSuccess ? 'text-green-600' :
+                      isFailed ? 'text-red-600' :
+                      'text-yellow-600'
+                    }`}>
+                      처리
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600">{log.itemCount}건</span>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    log.status === 'SUCCESS' ? 'bg-green-100 text-green-700' :
-                    log.status === 'FAILED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {log.status === 'SUCCESS' ? '성공' : log.status === 'FAILED' ? '실패' : '실행중'}
-                  </span>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">
-            <History size={40} className="mx-auto mb-2 text-gray-300" />
-            <p>아직 실행 기록이 없습니다.</p>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+              <History size={32} className="text-gray-300" />
+            </div>
+            <p className="text-gray-500 font-medium mb-1">아직 실행 기록이 없습니다</p>
+            <p className="text-sm text-gray-400">자동화를 실행하면 여기에 기록이 표시됩니다</p>
           </div>
         )}
       </Card>

@@ -2,10 +2,10 @@
  * Transform Pipeline
  * AI를 사용하여 수집된 게시물(CollectedPost)을 수집상품(CollectedProduct)으로 변환
  *
- * 배치 처리 방식:
- * - 여러 게시물을 하나의 API 호출로 처리하여 RPD(Requests Per Day) 절약
- * - gemini-2.5-flash-lite 기준: RPD 20, RPM 10, TPM 250,000
- * - 5개 게시물/배치, 자동화 1회당 2배치 = 10개 게시물, 2 RPD
+ * 배치 처리 방식 (TPM 15k 제한 대응):
+ * - 10개 게시물당 1회 API 호출 (~38k tokens)
+ * - 요청 간 60초 대기 (TPM 제한 회피)
+ * - 제한 없이 모든 대기 게시물 처리
  *
  * Note: Product 생성은 이 파이프라인에서 하지 않음
  * Product는 사용자가 수집상품 관리 페이지에서 수동으로 생성함
@@ -25,18 +25,17 @@ import {
 } from '../types'
 
 // =============================================
-// BATCH PROCESSING CONFIGURATION
+// PROCESSING CONFIGURATION
 // =============================================
 
-// 배치 설정: RPD 절약을 위한 배치 처리
-const BATCH_SIZE = 5  // 5개 게시물/배치 (출력 토큰 제한 고려)
-const MAX_BATCHES_PER_RUN = 2  // 자동화 1회당 최대 2배치 = 2 RPD
+// 배치 처리 설정 (TPM 15k 제한 대응)
+const BATCH_SIZE = 10  // 10개 게시물/요청
 
-// 배치 간 대기 시간 (RPM 10 = 6초/요청, 여유 고려하여 7초 설정)
-const BATCH_INTERVAL_MS = 7000
+// 요청 간 대기 시간
+const REQUEST_INTERVAL_MS = 7000  // 7초
 
-// 전체 파이프라인 타임아웃 (10분)
-const PIPELINE_TIMEOUT_MS = 10 * 60 * 1000
+// 전체 파이프라인 타임아웃 (없음 - 모든 게시물 처리)
+const PIPELINE_TIMEOUT_MS = 0  // 타임아웃 비활성화
 
 // =============================================
 // TRANSFORM PIPELINE (BATCH MODE)
@@ -46,10 +45,10 @@ const PIPELINE_TIMEOUT_MS = 10 * 60 * 1000
  * AI 변환 파이프라인 실행 (배치 처리 방식)
  * CollectedPost에서 AI를 사용하여 CollectedProduct 생성
  *
- * 배치 처리:
- * - 5개 게시물을 하나의 AI 요청으로 처리
- * - 자동화 1회당 최대 2배치 = 10개 게시물
- * - RPD 사용량: 2 (기존 개별 처리 대비 80% 절약)
+ * 배치 처리 (TPM 15k 제한 대응):
+ * - 10개 게시물당 1회 API 호출
+ * - 요청 간 60초 대기 (TPM 제한 회피)
+ * - 제한 없이 대기 중인 모든 게시물 처리
  */
 export async function runTransformPipeline(
   config: TransformConfig
@@ -64,8 +63,7 @@ export async function runTransformPipeline(
   const transformedPosts: TransformedPost[] = []
   let createdProducts = 0
 
-  console.log(`[Transform] Starting batch processing for user ${userId}`)
-  console.log(`[Transform] Batch size: ${BATCH_SIZE}, Max batches: ${MAX_BATCHES_PER_RUN}`)
+  console.log(`[Transform] Starting processing for user ${userId}`)
 
   // AI 설정 조회
   const aiConfig = await prisma.aiApiConfig.findFirst({
@@ -92,9 +90,7 @@ export async function runTransformPipeline(
     whereClause.id = { in: config.postIds }
   }
 
-  // 최대 처리 개수: 배치 크기 × 최대 배치 수
-  const maxPostsPerRun = BATCH_SIZE * MAX_BATCHES_PER_RUN
-
+  // 제한 없이 모든 대기 게시물 조회
   const posts = await prisma.collectedPost.findMany({
     where: whereClause,
     include: {
@@ -102,7 +98,6 @@ export async function runTransformPipeline(
         orderBy: { sortOrder: 'asc' },
       },
     },
-    take: maxPostsPerRun,
   })
 
   if (posts.length === 0) {
@@ -122,7 +117,7 @@ export async function runTransformPipeline(
     }
   }
 
-  console.log(`[Transform] Found ${posts.length} posts to transform (max: ${maxPostsPerRun})`)
+  console.log(`[Transform] Found ${posts.length} posts to transform`)
 
   // 진행 상황 초기화
   const { workflowLogId } = context
@@ -154,24 +149,13 @@ export async function runTransformPipeline(
   for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
     const batch = batches[batchIndex]
 
-    // 파이프라인 타임아웃 체크
-    if (Date.now() - pipelineStartTime > PIPELINE_TIMEOUT_MS) {
-      console.log(`[Transform] Pipeline timeout reached, stopping...`)
-      errors.push({
-        itemId: 0,
-        message: `파이프라인 실행 시간이 초과되었습니다. 나머지 항목은 다음 실행에서 처리됩니다.`,
-        timestamp: new Date(),
-      })
-      break
-    }
-
-    // 첫 번째 배치가 아니면 배치 간 대기
+    // 첫 번째 요청이 아니면 대기 (TPM 제한 대응)
     if (batchIndex > 0) {
-      console.log(`[Transform] Waiting ${BATCH_INTERVAL_MS / 1000}s before next batch...`)
-      await new Promise((resolve) => setTimeout(resolve, BATCH_INTERVAL_MS))
+      console.log(`[Transform] Waiting ${REQUEST_INTERVAL_MS / 1000}s before next request...`)
+      await new Promise((resolve) => setTimeout(resolve, REQUEST_INTERVAL_MS))
     }
 
-    console.log(`[Transform] Processing batch ${batchIndex + 1}/${batches.length} (${batch.length} posts)`)
+    console.log(`[Transform] Processing ${batchIndex + 1}/${batches.length}`)
 
     try {
       // 배치 입력 준비
@@ -319,11 +303,17 @@ export async function runTransformPipeline(
       // 그 외 에러는 다음 배치 계속 시도
     }
 
-    // 진행 상황 업데이트
+    // 진행 상황 및 details 실시간 업데이트
     if (workflowLogId) {
       const currentSuccess = transformedPosts.filter((p) => p.status === 'success').length
       const currentFailed = transformedPosts.filter((p) => p.status === 'failed').length
-      await updateWorkflowProgress(workflowLogId, posts.length, currentSuccess, currentFailed)
+      await updateWorkflowProgress(workflowLogId, posts.length, currentSuccess, currentFailed, {
+        transform: {
+          transformedPosts: transformedPosts.slice(-10), // 최근 10개만
+          batchProgress: `${batchIndex + 1}/${batches.length}`,
+          errors: errors.slice(-5),
+        },
+      })
     }
   }
 

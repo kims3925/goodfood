@@ -212,20 +212,28 @@ export async function failWorkflowLog(
 
 /**
  * 워크플로우 진행 상황 업데이트 (실시간)
+ * details를 함께 저장하여 작업마다 로그 확인 가능
  */
 export async function updateWorkflowProgress(
   logId: number,
   totalItems: number,
   successCount: number,
-  failedCount: number
+  failedCount: number,
+  details?: Record<string, any>
 ): Promise<void> {
+  const updateData: any = {
+    totalItems,
+    successCount,
+    failedCount,
+  }
+
+  if (details) {
+    updateData.details = JSON.stringify(sanitizeDetails(details))
+  }
+
   await prisma.workflowLog.update({
     where: { id: logId },
-    data: {
-      totalItems,
-      successCount,
-      failedCount,
-    },
+    data: updateData,
   })
 }
 

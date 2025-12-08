@@ -120,6 +120,7 @@ export interface ProductCreateResult extends PipelineResult {
 export interface CreatedProductResult {
   collectedProductId: number
   productId?: number
+  productName?: string
   status: 'success' | 'failed' | 'skipped'
   error?: string
 }
@@ -138,6 +139,10 @@ export interface PublishResult extends PipelineResult {
   details: {
     publishedProducts: PublishedProductResult[]
     channelResults: ChannelPublishResult[]
+    skippedProducts?: {
+      productId: number
+      reason: string
+    }[]
   }
 }
 

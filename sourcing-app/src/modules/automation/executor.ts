@@ -374,8 +374,15 @@ export async function executeFullPipeline(
       const channelIdsForPublish = parseNumberArray(automationConfig.retailChannelIds)
       if (channelIdsForPublish.length) {
         console.log('[FullPipeline] Step 4: Publish')
+
+        // 방금 생성된 상품 IDs 추출 (있으면 해당 상품만 발행)
+        const newlyCreatedProductIds = productCreateResult?.details?.createdProducts
+          ?.filter(p => p.status === 'success' && p.productId)
+          .map(p => p.productId!) || []
+
         publishResult = await runPublishPipeline({
           channelIds: channelIdsForPublish,
+          productIds: newlyCreatedProductIds.length > 0 ? newlyCreatedProductIds : undefined,
           publishReadyOnly: true,
         })
 

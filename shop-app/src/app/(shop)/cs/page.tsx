@@ -2,8 +2,11 @@
 
 import Link from 'next/link'
 import { Phone, MessageSquare, HelpCircle, Package, ChevronRight } from 'lucide-react'
+import { useShop } from '@/contexts/ShopContext'
 
 export default function CustomerServicePage() {
+  const { shop } = useShop()
+  const contactPhone = shop?.contactPhone || '-'
   const menuItems = [
     {
       icon: HelpCircle,
@@ -45,7 +48,7 @@ export default function CustomerServicePage() {
             </div>
             <div>
               <p className="text-sm opacity-90">고객행복센터</p>
-              <p className="text-3xl font-bold">1234-5678</p>
+              <p className="text-3xl font-bold">{contactPhone}</p>
             </div>
           </div>
           <div className="text-center md:text-right">

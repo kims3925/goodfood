@@ -66,8 +66,10 @@ const getNextExecutionInfo = (selectedHours: number[]): { text: string; remainin
   let isToday = true
 
   // 오늘 남은 시간 중 가장 가까운 것 찾기
+  // 현재 시간이 14:30이면 14시는 이미 지났으므로 다음 시간을 찾아야 함
   for (const hour of sortedHours) {
-    if (hour > currentHour) {
+    // 해당 시간이 현재 시간보다 크거나, 같은 시간이지만 아직 정각이 안 됐으면
+    if (hour > currentHour || (hour === currentHour && currentMinute < 1)) {
       nextHour = hour
       break
     }

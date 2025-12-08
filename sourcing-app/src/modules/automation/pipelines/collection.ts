@@ -202,9 +202,16 @@ export async function runCollectionPipeline(
     channelResults.push(channelResult)
     processedChannels++
 
-    // 진행 상황 업데이트
+    // 진행 상황 및 details 실시간 업데이트
     if (workflowLogId) {
-      await updateWorkflowProgress(workflowLogId, wholesaleChannels.length, successChannels, failedChannels)
+      await updateWorkflowProgress(workflowLogId, wholesaleChannels.length, successChannels, failedChannels, {
+        collection: {
+          channelResults,
+          totalNewPosts,
+          totalDuplicates,
+          errors: errors.slice(-5),
+        },
+      })
     }
   }
 
