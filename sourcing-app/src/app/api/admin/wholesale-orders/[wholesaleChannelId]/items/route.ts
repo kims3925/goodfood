@@ -41,9 +41,10 @@ export async function GET(
     toDate.setHours(23, 59, 59, 999)
 
     // 해당 도매처의 결제 완료 이상 상태 주문 아이템 조회 (PAID, SHIPPED, DELIVERED)
+    const statuses: ('PAID' | 'SHIPPED' | 'DELIVERED')[] = ['PAID', 'SHIPPED', 'DELIVERED']
     const whereCondition = {
       order: {
-        status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] as const },
+        status: { in: statuses },
         paidAt: {
           not: null,
           gte: fromDate,
@@ -73,8 +74,8 @@ export async function GET(
               orderedAt: true,
               shippingAddress: {
                 select: {
-                  recipient: true,
-                  phone: true,
+                  recipientName: true,
+                  recipientPhone: true,
                   postalCode: true,
                   address: true,
                   addressDetail: true,
@@ -217,8 +218,8 @@ export async function GET(
         quantity: item.quantity,
         wholesalePrice: Number(wholesalePrice),
         totalAmount: Number(wholesalePrice) * item.quantity,
-        customerName: addr?.recipient || '',
-        customerPhone: maskPhone(addr?.phone || ''),
+        customerName: addr?.recipientName || '',
+        customerPhone: maskPhone(addr?.recipientPhone || ''),
         customerAddress: fullAddress,
         postalCode: addr?.postalCode || '',
       }

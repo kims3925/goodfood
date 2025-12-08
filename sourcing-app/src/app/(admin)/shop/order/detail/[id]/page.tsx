@@ -98,11 +98,16 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.R
   RECEIVED: { label: '수령완료', color: 'bg-teal-100 text-teal-700', icon: <CheckCircle size={16} /> },
 }
 
+// 일반 상태 옵션 (첫 번째 줄)
 const ORDER_STATUS_OPTIONS = [
   { value: 'PENDING', label: '결제대기', color: 'bg-yellow-100 text-yellow-700' },
   { value: 'PAID', label: '결제완료', color: 'bg-blue-100 text-blue-700' },
   { value: 'SHIPPED', label: '배송중', color: 'bg-indigo-100 text-indigo-700' },
   { value: 'DELIVERED', label: '배송완료', color: 'bg-green-100 text-green-700' },
+]
+
+// 취소/환불 상태 옵션 (두 번째 줄)
+const CANCEL_STATUS_OPTIONS = [
   { value: 'CANCELLED', label: '주문취소', color: 'bg-red-100 text-red-700' },
   { value: 'REFUNDED', label: '환불완료', color: 'bg-gray-100 text-gray-700' },
 ]
@@ -554,8 +559,26 @@ export default function UnifiedOrderDetailPage() {
                   <h2 className="text-lg font-semibold text-gray-900">주문 상태 변경</h2>
                 </div>
                 <div className="p-4 space-y-2">
-                  <div className="flex flex-wrap gap-2 mb-4">
+                  {/* 일반 상태 (첫 번째 줄) */}
+                  <div className="flex flex-wrap gap-2">
                     {ORDER_STATUS_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => handleStatusChange(option.value)}
+                        disabled={isUpdating || option.value === order.status}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                          option.value === order.status
+                            ? `${option.color} ring-2 ring-offset-1 ring-current`
+                            : 'bg-white border border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* 취소/환불 상태 (두 번째 줄) */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {CANCEL_STATUS_OPTIONS.map((option) => (
                       <button
                         key={option.value}
                         onClick={() => handleStatusChange(option.value)}

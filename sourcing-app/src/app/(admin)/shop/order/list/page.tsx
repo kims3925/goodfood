@@ -22,7 +22,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmp
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 
-type OrderSource = 'SHOPPING_MALL' | 'GOOGLE_FORM'
+type OrderSource = 'SHOPPING_MALL'
 
 interface UnifiedOrder {
   id: number
@@ -74,7 +74,6 @@ export default function UnifiedOrderListPage() {
     SHIPPED: 0,
     DELIVERED: 0,
     CANCELLED: 0,
-    RECEIVED: 0,
   })
 
   const router = useRouter()
@@ -180,12 +179,10 @@ export default function UnifiedOrderListPage() {
     const colorMap: Record<string, string> = {
       PENDING: 'bg-yellow-100 text-yellow-700',
       PAID: 'bg-blue-100 text-blue-700',
-      PREPARING: 'bg-purple-100 text-purple-700',
       SHIPPED: 'bg-indigo-100 text-indigo-700',
       DELIVERED: 'bg-green-100 text-green-700',
       CANCELLED: 'bg-red-100 text-red-700',
       REFUNDED: 'bg-gray-100 text-gray-700',
-      RECEIVED: 'bg-teal-100 text-teal-700',
     }
 
     return (
@@ -207,7 +204,7 @@ export default function UnifiedOrderListPage() {
         </div>
 
         {/* 상태 필터 버튼 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
           <button
             onClick={() => setStatusFilter(null)}
             className={`rounded-xl p-4 transition-all ${

@@ -137,78 +137,10 @@ export async function GET(
         success: true,
         data: formattedOrder,
       })
-    } else if (source === 'GOOGLE_FORM') {
-      const order = await prisma.orderTest.findFirst({
-        where: {
-          id: parseInt(id),
-          userId: user.userId,
-        },
-        include: {
-          publishedProduct: {
-            include: {
-              product: true,
-            },
-          },
-        },
-      })
-
-      if (!order) {
-        return NextResponse.json(
-          { success: false, error: '주문을 찾을 수 없습니다.' },
-          { status: 404 }
-        )
-      }
-
-      // 밴드 주문 통합 형식으로 변환
-      const formattedOrder = {
-        id: order.id,
-        source: 'GOOGLE_FORM' as const,
-        orderNumber: `BAND-${order.id}`,
-        status: order.status || 'RECEIVED',
-        statusLabel: order.status === 'RECEIVED' ? '수령완료' : '주문완료',
-        customerName: order.recipient || '정보없음',
-        customerPhone: order.phone || null,
-        shippingAddress: order.address ? {
-          recipientName: order.recipient || '정보없음',
-          recipientPhone: order.phone || '',
-          postalCode: '',
-          address: order.address,
-          addressDetail: null,
-          deliveryMemo: order.memo || null,
-        } : null,
-        subtotalAmount: Number(order.totalAmount) || 0,
-        shippingFee: 0,
-        discountAmount: 0,
-        totalAmount: Number(order.totalAmount) || 0,
-        paymentMethod: null,
-        createdAt: order.createdAt?.toISOString(),
-        paidAt: null,
-        shippedAt: null,
-        deliveredAt: null,
-        cancelledAt: null,
-        items: [{
-          id: order.id,
-          productName: order.publishedProduct?.product?.name || order.productName || '상품명 없음',
-          optionSummary: order.options || null,
-          thumbnailUrl: order.publishedProduct?.product?.thumbnailUrl || null,
-          quantity: order.quantity || 1,
-          unitPrice: Number(order.totalAmount) / (order.quantity || 1),
-          totalPrice: Number(order.totalAmount) || 0,
-        }],
-        payment: null,
-        user: null,
-        shopId: null,
-        shopName: null,
-      }
-
-      return NextResponse.json({
-        success: true,
-        data: formattedOrder,
-      })
     }
 
     return NextResponse.json(
-      { success: false, error: 'source 파라미터가 필요합니다.' },
+      { success: false, error: 'source 파라미터가 필요하거나 유효하지 않습니다.' },
       { status: 400 }
     )
   } catch (error) {
@@ -307,12 +239,6 @@ export async function PATCH(
         success: true,
         message: '주문 상태가 변경되었습니다.',
       })
-    } else if (source === 'GOOGLE_FORM') {
-      // OrderTest는 상태 필드가 없으므로 현재는 지원 안함
-      return NextResponse.json(
-        { success: false, error: '밴드 주문은 상태 변경을 지원하지 않습니다.' },
-        { status: 400 }
-      )
     }
 
     return NextResponse.json(

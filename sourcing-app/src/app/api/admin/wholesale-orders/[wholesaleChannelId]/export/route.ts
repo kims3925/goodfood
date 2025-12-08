@@ -81,8 +81,8 @@ export async function GET(
             orderedAt: true,
             shippingAddress: {
               select: {
-                recipient: true,
-                phone: true,
+                recipientName: true,
+                recipientPhone: true,
                 postalCode: true,
                 address: true,
                 addressDetail: true,
@@ -228,8 +228,8 @@ export async function GET(
         item.quantity,
         wholesalePrice,
         supplyAmount,
-        addr?.recipient || '',
-        addr?.phone || '',
+        addr?.recipientName || '',
+        addr?.recipientPhone || '',
         fullAddress,
         orderedAt,
       ]
