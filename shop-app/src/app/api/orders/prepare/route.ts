@@ -52,6 +52,11 @@ interface OrderPrepareData {
     addressDetail?: string
     deliveryMemo?: string
   }
+  coupon?: {
+    userCouponId: number
+    discountAmount: number
+    isFreeShipping: boolean
+  }
 }
 
 // Shop ID 가져오기 (미들웨어에서 설정)
@@ -73,6 +78,7 @@ export async function POST(req: NextRequest) {
       shippingAddress,
       fromCart = true,
       userId: bodyUserId,
+      coupon: couponData,
     } = body
 
     // 고객 정보 검증
@@ -244,8 +250,65 @@ export async function POST(req: NextRequest) {
       (sum, item) => sum + item.unitPrice * item.quantity,
       0
     )
-    const shippingFee = subtotal >= 30000 ? 0 : 3000
-    totalAmount = subtotal + shippingFee
+    let shippingFee = subtotal >= 30000 ? 0 : 3000
+    let discountAmount = 0
+
+    // 쿠폰 처리
+    let validCoupon: {
+      userCouponId: number
+      discountAmount: number
+      isFreeShipping: boolean
+    } | undefined = undefined
+
+    if (couponData?.userCouponId) {
+      const userCoupon = await prisma.userCoupon.findUnique({
+        where: { id: couponData.userCouponId },
+        include: { coupon: true },
+      })
+
+      if (userCoupon && !userCoupon.isUsed && userCoupon.coupon.isActive) {
+        const coupon = userCoupon.coupon
+        const now = new Date()
+
+        // 유효기간 체크
+        if (now >= coupon.validFrom && now <= coupon.validUntil) {
+          // 최소 주문금액 체크
+          const minAmount = coupon.minPurchaseAmount ? Number(coupon.minPurchaseAmount) : 0
+          if (subtotal >= minAmount) {
+            if (coupon.discountType === 'FREE_SHIPPING') {
+              // 무료배송 쿠폰
+              validCoupon = {
+                userCouponId: userCoupon.id,
+                discountAmount: shippingFee,
+                isFreeShipping: true,
+              }
+              shippingFee = 0
+            } else if (coupon.discountType === 'PERCENTAGE') {
+              // 정률 할인
+              let discount = Math.floor(subtotal * (Number(coupon.discountValue) / 100))
+              const maxDiscount = coupon.maxDiscountAmount ? Number(coupon.maxDiscountAmount) : Infinity
+              discount = Math.min(discount, maxDiscount)
+              discountAmount = discount
+              validCoupon = {
+                userCouponId: userCoupon.id,
+                discountAmount: discount,
+                isFreeShipping: false,
+              }
+            } else {
+              // 정액 할인 (FIXED, FIXED_AMOUNT)
+              discountAmount = Math.min(Number(coupon.discountValue), subtotal)
+              validCoupon = {
+                userCouponId: userCoupon.id,
+                discountAmount,
+                isFreeShipping: false,
+              }
+            }
+          }
+        }
+      }
+    }
+
+    totalAmount = subtotal + shippingFee - discountAmount
 
     // 주문번호 생성
     const orderId = generateOrderNumber()
@@ -270,6 +333,7 @@ export async function POST(req: NextRequest) {
         addressDetail: shippingAddress.addressDetail,
         deliveryMemo: shippingAddress.deliveryMemo,
       },
+      coupon: validCoupon,
     }
 
     // 쿠키에 주문 정보 저장 (암호화된 JSON)
@@ -283,6 +347,7 @@ export async function POST(req: NextRequest) {
         totalAmount,
         subtotal,
         shippingFee,
+        discountAmount,
         itemCount: orderItems.reduce((sum, item) => sum + item.quantity, 0),
         items: orderItems.map((item) => ({
           productName: item.productName,
@@ -290,6 +355,10 @@ export async function POST(req: NextRequest) {
           unitPrice: item.unitPrice,
           totalPrice: item.unitPrice * item.quantity,
         })),
+        coupon: validCoupon ? {
+          discountAmount: validCoupon.discountAmount,
+          isFreeShipping: validCoupon.isFreeShipping,
+        } : null,
       },
       message: '주문 준비가 완료되었습니다. 결제를 진행해주세요.',
     })

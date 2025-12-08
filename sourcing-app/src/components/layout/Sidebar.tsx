@@ -33,6 +33,7 @@ import {
   PanelLeftOpen,
   Target,
   Truck,
+  Ticket,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -73,6 +74,7 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
       '/settlement': '정산 관리',
       '/cs': '고객 관리',
       '/user': '고객 관리',
+      '/coupon': '고객 관리',
       '/policy': '환경 설정',
       '/admin/settings': '환경 설정',
     }
@@ -214,6 +216,11 @@ export default function Sidebar({ isOpen = true, onClose, collapsed = false, onT
           label: '사용자 관리',
           href: '/user/list',
           icon: <Users size={16} />,
+        },
+        {
+          label: '쿠폰 관리',
+          href: '/coupon/list',
+          icon: <Ticket size={16} />,
         },
         {
           label: '고객 문의',

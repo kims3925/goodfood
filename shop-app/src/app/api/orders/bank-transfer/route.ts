@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
       shippingAddress,
       fromCart = true,
       userId: bodyUserId,
+      coupon: couponData,
     } = body
 
     // 배송 주소 검증 (수령인 정보 포함)
@@ -272,9 +273,66 @@ export async function POST(req: NextRequest) {
       (sum, item) => sum + item.unitPrice * item.quantity,
       0
     )
-    const shippingFee = subtotal >= 30000 ? 0 : 3000
-    const totalAmount = subtotal + shippingFee
+    let shippingFee = subtotal >= 30000 ? 0 : 3000
+    let discountAmount = 0
     const depositDeadline = getDepositDeadline()
+
+    // 쿠폰 처리
+    let validCoupon: {
+      userCouponId: number
+      discountAmount: number
+      isFreeShipping: boolean
+    } | undefined = undefined
+
+    if (couponData?.userCouponId) {
+      const userCoupon = await prisma.userCoupon.findUnique({
+        where: { id: couponData.userCouponId },
+        include: { coupon: true },
+      })
+
+      if (userCoupon && !userCoupon.isUsed && userCoupon.coupon.isActive) {
+        const coupon = userCoupon.coupon
+        const now = new Date()
+
+        // 유효기간 체크
+        if (now >= coupon.validFrom && now <= coupon.validUntil) {
+          // 최소 주문금액 체크
+          const minAmount = coupon.minPurchaseAmount ? Number(coupon.minPurchaseAmount) : 0
+          if (subtotal >= minAmount) {
+            if (coupon.discountType === 'FREE_SHIPPING') {
+              // 무료배송 쿠폰
+              validCoupon = {
+                userCouponId: userCoupon.id,
+                discountAmount: shippingFee,
+                isFreeShipping: true,
+              }
+              shippingFee = 0
+            } else if (coupon.discountType === 'PERCENTAGE') {
+              // 정률 할인
+              let discount = Math.floor(subtotal * (Number(coupon.discountValue) / 100))
+              const maxDiscount = coupon.maxDiscountAmount ? Number(coupon.maxDiscountAmount) : Infinity
+              discount = Math.min(discount, maxDiscount)
+              discountAmount = discount
+              validCoupon = {
+                userCouponId: userCoupon.id,
+                discountAmount: discount,
+                isFreeShipping: false,
+              }
+            } else {
+              // 정액 할인 (FIXED, FIXED_AMOUNT)
+              discountAmount = Math.min(Number(coupon.discountValue), subtotal)
+              validCoupon = {
+                userCouponId: userCoupon.id,
+                discountAmount,
+                isFreeShipping: false,
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const totalAmount = subtotal + shippingFee - discountAmount
 
     // 트랜잭션으로 주문 생성 (주문자 정보는 user 테이블에서)
     const result = await prisma.$transaction(async (tx) => {
@@ -289,7 +347,7 @@ export async function POST(req: NextRequest) {
           // 금액 정보
           subtotalAmount: subtotal,
           shippingFee,
-          discountAmount: 0,
+          discountAmount,
           totalAmount,
           items: {
             create: orderItems.map((item) => ({
@@ -349,6 +407,17 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // 4. 쿠폰 주문 연결 (입금 대기 상태이므로 isUsed는 false 유지)
+      // 입금 확인 시점에 isUsed: true로 변경됨
+      if (validCoupon?.userCouponId) {
+        await tx.userCoupon.update({
+          where: { id: validCoupon.userCouponId },
+          data: {
+            orderId: order.id,
+          },
+        })
+      }
+
       return { order, payment }
     })
 
@@ -360,6 +429,7 @@ export async function POST(req: NextRequest) {
         totalAmount: Number(result.order.totalAmount),
         subtotal: Number(result.order.subtotalAmount),
         shippingFee: Number(result.order.shippingFee),
+        discountAmount: Number(result.order.discountAmount),
         itemCount: orderItems.reduce((sum, item) => sum + item.quantity, 0),
         items: orderItems.map((item) => ({
           productName: item.productName,
@@ -367,6 +437,10 @@ export async function POST(req: NextRequest) {
           unitPrice: item.unitPrice,
           totalPrice: item.unitPrice * item.quantity,
         })),
+        coupon: validCoupon ? {
+          discountAmount: validCoupon.discountAmount,
+          isFreeShipping: validCoupon.isFreeShipping,
+        } : null,
       },
       bankInfo: {
         bankName: shop.bankName,

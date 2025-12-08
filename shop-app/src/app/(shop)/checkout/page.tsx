@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { ArrowLeft, Package, User, MapPin, CreditCard, Truck, Plus, Check, Building2, Wallet, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Package, User, MapPin, CreditCard, Truck, Plus, Check, Building2, Wallet, AlertCircle, Ticket, X, ChevronDown } from 'lucide-react'
 import TossPaymentWidget from '@/modules/payments/components/TossPaymentWidget'
 import { useShop } from '@/contexts/ShopContext'
 
@@ -51,6 +51,23 @@ interface CheckoutFormData {
   sameAsCustomer: boolean
 }
 
+interface UserCoupon {
+  id: number
+  isUsed: boolean
+  expiredAt: string
+  isExpired: boolean
+  coupon: {
+    id: number
+    code: string
+    name: string
+    description: string | null
+    discountType: 'PERCENTAGE' | 'FIXED' | 'FREE_SHIPPING'
+    discountValue: number
+    minPurchaseAmount: number | null
+    maxDiscountAmount: number | null
+  }
+}
+
 function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -89,6 +106,11 @@ function CheckoutContent() {
   const [tempOrderId, setTempOrderId] = useState<string>('') // 주문번호
   const [showPaymentWidget, setShowPaymentWidget] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // 쿠폰 관련 상태
+  const [availableCoupons, setAvailableCoupons] = useState<UserCoupon[]>([])
+  const [selectedCoupon, setSelectedCoupon] = useState<UserCoupon | null>(null)
+  const [showCouponModal, setShowCouponModal] = useState(false)
 
   // 에러 상태 및 섹션 ref
   const [errors, setErrors] = useState<{
@@ -150,10 +172,15 @@ function CheckoutContent() {
         await loadProduct()
       }
 
-      // 회원인 경우 배송지 로드
+      // 회원인 경우 배송지 및 쿠폰 로드
       if (session) {
-        const addressResponse = await fetch('/api/mypage/addresses')
+        const [addressResponse, couponResponse] = await Promise.all([
+          fetch('/api/mypage/addresses'),
+          fetch('/api/mypage/coupons'),
+        ])
+
         const addressData = await addressResponse.json()
+        const couponData = await couponResponse.json()
 
         if (addressData.success) {
           setAddresses(addressData.addresses)
@@ -174,6 +201,14 @@ function CheckoutContent() {
               }
             }))
           }
+        }
+
+        // 사용 가능한 쿠폰만 필터링 (사용하지 않았고, 만료되지 않은)
+        if (couponData.success) {
+          const validCoupons = couponData.coupons.filter(
+            (c: UserCoupon) => !c.isUsed && !c.isExpired
+          )
+          setAvailableCoupons(validCoupons)
         }
       }
     } catch (error) {
@@ -291,10 +326,74 @@ function CheckoutContent() {
     return price?.toLocaleString('ko-KR') || '0'
   }
 
-  const calculateShipping = (subtotal: number) => {
+  const calculateShipping = (subtotal: number, coupon: UserCoupon | null) => {
     const freeShippingAmount = 30000
     const shippingFee = 3000
+
+    // 무료배송 쿠폰 적용
+    if (coupon?.coupon.discountType === 'FREE_SHIPPING') {
+      return 0
+    }
+
     return subtotal >= freeShippingAmount ? 0 : shippingFee
+  }
+
+  // 쿠폰 할인 금액 계산
+  const calculateCouponDiscount = (subtotal: number, coupon: UserCoupon | null): number => {
+    if (!coupon) return 0
+
+    const { discountType, discountValue, minPurchaseAmount, maxDiscountAmount } = coupon.coupon
+
+    // 최소 주문 금액 체크
+    if (minPurchaseAmount && subtotal < minPurchaseAmount) {
+      return 0
+    }
+
+    // 무료배송 쿠폰은 할인 금액 0 (배송비에서 처리)
+    if (discountType === 'FREE_SHIPPING') {
+      return 0
+    }
+
+    let discount = 0
+
+    if (discountType === 'PERCENTAGE') {
+      discount = Math.floor(subtotal * (discountValue / 100))
+      // 최대 할인 금액 제한
+      if (maxDiscountAmount && discount > maxDiscountAmount) {
+        discount = maxDiscountAmount
+      }
+    } else if (discountType === 'FIXED') {
+      discount = discountValue
+    }
+
+    // 할인이 상품 금액을 초과하지 않도록
+    return Math.min(discount, subtotal)
+  }
+
+  // 쿠폰 사용 가능 여부 체크
+  const isCouponApplicable = (coupon: UserCoupon, subtotal: number): boolean => {
+    const { minPurchaseAmount } = coupon.coupon
+    if (minPurchaseAmount && subtotal < minPurchaseAmount) {
+      return false
+    }
+    return true
+  }
+
+  // 쿠폰 할인 텍스트
+  const getCouponDiscountText = (coupon: UserCoupon): string => {
+    const { discountType, discountValue, maxDiscountAmount } = coupon.coupon
+
+    if (discountType === 'FREE_SHIPPING') {
+      return '무료배송'
+    } else if (discountType === 'PERCENTAGE') {
+      let text = `${discountValue}% 할인`
+      if (maxDiscountAmount) {
+        text += ` (최대 ${formatPrice(maxDiscountAmount)}원)`
+      }
+      return text
+    } else {
+      return `${formatPrice(discountValue)}원 할인`
+    }
   }
 
   const handleFormChange = (field: string, value: string | boolean) => {
@@ -374,7 +473,13 @@ function CheckoutContent() {
           recipientName,
           recipientPhone,
           deliveryMemo: formData.deliveryMemo || undefined
-        }
+        },
+        // 쿠폰 정보
+        coupon: selectedCoupon ? {
+          userCouponId: selectedCoupon.id,
+          discountAmount: couponDiscount,
+          isFreeShipping: selectedCoupon.coupon.discountType === 'FREE_SHIPPING'
+        } : undefined
       }
 
       // 회원인 경우 userId 추가
@@ -483,8 +588,9 @@ function CheckoutContent() {
     orderName = product.title
   }
 
-  const shippingFee = calculateShipping(subtotal)
-  const totalAmount = subtotal + shippingFee
+  const couponDiscount = calculateCouponDiscount(subtotal, selectedCoupon)
+  const shippingFee = calculateShipping(subtotal, selectedCoupon)
+  const totalAmount = subtotal + shippingFee - couponDiscount
 
   if (isLoading) {
     return (
@@ -1059,6 +1165,49 @@ function CheckoutContent() {
               <div className="lg:w-[320px] flex-shrink-0">
                 <div className="lg:sticky lg:top-[294px]">
                   <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                    {/* 쿠폰 적용 (회원 전용) */}
+                    {session && (
+                      <div className="p-5 border-b border-gray-100">
+                        <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                          <Ticket className="w-4 h-4 text-gray-600" />
+                          쿠폰
+                        </h2>
+
+                        {selectedCoupon ? (
+                          <div className="flex items-center justify-between p-3 bg-[#FFF5F5] border border-[#FFE5E5] rounded-lg">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {selectedCoupon.coupon.name}
+                              </p>
+                              <p className="text-xs text-[#FF6B6B]">
+                                {getCouponDiscountText(selectedCoupon)}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => setSelectedCoupon(null)}
+                              className="ml-2 p-1 text-gray-400 hover:text-gray-600"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setShowCouponModal(true)}
+                            disabled={availableCoupons.length === 0}
+                            className="w-full flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-[#FF6B6B] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <span className="text-sm text-gray-600">
+                              {availableCoupons.length > 0
+                                ? `사용 가능한 쿠폰 ${availableCoupons.length}장`
+                                : '사용 가능한 쿠폰이 없습니다'
+                              }
+                            </span>
+                            <ChevronDown className="w-4 h-4 text-gray-400" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                     {/* 결제 금액 */}
                     <div className="p-5 border-b border-gray-100">
                       <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -1076,10 +1225,22 @@ function CheckoutContent() {
                             {shippingFee > 0 ? `+${formatPrice(shippingFee)}원` : '무료'}
                           </span>
                         </div>
-                        {shippingFee > 0 && subtotal < 30000 && (
+                        {shippingFee > 0 && subtotal < 30000 && !selectedCoupon?.coupon.discountType.includes('FREE_SHIPPING') && (
                           <p className="text-xs text-[#FF6B6B]">
                             {formatPrice(30000 - subtotal)}원 추가 시 무료배송
                           </p>
+                        )}
+                        {couponDiscount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">쿠폰 할인</span>
+                            <span className="text-[#FF6B6B]">-{formatPrice(couponDiscount)}원</span>
+                          </div>
+                        )}
+                        {selectedCoupon?.coupon.discountType === 'FREE_SHIPPING' && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">무료배송 쿠폰</span>
+                            <span className="text-[#FF6B6B]">적용됨</span>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1132,6 +1293,101 @@ function CheckoutContent() {
           </div>
         </div>
       </div>
+
+      {/* 쿠폰 선택 모달 */}
+      {showCouponModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowCouponModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg w-full max-w-md max-h-[80vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">쿠폰 선택</h3>
+              <button
+                onClick={() => setShowCouponModal(false)}
+                className="p-1 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto max-h-[60vh] p-4">
+              {availableCoupons.length === 0 ? (
+                <div className="text-center py-8">
+                  <Ticket className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500">사용 가능한 쿠폰이 없습니다</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {availableCoupons.map((coupon) => {
+                    const isApplicable = isCouponApplicable(coupon, subtotal)
+                    return (
+                      <button
+                        key={coupon.id}
+                        onClick={() => {
+                          if (isApplicable) {
+                            setSelectedCoupon(coupon)
+                            setShowCouponModal(false)
+                          }
+                        }}
+                        disabled={!isApplicable}
+                        className={`w-full text-left p-4 border rounded-lg transition-all ${
+                          isApplicable
+                            ? 'border-gray-200 hover:border-[#FF6B6B] hover:bg-[#FFF5F5]'
+                            : 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">
+                              {coupon.coupon.name}
+                            </p>
+                            <p className="text-lg font-bold text-[#FF6B6B] mt-1">
+                              {getCouponDiscountText(coupon)}
+                            </p>
+                            {coupon.coupon.minPurchaseAmount && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                {formatPrice(coupon.coupon.minPurchaseAmount)}원 이상 구매 시
+                                {!isApplicable && (
+                                  <span className="text-red-500 ml-1">
+                                    (미충족)
+                                  </span>
+                                )}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-400 mt-1">
+                              {new Date(coupon.expiredAt).toLocaleDateString('ko-KR')}까지
+                            </p>
+                          </div>
+                          {isApplicable && (
+                            <div className="w-5 h-5 border-2 border-gray-300 rounded-full flex items-center justify-center">
+                              {selectedCoupon?.id === coupon.id && (
+                                <div className="w-3 h-3 bg-[#FF6B6B] rounded-full" />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowCouponModal(false)}
+                className="w-full py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
