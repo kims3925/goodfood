@@ -22,6 +22,7 @@ model Shop {
   guestOrders        GuestOrder[]
   publishedProducts  PublishedProduct[]
   channels           Channel[]
+  settlements        Settlement[]
 
   @@index([userId])
   @@index([subdomain])

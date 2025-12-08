@@ -34,6 +34,7 @@ model User {
   loginLogs          UserLoginLog[]
   wishlists          Wishlist[]
   workflowLogs       WorkflowLog[]
+  settlements        Settlement[]
 
   @@index([email])
   @@index([phone])
@@ -59,19 +60,22 @@ model UserLoginLog {
 }
 
 model SourcingApiConfig {
-  id           Int              @id @default(autoincrement())
-  userId       Int              @map("user_id")
-  platform     SourcingPlatform
-  apiKey       String?          @map("api_key") @db.VarChar(500)
-  accessToken  String?          @map("access_token") @db.Text
-  refreshToken String?          @map("refresh_token") @db.Text
-  tokenExpiry  DateTime?        @map("token_expiry") @db.Timestamp(0)
-  metadata     String?          @db.LongText
-  isActive     Boolean          @default(true) @map("is_active")
-  lastSyncedAt DateTime?        @map("last_synced_at") @db.Timestamp(0)
-  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt    DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 Int              @id @default(autoincrement())
+  userId             Int              @map("user_id")
+  platform           SourcingPlatform
+  apiKey             String?          @map("api_key") @db.VarChar(500)
+  accessToken        String?          @map("access_token") @db.Text
+  refreshToken       String?          @map("refresh_token") @db.Text
+  tokenExpiry        DateTime?        @map("token_expiry") @db.Timestamp(0)
+  metadata           String?          @db.LongText
+  isActive           Boolean          @default(true) @map("is_active")
+  lastSyncedAt       DateTime?        @map("last_synced_at") @db.Timestamp(0)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  // 밴드 내부 API용 (수동 쿠키 입력)
+  bandSessionCookie  String?          @map("band_session_cookie") @db.Text
+  bandCookieExpiry   DateTime?        @map("band_cookie_expiry") @db.Timestamp(0)
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, platform])
   @@index([userId])

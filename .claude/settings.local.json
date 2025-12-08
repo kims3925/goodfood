@@ -36,7 +36,10 @@
       "mcp__playwright__playwright_console_logs",
       "mcp__playwright__playwright_evaluate",
       "mcp__playwright__playwright_click",
-      "mcp__sequential-thinking__sequentialthinking"
+      "mcp__sequential-thinking__sequentialthinking",
+      "mcp__playwright__playwright_navigate",
+      "Bash(rm:*)",
+      "mcp__playwright__playwright_get_visible_text"
     ],
     "deny": [],
     "ask": []

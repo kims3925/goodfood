@@ -40,12 +40,12 @@ export async function GET(
     const toDate = new Date(to)
     toDate.setHours(23, 59, 59, 999)
 
-    // 해당 도매처의 결제 완료 주문 아이템 조회
+    // 해당 도매처의 결제 완료 이상 상태 주문 아이템 조회 (PAID, SHIPPED, DELIVERED)
     const whereCondition = {
       order: {
-        status: 'PAID' as const,
-        paidAt: { not: null },
-        orderedAt: {
+        status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] as const },
+        paidAt: {
+          not: null,
           gte: fromDate,
           lte: toDate,
         },

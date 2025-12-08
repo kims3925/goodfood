@@ -47,6 +47,19 @@ export async function GET(
             },
           },
           payment: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          shop: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       })
 
@@ -57,9 +70,72 @@ export async function GET(
         )
       }
 
+      // 상태 레이블 매핑
+      const statusLabels: Record<string, string> = {
+        PENDING: '결제대기',
+        PAID: '결제완료',
+        PREPARING: '상품준비',
+        SHIPPED: '배송중',
+        DELIVERED: '배송완료',
+        CANCELLED: '취소됨',
+        REFUNDED: '환불됨',
+      }
+
+      // 통합 형식으로 변환
+      const formattedOrder = {
+        id: order.id,
+        source: 'SHOPPING_MALL' as const,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        statusLabel: statusLabels[order.status] || order.status,
+        customerName: order.shippingAddress?.recipientName || order.user?.name || '정보없음',
+        customerPhone: order.shippingAddress?.recipientPhone || null,
+        shippingAddress: order.shippingAddress ? {
+          recipientName: order.shippingAddress.recipientName,
+          recipientPhone: order.shippingAddress.recipientPhone,
+          postalCode: order.shippingAddress.postalCode,
+          address: order.shippingAddress.address,
+          addressDetail: order.shippingAddress.addressDetail,
+          deliveryMemo: order.shippingAddress.deliveryMemo,
+        } : null,
+        subtotalAmount: Number(order.subtotalAmount),
+        shippingFee: Number(order.shippingFee),
+        discountAmount: Number(order.discountAmount),
+        totalAmount: Number(order.totalAmount),
+        paymentMethod: order.payment?.method || null,
+        createdAt: order.orderedAt?.toISOString() || order.createdAt?.toISOString(),
+        paidAt: order.paidAt?.toISOString() || null,
+        shippedAt: order.shippedAt?.toISOString() || null,
+        deliveredAt: order.deliveredAt?.toISOString() || null,
+        cancelledAt: order.cancelledAt?.toISOString() || null,
+        items: order.items.map((item) => ({
+          id: item.id,
+          productName: item.productName,
+          optionSummary: item.optionSummary,
+          thumbnailUrl: item.thumbnailUrl || item.publishedProduct?.product?.thumbnailUrl || null,
+          quantity: item.quantity,
+          unitPrice: Number(item.unitPrice),
+          totalPrice: Number(item.totalPrice),
+        })),
+        payment: order.payment ? {
+          id: order.payment.id,
+          method: order.payment.method,
+          status: order.payment.status,
+          amount: Number(order.payment.amount),
+          paidAt: order.payment.approvedAt?.toISOString() || null,
+        } : null,
+        user: order.user ? {
+          id: order.user.id,
+          name: order.user.name,
+          email: order.user.email,
+        } : null,
+        shopId: order.shopId,
+        shopName: order.shop?.name || null,
+      }
+
       return NextResponse.json({
         success: true,
-        data: order,
+        data: formattedOrder,
       })
     } else if (source === 'GOOGLE_FORM') {
       const order = await prisma.orderTest.findFirst({
@@ -83,9 +159,51 @@ export async function GET(
         )
       }
 
+      // 밴드 주문 통합 형식으로 변환
+      const formattedOrder = {
+        id: order.id,
+        source: 'GOOGLE_FORM' as const,
+        orderNumber: `BAND-${order.id}`,
+        status: order.status || 'RECEIVED',
+        statusLabel: order.status === 'RECEIVED' ? '수령완료' : '주문완료',
+        customerName: order.recipient || '정보없음',
+        customerPhone: order.phone || null,
+        shippingAddress: order.address ? {
+          recipientName: order.recipient || '정보없음',
+          recipientPhone: order.phone || '',
+          postalCode: '',
+          address: order.address,
+          addressDetail: null,
+          deliveryMemo: order.memo || null,
+        } : null,
+        subtotalAmount: Number(order.totalAmount) || 0,
+        shippingFee: 0,
+        discountAmount: 0,
+        totalAmount: Number(order.totalAmount) || 0,
+        paymentMethod: null,
+        createdAt: order.createdAt?.toISOString(),
+        paidAt: null,
+        shippedAt: null,
+        deliveredAt: null,
+        cancelledAt: null,
+        items: [{
+          id: order.id,
+          productName: order.publishedProduct?.product?.name || order.productName || '상품명 없음',
+          optionSummary: order.options || null,
+          thumbnailUrl: order.publishedProduct?.product?.thumbnailUrl || null,
+          quantity: order.quantity || 1,
+          unitPrice: Number(order.totalAmount) / (order.quantity || 1),
+          totalPrice: Number(order.totalAmount) || 0,
+        }],
+        payment: null,
+        user: null,
+        shopId: null,
+        shopName: null,
+      }
+
       return NextResponse.json({
         success: true,
-        data: order,
+        data: formattedOrder,
       })
     }
 
