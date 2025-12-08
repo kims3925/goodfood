@@ -202,6 +202,16 @@ export default function UserDetailPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
+
+  // 개발자 도구에서 활성화: localStorage.setItem('enableUserDetail', 'true')
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const enabled = localStorage.getItem('enableUserDetail') === 'true'
+      if (!enabled) {
+        router.replace('/shop/user/list')
+      }
+    }
+  }, [router])
   const [addresses, setAddresses] = useState<Address[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('orders')

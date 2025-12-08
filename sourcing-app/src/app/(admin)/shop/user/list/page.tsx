@@ -82,6 +82,13 @@ export default function UserListPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [stats, setStats] = useState({ total: 0, USER: 0, MANAGER: 0 })
 
+  // 개발자 도구에서 활성화: localStorage.setItem('enableUserDetail', 'true')
+  const [enableDetail, setEnableDetail] = useState(false)
+
+  useEffect(() => {
+    setEnableDetail(localStorage.getItem('enableUserDetail') === 'true')
+  }, [])
+
   const itemsPerPage = 20
 
   const fetchUsers = useCallback(async () => {
@@ -299,8 +306,8 @@ export default function UserListPage() {
                   users.map((user, index) => (
                     <TableRow
                       key={user.id}
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/shop/user/${user.id}`)}
+                      className={`hover:bg-gray-50 ${enableDetail ? 'cursor-pointer' : ''}`}
+                      onClick={enableDetail ? () => router.push(`/shop/user/${user.id}`) : undefined}
                     >
                       <TableCell>
                         <span className="text-gray-500 text-sm">
