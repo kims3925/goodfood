@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Search,
   RefreshCw,
@@ -69,6 +70,7 @@ const roleColors: Record<UserRole, string> = {
 }
 
 export default function UserListPage() {
+  const router = useRouter()
   const toast = useToast()
   const [users, setUsers] = useState<User[]>([])
   const [shops, setShops] = useState<Shop[]>([])
@@ -297,7 +299,8 @@ export default function UserListPage() {
                   users.map((user, index) => (
                     <TableRow
                       key={user.id}
-                      className="hover:bg-gray-50"
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => router.push(`/shop/user/${user.id}`)}
                     >
                       <TableCell>
                         <span className="text-gray-500 text-sm">
