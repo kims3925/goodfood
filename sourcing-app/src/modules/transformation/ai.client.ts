@@ -6,7 +6,7 @@
 
 import { AiProvider } from '@bandauto/db'
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { ProductTransformationError, TransformationErrorCode } from './product.types'
+import { ProductTransformationError, TransformationErrorCode, TransformationErrorType } from './product.types'
 
 // =============================================
 // AI CLIENT INTERFACE
@@ -65,7 +65,8 @@ export class GeminiClient extends BaseAiClient {
           reject(new ProductTransformationError(
             `AI 응답 대기 시간이 초과되었습니다 (${this.timeout / 1000}초). 잠시 후 다시 시도해주세요.`,
             TransformationErrorCode.AI_API_ERROR,
-            { timeout: this.timeout }
+            { timeout: this.timeout },
+            TransformationErrorType.TRANSIENT  // 타임아웃은 일시적 에러
           ))
         }, this.timeout)
       })
@@ -129,26 +130,31 @@ export class GeminiClient extends BaseAiClient {
       if (error instanceof ProductTransformationError) {
         throw error
       }
-      // 토큰 관련 에러 처리
+      // 토큰/할당량 관련 에러 처리 (일시적 에러 - 재시도 가능)
       const errorMsg = error.message || ''
-      if (errorMsg.includes('quota') || errorMsg.includes('limit') || errorMsg.includes('token')) {
+      if (errorMsg.includes('quota') || errorMsg.includes('limit') || errorMsg.includes('token') || errorMsg.includes('rate')) {
         throw new ProductTransformationError(
           'API 할당량이 초과되었습니다. 잠시 후 다시 시도하거나 AI 설정을 확인해주세요.',
           TransformationErrorCode.AI_API_ERROR,
-          { originalError: error }
+          { originalError: error },
+          TransformationErrorType.TRANSIENT  // 일시적 에러
         )
       }
+      // API 키 관련 에러 (영구적 에러 - 재시도 불가)
       if (errorMsg.includes('API key') || errorMsg.includes('authentication') || errorMsg.includes('401')) {
         throw new ProductTransformationError(
           'AI API 키가 유효하지 않습니다. 환경 설정에서 API 키를 확인해주세요.',
           TransformationErrorCode.AI_API_ERROR,
-          { originalError: error }
+          { originalError: error },
+          TransformationErrorType.PERMANENT  // 영구적 에러
         )
       }
+      // 기타 에러는 영구적으로 분류 (기본값)
       throw new ProductTransformationError(
         `Gemini API 오류: ${error.message}`,
         TransformationErrorCode.AI_API_ERROR,
-        { originalError: error }
+        { originalError: error },
+        TransformationErrorType.PERMANENT
       )
     }
   }
@@ -206,41 +212,50 @@ export class OpenAiClient extends BaseAiClient {
         provider: AiProvider.OPENAI,
       }
     } catch (error: any) {
-      // 타임아웃 에러 처리 (AbortError)
+      // 타임아웃 에러 처리 (AbortError) - 일시적 에러
       if (error.name === 'AbortError') {
         throw new ProductTransformationError(
           `AI 응답 대기 시간이 초과되었습니다 (${this.timeout / 1000}초). 잠시 후 다시 시도해주세요.`,
           TransformationErrorCode.AI_API_ERROR,
-          { timeout: this.timeout }
+          { timeout: this.timeout },
+          TransformationErrorType.TRANSIENT
         )
       }
       // 사용자 친화적 에러 메시지 처리
       const errorMsg = error.message || ''
+      // 할당량/속도 제한 - 일시적 에러
       if (errorMsg.includes('quota') || errorMsg.includes('limit') || errorMsg.includes('rate')) {
         throw new ProductTransformationError(
           'API 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.',
           TransformationErrorCode.AI_API_ERROR,
-          { originalError: error }
+          { originalError: error },
+          TransformationErrorType.TRANSIENT
         )
       }
+      // API 키 에러 - 영구적 에러
       if (errorMsg.includes('API key') || errorMsg.includes('401') || errorMsg.includes('Incorrect')) {
         throw new ProductTransformationError(
           'AI API 키가 유효하지 않습니다. 환경 설정에서 확인해주세요.',
           TransformationErrorCode.AI_API_ERROR,
-          { originalError: error }
+          { originalError: error },
+          TransformationErrorType.PERMANENT
         )
       }
+      // 크레딧 부족 - 영구적 에러 (사용자가 결제해야 함)
       if (errorMsg.includes('insufficient_quota') || errorMsg.includes('billing')) {
         throw new ProductTransformationError(
           'API 크레딧이 부족합니다. 결제 정보를 확인해주세요.',
           TransformationErrorCode.AI_API_ERROR,
-          { originalError: error }
+          { originalError: error },
+          TransformationErrorType.PERMANENT
         )
       }
+      // 기타 에러 - 영구적으로 분류
       throw new ProductTransformationError(
         `OpenAI API 오류: ${error.message}`,
         TransformationErrorCode.AI_API_ERROR,
-        { originalError: error }
+        { originalError: error },
+        TransformationErrorType.PERMANENT
       )
     }
   }

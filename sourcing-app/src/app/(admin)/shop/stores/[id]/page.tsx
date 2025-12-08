@@ -153,12 +153,12 @@ export default function ShopDetailPage({
         }
       } else {
         toast.error(data.error || '쇼핑몰을 불러오는데 실패했습니다.')
-        router.push('/shop/list')
+        router.push('/shop/stores')
       }
     } catch (error) {
       console.error('쇼핑몰 상세 조회 실패:', error)
       toast.error('쇼핑몰을 불러오는데 실패했습니다.')
-      router.push('/shop/list')
+      router.push('/shop/stores')
     } finally {
       setIsLoading(false)
     }
@@ -242,7 +242,7 @@ export default function ShopDetailPage({
 
       if (data.success) {
         toast.success('쇼핑몰이 삭제되었습니다.')
-        router.push('/shop/list')
+        router.push('/shop/stores')
       } else {
         toast.error(data.error || '쇼핑몰 삭제에 실패했습니다.')
       }
@@ -314,7 +314,7 @@ export default function ShopDetailPage({
         {/* 헤더 */}
         <div className="mb-8">
           <button
-            onClick={() => router.push('/shop/list')}
+            onClick={() => router.push('/shop/stores')}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft size={20} />

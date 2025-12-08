@@ -45,7 +45,7 @@ export interface PipelineError {
 
 export interface CollectionConfig {
   channelIds?: number[]  // 필수 (비어있으면 수집 안함)
-  limit?: number  // 채널당 수집 제한 (기본값: 50)
+  limit?: number  // 채널당 수집 제한 (자동화: 10, 수동: 전체)
   batchSize?: number  // 배치당 처리 채널 수
 }
 
@@ -86,7 +86,9 @@ export interface TransformConfig {
 export interface TransformResult extends PipelineResult {
   details: {
     transformedPosts: TransformedPost[]
-    createdProducts: number // 생성된 CollectedProduct 수
+    createdProducts: number      // 생성된 CollectedProduct 수
+    skippedCount: number         // 스킵된 항목 수 (일시적 에러)
+    retryablePostIds: number[]   // 재처리 가능한 postId 목록
   }
 }
 
@@ -95,6 +97,8 @@ export interface TransformedPost {
   collectedProductId?: number
   status: 'success' | 'failed' | 'skipped'
   error?: string
+  errorType?: 'TRANSIENT' | 'PERMANENT'  // 에러 타입 (일시적/영구적)
+  retryable?: boolean                     // 재시도 가능 여부
 }
 
 // =============================================
@@ -226,7 +230,7 @@ export interface AutomationStats {
 // CRON SCHEDULE TYPES
 // =============================================
 
-export type CronInterval = '1h' | '3h' | '6h' | '12h' | '24h'
+export type CronInterval = '1h' | '3h' | '6h' | '12h' | '24h' | 'custom'
 
 export const CRON_EXPRESSIONS: Record<CronInterval, string> = {
   '1h': '0 * * * *',
@@ -234,6 +238,7 @@ export const CRON_EXPRESSIONS: Record<CronInterval, string> = {
   '6h': '0 */6 * * *',
   '12h': '0 */12 * * *',
   '24h': '0 0 * * *',
+  'custom': '', // selectedHours로 처리
 }
 
 export const INTERVAL_LABELS: Record<CronInterval, string> = {
@@ -242,4 +247,52 @@ export const INTERVAL_LABELS: Record<CronInterval, string> = {
   '6h': '6시간마다',
   '12h': '12시간마다',
   '24h': '24시간마다 (자정)',
+  'custom': '지정 시간',
+}
+
+// 선택된 시간들을 cron expression으로 변환
+export function selectedHoursToCron(hours: number[]): string {
+  if (hours.length === 0) return '0 * * * *' // 기본값: 매 시간
+  if (hours.length === 24) return '0 * * * *' // 전체 선택 = 매 시간
+
+  const sortedHours = [...hours].sort((a, b) => a - b)
+  return `0 ${sortedHours.join(',')} * * *`
+}
+
+// cron expression에서 선택된 시간들 추출
+export function cronToSelectedHours(cron: string | null): number[] {
+  if (!cron) return []
+
+  const parts = cron.split(' ')
+  if (parts.length !== 5) return []
+
+  const hourPart = parts[1]
+
+  // 매 시간 (24시간 전체)
+  if (hourPart === '*') {
+    return Array.from({ length: 24 }, (_, i) => i)
+  }
+
+  // N시간마다 (*/3 등)
+  if (hourPart.startsWith('*/')) {
+    const interval = parseInt(hourPart.substring(2))
+    const hours: number[] = []
+    for (let h = 0; h < 24; h += interval) {
+      hours.push(h)
+    }
+    return hours
+  }
+
+  // 콤마로 구분된 시간들 (0,3,6,9 등)
+  if (hourPart.includes(',')) {
+    return hourPart.split(',').map(h => parseInt(h)).filter(h => !isNaN(h))
+  }
+
+  // 단일 시간
+  const singleHour = parseInt(hourPart)
+  if (!isNaN(singleHour)) {
+    return [singleHour]
+  }
+
+  return []
 }

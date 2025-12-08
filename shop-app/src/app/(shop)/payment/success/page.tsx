@@ -69,6 +69,8 @@ function PaymentSuccessContent() {
   const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [isGuestOrder, setIsGuestOrder] = useState(false)
+  const [guestAccessToken, setGuestAccessToken] = useState<string | null>(null)
 
   // 중복 처리 방지를 위한 ref
   const isProcessingRef = useRef(false)
@@ -81,7 +83,14 @@ function PaymentSuccessContent() {
   // 결제 확인 함수
   const confirmPayment = async (retry = 0): Promise<boolean> => {
     try {
-      const response = await fetch('/api/payments/confirm', {
+      // 비회원 주문 여부 확인 (GORD- prefix)
+      const isGuest = orderId?.startsWith('GORD-') || false
+      setIsGuestOrder(isGuest)
+
+      // 회원/비회원에 따라 다른 API 호출
+      const confirmApiUrl = isGuest ? '/api/guest-payments/confirm' : '/api/payments/confirm'
+
+      const response = await fetch(confirmApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -98,6 +107,10 @@ function PaymentSuccessContent() {
       if (data.success) {
         setPaymentInfo(data.payment)
         setOrderInfo(data.order)
+        // 비회원인 경우 accessToken 저장
+        if (isGuest && data.accessToken) {
+          setGuestAccessToken(data.accessToken)
+        }
         return true
       }
 
@@ -520,13 +533,27 @@ function PaymentSuccessContent() {
             <ArrowLeft className="w-5 h-5" />
             계속 쇼핑하기
           </Link>
-          <Link
-            href="/mypage/orders"
-            className="flex-1 border-2 border-gray-200 text-gray-700 text-center py-4 rounded-xl font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
-          >
-            <Clock className="w-5 h-5" />
-            주문 내역 보기
-          </Link>
+          {isGuestOrder ? (
+            <Link
+              href={
+                guestAccessToken && orderInfo?.id
+                  ? `/order/guest/${orderInfo.id}?token=${encodeURIComponent(guestAccessToken)}`
+                  : `/order/lookup?orderNumber=${paymentInfo?.orderId || ''}`
+              }
+              className="flex-1 border-2 border-gray-200 text-gray-700 text-center py-4 rounded-xl font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+            >
+              <Clock className="w-5 h-5" />
+              주문 상세 보기
+            </Link>
+          ) : (
+            <Link
+              href="/mypage/orders"
+              className="flex-1 border-2 border-gray-200 text-gray-700 text-center py-4 rounded-xl font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+            >
+              <Clock className="w-5 h-5" />
+              주문 내역 보기
+            </Link>
+          )}
         </div>
 
         {/* 고객센터 안내 */}

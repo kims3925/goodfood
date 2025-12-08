@@ -194,12 +194,7 @@ function CheckoutContent() {
     }
   }, [formData.customerName, formData.customerPhone, formData.sameAsCustomer])
 
-  // 비회원인 경우 결제 방식을 무통장입금으로 자동 설정
-  useEffect(() => {
-    if (status !== 'loading' && !session) {
-      setPaymentMethod('BANK_TRANSFER')
-    }
-  }, [session, status])
+  // 비회원도 토스결제 가능하도록 기본값 유지 (TOSS)
 
   // 배송지 선택 시 formData 업데이트
   const handleAddressSelect = (addressId: number) => {
@@ -292,8 +287,10 @@ function CheckoutContent() {
   }
 
   const calculateShipping = (subtotal: number) => {
-    const freeShippingAmount = 30000
-    const shippingFee = 3000
+    // Shop 설정에서 무료배송 기준액과 기본 배송비 사용 (필수 설정)
+    const freeShippingAmount = shop?.freeShippingAmount
+    const shippingFee = shop?.defaultShippingFee
+    if (freeShippingAmount == null || shippingFee == null) return 0
     return subtotal >= freeShippingAmount ? 0 : shippingFee
   }
 
@@ -431,15 +428,10 @@ function CheckoutContent() {
           alert(data.error || '주문 생성에 실패했습니다.')
         }
       } else {
-        // 토스 결제는 회원 전용 (비회원은 무통장입금만 지원)
-        if (isGuest) {
-          alert('비회원은 무통장입금만 이용 가능합니다.')
-          setPaymentMethod('BANK_TRANSFER')
-          return
-        }
+        // 토스 결제 플로우 (회원/비회원 모두 지원)
+        const apiUrl = isGuest ? '/api/guest-orders/prepare' : '/api/orders/prepare'
 
-        // 토스 결제 플로우
-        const response = await fetch('/api/orders/prepare', {
+        const response = await fetch(apiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -453,10 +445,12 @@ function CheckoutContent() {
           // 주문번호 저장 (실제 주문은 결제 성공 시 생성됨)
           setTempOrderId(data.order.orderNumber)
           setShowPaymentWidget(true)
-          // 🔼 여기서 페이지 맨 위로 스크롤
+          // 페이지 맨 위로 스크롤
           if (typeof window !== 'undefined') {
             window.scrollTo({ top: 0, behavior: 'smooth' })
           }
+        } else {
+          alert(data.error || '주문 준비에 실패했습니다.')
         }
       }
     } catch (error) {
@@ -920,23 +914,14 @@ function CheckoutContent() {
                     결제 방식
                   </h2>
 
-                  {/* 비회원 안내 메시지 */}
-                  {!session && (
-                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-amber-700">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      <span className="text-sm">비회원은 무통장입금만 이용 가능합니다</span>
-                    </div>
-                  )}
 
                   <div className="space-y-3">
-                    {/* 토스 결제 - 회원만 */}
+                    {/* 토스 결제 - 회원/비회원 모두 */}
                     <label
-                      className={`flex items-center p-4 border rounded-lg transition-all ${
-                        !session
-                          ? 'cursor-not-allowed bg-gray-50 border-gray-200 opacity-60'
-                          : paymentMethod === 'TOSS'
-                            ? 'cursor-pointer border-[#FF6B6B] bg-[#FFF5F5]'
-                            : 'cursor-pointer border-gray-200 hover:border-gray-300'
+                      className={`flex items-center p-4 border rounded-lg cursor-pointer transition-all ${
+                        paymentMethod === 'TOSS'
+                          ? 'border-[#FF6B6B] bg-[#FFF5F5]'
+                          : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       <input
@@ -944,22 +929,21 @@ function CheckoutContent() {
                         name="paymentMethod"
                         value="TOSS"
                         checked={paymentMethod === 'TOSS'}
-                        onChange={() => session && setPaymentMethod('TOSS')}
-                        disabled={!session}
+                        onChange={() => setPaymentMethod('TOSS')}
                         className="sr-only"
                       />
                       <div className="flex items-center gap-3 flex-1">
-                        <CreditCard className={`w-5 h-5 ${paymentMethod === 'TOSS' && session ? 'text-[#FF6B6B]' : 'text-gray-400'}`} />
+                        <CreditCard className={`w-5 h-5 ${paymentMethod === 'TOSS' ? 'text-[#FF6B6B]' : 'text-gray-400'}`} />
                         <div>
-                          <span className={`font-medium ${paymentMethod === 'TOSS' && session ? 'text-gray-900' : 'text-gray-500'}`}>
+                          <span className={`font-medium ${paymentMethod === 'TOSS' ? 'text-gray-900' : 'text-gray-700'}`}>
                             신용카드 / 간편결제
                           </span>
                           <p className="text-xs text-gray-500 mt-0.5">
-                            {!session ? '회원 전용' : '토스페이먼츠를 통한 안전한 결제'}
+                            토스페이먼츠를 통한 안전한 결제
                           </p>
                         </div>
                       </div>
-                      {paymentMethod === 'TOSS' && session && (
+                      {paymentMethod === 'TOSS' && (
                         <Check className="w-5 h-5 text-[#FF6B6B]" />
                       )}
                     </label>
@@ -1076,9 +1060,9 @@ function CheckoutContent() {
                             {shippingFee > 0 ? `+${formatPrice(shippingFee)}원` : '무료'}
                           </span>
                         </div>
-                        {shippingFee > 0 && subtotal < 30000 && (
+                        {shippingFee > 0 && shop?.freeShippingAmount && shop.freeShippingAmount > subtotal && (
                           <p className="text-xs text-[#FF6B6B]">
-                            {formatPrice(30000 - subtotal)}원 추가 시 무료배송
+                            {formatPrice(shop.freeShippingAmount - subtotal)}원 추가 시 무료배송
                           </p>
                         )}
                       </div>

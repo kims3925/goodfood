@@ -45,6 +45,7 @@ interface AutomationStats {
 interface AutomationConfig {
   isEnabled: boolean
   cronInterval: string
+  selectedHours: number[]
   lastRunAt: string | null
   nextRunAt: string | null
 }
@@ -84,6 +85,18 @@ const getDaysAgo = (days: number) => {
   const date = new Date()
   date.setDate(date.getDate() - days)
   return date
+}
+
+// 선택된 시간 요약
+const getSelectedHoursSummary = (selectedHours: number[] | undefined): string => {
+  if (!selectedHours || selectedHours.length === 0) return '설정 안됨'
+  if (selectedHours.length === 24) return '매 시간 (24회/일)'
+
+  const sortedHours = [...selectedHours].sort((a, b) => a - b)
+  if (sortedHours.length <= 3) {
+    return sortedHours.map(h => `${h.toString().padStart(2, '0')}:00`).join(', ')
+  }
+  return `${sortedHours.length}개 시간대`
 }
 
 export default function AutomationDashboardPage() {
@@ -269,17 +282,6 @@ export default function AutomationDashboardPage() {
     return new Date(dateStr).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
   }
 
-  const getIntervalLabel = (interval: string): string => {
-    const labels: Record<string, string> = {
-      '1h': '1시간',
-      '3h': '3시간',
-      '6h': '6시간',
-      '12h': '12시간',
-      '24h': '24시간',
-    }
-    return labels[interval] || interval
-  }
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -381,7 +383,7 @@ export default function AutomationDashboardPage() {
                   <>
                     <span className="font-medium">실행 중</span>
                     <span className="mx-2">•</span>
-                    {getIntervalLabel(config.cronInterval || '1h')} 간격
+                    {getSelectedHoursSummary(config.selectedHours)}
                     {countdown && (
                       <>
                         <span className="mx-2">•</span>
@@ -804,9 +806,9 @@ export default function AutomationDashboardPage() {
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
               <Timer size={18} className="text-gray-500" />
               <div>
-                <p className="text-xs text-gray-500">실행 주기</p>
+                <p className="text-xs text-gray-500">실행 시간</p>
                 <p className="font-medium text-gray-900">
-                  {config?.cronInterval ? `${getIntervalLabel(config.cronInterval)} 마다` : '설정 안됨'}
+                  {getSelectedHoursSummary(config?.selectedHours)}
                 </p>
               </div>
             </div>

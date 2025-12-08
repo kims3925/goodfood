@@ -162,14 +162,32 @@ export interface AiProductAnalysis {
 // ERROR TYPES
 // =============================================
 
+/**
+ * 에러 타입 분류
+ * - TRANSIENT: 일시적 에러 (quota, rate limit, timeout) - 재시도 가능
+ * - PERMANENT: 영구적 에러 (invalid API key, content blocked) - 재시도 불가
+ */
+export enum TransformationErrorType {
+  TRANSIENT = 'TRANSIENT',
+  PERMANENT = 'PERMANENT',
+}
+
 export class ProductTransformationError extends Error {
   constructor(
     message: string,
     public code: string,
-    public details?: any
+    public details?: any,
+    public errorType: TransformationErrorType = TransformationErrorType.PERMANENT
   ) {
     super(message)
     this.name = 'ProductTransformationError'
+  }
+
+  /**
+   * 일시적 에러인지 확인 (재시도 가능 여부)
+   */
+  isTransient(): boolean {
+    return this.errorType === TransformationErrorType.TRANSIENT
   }
 }
 

@@ -83,23 +83,10 @@ export default function ChannelFormModal({
   const [configuredPlatforms, setConfiguredPlatforms] = useState<string[]>([])
   const [isLoadingApiSettings, setIsLoadingApiSettings] = useState(false)
 
-  // 파일 업로드 관련 상태
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
-  const [logoPreview, setLogoPreview] = useState<string | null>(null)
 
   // 기존 채널 키 목록 (DB에서 조회)
   const [existingWholesaleKeys, setExistingWholesaleKeys] = useState<string[]>([])
   const [existingRetailKeys, setExistingRetailKeys] = useState<string[]>([])
-
-  // 16자리 UUID 생성 함수
-  const generateShortUUID = () => {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-    let result = ''
-    for (let i = 0; i < 16; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
-    return result
-  }
 
   // 설정된 API 플랫폼 조회
   const fetchConfiguredPlatforms = useCallback(async () => {
@@ -197,7 +184,6 @@ export default function ChannelFormModal({
       setBandList([])
       setBandError(null)
       setBandListFetched(false)
-      setLogoPreview(null)
       setSelectedBands([])
     }
   }, [isOpen, channel, fetchConfiguredPlatforms, fetchExistingChannelKeys])
@@ -267,22 +253,10 @@ export default function ChannelFormModal({
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    // BAND 플랫폼 검증
+    // BAND 플랫폼 검증: 도매/소매 모두 다중 선택
     if (formData.platform === 'BAND' && !isEditMode) {
-      // 도매 채널: 다중 선택 확인
-      if (formData.kind === 'WHOLESALE') {
-        if (selectedBands.length === 0) {
-          newErrors.channelKey = '밴드를 선택해주세요.'
-        }
-      }
-      // 소매 채널: 단일 선택 확인
-      else if (formData.kind === 'RETAIL') {
-        if (!formData.channelKey.trim()) {
-          newErrors.channelKey = '밴드를 선택해주세요.'
-        }
-        if (!formData.name.trim()) {
-          newErrors.name = '채널명을 입력해주세요.'
-        }
+      if (selectedBands.length === 0) {
+        newErrors.channelKey = '밴드를 선택해주세요.'
       }
     }
     // 기타 플랫폼 channelKey 검증
@@ -300,12 +274,12 @@ export default function ChannelFormModal({
       }
     }
 
-    // 채널명 검사: 수정 모드 또는 등록 모드일 때 필수
+    // 채널명 검사: 수정 모드일 때만 필수 (BAND 다중 선택 시 자동 설정됨)
     if (!formData.name.trim()) {
       if (isEditMode) {
         newErrors.name = '채널명을 입력해주세요.'
-      } else if (formData.platform === 'BAND' && formData.kind === 'WHOLESALE' && selectedBands.length > 0) {
-        // 도매 BAND 다중 선택 시 name은 각 밴드에서 가져오므로 검증 제외
+      } else if (formData.platform === 'BAND' && selectedBands.length > 0) {
+        // BAND 다중 선택 시 name은 각 밴드에서 가져오므로 검증 제외
       } else if (formData.platform === 'BAND' && selectedBands.length === 0) {
         // BAND는 밴드 선택 시 name이 자동 설정되므로, 선택이 없을 때는 channelKey 에러가 우선
       } else if (!formData.channelKey) {
@@ -436,7 +410,6 @@ export default function ChannelFormModal({
     // kind 변경 시 관련 상태 초기화
     if (field === 'kind') {
       setSelectedBands([])
-      setLogoPreview(null)
       setFormData((prev) => ({
         ...prev,
         kind: value as ChannelKind,
@@ -459,8 +432,6 @@ export default function ChannelFormModal({
 
   // 플랫폼 선택 핸들러
   const handlePlatformSelect = (platform: ChannelPlatform) => {
-    // 로고 프리뷰 초기화
-    setLogoPreview(null)
     // 선택된 밴드 초기화
     setSelectedBands([])
 
@@ -477,74 +448,6 @@ export default function ChannelFormModal({
     if (platform === 'BAND') {
       fetchBandList()
     }
-  }
-
-  // 로고 파일 업로드 핸들러
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    // 파일 타입 검증
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('이미지 파일만 업로드 가능합니다. (jpg, png, gif, webp)')
-      return
-    }
-
-    // 파일 크기 검증 (5MB)
-    const maxSize = 5 * 1024 * 1024
-    if (file.size > maxSize) {
-      toast.error('파일 크기는 5MB 이하여야 합니다.')
-      return
-    }
-
-    setIsUploadingLogo(true)
-    try {
-      const formDataUpload = new FormData()
-      formDataUpload.append('file', file)
-
-      const response = await fetch('/api/images/channel', {
-        method: 'POST',
-        body: formDataUpload,
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setFormData((prev) => ({ ...prev, coverUrl: data.data.url }))
-        setLogoPreview(data.data.url)
-        toast.success('로고가 업로드되었습니다.')
-      } else {
-        toast.error(data.error || '로고 업로드에 실패했습니다.')
-      }
-    } catch (error) {
-      console.error('로고 업로드 실패:', error)
-      toast.error('로고 업로드 중 오류가 발생했습니다.')
-    } finally {
-      setIsUploadingLogo(false)
-    }
-  }
-
-  // 로고 삭제 핸들러 (파일시스템에서도 삭제)
-  const handleLogoRemove = async () => {
-    const currentCoverUrl = formData.coverUrl
-
-    // 새로 업로드한 채널 이미지인 경우에만 파일시스템에서 삭제
-    if (currentCoverUrl && currentCoverUrl.startsWith('/api/images/channel/file/')) {
-      const filename = currentCoverUrl.split('/').pop()
-      if (filename) {
-        try {
-          await fetch(`/api/images/channel?filename=${filename}`, {
-            method: 'DELETE',
-          })
-        } catch (error) {
-          console.error('로고 파일 삭제 실패:', error)
-        }
-      }
-    }
-
-    setFormData((prev) => ({ ...prev, coverUrl: '' }))
-    setLogoPreview(null)
   }
 
   // 밴드 선택 핸들러 (다중 선택)
@@ -842,13 +745,27 @@ export default function ChannelFormModal({
               </>
             )}
 
-            {/* 소매 채널: 단일 선택 + 로고/서브도메인 입력 */}
+            {/* 소매 채널: 다중 선택 */}
             {formData.kind === 'RETAIL' && (
               <>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  밴드 선택 <span className="text-red-500">*</span>
-                </label>
-                {errors.channelKey && !formData.channelKey && (
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    밴드 선택 <span className="text-red-500">*</span>
+                    {selectedBands.length > 0 && (
+                      <span className="ml-2 text-purple-600">({selectedBands.length}개 선택됨)</span>
+                    )}
+                  </label>
+                  {filteredBandList.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAllBands(filteredBandList)}
+                      className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                    >
+                      {selectedBands.length === filteredBandList.length ? '전체 해제' : '전체 선택'}
+                    </button>
+                  )}
+                </div>
+                {errors.channelKey && selectedBands.length === 0 && (
                   <p className="text-sm text-red-500 mb-2">{errors.channelKey}</p>
                 )}
 
@@ -925,25 +842,12 @@ export default function ChannelFormModal({
                   <div className="border border-gray-200 rounded-lg h-[450px] overflow-y-auto">
                     <div className="grid grid-cols-1 gap-2 p-2">
                       {filteredBandList.map((band) => {
-                        const isSelected = formData.channelKey === band.bandKey
+                        const isSelected = selectedBands.some((b) => b.bandKey === band.bandKey)
                         return (
                           <button
                             key={band.bandKey}
                             type="button"
-                            onClick={() => {
-                              setFormData((prev) => ({
-                                ...prev,
-                                channelKey: band.bandKey,
-                                name: band.name, // 밴드 이름 자동 반영
-                              }))
-                              // 에러 제거
-                              setErrors((prev) => {
-                                const newErrors = { ...prev }
-                                delete newErrors.channelKey
-                                delete newErrors.name
-                                return newErrors
-                              })
-                            }}
+                            onClick={() => handleBandSelect(band)}
                             className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
                               isSelected
                                 ? 'border-purple-500 bg-purple-50'
@@ -984,94 +888,6 @@ export default function ChannelFormModal({
                           </button>
                         )
                       })}
-                    </div>
-                  </div>
-                )}
-
-                {/* 소매 밴드 - 쇼핑몰 정보 입력 (밴드 선택 후 표시) */}
-                {formData.channelKey && (
-                  <div className="mt-4 border border-gray-200 rounded-lg p-4 space-y-4 bg-gray-50">
-                    <div className="flex items-center gap-3 pb-4 border-b border-gray-200">
-                      <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                        </svg>
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">밴드 쇼핑몰 정보</div>
-                        <div className="text-xs text-gray-500">쇼핑몰 정보를 입력해주세요</div>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        쇼핑몰명 <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        placeholder="쇼핑몰 이름을 입력하세요"
-                        value={formData.name}
-                        onChange={(e) => handleChange('name', e.target.value)}
-                        error={errors.name}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        쇼핑몰 로고 <span className="text-red-500">*</span>
-                      </label>
-                      {logoPreview || formData.coverUrl ? (
-                        <div className="flex items-center gap-4">
-                          <div className="relative">
-                            <img
-                              src={logoPreview || formData.coverUrl}
-                              alt="쇼핑몰 로고"
-                              className="w-20 h-20 rounded-lg object-cover border border-gray-200"
-                            />
-                            <button
-                              type="button"
-                              onClick={handleLogoRemove}
-                              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </div>
-                          <span className="text-sm text-gray-500">로고가 업로드되었습니다.</span>
-                        </div>
-                      ) : (
-                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-gray-50 transition-colors">
-                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            {isUploadingLogo ? (
-                              <>
-                                <svg className="animate-spin h-8 w-8 text-purple-500 mb-2" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                </svg>
-                                <p className="text-sm text-gray-500">업로드 중...</p>
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-8 h-8 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                <p className="text-sm text-gray-500">
-                                  <span className="font-semibold text-purple-600">클릭하여 업로드</span>
-                                </p>
-                                <p className="text-xs text-gray-400 mt-1">PNG, JPG, GIF, WEBP (최대 5MB)</p>
-                              </>
-                            )}
-                          </div>
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept="image/jpeg,image/png,image/gif,image/webp"
-                            onChange={handleLogoUpload}
-                            disabled={isUploadingLogo}
-                          />
-                        </label>
-                      )}
-                      {errors.coverUrl && (
-                        <p className="text-sm text-red-500 mt-1">{errors.coverUrl}</p>
-                      )}
                     </div>
                   </div>
                 )}

@@ -1,31 +1,19 @@
 /**
- * Orders Prepare API
- * 결제 전 주문 정보를 쿠키에 임시 저장
- * 실제 주문은 결제 성공(confirm) 시 생성됨
+ * Guest Orders Prepare API
+ * 비회원 토스 결제 전 주문 정보를 쿠키에 임시 저장
+ * 실제 주문은 결제 성공(guest-payments/confirm) 시 생성됨
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import prisma from '@bandauto/db'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/modules/auth/auth.config'
 
-// 주문번호 생성
-function generateOrderNumber(): string {
+// 비회원 주문번호 생성
+function generateGuestOrderNumber(): string {
   const date = new Date()
   const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '')
   const random = Math.random().toString(36).substring(2, 8).toUpperCase()
-  return `ORD-${dateStr}-${random}`
-}
-
-// 현재 로그인한 사용자 ID 가져오기
-async function getCurrentUserId(): Promise<number | null> {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) return null
-    return typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
-  } catch {
-    return null
-  }
+  return `GORD-${dateStr}-${random}`
 }
 
 // 세션 ID 가져오기
@@ -33,10 +21,16 @@ function getSessionId(req: NextRequest): string | null {
   return req.cookies.get('cart_session')?.value || null
 }
 
-interface OrderPrepareData {
+// 요청 헤더에서 Shop ID 가져오기
+async function getShopIdFromHeaders(): Promise<number | null> {
+  const headersList = await headers()
+  const shopId = headersList.get('x-shop-id')
+  return shopId ? parseInt(shopId) : null
+}
+
+interface GuestOrderPrepareData {
   orderId: string
-  userId: number
-  shopId?: number | null
+  shopId: number | null
   fromCart: boolean
   items?: { publishedProductId: number; variantId?: number; quantity: number }[]
   customerInfo: {
@@ -54,15 +48,9 @@ interface OrderPrepareData {
   }
 }
 
-// Shop ID 가져오기 (미들웨어에서 설정)
-function getShopId(req: NextRequest): number | null {
-  const shopIdHeader = req.headers.get('x-shop-id')
-  return shopIdHeader ? parseInt(shopIdHeader) : null
-}
-
 /**
- * POST /api/orders/prepare
- * 주문 정보 검증 및 임시 저장
+ * POST /api/guest-orders/prepare
+ * 비회원 주문 정보 검증 및 임시 저장
  */
 export async function POST(req: NextRequest) {
   try {
@@ -72,13 +60,12 @@ export async function POST(req: NextRequest) {
       customerInfo,
       shippingAddress,
       fromCart = true,
-      userId: bodyUserId,
     } = body
 
     // 고객 정보 검증
     if (!customerInfo?.name || !customerInfo?.phone) {
       return NextResponse.json(
-        { success: false, error: '고객 정보(이름, 전화번호)는 필수입니다' },
+        { success: false, error: '이름과 휴대폰번호는 필수입니다' },
         { status: 400 }
       )
     }
@@ -91,35 +78,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 로그인 체크
-    const currentUserId = await getCurrentUserId()
-    const userId = bodyUserId || currentUserId
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: '로그인이 필요합니다' },
-        { status: 401 }
-      )
-    }
-
-    // 사용자 확인
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    })
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '사용자를 찾을 수 없습니다' },
-        { status: 404 }
-      )
-    }
-
-    // 주문 아이템 검증 및 금액 계산
-    let orderItems: any[] = []
-    let totalAmount = 0
-
-    // Shop ID 가져오기
-    const shopId = getShopId(req)
+    // Shop ID 가져오기 (헤더에서)
+    const shopId = await getShopIdFromHeaders()
 
     // Shop의 배송비 설정 조회 (필수)
     let shopFreeShippingAmount: number | null = null
@@ -135,48 +95,37 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 주문 아이템 검증 및 금액 계산
+    let orderItems: any[] = []
+
     if (fromCart) {
-      // 장바구니에서 주문
+      // 세션 장바구니에서 주문
       const sessionId = getSessionId(req)
 
-      let cart = null
-      if (currentUserId) {
-        cart = await prisma.cart.findFirst({
-          where: { userId: currentUserId, shopId },
-          include: {
-            items: {
-              include: {
-                publishedProduct: {
-                  include: {
-                    product: {
-                      include: { variants: { take: 1 } },
-                    },
-                  },
-                },
-                variant: true,
-              },
-            },
-          },
-        })
-      } else if (sessionId) {
-        cart = await prisma.cart.findFirst({
-          where: { sessionId, userId: null, shopId },
-          include: {
-            items: {
-              include: {
-                publishedProduct: {
-                  include: {
-                    product: {
-                      include: { variants: { take: 1 } },
-                    },
-                  },
-                },
-                variant: true,
-              },
-            },
-          },
-        })
+      if (!sessionId) {
+        return NextResponse.json(
+          { success: false, error: '장바구니 정보를 찾을 수 없습니다' },
+          { status: 400 }
+        )
       }
+
+      const cart = await prisma.cart.findFirst({
+        where: { sessionId, userId: null, shopId },
+        include: {
+          items: {
+            include: {
+              publishedProduct: {
+                include: {
+                  product: {
+                    include: { variants: { take: 1 } },
+                  },
+                },
+              },
+              variant: true,
+            },
+          },
+        },
+      })
 
       if (!cart || cart.items.length === 0) {
         return NextResponse.json(
@@ -262,15 +211,14 @@ export async function POST(req: NextRequest) {
     const shippingFee = (shopFreeShippingAmount != null && shopDefaultShippingFee != null)
       ? (subtotal >= shopFreeShippingAmount ? 0 : shopDefaultShippingFee)
       : 0
-    totalAmount = subtotal + shippingFee
+    const totalAmount = subtotal + shippingFee
 
-    // 주문번호 생성
-    const orderId = generateOrderNumber()
+    // 비회원 주문번호 생성
+    const orderId = generateGuestOrderNumber()
 
     // 주문 준비 데이터
-    const prepareData: OrderPrepareData = {
+    const prepareData: GuestOrderPrepareData = {
       orderId,
-      userId,
       shopId,
       fromCart,
       items: fromCart ? undefined : items,
@@ -289,7 +237,7 @@ export async function POST(req: NextRequest) {
       },
     }
 
-    // 쿠키에 주문 정보 저장 (암호화된 JSON)
+    // 쿠키에 주문 정보 저장 (base64 인코딩)
     const prepareDataJson = JSON.stringify(prepareData)
     const encodedData = Buffer.from(prepareDataJson).toString('base64')
 
@@ -308,11 +256,11 @@ export async function POST(req: NextRequest) {
           totalPrice: item.unitPrice * item.quantity,
         })),
       },
-      message: '주문 준비가 완료되었습니다. 결제를 진행해주세요.',
+      message: '비회원 주문 준비가 완료되었습니다. 결제를 진행해주세요.',
     })
 
     // 쿠키 설정 (10분간 유효)
-    response.cookies.set('order_prepare', encodedData, {
+    response.cookies.set('guest_order_prepare', encodedData, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -322,9 +270,9 @@ export async function POST(req: NextRequest) {
 
     return response
   } catch (error: any) {
-    console.error('Orders prepare error:', error)
+    console.error('Guest orders prepare error:', error)
     return NextResponse.json(
-      { success: false, error: error.message || '주문 준비 실패' },
+      { success: false, error: error.message || '비회원 주문 준비 실패' },
       { status: 500 }
     )
   }

@@ -537,6 +537,54 @@ export default function ChannelDetailPage({
 
                   {/* 오른쪽: 상세 설정 */}
                   <div className={`lg:col-span-8 flex flex-col gap-6 ${channel.kind === 'WHOLESALE' ? 'justify-center' : ''}`}>
+                    {/* Shop 연결 (소매 채널만) - 맨 위에 배치 */}
+                    {channel.kind === 'RETAIL' && (
+                      <div className="p-4 bg-indigo-50 rounded-xl">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Store size={16} className="text-indigo-600" />
+                          <span className="text-sm font-semibold text-slate-700">Shop 연결</span>
+                          <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                            소매 채널
+                          </span>
+                        </div>
+                        {isEditMode ? (
+                          <>
+                            <select
+                              value={selectedShopId || ''}
+                              onChange={(e) => setSelectedShopId(e.target.value ? parseInt(e.target.value) : null)}
+                              className="w-full px-4 py-3 border border-indigo-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                            >
+                              <option value="">Shop을 선택하세요</option>
+                              {shops.map((shop) => (
+                                <option key={shop.id} value={shop.id}>
+                                  {shop.name} ({shop.subdomain}.{shopBaseDomain})
+                                </option>
+                              ))}
+                            </select>
+                            <p className="mt-2 text-xs text-slate-500">
+                              이 채널에서 발행할 때 연결될 Shop을 선택합니다.
+                            </p>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-3 bg-white rounded-lg p-3 border border-indigo-100">
+                            <div className="flex items-center justify-center w-10 h-10 bg-indigo-100 rounded-lg">
+                              <Store size={18} className="text-indigo-600" />
+                            </div>
+                            <div>
+                              {channel.shop ? (
+                                <>
+                                  <p className="font-medium text-slate-900">{channel.shop.name}</p>
+                                  <p className="text-sm text-indigo-600 font-mono">{channel.shop.subdomain}.{shopBaseDomain}</p>
+                                </>
+                              ) : (
+                                <p className="text-slate-400">연결된 Shop이 없습니다</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* 채널 메타 정보 */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
@@ -587,54 +635,6 @@ export default function ChannelDetailPage({
                         </p>
                       )}
                     </div>
-
-                    {/* Shop 연결 (소매 채널만) */}
-                    {channel.kind === 'RETAIL' && (
-                      <div className="p-4 bg-indigo-50 rounded-xl">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Store size={16} className="text-indigo-600" />
-                          <span className="text-sm font-semibold text-slate-700">Shop 연결</span>
-                          <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
-                            소매 채널
-                          </span>
-                        </div>
-                        {isEditMode ? (
-                          <>
-                            <select
-                              value={selectedShopId || ''}
-                              onChange={(e) => setSelectedShopId(e.target.value ? parseInt(e.target.value) : null)}
-                              className="w-full px-4 py-3 border border-indigo-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
-                            >
-                              <option value="">Shop을 선택하세요</option>
-                              {shops.map((shop) => (
-                                <option key={shop.id} value={shop.id}>
-                                  {shop.name} ({shop.subdomain}.{shopBaseDomain})
-                                </option>
-                              ))}
-                            </select>
-                            <p className="mt-2 text-xs text-slate-500">
-                              이 채널에서 발행할 때 연결될 Shop을 선택합니다.
-                            </p>
-                          </>
-                        ) : (
-                          <div className="flex items-center gap-3 bg-white rounded-lg p-3 border border-indigo-100">
-                            <div className="flex items-center justify-center w-10 h-10 bg-indigo-100 rounded-lg">
-                              <Store size={18} className="text-indigo-600" />
-                            </div>
-                            <div>
-                              {channel.shop ? (
-                                <>
-                                  <p className="font-medium text-slate-900">{channel.shop.name}</p>
-                                  <p className="text-sm text-indigo-600 font-mono">{channel.shop.subdomain}.{shopBaseDomain}</p>
-                                </>
-                              ) : (
-                                <p className="text-slate-400">연결된 Shop이 없습니다</p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>

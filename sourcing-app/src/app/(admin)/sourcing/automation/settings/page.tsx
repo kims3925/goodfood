@@ -35,6 +35,7 @@ interface Shop {
 interface AutomationConfig {
   isEnabled: boolean
   cronInterval: string
+  selectedHours: number[]
   collectFromAllChannels: boolean
   wholesaleChannelIds: number[]
   aiProvider: string
@@ -43,118 +44,85 @@ interface AutomationConfig {
   shopIds: number[]
 }
 
-const INTERVAL_OPTIONS = [
-  { value: '1h', label: '1시간', description: '매 정각 실행 (0분)', examples: '1:00, 2:00, 3:00...' },
-  { value: '3h', label: '3시간', description: '매 3시간 정각', examples: '0:00, 3:00, 6:00, 9:00...' },
-  { value: '6h', label: '6시간', description: '매 6시간 정각', examples: '0:00, 6:00, 12:00, 18:00' },
-  { value: '12h', label: '12시간', description: '매 12시간 정각', examples: '0:00, 12:00' },
-  { value: '24h', label: '24시간', description: '매일 자정', examples: '0:00 (자정)' },
-]
+// 00:00 ~ 23:00 시간 버튼 생성
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => ({
+  hour: i,
+  label: `${i.toString().padStart(2, '0')}:00`,
+}))
 
-// 다음 실행 시간 계산 함수
-const getNextExecutionTimes = (interval: string): string[] => {
-  const now = new Date()
-  const times: string[] = []
-
-  const intervalHours: { [key: string]: number } = {
-    '1h': 1,
-    '3h': 3,
-    '6h': 6,
-    '12h': 12,
-    '24h': 24,
+// 다음 실행까지 남은 시간을 계산하는 함수
+const getNextExecutionInfo = (selectedHours: number[]): { text: string; remainingText: string } => {
+  if (selectedHours.length === 0) {
+    return { text: '실행 시간을 선택해주세요', remainingText: '' }
   }
 
-  const hours = intervalHours[interval] || 1
-
-  // 다음 실행 시간들 계산 (최대 3개)
-  for (let i = 0; i < 24 && times.length < 3; i++) {
-    const checkHour = (Math.floor(now.getHours() / hours) * hours + hours * (times.length === 0 ? 0 : 1) + i) % 24
-    if (checkHour % hours === 0) {
-      const nextTime = new Date(now)
-      nextTime.setHours(checkHour, 0, 0, 0)
-
-      // 이미 지난 시간이면 다음 날로
-      if (nextTime <= now) {
-        if (times.length === 0) continue
-      }
-
-      if (times.length === 0 || !times.includes(nextTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }))) {
-        times.push(nextTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }))
-      }
-
-      if (times.length >= 3) break
-    }
-  }
-
-  // 간단한 방식으로 재계산
-  const result: string[] = []
-  const currentHour = now.getHours()
-
-  for (let h = 0; h < 24 && result.length < 3; h++) {
-    if (h % hours === 0) {
-      if (h > currentHour || (h === currentHour && now.getMinutes() === 0)) {
-        result.push(`${h.toString().padStart(2, '0')}:00`)
-      } else if (result.length === 0 && h <= currentHour) {
-        // 오늘 남은 시간 중 가장 가까운 것
-        const nextH = Math.ceil((currentHour + 1) / hours) * hours
-        if (nextH < 24) {
-          result.push(`${nextH.toString().padStart(2, '0')}:00`)
-        } else {
-          result.push(`내일 00:00`)
-        }
-      }
-    }
-  }
-
-  // 결과가 비어있으면 기본값
-  if (result.length === 0) {
-    const nextH = Math.ceil((currentHour + 1) / hours) * hours
-    if (nextH >= 24) {
-      result.push('내일 00:00')
-    } else {
-      result.push(`${nextH.toString().padStart(2, '0')}:00`)
-    }
-  }
-
-  return result
-}
-
-// 가장 가까운 다음 실행 시간
-const getNextExecution = (interval: string): string => {
   const now = new Date()
   const currentHour = now.getHours()
   const currentMinute = now.getMinutes()
 
-  const intervalHours: { [key: string]: number } = {
-    '1h': 1,
-    '3h': 3,
-    '6h': 6,
-    '12h': 12,
-    '24h': 24,
-  }
+  const sortedHours = [...selectedHours].sort((a, b) => a - b)
 
-  const hours = intervalHours[interval] || 1
+  let nextHour: number | null = null
+  let isToday = true
 
-  // 다음 실행 시간 계산
-  let nextHour = Math.ceil((currentHour + (currentMinute > 0 ? 1 : 0)) / hours) * hours
-
-  if (nextHour >= 24) {
-    return '내일 00:00'
-  }
-
-  if (nextHour === currentHour && currentMinute > 0) {
-    nextHour += hours
-    if (nextHour >= 24) {
-      return '내일 00:00'
+  // 오늘 남은 시간 중 가장 가까운 것 찾기
+  for (const hour of sortedHours) {
+    if (hour > currentHour) {
+      nextHour = hour
+      break
     }
   }
 
-  return `오늘 ${nextHour.toString().padStart(2, '0')}:00`
+  // 오늘 남은 시간이 없으면 내일 첫 번째 시간
+  if (nextHour === null) {
+    nextHour = sortedHours[0]
+    isToday = false
+  }
+
+  // 남은 시간 계산
+  const nextDate = new Date()
+  if (!isToday) {
+    nextDate.setDate(nextDate.getDate() + 1)
+  }
+  nextDate.setHours(nextHour, 0, 0, 0)
+
+  const diffMs = nextDate.getTime() - now.getTime()
+  const diffMinutes = Math.floor(diffMs / (1000 * 60))
+  const hours = Math.floor(diffMinutes / 60)
+  const minutes = diffMinutes % 60
+
+  const timeText = `${isToday ? '오늘' : '내일'} ${nextHour.toString().padStart(2, '0')}:00`
+
+  let remainingText = ''
+  if (hours > 0 && minutes > 0) {
+    remainingText = `${hours}시간 ${minutes}분 후`
+  } else if (hours > 0) {
+    remainingText = `${hours}시간 후`
+  } else if (minutes > 0) {
+    remainingText = `${minutes}분 후`
+  } else {
+    remainingText = '곧 실행'
+  }
+
+  return { text: timeText, remainingText }
+}
+
+// 선택된 시간 요약
+const getSelectedHoursSummary = (selectedHours: number[]): string => {
+  if (selectedHours.length === 0) return '선택된 시간 없음'
+  if (selectedHours.length === 24) return '매 시간 (24회/일)'
+
+  const sortedHours = [...selectedHours].sort((a, b) => a - b)
+  if (sortedHours.length <= 4) {
+    return sortedHours.map(h => `${h.toString().padStart(2, '0')}:00`).join(', ')
+  }
+  return `${sortedHours.length}개 시간 선택됨`
 }
 
 const defaultConfig: AutomationConfig = {
   isEnabled: false,
-  cronInterval: '1h',
+  cronInterval: 'custom',
+  selectedHours: [],
   collectFromAllChannels: true,
   wholesaleChannelIds: [],
   aiProvider: 'GEMINI',
@@ -180,11 +148,13 @@ export default function AutomationSettingsPage() {
   const [showAllRetail, setShowAllRetail] = useState(false)
   const [warningSections, setWarningSections] = useState<string[]>([])
   const [warningPhase, setWarningPhase] = useState<'idle' | 'shake' | 'fading'>('idle')
+  const [nextExecution, setNextExecution] = useState<{ text: string; remainingText: string }>({ text: '', remainingText: '' })
 
   const CHANNELS_PER_PAGE = 4
 
   // 섹션별 변경 여부 확인 (isEnabled는 버튼으로 변경하므로 제외)
-  const hasScheduleChanges = config.cronInterval !== initialConfig.cronInterval
+  const hasScheduleChanges = JSON.stringify([...(config.selectedHours || [])].sort()) !==
+    JSON.stringify([...(initialConfig.selectedHours || [])].sort())
 
   const hasCollectionChanges = JSON.stringify((config.wholesaleChannelIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.wholesaleChannelIds || []).slice().sort())
@@ -228,6 +198,11 @@ export default function AutomationSettingsPage() {
   const handleStartAutomation = () => {
     // 필수 설정 검증
     const missingSettings: string[] = []
+
+    // 실행 시간 선택 확인
+    if (config.selectedHours.length === 0) {
+      missingSettings.push('실행 시간')
+    }
 
     // 쇼핑몰 선택 확인
     if (config.shopIds.length === 0) {
@@ -295,6 +270,21 @@ export default function AutomationSettingsPage() {
     loadData()
   }, [])
 
+  // 다음 실행 시간 실시간 업데이트 (1분마다)
+  useEffect(() => {
+    const updateNextExecution = () => {
+      setNextExecution(getNextExecutionInfo(config.selectedHours))
+    }
+
+    // 초기 계산
+    updateNextExecution()
+
+    // 1분마다 업데이트
+    const interval = setInterval(updateNextExecution, 60000)
+
+    return () => clearInterval(interval)
+  }, [config.selectedHours])
+
   const loadData = async () => {
     try {
       const [configRes, wholesaleRes, retailRes, policyRes, aiSettingsRes, shopsRes] = await Promise.all([
@@ -313,6 +303,7 @@ export default function AutomationSettingsPage() {
           const loadedConfig = {
             ...defaultConfig,
             ...configData.data,
+            selectedHours: configData.data?.selectedHours || [],
             wholesaleChannelIds: configData.data?.wholesaleChannelIds || [],
             retailChannelIds: configData.data?.retailChannelIds || [],
             shopIds: configData.data?.shopIds || [],
@@ -549,9 +540,14 @@ export default function AutomationSettingsPage() {
                     ? (
                       <span className="flex items-center gap-2">
                         <Clock size={12} />
-                        <span>다음: <span className="font-semibold text-white">{getNextExecution(config.cronInterval)}</span></span>
-                        <span className="w-1 h-1 bg-green-200 rounded-full" />
-                        <span>{INTERVAL_OPTIONS.find(o => o.value === config.cronInterval)?.label}</span>
+                        <span>다음: <span className="font-semibold text-white">{nextExecution.text}</span></span>
+                        {nextExecution.remainingText && (
+                          <>
+                            <span className="px-1.5 py-0.5 bg-white/20 rounded text-[10px] font-medium">{nextExecution.remainingText}</span>
+                            <span className="w-1 h-1 bg-green-200 rounded-full" />
+                          </>
+                        )}
+                        <span>{getSelectedHoursSummary(config.selectedHours)}</span>
                       </span>
                     )
                     : '아래 설정을 완료하고 자동화를 시작하세요'
@@ -579,140 +575,42 @@ export default function AutomationSettingsPage() {
         </div>
       </div>
 
-      {/* Shop Selection Section - 발행 설정과 동일한 스타일 */}
-      <Card className={`overflow-hidden transition-all ${warningSections.includes('shop') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
+      {/* Schedule Settings - 독립 섹션 */}
+      <Card className={`overflow-hidden transition-all ${warningSections.includes('schedule') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shadow-rose-200">
-                <ShoppingBag className="w-5 h-5 text-white" />
+              <div className="w-11 h-11 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-200">
+                <Clock className="w-5 h-5 text-white" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-bold text-gray-900">쇼핑몰 발행</h2>
-                  {hasShopChanges && (
+                  <h2 className="text-lg font-bold text-gray-900">실행 주기</h2>
+                  {hasScheduleChanges && (
                     <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
                   )}
-                  {config.shopIds.length > 0 && (
-                    <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-rose-100 text-rose-700">
-                      {config.shopIds.length}개
+                  {config.selectedHours.length > 0 && (
+                    <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-violet-100 text-violet-700">
+                      {config.selectedHours.length}개 시간
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-500">상품이 발행될 쇼핑몰을 선택하세요 (복수 선택 가능)</p>
+                <p className="text-sm text-gray-500">자동화가 실행될 시간을 선택하세요 (복수 선택 가능)</p>
               </div>
             </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => handleSaveSection('shop')}
-              disabled={savingSection === 'shop' || !hasShopChanges}
-              className="flex items-center gap-2 text-sm px-4 shadow-md"
-            >
-              {savingSection === 'shop' ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
-              저장
-            </Button>
-          </div>
-
-          {shops.length > 0 ? (
-            <div className="grid grid-cols-4 gap-4">
-              {shops.map((shop) => {
-                const isSelected = config.shopIds.includes(shop.id)
-                return (
-                  <div
-                    key={shop.id}
-                    onClick={() => {
-                      setConfig(prev => ({
-                        ...prev,
-                        shopIds: prev.shopIds.includes(shop.id)
-                          ? prev.shopIds.filter(id => id !== shop.id)
-                          : [...prev.shopIds, shop.id]
-                      }))
-                    }}
-                    className={`
-                      relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all duration-300 group
-                      ${isSelected
-                        ? 'border-rose-500 shadow-lg shadow-rose-100 scale-[1.02]'
-                        : 'border-gray-200 hover:border-rose-300 hover:shadow-md hover:scale-[1.01]'
-                      }
-                    `}
-                  >
-                    <div className="h-28 bg-gradient-to-br from-gray-100 to-gray-50 relative overflow-hidden">
-                      {shop.coverUrl ? (
-                        <img
-                          src={shop.coverUrl}
-                          alt={shop.name}
-                          className={`w-full h-full object-cover transition-transform duration-300 ${isSelected ? '' : 'group-hover:scale-105'}`}
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-gray-300">
-                          <ShoppingBag size={36} />
-                        </div>
-                      )}
-                      {isSelected && (
-                        <div className="absolute inset-0 bg-gradient-to-t from-rose-500/30 to-transparent" />
-                      )}
-                      {!isSelected && (
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
-                      )}
-                    </div>
-                    <div className={`p-2 text-center transition-colors ${isSelected ? 'bg-rose-50' : 'bg-white'}`}>
-                      <span className={`text-sm font-medium line-clamp-1 ${isSelected ? 'text-rose-700' : 'text-gray-700'}`}>{shop.name}</span>
-                      <p className={`text-xs ${isSelected ? 'text-rose-500' : 'text-gray-400'}`}>{shop.subdomain}</p>
-                    </div>
-                    {isSelected && (
-                      <div className="absolute top-2 right-2 w-6 h-6 bg-gradient-to-br from-rose-500 to-pink-600 rounded-full flex items-center justify-center shadow-md">
-                        <Check size={14} className="text-white" />
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="p-5 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
-              <p className="text-gray-600 text-sm">
-                등록된 쇼핑몰이 없습니다.
-                <a href="/admin/settings/shop" className="text-blue-600 hover:underline font-medium ml-1">
-                  설정 &gt; 쇼핑몰 설정
-                </a>
-                에서 추가해주세요.
-              </p>
-            </div>
-          )}
-          {config.shopIds.length === 0 && shops.length > 0 && (
-            <div className="flex items-center gap-3 mt-5 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
-              <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                <ShoppingBag size={16} className="text-amber-600" />
-              </div>
-              <p className="text-sm text-amber-700 font-medium">
-                상품이 발행될 쇼핑몰을 선택해주세요
-              </p>
-            </div>
-          )}
-        </div>
-      </Card>
-
-      {/* Row 1: Schedule Settings + AI Settings - 2 Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Schedule Settings */}
-        <Card className={`overflow-hidden transition-all ${warningSections.includes('schedule') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
-          <div className="p-4 pb-5 flex flex-col">
-            <div className="flex items-center justify-between mb-10">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-200">
-                  <Clock className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-gray-900">실행 주기</h2>
-                    {hasScheduleChanges && (
-                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-500">자동화가 실행될 간격을 선택하세요</p>
-                </div>
-              </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (config.selectedHours.length === 24) {
+                    setConfig(prev => ({ ...prev, selectedHours: [] }))
+                  } else {
+                    setConfig(prev => ({ ...prev, selectedHours: HOUR_OPTIONS.map(o => o.hour) }))
+                  }
+                }}
+                className="text-sm text-violet-600 hover:text-violet-800 font-medium px-3 py-1.5 rounded-lg hover:bg-violet-50 transition-colors"
+              >
+                {config.selectedHours.length === 24 ? '전체 해제' : '전체 선택'}
+              </button>
               <Button
                 variant="primary"
                 size="sm"
@@ -724,50 +622,170 @@ export default function AutomationSettingsPage() {
                 저장
               </Button>
             </div>
+          </div>
 
-            <div className="grid grid-cols-5 gap-3">
-              {INTERVAL_OPTIONS.map((option) => {
-                const isSelected = config.cronInterval === option.value
-                return (
-                  <button
-                    key={option.value}
-                    onClick={() => setConfig(prev => ({ ...prev, cronInterval: option.value }))}
-                    className={`
-                      relative group px-3 py-4 rounded-xl border-2 transition-all duration-200 text-center
-                      ${isSelected
-                        ? 'border-violet-500 bg-gradient-to-br from-violet-50 to-purple-50 shadow-md shadow-violet-100'
-                        : 'border-gray-200 hover:border-violet-300 hover:bg-violet-50/50 hover:shadow-sm'
-                      }
-                    `}
-                  >
-                    {isSelected && (
-                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-violet-500 to-purple-600 rounded-full flex items-center justify-center shadow-md">
-                        <Check size={14} className="text-white" />
-                      </div>
-                    )}
-                    <div className={`font-bold text-xl mb-1 ${isSelected ? 'text-violet-700' : 'text-gray-700 group-hover:text-violet-600'}`}>
-                      {option.label}
-                    </div>
-                    <div className={`text-xs ${isSelected ? 'text-violet-600' : 'text-gray-400'}`}>
-                      {option.description}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+          {/* 24시간 버튼 그리드 */}
+          <div className="grid grid-cols-12 gap-1.5">
+            {HOUR_OPTIONS.map((option) => {
+              const isSelected = config.selectedHours.includes(option.hour)
+              return (
+                <button
+                  key={option.hour}
+                  onClick={() => {
+                    setConfig(prev => ({
+                      ...prev,
+                      selectedHours: prev.selectedHours.includes(option.hour)
+                        ? prev.selectedHours.filter(h => h !== option.hour)
+                        : [...prev.selectedHours, option.hour]
+                    }))
+                  }}
+                  className={`
+                    relative group py-2 rounded-lg border-2 transition-all duration-200 text-center text-sm font-medium
+                    ${isSelected
+                      ? 'border-violet-500 bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-md shadow-violet-200'
+                      : 'border-gray-200 text-gray-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600'
+                    }
+                  `}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
 
-            {/* 다음 실행 시간 미리보기 */}
-            <div className="mt-5 p-4 bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl border border-violet-100">
-              <div className="flex items-center gap-2 text-sm">
+          {/* 다음 실행 시간 미리보기 */}
+          <div className="mt-4 p-3 bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl border border-violet-100">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
                 <Clock size={16} className="text-violet-500" />
                 <span className="text-violet-700 font-medium">다음 실행:</span>
-                <span className="text-violet-900 font-bold">{getNextExecution(config.cronInterval)}</span>
-                <span className="text-violet-400 mx-1">|</span>
-                <span className="text-violet-600 text-xs">
-                  {INTERVAL_OPTIONS.find(o => o.value === config.cronInterval)?.examples}
-                </span>
+                <span className="text-violet-900 font-bold">{nextExecution.text}</span>
+                {nextExecution.remainingText && (
+                  <span className="px-2 py-0.5 bg-violet-100 text-violet-700 rounded-full text-xs font-medium">
+                    {nextExecution.remainingText}
+                  </span>
+                )}
               </div>
+              <span className="text-violet-600 text-xs">
+                {getSelectedHoursSummary(config.selectedHours)}
+              </span>
             </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Row 1: Shop Selection + AI Settings - 2 Column Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Shop Selection Section */}
+        <Card className={`overflow-hidden transition-all ${warningSections.includes('shop') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
+          <div className="p-4 pb-5 flex flex-col">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shadow-rose-200">
+                  <ShoppingBag className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-gray-900">쇼핑몰 발행</h2>
+                    {hasShopChanges && (
+                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
+                    )}
+                    {config.shopIds.length > 0 && (
+                      <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-rose-100 text-rose-700">
+                        {config.shopIds.length}개
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500">상품이 발행될 쇼핑몰을 선택하세요</p>
+                </div>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => handleSaveSection('shop')}
+                disabled={savingSection === 'shop' || !hasShopChanges}
+                className="flex items-center gap-2 text-sm px-4 shadow-md"
+              >
+                {savingSection === 'shop' ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+                저장
+              </Button>
+            </div>
+
+            {shops.length > 0 ? (
+              <div className="grid grid-cols-4 gap-4">
+                {shops.map((shop) => {
+                  const isSelected = config.shopIds.includes(shop.id)
+                  return (
+                    <div
+                      key={shop.id}
+                      onClick={() => {
+                        setConfig(prev => ({
+                          ...prev,
+                          shopIds: prev.shopIds.includes(shop.id)
+                            ? prev.shopIds.filter(id => id !== shop.id)
+                            : [...prev.shopIds, shop.id]
+                        }))
+                      }}
+                      className={`
+                        relative cursor-pointer rounded-xl overflow-hidden border-2 transition-all duration-300 group
+                        ${isSelected
+                          ? 'border-rose-500 shadow-lg shadow-rose-100 scale-[1.02]'
+                          : 'border-gray-200 hover:border-rose-300 hover:shadow-md hover:scale-[1.01]'
+                        }
+                      `}
+                    >
+                      <div className="h-28 bg-gradient-to-br from-gray-100 to-gray-50 relative overflow-hidden">
+                        {shop.coverUrl ? (
+                          <img
+                            src={shop.coverUrl}
+                            alt={shop.name}
+                            className={`w-full h-full object-cover transition-transform duration-300 ${isSelected ? '' : 'group-hover:scale-105'}`}
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-gray-300">
+                            <ShoppingBag size={36} />
+                          </div>
+                        )}
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-gradient-to-t from-rose-500/30 to-transparent" />
+                        )}
+                        {!isSelected && (
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
+                        )}
+                      </div>
+                      <div className={`p-2 text-center transition-colors ${isSelected ? 'bg-rose-50' : 'bg-white'}`}>
+                        <span className={`text-sm font-medium line-clamp-1 ${isSelected ? 'text-rose-700' : 'text-gray-700'}`}>{shop.name}</span>
+                      </div>
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 w-6 h-6 bg-gradient-to-br from-rose-500 to-pink-600 rounded-full flex items-center justify-center shadow-md">
+                          <Check size={14} className="text-white" />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="p-4 bg-gradient-to-r from-rose-50 to-pink-50 rounded-xl border border-rose-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-rose-100 rounded-lg flex items-center justify-center">
+                      <ShoppingBag size={16} className="text-rose-600" />
+                    </div>
+                    <p className="text-sm text-rose-700">
+                      등록된 쇼핑몰이 없습니다. 쇼핑몰을 추가해주세요.
+                    </p>
+                  </div>
+                  <a
+                    href="/sourcing/settings/shop"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <ShoppingBag size={14} />
+                    쇼핑몰 설정
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
         </Card>
 
@@ -848,10 +866,24 @@ export default function AutomationSettingsPage() {
                     })}
                   </div>
                 ) : (
-                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
-                    <p className="text-sm text-gray-600">
-                      <a href="/admin/settings/ai" className="text-blue-600 hover:underline font-medium">AI 설정</a>에서 API 키를 등록하세요
-                    </p>
+                  <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+                          <Sparkles size={16} className="text-amber-600" />
+                        </div>
+                        <p className="text-sm text-amber-700">
+                          등록된 AI API가 없습니다. API 키를 등록해주세요.
+                        </p>
+                      </div>
+                      <a
+                        href="/sourcing/settings/ai"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        <Sparkles size={14} />
+                        AI 설정
+                      </a>
+                    </div>
                   </div>
                 )}
               </div>
@@ -859,50 +891,54 @@ export default function AutomationSettingsPage() {
               {/* Pricing Policy */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">가격 정책</label>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    onClick={() => setConfig(prev => ({ ...prev, pricingPolicyId: null }))}
-                    className={`
-                      relative group flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all duration-200 text-sm
-                      ${config.pricingPolicyId === null
-                        ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50 shadow-sm'
-                        : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
-                      }
-                    `}
-                  >
-                    {config.pricingPolicyId === null && (
-                      <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center">
-                        <Check size={12} className="text-white" />
+                {pricingPolicies.length > 0 ? (
+                  <div className="flex flex-wrap gap-3">
+                    {pricingPolicies.map((policy) => {
+                      const isSelected = config.pricingPolicyId === policy.id
+                      return (
+                        <button
+                          key={policy.id}
+                          onClick={() => setConfig(prev => ({ ...prev, pricingPolicyId: policy.id }))}
+                          className={`
+                            relative group flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all duration-200 text-sm
+                            ${isSelected
+                              ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50 shadow-sm'
+                              : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
+                            }
+                          `}
+                        >
+                          {isSelected && (
+                            <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center">
+                              <Check size={12} className="text-white" />
+                            </div>
+                          )}
+                          <FileText size={16} className={isSelected ? 'text-amber-600' : 'text-gray-400'} />
+                          <span className={`font-medium truncate max-w-[120px] ${isSelected ? 'text-amber-700' : 'text-gray-600'}`}>{policy.name}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+                          <FileText size={16} className="text-amber-600" />
+                        </div>
+                        <p className="text-sm text-amber-700">
+                          등록된 가격 정책이 없습니다. 정책을 추가해주세요.
+                        </p>
                       </div>
-                    )}
-                    <FileText size={16} className={config.pricingPolicyId === null ? 'text-amber-600' : 'text-gray-400'} />
-                    <span className={`font-medium ${config.pricingPolicyId === null ? 'text-amber-700' : 'text-gray-600'}`}>없음</span>
-                  </button>
-                  {pricingPolicies.map((policy) => {
-                    const isSelected = config.pricingPolicyId === policy.id
-                    return (
-                      <button
-                        key={policy.id}
-                        onClick={() => setConfig(prev => ({ ...prev, pricingPolicyId: policy.id }))}
-                        className={`
-                          relative group flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all duration-200 text-sm
-                          ${isSelected
-                            ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50 shadow-sm'
-                            : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
-                          }
-                        `}
+                      <a
+                        href="/sourcing/settings/policy"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
                       >
-                        {isSelected && (
-                          <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center">
-                            <Check size={12} className="text-white" />
-                          </div>
-                        )}
-                        <FileText size={16} className={isSelected ? 'text-amber-600' : 'text-gray-400'} />
-                        <span className={`font-medium truncate max-w-[120px] ${isSelected ? 'text-amber-700' : 'text-gray-600'}`}>{policy.name}</span>
-                      </button>
-                    )
-                  })}
-                </div>
+                        <FileText size={14} />
+                        정책 설정
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1094,26 +1130,26 @@ export default function AutomationSettingsPage() {
           </div>
           )
         ) : (
-          <div className="p-5 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
-            <p className="text-gray-600 text-sm">
-              등록된 도매밴드가 없습니다.
-              <a href="/channel" className="text-blue-600 hover:underline font-medium ml-1">
-                밴드관리 &gt; 도매밴드 관리
+          <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Store size={16} className="text-blue-600" />
+                </div>
+                <p className="text-sm text-blue-700">
+                  등록된 도매밴드가 없습니다. 도매밴드를 추가해주세요.
+                </p>
+              </div>
+              <a
+                href="/sourcing/channel"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <Store size={14} />
+                밴드 관리
               </a>
-              에서 추가해주세요.
-            </p>
+            </div>
           </div>
         )}
-          {config.wholesaleChannelIds.length === 0 && wholesaleChannels.length > 0 && (
-            <div className="flex items-center gap-3 mt-5 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
-              <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                <Store size={16} className="text-amber-600" />
-              </div>
-              <p className="text-sm text-amber-700 font-medium">
-                수집할 도매밴드를 선택해주세요
-              </p>
-            </div>
-          )}
         </div>
       </Card>
 
@@ -1300,26 +1336,26 @@ export default function AutomationSettingsPage() {
           </div>
           )
         ) : (
-          <div className="p-5 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-200">
-            <p className="text-gray-600 text-sm">
-              등록된 소매밴드가 없습니다.
-              <a href="/channel" className="text-blue-600 hover:underline font-medium ml-1">
-                밴드관리 &gt; 소매밴드 관리
+          <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                  <Send size={16} className="text-green-600" />
+                </div>
+                <p className="text-sm text-green-700">
+                  등록된 소매밴드가 없습니다. 소매밴드를 추가해주세요.
+                </p>
+              </div>
+              <a
+                href="/sourcing/channel"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <Send size={14} />
+                밴드 관리
               </a>
-              에서 추가해주세요.
-            </p>
+            </div>
           </div>
         )}
-          {config.retailChannelIds.length === 0 && retailChannels.length > 0 && (
-            <div className="flex items-center gap-3 mt-5 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
-              <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                <Send size={16} className="text-amber-600" />
-              </div>
-              <p className="text-sm text-amber-700 font-medium">
-                발행할 소매밴드를 선택해주세요
-              </p>
-            </div>
-          )}
         </div>
       </Card>
     </div>

@@ -110,7 +110,6 @@ export const shopMenuItems: MenuItem[] = [
       { label: '리뷰 관리', href: '/shop/reviews', icon: Star },
     ],
   },
-  { label: '사용자 관리', href: '/shop/user/list', icon: Users },
   {
     label: '프로모션',
     icon: Gift,
@@ -172,7 +171,6 @@ export const shopPathToMenuMap: Record<string, string> = {
   '/shop/customer': '고객',
   '/shop/cs': '고객',
   '/shop/reviews': '고객',
-  '/shop/user': '사용자 관리',
   '/shop/promotion': '프로모션',
   '/shop/settings': '설정',
 }

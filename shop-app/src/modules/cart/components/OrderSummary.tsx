@@ -6,6 +6,7 @@ interface OrderSummaryProps {
   subtotal: number
   shippingFee: number
   discount?: number
+  freeShippingAmount?: number | null // Shop의 무료배송 기준액 (필수 설정)
   onCheckout?: () => void
 }
 
@@ -13,6 +14,7 @@ export default function OrderSummary({
   subtotal,
   shippingFee,
   discount = 0,
+  freeShippingAmount,
   onCheckout,
 }: OrderSummaryProps) {
   const formatPrice = (value: number) => {
@@ -56,11 +58,11 @@ export default function OrderSummary({
       </div>
 
       {/* Free Shipping Notice */}
-      {shippingFee > 0 && subtotal < 50000 && (
+      {shippingFee > 0 && freeShippingAmount != null && subtotal < freeShippingAmount && (
         <div className="mt-4 p-3 bg-gray-50 rounded-lg">
           <p className="text-xs text-gray-600">
             <span className="font-medium text-primary-600">
-              {formatPrice(50000 - subtotal)}원
+              {formatPrice(freeShippingAmount - subtotal)}원
             </span>{' '}
             더 구매하시면 무료배송!
           </p>
