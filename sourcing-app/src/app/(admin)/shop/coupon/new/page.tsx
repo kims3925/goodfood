@@ -1,11 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Save, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, Save } from 'lucide-react'
 import Input from '@/components/ui/Input'
-import Loading from '@/components/ui/Loading'
-import ConfirmModal from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
 
 interface CouponFormData {
@@ -17,21 +15,15 @@ interface CouponFormData {
   minPurchaseAmount: number | null
   maxDiscountAmount: number | null
   maxIssueCount: number | null
-  issuedCount: number
   validFrom: string
   validUntil: string
   isActive: boolean
 }
 
-export default function CouponDetailPage() {
-  const params = useParams()
-  const id = params.id as string
+export default function CouponNewPage() {
   const router = useRouter()
   const toast = useToast()
-  const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
 
   const [formData, setFormData] = useState<CouponFormData>({
     code: '',
@@ -42,49 +34,18 @@ export default function CouponDetailPage() {
     minPurchaseAmount: null,
     maxDiscountAmount: null,
     maxIssueCount: null,
-    issuedCount: 0,
-    validFrom: '',
-    validUntil: '',
+    validFrom: new Date().toISOString().split('T')[0],
+    validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     isActive: true,
   })
 
-  useEffect(() => {
-    loadCoupon()
-  }, [id])
-
-  const loadCoupon = async () => {
-    try {
-      setIsLoading(true)
-      const response = await fetch(`/api/coupon/${id}`)
-      const data = await response.json()
-
-      if (data.success) {
-        const coupon = data.data
-        setFormData({
-          code: coupon.code,
-          name: coupon.name,
-          description: coupon.description || '',
-          discountType: coupon.discountType,
-          discountValue: Number(coupon.discountValue),
-          minPurchaseAmount: coupon.minPurchaseAmount ? Number(coupon.minPurchaseAmount) : null,
-          maxDiscountAmount: coupon.maxDiscountAmount ? Number(coupon.maxDiscountAmount) : null,
-          maxIssueCount: coupon.maxIssueCount,
-          issuedCount: coupon.issuedCount,
-          validFrom: new Date(coupon.validFrom).toISOString().split('T')[0],
-          validUntil: new Date(coupon.validUntil).toISOString().split('T')[0],
-          isActive: coupon.isActive,
-        })
-      } else {
-        toast.error('쿠폰을 불러오는데 실패했습니다.')
-        router.push('/coupon/list')
-      }
-    } catch (error) {
-      console.error('쿠폰 조회 실패:', error)
-      toast.error('쿠폰을 불러오는데 실패했습니다.')
-      router.push('/coupon/list')
-    } finally {
-      setIsLoading(false)
+  const generateCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    let code = ''
+    for (let i = 0; i < 10; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length))
     }
+    setFormData(prev => ({ ...prev, code }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,8 +70,8 @@ export default function CouponDetailPage() {
 
     setIsSubmitting(true)
     try {
-      const response = await fetch(`/api/coupon/${id}`, {
-        method: 'PUT',
+      const response = await fetch('/api/coupon', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
@@ -118,49 +79,17 @@ export default function CouponDetailPage() {
       const data = await response.json()
 
       if (data.success) {
-        toast.success('쿠폰이 수정되었습니다.')
-        router.push('/coupon/list')
+        toast.success('쿠폰이 생성되었습니다.')
+        router.push('/shop/coupon/list')
       } else {
-        toast.error(data.error || '쿠폰 수정에 실패했습니다.')
+        toast.error(data.error || '쿠폰 생성에 실패했습니다.')
       }
     } catch (error) {
-      console.error('쿠폰 수정 실패:', error)
-      toast.error('쿠폰 수정에 실패했습니다.')
+      console.error('쿠폰 생성 실패:', error)
+      toast.error('쿠폰 생성에 실패했습니다.')
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  const handleDelete = async () => {
-    setIsDeleting(true)
-    try {
-      const response = await fetch(`/api/coupon/${id}`, {
-        method: 'DELETE',
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success('쿠폰이 삭제되었습니다.')
-        router.push('/coupon/list')
-      } else {
-        toast.error(data.error || '쿠폰 삭제에 실패했습니다.')
-      }
-    } catch (error) {
-      console.error('쿠폰 삭제 실패:', error)
-      toast.error('쿠폰 삭제에 실패했습니다.')
-    } finally {
-      setIsDeleting(false)
-      setShowDeleteConfirm(false)
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loading />
-      </div>
-    )
   }
 
   return (
@@ -175,21 +104,10 @@ export default function CouponDetailPage() {
             <ArrowLeft size={20} />
             <span>뒤로가기</span>
           </button>
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">쿠폰 수정</h1>
-              <p className="text-gray-600">
-                쿠폰 정보를 수정합니다.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-300 rounded-md hover:bg-red-50 transition-colors"
-            >
-              <Trash2 size={20} />
-              삭제
-            </button>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">쿠폰 생성</h1>
+          <p className="text-gray-600">
+            새로운 쿠폰을 생성합니다.
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -203,14 +121,23 @@ export default function CouponDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   쿠폰 코드 <span className="text-red-500">*</span>
                 </label>
-                <Input
-                  type="text"
-                  value={formData.code}
-                  onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
-                  placeholder="예: WELCOME2024"
-                  className="font-mono"
-                  maxLength={50}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    value={formData.code}
+                    onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                    placeholder="예: WELCOME2024"
+                    className="flex-1 font-mono"
+                    maxLength={50}
+                  />
+                  <button
+                    type="button"
+                    onClick={generateCode}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                  >
+                    자동생성
+                  </button>
+                </div>
                 <p className="text-xs text-gray-500 mt-1">
                   고객이 입력할 쿠폰 코드입니다. 영문과 숫자만 사용 가능합니다.
                 </p>
@@ -376,16 +303,6 @@ export default function CouponDetailPage() {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">발급 설정</h2>
 
             <div className="space-y-4">
-              {/* 발급 현황 */}
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="text-sm text-gray-600">
-                  현재 발급 수량: <span className="font-semibold text-gray-900">{formData.issuedCount}개</span>
-                  {formData.maxIssueCount && (
-                    <span className="text-gray-500"> / {formData.maxIssueCount}개</span>
-                  )}
-                </div>
-              </div>
-
               {/* 최대 발급 수량 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -399,10 +316,10 @@ export default function CouponDetailPage() {
                     maxIssueCount: e.target.value ? Number(e.target.value) : null
                   }))}
                   placeholder="1000"
-                  min={formData.issuedCount || 1}
+                  min={1}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  발급 가능한 총 수량입니다. 비워두면 무제한. 이미 발급된 수량보다 적게 설정할 수 없습니다.
+                  발급 가능한 총 수량입니다. 비워두면 무제한.
                 </p>
               </div>
 
@@ -461,23 +378,11 @@ export default function CouponDetailPage() {
               className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
               <Save size={20} />
-              {isSubmitting ? '저장 중...' : '변경사항 저장'}
+              {isSubmitting ? '저장 중...' : '쿠폰 생성'}
             </button>
           </div>
         </form>
       </div>
-
-      {/* 삭제 확인 모달 */}
-      <ConfirmModal
-        isOpen={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-        onConfirm={handleDelete}
-        title="쿠폰 삭제"
-        message="이 쿠폰을 삭제하시겠습니까? 이미 발급된 사용자 쿠폰도 함께 삭제됩니다."
-        confirmText="삭제"
-        variant="danger"
-        isLoading={isDeleting}
-      />
     </div>
   )
 }

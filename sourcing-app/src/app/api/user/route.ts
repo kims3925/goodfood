@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-import { UserRole, Prisma } from '@bandauto/db'
+import { Prisma } from '@bandauto/db'
+
+// 스키마의 UserRole: USER, MANAGER, ADMIN
+// 조회 대상은 USER, MANAGER만 (ADMIN 제외)
+type UserRole = 'USER' | 'MANAGER'
+const validRoles: UserRole[] = ['USER', 'MANAGER']
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,11 +24,14 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const search = searchParams.get('search') || ''
-    const role = searchParams.get('role') as UserRole | null
+    const roleParam = searchParams.get('role')
+    const role = roleParam && validRoles.includes(roleParam as UserRole) ? roleParam as UserRole : null
 
     const skip = (page - 1) * limit
 
     const where: Prisma.UserWhereInput = {
+      // ADMIN 제외, USER/MANAGER만 조회
+      role: role ? role : { in: ['USER', 'MANAGER'] },
       ...(search && {
         OR: [
           { email: { contains: search } },
@@ -31,7 +39,6 @@ export async function GET(request: NextRequest) {
           { phone: { contains: search } },
         ],
       }),
-      ...(role && { role }),
     }
 
     const [users, total] = await Promise.all([
@@ -44,7 +51,6 @@ export async function GET(request: NextRequest) {
           phone: true,
           role: true,
           profileImage: true,
-          oauthProvider: true,
           createdAt: true,
           signupCompletedAt: true,
           _count: {

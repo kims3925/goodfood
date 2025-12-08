@@ -14,7 +14,6 @@ import {
   MessageSquare,
   Star,
   UserCheck,
-  ShieldCheck,
   UserCog,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -31,7 +30,7 @@ import {
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 
-type UserRole = 'SOURCING_USER' | 'CUSTOMER' | 'ADMIN'
+type UserRole = 'USER' | 'MANAGER' | 'ADMIN'
 
 interface User {
   id: number
@@ -40,7 +39,6 @@ interface User {
   phone: string | null
   role: UserRole
   profileImage: string | null
-  oauthProvider: string | null
   createdAt: string
   signupCompletedAt: string | null
   _count: {
@@ -51,14 +49,14 @@ interface User {
 }
 
 const roleLabels: Record<UserRole, string> = {
-  SOURCING_USER: '소싱 관리자',
-  CUSTOMER: '쇼핑몰 고객',
+  USER: '일반 사용자',
+  MANAGER: '쇼핑몰 관리자',
   ADMIN: '슈퍼 관리자',
 }
 
 const roleColors: Record<UserRole, string> = {
-  SOURCING_USER: 'bg-blue-100 text-blue-700',
-  CUSTOMER: 'bg-green-100 text-green-700',
+  USER: 'bg-green-100 text-green-700',
+  MANAGER: 'bg-blue-100 text-blue-700',
   ADMIN: 'bg-purple-100 text-purple-700',
 }
 
@@ -89,10 +87,13 @@ export default function UserListPage() {
       const res = await fetch(`/api/user?${params}`)
       const data = await res.json()
 
-      if (data.users) {
+      if (res.ok && data.users) {
         setUsers(data.users)
         setTotalPages(data.pagination.totalPages)
         setTotal(data.pagination.total)
+      } else if (res.status === 401) {
+        // 인증 안됨 - 조용히 무시 (로그인 페이지로 리다이렉트 될 수 있음)
+        console.log('인증이 필요합니다')
       } else {
         toast.error(data.error || '사용자 목록을 불러오는데 실패했습니다.')
       }
@@ -102,7 +103,8 @@ export default function UserListPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, roleFilter, toast])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, search, roleFilter])
 
   useEffect(() => {
     fetchUsers()
@@ -122,9 +124,8 @@ export default function UserListPage() {
   }
 
   // 역할별 통계
-  const customerCount = users.filter((u) => u.role === 'CUSTOMER').length
-  const sourcingUserCount = users.filter((u) => u.role === 'SOURCING_USER').length
-  const adminCount = users.filter((u) => u.role === 'ADMIN').length
+  const userCount = users.filter((u) => u.role === 'USER').length
+  const managerCount = users.filter((u) => u.role === 'MANAGER').length
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -138,7 +139,7 @@ export default function UserListPage() {
         </div>
 
         {/* 통계 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-gray-100 rounded-lg">
@@ -156,8 +157,8 @@ export default function UserListPage() {
                 <UserCheck size={24} className="text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">쇼핑몰 고객</p>
-                <p className="text-2xl font-bold text-green-600">{customerCount}</p>
+                <p className="text-sm text-gray-500">일반 사용자</p>
+                <p className="text-2xl font-bold text-green-600">{userCount}</p>
               </div>
             </div>
           </div>
@@ -167,19 +168,8 @@ export default function UserListPage() {
                 <UserCog size={24} className="text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">소싱 관리자</p>
-                <p className="text-2xl font-bold text-blue-600">{sourcingUserCount}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <ShieldCheck size={24} className="text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">슈퍼 관리자</p>
-                <p className="text-2xl font-bold text-purple-600">{adminCount}</p>
+                <p className="text-sm text-gray-500">쇼핑몰 관리자</p>
+                <p className="text-2xl font-bold text-blue-600">{managerCount}</p>
               </div>
             </div>
           </div>
@@ -221,36 +211,25 @@ export default function UserListPage() {
                     전체
                   </button>
                   <button
-                    onClick={() => { setRoleFilter('CUSTOMER'); setPage(1) }}
+                    onClick={() => { setRoleFilter('USER'); setPage(1) }}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
-                      roleFilter === 'CUSTOMER'
+                      roleFilter === 'USER'
                         ? 'bg-white shadow-sm text-green-600'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
                     <UserCheck size={14} />
-                    고객
+                    일반
                   </button>
                   <button
-                    onClick={() => { setRoleFilter('SOURCING_USER'); setPage(1) }}
+                    onClick={() => { setRoleFilter('MANAGER'); setPage(1) }}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
-                      roleFilter === 'SOURCING_USER'
+                      roleFilter === 'MANAGER'
                         ? 'bg-white shadow-sm text-blue-600'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
                     <UserCog size={14} />
-                    소싱
-                  </button>
-                  <button
-                    onClick={() => { setRoleFilter('ADMIN'); setPage(1) }}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
-                      roleFilter === 'ADMIN'
-                        ? 'bg-white shadow-sm text-purple-600'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <ShieldCheck size={14} />
                     관리자
                   </button>
                 </div>
@@ -336,11 +315,6 @@ export default function UserListPage() {
                         >
                           {roleLabels[user.role]}
                         </span>
-                        {user.oauthProvider && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            {user.oauthProvider}
-                          </div>
-                        )}
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1 text-gray-600">

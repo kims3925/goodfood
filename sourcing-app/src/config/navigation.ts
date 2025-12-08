@@ -18,11 +18,7 @@ import {
   Link2,
   Bot,
   ShoppingBag,
-  Star,
-  Gift,
   Ticket,
-  Calendar,
-  CreditCard,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
@@ -81,7 +77,7 @@ export const sourcingMenuItems: MenuItem[] = [
 // 쇼핑몰 탭 메뉴
 export const shopMenuItems: MenuItem[] = [
   { label: '대시보드', href: '/shop/dashboard', icon: LayoutDashboard },
-  { label: '쇼핑몰 관리', href: '/shop/stores', icon: ShoppingBag },
+  { label: '쇼핑몰 관리', href: '/shop/store/list', icon: ShoppingBag },
   {
     label: '주문',
     icon: ClipboardList,
@@ -98,32 +94,9 @@ export const shopMenuItems: MenuItem[] = [
       { label: '정산 이력', href: '/shop/settlement/history', icon: History },
     ],
   },
-  {
-    label: '고객',
-    icon: Users,
-    children: [
-      { label: '고객 목록', href: '/shop/customer/list', icon: Users },
-      { label: '고객 문의', href: '/shop/cs/inquiry', icon: MessageSquare },
-      { label: '리뷰 관리', href: '/shop/reviews', icon: Star },
-    ],
-  },
   { label: '사용자 관리', href: '/shop/user/list', icon: Users },
-  {
-    label: '프로모션',
-    icon: Gift,
-    children: [
-      { label: '쿠폰', href: '/shop/promotion/coupon', icon: Ticket },
-      { label: '기획전', href: '/shop/promotion/event', icon: Calendar },
-    ],
-  },
-  {
-    label: '설정',
-    icon: Settings,
-    children: [
-      { label: '배송 설정', href: '/shop/settings/shipping', icon: Truck },
-      { label: '결제 설정', href: '/shop/settings/payment', icon: CreditCard },
-    ],
-  },
+  { label: '고객 문의', href: '/shop/cs/inquiry', icon: MessageSquare },
+  { label: '쿠폰', href: '/shop/coupon/list', icon: Ticket },
 ]
 
 // 헬퍼 함수들
@@ -160,16 +133,13 @@ export const sourcingPathToMenuMap: Record<string, string> = {
 
 export const shopPathToMenuMap: Record<string, string> = {
   '/shop/dashboard': '대시보드',
-  '/shop/stores': '쇼핑몰 관리',
+  '/shop/store': '쇼핑몰 관리',
   '/shop/order': '주문',
   '/shop/wholesale-orders': '주문',
   '/shop/settlement': '정산',
-  '/shop/customer': '고객',
-  '/shop/cs': '고객',
-  '/shop/reviews': '고객',
   '/shop/user': '사용자 관리',
-  '/shop/promotion': '프로모션',
-  '/shop/settings': '설정',
+  '/shop/cs': '고객 문의',
+  '/shop/coupon': '쿠폰',
 }
 
 export function getPathToMenuMap(section: AppSection): Record<string, string> {
