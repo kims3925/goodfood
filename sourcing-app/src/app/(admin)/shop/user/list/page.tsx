@@ -82,12 +82,16 @@ export default function UserListPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [stats, setStats] = useState({ total: 0, USER: 0, MANAGER: 0 })
 
-  // 개발자 도구에서 활성화: localStorage.setItem('enableUserDetail', 'true')
-  const [enableDetail, setEnableDetail] = useState(false)
+  // 개발자 도구에서 활성화: localStorage.setItem('enableUserManagement', 'true')
+  const [enabled, setEnabled] = useState<boolean | null>(null)
 
   useEffect(() => {
-    setEnableDetail(localStorage.getItem('enableUserDetail') === 'true')
-  }, [])
+    const isEnabled = localStorage.getItem('enableUserManagement') === 'true'
+    setEnabled(isEnabled)
+    if (!isEnabled) {
+      router.replace('/shop/dashboard')
+    }
+  }, [router])
 
   const itemsPerPage = 20
 
@@ -140,6 +144,15 @@ export default function UserListPage() {
       month: '2-digit',
       day: '2-digit',
     })
+  }
+
+  // 활성화 체크 중이면 로딩 표시
+  if (enabled === null || !enabled) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loading />
+      </div>
+    )
   }
 
   return (
@@ -306,8 +319,8 @@ export default function UserListPage() {
                   users.map((user, index) => (
                     <TableRow
                       key={user.id}
-                      className={`hover:bg-gray-50 ${enableDetail ? 'cursor-pointer' : ''}`}
-                      onClick={enableDetail ? () => router.push(`/shop/user/${user.id}`) : undefined}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => router.push(`/shop/user/${user.id}`)}
                     >
                       <TableCell>
                         <span className="text-gray-500 text-sm">

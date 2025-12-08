@@ -94,7 +94,7 @@ export const shopMenuItems: MenuItem[] = [
       { label: '정산 이력', href: '/shop/settlement/history', icon: History },
     ],
   },
-  { label: '사용자 관리', href: '/shop/user/list', icon: Users },
+  // { label: '사용자 관리', href: '/shop/user/list', icon: Users }, // TODO: 추후 활성화
   { label: '고객 문의', href: '/shop/cs/inquiry', icon: MessageSquare },
   { label: '쿠폰', href: '/shop/coupon/list', icon: Ticket },
 ]
@@ -137,7 +137,7 @@ export const shopPathToMenuMap: Record<string, string> = {
   '/shop/order': '주문',
   '/shop/wholesale-orders': '주문',
   '/shop/settlement': '정산',
-  '/shop/user': '사용자 관리',
+  // '/shop/user': '사용자 관리', // TODO: 추후 활성화
   '/shop/cs': '고객 문의',
   '/shop/coupon': '쿠폰',
 }
