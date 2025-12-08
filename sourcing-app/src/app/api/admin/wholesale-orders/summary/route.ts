@@ -33,14 +33,14 @@ export async function GET(request: NextRequest) {
     const toDate = new Date(to)
     toDate.setHours(23, 59, 59, 999)
 
-    // 결제 완료된 주문만 조회 (PAID 상태이면서 paidAt이 있는 경우)
+    // 결제 완료 이상 상태의 주문만 조회 (PAID, SHIPPED, DELIVERED)
     // 도매처 경로: OrderItem → PublishedProduct → Product → CollectedProduct → CollectedPost → Channel(WHOLESALE)
     const orderItems = await prisma.orderItem.findMany({
       where: {
         order: {
-          status: 'PAID',
-          paidAt: { not: null },
-          orderedAt: {
+          status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+          paidAt: {
+            not: null,
             gte: fromDate,
             lte: toDate,
           },

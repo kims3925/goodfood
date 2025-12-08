@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
-// 통합 주문 타입
-export type OrderSource = 'SHOPPING_MALL' | 'GOOGLE_FORM'
+// 주문 소스 타입
+export type OrderSource = 'SHOPPING_MALL'
 
 export interface UnifiedOrder {
   id: number
@@ -32,18 +32,15 @@ export interface UnifiedOrder {
 const statusLabels: Record<string, string> = {
   PENDING: '결제대기',
   PAID: '결제완료',
-  PREPARING: '상품준비중',
   SHIPPED: '배송중',
   DELIVERED: '배송완료',
   CANCELLED: '주문취소',
   REFUNDED: '환불완료',
-  // OrderTest는 상태가 없으므로 기본값
-  RECEIVED: '주문접수',
 }
 
 /**
  * GET /api/order/unified
- * 쇼핑몰 주문 + 구글폼 주문 통합 조회
+ * 쇼핑몰 주문 조회
  */
 export async function GET(request: NextRequest) {
   try {
@@ -70,11 +67,9 @@ export async function GET(request: NextRequest) {
       total: 0,
       PENDING: 0,
       PAID: 0,
-      PREPARING: 0,
       SHIPPED: 0,
       DELIVERED: 0,
       CANCELLED: 0, // CANCELLED + REFUNDED
-      RECEIVED: 0, // 밴드 주문
     }
 
     // 1. 쇼핑몰 주문 조회 (source가 ALL 또는 SHOPPING_MALL인 경우)
@@ -103,16 +98,15 @@ export async function GET(request: NextRequest) {
           if (search) {
             countBaseWhere.OR = [
               { orderNumber: { contains: search } },
-              { shippingAddress: { recipient: { contains: search } } },
-              { shippingAddress: { phone: { contains: search } } },
+              { shippingAddress: { recipientName: { contains: search } } },
+              { shippingAddress: { recipientPhone: { contains: search } } },
             ]
           }
 
           try {
-            const [pendingCount, paidCount, preparingCount, shippedCount, deliveredCount, cancelledCount, refundedCount] = await Promise.all([
+            const [pendingCount, paidCount, shippedCount, deliveredCount, cancelledCount, refundedCount] = await Promise.all([
               prisma.order.count({ where: { ...countBaseWhere, status: 'PENDING' } }),
               prisma.order.count({ where: { ...countBaseWhere, status: 'PAID' } }),
-              prisma.order.count({ where: { ...countBaseWhere, status: 'PREPARING' } }),
               prisma.order.count({ where: { ...countBaseWhere, status: 'SHIPPED' } }),
               prisma.order.count({ where: { ...countBaseWhere, status: 'DELIVERED' } }),
               prisma.order.count({ where: { ...countBaseWhere, status: 'CANCELLED' } }),
@@ -121,7 +115,6 @@ export async function GET(request: NextRequest) {
 
             statusCounts.PENDING = pendingCount
             statusCounts.PAID = paidCount
-            statusCounts.PREPARING = preparingCount
             statusCounts.SHIPPED = shippedCount
             statusCounts.DELIVERED = deliveredCount
             statusCounts.CANCELLED = cancelledCount + refundedCount
@@ -141,8 +134,8 @@ export async function GET(request: NextRequest) {
               ...(search && {
                 OR: [
                   { orderNumber: { contains: search } },
-                  { shippingAddress: { recipient: { contains: search } } },
-                  { shippingAddress: { phone: { contains: search } } },
+                  { shippingAddress: { recipientName: { contains: search } } },
+                  { shippingAddress: { recipientPhone: { contains: search } } },
                 ],
               }),
               ...(status && status === 'CANCELLED'
@@ -206,73 +199,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 2. 구글폼 주문 조회 (source가 ALL 또는 GOOGLE_FORM인 경우, shopId 필터가 없을 때만)
-    if ((!source || source === 'ALL' || source === 'GOOGLE_FORM') && !shopId) {
-      try {
-        const bandOrderBaseWhere = {
-          userId: user.userId,
-          ...(search && {
-            OR: [
-              { productName: { contains: search } },
-              { customerName: { contains: search } },
-            ],
-          }),
-        }
-
-        // 밴드 주문 카운트 (status 필터와 무관)
-        const bandOrderCount = await prisma.orderTest.count({ where: bandOrderBaseWhere })
-        statusCounts.RECEIVED = bandOrderCount
-
-        // status 필터가 없거나 RECEIVED인 경우에만 밴드 주문 조회
-        if (!status || status === 'RECEIVED') {
-          const formOrders = await prisma.orderTest.findMany({
-            where: bandOrderBaseWhere,
-            include: {
-              publishedProduct: {
-                include: {
-                  product: {
-                    select: {
-                      name: true,
-                      thumbnailUrl: true,
-                    },
-                  },
-                },
-              },
-            },
-            orderBy: { createdAt: 'desc' },
-          })
-
-          for (const order of formOrders) {
-            unifiedOrders.push({
-              id: order.id,
-              source: 'GOOGLE_FORM',
-              orderNumber: `BAND-${String(order.id).padStart(6, '0')}`,
-              customerName: order.customerName,
-              customerPhone: null,
-              productSummary: order.publishedProduct?.product?.name || order.productName,
-              itemCount: 1,
-              totalAmount: order.totalPrice || 0,
-              status: 'RECEIVED',
-              statusLabel: '주문접수',
-              createdAt: order.createdAt.toISOString(),
-            })
-          }
-        }
-      } catch (formOrderError) {
-        console.error('밴드 주문 조회 실패:', formOrderError)
-        // 밴드 주문 조회 실패 시 빈 배열로 처리하고 계속 진행
-      }
-    }
-
     // 정렬: 최신순
     unifiedOrders.sort((a, b) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
 
     // 전체 카운트 계산
-    statusCounts.total = statusCounts.PENDING + statusCounts.PAID + statusCounts.PREPARING +
-                         statusCounts.SHIPPED + statusCounts.DELIVERED + statusCounts.CANCELLED +
-                         statusCounts.RECEIVED
+    statusCounts.total = statusCounts.PENDING + statusCounts.PAID +
+                         statusCounts.SHIPPED + statusCounts.DELIVERED + statusCounts.CANCELLED
 
     // 페이지네이션
     const total = unifiedOrders.length

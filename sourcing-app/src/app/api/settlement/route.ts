@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
             id: item.id,
             orderId: order.id,
             orderNumber: order.orderNumber,
-            customerName: order.recipientName,
+            customerName: order.shippingAddress?.recipientName || '알 수 없음',
             productName: item.productName,
             thumbnailUrl: item.thumbnailUrl || null,
             quantity: item.quantity,
@@ -186,7 +186,7 @@ export async function GET(request: NextRequest) {
           id: item.id,
           orderId: order.id,
           orderNumber: order.orderNumber,
-          customerName: order.recipientName,
+          customerName: order.shippingAddress?.recipientName || '알 수 없음',
           productName: item.productName,
           thumbnailUrl,
           quantity: item.quantity,
@@ -253,47 +253,138 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { shopId, channelId, periodStart, periodEnd, memo } = body
+    const { shopId, periodStart, periodEnd, memo } = body
 
-    if (!shopId || !periodStart || !periodEnd) {
+    if (!shopId) {
       return NextResponse.json(
-        { success: false, error: '필수 정보가 누락되었습니다.' },
+        { success: false, error: '쇼핑몰 정보가 누락되었습니다.' },
         { status: 400 }
       )
     }
 
-    // 해당 기간의 주문 데이터 집계
-    const start = new Date(periodStart)
-    const end = new Date(periodEnd)
-    end.setHours(23, 59, 59, 999)
-
-    // Shop 기준 주문 조회
-    const shopOrderItems = await prisma.orderItem.findMany({
+    // Shop 소유권 확인
+    const shop = await prisma.shop.findFirst({
       where: {
-        order: {
-          userId: user.userId,
-          shopId: parseInt(shopId),
-          status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
-          orderedAt: { gte: start, lte: end },
-        },
+        id: parseInt(shopId),
+        userId: user.userId,
       },
     })
 
-    const totalOrders = shopOrderItems.length
-    const totalAmount = shopOrderItems.reduce((sum, item) => sum + Number(item.totalPrice), 0)
+    if (!shop) {
+      return NextResponse.json(
+        { success: false, error: '쇼핑몰을 찾을 수 없습니다.' },
+        { status: 404 }
+      )
+    }
 
-    // 현재는 Settlement 테이블이 없으므로 계산된 데이터만 반환
+    // 해당 기간의 주문 데이터 집계
+    const start = periodStart ? new Date(periodStart) : new Date('2000-01-01')
+    const end = periodEnd ? new Date(periodEnd) : new Date()
+    end.setHours(23, 59, 59, 999)
+
+    // 이미 정산된 주문 아이템 ID 조회 (중복 방지)
+    const existingSettlementItems = await prisma.settlementItem.findMany({
+      where: {
+        settlement: {
+          userId: user.userId,
+          shopId: parseInt(shopId),
+          status: { not: 'CANCELLED' },
+        },
+      },
+      select: { orderItemId: true },
+    })
+    const settledOrderItemIds = new Set(existingSettlementItems.map(i => i.orderItemId))
+
+    // Shop 기준 주문 조회 (아직 정산되지 않은 주문만)
+    const orders = await prisma.order.findMany({
+      where: {
+        userId: user.userId,
+        shopId: parseInt(shopId),
+        status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+        orderedAt: { gte: start, lte: end },
+      },
+      include: {
+        items: true,
+      },
+    })
+
+    // 정산 대상 주문 아이템 필터링 (이미 정산된 아이템 제외)
+    const settlementItems: Array<{
+      orderItemId: number
+      orderId: number
+      quantity: number
+      unitPrice: number
+      totalPrice: number
+    }> = []
+
+    for (const order of orders) {
+      for (const item of order.items) {
+        if (!settledOrderItemIds.has(item.id)) {
+          settlementItems.push({
+            orderItemId: item.id,
+            orderId: order.id,
+            quantity: item.quantity,
+            unitPrice: Number(item.unitPrice),
+            totalPrice: Number(item.totalPrice),
+          })
+        }
+      }
+    }
+
+    if (settlementItems.length === 0) {
+      return NextResponse.json(
+        { success: false, error: '정산할 주문이 없습니다. 해당 기간에 새로운 주문이 없거나 이미 정산되었습니다.' },
+        { status: 400 }
+      )
+    }
+
+    const totalOrders = settlementItems.length
+    const totalAmount = settlementItems.reduce((sum, item) => sum + item.totalPrice, 0)
+
+    // 트랜잭션으로 정산 및 정산 아이템 생성
+    const settlement = await prisma.$transaction(async (tx) => {
+      // 정산 생성 (자동 완료 처리)
+      const newSettlement = await tx.settlement.create({
+        data: {
+          userId: user.userId,
+          shopId: parseInt(shopId),
+          periodStart: start,
+          periodEnd: end,
+          totalOrders,
+          totalAmount,
+          memo: memo || null,
+          status: 'COMPLETED',
+          settledAt: new Date(),
+        },
+      })
+
+      // 정산 아이템 생성
+      await tx.settlementItem.createMany({
+        data: settlementItems.map(item => ({
+          settlementId: newSettlement.id,
+          orderItemId: item.orderItemId,
+          orderId: item.orderId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+        })),
+      })
+
+      return newSettlement
+    })
+
     return NextResponse.json({
       success: true,
       data: {
-        shopId: parseInt(shopId),
-        channelId: channelId ? parseInt(channelId) : null,
-        periodStart,
-        periodEnd,
-        totalOrders,
-        totalAmount,
-        memo,
-        message: '정산 데이터가 계산되었습니다.',
+        id: settlement.id,
+        shopId: settlement.shopId,
+        periodStart: settlement.periodStart.toISOString(),
+        periodEnd: settlement.periodEnd.toISOString(),
+        totalOrders: settlement.totalOrders,
+        totalAmount: Number(settlement.totalAmount),
+        status: settlement.status,
+        memo: settlement.memo,
+        message: '정산이 생성되었습니다.',
       },
     })
   } catch (error) {

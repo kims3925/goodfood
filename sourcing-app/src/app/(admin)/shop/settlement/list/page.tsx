@@ -93,6 +93,8 @@ export default function SettlementListPage() {
     shopId: number
     shopName: string
     channelId: number | null
+    totalAmount: number
+    orderCount: number
   } | null>(null)
 
   const fetchData = useCallback(async () => {
@@ -140,6 +142,8 @@ export default function SettlementListPage() {
       shopId: shop.id,
       shopName: shop.name,
       channelId: shop.channelId,
+      totalAmount: shop.totalAmount,
+      orderCount: shop.itemCount,
     })
   }
 
@@ -290,7 +294,7 @@ export default function SettlementListPage() {
           </button>
           {/* 정산 이력 카드 */}
           <button
-            onClick={() => router.push('/settlement/history')}
+            onClick={() => router.push('/shop/settlement/history')}
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left"
           >
             <div className="flex items-center gap-3">
@@ -422,7 +426,7 @@ export default function SettlementListPage() {
                           <td className="px-4 py-3 text-sm font-mono">
                             {item.orderId ? (
                               <a
-                                href={`/order/${item.orderId}`}
+                                href={`/shop/order/detail/${item.orderId}?source=SHOPPING_MALL`}
                                 className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
                                 onClick={(e) => e.stopPropagation()}
                               >
@@ -566,9 +570,13 @@ export default function SettlementListPage() {
       {/* 정산 모달 */}
       {settlementModal && (
         <SettlementModal
-          channelId={settlementModal.channelId || settlementModal.shopId}
-          channelName={settlementModal.shopName}
           shopId={settlementModal.shopId}
+          shopName={settlementModal.shopName}
+          channelId={settlementModal.channelId}
+          periodStart={startDate}
+          periodEnd={endDate}
+          totalAmount={settlementModal.totalAmount}
+          orderCount={settlementModal.orderCount}
           onClose={closeSettlementModal}
           onSuccess={() => {
             fetchData()

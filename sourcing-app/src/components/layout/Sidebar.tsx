@@ -137,6 +137,25 @@ export default function Sidebar({
 
   // 경로에 따라 해당 메뉴 그룹 자동 확장
   useEffect(() => {
+    const pathToMenuMap: Record<string, string> = {
+      '/dashboard/shop': '대시보드',
+      '/dashboard/automation': '대시보드',
+      '/channel': '채널 관리',
+      '/shop': '쇼핑몰 관리',
+      '/collected-product': '상품 관리',
+      '/product': '상품 관리',
+      '/published-product': '상품 관리',
+      '/publish': '발행',
+      '/order': '주문서 관리',
+      '/automation': '자동화 관리',
+      '/settlement': '정산 관리',
+      '/cs': '고객 관리',
+      '/user': '고객 관리',
+      '/coupon': '고객 관리',
+      '/policy': '환경 설정',
+      '/admin/settings': '환경 설정',
+    }
+
     const matchedMenus: string[] = []
     for (const [path, menu] of Object.entries(pathToMenuMap)) {
       if (pathname.startsWith(path)) {

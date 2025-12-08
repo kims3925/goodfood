@@ -43,6 +43,12 @@ export interface OrderPrepareData {
     addressDetail?: string
     deliveryMemo?: string
   }
+  // 쿠폰 정보
+  coupon?: {
+    userCouponId: number
+    discountAmount: number
+    isFreeShipping: boolean
+  }
 }
 
 export interface ConfirmPaymentDTO {
@@ -247,6 +253,19 @@ export class PaymentService {
           await tx.cartItem.deleteMany({
             where: { cartId: cartToClear.id },
           })
+        }
+
+        // 쿠폰 사용 처리 (결제 완료 시에만)
+        if (!isVirtualAccount && orderPrepareData?.coupon?.userCouponId) {
+          await tx.userCoupon.update({
+            where: { id: orderPrepareData.coupon.userCouponId },
+            data: {
+              isUsed: true,
+              usedAt: new Date(),
+              orderId: order!.id,
+            },
+          })
+          console.log(`쿠폰 사용 처리 완료: userCouponId=${orderPrepareData.coupon.userCouponId}`)
         }
 
         return { order: updatedOrder, payment, tossResult }

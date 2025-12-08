@@ -22,10 +22,11 @@ import { useToast } from '@/components/ui/Toast'
 
 interface Settlement {
   id: number
-  retailBand: {
+  shop: {
     id: number
     name: string
     coverUrl: string | null
+    logoUrl: string | null
   }
   periodStart: string
   periodEnd: string
@@ -157,7 +158,7 @@ export default function SettlementHistoryPage() {
       const result = await res.json()
 
       if (result.success) {
-        toast.success(`정산이 ${pendingNewStatus === 'COMPLETED' ? '완료' : '취소'}되었습니다.`)
+        toast.success('정산이 취소되었습니다.')
         fetchData()
       } else {
         toast.error(result.error || '상태 변경에 실패했습니다.')
@@ -209,7 +210,7 @@ export default function SettlementHistoryPage() {
         {/* 헤더 */}
         <div className="mb-8">
           <button
-            onClick={() => router.push('/settlement/list')}
+            onClick={() => router.push('/shop/settlement/list')}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft size={20} />
@@ -303,7 +304,7 @@ export default function SettlementHistoryPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      소매밴드
+                      쇼핑몰
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       정산 기간
@@ -330,10 +331,10 @@ export default function SettlementHistoryPage() {
                     <tr key={settlement.id} className="hover:bg-gray-50">
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
-                          {settlement.retailBand.coverUrl ? (
+                          {settlement.shop.logoUrl || settlement.shop.coverUrl ? (
                             <Image
-                              src={settlement.retailBand.coverUrl}
-                              alt={settlement.retailBand.name}
+                              src={settlement.shop.logoUrl || settlement.shop.coverUrl!}
+                              alt={settlement.shop.name}
                               width={40}
                               height={40}
                               className="w-10 h-10 rounded-lg object-cover"
@@ -344,7 +345,7 @@ export default function SettlementHistoryPage() {
                             </div>
                           )}
                           <span className="font-medium text-gray-900">
-                            {settlement.retailBand.name}
+                            {settlement.shop.name}
                           </span>
                         </div>
                       </td>
@@ -367,28 +368,22 @@ export default function SettlementHistoryPage() {
                         {formatDate(settlement.createdAt)}
                       </td>
                       <td className="px-4 py-4">
-                        {settlement.status === 'PENDING' && (
-                          <div className="flex gap-2">
+                        {settlement.status === 'COMPLETED' && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">
+                              {settlement.settledAt && formatDate(settlement.settledAt)}
+                            </span>
                             <button
-                              onClick={() => handleStatusChange(settlement.id, 'COMPLETED')}
-                              disabled={updating === settlement.id}
-                              className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
-                            >
-                              완료
-                            </button>
-                            <button
-                              onClick={() => handleDelete(settlement.id)}
+                              onClick={() => handleStatusChange(settlement.id, 'CANCELLED')}
                               disabled={updating === settlement.id}
                               className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
                             >
-                              삭제
+                              취소
                             </button>
                           </div>
                         )}
-                        {settlement.status === 'COMPLETED' && settlement.settledAt && (
-                          <span className="text-xs text-gray-500">
-                            {formatDate(settlement.settledAt)} 완료
-                          </span>
+                        {settlement.status === 'CANCELLED' && (
+                          <span className="text-xs text-red-500">취소됨</span>
                         )}
                       </td>
                     </tr>
@@ -440,7 +435,7 @@ export default function SettlementHistoryPage() {
         )}
       </div>
 
-      {/* 상태 변경 확인 모달 */}
+      {/* 정산 취소 확인 모달 */}
       <ConfirmModal
         isOpen={showStatusConfirm}
         onClose={() => {
@@ -449,10 +444,10 @@ export default function SettlementHistoryPage() {
           setPendingNewStatus('')
         }}
         onConfirm={confirmStatusChange}
-        title="정산 상태 변경"
-        message={`정산 상태를 ${pendingNewStatus === 'COMPLETED' ? '완료' : '취소'}로 변경하시겠습니까?`}
-        confirmText={pendingNewStatus === 'COMPLETED' ? '완료' : '취소'}
-        variant={pendingNewStatus === 'COMPLETED' ? 'info' : 'warning'}
+        title="정산 취소"
+        message="이 정산을 취소하시겠습니까? 취소된 주문은 다시 정산할 수 있습니다."
+        confirmText="취소"
+        variant="danger"
         isLoading={updating !== null}
       />
 

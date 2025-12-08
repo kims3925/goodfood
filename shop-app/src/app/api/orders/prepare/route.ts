@@ -52,6 +52,11 @@ interface OrderPrepareData {
     addressDetail?: string
     deliveryMemo?: string
   }
+  coupon?: {
+    userCouponId: number
+    discountAmount: number
+    isFreeShipping: boolean
+  }
 }
 
 // Shop ID 가져오기 (미들웨어에서 설정)
@@ -73,6 +78,7 @@ export async function POST(req: NextRequest) {
       shippingAddress,
       fromCart = true,
       userId: bodyUserId,
+      coupon: couponData,
     } = body
 
     // 고객 정보 검증
@@ -287,6 +293,7 @@ export async function POST(req: NextRequest) {
         addressDetail: shippingAddress.addressDetail,
         deliveryMemo: shippingAddress.deliveryMemo,
       },
+      coupon: validCoupon,
     }
 
     // 쿠키에 주문 정보 저장 (암호화된 JSON)
@@ -300,6 +307,7 @@ export async function POST(req: NextRequest) {
         totalAmount,
         subtotal,
         shippingFee,
+        discountAmount,
         itemCount: orderItems.reduce((sum, item) => sum + item.quantity, 0),
         items: orderItems.map((item) => ({
           productName: item.productName,
@@ -307,6 +315,10 @@ export async function POST(req: NextRequest) {
           unitPrice: item.unitPrice,
           totalPrice: item.unitPrice * item.quantity,
         })),
+        coupon: validCoupon ? {
+          discountAmount: validCoupon.discountAmount,
+          isFreeShipping: validCoupon.isFreeShipping,
+        } : null,
       },
       message: '주문 준비가 완료되었습니다. 결제를 진행해주세요.',
     })

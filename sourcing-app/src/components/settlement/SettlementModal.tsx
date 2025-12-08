@@ -1,27 +1,45 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Calendar, FileText, Loader2 } from 'lucide-react'
+import { X, FileText, Loader2, CheckCircle, Package, Banknote } from 'lucide-react'
 import Button from '@/components/ui/Button'
 
 interface SettlementModalProps {
-  channelId: number
-  channelName: string
-  shopId?: number  // Shop ID (Shop 기준 정산용)
+  shopId: number
+  shopName: string
+  channelId?: number | null
+  // 정산 정보 (목록에서 전달)
+  periodStart: string
+  periodEnd: string
+  totalAmount: number
+  orderCount: number
+  // 은행 정보 (선택)
+  bankInfo?: {
+    bankName: string | null
+    accountNumber: string | null
+    accountHolder: string | null
+  }
   onClose: () => void
   onSuccess: () => void
 }
 
 export default function SettlementModal({
-  channelId,
-  channelName,
   shopId,
+  shopName,
+  channelId,
+  periodStart,
+  periodEnd,
+  totalAmount,
+  orderCount,
+  bankInfo,
   onClose,
   onSuccess,
 }: SettlementModalProps) {
-  const [periodStart, setPeriodStart] = useState('')
-  const [periodEnd, setPeriodEnd] = useState('')
+  // 정산 처리일 (기본값: 오늘)
+  const today = new Date().toISOString().split('T')[0]
+  const [settlementDate, setSettlementDate] = useState(today)
   const [memo, setMemo] = useState('')
+  const [confirmed, setConfirmed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -29,13 +47,8 @@ export default function SettlementModal({
     e.preventDefault()
     setError('')
 
-    if (!periodStart || !periodEnd) {
-      setError('정산 기간을 선택해주세요.')
-      return
-    }
-
-    if (new Date(periodStart) > new Date(periodEnd)) {
-      setError('시작일이 종료일보다 클 수 없습니다.')
+    if (!confirmed) {
+      setError('정산 내용을 확인해주세요.')
       return
     }
 
@@ -45,7 +58,7 @@ export default function SettlementModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          shopId: shopId || channelId,  // Shop ID 우선 사용
+          shopId,
           channelId,
           periodStart,
           periodEnd,
@@ -68,21 +81,18 @@ export default function SettlementModal({
     }
   }
 
-  // 오늘 날짜를 기본값으로 설정하는 빠른 선택 버튼
-  const setThisMonth = () => {
-    const now = new Date()
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    setPeriodStart(firstDay.toISOString().split('T')[0])
-    setPeriodEnd(lastDay.toISOString().split('T')[0])
+  const formatPrice = (price: number) => {
+    return price.toLocaleString()
   }
 
-  const setLastMonth = () => {
-    const now = new Date()
-    const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const lastDay = new Date(now.getFullYear(), now.getMonth(), 0)
-    setPeriodStart(firstDay.toISOString().split('T')[0])
-    setPeriodEnd(lastDay.toISOString().split('T')[0])
+  const formatDateDisplay = (dateStr: string) => {
+    if (!dateStr) return '-'
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
   }
 
   return (
@@ -113,73 +123,79 @@ export default function SettlementModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               쇼핑몰
             </label>
-            <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700">
-              {channelName}
+            <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 font-medium">
+              {shopName}
             </div>
           </div>
 
-          {/* 기간 선택 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              정산 기간
-            </label>
-            <div className="flex gap-2 mb-2">
-              <button
-                type="button"
-                onClick={setThisMonth}
-                className="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"
-              >
-                이번달
-              </button>
-              <button
-                type="button"
-                onClick={setLastMonth}
-                className="px-3 py-1 text-xs bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100"
-              >
-                지난달
-              </button>
+          {/* 정산 금액 카드 */}
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 text-blue-600 mb-2">
+              <Banknote size={18} />
+              <span className="text-sm font-medium">정산 금액</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="date"
-                  value={periodStart}
-                  onChange={(e) => setPeriodStart(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <span className="text-gray-500">~</span>
-              <div className="relative flex-1">
-                <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="date"
-                  value={periodEnd}
-                  onChange={(e) => setPeriodEnd(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+            <div className="text-3xl font-bold text-gray-900 mb-1">
+              ₩{formatPrice(totalAmount)}
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Package size={14} />
+              <span>{orderCount}건</span>
             </div>
           </div>
+
+          {/* 정산 처리일 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              정산 처리일
+            </label>
+            <input
+              type="date"
+              value={settlementDate}
+              onChange={(e) => setSettlementDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* 은행 정보 (있는 경우) */}
+          {bankInfo && (bankInfo.bankName || bankInfo.accountNumber) && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="text-xs font-medium text-gray-500 mb-1">입금 계좌</div>
+              <div className="text-sm text-gray-700">
+                {bankInfo.bankName} {bankInfo.accountNumber}
+                {bankInfo.accountHolder && (
+                  <span className="text-gray-500 ml-1">({bankInfo.accountHolder})</span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* 메모 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              <FileText size={14} className="inline mr-1" />
               메모 (선택)
             </label>
-            <div className="relative">
-              <FileText size={16} className="absolute left-3 top-3 text-gray-400" />
-              <textarea
-                value={memo}
-                onChange={(e) => setMemo(e.target.value)}
-                placeholder="정산에 대한 메모를 입력하세요..."
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                rows={3}
-              />
-            </div>
+            <textarea
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="정산에 대한 메모를 입력하세요..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              rows={2}
+            />
           </div>
+
+          {/* 확인 체크박스 */}
+          <label className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+              className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <span className="text-sm text-blue-800">
+              위 정산 내용을 확인했습니다.
+            </span>
+          </label>
 
           {/* 에러 메시지 */}
           {error && (
@@ -201,7 +217,7 @@ export default function SettlementModal({
             <Button
               type="submit"
               variant="primary"
-              disabled={loading}
+              disabled={loading || !confirmed}
               className="flex-1"
             >
               {loading ? (
@@ -210,7 +226,10 @@ export default function SettlementModal({
                   처리중...
                 </>
               ) : (
-                '정산 생성'
+                <>
+                  <CheckCircle size={16} />
+                  정산 생성
+                </>
               )}
             </Button>
           </div>

@@ -18,7 +18,6 @@ import {
   Link2,
   Bot,
   ShoppingBag,
-  RotateCcw,
   Star,
   Gift,
   Ticket,
@@ -89,8 +88,6 @@ export const shopMenuItems: MenuItem[] = [
     children: [
       { label: '주문 목록', href: '/shop/order/list', icon: ClipboardList },
       { label: '도매처 발주', href: '/shop/wholesale-orders', icon: Truck },
-      { label: '배송 관리', href: '/shop/shipping', icon: Truck },
-      { label: '반품/교환', href: '/shop/returns', icon: RotateCcw },
     ],
   },
   {
@@ -165,8 +162,6 @@ export const shopPathToMenuMap: Record<string, string> = {
   '/shop/stores': '쇼핑몰 관리',
   '/shop/order': '주문',
   '/shop/wholesale-orders': '주문',
-  '/shop/shipping': '주문',
-  '/shop/returns': '주문',
   '/shop/settlement': '정산',
   '/shop/customer': '고객',
   '/shop/cs': '고객',

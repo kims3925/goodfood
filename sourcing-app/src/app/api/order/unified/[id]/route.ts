@@ -47,30 +47,17 @@ export async function GET(
             },
           },
           payment: true,
-        },
-      })
-
-      if (!order) {
-        return NextResponse.json(
-          { success: false, error: '주문을 찾을 수 없습니다.' },
-          { status: 404 }
-        )
-      }
-
-      return NextResponse.json({
-        success: true,
-        data: order,
-      })
-    } else if (source === 'GOOGLE_FORM') {
-      const order = await prisma.orderTest.findFirst({
-        where: {
-          id: parseInt(id),
-          userId: user.userId,
-        },
-        include: {
-          publishedProduct: {
-            include: {
-              product: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          shop: {
+            select: {
+              id: true,
+              name: true,
             },
           },
         },
@@ -83,14 +70,77 @@ export async function GET(
         )
       }
 
+      // 상태 레이블 매핑
+      const statusLabels: Record<string, string> = {
+        PENDING: '결제대기',
+        PAID: '결제완료',
+        PREPARING: '상품준비',
+        SHIPPED: '배송중',
+        DELIVERED: '배송완료',
+        CANCELLED: '취소됨',
+        REFUNDED: '환불됨',
+      }
+
+      // 통합 형식으로 변환
+      const formattedOrder = {
+        id: order.id,
+        source: 'SHOPPING_MALL' as const,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        statusLabel: statusLabels[order.status] || order.status,
+        customerName: order.shippingAddress?.recipientName || order.user?.name || '정보없음',
+        customerPhone: order.shippingAddress?.recipientPhone || null,
+        shippingAddress: order.shippingAddress ? {
+          recipientName: order.shippingAddress.recipientName,
+          recipientPhone: order.shippingAddress.recipientPhone,
+          postalCode: order.shippingAddress.postalCode,
+          address: order.shippingAddress.address,
+          addressDetail: order.shippingAddress.addressDetail,
+          deliveryMemo: order.shippingAddress.deliveryMemo,
+        } : null,
+        subtotalAmount: Number(order.subtotalAmount),
+        shippingFee: Number(order.shippingFee),
+        discountAmount: Number(order.discountAmount),
+        totalAmount: Number(order.totalAmount),
+        paymentMethod: order.payment?.method || null,
+        createdAt: order.orderedAt?.toISOString() || order.createdAt?.toISOString(),
+        paidAt: order.paidAt?.toISOString() || null,
+        shippedAt: order.shippedAt?.toISOString() || null,
+        deliveredAt: order.deliveredAt?.toISOString() || null,
+        cancelledAt: order.cancelledAt?.toISOString() || null,
+        items: order.items.map((item) => ({
+          id: item.id,
+          productName: item.productName,
+          optionSummary: item.optionSummary,
+          thumbnailUrl: item.thumbnailUrl || item.publishedProduct?.product?.thumbnailUrl || null,
+          quantity: item.quantity,
+          unitPrice: Number(item.unitPrice),
+          totalPrice: Number(item.totalPrice),
+        })),
+        payment: order.payment ? {
+          id: order.payment.id,
+          method: order.payment.method,
+          status: order.payment.status,
+          amount: Number(order.payment.amount),
+          paidAt: order.payment.approvedAt?.toISOString() || null,
+        } : null,
+        user: order.user ? {
+          id: order.user.id,
+          name: order.user.name,
+          email: order.user.email,
+        } : null,
+        shopId: order.shopId,
+        shopName: order.shop?.name || null,
+      }
+
       return NextResponse.json({
         success: true,
-        data: order,
+        data: formattedOrder,
       })
     }
 
     return NextResponse.json(
-      { success: false, error: 'source 파라미터가 필요합니다.' },
+      { success: false, error: 'source 파라미터가 필요하거나 유효하지 않습니다.' },
       { status: 400 }
     )
   } catch (error) {
@@ -189,12 +239,6 @@ export async function PATCH(
         success: true,
         message: '주문 상태가 변경되었습니다.',
       })
-    } else if (source === 'GOOGLE_FORM') {
-      // OrderTest는 상태 필드가 없으므로 현재는 지원 안함
-      return NextResponse.json(
-        { success: false, error: '밴드 주문은 상태 변경을 지원하지 않습니다.' },
-        { status: 400 }
-      )
     }
 
     return NextResponse.json(

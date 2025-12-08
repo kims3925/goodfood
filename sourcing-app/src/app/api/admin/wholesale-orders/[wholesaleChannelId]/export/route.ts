@@ -52,13 +52,13 @@ export async function GET(
       )
     }
 
-    // 해당 도매처의 결제 완료 주문 아이템 조회
+    // 해당 도매처의 결제 완료 이상 상태 주문 아이템 조회 (PAID, SHIPPED, DELIVERED)
     const items = await prisma.orderItem.findMany({
       where: {
         order: {
-          status: 'PAID',
-          paidAt: { not: null },
-          orderedAt: {
+          status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+          paidAt: {
+            not: null,
             gte: fromDate,
             lte: toDate,
           },
@@ -81,8 +81,8 @@ export async function GET(
             orderedAt: true,
             shippingAddress: {
               select: {
-                recipient: true,
-                phone: true,
+                recipientName: true,
+                recipientPhone: true,
                 postalCode: true,
                 address: true,
                 addressDetail: true,
@@ -228,8 +228,8 @@ export async function GET(
         item.quantity,
         wholesalePrice,
         supplyAmount,
-        addr?.recipient || '',
-        addr?.phone || '',
+        addr?.recipientName || '',
+        addr?.recipientPhone || '',
         fullAddress,
         orderedAt,
       ]
