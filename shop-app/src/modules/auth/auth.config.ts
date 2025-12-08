@@ -35,25 +35,16 @@ async function logSignIn(opts: {
   })
 }
 
-// 쿠키 도메인 설정 (서브도메인 간 세션 공유)
+// 쿠키 도메인 설정
+// undefined 반환 시 현재 호스트(서브도메인)에만 쿠키 적용 → 쇼핑몰별 세션 분리
 function getCookieDomain(): string | undefined {
-  // 환경변수에서 명시적으로 설정된 경우 사용
-  if (process.env.COOKIE_DOMAIN) {
-    return process.env.COOKIE_DOMAIN
-  }
-
-  // 로컬 개발 환경에서 lvh.me 사용 시 서브도메인 간 세션 공유
-  if (process.env.NODE_ENV !== 'production') {
-    // lvh.me를 사용하는 경우 .lvh.me 도메인 설정
-    return '.lvh.me'
-  }
-
-  // 프로덕션: 환경변수에서 루트 도메인 가져오기 (예: .shop.com)
+  // 각 쇼핑몰(서브도메인)별로 별도 세션 사용
+  // abc.lvh.me, xyz.lvh.me 각각 독립된 로그인 상태 유지
   return undefined
 }
 
 export const authOptions: NextAuthOptions = {
-  // 서브도메인 간 세션 공유를 위한 쿠키 설정
+  // 서브도메인별 세션 분리를 위한 쿠키 설정
   cookies: {
     sessionToken: {
       name:
@@ -126,6 +117,29 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
+        // 현재 쇼핑몰 확인 (일반 사용자만 체크)
+        if (user.role === 'USER') {
+          try {
+            const h = headers()
+            const host = h.get('host') || ''
+            // abc.lvh.me:3000 -> abc
+            const subdomain = host.split('.')[0]
+
+            if (subdomain && subdomain !== 'lvh' && subdomain !== 'localhost') {
+              const shop = await prisma.shop.findUnique({
+                where: { subdomain },
+              })
+
+              if (shop && user.shopId !== shop.id) {
+                console.log('[Auth] 다른 쇼핑몰 사용자 로그인 시도:', credentials.email, '사용자 shopId:', user.shopId, '현재 shop:', shop.id)
+                return null
+              }
+            }
+          } catch (e) {
+            console.log('[Auth] 쇼핑몰 확인 중 오류:', e)
+          }
+        }
+
         console.log('[Auth] 로그인 성공:', credentials.email)
         return {
           id: user.id.toString(),
@@ -145,6 +159,39 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/error',
   },
   callbacks: {
+    // 서브도메인 간 리다이렉트 허용
+    async redirect({ url, baseUrl }) {
+      // 상대 경로는 그대로 허용
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`
+      }
+
+      try {
+        const urlObj = new URL(url)
+        const baseUrlObj = new URL(baseUrl)
+
+        // 같은 호스트면 허용
+        if (urlObj.host === baseUrlObj.host) {
+          return url
+        }
+
+        // 서브도메인 허용 (.lvh.me, 프로덕션 도메인)
+        const allowedDomains = ['.lvh.me', process.env.COOKIE_DOMAIN].filter(Boolean)
+        const isAllowedSubdomain = allowedDomains.some(
+          (domain) => domain && urlObj.host.endsWith(domain.replace(/^\./, ''))
+        )
+
+        if (isAllowedSubdomain) {
+          return url
+        }
+      } catch {
+        // URL 파싱 실패 시 baseUrl 사용
+      }
+
+      // 기본: baseUrl로 리다이렉트
+      return baseUrl
+    },
+
     async signIn({ user, account }) {
       const provider = account?.provider ?? 'unknown'
 

@@ -16,6 +16,7 @@ model Shop {
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
 
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customers          User[]             @relation("ShopCustomers")
   theme              ShopTheme?
   carts              Cart[]
   orders             Order[]

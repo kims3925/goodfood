@@ -100,7 +100,8 @@ function StoreLayoutContent({
                           <button
                             onClick={() => {
                               setIsUserMenuOpen(false)
-                              signOut({ callbackUrl: '/main' })
+                              // 현재 도메인 유지하며 로그아웃
+                              signOut({ callbackUrl: `${window.location.origin}/main` })
                             }}
                             className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700 w-full"
                           >

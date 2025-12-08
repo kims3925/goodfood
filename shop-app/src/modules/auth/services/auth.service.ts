@@ -19,6 +19,7 @@ export interface SignupDTO {
   password: string
   name: string
   phone?: string
+  shopId?: number
 }
 
 export interface UserResponse {
@@ -38,7 +39,7 @@ export class AuthService {
    * 회원가입
    */
   async signup(data: SignupDTO): Promise<UserResponse> {
-    const { email, password, name, phone } = data
+    const { email, password, name, phone, shopId } = data
 
     // 입력 검증
     this.validateSignupInput(email, password, name)
@@ -62,6 +63,7 @@ export class AuthService {
         password: passwordHash,
         name,
         phone: phone || null,
+        shopId: shopId || null,
       },
     })
 

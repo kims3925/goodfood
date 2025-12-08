@@ -26,12 +26,16 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const roleParam = searchParams.get('role')
     const role = roleParam && validRoles.includes(roleParam as UserRole) ? roleParam as UserRole : null
+    const shopIdParam = searchParams.get('shopId')
+    const shopId = shopIdParam ? parseInt(shopIdParam) : null
 
     const skip = (page - 1) * limit
 
     const where: Prisma.UserWhereInput = {
       // ADMIN 제외, USER/MANAGER만 조회
       role: role ? role : { in: ['USER', 'MANAGER'] },
+      // 쇼핑몰 필터링
+      ...(shopId && { shopId }),
       ...(search && {
         OR: [
           { email: { contains: search } },
@@ -41,11 +45,12 @@ export async function GET(request: NextRequest) {
       }),
     }
 
-    const [users, total] = await Promise.all([
+    const [users, total, shops, roleCounts] = await Promise.all([
       prisma.user.findMany({
         where,
         select: {
           id: true,
+          shopId: true,
           email: true,
           name: true,
           phone: true,
@@ -53,6 +58,13 @@ export async function GET(request: NextRequest) {
           profileImage: true,
           createdAt: true,
           signupCompletedAt: true,
+          registeredShop: {
+            select: {
+              id: true,
+              name: true,
+              subdomain: true,
+            },
+          },
           _count: {
             select: {
               orders: true,
@@ -66,10 +78,40 @@ export async function GET(request: NextRequest) {
         take: limit,
       }),
       prisma.user.count({ where }),
+      // 쇼핑몰 목록 (필터 드롭다운용)
+      prisma.shop.findMany({
+        select: {
+          id: true,
+          name: true,
+          subdomain: true,
+        },
+        orderBy: { name: 'asc' },
+      }),
+      // 역할별 카운트
+      prisma.user.groupBy({
+        by: ['role'],
+        where: {
+          role: { in: ['USER', 'MANAGER'] },
+          ...(shopId && { shopId }),
+        },
+        _count: { role: true },
+      }),
     ])
+
+    // 역할별 카운트 정리
+    const roleCountMap: Record<string, number> = {}
+    roleCounts.forEach((item) => {
+      roleCountMap[item.role] = item._count.role
+    })
 
     return NextResponse.json({
       users,
+      shops,
+      stats: {
+        total,
+        USER: roleCountMap['USER'] || 0,
+        MANAGER: roleCountMap['MANAGER'] || 0,
+      },
       pagination: {
         page,
         limit,

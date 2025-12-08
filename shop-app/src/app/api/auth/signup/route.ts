@@ -11,9 +11,9 @@ const authService = getAuthService()
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name, phone } = await request.json()
+    const { email, password, name, phone, shopId } = await request.json()
 
-    const user = await authService.signup({ email, password, name, phone })
+    const user = await authService.signup({ email, password, name, phone, shopId })
 
     return NextResponse.json({
       success: true,
