@@ -75,7 +75,7 @@ export async function runPublishPipeline(
       id: true,
       name: true,
       options: { select: { id: true } },
-      variants: { select: { id: true } },
+      variants: { select: { id: true, price: true } },
       publishedProducts: {
         where: { channelId: { in: channelIds } },
         select: { channelId: true },
@@ -98,22 +98,36 @@ export async function runPublishPipeline(
     }
   }
 
-  // options와 variants가 있는 상품만 필터링
+  // 가격 정보가 있는지 확인하는 헬퍼 함수
+  const hasValidPrice = (variants: { id: number; price: number | null }[]): boolean => {
+    return variants.some(v => v.price !== null && v.price > 0)
+  }
+
+  // options, variants가 있고 가격 정보가 있는 상품만 필터링
   const validProducts = products.filter(
-    (p) => p.options.length > 0 && p.variants.length > 0
+    (p) => p.options.length > 0 && p.variants.length > 0 && hasValidPrice(p.variants)
   )
+
+  // 건너뛸 상품들 (options/variants 없거나 가격 없음)
   const skippedProducts = products.filter(
-    (p) => p.options.length === 0 || p.variants.length === 0
+    (p) => p.options.length === 0 || p.variants.length === 0 || !hasValidPrice(p.variants)
   )
 
   if (skippedProducts.length > 0) {
-    console.log(`[Publish Pipeline] Skipping ${skippedProducts.length} products without options/variants`)
+    console.log(`[Publish Pipeline] Skipping ${skippedProducts.length} products without options/variants/price`)
     for (const p of skippedProducts) {
-      const reason = p.options.length === 0 && p.variants.length === 0
-        ? 'options와 variants가 없음'
-        : p.options.length === 0
-          ? 'options가 없음'
-          : 'variants가 없음'
+      let reason: string
+      if (p.options.length === 0 && p.variants.length === 0) {
+        reason = 'options와 variants가 없음'
+      } else if (p.options.length === 0) {
+        reason = 'options가 없음'
+      } else if (p.variants.length === 0) {
+        reason = 'variants가 없음'
+      } else if (!hasValidPrice(p.variants)) {
+        reason = '가격 정보가 없음'
+      } else {
+        reason = '알 수 없는 이유'
+      }
       console.log(`[Publish Pipeline] Skipped product ${p.id} (${p.name}): ${reason}`)
       errors.push({
         itemId: p.id,
@@ -124,7 +138,7 @@ export async function runPublishPipeline(
   }
 
   if (validProducts.length === 0) {
-    console.log('[Publish Pipeline] No valid products to publish (all missing options/variants)')
+    console.log('[Publish Pipeline] No valid products to publish (all missing options/variants/price)')
     return {
       success: true,
       totalItems: products.length,
@@ -133,14 +147,21 @@ export async function runPublishPipeline(
       details: {
         publishedProducts: [],
         channelResults: [],
-        skippedProducts: skippedProducts.map((p) => ({
-          productId: p.id,
-          reason: p.options.length === 0 && p.variants.length === 0
-            ? 'options와 variants가 없음'
-            : p.options.length === 0
-              ? 'options가 없음'
-              : 'variants가 없음',
-        })),
+        skippedProducts: skippedProducts.map((p) => {
+          let reason: string
+          if (p.options.length === 0 && p.variants.length === 0) {
+            reason = 'options와 variants가 없음'
+          } else if (p.options.length === 0) {
+            reason = 'options가 없음'
+          } else if (p.variants.length === 0) {
+            reason = 'variants가 없음'
+          } else if (!hasValidPrice(p.variants)) {
+            reason = '가격 정보가 없음'
+          } else {
+            reason = '알 수 없는 이유'
+          }
+          return { productId: p.id, reason }
+        }),
       },
       errors,
     }
