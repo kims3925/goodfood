@@ -35,16 +35,16 @@ async function logSignIn(opts: {
   })
 }
 
-// 쿠키 도메인 설정 (서브도메인 간 세션 공유)
+// 쿠키 도메인 설정
+// .lvh.me로 설정하면 모든 서브도메인에서 세션 공유
 function getCookieDomain(): string | undefined {
   // 환경변수에서 명시적으로 설정된 경우 사용
   if (process.env.COOKIE_DOMAIN) {
     return process.env.COOKIE_DOMAIN
   }
 
-  // 로컬 개발 환경에서 lvh.me 사용 시 서브도메인 간 세션 공유
+  // 개발 환경: 모든 서브도메인에서 세션 공유
   if (process.env.NODE_ENV !== 'production') {
-    // lvh.me를 사용하는 경우 .lvh.me 도메인 설정
     return '.lvh.me'
   }
 
@@ -145,6 +145,39 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/error',
   },
   callbacks: {
+    // 서브도메인 간 리다이렉트 허용
+    async redirect({ url, baseUrl }) {
+      // 상대 경로는 그대로 허용
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`
+      }
+
+      try {
+        const urlObj = new URL(url)
+        const baseUrlObj = new URL(baseUrl)
+
+        // 같은 호스트면 허용
+        if (urlObj.host === baseUrlObj.host) {
+          return url
+        }
+
+        // 서브도메인 허용 (.lvh.me, 프로덕션 도메인)
+        const allowedDomains = ['.lvh.me', process.env.COOKIE_DOMAIN].filter(Boolean)
+        const isAllowedSubdomain = allowedDomains.some(
+          (domain) => domain && urlObj.host.endsWith(domain.replace(/^\./, ''))
+        )
+
+        if (isAllowedSubdomain) {
+          return url
+        }
+      } catch {
+        // URL 파싱 실패 시 baseUrl 사용
+      }
+
+      // 기본: baseUrl로 리다이렉트
+      return baseUrl
+    },
+
     async signIn({ user, account }) {
       const provider = account?.provider ?? 'unknown'
 

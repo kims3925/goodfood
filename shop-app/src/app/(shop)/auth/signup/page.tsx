@@ -3,10 +3,20 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Eye, EyeOff, Mail, Lock, User, Phone, Loader2, Check } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User, Phone, Loader2, Check, AlertCircle, CheckCircle } from 'lucide-react'
+import { useShop } from '@/contexts/ShopContext'
+
+interface FieldErrors {
+  name?: string
+  email?: string
+  password?: string
+  passwordConfirm?: string
+  phone?: string
+}
 
 export default function SignupPage() {
   const router = useRouter()
+  const { shop } = useShop()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -18,6 +28,8 @@ export default function SignupPage() {
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [agreements, setAgreements] = useState({
     all: false,
     terms: false,
@@ -25,9 +37,81 @@ export default function SignupPage() {
     marketing: false,
   })
 
+  // 개별 필드 검증
+  const validateField = (name: string, value: string): string | undefined => {
+    switch (name) {
+      case 'name':
+        if (!value.trim()) return '이름을 입력해주세요.'
+        if (value.trim().length < 2) return '이름은 2자 이상이어야 합니다.'
+        return undefined
+
+      case 'email':
+        if (!value.trim()) return '이메일을 입력해주세요.'
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(value)) return '올바른 이메일 형식이 아닙니다.'
+        return undefined
+
+      case 'password':
+        if (!value) return '비밀번호를 입력해주세요.'
+        if (value.length < 8) return '비밀번호는 8자 이상이어야 합니다.'
+        if (!/[a-zA-Z]/.test(value)) return '영문자를 포함해주세요.'
+        if (!/[0-9]/.test(value)) return '숫자를 포함해주세요.'
+        return undefined
+
+      case 'passwordConfirm':
+        if (!value) return '비밀번호 확인을 입력해주세요.'
+        if (value !== formData.password) return '비밀번호가 일치하지 않습니다.'
+        return undefined
+
+      case 'phone':
+        if (value && !/^01[0-9]{8,9}$/.test(value.replace(/-/g, ''))) {
+          return '올바른 휴대폰 번호 형식이 아닙니다.'
+        }
+        return undefined
+
+      default:
+        return undefined
+    }
+  }
+
+  // 비밀번호 강도 계산
+  const getPasswordStrength = (password: string): { level: number; text: string; color: string } => {
+    if (!password) return { level: 0, text: '', color: '' }
+
+    let score = 0
+    if (password.length >= 8) score++
+    if (password.length >= 12) score++
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++
+    if (/[0-9]/.test(password)) score++
+    if (/[^a-zA-Z0-9]/.test(password)) score++
+
+    if (score <= 2) return { level: 1, text: '약함', color: 'bg-red-500' }
+    if (score <= 3) return { level: 2, text: '보통', color: 'bg-yellow-500' }
+    return { level: 3, text: '강함', color: 'bg-green-500' }
+  }
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
+
+    // 이미 터치된 필드는 실시간 검증
+    if (touched[name]) {
+      const error = validateField(name, value)
+      setFieldErrors((prev) => ({ ...prev, [name]: error }))
+    }
+
+    // 비밀번호 변경 시 비밀번호 확인도 재검증
+    if (name === 'password' && touched.passwordConfirm && formData.passwordConfirm) {
+      const confirmError = formData.passwordConfirm !== value ? '비밀번호가 일치하지 않습니다.' : undefined
+      setFieldErrors((prev) => ({ ...prev, passwordConfirm: confirmError }))
+    }
+  }
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setTouched((prev) => ({ ...prev, [name]: true }))
+    const error = validateField(name, value)
+    setFieldErrors((prev) => ({ ...prev, [name]: error }))
   }
 
   const handleAgreementChange = (key: keyof typeof agreements) => {
@@ -47,31 +131,32 @@ export default function SignupPage() {
   }
 
   const validateForm = () => {
-    if (!formData.name.trim()) {
-      setError('이름을 입력해주세요.')
+    const errors: FieldErrors = {}
+
+    const nameError = validateField('name', formData.name)
+    const emailError = validateField('email', formData.email)
+    const passwordError = validateField('password', formData.password)
+    const passwordConfirmError = validateField('passwordConfirm', formData.passwordConfirm)
+    const phoneError = validateField('phone', formData.phone)
+
+    if (nameError) errors.name = nameError
+    if (emailError) errors.email = emailError
+    if (passwordError) errors.password = passwordError
+    if (passwordConfirmError) errors.passwordConfirm = passwordConfirmError
+    if (phoneError) errors.phone = phoneError
+
+    setFieldErrors(errors)
+    setTouched({ name: true, email: true, password: true, passwordConfirm: true, phone: true })
+
+    if (Object.keys(errors).length > 0) {
       return false
     }
-    if (!formData.email.trim()) {
-      setError('이메일을 입력해주세요.')
-      return false
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(formData.email)) {
-      setError('올바른 이메일 형식이 아닙니다.')
-      return false
-    }
-    if (formData.password.length < 8) {
-      setError('비밀번호는 8자 이상이어야 합니다.')
-      return false
-    }
-    if (formData.password !== formData.passwordConfirm) {
-      setError('비밀번호가 일치하지 않습니다.')
-      return false
-    }
+
     if (!agreements.terms || !agreements.privacy) {
       setError('필수 약관에 동의해주세요.')
       return false
     }
+
     return true
   }
 
@@ -92,6 +177,7 @@ export default function SignupPage() {
           email: formData.email,
           password: formData.password,
           phone: formData.phone || undefined,
+          shopId: shop?.id,
         }),
       })
 
@@ -111,6 +197,9 @@ export default function SignupPage() {
     }
   }
 
+  const passwordStrength = getPasswordStrength(formData.password)
+  const isPasswordMatch = formData.passwordConfirm && formData.password === formData.passwordConfirm
+
   return (
     <div className="bg-gray-50 flex justify-center py-6 px-4">
       <div className="max-w-md w-full">
@@ -119,7 +208,8 @@ export default function SignupPage() {
           <h2 className="text-2xl font-bold text-center mb-6">회원가입</h2>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md text-sm">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md text-sm flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {error}
             </div>
           )}
@@ -138,11 +228,19 @@ export default function SignupPage() {
                   type="text"
                   value={formData.name}
                   onChange={handleChange}
+                  onBlur={handleBlur}
                   placeholder="이름을 입력하세요"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none transition"
-                  required
+                  className={`w-full pl-10 pr-4 py-3 border rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none transition ${
+                    touched.name && fieldErrors.name ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
               </div>
+              {touched.name && fieldErrors.name && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.name}
+                </p>
+              )}
             </div>
 
             {/* Email */}
@@ -158,11 +256,19 @@ export default function SignupPage() {
                   type="email"
                   value={formData.email}
                   onChange={handleChange}
+                  onBlur={handleBlur}
                   placeholder="example@email.com"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none transition"
-                  required
+                  className={`w-full pl-10 pr-4 py-3 border rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none transition ${
+                    touched.email && fieldErrors.email ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
               </div>
+              {touched.email && fieldErrors.email && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
             {/* Password */}
@@ -178,9 +284,11 @@ export default function SignupPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={handleChange}
-                  placeholder="8자 이상 입력하세요"
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none transition"
-                  required
+                  onBlur={handleBlur}
+                  placeholder="영문, 숫자 포함 8자 이상"
+                  className={`w-full pl-10 pr-12 py-3 border rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none transition ${
+                    touched.password && fieldErrors.password ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
                 <button
                   type="button"
@@ -190,6 +298,33 @@ export default function SignupPage() {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              {/* 비밀번호 강도 표시 */}
+              {formData.password && (
+                <div className="mt-2">
+                  <div className="flex gap-1 mb-1">
+                    {[1, 2, 3].map((level) => (
+                      <div
+                        key={level}
+                        className={`h-1 flex-1 rounded-full transition-colors ${
+                          passwordStrength.level >= level ? passwordStrength.color : 'bg-gray-200'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className={`text-xs ${
+                    passwordStrength.level === 1 ? 'text-red-500' :
+                    passwordStrength.level === 2 ? 'text-yellow-600' : 'text-green-600'
+                  }`}>
+                    비밀번호 강도: {passwordStrength.text}
+                  </p>
+                </div>
+              )}
+              {touched.password && fieldErrors.password && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.password}
+                </p>
+              )}
             </div>
 
             {/* Password Confirm */}
@@ -205,9 +340,12 @@ export default function SignupPage() {
                   type={showPasswordConfirm ? 'text' : 'password'}
                   value={formData.passwordConfirm}
                   onChange={handleChange}
+                  onBlur={handleBlur}
                   placeholder="비밀번호를 다시 입력하세요"
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none transition"
-                  required
+                  className={`w-full pl-10 pr-12 py-3 border rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none transition ${
+                    touched.passwordConfirm && fieldErrors.passwordConfirm ? 'border-red-500' :
+                    isPasswordMatch ? 'border-green-500' : 'border-gray-300'
+                  }`}
                 />
                 <button
                   type="button"
@@ -217,6 +355,18 @@ export default function SignupPage() {
                   {showPasswordConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              {isPasswordMatch && (
+                <p className="mt-1 text-sm text-green-600 flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" />
+                  비밀번호가 일치합니다.
+                </p>
+              )}
+              {touched.passwordConfirm && fieldErrors.passwordConfirm && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.passwordConfirm}
+                </p>
+              )}
             </div>
 
             {/* Phone */}
@@ -232,10 +382,19 @@ export default function SignupPage() {
                   type="tel"
                   value={formData.phone}
                   onChange={handleChange}
+                  onBlur={handleBlur}
                   placeholder="01012345678"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none transition"
+                  className={`w-full pl-10 pr-4 py-3 border rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none transition ${
+                    touched.phone && fieldErrors.phone ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
               </div>
+              {touched.phone && fieldErrors.phone && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.phone}
+                </p>
+              )}
             </div>
 
             {/* Agreements */}

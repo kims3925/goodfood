@@ -39,7 +39,8 @@
       "mcp__sequential-thinking__sequentialthinking",
       "mcp__playwright__playwright_navigate",
       "Bash(rm:*)",
-      "mcp__playwright__playwright_get_visible_text"
+      "mcp__playwright__playwright_get_visible_text",
+      "Bash(git -C \"C:/Users/hsw48/Desktop/bandauto\" diff HEAD~5..HEAD --stat)"
     ],
     "deny": [],
     "ask": []

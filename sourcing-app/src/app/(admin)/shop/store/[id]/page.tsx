@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -20,6 +20,9 @@ import {
   ExternalLink,
   Package,
   ShoppingCart,
+  CheckCircle,
+  XCircle,
+  Loader2,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -103,6 +106,18 @@ export default function ShopDetailPage({
   const [faviconUrl, setFaviconUrl] = useState('')
   const [bannerUrl, setBannerUrl] = useState('')
 
+  // 중복 체크 상태
+  const [subdomainCheck, setSubdomainCheck] = useState<{ checking: boolean; isDuplicate: boolean | null; message?: string }>({
+    checking: false,
+    isDuplicate: null,
+  })
+  const [nameCheck, setNameCheck] = useState<{ checking: boolean; isDuplicate: boolean | null; message?: string }>({
+    checking: false,
+    isDuplicate: null,
+  })
+  const subdomainDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  const nameDebounceRef = useRef<NodeJS.Timeout | null>(null)
+
   // Shop URL 도메인 (.env의 NEXT_PUBLIC_DOMAIN 사용)
   const shopBaseDomain = useMemo(() => {
     return process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'
@@ -112,6 +127,79 @@ export default function ShopDetailPage({
     const protocol = shopBaseDomain.includes('lvh.me') ? 'http' : 'https'
     return `${protocol}://${subdomainValue}.${shopBaseDomain}`
   }, [shopBaseDomain])
+
+  // 서브도메인 중복 체크
+  const checkSubdomainDuplicate = useCallback(async (value: string) => {
+    if (!value.trim() || value === shop?.subdomain) {
+      setSubdomainCheck({ checking: false, isDuplicate: null })
+      return
+    }
+
+    setSubdomainCheck({ checking: true, isDuplicate: null })
+    try {
+      const response = await fetch(`/api/shop/check-duplicate?subdomain=${encodeURIComponent(value)}&excludeId=${id}`)
+      const data = await response.json()
+      if (data.success && data.data.subdomain) {
+        setSubdomainCheck({
+          checking: false,
+          isDuplicate: data.data.subdomain.isDuplicate,
+          message: data.data.subdomain.message,
+        })
+      }
+    } catch (error) {
+      setSubdomainCheck({ checking: false, isDuplicate: null })
+    }
+  }, [id, shop?.subdomain])
+
+  // 쇼핑몰명 중복 체크
+  const checkNameDuplicate = useCallback(async (value: string) => {
+    if (!value.trim() || value === shop?.name) {
+      setNameCheck({ checking: false, isDuplicate: null })
+      return
+    }
+
+    setNameCheck({ checking: true, isDuplicate: null })
+    try {
+      const response = await fetch(`/api/shop/check-duplicate?name=${encodeURIComponent(value)}&excludeId=${id}`)
+      const data = await response.json()
+      if (data.success && data.data.name) {
+        setNameCheck({
+          checking: false,
+          isDuplicate: data.data.name.isDuplicate,
+          message: data.data.name.message,
+        })
+      }
+    } catch (error) {
+      setNameCheck({ checking: false, isDuplicate: null })
+    }
+  }, [id, shop?.name])
+
+  // 서브도메인 변경 핸들러
+  const handleSubdomainChange = (value: string) => {
+    const lowerValue = value.toLowerCase()
+    setSubdomain(lowerValue)
+
+    if (subdomainDebounceRef.current) {
+      clearTimeout(subdomainDebounceRef.current)
+    }
+
+    subdomainDebounceRef.current = setTimeout(() => {
+      checkSubdomainDuplicate(lowerValue)
+    }, 500)
+  }
+
+  // 쇼핑몰명 변경 핸들러
+  const handleNameChange = (value: string) => {
+    setName(value)
+
+    if (nameDebounceRef.current) {
+      clearTimeout(nameDebounceRef.current)
+    }
+
+    nameDebounceRef.current = setTimeout(() => {
+      checkNameDuplicate(value)
+    }, 500)
+  }
 
   const loadShop = useCallback(async () => {
     try {
@@ -153,12 +241,12 @@ export default function ShopDetailPage({
         }
       } else {
         toast.error(data.error || '쇼핑몰을 불러오는데 실패했습니다.')
-        router.push('/shop/stores')
+        router.push('/shop/store/list')
       }
     } catch (error) {
       console.error('쇼핑몰 상세 조회 실패:', error)
       toast.error('쇼핑몰을 불러오는데 실패했습니다.')
-      router.push('/shop/stores')
+      router.push('/shop/store/list')
     } finally {
       setIsLoading(false)
     }
@@ -182,6 +270,17 @@ export default function ShopDetailPage({
     const subdomainRegex = /^[a-z0-9-]+$/
     if (!subdomainRegex.test(subdomain)) {
       toast.error('서브도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.')
+      return
+    }
+
+    // 중복 체크 검증
+    if (subdomainCheck.isDuplicate) {
+      toast.error('이미 사용 중인 서브도메인입니다.')
+      return
+    }
+
+    if (nameCheck.isDuplicate) {
+      toast.error('이미 사용 중인 쇼핑몰명입니다.')
       return
     }
 
@@ -242,7 +341,7 @@ export default function ShopDetailPage({
 
       if (data.success) {
         toast.success('쇼핑몰이 삭제되었습니다.')
-        router.push('/shop/stores')
+        router.push('/shop/store/list')
       } else {
         toast.error(data.error || '쇼핑몰 삭제에 실패했습니다.')
       }
@@ -314,7 +413,7 @@ export default function ShopDetailPage({
         {/* 헤더 */}
         <div className="mb-8">
           <button
-            onClick={() => router.push('/shop/stores')}
+            onClick={() => router.push('/shop/store/list')}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft size={20} />
@@ -448,17 +547,40 @@ export default function ShopDetailPage({
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-1">서브도메인</label>
                   {isEditMode ? (
-                    <div className="flex items-center">
-                      <Input
-                        value={subdomain}
-                        onChange={(e) => setSubdomain(e.target.value.toLowerCase())}
-                        placeholder="myshop"
-                        className="rounded-r-none"
-                      />
-                      <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-500 text-sm whitespace-nowrap">
-                        .{shopBaseDomain}
-                      </span>
-                    </div>
+                    <>
+                      <div className="flex items-center">
+                        <Input
+                          value={subdomain}
+                          onChange={(e) => handleSubdomainChange(e.target.value)}
+                          placeholder="myshop"
+                          className={`rounded-r-none ${
+                            subdomainCheck.isDuplicate === true ? 'border-red-500 focus:ring-red-500' :
+                            subdomainCheck.isDuplicate === false ? 'border-green-500 focus:ring-green-500' : ''
+                          }`}
+                        />
+                        <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-500 text-sm whitespace-nowrap">
+                          .{shopBaseDomain}
+                        </span>
+                      </div>
+                      {subdomainCheck.checking && (
+                        <div className="flex items-center gap-1 mt-1 text-gray-500 text-xs">
+                          <Loader2 size={12} className="animate-spin" />
+                          <span>확인 중...</span>
+                        </div>
+                      )}
+                      {!subdomainCheck.checking && subdomainCheck.isDuplicate === true && (
+                        <div className="flex items-center gap-1 mt-1 text-red-600 text-xs">
+                          <XCircle size={12} />
+                          <span>{subdomainCheck.message}</span>
+                        </div>
+                      )}
+                      {!subdomainCheck.checking && subdomainCheck.isDuplicate === false && (
+                        <div className="flex items-center gap-1 mt-1 text-green-600 text-xs">
+                          <CheckCircle size={12} />
+                          <span>사용 가능한 서브도메인입니다.</span>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <p className="text-gray-900 font-mono">{shop.subdomain}<span className="text-gray-400">.{shopBaseDomain}</span></p>
                   )}
@@ -466,11 +588,35 @@ export default function ShopDetailPage({
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-1">쇼핑몰명</label>
                   {isEditMode ? (
-                    <Input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="내 쇼핑몰"
-                    />
+                    <>
+                      <Input
+                        value={name}
+                        onChange={(e) => handleNameChange(e.target.value)}
+                        placeholder="내 쇼핑몰"
+                        className={
+                          nameCheck.isDuplicate === true ? 'border-red-500 focus:ring-red-500' :
+                          nameCheck.isDuplicate === false ? 'border-green-500 focus:ring-green-500' : ''
+                        }
+                      />
+                      {nameCheck.checking && (
+                        <div className="flex items-center gap-1 mt-1 text-gray-500 text-xs">
+                          <Loader2 size={12} className="animate-spin" />
+                          <span>확인 중...</span>
+                        </div>
+                      )}
+                      {!nameCheck.checking && nameCheck.isDuplicate === true && (
+                        <div className="flex items-center gap-1 mt-1 text-red-600 text-xs">
+                          <XCircle size={12} />
+                          <span>{nameCheck.message}</span>
+                        </div>
+                      )}
+                      {!nameCheck.checking && nameCheck.isDuplicate === false && (
+                        <div className="flex items-center gap-1 mt-1 text-green-600 text-xs">
+                          <CheckCircle size={12} />
+                          <span>사용 가능한 쇼핑몰명입니다.</span>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <p className="text-gray-900">{shop.name}</p>
                   )}

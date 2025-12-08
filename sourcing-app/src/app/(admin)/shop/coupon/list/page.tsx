@@ -198,7 +198,7 @@ export default function CouponListPage() {
 
   // 행 클릭 시 상세 페이지로 이동
   const handleRowClick = (id: number) => {
-    router.push(`/coupon/${id}`)
+    router.push(`/shop/coupon/${id}`)
   }
 
   const formatDate = (dateString: string) => {
@@ -342,7 +342,7 @@ export default function CouponListPage() {
           </div>
           {/* 쿠폰 추가 카드 */}
           <button
-            onClick={() => router.push('/coupon/new')}
+            onClick={() => router.push('/shop/coupon/new')}
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left"
           >
             <div className="flex items-center gap-3">
