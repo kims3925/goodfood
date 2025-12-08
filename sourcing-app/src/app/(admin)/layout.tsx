@@ -20,6 +20,30 @@ export default function AdminLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [currentSection, setCurrentSection] = useState<AppSection>('sourcing')
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+
+  // 인증 상태 확인
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/session')
+        const data = await response.json()
+
+        if (!data.success || !data.user) {
+          // 로그인되지 않은 경우 로그인 페이지로 리다이렉트
+          router.replace(`/login?redirect=${encodeURIComponent(pathname)}`)
+          return
+        }
+
+        setIsAuthenticated(true)
+      } catch (error) {
+        console.error('인증 확인 실패:', error)
+        router.replace('/login')
+      }
+    }
+
+    checkAuth()
+  }, [pathname, router])
 
   // URL에서 섹션 감지
   useEffect(() => {
@@ -50,6 +74,20 @@ export default function AdminLayout({
     // 해당 섹션의 기본 페이지로 이동
     const defaultPath = getDefaultPathBySection(section)
     router.push(defaultPath)
+  }
+
+  // 인증 확인 중에는 로딩 표시
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  // 인증되지 않은 경우 아무것도 렌더링하지 않음 (리다이렉트 중)
+  if (!isAuthenticated) {
+    return null
   }
 
   return (

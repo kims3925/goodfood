@@ -91,16 +91,37 @@ ${policyContent}
 제목: ${post.title}
 내용: ${post.content || ''}
 ${policySection}
+
 # 추출 규칙
 
-## 1. 상품명
-원산지/지역 + 품질키워드 + 상품명 조합
+## 1. 상품명 (카피형 네이밍)
+원산지/지역 + 품질키워드 + 상품명 조합으로, 쇼핑몰 메인에 걸려도 눈에 확 들어오는 "카피형 상품명"으로 작성
+
+**예시:**
 - 수산물: "싱싱한 통영산 활돌문어", "당일조업 고흥 활 산낙지"
 - 농산물: "꿀달수 무안 황토 고구마", "햇 충주 국내산 참깨"
 - 가공식품: "30년전통 울산 수제 치즈설기", "50년전통 부산 프리미엄 꼬치어묵"
 
-## 2. 설명 (200-500자)
-게시물에서 상품 특징, 효능, 맛 설명 부분을 추출하여 작성
+**상품명 스타일 규칙:**
+- 첫 단어/앞부분에 임팩트 있는 형용사·키워드 사용 (예: 극강, 미친 가성비, 역대급, 찐맛보장, 꿀맛, 싱싱, 프리미엄, 명품 등)
+- 한 줄에 읽기 쉬운 1문장형 네이밍 (대략 20~30자 내외)
+- "국내산/수입산/지역명" 등 신뢰 키워드 포함
+- 느낌표는 0~1개까지만 사용 (과도한 반복 금지)
+
+## 2. 설명 (200-500자, 마케팅 카피 스타일)
+게시물에서 상품 특징, 효능, 맛 설명 부분을 추출하여, 광고 문구처럼 팡팡 튀는 마케팅 카피 스타일로 재구성
+
+**설명 스타일 규칙:**
+- 200~500자 사이로 작성
+- 1문단 또는 2문단 정도로 자연스럽게 구성
+- 첫 문장은 훅(Hook) 역할을 하도록 강렬하게 시작 (예: "한 번 먹으면 다시 찾게 되는 찐맛 고구마입니다.")
+- 중간에는 아래 요소들을 섞어 서술:
+  * 원산지/재배 환경/제조 방식 등 신뢰 포인트
+  * 맛·식감·향에 대한 감성적인 표현 (쫀득쫀득, 촉촉, 진득한 국물, 바삭바삭 등)
+  * 활용 요리 (예: 구이, 찜, 탕, 반찬, 간식 등)
+  * 재구매/후기/인기 강조 (예: 재구매 폭주, 판매자 강력 추천 등) — 사실이 아니라면 "느낌" 정도로 순화
+- 문장은 부드러운 구어체 + 판매페이지 문구 느낌으로 작성
+- 과장 표현은 쓰되, 명백한 허위·의학적 효능 단정 표현은 피하기 (예: "당뇨 완치" → "당분이 적어 부담 없이 즐기기 좋습니다")
 
 ## 3. 카테고리
 수산물, 농산물, 가공식품, 장류, 음료/차, 절임류
@@ -121,7 +142,25 @@ ${policySection}
 
 ${pricingRule}
 
-# 예시1 - 수산물(낙지)
+# 데이터 구조 규칙 (필수 준수!)
+
+## 가격 타입 규칙 (매우 중요!)
+- 모든 가격은 반드시 **숫자 타입**으로 응답
+- 올바른 예: "wholesalePrice": 48000
+- 잘못된 예: "wholesalePrice": "48000" ← 문자열 금지!
+- 잘못된 예: "wholesalePrice": "48,000원" ← 콤마, 원 금지!
+
+## options와 variants 관계
+- options: 옵션 그룹 정의 (groupName과 가능한 values 목록)
+- variants: 각 옵션에 대한 실제 가격 정보
+- **중요**: options.values의 모든 값은 variants에 1:1 대응되어야 함
+- **중요**: 각 variant에는 options 객체가 포함되어야 함
+
+## 빈 배열 금지
+- variants: [] (빈 배열) 금지
+- 단일 규격 상품도 반드시 1개의 variant 포함
+
+# 예시1 - 수산물(낙지) - 다중 옵션
 입력: "세발낙지 10마리 48,000원 (5미 29,000원)
 얼치기 10마리 55,000원 (5미 32,500원)
 소낙지 10마리 70,000원"
@@ -134,15 +173,16 @@ ${pricingRule}
   "options": [{ "groupName": "규격", "values": ["세발낙지 10미", "세발낙지 5미", "얼치기 10미", "얼치기 5미", "소낙지 10미"] }],
   "pricing": { "wholesalePrice": 29000, "price": 29000, "currency": "KRW" },
   "variants": [
-    { "optionSummary": "세발낙지 10미", "wholesalePrice": 48000, "price": 48000 },
-    { "optionSummary": "세발낙지 5미", "wholesalePrice": 29000, "price": 29000 },
-    { "optionSummary": "얼치기 10미", "wholesalePrice": 55000, "price": 55000 },
-    { "optionSummary": "얼치기 5미", "wholesalePrice": 32500, "price": 32500 },
-    { "optionSummary": "소낙지 10미", "wholesalePrice": 70000, "price": 70000 }
-  ]
+    { "optionSummary": "세발낙지 10미", "options": { "규격": "세발낙지 10미" }, "wholesalePrice": 48000, "price": 48000 },
+    { "optionSummary": "세발낙지 5미", "options": { "규격": "세발낙지 5미" }, "wholesalePrice": 29000, "price": 29000 },
+    { "optionSummary": "얼치기 10미", "options": { "규격": "얼치기 10미" }, "wholesalePrice": 55000, "price": 55000 },
+    { "optionSummary": "얼치기 5미", "options": { "규격": "얼치기 5미" }, "wholesalePrice": 32500, "price": 32500 },
+    { "optionSummary": "소낙지 10미", "options": { "규격": "소낙지 10미" }, "wholesalePrice": 70000, "price": 70000 }
+  ],
+  "shipping": { "shippingFee": null, "shippingInfo": null }
 }
 
-# 예시2 - 가공식품(떡/호빵)
+# 예시2 - 가공식품(떡/호빵) - 세트 구성
 입력: "통팥 호빵 1팩 4,900원
 야채 호빵 1팩 5,800원
 통팥 2팩+야채 1팩 14,900원"
@@ -155,10 +195,11 @@ ${pricingRule}
   "options": [{ "groupName": "구성", "values": ["통팥 1팩", "야채 1팩", "통팥2+야채1"] }],
   "pricing": { "wholesalePrice": 4900, "price": 4900, "currency": "KRW" },
   "variants": [
-    { "optionSummary": "통팥 1팩", "wholesalePrice": 4900, "price": 4900 },
-    { "optionSummary": "야채 1팩", "wholesalePrice": 5800, "price": 5800 },
-    { "optionSummary": "통팥2+야채1", "wholesalePrice": 14900, "price": 14900 }
-  ]
+    { "optionSummary": "통팥 1팩", "options": { "구성": "통팥 1팩" }, "wholesalePrice": 4900, "price": 4900 },
+    { "optionSummary": "야채 1팩", "options": { "구성": "야채 1팩" }, "wholesalePrice": 5800, "price": 5800 },
+    { "optionSummary": "통팥2+야채1", "options": { "구성": "통팥2+야채1" }, "wholesalePrice": 14900, "price": 14900 }
+  ],
+  "shipping": { "shippingFee": null, "shippingInfo": null }
 }
 
 # 예시3 - 농산물(단일규격)
@@ -172,35 +213,42 @@ ${pricingRule}
   "options": [{ "groupName": "규격", "values": ["상중 10키로"] }],
   "pricing": { "wholesalePrice": 39000, "price": 39000, "currency": "KRW" },
   "variants": [
-    { "optionSummary": "상중 10키로", "wholesalePrice": 39000, "price": 39000 }
-  ]
+    { "optionSummary": "상중 10키로", "options": { "규격": "상중 10키로" }, "wholesalePrice": 39000, "price": 39000 }
+  ],
+  "shipping": { "shippingFee": null, "shippingInfo": null }
 }
 
-# 6. 배송비 정보 추출
+# 5. 배송비 정보 추출
 게시물에서 배송비 관련 정보를 찾아 추출합니다:
 - "택배비 포함", "배송비 별도", "무료배송" 등의 패턴
 - "배송비 3,000원", "택배비 4,000원" 등 구체적인 금액
 - "2박스 이상 무료배송", "합배송 가능" 등 조건부 배송 정보
 
-# 응답 형식
-\`\`\`json
-{
-  "productName": "상품명",
-  "description": "설명 (200-500자, 필수)",
-  "category": "카테고리",
-  "options": [{ "groupName": "규격", "values": ["값1", "값2"] }],
-  "pricing": { "wholesalePrice": 숫자, "price": 숫자, "currency": "KRW" },
-  "variants": [{ "optionSummary": "값1", "wholesalePrice": 숫자, "price": 숫자 }],
-  "shipping": { "shippingFee": 숫자또는null, "shippingInfo": "배송관련원문정보" }
-}
-\`\`\`
+# 응답 형식 (반드시 아래 형식 준수!)
+순수 JSON만 응답 (마크다운 코드블록 금지)
 
-# 주의사항
-- JSON만 응답
-- 가격은 숫자만 (18500)
-- 배송비는 shipping 객체에 별도로 추출 (shippingFee: 배송비 금액, shippingInfo: 배송 관련 원문 정보)
-- 단일 규격이어도 반드시 options, variants 배열에 포함 (빈 배열 금지)
-- 설명은 반드시 작성 (빈 문자열 금지)`
+{
+  "productName": "상품명 (필수)",
+  "description": "설명 200-500자 (필수, 빈 문자열 금지)",
+  "category": "카테고리",
+  "options": [
+    { "groupName": "옵션그룹명", "values": ["값1", "값2"] }
+  ],
+  "pricing": { "wholesalePrice": 숫자, "price": 숫자, "currency": "KRW" },
+  "variants": [
+    { "optionSummary": "값1", "options": { "옵션그룹명": "값1" }, "wholesalePrice": 숫자, "price": 숫자 }
+  ],
+  "shipping": { "shippingFee": 숫자또는null, "shippingInfo": "원문정보또는null" }
+}
+
+# 주의사항 체크리스트 (필수!)
+- JSON만 응답 (마크다운 코드블록 없이)
+- 모든 가격은 숫자 타입 (48000, 문자열 "48000" 금지)
+- variants 배열 비어있지 않음 (최소 1개)
+- 각 variant에 options 객체 포함
+- options.values와 variants가 1:1 대응
+- description 빈 문자열 아님
+- shipping 객체 포함`
 }
 
 // =============================================
@@ -208,20 +256,199 @@ ${pricingRule}
 // =============================================
 
 /**
+ * 가격 값을 숫자로 안전하게 변환
+ * 문자열 "48000", "48,000", "48000원" 등을 숫자로 변환
+ */
+function parsePrice(value: any): number | undefined {
+  // 이미 숫자인 경우
+  if (typeof value === 'number' && !isNaN(value) && value > 0) {
+    return value
+  }
+
+  // 문자열인 경우 파싱 시도
+  if (typeof value === 'string') {
+    // 콤마, 원, ₩, 공백 등 제거 후 숫자 추출
+    const cleaned = value.replace(/[,원₩￦\s]/g, '')
+    const parsed = parseFloat(cleaned)
+    if (!isNaN(parsed) && parsed > 0) {
+      console.log(`💱 가격 문자열 변환: "${value}" -> ${parsed}`)
+      return parsed
+    }
+  }
+
+  return undefined
+}
+
+/**
  * Parse AI-extracted variants from raw response
  * Returns only variants with at least one price (wholesalePrice or price)
+ * 개선: 문자열 가격도 숫자로 변환하여 처리
  */
 function parseAiVariants(rawVariants: any[]): GeneratedVariant[] {
-  if (!rawVariants || !Array.isArray(rawVariants)) return []
+  if (!rawVariants || !Array.isArray(rawVariants)) {
+    console.warn('⚠️ variants가 배열이 아님:', typeof rawVariants)
+    return []
+  }
 
-  return rawVariants
-    .filter(v => v && (v.wholesalePrice !== undefined || v.price !== undefined))
-    .map(v => ({
-      optionSummary: v.optionSummary || '',
-      options: v.options || {},
-      wholesalePrice: typeof v.wholesalePrice === 'number' ? v.wholesalePrice : undefined,
-      price: typeof v.price === 'number' ? v.price : undefined,
-    }))
+  console.log(`📊 variants 파싱 시작: ${rawVariants.length}개 입력`)
+
+  const parsed = rawVariants
+    .filter((v, index) => {
+      if (!v) {
+        console.warn(`⚠️ variants[${index}]가 null/undefined`)
+        return false
+      }
+      // 가격 정보가 최소 하나라도 있어야 함
+      const hasWholesalePrice = v.wholesalePrice !== undefined && v.wholesalePrice !== null
+      const hasPrice = v.price !== undefined && v.price !== null
+      if (!hasWholesalePrice && !hasPrice) {
+        console.warn(`⚠️ variants[${index}]에 가격 정보 없음:`, v.optionSummary || '(요약 없음)')
+        return false
+      }
+      return true
+    })
+    .map((v, index) => {
+      const wholesalePrice = parsePrice(v.wholesalePrice)
+      const price = parsePrice(v.price)
+
+      // 가격 변환 결과 로깅
+      if (wholesalePrice === undefined && v.wholesalePrice !== undefined) {
+        console.warn(`⚠️ variants[${index}].wholesalePrice 변환 실패:`, v.wholesalePrice)
+      }
+      if (price === undefined && v.price !== undefined) {
+        console.warn(`⚠️ variants[${index}].price 변환 실패:`, v.price)
+      }
+
+      return {
+        optionSummary: String(v.optionSummary || ''),
+        options: v.options && typeof v.options === 'object' ? v.options : {},
+        wholesalePrice,
+        price: price || wholesalePrice, // price 없으면 wholesalePrice 사용
+      }
+    })
+    // 최종적으로 가격이 있는 항목만 유지
+    .filter(v => v.wholesalePrice !== undefined || v.price !== undefined)
+
+  console.log(`📊 variants 파싱 결과: 입력 ${rawVariants.length}개 -> 유효 ${parsed.length}개`)
+  return parsed
+}
+
+/**
+ * optionSummary에서 options 객체 추론
+ * AI가 options 필드를 생성하지 않은 경우 사용
+ */
+function inferOptionsFromSummary(
+  summary: string,
+  optionGroups: OptionGroup[]
+): Record<string, string> {
+  if (!summary || !optionGroups || optionGroups.length === 0) return {}
+
+  const options: Record<string, string> = {}
+
+  for (const group of optionGroups) {
+    if (!group.values || !Array.isArray(group.values)) continue
+
+    // optionSummary에서 해당 그룹의 값 찾기
+    for (const value of group.values) {
+      if (summary.includes(value)) {
+        options[group.groupName] = value
+        break
+      }
+    }
+  }
+
+  // 그룹이 하나이고 매칭된 값이 없으면 summary 전체를 값으로 사용
+  if (optionGroups.length === 1 && Object.keys(options).length === 0) {
+    options[optionGroups[0].groupName] = summary
+  }
+
+  if (Object.keys(options).length > 0) {
+    console.log(`🔍 options 추론 완료: "${summary}" -> ${JSON.stringify(options)}`)
+  }
+
+  return options
+}
+
+/**
+ * AI 응답 필수 필드 검증
+ */
+interface ValidationResult {
+  valid: boolean
+  errors: string[]
+  warnings: string[]
+}
+
+function validateAiResponse(parsed: any): ValidationResult {
+  const errors: string[] = []
+  const warnings: string[] = []
+
+  // 필수 필드 검증
+  if (!parsed.productName || typeof parsed.productName !== 'string' || parsed.productName.trim() === '') {
+    errors.push('productName이 없거나 유효하지 않음')
+  }
+
+  // 설명 검증 (경고만)
+  if (!parsed.description || typeof parsed.description !== 'string' || parsed.description.trim() === '') {
+    warnings.push('description이 없거나 빈 문자열')
+  }
+
+  // options 검증
+  if (!parsed.options || !Array.isArray(parsed.options)) {
+    warnings.push('options가 없거나 배열이 아님')
+  } else if (parsed.options.length === 0) {
+    warnings.push('options 배열이 비어있음')
+  } else {
+    for (let i = 0; i < parsed.options.length; i++) {
+      const opt = parsed.options[i]
+      if (!opt || !opt.groupName) {
+        warnings.push(`options[${i}].groupName이 없음`)
+      }
+      if (!opt || !opt.values || !Array.isArray(opt.values) || opt.values.length === 0) {
+        warnings.push(`options[${i}].values가 비어있거나 유효하지 않음`)
+      }
+    }
+  }
+
+  // variants 검증
+  if (!parsed.variants || !Array.isArray(parsed.variants)) {
+    warnings.push('variants가 없거나 배열이 아님')
+  } else if (parsed.variants.length === 0) {
+    warnings.push('variants 배열이 비어있음 (폴백 처리 필요)')
+  } else {
+    for (let i = 0; i < parsed.variants.length; i++) {
+      const v = parsed.variants[i]
+      if (!v) continue
+
+      if (!v.optionSummary) {
+        warnings.push(`variants[${i}].optionSummary가 없음`)
+      }
+      if (v.wholesalePrice === undefined && v.price === undefined) {
+        warnings.push(`variants[${i}]에 가격 정보가 없음`)
+      }
+      // 가격 타입 검증
+      if (v.wholesalePrice !== undefined && typeof v.wholesalePrice !== 'number') {
+        warnings.push(`variants[${i}].wholesalePrice가 숫자가 아님: ${typeof v.wholesalePrice} ("${v.wholesalePrice}")`)
+      }
+      if (v.price !== undefined && typeof v.price !== 'number') {
+        warnings.push(`variants[${i}].price가 숫자가 아님: ${typeof v.price} ("${v.price}")`)
+      }
+      // options 필드 검증
+      if (!v.options || Object.keys(v.options).length === 0) {
+        warnings.push(`variants[${i}].options가 없거나 비어있음 (추론 필요)`)
+      }
+    }
+  }
+
+  // pricing 검증
+  if (!parsed.pricing) {
+    warnings.push('pricing 객체가 없음')
+  } else {
+    if (parsed.pricing.wholesalePrice === undefined && parsed.pricing.price === undefined) {
+      warnings.push('pricing에 가격 정보가 없음')
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings }
 }
 
 /**
@@ -377,9 +604,14 @@ function parseAiResponse(aiResponse: AiResponse): AiProductAnalysis {
     // Parse JSON
     const parsed = JSON.parse(jsonText)
 
-    // Validate required fields
-    if (!parsed.productName) {
-      throw new Error('Product name is required')
+    // 검증 로직 실행
+    const validation = validateAiResponse(parsed)
+    if (!validation.valid) {
+      console.error('❌ AI 응답 검증 실패:', validation.errors)
+      throw new Error(`AI 응답 검증 실패: ${validation.errors.join(', ')}`)
+    }
+    if (validation.warnings.length > 0) {
+      console.warn('⚠️ AI 응답 검증 경고:', validation.warnings)
     }
 
     // 간단한 형식: wholesalePrice, price 사용
@@ -534,15 +766,28 @@ function buildProductDraft(
       price: v.price || v.wholesalePrice || sellingPrice,
     }))
 
+    // variants에 options가 비어있으면 optionSummary에서 추론 시도
+    variants = variants.map(v => {
+      if (Object.keys(v.options).length === 0 && v.optionSummary && analysis.options.length > 0) {
+        const inferredOptions = inferOptionsFromSummary(v.optionSummary, analysis.options)
+        return {
+          ...v,
+          options: inferredOptions,
+        }
+      }
+      return v
+    })
+
     console.log('📦 AI Variants:', variants.map(v => ({
       summary: v.optionSummary,
+      options: v.options,
       wholesalePrice: v.wholesalePrice,
       price: v.price,
     })))
 
   } else if (analysis.options.length > 0) {
-    // Case 2: 옵션 조합으로 variants 자동 생성 (기존 로직)
-    console.log('📦 옵션 조합으로 variants 자동 생성')
+    // Case 2: variants가 없지만 options가 있는 경우 - 자동 생성
+    console.warn('⚠️ AI가 variants를 생성하지 않음, options에서 자동 생성')
 
     variants = generateVariants(analysis.options)
     const optionPrices = analysis.pricing.optionPrices || []
@@ -551,18 +796,27 @@ function buildProductDraft(
       const optionPrice = findOptionPriceForVariant(variant, optionPrices)
       return {
         ...variant,
+        wholesalePrice: analysis.pricing.basePrice, // 도매가 추가
         price: optionPrice || sellingPrice,
       }
     })
 
     console.log('📦 Generated Variants:', variants.map(v => ({
       summary: v.optionSummary,
+      options: v.options,
+      wholesalePrice: v.wholesalePrice,
       price: v.price,
     })))
 
   } else {
-    // Case 3: 옵션 없음
-    variants = []
+    // Case 3: options/variants 모두 없음 - 단일 상품으로 처리
+    console.warn('⚠️ options, variants 모두 없음, 단일 상품으로 처리')
+    variants = [{
+      optionSummary: '기본',
+      options: {},
+      wholesalePrice: analysis.pricing.basePrice,
+      price: sellingPrice,
+    }]
   }
 
   // Build product draft
@@ -654,7 +908,349 @@ export async function transformPostToProduct(
 }
 
 // =============================================
+// BATCH PROCESSING
+// =============================================
+
+/**
+ * 배치 변환 결과 타입
+ */
+export interface BatchTransformResult {
+  postId: number
+  success: boolean
+  draft?: ProductDraft
+  error?: string
+}
+
+/**
+ * 배치 처리용 프롬프트 생성
+ * 여러 게시물을 하나의 프롬프트로 결합하여 1회 API 호출로 처리
+ */
+function buildBatchProductExtractionPrompt(
+  inputs: ProductTransformationInput[],
+  policyContent?: string | null
+): string {
+  // 게시물 목록 섹션 생성
+  const postsSection = inputs.map((input, i) => `
+## 게시물 ${i + 1} (ID: ${input.post.id})
+제목: ${input.post.title}
+내용: ${input.post.content || '(내용 없음)'}
+`).join('\n')
+
+  // 정책 섹션 생성
+  const policySection = policyContent
+    ? `
+# 가격 정책
+${policyContent}
+`
+    : ''
+
+  // 가격 추출 규칙
+  const pricingRule = policyContent
+    ? `5. **가격**: 도매가(wholesalePrice)와 판매가(price)를 추출합니다.
+   - 도매가: 게시물에서 추출한 원래 가격
+   - 판매가: 위 가격정책을 적용한 최종 가격`
+    : `5. **가격**: 상품의 가격을 추출합니다.
+   - 도매가(wholesalePrice): 공급가, 도매가
+   - 판매가(price): 소비자 판매 가격 (없으면 도매가와 동일)`
+
+  return `당신은 한국 도매 쇼핑몰 상품 정보 추출 전문가입니다.
+
+아래 ${inputs.length}개의 게시물을 분석하여 각각의 상품 정보를 추출해주세요.
+
+# 게시물 목록
+${postsSection}
+${policySection}
+
+# 추출 규칙
+
+## 1. 상품명 (카피형 네이밍)
+원산지/지역 + 품질키워드 + 상품명 조합으로, 쇼핑몰 메인에 걸려도 눈에 확 들어오는 "카피형 상품명"으로 작성
+
+**예시:**
+- 수산물: "싱싱한 통영산 활돌문어", "당일조업 고흥 활 산낙지"
+- 농산물: "꿀달수 무안 황토 고구마", "햇 충주 국내산 참깨"
+- 가공식품: "30년전통 울산 수제 치즈설기", "50년전통 부산 프리미엄 꼬치어묵"
+
+**상품명 스타일 규칙:**
+- 첫 단어/앞부분에 임팩트 있는 형용사·키워드 사용 (예: 극강, 미친 가성비, 역대급, 찐맛보장, 꿀맛, 싱싱, 프리미엄, 명품 등)
+- 한 줄에 읽기 쉬운 1문장형 네이밍 (대략 20~30자 내외)
+- "국내산/수입산/지역명" 등 신뢰 키워드 포함
+- 느낌표는 0~1개까지만 사용 (과도한 반복 금지)
+
+## 2. 설명 (200-500자, 마케팅 카피 스타일)
+게시물에서 상품 특징, 효능, 맛 설명 부분을 추출하여, 광고 문구처럼 팡팡 튀는 마케팅 카피 스타일로 재구성
+
+**설명 스타일 규칙:**
+- 200~500자 사이로 작성
+- 1문단 또는 2문단 정도로 자연스럽게 구성
+- 첫 문장은 훅(Hook) 역할을 하도록 강렬하게 시작 (예: "한 번 먹으면 다시 찾게 되는 찐맛 고구마입니다.")
+- 중간에는 아래 요소들을 섞어 서술:
+  * 원산지/재배 환경/제조 방식 등 신뢰 포인트
+  * 맛·식감·향에 대한 감성적인 표현 (쫀득쫀득, 촉촉, 진득한 국물, 바삭바삭 등)
+  * 활용 요리 (예: 구이, 찜, 탕, 반찬, 간식 등)
+  * 재구매/후기/인기 강조 (예: 재구매 폭주, 판매자 강력 추천 등) — 사실이 아니라면 "느낌" 정도로 순화
+- 문장은 부드러운 구어체 + 판매페이지 문구 느낌으로 작성
+- 과장 표현은 쓰되, 명백한 허위·의학적 효능 단정 표현은 피하기 (예: "당뇨 완치" → "당분이 적어 부담 없이 즐기기 좋습니다")
+
+## 3. 카테고리
+수산물, 농산물, 가공식품, 장류, 음료/차, 절임류
+
+## 4. 옵션/variants 추출 (핵심!)
+가격이 다른 상품 구성을 찾아 추출
+
+${pricingRule}
+
+# 데이터 구조 규칙 (필수 준수!)
+
+## 가격 타입 규칙 (매우 중요!)
+- 모든 가격은 반드시 **숫자 타입**으로 응답
+- 올바른 예: "wholesalePrice": 48000
+- 잘못된 예: "wholesalePrice": "48000" ← 문자열 금지!
+
+## options와 variants 관계
+- options: 옵션 그룹 정의 (groupName과 가능한 values 목록)
+- variants: 각 옵션에 대한 실제 가격 정보
+- **중요**: 각 variant에는 options 객체가 포함되어야 함
+
+## 빈 배열 금지
+- variants: [] (빈 배열) 금지
+- 단일 규격 상품도 반드시 1개의 variant 포함
+
+# 응답 형식 (필수!)
+각 게시물에 대한 분석 결과를 JSON 배열로 응답해주세요.
+순수 JSON만 응답 (마크다운 코드블록 금지)
+
+[
+  {
+    "postId": 게시물ID숫자,
+    "productName": "상품명",
+    "description": "설명 200-500자",
+    "category": "카테고리",
+    "options": [{ "groupName": "규격", "values": ["값1", "값2"] }],
+    "pricing": { "wholesalePrice": 숫자, "price": 숫자, "currency": "KRW" },
+    "variants": [
+      { "optionSummary": "값1", "options": { "규격": "값1" }, "wholesalePrice": 숫자, "price": 숫자 }
+    ],
+    "shipping": { "shippingFee": 숫자또는null, "shippingInfo": "원문정보또는null" }
+  }
+]
+
+# 주의사항 체크리스트 (필수!)
+- JSON 배열만 응답 (마크다운 코드블록 없이)
+- 각 객체에 postId 포함 (게시물 ID와 일치)
+- 모든 가격은 숫자 타입
+- variants 배열 비어있지 않음 (최소 1개)
+- 각 variant에 options 객체 포함`
+}
+
+/**
+ * 배치 응답에서 개별 결과 파싱
+ */
+interface BatchParseResult {
+  postId: number
+  success: boolean
+  analysis?: AiProductAnalysis
+  error?: string
+}
+
+/**
+ * JSON 배열 추출
+ */
+function extractJsonArray(content: string): any[] {
+  let jsonText = content.trim()
+
+  // 마크다운 코드블록 제거
+  const jsonMatch = jsonText.match(/```(?:json|JSON)?\s*([\s\S]*)\s*```/)
+  if (jsonMatch) {
+    jsonText = jsonMatch[1].trim()
+  }
+
+  // 시작 부분에 ``` 있으면 제거
+  if (jsonText.startsWith('```')) {
+    jsonText = jsonText.replace(/^```(?:json|JSON)?\s*\n?/, '').trim()
+    jsonText = jsonText.replace(/\n?\s*```\s*$/, '').trim()
+  }
+
+  // [ 로 시작하지 않으면 배열 찾기
+  if (!jsonText.startsWith('[')) {
+    const firstBracket = jsonText.indexOf('[')
+    const lastBracket = jsonText.lastIndexOf(']')
+    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+      jsonText = jsonText.substring(firstBracket, lastBracket + 1)
+    }
+  }
+
+  // JSON 복구 시도 (잘린 응답 처리)
+  jsonText = repairTruncatedJson(jsonText)
+
+  const parsed = JSON.parse(jsonText)
+  if (!Array.isArray(parsed)) {
+    throw new Error('응답이 JSON 배열이 아닙니다')
+  }
+
+  return parsed
+}
+
+/**
+ * 개별 분석 결과를 AiProductAnalysis로 변환
+ */
+function parseIndividualResult(item: any): AiProductAnalysis {
+  // AI가 직접 추출한 variants 파싱
+  const aiVariants = parseAiVariants(item.variants || [])
+
+  // 가격 정보 추출
+  const basePrice = item.pricing?.wholesalePrice ||
+                    item.pricing?.basePrice ||
+                    item.pricing?.price
+
+  const sellingPrice = item.pricing?.price ||
+                       item.pricing?.sellingPrice ||
+                       basePrice
+
+  // 배송비 정보 파싱
+  const shippingFee = typeof item.shipping?.shippingFee === 'number'
+    ? item.shipping.shippingFee
+    : null
+  const shippingInfo = typeof item.shipping?.shippingInfo === 'string'
+    ? item.shipping.shippingInfo
+    : null
+
+  return {
+    productName: item.productName,
+    description: item.description || '',
+    category: item.category || undefined,
+    options: item.options || [],
+    variants: aiVariants,
+    pricing: {
+      basePrice: basePrice,
+      sellingPrice: sellingPrice,
+      price: sellingPrice,
+      currency: item.pricing?.currency || 'KRW',
+      optionPrices: [],
+      priceRange: undefined,
+    },
+    shipping: {
+      shippingFee,
+      shippingInfo,
+    },
+    rawResponse: JSON.stringify(item),
+  }
+}
+
+/**
+ * 배치 AI 응답 파싱
+ * JSON 배열 → 개별 분석 결과 매핑
+ */
+function parseBatchAiResponse(
+  aiResponse: AiResponse,
+  postIds: number[]
+): BatchParseResult[] {
+  try {
+    console.log('🔍 배치 AI 응답 파싱 시작')
+    console.log('🔍 원본 응답 (처음 500자):', aiResponse.content.substring(0, 500))
+
+    // JSON 배열 추출 및 파싱
+    const jsonArray = extractJsonArray(aiResponse.content)
+    console.log(`✅ JSON 배열 파싱 성공: ${jsonArray.length}개 항목`)
+
+    return postIds.map(postId => {
+      const item = jsonArray.find((r: any) => r.postId === postId)
+      if (!item) {
+        console.warn(`⚠️ postId ${postId}에 대한 결과 없음`)
+        return { postId, success: false, error: '응답에서 해당 게시물 결과 없음' }
+      }
+
+      try {
+        // 개별 분석 결과 변환
+        const analysis = parseIndividualResult(item)
+        console.log(`✅ postId ${postId} 파싱 성공: ${analysis.productName}`)
+        return { postId, success: true, analysis }
+      } catch (parseError: any) {
+        console.error(`❌ postId ${postId} 개별 파싱 실패:`, parseError.message)
+        return { postId, success: false, error: `개별 파싱 실패: ${parseError.message}` }
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 배치 파싱 전체 실패:', error.message)
+    // 전체 파싱 실패 시 모든 게시물 실패 처리
+    return postIds.map(postId => ({
+      postId,
+      success: false,
+      error: `배치 파싱 실패: ${error.message}`
+    }))
+  }
+}
+
+/**
+ * 여러 게시물을 한 번의 API 호출로 변환
+ * @param inputs 변환할 게시물 배열 (권장: 5개)
+ * @param aiConfig AI 설정
+ * @param policyContent 가격 정책 (선택)
+ */
+export async function transformPostsToProductsBatch(
+  inputs: ProductTransformationInput[],
+  aiConfig: { apiKey: string; model: string; provider: import('@bandauto/db').AiProvider },
+  policyContent?: string | null
+): Promise<BatchTransformResult[]> {
+  if (inputs.length === 0) return []
+
+  console.log(`🔄 배치 변환 시작: ${inputs.length}개 게시물`)
+
+  // 입력 유효성 검사
+  const validInputs = inputs.filter(input => {
+    if (!input.post) return false
+    if (!input.post.title && !input.post.content) return false
+    return true
+  })
+
+  if (validInputs.length === 0) {
+    return inputs.map(input => ({
+      postId: input.post?.id || 0,
+      success: false,
+      error: '유효하지 않은 게시물'
+    }))
+  }
+
+  // AI 클라이언트 생성
+  const aiClient = createAiClient({
+    provider: aiConfig.provider,
+    apiKey: aiConfig.apiKey,
+    model: aiConfig.model,
+  })
+
+  // 배치 프롬프트 생성
+  const prompt = buildBatchProductExtractionPrompt(validInputs, policyContent)
+  console.log(`📝 배치 프롬프트 생성 완료 (길이: ${prompt.length})`)
+
+  // AI 호출 (1회)
+  const aiResponse = await aiClient.generateContent(prompt)
+  console.log(`✅ AI 응답 수신 (토큰: ${aiResponse.tokensUsed || 'N/A'})`)
+
+  // 배치 응답 파싱
+  const postIds = validInputs.map(i => i.post.id)
+  const parseResults = parseBatchAiResponse(aiResponse, postIds)
+
+  // ProductDraft 생성
+  return parseResults.map((result, index) => {
+    if (!result.success || !result.analysis) {
+      return { postId: result.postId, success: false, error: result.error }
+    }
+
+    try {
+      const draft = buildProductDraft(result.analysis, validInputs[index])
+      return { postId: result.postId, success: true, draft }
+    } catch (draftError: any) {
+      return {
+        postId: result.postId,
+        success: false,
+        error: `ProductDraft 생성 실패: ${draftError.message}`
+      }
+    }
+  })
+}
+
+// =============================================
 // EXPORT
 // =============================================
 
-export { buildProductExtractionPrompt, parseAiResponse, buildProductDraft }
+export { buildProductExtractionPrompt, parseAiResponse, buildProductDraft, buildBatchProductExtractionPrompt }

@@ -19,8 +19,8 @@ export default function AISettingsPage() {
     provider: 'gemini',
     geminiApiKey: '',
     openaiApiKey: '',
-    geminiModel: 'gemini-2.5-flash',
-    openaiModel: 'gpt-4o-mini',
+    geminiModel: 'gemini-2.5-flash-lite',
+    openaiModel: 'o3-mini',
     temperature: 0.7,
     maxTokens: 2048
   })
@@ -233,6 +233,8 @@ export default function AISettingsPage() {
                     <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (1,000 요청/일, 무료)</option>
                     <option value="gemini-2.5-flash">Gemini 2.5 Flash (250 요청/일)</option>
                     <option value="gemini-2.5-pro">Gemini 2.5 Pro (25 요청/일)</option>
+                    <option value="gemma-3-12b-it">Gemma 3 12B (오픈소스, 경량)</option>
+                    <option value="gemma-3-27b-it">Gemma 3 27B (오픈소스, 고성능)</option>
                   </select>
                 </div>
 
@@ -294,10 +296,10 @@ export default function AISettingsPage() {
                     }}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
-                    <option value="gpt-4o-mini">GPT-4o-mini ($0.15/1M 입력, 가성비 최고!)</option>
-                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo ($0.5/1M 입력)</option>
-                    <option value="gpt-4o">GPT-4o ($5/1M 입력, 최고 성능)</option>
-                    <option value="gpt-4-turbo">GPT-4 Turbo ($10/1M 입력)</option>
+                    <option value="o3-mini">o3-mini ($1.1/1M 입력, 추론 최적화)</option>
+                    <option value="gpt-4o-mini">GPT-4o-mini ($0.15/1M 입력, 가성비)</option>
+                    <option value="gpt-5-mini">GPT-5-mini (최신, 고성능)</option>
+                    <option value="gpt-4o">GPT-4o ($2.5/1M 입력, 고성능)</option>
                   </select>
                 </div>
 
@@ -308,9 +310,9 @@ export default function AISettingsPage() {
                     <span className="text-sm font-medium text-green-800">가격 정보</span>
                   </div>
                   <div className="text-xs text-green-700 space-y-1">
-                    <div>• GPT-4o-mini: 입력 $0.15/1M, 출력 $0.6/1M (추천!)</div>
-                    <div>• GPT-3.5 Turbo: 입력 $0.5/1M, 출력 $1.5/1M</div>
-                    <div>• GPT-4o: 입력 $5/1M, 출력 $15/1M</div>
+                    <div>• o3-mini: 입력 $1.1/1M, 출력 $4.4/1M (추론 최적화, 추천!)</div>
+                    <div>• GPT-4o-mini: 입력 $0.15/1M, 출력 $0.6/1M (가성비)</div>
+                    <div>• GPT-4o: 입력 $2.5/1M, 출력 $10/1M (고성능)</div>
                     <div>• 신규 사용자: $5 무료 크레딧 (3개월 유효)</div>
                   </div>
                 </div>

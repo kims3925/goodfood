@@ -24,6 +24,7 @@ interface PublishedChannel {
   channelName: string | null
   channelCoverUrl: string | null
   platform: string | null
+  shopId: number | null
   publishedAt: string | null
   createdAt: string
   updatedAt: string
@@ -338,11 +339,20 @@ export default function PublishedProductListPage() {
       return <span className="text-gray-400 text-sm">발행 채널 없음</span>
     }
 
+    // channelId 기준으로 중복 제거 (channelId가 null인 경우 shopId로 구분)
+    const uniqueChannels = productGroup.publishedChannels.reduce((acc, channel) => {
+      const key = channel.channelId?.toString() || `shop-${channel.shopId}` || channel.publishId.toString()
+      if (!acc.has(key)) {
+        acc.set(key, channel)
+      }
+      return acc
+    }, new Map<string, PublishedChannel>())
+
     return (
       <div className="flex flex-wrap gap-1.5">
-        {productGroup.publishedChannels.map((channel) => (
+        {Array.from(uniqueChannels.values()).map((channel) => (
           <span
-            key={channel.publishId}
+            key={channel.channelId || channel.publishId}
             className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium"
             title={channel.channelName || '알 수 없음'}
           >

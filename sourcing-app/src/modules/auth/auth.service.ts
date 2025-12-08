@@ -11,7 +11,7 @@ const secret = new TextEncoder().encode(JWT_SECRET)
 export interface TokenPayload {
   userId: number
   email: string
-  role: 'SOURCING_USER' | 'CUSTOMER' | 'ADMIN'
+  role: 'USER' | 'MANAGER' | 'ADMIN'
 }
 
 /**

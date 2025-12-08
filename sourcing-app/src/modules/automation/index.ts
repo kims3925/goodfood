@@ -67,6 +67,8 @@ export type {
 export {
   CRON_EXPRESSIONS,
   INTERVAL_LABELS,
+  selectedHoursToCron,
+  cronToSelectedHours,
 } from './types'
 
 // Context

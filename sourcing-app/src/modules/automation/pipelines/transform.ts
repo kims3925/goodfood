@@ -2,6 +2,11 @@
  * Transform Pipeline
  * AI를 사용하여 수집된 게시물(CollectedPost)을 수집상품(CollectedProduct)으로 변환
  *
+ * 배치 처리 방식:
+ * - 여러 게시물을 하나의 API 호출로 처리하여 RPD(Requests Per Day) 절약
+ * - gemini-2.5-flash-lite 기준: RPD 20, RPM 10, TPM 250,000
+ * - 5개 게시물/배치, 자동화 1회당 2배치 = 10개 게시물, 2 RPD
+ *
  * Note: Product 생성은 이 파이프라인에서 하지 않음
  * Product는 사용자가 수집상품 관리 페이지에서 수동으로 생성함
  */
@@ -9,8 +14,9 @@
 import prisma, { AiProvider } from '@bandauto/db'
 import { getBatchContext } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
-import { transformPostToProduct } from '@/modules/transformation'
+import { transformPostsToProductsBatch, BatchTransformResult } from '@/modules/transformation/product.transformer'
 import { settingsService } from '@/modules/config/domain/src/settings'
+import { ProductTransformationError } from '@/modules/transformation/product.types'
 import {
   TransformConfig,
   TransformResult,
@@ -18,66 +24,32 @@ import {
   PipelineError,
 } from '../types'
 
-// 연속 실패 시 조기 종료 임계값
-const MAX_CONSECUTIVE_FAILURES = 5
+// =============================================
+// BATCH PROCESSING CONFIGURATION
+// =============================================
+
+// 배치 설정: RPD 절약을 위한 배치 처리
+const BATCH_SIZE = 5  // 5개 게시물/배치 (출력 토큰 제한 고려)
+const MAX_BATCHES_PER_RUN = 2  // 자동화 1회당 최대 2배치 = 2 RPD
+
+// 배치 간 대기 시간 (RPM 10 = 6초/요청, 여유 고려하여 7초 설정)
+const BATCH_INTERVAL_MS = 7000
+
 // 전체 파이프라인 타임아웃 (10분)
 const PIPELINE_TIMEOUT_MS = 10 * 60 * 1000
-// 재시도 설정
-const MAX_RETRIES = 3
-const BASE_DELAY_MS = 1000 // 1초
 
 // =============================================
-// RETRY UTILITY
+// TRANSFORM PIPELINE (BATCH MODE)
 // =============================================
 
 /**
- * 지수 백오프 재시도 래퍼
- * @param fn 실행할 비동기 함수
- * @param maxRetries 최대 재시도 횟수
- * @param baseDelayMs 기본 대기 시간 (밀리초)
- * @returns 함수 실행 결과
- */
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  maxRetries: number = MAX_RETRIES,
-  baseDelayMs: number = BASE_DELAY_MS
-): Promise<T> {
-  let lastError: Error | null = null
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn()
-    } catch (error: any) {
-      lastError = error
-      const isLastAttempt = attempt === maxRetries
-
-      // 재시도하지 않을 에러 타입 확인
-      const isNonRetryableError =
-        error.message?.includes('API key') ||
-        error.message?.includes('Invalid') ||
-        error.message?.includes('필수')
-
-      if (isNonRetryableError || isLastAttempt) {
-        throw error
-      }
-
-      // 지수 백오프 대기 (1s, 2s, 4s, ...)
-      const delay = baseDelayMs * Math.pow(2, attempt)
-      console.log(`[Transform] 재시도 ${attempt + 1}/${maxRetries} (${delay}ms 후): ${error.message}`)
-      await new Promise((resolve) => setTimeout(resolve, delay))
-    }
-  }
-
-  throw lastError || new Error('Max retries exceeded')
-}
-
-// =============================================
-// TRANSFORM PIPELINE
-// =============================================
-
-/**
- * AI 변환 파이프라인 실행
+ * AI 변환 파이프라인 실행 (배치 처리 방식)
  * CollectedPost에서 AI를 사용하여 CollectedProduct 생성
+ *
+ * 배치 처리:
+ * - 5개 게시물을 하나의 AI 요청으로 처리
+ * - 자동화 1회당 최대 2배치 = 10개 게시물
+ * - RPD 사용량: 2 (기존 개별 처리 대비 80% 절약)
  */
 export async function runTransformPipeline(
   config: TransformConfig
@@ -92,7 +64,8 @@ export async function runTransformPipeline(
   const transformedPosts: TransformedPost[] = []
   let createdProducts = 0
 
-  console.log(`[Transform] Starting for user ${userId}`)
+  console.log(`[Transform] Starting batch processing for user ${userId}`)
+  console.log(`[Transform] Batch size: ${BATCH_SIZE}, Max batches: ${MAX_BATCHES_PER_RUN}`)
 
   // AI 설정 조회
   const aiConfig = await prisma.aiApiConfig.findFirst({
@@ -119,8 +92,8 @@ export async function runTransformPipeline(
     whereClause.id = { in: config.postIds }
   }
 
-  // 배치 크기 설정 (기본값: 50)
-  const batchSize = config.batchSize ?? 50
+  // 최대 처리 개수: 배치 크기 × 최대 배치 수
+  const maxPostsPerRun = BATCH_SIZE * MAX_BATCHES_PER_RUN
 
   const posts = await prisma.collectedPost.findMany({
     where: whereClause,
@@ -129,7 +102,7 @@ export async function runTransformPipeline(
         orderBy: { sortOrder: 'asc' },
       },
     },
-    take: batchSize,
+    take: maxPostsPerRun,
   })
 
   if (posts.length === 0) {
@@ -142,14 +115,16 @@ export async function runTransformPipeline(
       details: {
         transformedPosts: [],
         createdProducts: 0,
+        skippedCount: 0,
+        retryablePostIds: [],
       },
       errors: [],
     }
   }
 
-  console.log(`[Transform] Found ${posts.length} posts to transform`)
+  console.log(`[Transform] Found ${posts.length} posts to transform (max: ${maxPostsPerRun})`)
 
-  // 진행 상황 초기화 (totalItems 설정)
+  // 진행 상황 초기화
   const { workflowLogId } = context
   if (workflowLogId) {
     await updateWorkflowProgress(workflowLogId, posts.length, 0, 0)
@@ -157,7 +132,6 @@ export async function runTransformPipeline(
 
   // 파이프라인 시작 시간 기록
   const pipelineStartTime = Date.now()
-  let consecutiveFailures = 0
 
   // 가격 정책 조회
   let pricingPolicyContent: string | null = null
@@ -168,106 +142,182 @@ export async function runTransformPipeline(
     pricingPolicyContent = policy?.content || null
   }
 
-  // 커스텀 프롬프트 조회
-  const promptConfig = await settingsService.getPromptByType(userId, 'product_extraction')
-  const customPrompt = promptConfig?.prompt || undefined
-  console.log(`[Transform] Custom prompt: ${customPrompt ? '사용자 정의 프롬프트 사용' : '기본 프롬프트 사용'}`)
+  // 게시물을 배치로 나누기
+  const batches: typeof posts[] = []
+  for (let i = 0; i < posts.length; i += BATCH_SIZE) {
+    batches.push(posts.slice(i, i + BATCH_SIZE))
+  }
 
-  // 각 게시물 변환
-  for (const post of posts) {
+  console.log(`[Transform] Split into ${batches.length} batches`)
+
+  // 각 배치 처리
+  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    const batch = batches[batchIndex]
+
     // 파이프라인 타임아웃 체크
     if (Date.now() - pipelineStartTime > PIPELINE_TIMEOUT_MS) {
-      console.log(`[Transform] Pipeline timeout reached after ${PIPELINE_TIMEOUT_MS / 1000}s, stopping...`)
+      console.log(`[Transform] Pipeline timeout reached, stopping...`)
       errors.push({
         itemId: 0,
-        message: `파이프라인 실행 시간이 초과되었습니다 (${PIPELINE_TIMEOUT_MS / 60000}분). 나머지 항목은 다음 실행에서 처리됩니다.`,
+        message: `파이프라인 실행 시간이 초과되었습니다. 나머지 항목은 다음 실행에서 처리됩니다.`,
         timestamp: new Date(),
       })
       break
     }
 
-    // 연속 실패 체크 - AI API 문제일 가능성 높음
-    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-      console.log(`[Transform] Too many consecutive failures (${consecutiveFailures}), stopping...`)
-      errors.push({
-        itemId: 0,
-        message: `연속 ${MAX_CONSECUTIVE_FAILURES}회 실패로 파이프라인이 중단되었습니다. AI API 상태를 확인해주세요.`,
-        timestamp: new Date(),
-      })
-      break
+    // 첫 번째 배치가 아니면 배치 간 대기
+    if (batchIndex > 0) {
+      console.log(`[Transform] Waiting ${BATCH_INTERVAL_MS / 1000}s before next batch...`)
+      await new Promise((resolve) => setTimeout(resolve, BATCH_INTERVAL_MS))
     }
 
-    const transformedPost: TransformedPost = {
-      postId: post.id,
-      status: 'pending' as any,
-    }
+    console.log(`[Transform] Processing batch ${batchIndex + 1}/${batches.length} (${batch.length} posts)`)
 
     try {
-      console.log(`[Transform] Processing post ${post.id}: ${post.title.substring(0, 50)}...`)
+      // 배치 입력 준비
+      const inputs = batch.map(post => ({
+        post: post as any,
+        aiProvider: config.aiProvider,
+        aiConfig: {
+          apiKey: aiConfig.apiKey,
+          model: aiConfig.model,
+        },
+      }))
 
-      // AI 변환 실행 (재시도 로직 포함)
-      const draft = await withRetry(() =>
-        transformPostToProduct({
-          post: post as any,
-          aiProvider: config.aiProvider,
-          aiConfig: {
-            apiKey: aiConfig.apiKey,
-            model: aiConfig.model,
-          },
-          policyContent: pricingPolicyContent || undefined,
-          customPrompt,
-        })
+      // 배치 변환 실행 (1회 API 호출)
+      const batchResults = await transformPostsToProductsBatch(
+        inputs,
+        {
+          apiKey: aiConfig.apiKey,
+          model: aiConfig.model,
+          provider: config.aiProvider,
+        },
+        pricingPolicyContent
       )
 
-      // CollectedProduct 생성 (수집상품)
-      const collectedProduct = await prisma.collectedProduct.create({
-        data: {
-          userId,
-          postId: post.id,
-          name: draft.name,
-          description: draft.description || null,
-          currency: draft.currency || 'KRW',
-          // AI 분석 결과를 rawMetadata에 저장 (JSON 직렬화)
-          rawMetadata: JSON.parse(JSON.stringify({
-            category: draft.categoryId,
-            options: draft.options,
-            variants: draft.variants,
-            shipping: {
-              shippingFee: draft.shippingFee ?? null,
-              shippingInfo: draft.shippingInfo ?? null,
-            },
-          })),
-        },
-      })
+      // 결과 처리
+      for (let i = 0; i < batchResults.length; i++) {
+        const result = batchResults[i]
+        const post = batch[i]
 
-      // AI 사용량 업데이트
+        let transformedPost: TransformedPost
+
+        if (result.success && result.draft) {
+          try {
+            // CollectedProduct 생성
+            const collectedProduct = await prisma.collectedProduct.create({
+              data: {
+                userId,
+                postId: post.id,
+                name: result.draft.name,
+                description: result.draft.description || null,
+                currency: result.draft.currency || 'KRW',
+                rawMetadata: JSON.parse(JSON.stringify({
+                  category: result.draft.categoryId,
+                  options: result.draft.options,
+                  variants: result.draft.variants,
+                  shipping: {
+                    shippingFee: result.draft.shippingFee ?? null,
+                    shippingInfo: result.draft.shippingInfo ?? null,
+                  },
+                })),
+              },
+            })
+
+            transformedPost = {
+              postId: result.postId,
+              status: 'success',
+              collectedProductId: collectedProduct.id,
+            }
+            createdProducts++
+
+            console.log(`[Transform] Created collectedProduct ${collectedProduct.id} for post ${post.id}`)
+          } catch (dbError: any) {
+            console.error(`[Transform] DB error for post ${post.id}:`, dbError.message)
+            transformedPost = {
+              postId: result.postId,
+              status: 'failed',
+              error: `DB 저장 실패: ${dbError.message}`,
+              errorType: 'PERMANENT',
+              retryable: false,
+            }
+
+            errors.push({
+              itemId: post.id,
+              message: `DB 저장 실패: ${dbError.message}`,
+              timestamp: new Date(),
+            })
+          }
+        } else {
+          // 배치 내 개별 실패
+          transformedPost = {
+            postId: result.postId,
+            status: 'failed',
+            error: result.error || '알 수 없는 오류',
+            errorType: 'PERMANENT',
+            retryable: true,  // 배치 실패는 재시도 가능
+          }
+
+          console.log(`[Transform] Post ${post.id} failed: ${result.error}`)
+
+          errors.push({
+            itemId: post.id,
+            message: result.error || '알 수 없는 오류',
+            timestamp: new Date(),
+          })
+        }
+
+        transformedPosts.push(transformedPost)
+      }
+
+      // AI 사용량 업데이트 (배치당 1회)
       await prisma.aiApiConfig.update({
         where: { id: aiConfig.id },
         data: {
-          usageCount: { increment: 1 },
+          usageCount: { increment: 1 },  // 배치 1회 = API 1회
           lastUsedAt: new Date(),
         },
       })
 
-      transformedPost.status = 'success'
-      transformedPost.collectedProductId = collectedProduct.id
-      createdProducts++
-      consecutiveFailures = 0 // 성공 시 연속 실패 카운터 리셋
+      console.log(`[Transform] Batch ${batchIndex + 1} completed`)
 
-      console.log(`[Transform] Created collectedProduct ${collectedProduct.id} for post ${post.id}`)
-    } catch (postError: any) {
-      console.error(`[Transform] Error transforming post ${post.id}:`, postError)
-      transformedPost.status = 'failed'
-      transformedPost.error = postError.message
-      consecutiveFailures++ // 실패 시 연속 실패 카운터 증가
-      errors.push({
-        itemId: post.id,
-        message: postError.message,
-        timestamp: new Date(),
-      })
+    } catch (batchError: any) {
+      console.error(`[Transform] Batch ${batchIndex + 1} failed:`, batchError)
+
+      // 배치 전체 실패 시 모든 게시물을 실패로 처리
+      for (const post of batch) {
+        const transformedPost: TransformedPost = {
+          postId: post.id,
+          status: 'failed',
+          error: batchError.message,
+          errorType: batchError instanceof ProductTransformationError && batchError.isTransient()
+            ? 'TRANSIENT'
+            : 'PERMANENT',
+          retryable: batchError instanceof ProductTransformationError && batchError.isTransient(),
+        }
+
+        transformedPosts.push(transformedPost)
+
+        errors.push({
+          itemId: post.id,
+          message: batchError.message,
+          timestamp: new Date(),
+        })
+      }
+
+      // 배치 실패 시 다음 배치 시도 여부 결정
+      if (batchError.message?.includes('API key') || batchError.message?.includes('401')) {
+        // API 키 에러는 중단
+        console.log('[Transform] API key error, stopping pipeline')
+        errors.push({
+          itemId: 0,
+          message: 'API 키 오류로 파이프라인이 중단되었습니다.',
+          timestamp: new Date(),
+        })
+        break
+      }
+      // 그 외 에러는 다음 배치 계속 시도
     }
-
-    transformedPosts.push(transformedPost)
 
     // 진행 상황 업데이트
     if (workflowLogId) {
@@ -277,8 +327,22 @@ export async function runTransformPipeline(
     }
   }
 
+  // 결과 집계
   const successCount = transformedPosts.filter((p) => p.status === 'success').length
   const failedCount = transformedPosts.filter((p) => p.status === 'failed').length
+  const skippedPosts = transformedPosts.filter((p) => p.status === 'skipped')
+  const skippedCount = skippedPosts.length
+  const retryablePostIds = transformedPosts
+    .filter((p) => p.retryable)
+    .map((p) => p.postId)
+
+  console.log(`[Transform] Completed: ${successCount} success, ${failedCount} failed, ${skippedCount} skipped`)
+  console.log(`[Transform] API calls made: ${batches.length} (batch mode)`)
+  console.log(`[Transform] RPD saved: ${posts.length - batches.length} requests`)
+
+  if (retryablePostIds.length > 0) {
+    console.log(`[Transform] Retryable post IDs: ${retryablePostIds.join(', ')}`)
+  }
 
   return {
     success: failedCount === 0,
@@ -288,6 +352,8 @@ export async function runTransformPipeline(
     details: {
       transformedPosts,
       createdProducts,
+      skippedCount,
+      retryablePostIds,
     },
     errors,
   }

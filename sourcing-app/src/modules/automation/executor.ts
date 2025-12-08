@@ -78,7 +78,7 @@ export async function executeCollectionPipeline(
 
     const collectionConfig = {
       channelIds: config?.channelIds ?? parseNumberArray(automationConfig?.channelIds),
-      limit: config?.limit ?? 20,
+      limit: config?.limit ?? 10,  // 자동화 수동실행: 최근 10개만 수집
     }
 
     const result = await runCollectionPipeline(collectionConfig)
@@ -322,6 +322,7 @@ export async function executeFullPipeline(
       console.log('[FullPipeline] Step 1: Collection')
       collectionResult = await runCollectionPipeline({
         channelIds: parseNumberArray(automationConfig.channelIds),
+        limit: 10,  // 자동화 파이프라인: 최근 10개만 수집
       })
 
       // 진행 상황 업데이트
@@ -573,6 +574,7 @@ export async function executeFullPipelineWithLock(
       console.log('[FullPipeline] Step 1: Collection')
       collectionResult = await runCollectionPipeline({
         channelIds: parseNumberArray(automationConfig.channelIds),
+        limit: 10,  // 자동화 파이프라인: 최근 10개만 수집
       })
 
       totalItems += collectionResult.totalItems

@@ -34,6 +34,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 역할 검사: ADMIN, MANAGER만 로그인 허용
+    console.log('로그인 시도 - 사용자 역할:', user.role, '이메일:', user.email)
+    if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+      console.log('역할 검사 실패:', user.role)
+      return NextResponse.json(
+        {
+          success: false,
+          error: '소싱앱 접근 권한이 없습니다.',
+        },
+        { status: 403 }
+      )
+    }
+
     // 비밀번호 검증
     if (!user.password) {
       return NextResponse.json(

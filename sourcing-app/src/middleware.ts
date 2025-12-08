@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { verifyToken } from '@/modules/auth/auth.service'
 
 // sourcing-app에 접근 가능한 역할
-const ALLOWED_ROLES = ['ADMIN', 'SOURCING_USER']
+const ALLOWED_ROLES = ['ADMIN', 'MANAGER']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl

@@ -265,7 +265,11 @@ async function fetchBandPosts(
   const items = data.result_data?.items || []
   console.log(`[Collection] Fetched ${items.length} posts from Band API`)
 
-  return items
+  // limit이 적용된 경우 최근 N개만 반환 (Band API는 최신순 정렬)
+  const limitedItems = limit > 0 ? items.slice(0, limit) : items
+  console.log(`[Collection] Returning ${limitedItems.length} posts (limit: ${limit})`)
+
+  return limitedItems
 }
 
 /**

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-import { CRON_EXPRESSIONS, CronInterval, updateScheduler } from '@/modules/automation'
+import { CRON_EXPRESSIONS, CronInterval, updateScheduler, selectedHoursToCron, cronToSelectedHours } from '@/modules/automation'
 
 /**
  * GET /api/automation/config
@@ -53,6 +53,9 @@ export async function GET() {
     // cronExpression에서 interval 추출
     const cronInterval = getCronIntervalFromExpression(config.cronExpression)
 
+    // cronExpression에서 selectedHours 추출
+    const selectedHours = cronToSelectedHours(config.cronExpression)
+
     // Parse JSON strings back to arrays
     let channelIds: number[] = []
     let retailChannelIds: number[] = []
@@ -72,6 +75,7 @@ export async function GET() {
       data: {
         ...config,
         cronInterval,
+        selectedHours,
         channelIds,
         wholesaleChannelIds: channelIds,
         retailChannelIds,
@@ -105,6 +109,7 @@ export async function POST(request: NextRequest) {
     const {
       isEnabled,
       cronInterval,
+      selectedHours,
       channelIds,
       wholesaleChannelIds,
       aiProvider,
@@ -118,8 +123,13 @@ export async function POST(request: NextRequest) {
     const finalRetailChannelIds = retailChannelIds || []
     const finalShopIds = shopIds || []
 
-    // cronInterval을 cronExpression으로 변환
-    const cronExpression = cronInterval ? CRON_EXPRESSIONS[cronInterval as CronInterval] : null
+    // selectedHours가 있으면 해당 시간들로 cron expression 생성, 없으면 기존 cronInterval 사용
+    let cronExpression: string | null = null
+    if (selectedHours && Array.isArray(selectedHours) && selectedHours.length > 0) {
+      cronExpression = selectedHoursToCron(selectedHours)
+    } else if (cronInterval) {
+      cronExpression = CRON_EXPRESSIONS[cronInterval as CronInterval] || null
+    }
 
     // 다음 실행 시간 계산
     let nextRunAt = null
@@ -220,6 +230,7 @@ function calculateNextRunTime(cronExpression: string): Date {
   }
 
   const [minute, hour] = parts
+  const currentHour = now.getHours()
 
   // 매 시간 실행
   if (minute === '0' && hour === '*') {
@@ -234,13 +245,32 @@ function calculateNextRunTime(cronExpression: string): Date {
     const interval = parseInt(hour.substring(2))
     const next = new Date(now)
     next.setMinutes(0, 0, 0)
-    const currentHour = next.getHours()
     const nextHour = Math.ceil((currentHour + 1) / interval) * interval
     next.setHours(nextHour)
     return next
   }
 
-  // 매일 특정 시간
+  // 콤마로 구분된 여러 시간 (예: 9,14,18)
+  if (minute === '0' && hour.includes(',')) {
+    const hours = hour.split(',').map(h => parseInt(h)).sort((a, b) => a - b)
+
+    // 오늘 남은 시간 중 가장 가까운 것 찾기
+    for (const h of hours) {
+      if (h > currentHour) {
+        const next = new Date(now)
+        next.setHours(h, 0, 0, 0)
+        return next
+      }
+    }
+
+    // 오늘 남은 시간이 없으면 내일 첫 번째 시간
+    const next = new Date(now)
+    next.setDate(next.getDate() + 1)
+    next.setHours(hours[0], 0, 0, 0)
+    return next
+  }
+
+  // 매일 특정 시간 (단일)
   if (minute === '0' && !isNaN(parseInt(hour))) {
     const targetHour = parseInt(hour)
     const next = new Date(now)

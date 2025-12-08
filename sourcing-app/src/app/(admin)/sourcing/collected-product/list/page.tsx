@@ -545,6 +545,10 @@ export default function CollectedProductListPage() {
       loadProducts()
     } else {
       toast.error('상품 등록에 실패했습니다.')
+      // 실패 시 선택 상태 초기화
+      setSelectedPostIds([])
+      setSelectedPosts([])
+      setExpandedPostIds([])
       setModalStep('select')
     }
   }
@@ -757,7 +761,7 @@ export default function CollectedProductListPage() {
                   <TableHead className="w-[40%]">상품명 / 게시물</TableHead>
                   <TableHead className="w-[20%]">출처 채널</TableHead>
                   <TableHead className="w-[20%]">변환상태</TableHead>
-                  <TableHead className="w-[16%]">수집일</TableHead>
+                  <TableHead className="w-[16%]">수집일시</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -812,10 +816,16 @@ export default function CollectedProductListPage() {
                     <TableCell>
                       <span className="text-sm text-gray-600 whitespace-nowrap">
                         {new Date(product.createdAt).toLocaleDateString('ko-KR', {
-                          year: '2-digit',
+                          year: 'numeric',
                           month: '2-digit',
                           day: '2-digit',
-                        }).replace(/\. /g, '.').replace(/\.$/, '')}
+                        }).replace(/\. /g, '-').replace(/\.$/, '')}{' '}
+                        {new Date(product.createdAt).toLocaleTimeString('ko-KR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: false,
+                        })}
                       </span>
                     </TableCell>
                   </TableRow>
@@ -1225,7 +1235,13 @@ export default function CollectedProductListPage() {
                   : `전체 ${availablePosts.length}개 게시물`}
               </p>
               <div className="flex gap-2">
-                <Button variant="secondary" onClick={() => setModalStep('pricing')}>
+                <Button variant="secondary" onClick={() => {
+                  // 이전 단계로 돌아갈 때 선택 상태 초기화
+                  setSelectedPostIds([])
+                  setSelectedPosts([])
+                  setExpandedPostIds([])
+                  setModalStep('pricing')
+                }}>
                   이전
                 </Button>
                 <Button

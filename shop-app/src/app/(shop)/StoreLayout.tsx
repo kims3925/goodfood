@@ -52,14 +52,6 @@ function StoreLayoutContent({
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
       <header className="kurly-header border-b border-gray-200">
-        {/* Top Banner - CSS Variable 사용 */}
-        <div
-          className="text-white text-center py-2 text-sm"
-          style={{ background: 'linear-gradient(to right, var(--color-primary), var(--color-primary-dark))' }}
-        >
-          <span>{shopName} 오픈 기념! 전 상품 무료배송</span>
-        </div>
-
         {/* Top Utility Bar */}
         <div className="border-b border-gray-100 bg-white">
           <div className="kurly-container">
