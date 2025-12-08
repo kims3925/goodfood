@@ -445,7 +445,7 @@ export default function ShopDashboardPage() {
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900">최근 주문</h3>
             <a
-              href="/order/list"
+              href="/shop/order/list"
               className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700"
             >
               전체보기 <ChevronRight size={16} />

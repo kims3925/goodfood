@@ -212,7 +212,7 @@ export default function InquiryDetailPage({ params }: { params: { id: string } }
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-8 flex items-center gap-4">
-          <Link href="/cs/inquiry">
+          <Link href="/shop/cs/inquiry">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
               목록으로
