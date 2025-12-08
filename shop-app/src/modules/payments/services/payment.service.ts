@@ -34,11 +34,7 @@ export interface OrderPrepareData {
   shopId?: number | null
   fromCart: boolean
   items?: { publishedProductId: number; variantId?: number; quantity: number }[]
-  customerInfo: {
-    name: string
-    phone: string
-    email?: string
-  }
+  // 배송지 정보 (수령인)
   shippingAddress: {
     recipientName: string
     recipientPhone: string
@@ -287,10 +283,11 @@ export class PaymentService {
           id: result.order.id,
           orderNumber: result.order.orderNumber,
           status: result.order.status,
+          // 주문자 정보 (user 테이블에서)
           customer: {
-            name: result.order.customerName || result.order.user?.name || '고객',
-            email: result.order.customerEmail || result.order.user?.email || '',
-            phone: result.order.customerPhone || result.order.user?.phone || '',
+            name: result.order.user?.name || '고객',
+            email: result.order.user?.email || '',
+            phone: result.order.user?.phone || '',
           },
           quantity: result.order.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
           subtotal: Number(result.order.subtotalAmount),
@@ -382,17 +379,13 @@ export class PaymentService {
     const discountAmount = 0
     const totalAmount = subtotal + shippingFee - discountAmount
 
-    // 주문 생성
+    // 주문 생성 (주문자 정보는 user 테이블에서, 수령인 정보는 shippingAddress에)
     const order = await prisma.order.create({
       data: {
         userId: prepareData.userId,
         shopId: prepareData.shopId ?? null,
         orderNumber: prepareData.orderId,
         status: 'PENDING',
-        // 주문자 정보
-        customerName: prepareData.customerInfo.name,
-        customerPhone: prepareData.customerInfo.phone,
-        customerEmail: prepareData.customerInfo.email || null,
         // 금액 정보
         subtotalAmount: new Decimal(subtotal),
         shippingFee: new Decimal(shippingFee),
@@ -410,7 +403,7 @@ export class PaymentService {
             totalPrice: new Decimal(item.unitPrice * item.quantity),
           })),
         },
-        // 배송지 정보 (ShippingAddress 테이블에 저장)
+        // 배송지 정보 (수령인 - ShippingAddress 테이블에 저장)
         shippingAddress: {
           create: {
             recipientName: prepareData.shippingAddress.recipientName,

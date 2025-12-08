@@ -4,9 +4,6 @@ model Order {
   shopId         Int?                @map("shop_id")
   orderNumber    String              @unique @map("order_number") @db.VarChar(50)
   status         CustomerOrderStatus @default(PENDING)
-  customerName  String  @map("customer_name") @db.VarChar(100)
-  customerPhone String  @map("customer_phone") @db.VarChar(20)
-  customerEmail String? @map("customer_email") @db.VarChar(200)
   subtotalAmount Decimal             @map("subtotal_amount") @db.Decimal(12, 2)
   shippingFee    Decimal             @default(0.00) @map("shipping_fee") @db.Decimal(10, 2)
   discountAmount Decimal             @default(0.00) @map("discount_amount") @db.Decimal(10, 2)
@@ -33,21 +30,6 @@ model Order {
   @@index([orderedAt])
   @@index([userId, status])
   @@map("order")
-}
-
-model ShippingAddress {
-  id            Int     @id @default(autoincrement())
-  orderId       Int     @unique @map("order_id")
-  recipient     String  @db.VarChar(100)
-  phone         String  @db.VarChar(20)
-  postalCode    String  @map("postal_code") @db.VarChar(10)
-  address       String  @db.VarChar(500)
-  addressDetail String? @map("address_detail") @db.VarChar(500)
-  deliveryMemo  String? @map("delivery_memo") @db.VarChar(500)
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@map("shipping_address")
 }
 
 model OrderItem {

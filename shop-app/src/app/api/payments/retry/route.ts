@@ -199,22 +199,18 @@ export async function POST(req: NextRequest) {
           }
         })
 
-        // 새 주문 생성
+        // 새 주문 생성 (주문자 정보는 user 테이블에서)
         const order = await tx.order.create({
           data: {
             orderNumber: newOrderNumber,
             userId: existingOrder.userId,
             status: 'PENDING',
-            // 주문자 정보
-            customerName: existingOrder.customerName,
-            customerPhone: existingOrder.customerPhone,
-            customerEmail: existingOrder.customerEmail,
             // 금액 정보
             subtotalAmount: existingOrder.subtotalAmount,
             shippingFee: existingOrder.shippingFee,
             discountAmount: existingOrder.discountAmount,
             totalAmount: existingOrder.totalAmount,
-            // 배송지 정보 (별도 테이블)
+            // 배송지 정보 (수령인 - 별도 테이블)
             shippingAddress: existingOrder.shippingAddress ? {
               create: {
                 recipientName: existingOrder.shippingAddress.recipientName,

@@ -23,12 +23,6 @@ import {
 // Types
 // ============================================
 
-export interface CustomerInfo {
-  name: string
-  phone: string
-  email?: string
-}
-
 export interface ShippingAddress {
   recipientName: string
   recipientPhone: string
@@ -47,7 +41,6 @@ export interface OrderItem {
 export interface CreateOrderFromCartDTO {
   userId: number
   shopId?: number  // Shop 기반 주문 필터링
-  customerInfo: CustomerInfo
   shippingAddress: ShippingAddress
 }
 
@@ -55,7 +48,6 @@ export interface CreateOrderFromItemsDTO {
   userId: number
   shopId?: number  // Shop 기반 주문 필터링
   items: OrderItem[]
-  customerInfo: CustomerInfo
   shippingAddress: ShippingAddress
 }
 
@@ -63,13 +55,13 @@ export interface OrderResponse {
   id: number
   orderNumber: string
   status: string
-  // 주문자 정보
+  // 주문자 정보 (회원 user 테이블에서)
   customer: {
     name: string
-    phone: string
-    email: string | null
+    phone: string | null
+    email: string
   }
-  // 배송지 정보 (별도 테이블에서 조회)
+  // 배송지 정보 (수령인 - shippingAddress 테이블에서)
   shippingAddress: {
     recipientName: string
     recipientPhone: string
@@ -108,8 +100,8 @@ export interface PaymentRequestData {
   orderId: string
   orderName: string
   amount: number
-  customerName: string
-  customerEmail: string
+  customerName: string  // user.name
+  customerEmail: string // user.email
   successUrl: string
   failUrl: string
 }
@@ -140,13 +132,12 @@ export class OrderService {
     order: OrderResponse
     payment: PaymentRequestData
   }> {
-    const { userId, shopId, customerInfo, shippingAddress } = data
+    const { userId, shopId, shippingAddress } = data
 
     // 입력 검증
-    this.validateCustomerInfo(customerInfo)
     this.validateShippingAddress(shippingAddress)
 
-    // 사용자 조회
+    // 사용자 조회 (주문자 정보)
     const user = await prisma.user.findUnique({
       where: { id: userId },
     })
@@ -193,19 +184,15 @@ export class OrderService {
     const discountAmount = 0
     const totalAmount = subtotal + shippingFee - discountAmount
 
-    // 주문 생성
+    // 주문 생성 (주문자 정보는 user 테이블에서)
     const orderInput: CreateOrderInput = {
       userId,
       shopId,
       orderNumber: this.generateOrderNumber(),
-      // 주문자 정보
-      customerName: customerInfo.name,
-      customerPhone: customerInfo.phone,
-      customerEmail: customerInfo.email,
-      // 배송지 정보 (별도 테이블)
+      // 배송지 정보 (수령인)
       shippingAddress: {
-        recipientName: shippingAddress.recipientName || customerInfo.name,
-        recipientPhone: shippingAddress.recipientPhone || customerInfo.phone,
+        recipientName: shippingAddress.recipientName,
+        recipientPhone: shippingAddress.recipientPhone,
         postalCode: shippingAddress.postalCode,
         address: shippingAddress.address,
         addressDetail: shippingAddress.addressDetail,
@@ -220,7 +207,7 @@ export class OrderService {
 
     const order = await this.orderRepository.create(orderInput)
 
-    // TossPayments 결제 요청 정보 생성
+    // TossPayments 결제 요청 정보 생성 (주문자 정보는 user에서)
     const paymentRequest: PaymentRequestData = {
       orderId: order.orderNumber,
       orderName:
@@ -228,8 +215,8 @@ export class OrderService {
           ? `${orderItems[0].productName} 외 ${orderItems.length - 1}건`
           : orderItems[0].productName,
       amount: totalAmount,
-      customerName: customerInfo.name || '고객',
-      customerEmail: customerInfo.email || '',
+      customerName: user.name || '고객',
+      customerEmail: user.email || '',
       successUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/success`,
       failUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/fail`,
     }
@@ -247,17 +234,16 @@ export class OrderService {
     order: OrderResponse
     payment: PaymentRequestData
   }> {
-    const { userId, shopId, items, customerInfo, shippingAddress } = data
+    const { userId, shopId, items, shippingAddress } = data
 
     // 입력 검증
-    this.validateCustomerInfo(customerInfo)
     this.validateShippingAddress(shippingAddress)
 
     if (!items || items.length === 0) {
       throw new ValidationError('주문 상품이 없습니다')
     }
 
-    // 사용자 조회
+    // 사용자 조회 (주문자 정보)
     const user = await prisma.user.findUnique({
       where: { id: userId },
     })
@@ -321,19 +307,15 @@ export class OrderService {
     const discountAmount = 0
     const totalAmount = subtotal + shippingFee - discountAmount
 
-    // 주문 생성
+    // 주문 생성 (주문자 정보는 user 테이블에서)
     const orderInput: CreateOrderInput = {
       userId,
       shopId,
       orderNumber: this.generateOrderNumber(),
-      // 주문자 정보
-      customerName: customerInfo.name,
-      customerPhone: customerInfo.phone,
-      customerEmail: customerInfo.email,
-      // 배송지 정보 (별도 테이블)
+      // 배송지 정보 (수령인)
       shippingAddress: {
-        recipientName: shippingAddress.recipientName || customerInfo.name,
-        recipientPhone: shippingAddress.recipientPhone || customerInfo.phone,
+        recipientName: shippingAddress.recipientName,
+        recipientPhone: shippingAddress.recipientPhone,
         postalCode: shippingAddress.postalCode,
         address: shippingAddress.address,
         addressDetail: shippingAddress.addressDetail,
@@ -348,7 +330,7 @@ export class OrderService {
 
     const order = await this.orderRepository.create(orderInput)
 
-    // TossPayments 결제 요청 정보 생성
+    // TossPayments 결제 요청 정보 생성 (주문자 정보는 user에서)
     const paymentRequest: PaymentRequestData = {
       orderId: order.orderNumber,
       orderName:
@@ -356,8 +338,8 @@ export class OrderService {
           ? `${orderItems[0].productName} 외 ${orderItems.length - 1}건`
           : orderItems[0].productName,
       amount: totalAmount,
-      customerName: customerInfo.name || '고객',
-      customerEmail: customerInfo.email || '',
+      customerName: user.name || '고객',
+      customerEmail: user.email || '',
       successUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/success`,
       failUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/fail`,
     }
@@ -477,18 +459,6 @@ export class OrderService {
   }
 
   /**
-   * 입력 검증: 고객 정보
-   */
-  private validateCustomerInfo(customerInfo: CustomerInfo): void {
-    if (!customerInfo?.name) {
-      throw new ValidationError('고객 이름은 필수입니다')
-    }
-    if (!customerInfo?.phone) {
-      throw new ValidationError('고객 전화번호는 필수입니다')
-    }
-  }
-
-  /**
    * 입력 검증: 배송 주소
    */
   private validateShippingAddress(shippingAddress: ShippingAddress): void {
@@ -525,13 +495,13 @@ export class OrderService {
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status,
-      // 주문자 정보
+      // 주문자 정보 (user 테이블에서)
       customer: {
-        name: order.customerName,
-        phone: order.customerPhone,
-        email: order.customerEmail,
+        name: order.user?.name || '',
+        phone: order.user?.phone || null,
+        email: order.user?.email || '',
       },
-      // 배송지 정보 (별도 테이블)
+      // 배송지 정보 (수령인 - shippingAddress 테이블)
       shippingAddress: order.shippingAddress
         ? {
             recipientName: order.shippingAddress.recipientName,

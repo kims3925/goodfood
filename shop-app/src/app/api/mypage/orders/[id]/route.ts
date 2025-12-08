@@ -126,11 +126,12 @@ export async function GET(
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status,
-      customerName: order.customerName,
-      customerPhone: order.customerPhone,
-      customerEmail: order.customerEmail,
-      // 배송 정보
-shippingAddress: order.shippingAddress ? {
+      // 주문자 정보 (user 테이블에서)
+      customerName: order.user?.name || '',
+      customerPhone: order.user?.phone || '',
+      customerEmail: order.user?.email || '',
+      // 배송 정보 (수령인 - shippingAddress 테이블에서)
+      shippingAddress: order.shippingAddress ? {
         recipientName: order.shippingAddress.recipientName,
         recipientPhone: order.shippingAddress.recipientPhone,
         postalCode: order.shippingAddress.postalCode,

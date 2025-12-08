@@ -35,11 +35,7 @@ export interface CreateOrderInput {
   userId: number
   shopId?: number | null  // Shop 기반 주문 필터링
   orderNumber: string
-  // 주문자 정보
-  customerName: string
-  customerPhone: string
-  customerEmail?: string | null
-  // 배송지 정보 (별도 테이블로 분리)
+  // 배송지 정보 (주문자 정보 포함 - recipient, phone 사용)
   shippingAddress: ShippingAddressInput
   // 금액 정보
   subtotalAmount: number
@@ -69,10 +65,6 @@ export interface OrderWithRelations {
   shopId: number | null  // Shop 기반 필터링
   orderNumber: string
   status: string
-  // 주문자 정보
-  customerName: string
-  customerPhone: string
-  customerEmail: string | null
   // 금액 정보
   subtotalAmount: any
   shippingFee: any
@@ -87,13 +79,14 @@ export interface OrderWithRelations {
   cancelledBy: string | null
   createdAt: Date
   updatedAt: Date
+  // 주문자 정보 (회원 - user 테이블에서)
   user: {
     id: number
     name: string
     email: string
     phone: string | null
   }
-  // 배송지 정보 (별도 테이블)
+  // 배송지 정보 (수령인 - recipient, phone)
   shippingAddress: ShippingAddressWithRelations | null
   items: Array<{
     id: number
@@ -165,16 +158,12 @@ export class OrderRepository {
         shopId: data.shopId || null,
         orderNumber: data.orderNumber,
         status: 'PENDING',
-        // 주문자 정보
-        customerName: data.customerName,
-        customerPhone: data.customerPhone,
-        customerEmail: data.customerEmail || null,
         // 금액 정보
         subtotalAmount: new Decimal(data.subtotalAmount),
         shippingFee: new Decimal(data.shippingFee),
         discountAmount: new Decimal(data.discountAmount || 0),
         totalAmount: new Decimal(data.totalAmount),
-        // 배송지 정보 (별도 테이블)
+        // 배송지 정보 (수령인 정보)
         shippingAddress: {
           create: {
             recipientName: data.shippingAddress.recipientName,
@@ -196,16 +185,6 @@ export class OrderRepository {
             unitPrice: new Decimal(item.unitPrice),
             totalPrice: new Decimal(item.unitPrice * item.quantity),
           })),
-        },
-        shippingAddress: {
-          create: {
-            recipient: data.shippingAddress.recipient,
-            phone: data.shippingAddress.phone,
-            postalCode: data.shippingAddress.postalCode,
-            address: data.shippingAddress.address,
-            addressDetail: data.shippingAddress.addressDetail || null,
-            deliveryMemo: data.shippingAddress.deliveryMemo || null,
-          },
         },
       },
       include: orderIncludeOptions,

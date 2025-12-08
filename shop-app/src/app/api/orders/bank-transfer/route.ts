@@ -65,24 +65,22 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const {
       items,
-      customerInfo,
       shippingAddress,
       fromCart = true,
       userId: bodyUserId,
     } = body
 
-    // 고객 정보 검증
-    if (!customerInfo?.name || !customerInfo?.phone) {
+    // 배송 주소 검증 (수령인 정보 포함)
+    if (!shippingAddress?.address || !shippingAddress?.postalCode) {
       return NextResponse.json(
-        { success: false, error: '고객 정보(이름, 전화번호)는 필수입니다' },
+        { success: false, error: '배송 주소는 필수입니다' },
         { status: 400 }
       )
     }
 
-    // 배송 주소 검증
-    if (!shippingAddress?.address || !shippingAddress?.postalCode) {
+    if (!shippingAddress?.recipientName || !shippingAddress?.recipientPhone) {
       return NextResponse.json(
-        { success: false, error: '배송 주소는 필수입니다' },
+        { success: false, error: '수령인 정보(이름, 전화번호)는 필수입니다' },
         { status: 400 }
       )
     }
@@ -278,7 +276,7 @@ export async function POST(req: NextRequest) {
     const totalAmount = subtotal + shippingFee
     const depositDeadline = getDepositDeadline()
 
-    // 트랜잭션으로 주문 생성
+    // 트랜잭션으로 주문 생성 (주문자 정보는 user 테이블에서)
     const result = await prisma.$transaction(async (tx) => {
       // 1. Order 생성
       const orderNumber = generateOrderNumber()
@@ -288,10 +286,6 @@ export async function POST(req: NextRequest) {
           shopId,
           orderNumber,
           status: CustomerOrderStatus.PENDING,
-          // 주문자 정보
-          customerName: customerInfo.name,
-          customerPhone: customerInfo.phone,
-          customerEmail: customerInfo.email || null,
           // 금액 정보
           subtotalAmount: subtotal,
           shippingFee,
@@ -309,11 +303,11 @@ export async function POST(req: NextRequest) {
               totalPrice: item.unitPrice * item.quantity,
             })),
           },
-          // 배송지 정보 (ShippingAddress 테이블에 저장)
+          // 배송지 정보 (수령인 - ShippingAddress 테이블에 저장)
           shippingAddress: {
             create: {
-              recipientName: shippingAddress.recipientName || customerInfo.name,
-              recipientPhone: shippingAddress.recipientPhone || customerInfo.phone,
+              recipientName: shippingAddress.recipientName,
+              recipientPhone: shippingAddress.recipientPhone,
               postalCode: shippingAddress.postalCode,
               address: shippingAddress.address,
               addressDetail: shippingAddress.addressDetail || null,
