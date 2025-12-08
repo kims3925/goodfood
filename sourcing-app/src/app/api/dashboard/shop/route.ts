@@ -107,13 +107,10 @@ export async function GET(request: NextRequest) {
         orderedAt: { gte: start, lte: end },
       },
       include: {
+        shop: true,
         items: {
           include: {
-            publishedProduct: {
-              include: {
-                channel: true,
-              },
-            },
+            publishedProduct: true,
           },
         },
       },
@@ -238,7 +235,7 @@ export async function GET(request: NextRequest) {
     const recentOrders = recentOrdersData.map(order => ({
       id: order.id,
       orderNumber: order.orderNumber,
-      customer: order.recipientName.substring(0, 1) + '**',
+      customer: order.recipientName ? order.recipientName.substring(0, 1) + '**' : '미지정',
       amount: Number(order.totalAmount),
       status: order.status,
       time: formatRelativeTime(order.orderedAt),
@@ -273,35 +270,36 @@ export async function GET(request: NextRequest) {
         thumbnailUrl: product.thumbnailUrl,
       }))
 
-    // === 채널별 매출 ===
-    const channelColors = ['#10B981', '#6366F1', '#F59E0B', '#3B82F6', '#EF4444']
+    // === 쇼핑몰별 매출 ===
+    const shopColors = ['#10B981', '#6366F1', '#F59E0B', '#3B82F6', '#EF4444', '#8B5CF6', '#EC4899']
 
-    const channelRevenues = orderItems.reduce((acc, item) => {
-      const channel = item.publishedProduct?.channel
-      const channelName = channel?.name || '미분류'
-      const channelId = channel?.id || 0
+    const shopRevenues = currentOrders.reduce((acc, order) => {
+      const shopId = order.shopId || 0
+      const shopName = order.shop?.name || '미분류'
 
-      if (!acc[channelId]) {
-        acc[channelId] = {
-          name: channelName,
+      if (!acc[shopId]) {
+        acc[shopId] = {
+          id: shopId,
+          name: shopName,
           revenue: 0,
         }
       }
-      acc[channelId].revenue += Number(item.totalPrice)
+      acc[shopId].revenue += Number(order.totalAmount)
       return acc
-    }, {} as Record<number, { name: string; revenue: number }>)
+    }, {} as Record<number, { id: number; name: string; revenue: number }>)
 
-    const totalChannelRevenue = Object.values(channelRevenues).reduce((sum, c) => sum + c.revenue, 0)
+    const totalShopRevenue = Object.values(shopRevenues).reduce((sum, s) => sum + s.revenue, 0)
 
-    const channelRevenue = Object.values(channelRevenues)
+    const shopRevenue = Object.values(shopRevenues)
       .sort((a, b) => b.revenue - a.revenue)
-      .map((channel, index) => ({
-        name: channel.name,
-        revenue: channel.revenue,
-        percentage: totalChannelRevenue > 0
-          ? Math.round((channel.revenue / totalChannelRevenue) * 100)
+      .map((shop, index) => ({
+        id: shop.id,
+        name: shop.name,
+        revenue: shop.revenue,
+        percentage: totalShopRevenue > 0
+          ? Math.round((shop.revenue / totalShopRevenue) * 100)
           : 0,
-        color: channelColors[index % channelColors.length],
+        color: shopColors[index % shopColors.length],
       }))
 
     return NextResponse.json({
@@ -312,7 +310,7 @@ export async function GET(request: NextRequest) {
         orderStatusChart,
         recentOrders,
         topProducts,
-        channelRevenue,
+        shopRevenue,
       },
     })
   } catch (error) {

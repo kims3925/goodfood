@@ -70,7 +70,8 @@ interface DashboardData {
     revenue: number
     thumbnailUrl: string | null
   }[]
-  channelRevenue: {
+  shopRevenue: {
+    id: number
     name: string
     revenue: number
     percentage: number
@@ -235,7 +236,7 @@ export default function ShopDashboardPage() {
 
   if (!data) return null
 
-  const { stats, revenueChart, orderStatusChart, recentOrders, topProducts, channelRevenue } = data
+  const { stats, revenueChart, orderStatusChart, recentOrders, topProducts, shopRevenue } = data
 
   return (
     <div className="space-y-6 pb-8">
@@ -520,25 +521,25 @@ export default function ShopDashboardPage() {
         </Card>
       </div>
 
-      {/* 채널별 매출 */}
+      {/* 쇼핑몰별 매출 */}
       <Card className="p-6">
         <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">채널별 매출 현황</h3>
-          <p className="mt-1 text-sm text-gray-500">판매 채널별 매출 비교</p>
+          <h3 className="text-lg font-semibold text-gray-900">쇼핑몰별 매출 현황</h3>
+          <p className="mt-1 text-sm text-gray-500">운영 중인 쇼핑몰별 매출 비교</p>
         </div>
-        {channelRevenue.length > 0 ? (
+        {shopRevenue.length > 0 ? (
           <>
             <div className="space-y-4">
-              {channelRevenue.map((channel) => (
-                <div key={channel.name} className="space-y-2">
+              {shopRevenue.map((shop) => (
+                <div key={shop.id} className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">{channel.name}</span>
+                    <span className="text-sm font-medium text-gray-700">{shop.name}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-gray-900">
-                        {formatCurrency(channel.revenue)}
+                        {formatCurrency(shop.revenue)}
                       </span>
                       <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                        {channel.percentage}%
+                        {shop.percentage}%
                       </span>
                     </div>
                   </div>
@@ -546,8 +547,8 @@ export default function ShopDashboardPage() {
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{
-                        width: `${channel.percentage}%`,
-                        backgroundColor: channel.color,
+                        width: `${shop.percentage}%`,
+                        backgroundColor: shop.color,
                       }}
                     />
                   </div>
@@ -555,18 +556,18 @@ export default function ShopDashboardPage() {
               ))}
             </div>
 
-            {/* 채널 비율 요약 */}
-            <div className="mt-6 flex items-center justify-center gap-6">
-              {channelRevenue.map((channel) => (
-                <div key={channel.name} className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full" style={{ backgroundColor: channel.color }} />
-                  <span className="text-sm text-gray-600">{channel.name}</span>
+            {/* 쇼핑몰 비율 요약 */}
+            <div className="mt-6 flex items-center justify-center gap-6 flex-wrap">
+              {shopRevenue.map((shop) => (
+                <div key={shop.id} className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full" style={{ backgroundColor: shop.color }} />
+                  <span className="text-sm text-gray-600">{shop.name}</span>
                 </div>
               ))}
             </div>
           </>
         ) : (
-          <EmptyState message="채널별 매출 데이터가 없습니다." />
+          <EmptyState message="쇼핑몰별 매출 데이터가 없습니다." />
         )}
       </Card>
     </div>
