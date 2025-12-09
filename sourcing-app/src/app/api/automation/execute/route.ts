@@ -441,6 +441,70 @@ export async function GET() {
 
     const running = await getRunningWorkflow(currentUser.userId)
 
+    // details 파싱하여 단계별 진행 상태 추출
+    let stageProgress = null
+    let currentStage = null
+    if (running?.details) {
+      try {
+        const details = typeof running.details === 'string'
+          ? JSON.parse(running.details)
+          : running.details
+
+        // 현재 단계 판단 및 단계별 진행 상태
+        stageProgress = {
+          collection: details.collection ? {
+            completed: true,
+            totalNewPosts: details.collection.totalNewPosts || 0,
+            channelResults: details.collection.channelResults?.map((ch: any) => ({
+              channelName: ch.channelName,
+              newPosts: ch.newPosts || 0,
+              failed: ch.failed || 0,
+            })) || [],
+          } : null,
+          transform: details.transform ? {
+            completed: !details.transform.batchProgress || details.transform.batchProgress.current >= details.transform.batchProgress.total,
+            total: details.transform.transformedPosts?.length || 0,
+            success: details.transform.transformedPosts?.filter((p: any) => p.status === 'success').length || 0,
+            failed: details.transform.transformedPosts?.filter((p: any) => p.status !== 'success').length || 0,
+            batchProgress: details.transform.batchProgress || null,
+          } : null,
+          productCreate: details.productCreate ? {
+            completed: true,
+            total: details.productCreate.createdProducts?.length || 0,
+            success: details.productCreate.createdProducts?.filter((p: any) => p.status === 'success').length || 0,
+            failed: details.productCreate.createdProducts?.filter((p: any) => p.status !== 'success').length || 0,
+          } : null,
+          publish: details.publish ? {
+            completed: true,
+            total: details.publish.publishedProducts?.length || 0,
+            success: details.publish.publishedProducts?.filter((p: any) => p.status?.toUpperCase() === 'SUCCESS').length || 0,
+            failed: details.publish.publishedProducts?.filter((p: any) => p.status?.toUpperCase() !== 'SUCCESS').length || 0,
+            currentChannel: details.publish.currentChannel || null,
+            currentProgress: details.publish.currentProgress || null,
+          } : null,
+        }
+
+        // 현재 진행 중인 단계 판단
+        if (details.publish?.currentProgress && !stageProgress.publish?.completed) {
+          currentStage = 'publish'
+        } else if (details.productCreate && !details.publish) {
+          currentStage = 'productCreate'
+        } else if (details.transform?.batchProgress && details.transform.batchProgress.current < details.transform.batchProgress.total) {
+          currentStage = 'transform'
+        } else if (details.transform && !details.productCreate) {
+          currentStage = 'productCreate'
+        } else if (details.collection && !details.transform) {
+          currentStage = 'transform'
+        } else if (!details.collection) {
+          currentStage = 'collection'
+        } else if (details.publish) {
+          currentStage = 'publish'
+        }
+      } catch (e) {
+        console.error('Failed to parse workflow details:', e)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -454,6 +518,8 @@ export async function GET() {
               totalItems: running.totalItems,
               successCount: running.successCount,
               failedCount: running.failedCount,
+              currentStage,
+              stageProgress,
             }
           : null,
       },

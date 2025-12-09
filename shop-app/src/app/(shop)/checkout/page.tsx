@@ -156,6 +156,11 @@ function CheckoutContent() {
     document.body.style.overflow = 'unset'
   }
 
+  // 페이지 로드 시 스크롤을 맨 위로 이동
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
+
   useEffect(() => {
     loadCheckoutData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -172,15 +177,27 @@ function CheckoutContent() {
         await loadProduct()
       }
 
-      // 회원인 경우 배송지 및 쿠폰 로드
+      // 회원인 경우 프로필, 배송지 및 쿠폰 로드
       if (session) {
-        const [addressResponse, couponResponse] = await Promise.all([
+        const [profileResponse, addressResponse, couponResponse] = await Promise.all([
+          fetch('/api/mypage/profile'),
           fetch('/api/mypage/addresses'),
           fetch('/api/mypage/coupons'),
         ])
 
+        const profileData = await profileResponse.json()
         const addressData = await addressResponse.json()
         const couponData = await couponResponse.json()
+
+        // 회원 프로필 정보로 주문자 정보 자동 세팅
+        if (profileData.success && profileData.user) {
+          setFormData(prev => ({
+            ...prev,
+            customerName: profileData.user.name || '',
+            customerPhone: profileData.user.phone || '',
+            customerEmail: profileData.user.email || '',
+          }))
+        }
 
         if (addressData.success) {
           setAddresses(addressData.addresses)
@@ -416,8 +433,8 @@ function CheckoutContent() {
     // 에러 초기화
     const newErrors: { customerInfo?: string; shippingAddress?: string } = {}
 
-    // 폼 검증 - 주문자 정보
-    if (!formData.customerName || !formData.customerPhone) {
+    // 폼 검증 - 주문자 정보 (비회원일 때만 검증)
+    if (isGuest && (!formData.customerName || !formData.customerPhone)) {
       newErrors.customerInfo = '주문자 이름과 휴대폰 번호를 입력해주세요.'
     }
 
@@ -780,57 +797,59 @@ function CheckoutContent() {
                   )}
                 </div>
 
-                {/* 주문자 정보 */}
-                <div ref={customerInfoRef} className="bg-white rounded-lg shadow-sm p-6 mb-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <User className="w-5 h-5 text-gray-600" />
-                    주문자 정보
-                  </h2>
-                  {errors.customerInfo && (
-                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      <span className="text-sm">{errors.customerInfo}</span>
-                    </div>
-                  )}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        이름 <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.customerName}
-                        onChange={(e) => handleFormChange('customerName', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
-                        placeholder="홍길동"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        휴대폰 번호 <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="tel"
-                        value={formData.customerPhone}
-                        onChange={(e) => handleFormChange('customerPhone', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
-                        placeholder="010-1234-5678"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        이메일
-                      </label>
-                      <input
-                        type="email"
-                        value={formData.customerEmail}
-                        onChange={(e) => handleFormChange('customerEmail', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
-                        placeholder="example@email.com"
-                      />
+                {/* 주문자 정보 - 비회원일 때만 표시 */}
+                {!session && (
+                  <div ref={customerInfoRef} className="bg-white rounded-lg shadow-sm p-6 mb-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <User className="w-5 h-5 text-gray-600" />
+                      주문자 정보
+                    </h2>
+                    {errors.customerInfo && (
+                      <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <span className="text-sm">{errors.customerInfo}</span>
+                      </div>
+                    )}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          이름 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.customerName}
+                          onChange={(e) => handleFormChange('customerName', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
+                          placeholder="홍길동"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          휴대폰 번호 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="tel"
+                          value={formData.customerPhone}
+                          onChange={(e) => handleFormChange('customerPhone', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
+                          placeholder="010-1234-5678"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          이메일
+                        </label>
+                        <input
+                          type="email"
+                          value={formData.customerEmail}
+                          onChange={(e) => handleFormChange('customerEmail', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
+                          placeholder="example@email.com"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* 배송지 정보 */}
                 <div ref={shippingAddressRef} className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -1144,8 +1163,7 @@ function CheckoutContent() {
               </div>
 
               {/* 우측: 결제 정보 (스티키) */}
-              <div className="lg:w-[320px] flex-shrink-0">
-                <div className="lg:sticky lg:top-[294px]">
+              <div className="lg:w-[320px] flex-shrink-0 lg:self-start lg:sticky lg:top-6">
                   <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                     {/* 쿠폰 적용 (회원 전용) */}
                     {session && (
@@ -1269,7 +1287,6 @@ function CheckoutContent() {
                       </ul>
                     </div>
                   </div>
-                </div>
               </div>
             </div>
           </div>

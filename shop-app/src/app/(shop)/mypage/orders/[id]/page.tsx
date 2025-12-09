@@ -77,16 +77,20 @@ interface BankTransferInfo {
   depositDeadline: string
 }
 
-interface Order {
-  id: number
-  orderNumber: string
-  status: string
+interface ShippingAddress {
   recipientName: string
   recipientPhone: string
   postalCode: string
   address: string
   addressDetail: string | null
   deliveryMemo: string | null
+}
+
+interface Order {
+  id: number
+  orderNumber: string
+  status: string
+  shippingAddress: ShippingAddress | null
   subtotalAmount: number
   shippingFee: number
   discountAmount: number
@@ -98,8 +102,8 @@ interface Order {
   cancelledAt: string | null
   customer: {
     name: string
-    email: string
-    phone: string
+    email: string | null
+    phone: string | null
   }
   items: OrderItem[]
   hasWritableReview: boolean
@@ -541,47 +545,49 @@ export default function OrderDetailPage() {
           </div>
 
           {/* 배송지 정보 */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-[#FF6B6B]" />
-              배송지 정보
-            </h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-start gap-3">
-                <User className="w-4 h-4 text-gray-400 mt-0.5" />
-                <div>
-                  <p className="text-gray-600">받는 분</p>
-                  <p className="font-medium text-gray-900">{order.recipientName}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Phone className="w-4 h-4 text-gray-400 mt-0.5" />
-                <div>
-                  <p className="text-gray-600">연락처</p>
-                  <p className="font-medium text-gray-900">{formatPhoneNumber(order.recipientPhone)}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
-                <div>
-                  <p className="text-gray-600">주소</p>
-                  <p className="font-medium text-gray-900">
-                    [{order.postalCode}] {order.address}
-                    {order.addressDetail && ` ${order.addressDetail}`}
-                  </p>
-                </div>
-              </div>
-              {order.deliveryMemo && (
+          {order.shippingAddress && (
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-[#FF6B6B]" />
+                배송지 정보
+              </h2>
+              <div className="space-y-3 text-sm">
                 <div className="flex items-start gap-3">
-                  <FileText className="w-4 h-4 text-gray-400 mt-0.5" />
+                  <User className="w-4 h-4 text-gray-400 mt-0.5" />
                   <div>
-                    <p className="text-gray-600">배송 메모</p>
-                    <p className="font-medium text-gray-900">{order.deliveryMemo}</p>
+                    <p className="text-gray-600">받는 분</p>
+                    <p className="font-medium text-gray-900">{order.shippingAddress.recipientName}</p>
                   </div>
                 </div>
-              )}
+                <div className="flex items-start gap-3">
+                  <Phone className="w-4 h-4 text-gray-400 mt-0.5" />
+                  <div>
+                    <p className="text-gray-600">연락처</p>
+                    <p className="font-medium text-gray-900">{formatPhoneNumber(order.shippingAddress.recipientPhone)}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
+                  <div>
+                    <p className="text-gray-600">주소</p>
+                    <p className="font-medium text-gray-900">
+                      [{order.shippingAddress.postalCode}] {order.shippingAddress.address}
+                      {order.shippingAddress.addressDetail && ` ${order.shippingAddress.addressDetail}`}
+                    </p>
+                  </div>
+                </div>
+                {order.shippingAddress.deliveryMemo && (
+                  <div className="flex items-start gap-3">
+                    <FileText className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <div>
+                      <p className="text-gray-600">배송 메모</p>
+                      <p className="font-medium text-gray-900">{order.shippingAddress.deliveryMemo}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* 오른쪽: 결제 정보 */}
@@ -689,10 +695,12 @@ export default function OrderDetailPage() {
                 <User className="w-4 h-4 text-gray-400" />
                 <span className="text-gray-900">{order.customer.name}</span>
               </div>
-              <div className="flex items-center gap-3">
-                <Phone className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-900">{formatPhoneNumber(order.customer.phone)}</span>
-              </div>
+              {order.customer.phone && (
+                <div className="flex items-center gap-3">
+                  <Phone className="w-4 h-4 text-gray-400" />
+                  <span className="text-gray-900">{formatPhoneNumber(order.customer.phone)}</span>
+                </div>
+              )}
               {order.customer.email && (
                 <div className="flex items-center gap-3">
                   <Mail className="w-4 h-4 text-gray-400" />
