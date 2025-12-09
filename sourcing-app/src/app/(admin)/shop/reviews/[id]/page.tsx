@@ -339,10 +339,7 @@ export default function ReviewDetailPage() {
                 <div className="p-4 space-y-3">
                   <div>
                     <p className="text-sm text-gray-500">주문번호</p>
-                    <p
-                      className="font-medium text-blue-600 font-mono cursor-pointer hover:underline"
-                      onClick={() => router.push(`/shop/order/detail/${review.orderItem?.order?.id}?source=SHOPPING_MALL`)}
-                    >
+                    <p className="font-medium text-gray-900 font-mono">
                       {review.orderItem.order.orderNumber}
                     </p>
                   </div>

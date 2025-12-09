@@ -15,11 +15,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
     }
 
-    // ADMIN만 사용자 목록 조회 가능
-    if (currentUser.role !== 'ADMIN') {
-      return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 })
-    }
-
     const searchParams = request.nextUrl.searchParams
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
@@ -31,10 +26,8 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit
 
-    const where: Prisma.UserWhereInput = {
-      // ADMIN 제외, USER/MANAGER만 조회
-      role: role ? role : { in: ['USER', 'MANAGER'] },
-      // 쇼핑몰 필터링
+    // 공통 필터 (검색어, 쇼핑몰)
+    const commonFilters: Prisma.UserWhereInput = {
       ...(shopId && { shopId }),
       ...(search && {
         OR: [
@@ -43,6 +36,36 @@ export async function GET(request: NextRequest) {
           { phone: { contains: search } },
         ],
       }),
+    }
+
+    // 역할별 조회 조건 구성
+    // - MANAGER: 항상 표시
+    // - USER: 주문이 1개 이상 있는 경우만
+    let where: Prisma.UserWhereInput
+
+    if (role === 'MANAGER') {
+      // MANAGER만 조회
+      where = { role: 'MANAGER', ...commonFilters }
+    } else if (role === 'USER') {
+      // USER 중 주문이 있는 사용자만
+      where = {
+        role: 'USER',
+        orders: { some: {} },
+        ...commonFilters,
+      }
+    } else {
+      // 전체: MANAGER + 주문이 있는 USER
+      where = {
+        AND: [
+          commonFilters,
+          {
+            OR: [
+              { role: 'MANAGER' },
+              { role: 'USER', orders: { some: {} } },
+            ],
+          },
+        ],
+      }
     }
 
     const [users, total, shops, roleCounts] = await Promise.all([
@@ -87,30 +110,36 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { name: 'asc' },
       }),
-      // 역할별 카운트
-      prisma.user.groupBy({
-        by: ['role'],
-        where: {
-          role: { in: ['USER', 'MANAGER'] },
-          ...(shopId && { shopId }),
-        },
-        _count: { role: true },
-      }),
+      // 역할별 카운트 (MANAGER 전체 + 주문 있는 USER)
+      Promise.all([
+        // MANAGER 수
+        prisma.user.count({
+          where: {
+            role: 'MANAGER',
+            ...(shopId && { shopId }),
+          },
+        }),
+        // 주문이 있는 USER 수
+        prisma.user.count({
+          where: {
+            role: 'USER',
+            orders: { some: {} },
+            ...(shopId && { shopId }),
+          },
+        }),
+      ]),
     ])
 
-    // 역할별 카운트 정리
-    const roleCountMap: Record<string, number> = {}
-    roleCounts.forEach((item) => {
-      roleCountMap[item.role] = item._count.role
-    })
+    // 역할별 카운트 (roleCounts = [managerCount, userCount])
+    const [managerCount, userCount] = roleCounts
 
     return NextResponse.json({
       users,
       shops,
       stats: {
         total,
-        USER: roleCountMap['USER'] || 0,
-        MANAGER: roleCountMap['MANAGER'] || 0,
+        USER: userCount,
+        MANAGER: managerCount,
       },
       pagination: {
         page,

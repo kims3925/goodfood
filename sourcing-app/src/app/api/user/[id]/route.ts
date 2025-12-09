@@ -12,11 +12,6 @@ export async function GET(
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
     }
 
-    // ADMIN만 사용자 상세 조회 가능
-    if (currentUser.role !== 'ADMIN') {
-      return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 })
-    }
-
     const { id } = await params
     const userId = parseInt(id)
 

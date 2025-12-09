@@ -226,7 +226,12 @@ export async function GET(request: NextRequest) {
     // === 최근 주문 5건 ===
     const recentOrdersData = await prisma.order.findMany({
       where: {
-        userId: user.userId,
+        shop: { userId: user.userId },
+      },
+      include: {
+        user: {
+          select: { name: true },
+        },
       },
       orderBy: { orderedAt: 'desc' },
       take: 5,
@@ -235,7 +240,7 @@ export async function GET(request: NextRequest) {
     const recentOrders = recentOrdersData.map(order => ({
       id: order.id,
       orderNumber: order.orderNumber,
-      customer: order.recipientName ? order.recipientName.substring(0, 1) + '**' : '미지정',
+      customer: order.user?.name ? order.user.name.substring(0, 1) + '**' : '미지정',
       amount: Number(order.totalAmount),
       status: order.status,
       time: formatRelativeTime(order.orderedAt),

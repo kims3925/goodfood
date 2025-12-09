@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Star, Package, X, Pencil } from 'lucide-react'
+import { Star, Package, X, Pencil, Trash2, MoreVertical } from 'lucide-react'
 
 interface WritableItem {
   orderItemId: number
@@ -75,6 +75,18 @@ export default function ReviewsPage() {
   // 탭별 카운트
   const [writableCount, setWritableCount] = useState(0)
   const [writtenCount, setWrittenCount] = useState(0)
+
+  // 리뷰 수정 모달
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingReview, setEditingReview] = useState<WrittenReview | null>(null)
+  const [editRating, setEditRating] = useState(5)
+  const [editTitle, setEditTitle] = useState('')
+  const [editContent, setEditContent] = useState('')
+
+  // 리뷰 삭제 확인 모달
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deletingReviewId, setDeletingReviewId] = useState<number | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (sessionStatus === 'loading') return
@@ -205,6 +217,91 @@ export default function ReviewsPage() {
       console.error('Failed to submit review:', error)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // 수정 모달 열기
+  const openEditModal = (review: WrittenReview) => {
+    setEditingReview(review)
+    setEditRating(review.rating)
+    setEditTitle(review.title || '')
+    setEditContent(review.content)
+    setShowEditModal(true)
+  }
+
+  // 수정 모달 닫기
+  const closeEditModal = () => {
+    setShowEditModal(false)
+    setEditingReview(null)
+    setEditRating(5)
+    setEditTitle('')
+    setEditContent('')
+  }
+
+  // 리뷰 수정 제출
+  const handleEditReview = async () => {
+    if (!editingReview) return
+    if (!editContent.trim()) return
+
+    try {
+      setSubmitting(true)
+      const response = await fetch(`/api/mypage/reviews/${editingReview.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rating: editRating,
+          title: editTitle.trim() || null,
+          content: editContent.trim(),
+          images: editingReview.images || [],
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        closeEditModal()
+        fetchData()
+      }
+    } catch (error) {
+      console.error('Failed to edit review:', error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // 삭제 확인 모달 열기
+  const openDeleteConfirm = (reviewId: number) => {
+    setDeletingReviewId(reviewId)
+    setShowDeleteConfirm(true)
+  }
+
+  // 삭제 확인 모달 닫기
+  const closeDeleteConfirm = () => {
+    setShowDeleteConfirm(false)
+    setDeletingReviewId(null)
+  }
+
+  // 리뷰 삭제
+  const handleDeleteReview = async () => {
+    if (!deletingReviewId) return
+
+    try {
+      setDeleting(true)
+      const response = await fetch(`/api/mypage/reviews/${deletingReviewId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        closeDeleteConfirm()
+        fetchCounts()
+        fetchData()
+      }
+    } catch (error) {
+      console.error('Failed to delete review:', error)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -405,6 +502,23 @@ export default function ReviewsPage() {
                         {formatDate(review.createdAt)}
                       </p>
                     </div>
+                    {/* 수정/삭제 버튼 */}
+                    <div className="flex items-start gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => openEditModal(review)}
+                        className="px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center gap-1"
+                      >
+                        <Pencil className="w-4 h-4" />
+                        수정
+                      </button>
+                      <button
+                        onClick={() => openDeleteConfirm(review.id)}
+                        className="px-3 py-1.5 text-sm text-red-600 border border-red-300 rounded-md hover:bg-red-50 transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        삭제
+                      </button>
+                    </div>
                   </div>
 
                   {/* 평점 */}
@@ -593,6 +707,150 @@ export default function ReviewsPage() {
                 className="flex-1 px-4 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? '작성 중...' : '작성 완료'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 후기 수정 모달 */}
+      {showEditModal && editingReview && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            {/* 모달 헤더 */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">후기 수정</h2>
+              <button
+                onClick={closeEditModal}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* 모달 내용 */}
+            <div className="p-6">
+              {/* 상품 정보 */}
+              <div className="flex gap-4 mb-6 pb-6 border-b border-gray-100">
+                <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                  {editingReview.orderItem?.thumbnailUrl || editingReview.product.thumbnailUrl ? (
+                    <img
+                      src={editingReview.orderItem?.thumbnailUrl || editingReview.product.thumbnailUrl || ''}
+                      alt={editingReview.orderItem?.productName || editingReview.product.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="w-8 h-8 text-gray-300" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-gray-900">
+                    {editingReview.orderItem?.productName || editingReview.product.name}
+                  </h3>
+                  {editingReview.orderItem?.optionSummary && (
+                    <p className="text-sm text-gray-500">{editingReview.orderItem.optionSummary}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* 평점 */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  별점 <span className="text-red-500">*</span>
+                </label>
+                {renderStars(editRating, true, setEditRating)}
+                <p className="text-sm text-gray-500 mt-1">
+                  {editRating === 5 && '아주 좋아요'}
+                  {editRating === 4 && '맘에 들어요'}
+                  {editRating === 3 && '보통이에요'}
+                  {editRating === 2 && '그저 그래요'}
+                  {editRating === 1 && '별로예요'}
+                </p>
+              </div>
+
+              {/* 제목 */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  제목 (선택)
+                </label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="후기 제목을 입력해주세요"
+                  maxLength={200}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none"
+                />
+              </div>
+
+              {/* 내용 */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  내용 <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  placeholder="상품에 대한 솔직한 후기를 남겨주세요"
+                  rows={5}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none resize-none"
+                />
+                <p className="text-sm text-gray-500 mt-1 text-right">
+                  {editContent.length}/1000
+                </p>
+              </div>
+            </div>
+
+            {/* 모달 푸터 */}
+            <div className="flex gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={closeEditModal}
+                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleEditReview}
+                disabled={submitting || !editContent.trim()}
+                className="flex-1 px-4 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? '수정 중...' : '수정 완료'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 삭제 확인 모달 */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-sm w-full">
+            <div className="p-6">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 text-center mb-2">
+                후기를 삭제하시겠습니까?
+              </h3>
+              <p className="text-gray-600 text-center text-sm">
+                삭제된 후기는 복구할 수 없습니다.
+              </p>
+            </div>
+            <div className="flex gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={closeDeleteConfirm}
+                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleDeleteReview}
+                disabled={deleting}
+                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
+              >
+                {deleting ? '삭제 중...' : '삭제'}
               </button>
             </div>
           </div>
