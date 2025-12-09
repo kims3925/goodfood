@@ -291,15 +291,15 @@ export async function getAutomationStats(
       -- AI 변환 대기 중인 게시물 수 (CollectedProduct가 없는 게시물)
       (SELECT COUNT(*) FROM collected_post cp
        WHERE cp.user_id = ${userId}
-       AND NOT EXISTS (SELECT 1 FROM collected_product cpr WHERE cpr.post_id = cp.id)) as pendingTransform,
+       AND NOT EXISTS (SELECT 1 FROM collected_product cpr WHERE cpr.collected_post_id = cp.id)) as pendingTransform,
 
       -- AI 변환 완료된 게시물 수 (CollectedProduct가 있는 게시물)
       (SELECT COUNT(*) FROM collected_post cp
        WHERE cp.user_id = ${userId}
-       AND EXISTS (SELECT 1 FROM collected_product cpr WHERE cpr.post_id = cp.id)) as totalTransformed,
+       AND EXISTS (SELECT 1 FROM collected_product cpr WHERE cpr.collected_post_id = cp.id)) as totalTransformed,
 
       -- 기간 내 AI 변환 완료된 게시물 수 (distinct postId)
-      (SELECT COUNT(DISTINCT post_id) FROM collected_product
+      (SELECT COUNT(DISTINCT collected_post_id) FROM collected_product
        WHERE user_id = ${userId}
        AND created_at >= ${periodStart} AND created_at <= ${periodEnd}) as periodTransformed,
 

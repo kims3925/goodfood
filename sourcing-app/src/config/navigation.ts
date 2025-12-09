@@ -19,6 +19,7 @@ import {
   Bot,
   ShoppingBag,
   Ticket,
+  Star,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
@@ -97,6 +98,7 @@ export const shopMenuItems: MenuItem[] = [
   },
   // { label: '사용자 관리', href: '/shop/user/list', icon: Users }, // TODO: 추후 활성화
   { label: '고객 문의', href: '/shop/cs/inquiry', icon: MessageSquare },
+  { label: '리뷰 관리', href: '/shop/reviews', icon: Star },
   { label: '쿠폰', href: '/shop/coupon/list', icon: Ticket },
 ]
 
@@ -140,6 +142,7 @@ export const shopPathToMenuMap: Record<string, string> = {
   '/shop/settlement': '정산',
   // '/shop/user': '사용자 관리', // TODO: 추후 활성화
   '/shop/cs': '고객 문의',
+  '/shop/reviews': '리뷰 관리',
   '/shop/coupon': '쿠폰',
 }
 
