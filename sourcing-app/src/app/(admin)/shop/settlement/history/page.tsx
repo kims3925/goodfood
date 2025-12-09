@@ -307,9 +307,6 @@ export default function SettlementHistoryPage() {
                       쇼핑몰
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      정산 기간
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       주문 수
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -319,7 +316,7 @@ export default function SettlementHistoryPage() {
                       상태
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      생성일
+                      정산일
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       관리
@@ -349,12 +346,6 @@ export default function SettlementHistoryPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <Calendar size={14} className="text-gray-400" />
-                          {formatDate(settlement.periodStart)} ~ {formatDate(settlement.periodEnd)}
-                        </div>
-                      </td>
                       <td className="px-4 py-4 text-sm text-gray-900 font-medium">
                         {settlement.totalOrders}건
                       </td>
@@ -364,23 +355,21 @@ export default function SettlementHistoryPage() {
                       <td className="px-4 py-4">
                         {getStatusBadge(settlement.status)}
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-500">
-                        {formatDate(settlement.createdAt)}
+                      <td className="px-4 py-4 text-sm text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <Calendar size={14} className="text-gray-400" />
+                          {formatDate(settlement.settledAt || settlement.createdAt)}
+                        </div>
                       </td>
                       <td className="px-4 py-4">
                         {settlement.status === 'COMPLETED' && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">
-                              {settlement.settledAt && formatDate(settlement.settledAt)}
-                            </span>
-                            <button
-                              onClick={() => handleStatusChange(settlement.id, 'CANCELLED')}
-                              disabled={updating === settlement.id}
-                              className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
-                            >
-                              취소
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => handleStatusChange(settlement.id, 'CANCELLED')}
+                            disabled={updating === settlement.id}
+                            className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+                          >
+                            취소
+                          </button>
                         )}
                         {settlement.status === 'CANCELLED' && (
                           <span className="text-xs text-red-500">취소됨</span>

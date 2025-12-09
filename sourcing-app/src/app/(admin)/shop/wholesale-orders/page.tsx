@@ -378,17 +378,30 @@ export default function WholesaleOrdersPage() {
 
         {/* 상세 모달 */}
         {selectedChannel && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-10 md:p-16">
+            <div className="bg-white rounded-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
               {/* 모달 헤더 */}
-              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">{selectedChannel.wholesaleChannelName}</h2>
-                  <p className="text-sm text-gray-500">{selectedDate} 발주 상세</p>
+              <div className="px-8 py-5 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
+                <div className="flex items-center gap-4">
+                  {selectedChannel.wholesaleChannelCoverUrl ? (
+                    <img
+                      src={selectedChannel.wholesaleChannelCoverUrl}
+                      alt={selectedChannel.wholesaleChannelName}
+                      className="w-12 h-12 rounded-xl object-cover border border-gray-200"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center border border-gray-200">
+                      <Store size={24} className="text-gray-400" />
+                    </div>
+                  )}
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">{selectedChannel.wholesaleChannelName}</h2>
+                    <p className="text-sm text-gray-500">{selectedDate} 발주 상세</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 rounded-lg transition-colors shadow-sm"
                     onClick={() => downloadExcel(selectedChannel.wholesaleChannelId, selectedChannel.wholesaleChannelName)}
                   >
                     <Download size={16} />
@@ -399,96 +412,131 @@ export default function WholesaleOrdersPage() {
                       setSelectedChannel(null)
                       setOrderItems(null)
                     }}
-                    className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                    className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
                   >
-                    <X size={20} />
+                    <X size={22} className="text-gray-500" />
                   </button>
                 </div>
               </div>
 
               {/* 요약 */}
               {orderItems && (
-                <div className="px-6 py-3 bg-gray-100 border-b border-gray-200 flex items-center gap-6">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">총 수량:</span>
-                    <span className="font-bold text-gray-900">{orderItems.summary.totalQuantity.toLocaleString()}개</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">총 금액:</span>
-                    <span className="font-bold text-gray-900">{formatPrice(orderItems.summary.totalAmount)}</span>
+                <div className="px-8 py-5 bg-gradient-to-br from-gray-50 to-gray-100/50 border-b border-gray-200">
+                  <div className="grid grid-cols-3 gap-5">
+                    <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-[38px] h-[38px] rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                          <Package size={19} className="text-blue-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-500">총 수량</p>
+                          <p className="text-2xl font-bold text-gray-900 truncate">{orderItems.summary.totalQuantity.toLocaleString()}개</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-[38px] h-[38px] rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
+                          <Banknote size={19} className="text-green-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-500">총 금액</p>
+                          <p className="text-2xl font-bold text-gray-900 truncate">{formatPrice(orderItems.summary.totalAmount)}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-[38px] h-[38px] rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
+                          <ShoppingCart size={19} className="text-purple-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-500">주문 건수</p>
+                          <p className="text-2xl font-bold text-gray-900 truncate">{orderItems.items.length}건</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
               {/* 테이블 */}
-              <div className="flex-1 overflow-auto">
+              <div className="flex-1 overflow-auto p-6">
                 {detailLoading ? (
-                  <div className="flex justify-center py-12">
+                  <div className="flex justify-center py-16">
                     <Loading />
                   </div>
                 ) : orderItems && orderItems.items.length > 0 ? (
-                  <table className="w-full">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">상품명</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">옵션</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">수량</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">단가</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">공급가액</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">고객명</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">연락처</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">주소</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">주문일시</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {orderItems.items.map((item) => (
-                        <tr key={item.orderItemId} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900 max-w-[200px] truncate" title={item.productName}>
-                            {item.productName}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{item.optionSummary}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 text-center font-medium">{item.quantity}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatPrice(item.wholesalePrice)}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">{formatPrice(item.totalAmount)}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{item.customerName}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{formatPhoneNumber(item.customerPhone)}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600 max-w-[250px] truncate" title={item.customerAddress}>
-                            {item.customerAddress}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{formatDate(item.orderedAt)}</td>
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">상품명</th>
+                          <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">옵션</th>
+                          <th className="text-right py-4 px-5 text-sm font-semibold text-gray-700">수량</th>
+                          <th className="text-right py-4 px-5 text-sm font-semibold text-gray-700">단가</th>
+                          <th className="text-right py-4 px-5 text-sm font-semibold text-gray-700">금액</th>
+                          <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">고객명</th>
+                          <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">연락처</th>
+                          <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">주소</th>
+                          <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">주문일시</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {orderItems.items.map((item, idx) => (
+                          <tr key={item.orderItemId} className={`border-b border-gray-100 ${idx % 2 === 1 ? 'bg-gray-50/50' : ''}`}>
+                            <td className="py-4 px-5 text-sm text-gray-900 max-w-[200px] truncate" title={item.productName}>
+                              {item.productName}
+                            </td>
+                            <td className="py-4 px-5">
+                              <span className="inline-block px-2.5 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-md">
+                                {item.optionSummary || '-'}
+                              </span>
+                            </td>
+                            <td className="py-4 px-5 text-sm text-right font-medium text-gray-900">{item.quantity}</td>
+                            <td className="py-4 px-5 text-sm text-right text-gray-600">{formatPrice(item.wholesalePrice)}</td>
+                            <td className="py-4 px-5 text-sm text-right font-semibold text-gray-900">{formatPrice(item.totalAmount)}</td>
+                            <td className="py-4 px-5 text-sm text-gray-900">{item.customerName}</td>
+                            <td className="py-4 px-5 text-sm text-gray-600">{formatPhoneNumber(item.customerPhone)}</td>
+                            <td className="py-4 px-5 text-sm text-gray-600 max-w-[220px] truncate" title={item.customerAddress}>
+                              {item.customerAddress}
+                            </td>
+                            <td className="py-4 px-5 text-sm text-gray-500 whitespace-nowrap">{formatDate(item.orderedAt)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
-                  <div className="py-12 text-center text-gray-500">
-                    주문 내역이 없습니다.
+                  <div className="py-16 text-center">
+                    <Package size={48} className="mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-500">주문 내역이 없습니다.</p>
                   </div>
                 )}
               </div>
 
               {/* 페이지네이션 */}
               {orderItems && orderItems.pagination.totalPages > 1 && (
-                <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+                <div className="px-8 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
                   <p className="text-sm text-gray-600">
-                    총 {orderItems.pagination.total}건 중 {(detailPage - 1) * 50 + 1}-{Math.min(detailPage * 50, orderItems.pagination.total)}건
+                    총 <span className="font-semibold text-gray-900">{orderItems.pagination.total}건</span> 중{' '}
+                    <span className="font-medium">{(detailPage - 1) * 50 + 1}-{Math.min(detailPage * 50, orderItems.pagination.total)}건</span>
                   </p>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => fetchDetails(selectedChannel.wholesaleChannelId, detailPage - 1)}
                       disabled={detailPage === 1}
-                      className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <ChevronLeft size={18} />
                     </button>
-                    <span className="text-sm text-gray-600">
+                    <span className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg">
                       {detailPage} / {orderItems.pagination.totalPages}
                     </span>
                     <button
                       onClick={() => fetchDetails(selectedChannel.wholesaleChannelId, detailPage + 1)}
                       disabled={detailPage === orderItems.pagination.totalPages}
-                      className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <ChevronRight size={18} />
                     </button>

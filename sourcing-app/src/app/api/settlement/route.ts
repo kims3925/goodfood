@@ -296,10 +296,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 해당 기간의 주문 데이터 집계
-    const start = periodStart ? new Date(periodStart) : new Date('2000-01-01')
-    const end = periodEnd ? new Date(periodEnd) : new Date()
-    end.setHours(23, 59, 59, 999)
+    // 날짜 필터 설정 (없으면 전체 기간)
+    const filterStart = periodStart ? new Date(periodStart) : undefined
+    const filterEnd = periodEnd ? new Date(periodEnd) : undefined
+    if (filterEnd) filterEnd.setHours(23, 59, 59, 999)
 
     // 이미 정산된 주문 아이템 ID 조회 (중복 방지)
     const existingSettlementItems = await prisma.settlementItem.findMany({
@@ -320,11 +320,17 @@ export async function POST(request: NextRequest) {
       where: {
         shopId: parseInt(shopId),
         status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
-        orderedAt: { gte: start, lte: end },
+        ...(filterStart || filterEnd ? {
+          orderedAt: {
+            ...(filterStart ? { gte: filterStart } : {}),
+            ...(filterEnd ? { lte: filterEnd } : {}),
+          }
+        } : {}),
       },
       include: {
         items: true,
       },
+      orderBy: { orderedAt: 'asc' },
     })
 
     // 정산 대상 주문 아이템 필터링 (이미 정산된 아이템 제외)
@@ -357,6 +363,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 실제 정산 기간 계산 (포함된 주문들의 날짜 범위)
+    const includedOrderIds = new Set(settlementItems.map(item => item.orderId))
+    const includedOrders = orders.filter(o => includedOrderIds.has(o.id))
+    const actualPeriodStart = includedOrders.length > 0
+      ? includedOrders[0].orderedAt
+      : new Date()
+    const actualPeriodEnd = includedOrders.length > 0
+      ? includedOrders[includedOrders.length - 1].orderedAt
+      : new Date()
+
     const totalOrders = settlementItems.length
     const totalAmount = settlementItems.reduce((sum, item) => sum + item.totalPrice, 0)
 
@@ -367,8 +383,8 @@ export async function POST(request: NextRequest) {
         data: {
           userId: user.userId,
           shopId: parseInt(shopId),
-          periodStart: start,
-          periodEnd: end,
+          periodStart: actualPeriodStart,
+          periodEnd: actualPeriodEnd,
           totalOrders,
           totalAmount,
           memo: memo || null,
