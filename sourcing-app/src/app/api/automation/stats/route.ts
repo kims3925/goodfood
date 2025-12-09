@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { getAutomationStats } from '@/modules/automation'
+import { getHourlyWorkflowStats } from '@/modules/automation/workflow-service'
 
 /**
  * GET /api/automation/stats
@@ -65,11 +66,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const stats = await getAutomationStats(currentUser.userId, startDate, endDate)
+    const [stats, hourlyStats] = await Promise.all([
+      getAutomationStats(currentUser.userId, startDate, endDate),
+      getHourlyWorkflowStats(currentUser.userId, startDate, endDate),
+    ])
 
     return NextResponse.json({
       success: true,
-      data: stats,
+      data: {
+        ...stats,
+        hourlyStats,
+      },
     })
   } catch (error) {
     console.error('통계 조회 실패:', error)

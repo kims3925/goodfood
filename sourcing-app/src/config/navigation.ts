@@ -36,22 +36,22 @@ export interface MenuItem {
 
 // 소싱 탭 메뉴
 export const sourcingMenuItems: MenuItem[] = [
-  { label: '대시보드', href: '/sourcing/dashboard/automation', icon: LayoutDashboard },
+  { label: '대시보드', href: '/sourcing/dashboard', icon: LayoutDashboard },
+  { label: '채널 관리', href: '/sourcing/channel', icon: Store },
   {
     label: '수집',
     icon: Database,
     children: [
-      { label: '채널 관리', href: '/sourcing/channel', icon: Store },
-      { label: '게시물', href: '/sourcing/post/list', icon: FileText },
-      { label: '수집상품', href: '/sourcing/collected-product/list', icon: Database },
+      { label: '수집 게시물', href: '/sourcing/post/list', icon: FileText },
+      { label: '수집 상품', href: '/sourcing/collected-product/list', icon: Database },
     ],
   },
   {
     label: '상품',
     icon: Package,
     children: [
-      { label: '가공상품', href: '/sourcing/product/list', icon: Package },
-      { label: '발행상품', href: '/sourcing/published-product/list', icon: Send },
+      { label: '가공 상품', href: '/sourcing/product/list', icon: Package },
+      { label: '발행 상품', href: '/sourcing/published-product/list', icon: Send },
     ],
   },
   { label: '발행', href: '/sourcing/publish', icon: Send },
@@ -117,13 +117,13 @@ export function getSectionLabel(section: AppSection): string {
 }
 
 export function getDefaultPathBySection(section: AppSection): string {
-  return section === 'sourcing' ? '/sourcing/dashboard/automation' : '/shop/dashboard'
+  return section === 'sourcing' ? '/sourcing/dashboard' : '/shop/dashboard'
 }
 
 // 경로 -> 메뉴 라벨 매핑 (메뉴 자동 확장용)
 export const sourcingPathToMenuMap: Record<string, string> = {
-  '/sourcing/dashboard/automation': '대시보드',
-  '/sourcing/channel': '수집',
+  '/sourcing/dashboard': '대시보드',
+  '/sourcing/channel': '채널 관리',
   '/sourcing/post': '수집',
   '/sourcing/collected-product': '수집',
   '/sourcing/product': '상품',

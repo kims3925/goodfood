@@ -22,10 +22,29 @@ import {
   ShoppingBag,
   Calendar,
 } from 'lucide-react'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+  ReferenceArea,
+} from 'recharts'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
 import Link from 'next/link'
+
+interface HourlyStats {
+  hour: number
+  collect: number
+  transform: number
+  productCreate: number
+  publish: number
+}
 
 interface AutomationStats {
   todayCollected: number
@@ -40,6 +59,8 @@ interface AutomationStats {
   // 오늘 통계
   todayTransformed: number
   todayProducts: number
+  // 시간대별 통계
+  hourlyStats: HourlyStats[]
 }
 
 interface AutomationConfig {
@@ -48,6 +69,8 @@ interface AutomationConfig {
   selectedHours: number[]
   lastRunAt: string | null
   nextRunAt: string | null
+  retailChannelIds: number[]
+  shopIds: number[]
 }
 
 interface RunningWorkflow {
@@ -421,14 +444,6 @@ export default function AutomationDashboardPage() {
                 {config?.isEnabled ? (
                   <>
                     <span className="font-medium">실행 중</span>
-                    <span className="mx-2">•</span>
-                    {getSelectedHoursSummary(config.selectedHours)}
-                    {config.selectedHours && config.selectedHours.length > 0 && (
-                      <>
-                        <span className="mx-2">•</span>
-                        다음 실행 <span className="font-semibold">{calculateNextExecution(config.selectedHours).nextTime}</span>
-                      </>
-                    )}
                   </>
                 ) : (
                   '자동화가 비활성화되어 있습니다'
@@ -460,6 +475,75 @@ export default function AutomationDashboardPage() {
         </div>
       </div>
 
+      {/* Quick Actions - 수동 실행 */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <Play size={20} className="text-green-500" />
+          수동 실행
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <button
+            onClick={() => handleExecute('collect')}
+            disabled={isExecuting || !!runningWorkflow}
+            className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-green-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="w-10 h-10 rounded-lg bg-green-100 group-hover:bg-green-500 flex items-center justify-center mb-3 transition-colors">
+              <Package size={20} className="text-green-600 group-hover:text-white transition-colors" />
+            </div>
+            <p className="font-medium text-gray-900 text-sm">게시물 수집</p>
+            <p className="text-xs text-gray-500 mt-1">도매채널 게시물 수집</p>
+          </button>
+
+          <button
+            onClick={() => handleExecute('transform')}
+            disabled={isExecuting || !!runningWorkflow}
+            className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-yellow-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="w-10 h-10 rounded-lg bg-yellow-100 group-hover:bg-yellow-500 flex items-center justify-center mb-3 transition-colors">
+              <Zap size={20} className="text-yellow-600 group-hover:text-white transition-colors" />
+            </div>
+            <p className="font-medium text-gray-900 text-sm">AI 변환</p>
+            <p className="text-xs text-gray-500 mt-1">상품 정보 생성</p>
+          </button>
+
+          <button
+            onClick={() => handleExecute('register')}
+            disabled={isExecuting || !!runningWorkflow}
+            className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-orange-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="w-10 h-10 rounded-lg bg-orange-100 group-hover:bg-orange-500 flex items-center justify-center mb-3 transition-colors">
+              <ShoppingBag size={20} className="text-orange-600 group-hover:text-white transition-colors" />
+            </div>
+            <p className="font-medium text-gray-900 text-sm">상품 등록</p>
+            <p className="text-xs text-gray-500 mt-1">Product 생성</p>
+          </button>
+
+          <button
+            onClick={() => handleExecute('publish')}
+            disabled={isExecuting || !!runningWorkflow}
+            className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-blue-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="w-10 h-10 rounded-lg bg-blue-100 group-hover:bg-blue-500 flex items-center justify-center mb-3 transition-colors">
+              <Upload size={20} className="text-blue-600 group-hover:text-white transition-colors" />
+            </div>
+            <p className="font-medium text-gray-900 text-sm">발행</p>
+            <p className="text-xs text-gray-500 mt-1">소매밴드 발행</p>
+          </button>
+
+          <button
+            onClick={() => handleExecute('full')}
+            disabled={isExecuting || !!runningWorkflow}
+            className="group relative p-4 rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white hover:border-purple-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="w-10 h-10 rounded-lg bg-purple-100 group-hover:bg-purple-500 flex items-center justify-center mb-3 transition-colors">
+              <Play size={20} className="text-purple-600 group-hover:text-white transition-colors" />
+            </div>
+            <p className="font-medium text-gray-900 text-sm">전체 실행</p>
+            <p className="text-xs text-gray-500 mt-1">전체 파이프라인</p>
+          </button>
+        </div>
+      </Card>
+
       {/* Pipeline Flow Visualization */}
       <Card className="p-6 bg-gradient-to-r from-slate-50 to-white">
         <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
@@ -467,7 +551,8 @@ export default function AutomationDashboardPage() {
           파이프라인 현황
         </h2>
 
-        <div className="flex items-center justify-between">
+        {/* 파이프라인 플로우 + 전환율 */}
+        <div className="flex items-center justify-between mb-6">
           {/* Step 1: 수집 */}
           <div className="flex-1">
             <div className={`relative p-4 rounded-xl border-2 transition-all ${
@@ -500,8 +585,11 @@ export default function AutomationDashboardPage() {
             </div>
           </div>
 
-          {/* Arrow */}
-          <div className="px-2">
+          {/* Arrow with Conversion Rate */}
+          <div className="px-2 flex flex-col items-center">
+            <span className="text-xs font-medium text-gray-500 mb-1">
+              {stats?.todayCollected ? ((stats.todayTransformed / stats.todayCollected) * 100).toFixed(1) : 0}%
+            </span>
             <ArrowRight size={18} className="text-gray-300" />
           </div>
 
@@ -537,8 +625,11 @@ export default function AutomationDashboardPage() {
             </div>
           </div>
 
-          {/* Arrow */}
-          <div className="px-2">
+          {/* Arrow with Conversion Rate */}
+          <div className="px-2 flex flex-col items-center">
+            <span className="text-xs font-medium text-gray-500 mb-1">
+              {stats?.todayTransformed ? ((stats.todayProducts / stats.todayTransformed) * 100).toFixed(1) : 0}%
+            </span>
             <ArrowRight size={18} className="text-gray-300" />
           </div>
 
@@ -558,8 +649,15 @@ export default function AutomationDashboardPage() {
             </div>
           </div>
 
-          {/* Arrow */}
-          <div className="px-2">
+          {/* Arrow with Conversion Rate (채널별 평균) */}
+          <div className="px-2 flex flex-col items-center">
+            <span className="text-xs font-medium text-gray-500 mb-1">
+              {(() => {
+                const channelCount = (config?.retailChannelIds?.length || 0) + (config?.shopIds?.length || 0)
+                if (!stats?.todayProducts || !channelCount) return '0'
+                return ((stats.todayPublished / channelCount / stats.todayProducts) * 100).toFixed(1)
+              })()}%
+            </span>
             <ArrowRight size={18} className="text-gray-300" />
           </div>
 
@@ -595,109 +693,298 @@ export default function AutomationDashboardPage() {
             </div>
           </div>
         </div>
+
       </Card>
 
-      {/* Progress Section - 기간 내 진행률 */}
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
-          <TrendingUp size={20} className="text-green-500" />
-          기간 내 진행률
-        </h2>
+      {/* 시간대별 처리량 그래프 + 스케줄 정보 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* 시간대별 처리량 선 그래프 - recharts */}
+        {stats?.hourlyStats && stats.hourlyStats.length > 0 && (
+          <Card className="p-4 lg:col-span-2">
+            <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+              <Activity size={16} className="text-blue-500" />
+              {isCustomDate
+                ? `${startDate} ~ ${endDate} 시간대별 처리량`
+                : period === 'today'
+                ? '오늘 시간대별 처리량'
+                : period === '7days'
+                ? '최근 7일 시간대별 처리량'
+                : '최근 30일 시간대별 처리량'}
+            </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* 게시물 수집 진행률 */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                  <Package size={16} className="text-green-600" />
-                </div>
-                <span className="font-medium text-gray-700">게시물</span>
-              </div>
-              <span className="text-sm font-semibold text-green-600">{stats?.todayCollected || 0}건</span>
-            </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-500"
-                style={{ width: '100%' }}
-              />
-            </div>
-            <p className="text-xs text-gray-500">전체 {stats?.totalPosts || 0}건</p>
-          </div>
+            {/* recharts 선 그래프 */}
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={stats.hourlyStats.map(h => ({
+                    ...h,
+                    hourLabel: `${h.hour.toString().padStart(2, '0')}:00`,
+                    isScheduled: config?.selectedHours?.includes(h.hour) ?? false,
+                  }))}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
 
-          {/* AI 변환 진행률 */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center">
-                  <Zap size={16} className="text-yellow-600" />
-                </div>
-                <span className="font-medium text-gray-700">AI 변환</span>
-              </div>
-              <span className="text-sm font-semibold text-yellow-600">
-                {stats?.todayTransformed || 0}/{stats?.todayCollected || 0}
+                  {/* 예약된 시간대 하이라이트 - 더 눈에 띄는 배경 */}
+                  {config?.selectedHours?.map(hour => (
+                    <ReferenceArea
+                      key={`scheduled-${hour}`}
+                      x1={hour - 0.45}
+                      x2={hour + 0.45}
+                      fill="#8b5cf6"
+                      fillOpacity={0.25}
+                      stroke="#8b5cf6"
+                      strokeOpacity={0.5}
+                    />
+                  ))}
+
+                  {/* 현재 시간 세로선 */}
+                  <ReferenceLine
+                    x={new Date().getHours()}
+                    stroke="#ef4444"
+                    strokeDasharray="4 2"
+                    strokeWidth={2}
+                  />
+
+                  <XAxis
+                    dataKey="hour"
+                    tick={(props) => {
+                      const { x, y, payload } = props
+                      const hour = payload.value
+                      const isScheduled = config?.selectedHours?.includes(hour) ?? false
+                      // 3시간 간격이 아니고 예약된 시간도 아니면 표시 안함
+                      if (hour % 3 !== 0 && !isScheduled) return null
+                      return (
+                        <g transform={`translate(${x},${y})`}>
+                          {isScheduled && (
+                            <rect
+                              x={-12}
+                              y={2}
+                              width={24}
+                              height={16}
+                              rx={4}
+                              fill="#8b5cf6"
+                            />
+                          )}
+                          <text
+                            x={0}
+                            y={12}
+                            textAnchor="middle"
+                            fill={isScheduled ? '#ffffff' : '#9ca3af'}
+                            fontSize={isScheduled ? 10 : 11}
+                            fontWeight={isScheduled ? 600 : 400}
+                          >
+                            {hour.toString().padStart(2, '0')}
+                          </text>
+                        </g>
+                      )
+                    }}
+                    axisLine={{ stroke: '#e5e7eb' }}
+                    tickLine={{ stroke: '#e5e7eb' }}
+                    interval={0}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: '#9ca3af' }}
+                    axisLine={{ stroke: '#e5e7eb' }}
+                    tickLine={{ stroke: '#e5e7eb' }}
+                    width={35}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload || payload.length === 0) return null
+                      const isScheduled = config?.selectedHours?.includes(Number(label)) ?? false
+                      return (
+                        <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl">
+                          <div className="font-semibold mb-1 flex items-center gap-2">
+                            {String(label).padStart(2, '0')}:00
+                            {isScheduled && (
+                              <span className="px-1.5 py-0.5 bg-violet-500 rounded text-[10px]">예약</span>
+                            )}
+                          </div>
+                          <div className="space-y-1 text-[11px]">
+                            {payload.map((entry, index) => (
+                              <div key={index} className="flex items-center gap-2">
+                                <span
+                                  className="w-2 h-2 rounded-full"
+                                  style={{ backgroundColor: entry.color }}
+                                />
+                                {entry.name}: {entry.value}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    }}
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="collect"
+                    name="수집"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: '#fff', strokeWidth: 2 }}
+                    activeDot={{ r: 5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="transform"
+                    name="변환"
+                    stroke="#eab308"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: '#fff', strokeWidth: 2 }}
+                    activeDot={{ r: 5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="productCreate"
+                    name="등록"
+                    stroke="#f97316"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: '#fff', strokeWidth: 2 }}
+                    activeDot={{ r: 5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="publish"
+                    name="발행"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: '#fff', strokeWidth: 2 }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* 범례 */}
+            <div className="flex items-center justify-center gap-3 text-xs text-gray-500 flex-wrap mt-2">
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-0.5 bg-green-500 rounded" /> 수집
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-0.5 bg-yellow-500 rounded" /> 변환
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-0.5 bg-orange-500 rounded" /> 등록
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-0.5 bg-blue-500 rounded" /> 발행
+              </span>
+              <span className="flex items-center gap-1 ml-1 pl-1 border-l border-gray-300">
+                <span className="w-2 h-2 rounded-full bg-violet-500" /> 예약
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-0.5 bg-red-500 rounded" /> 현재
               </span>
             </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full transition-all duration-500"
-                style={{ width: `${stats?.todayCollected ? Math.round((stats.todayTransformed / stats.todayCollected) * 100) : 0}%` }}
-              />
-            </div>
-            <p className="text-xs text-gray-500">
-              {stats?.todayCollected ? Math.round((stats.todayTransformed / stats.todayCollected) * 100) : 0}% 완료
-            </p>
+          </Card>
+        )}
+
+        {/* Schedule Info - 그래프 옆에 배치 */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Clock size={20} className="text-blue-500" />
+              스케줄 정보
+            </h2>
+            <Link href="/automation/settings">
+              <button className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                <Settings size={12} />
+                설정
+              </button>
+            </Link>
           </div>
 
-          {/* 상품 등록 진행률 */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
-                  <ShoppingBag size={16} className="text-orange-600" />
+          {/* 다음 실행 시간 - 강조 표시 */}
+          {config?.isEnabled && config?.selectedHours && config.selectedHours.length > 0 ? (
+            <div className="mb-4 p-4 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100 text-xs mb-1">다음 실행</p>
+                  <p className="text-2xl font-bold">
+                    {calculateNextExecution(config.selectedHours).nextTime}
+                  </p>
                 </div>
-                <span className="font-medium text-gray-700">상품 등록</span>
+                <div className="text-right">
+                  <p className="text-blue-100 text-xs mb-1">남은 시간</p>
+                  <p className="text-lg font-semibold text-blue-100">
+                    {countdown || '계산 중...'}
+                  </p>
+                </div>
               </div>
-              <span className="text-sm font-semibold text-orange-600">
-                {stats?.todayProducts || 0}/{stats?.todayTransformed || 0}
-              </span>
             </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-500"
-                style={{ width: `${stats?.todayTransformed ? Math.round((stats.todayProducts / stats.todayTransformed) * 100) : 0}%` }}
-              />
+          ) : (
+            <div className="mb-4 p-4 bg-gray-100 rounded-xl">
+              <div className="flex items-center gap-3 text-gray-500">
+                <Pause size={20} />
+                <div>
+                  <p className="font-medium text-gray-700">자동 실행 비활성화</p>
+                  <p className="text-xs">설정에서 스케줄을 활성화하세요</p>
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-gray-500">
-              {stats?.todayTransformed ? Math.round((stats.todayProducts / stats.todayTransformed) * 100) : 0}% 완료
-            </p>
-          </div>
+          )}
 
-          {/* 발행 진행률 */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <Upload size={16} className="text-blue-600" />
-                </div>
-                <span className="font-medium text-gray-700">발행</span>
+            {/* 실행 시간대 */}
+            <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+              <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                <Timer size={16} className="text-indigo-600" />
               </div>
-              <span className="text-sm font-semibold text-blue-600">
-                {stats?.todayPublished || 0}/{stats?.todayProducts || 0}
-              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500 mb-1">실행 시간대</p>
+                {config?.selectedHours && config.selectedHours.length > 0 ? (
+                  <div>
+                    <p className="font-medium text-gray-900 text-sm">
+                      {config.selectedHours.length === 24
+                        ? '매 시간 실행'
+                        : `하루 ${config.selectedHours.length}회`}
+                    </p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {[...config.selectedHours].sort((a, b) => a - b).slice(0, 6).map(hour => (
+                        <span
+                          key={hour}
+                          className="px-1.5 py-0.5 text-xs bg-indigo-100 text-indigo-700 rounded font-medium"
+                        >
+                          {hour.toString().padStart(2, '0')}:00
+                        </span>
+                      ))}
+                      {config.selectedHours.length > 6 && (
+                        <span className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 rounded">
+                          +{config.selectedHours.length - 6}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="font-medium text-gray-400 text-sm">설정 안됨</p>
+                )}
+              </div>
             </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-400 to-blue-500 rounded-full transition-all duration-500"
-                style={{ width: `${stats?.todayProducts ? Math.round((stats.todayPublished / stats.todayProducts) * 100) : 0}%` }}
-              />
+
+            {/* 마지막 실행 */}
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                <CheckCircle size={16} className="text-green-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-gray-500">마지막 실행</p>
+                <p className="font-medium text-gray-900 text-sm">
+                  {config?.lastRunAt
+                    ? new Date(config.lastRunAt).toLocaleString('ko-KR', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    : '아직 실행 기록 없음'}
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-gray-500">
-              {stats?.todayProducts ? Math.round((stats.todayPublished / stats.todayProducts) * 100) : 0}% 완료
-            </p>
           </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       {/* Running Workflow Monitor */}
       {runningWorkflow && (
@@ -763,115 +1050,6 @@ export default function AutomationDashboardPage() {
           </div>
         </Card>
       )}
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Manual Execution */}
-        <Card className="p-6 lg:col-span-2">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Play size={20} className="text-green-500" />
-            수동 실행
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <button
-              onClick={() => handleExecute('collect')}
-              disabled={isExecuting || !!runningWorkflow}
-              className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-green-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="w-10 h-10 rounded-lg bg-green-100 group-hover:bg-green-500 flex items-center justify-center mb-3 transition-colors">
-                <Package size={20} className="text-green-600 group-hover:text-white transition-colors" />
-              </div>
-              <p className="font-medium text-gray-900 text-sm">게시물 수집</p>
-              <p className="text-xs text-gray-500 mt-1">도매채널 게시물 수집</p>
-            </button>
-
-            <button
-              onClick={() => handleExecute('transform')}
-              disabled={isExecuting || !!runningWorkflow}
-              className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-yellow-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="w-10 h-10 rounded-lg bg-yellow-100 group-hover:bg-yellow-500 flex items-center justify-center mb-3 transition-colors">
-                <Zap size={20} className="text-yellow-600 group-hover:text-white transition-colors" />
-              </div>
-              <p className="font-medium text-gray-900 text-sm">AI 변환</p>
-              <p className="text-xs text-gray-500 mt-1">상품 정보 생성</p>
-            </button>
-
-            <button
-              onClick={() => handleExecute('register')}
-              disabled={isExecuting || !!runningWorkflow}
-              className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-orange-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="w-10 h-10 rounded-lg bg-orange-100 group-hover:bg-orange-500 flex items-center justify-center mb-3 transition-colors">
-                <ShoppingBag size={20} className="text-orange-600 group-hover:text-white transition-colors" />
-              </div>
-              <p className="font-medium text-gray-900 text-sm">상품 등록</p>
-              <p className="text-xs text-gray-500 mt-1">Product 생성</p>
-            </button>
-
-            <button
-              onClick={() => handleExecute('publish')}
-              disabled={isExecuting || !!runningWorkflow}
-              className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-blue-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="w-10 h-10 rounded-lg bg-blue-100 group-hover:bg-blue-500 flex items-center justify-center mb-3 transition-colors">
-                <Upload size={20} className="text-blue-600 group-hover:text-white transition-colors" />
-              </div>
-              <p className="font-medium text-gray-900 text-sm">발행</p>
-              <p className="text-xs text-gray-500 mt-1">소매밴드 발행</p>
-            </button>
-
-            <button
-              onClick={() => handleExecute('full')}
-              disabled={isExecuting || !!runningWorkflow}
-              className="group relative p-4 rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white hover:border-purple-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="w-10 h-10 rounded-lg bg-purple-100 group-hover:bg-purple-500 flex items-center justify-center mb-3 transition-colors">
-                <Play size={20} className="text-purple-600 group-hover:text-white transition-colors" />
-              </div>
-              <p className="font-medium text-gray-900 text-sm">전체 실행</p>
-              <p className="text-xs text-gray-500 mt-1">전체 파이프라인</p>
-            </button>
-          </div>
-        </Card>
-
-        {/* Schedule Info */}
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Clock size={20} className="text-blue-500" />
-            스케줄 정보
-          </h2>
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Timer size={18} className="text-gray-500" />
-              <div>
-                <p className="text-xs text-gray-500">실행 시간</p>
-                <p className="font-medium text-gray-900">
-                  {getSelectedHoursSummary(config?.selectedHours)}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <CheckCircle size={18} className="text-green-500" />
-              <div>
-                <p className="text-xs text-gray-500">마지막 실행</p>
-                <p className="font-medium text-gray-900">{formatTime(config?.lastRunAt || null)}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-              <TrendingUp size={18} className="text-blue-500" />
-              <div>
-                <p className="text-xs text-gray-500">다음 실행</p>
-                <p className="font-medium text-blue-600">
-                  {config?.isEnabled ? formatTime(config?.nextRunAt || null) : '비활성화'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </Card>
-      </div>
 
       {/* Recent Logs - Timeline Style */}
       <Card className="p-6 bg-gradient-to-br from-slate-50 to-white">

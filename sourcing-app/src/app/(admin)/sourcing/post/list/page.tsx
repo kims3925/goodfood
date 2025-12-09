@@ -541,9 +541,9 @@ export default function PostsManagePage() {
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">게시물 관리</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">수집 게시물 관리</h1>
           <p className="text-gray-600">
-            도매밴드에서 수집한 게시물을 관리합니다. AI 분석 및 가공을 통해 발행할 수 있습니다.
+            도매채널에서 수집한 게시물을 관리합니다.
           </p>
         </div>
 

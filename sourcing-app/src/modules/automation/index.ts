@@ -97,6 +97,7 @@ export {
   cancelWorkflow,
   cleanupStaleWorkflows,
   getDailyWorkflowStats,
+  getHourlyWorkflowStats,
 } from './workflow-service'
 
 // Pipeline Executors
