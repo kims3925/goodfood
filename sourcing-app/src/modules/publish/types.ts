@@ -24,6 +24,7 @@ export interface PublishBatchParams {
   userId: number
   productIds: number[]
   channelId: number
+  onProgress?: (current: number, total: number, result: PublishToChannelResult) => void | Promise<void>
 }
 
 export interface PublishBatchResult {

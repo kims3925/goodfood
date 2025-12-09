@@ -254,7 +254,7 @@ export class PublishService {
    * 여러 상품을 단일 채널에 발행 (배치)
    */
   async publishBatch(params: PublishBatchParams): Promise<PublishBatchResult> {
-    const { userId, productIds, channelId } = params
+    const { userId, productIds, channelId, onProgress } = params
 
     // 채널 정보 조회
     const channel = await prisma.channel.findFirst({
@@ -323,6 +323,11 @@ export class PublishService {
         if (result.error) {
           errors.push(`Product ${productId}: ${result.error}`)
         }
+      }
+
+      // 진행 상황 콜백 호출
+      if (onProgress) {
+        await onProgress(i + 1, productIds.length, result)
       }
     }
 

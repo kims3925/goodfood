@@ -758,7 +758,7 @@ export default function ProductListPage() {
                 <Package size={24} className="text-gray-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">가공상품</p>
+                <p className="text-sm text-gray-500">가공 상품</p>
                 <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
               </div>
             </div>

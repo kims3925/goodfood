@@ -5,7 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
-import { getAutomationStats, getHourlyWorkflowStats } from '@/modules/automation'
+import { getAutomationStats } from '@/modules/automation'
+import { getHourlyWorkflowStats } from '@/modules/automation/workflow-service'
 
 /**
  * GET /api/automation/stats
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     const [stats, hourlyStats] = await Promise.all([
       getAutomationStats(currentUser.userId, startDate, endDate),
-      getHourlyWorkflowStats(currentUser.userId),
+      getHourlyWorkflowStats(currentUser.userId, startDate, endDate),
     ])
 
     return NextResponse.json({
