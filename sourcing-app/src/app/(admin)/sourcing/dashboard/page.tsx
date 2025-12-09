@@ -27,6 +27,14 @@ import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
 import Link from 'next/link'
 
+interface HourlyStats {
+  hour: number
+  collect: number
+  transform: number
+  productCreate: number
+  publish: number
+}
+
 interface AutomationStats {
   todayCollected: number
   pendingTransform: number
@@ -40,6 +48,8 @@ interface AutomationStats {
   // 오늘 통계
   todayTransformed: number
   todayProducts: number
+  // 시간대별 통계
+  hourlyStats: HourlyStats[]
 }
 
 interface AutomationConfig {
@@ -421,14 +431,6 @@ export default function AutomationDashboardPage() {
                 {config?.isEnabled ? (
                   <>
                     <span className="font-medium">실행 중</span>
-                    <span className="mx-2">•</span>
-                    {getSelectedHoursSummary(config.selectedHours)}
-                    {config.selectedHours && config.selectedHours.length > 0 && (
-                      <>
-                        <span className="mx-2">•</span>
-                        다음 실행 <span className="font-semibold">{calculateNextExecution(config.selectedHours).nextTime}</span>
-                      </>
-                    )}
                   </>
                 ) : (
                   '자동화가 비활성화되어 있습니다'
@@ -467,7 +469,8 @@ export default function AutomationDashboardPage() {
           파이프라인 현황
         </h2>
 
-        <div className="flex items-center justify-between">
+        {/* 파이프라인 플로우 + 전환율 */}
+        <div className="flex items-center justify-between mb-6">
           {/* Step 1: 수집 */}
           <div className="flex-1">
             <div className={`relative p-4 rounded-xl border-2 transition-all ${
@@ -500,8 +503,11 @@ export default function AutomationDashboardPage() {
             </div>
           </div>
 
-          {/* Arrow */}
-          <div className="px-2">
+          {/* Arrow with Conversion Rate */}
+          <div className="px-2 flex flex-col items-center">
+            <span className="text-xs font-medium text-gray-500 mb-1">
+              {stats?.todayCollected ? ((stats.todayTransformed / stats.todayCollected) * 100).toFixed(1) : 0}%
+            </span>
             <ArrowRight size={18} className="text-gray-300" />
           </div>
 
@@ -537,8 +543,11 @@ export default function AutomationDashboardPage() {
             </div>
           </div>
 
-          {/* Arrow */}
-          <div className="px-2">
+          {/* Arrow with Conversion Rate */}
+          <div className="px-2 flex flex-col items-center">
+            <span className="text-xs font-medium text-gray-500 mb-1">
+              {stats?.todayTransformed ? ((stats.todayProducts / stats.todayTransformed) * 100).toFixed(1) : 0}%
+            </span>
             <ArrowRight size={18} className="text-gray-300" />
           </div>
 
@@ -558,8 +567,11 @@ export default function AutomationDashboardPage() {
             </div>
           </div>
 
-          {/* Arrow */}
-          <div className="px-2">
+          {/* Arrow with Conversion Rate */}
+          <div className="px-2 flex flex-col items-center">
+            <span className="text-xs font-medium text-gray-500 mb-1">
+              {stats?.todayProducts ? ((stats.todayPublished / stats.todayProducts) * 100).toFixed(1) : 0}%
+            </span>
             <ArrowRight size={18} className="text-gray-300" />
           </div>
 
@@ -595,108 +607,65 @@ export default function AutomationDashboardPage() {
             </div>
           </div>
         </div>
-      </Card>
 
-      {/* Progress Section - 기간 내 진행률 */}
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
-          <TrendingUp size={20} className="text-green-500" />
-          기간 내 진행률
-        </h2>
+        {/* 오늘 시간대별 처리량 차트 */}
+        {stats?.hourlyStats && stats.hourlyStats.length > 0 && (
+          <div className="border-t pt-4">
+            <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+              <Activity size={16} className="text-blue-500" />
+              오늘 시간대별 처리량
+            </h3>
+            <div className="flex items-end gap-1 h-20">
+              {stats.hourlyStats.map((hourData, index) => {
+                const total = hourData.collect + hourData.transform + hourData.productCreate + hourData.publish
+                const maxValue = Math.max(...stats.hourlyStats.map(h => h.collect + h.transform + h.productCreate + h.publish), 1)
+                const height = total > 0 ? Math.max((total / maxValue) * 100, 10) : 0
+                const currentHour = new Date().getHours()
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* 게시물 수집 진행률 */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                  <Package size={16} className="text-green-600" />
-                </div>
-                <span className="font-medium text-gray-700">게시물</span>
-              </div>
-              <span className="text-sm font-semibold text-green-600">{stats?.todayCollected || 0}건</span>
+                return (
+                  <div
+                    key={index}
+                    className="flex-1 flex flex-col items-center group relative"
+                  >
+                    {/* 바 */}
+                    <div
+                      className={`w-full rounded-t transition-all ${
+                        index === currentHour
+                          ? 'bg-blue-500'
+                          : total > 0
+                          ? 'bg-blue-300'
+                          : 'bg-gray-100'
+                      }`}
+                      style={{ height: `${height}%`, minHeight: total > 0 ? '4px' : '2px' }}
+                    />
+                    {/* 시간 라벨 (6시간 간격으로 표시) */}
+                    {index % 6 === 0 && (
+                      <span className="text-[10px] text-gray-400 mt-1">{index}시</span>
+                    )}
+                    {/* 툴팁 */}
+                    {total > 0 && (
+                      <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
+                        {index}시: {total}건
+                        <div className="text-[10px] text-gray-300">
+                          수집 {hourData.collect} / 변환 {hourData.transform} / 등록 {hourData.productCreate} / 발행 {hourData.publish}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-500"
-                style={{ width: '100%' }}
-              />
-            </div>
-            <p className="text-xs text-gray-500">전체 {stats?.totalPosts || 0}건</p>
-          </div>
-
-          {/* AI 변환 진행률 */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center">
-                  <Zap size={16} className="text-yellow-600" />
-                </div>
-                <span className="font-medium text-gray-700">AI 변환</span>
-              </div>
-              <span className="text-sm font-semibold text-yellow-600">
-                {stats?.todayTransformed || 0}/{stats?.todayCollected || 0}
+            {/* 범례 */}
+            <div className="flex items-center justify-center gap-4 mt-3 text-xs text-gray-500">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-blue-500" /> 현재 시간
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-blue-300" /> 처리 완료
               </span>
             </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full transition-all duration-500"
-                style={{ width: `${stats?.todayCollected ? Math.round((stats.todayTransformed / stats.todayCollected) * 100) : 0}%` }}
-              />
-            </div>
-            <p className="text-xs text-gray-500">
-              {stats?.todayCollected ? Math.round((stats.todayTransformed / stats.todayCollected) * 100) : 0}% 완료
-            </p>
           </div>
-
-          {/* 상품 등록 진행률 */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
-                  <ShoppingBag size={16} className="text-orange-600" />
-                </div>
-                <span className="font-medium text-gray-700">상품 등록</span>
-              </div>
-              <span className="text-sm font-semibold text-orange-600">
-                {stats?.todayProducts || 0}/{stats?.todayTransformed || 0}
-              </span>
-            </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-500"
-                style={{ width: `${stats?.todayTransformed ? Math.round((stats.todayProducts / stats.todayTransformed) * 100) : 0}%` }}
-              />
-            </div>
-            <p className="text-xs text-gray-500">
-              {stats?.todayTransformed ? Math.round((stats.todayProducts / stats.todayTransformed) * 100) : 0}% 완료
-            </p>
-          </div>
-
-          {/* 발행 진행률 */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <Upload size={16} className="text-blue-600" />
-                </div>
-                <span className="font-medium text-gray-700">발행</span>
-              </div>
-              <span className="text-sm font-semibold text-blue-600">
-                {stats?.todayPublished || 0}/{stats?.todayProducts || 0}
-              </span>
-            </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-400 to-blue-500 rounded-full transition-all duration-500"
-                style={{ width: `${stats?.todayProducts ? Math.round((stats.todayPublished / stats.todayProducts) * 100) : 0}%` }}
-              />
-            </div>
-            <p className="text-xs text-gray-500">
-              {stats?.todayProducts ? Math.round((stats.todayPublished / stats.todayProducts) * 100) : 0}% 완료
-            </p>
-          </div>
-        </div>
+        )}
       </Card>
 
       {/* Running Workflow Monitor */}

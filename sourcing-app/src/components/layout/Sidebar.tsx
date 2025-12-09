@@ -139,7 +139,7 @@ export default function Sidebar({
   useEffect(() => {
     const pathToMenuMap: Record<string, string> = {
       '/dashboard/shop': '대시보드',
-      '/dashboard/automation': '대시보드',
+      '/dashboard': '대시보드',
       '/channel': '채널 관리',
       '/shop': '쇼핑몰 관리',
       '/collected-product': '상품 관리',
