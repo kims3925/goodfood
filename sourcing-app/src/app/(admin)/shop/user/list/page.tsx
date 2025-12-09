@@ -82,17 +82,6 @@ export default function UserListPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [stats, setStats] = useState({ total: 0, USER: 0, MANAGER: 0 })
 
-  // 개발자 도구에서 활성화: localStorage.setItem('enableUserManagement', 'true')
-  const [enabled, setEnabled] = useState<boolean | null>(null)
-
-  useEffect(() => {
-    const isEnabled = localStorage.getItem('enableUserManagement') === 'true'
-    setEnabled(isEnabled)
-    if (!isEnabled) {
-      router.replace('/shop/dashboard')
-    }
-  }, [router])
-
   const itemsPerPage = 20
 
   const fetchUsers = useCallback(async () => {
@@ -144,15 +133,6 @@ export default function UserListPage() {
       month: '2-digit',
       day: '2-digit',
     })
-  }
-
-  // 활성화 체크 중이면 로딩 표시
-  if (enabled === null || !enabled) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loading />
-      </div>
-    )
   }
 
   return (

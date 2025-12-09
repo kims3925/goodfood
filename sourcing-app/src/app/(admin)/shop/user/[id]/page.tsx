@@ -199,21 +199,11 @@ export default function UserDetailPage() {
   const userId = params.id as string
 
   const [loading, setLoading] = useState(true)
-  const [enabled, setEnabled] = useState<boolean | null>(null)
   const [user, setUser] = useState<UserDetail | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
   const [addresses, setAddresses] = useState<Address[]>([])
-
-  // 개발자 도구에서 활성화: localStorage.setItem('enableUserManagement', 'true')
-  useEffect(() => {
-    const isEnabled = localStorage.getItem('enableUserManagement') === 'true'
-    setEnabled(isEnabled)
-    if (!isEnabled) {
-      router.replace('/shop/dashboard')
-    }
-  }, [router])
   const [stats, setStats] = useState<Stats | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('orders')
 
@@ -272,8 +262,7 @@ export default function UserDetailPage() {
     return Number(price).toLocaleString() + '원'
   }
 
-  // 활성화 체크 중이거나 비활성화 상태면 로딩 표시
-  if (enabled === null || !enabled || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loading />

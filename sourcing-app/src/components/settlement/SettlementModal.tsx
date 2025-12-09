@@ -1,8 +1,28 @@
 'use client'
 
 import { useState } from 'react'
-import { X, FileText, Loader2, CheckCircle, Package, Banknote } from 'lucide-react'
+import { X, FileText, Loader2, CheckCircle, Package, Banknote, ChevronDown, ChevronUp, TrendingUp } from 'lucide-react'
 import Button from '@/components/ui/Button'
+
+interface OrderItem {
+  id: number
+  orderId: number | null
+  orderNumber: string
+  customerName: string
+  productName: string
+  thumbnailUrl: string | null
+  quantity: number
+  unitPrice: number
+  totalPrice: number
+  wholesalePrice: number | null
+  marginRate: number | null
+  margin: number | null
+  status: string
+  orderedAt: string
+  shopId: number | null
+  shopName: string | null
+  isSettled: boolean
+}
 
 interface SettlementModalProps {
   shopId: number
@@ -13,6 +33,8 @@ interface SettlementModalProps {
   periodEnd: string
   totalAmount: number
   orderCount: number
+  // 주문 아이템 목록
+  items?: OrderItem[]
   // 은행 정보 (선택)
   bankInfo?: {
     bankName: string | null
@@ -31,6 +53,7 @@ export default function SettlementModal({
   periodEnd,
   totalAmount,
   orderCount,
+  items = [],
   bankInfo,
   onClose,
   onSuccess,
@@ -42,6 +65,19 @@ export default function SettlementModal({
   const [confirmed, setConfirmed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showItems, setShowItems] = useState(false)
+
+  // 정산 완료/미완료 아이템 분리
+  const settledItems = items.filter(i => i.isSettled)
+  const unsettledItems = items.filter(i => !i.isSettled)
+  const unsettledAmount = unsettledItems.reduce((sum, i) => sum + i.totalPrice, 0)
+  const unsettledCount = unsettledItems.length
+
+  // 평균 마진율 계산
+  const itemsWithMargin = unsettledItems.filter(i => i.marginRate !== null)
+  const avgMarginRate = itemsWithMargin.length > 0
+    ? Math.round(itemsWithMargin.reduce((sum, i) => sum + (i.marginRate || 0), 0) / itemsWithMargin.length * 10) / 10
+    : null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -104,9 +140,9 @@ export default function SettlementModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-lg font-semibold text-gray-900">정산 생성</h2>
           <button
             onClick={onClose}
@@ -117,7 +153,7 @@ export default function SettlementModal({
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1">
           {/* 쇼핑몰 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -128,20 +164,158 @@ export default function SettlementModal({
             </div>
           </div>
 
-          {/* 정산 금액 카드 */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
-            <div className="flex items-center gap-2 text-blue-600 mb-2">
-              <Banknote size={18} />
-              <span className="text-sm font-medium">정산 금액</span>
+          {/* 정산 현황 요약 */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* 미정산 금액 (정산 대상) */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 text-blue-600 mb-2">
+                <Banknote size={18} />
+                <span className="text-sm font-medium">정산 대상</span>
+              </div>
+              <div className="text-2xl font-bold text-gray-900 mb-1">
+                ₩{formatPrice(unsettledAmount)}
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Package size={14} />
+                <span>{unsettledCount}건</span>
+                {avgMarginRate !== null && (
+                  <>
+                    <span className="text-gray-300">|</span>
+                    <TrendingUp size={14} />
+                    <span className={`font-medium ${
+                      avgMarginRate >= 30 ? 'text-green-600' :
+                      avgMarginRate >= 15 ? 'text-blue-600' :
+                      'text-orange-600'
+                    }`}>
+                      평균 마진 {avgMarginRate}%
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="text-3xl font-bold text-gray-900 mb-1">
-              ₩{formatPrice(totalAmount)}
-            </div>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Package size={14} />
-              <span>{orderCount}건</span>
+
+            {/* 정산 완료 금액 */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 text-green-600 mb-2">
+                <CheckCircle size={18} />
+                <span className="text-sm font-medium">정산 완료</span>
+              </div>
+              <div className="text-2xl font-bold text-gray-900 mb-1">
+                ₩{formatPrice(settledItems.reduce((sum, i) => sum + i.totalPrice, 0))}
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Package size={14} />
+                <span>{settledItems.length}건</span>
+              </div>
             </div>
           </div>
+
+          {/* 미정산 주문 목록 토글 */}
+          {items.length > 0 && (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowItems(!showItems)}
+                className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
+              >
+                <span className="text-sm font-medium text-gray-700">
+                  주문 목록 ({items.length}건)
+                </span>
+                {showItems ? (
+                  <ChevronUp size={18} className="text-gray-400" />
+                ) : (
+                  <ChevronDown size={18} className="text-gray-400" />
+                )}
+              </button>
+
+              {showItems && (
+                <div className="max-h-64 overflow-y-auto">
+                  {/* 미정산 주문 */}
+                  {unsettledItems.length > 0 && (
+                    <div>
+                      <div className="px-4 py-2 bg-orange-50 border-b border-orange-100">
+                        <span className="text-xs font-medium text-orange-700">미정산 ({unsettledItems.length}건)</span>
+                      </div>
+                      <div className="divide-y divide-gray-100">
+                        {unsettledItems.map((item) => (
+                          <div key={item.id} className="px-4 py-3 flex items-center gap-3">
+                            {item.thumbnailUrl ? (
+                              <img
+                                src={item.thumbnailUrl}
+                                alt={item.productName}
+                                className="w-10 h-10 rounded object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                <Package size={16} className="text-gray-400" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-gray-900 truncate">{item.productName}</div>
+                              <div className="text-xs text-gray-500">
+                                {item.orderNumber} | {item.quantity}개 | {formatPrice(item.totalPrice)}원
+                              </div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              {item.marginRate !== null ? (
+                                <span className={`text-sm font-medium ${
+                                  item.marginRate >= 30 ? 'text-green-600' :
+                                  item.marginRate >= 15 ? 'text-blue-600' :
+                                  item.marginRate >= 0 ? 'text-orange-600' :
+                                  'text-red-600'
+                                }`}>
+                                  {item.marginRate}%
+                                </span>
+                              ) : (
+                                <span className="text-sm text-gray-400">-</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 정산 완료 주문 */}
+                  {settledItems.length > 0 && (
+                    <div>
+                      <div className="px-4 py-2 bg-green-50 border-b border-green-100">
+                        <span className="text-xs font-medium text-green-700">정산 완료 ({settledItems.length}건)</span>
+                      </div>
+                      <div className="divide-y divide-gray-100">
+                        {settledItems.map((item) => (
+                          <div key={item.id} className="px-4 py-3 flex items-center gap-3 bg-green-50/30">
+                            {item.thumbnailUrl ? (
+                              <img
+                                src={item.thumbnailUrl}
+                                alt={item.productName}
+                                className="w-10 h-10 rounded object-cover flex-shrink-0 opacity-70"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center flex-shrink-0 opacity-70">
+                                <Package size={16} className="text-gray-400" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-gray-600 truncate">{item.productName}</div>
+                              <div className="text-xs text-gray-400">
+                                {item.orderNumber} | {item.quantity}개 | {formatPrice(item.totalPrice)}원
+                              </div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-green-100 text-green-700">
+                                완료
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 정산 처리일 */}
           <div>
@@ -184,18 +358,30 @@ export default function SettlementModal({
             />
           </div>
 
+          {/* 미정산 건이 없는 경우 안내 */}
+          {unsettledCount === 0 && (
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
+              <CheckCircle size={32} className="mx-auto text-green-500 mb-2" />
+              <p className="text-sm text-gray-600">
+                모든 주문이 이미 정산 완료되었습니다.
+              </p>
+            </div>
+          )}
+
           {/* 확인 체크박스 */}
-          <label className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
-            <input
-              type="checkbox"
-              checked={confirmed}
-              onChange={(e) => setConfirmed(e.target.checked)}
-              className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <span className="text-sm text-blue-800">
-              위 정산 내용을 확인했습니다.
-            </span>
-          </label>
+          {unsettledCount > 0 && (
+            <label className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+                className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm text-blue-800">
+                미정산 {unsettledCount}건 (₩{formatPrice(unsettledAmount)})을 정산합니다.
+              </span>
+            </label>
+          )}
 
           {/* 에러 메시지 */}
           {error && (
@@ -217,7 +403,7 @@ export default function SettlementModal({
             <Button
               type="submit"
               variant="primary"
-              disabled={loading || !confirmed}
+              disabled={loading || !confirmed || unsettledCount === 0}
               className="flex-1"
             >
               {loading ? (
