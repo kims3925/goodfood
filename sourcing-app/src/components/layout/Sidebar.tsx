@@ -202,11 +202,34 @@ export default function Sidebar({
     )
   }
 
+  // 모든 메뉴 아이템의 href 목록을 추출
+  const allMenuHrefs = useMemo(() => {
+    const hrefs: string[] = []
+    const collectHrefs = (items: MenuItem[]) => {
+      for (const item of items) {
+        if (item.href) hrefs.push(item.href)
+        if (item.children) collectHrefs(item.children)
+      }
+    }
+    collectHrefs(menuItems)
+    return hrefs
+  }, [menuItems])
+
   const isActive = (href?: string) => {
     if (!href) return false
-    // 정확한 경로 매칭 또는 하위 경로 매칭
+    // 정확한 경로 매칭
     if (pathname === href) return true
-    if (pathname.startsWith(href + '/')) return true
+
+    // 하위 경로 매칭 (단, 더 구체적인 메뉴 href가 없는 경우에만)
+    if (pathname.startsWith(href + '/')) {
+      // 현재 pathname과 더 길게 매칭되는 다른 메뉴 href가 있는지 확인
+      const hasMoreSpecificMatch = allMenuHrefs.some(
+        menuHref => menuHref !== href &&
+                    menuHref.length > href.length &&
+                    (pathname === menuHref || pathname.startsWith(menuHref + '/'))
+      )
+      return !hasMoreSpecificMatch
+    }
     return false
   }
 

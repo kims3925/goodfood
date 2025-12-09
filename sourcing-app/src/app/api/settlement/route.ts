@@ -90,10 +90,23 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // 이미 정산된 주문 아이템 ID 조회 (중복 방지)
+    const existingSettlementItems = await prisma.settlementItem.findMany({
+      where: {
+        settlement: {
+          userId: user.userId,
+          status: { not: 'CANCELLED' },
+        },
+      },
+      select: { orderItemId: true },
+    })
+    const settledOrderItemIds = new Set(existingSettlementItems.map(i => i.orderItemId))
+
     // 쇼핑몰 주문 조회 (Shop별로 그룹화)
+    // Shop 소유자의 주문을 조회 (Order.userId는 주문한 고객, Shop.userId가 소유자)
     const shopOrders = await prisma.order.findMany({
       where: {
-        userId: user.userId,
+        shop: { userId: user.userId },  // Shop 소유자 기준으로 필터링
         status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
         shopId: { not: null },
         ...(Object.keys(dateFilter).length > 0 ? { orderedAt: dateFilter } : {}),
@@ -137,6 +150,9 @@ export async function GET(request: NextRequest) {
       if (!orderShopId) {
         // shopId가 없는 주문은 미분류
         for (const item of order.items) {
+          // 이미 정산된 아이템 제외
+          if (settledOrderItemIds.has(item.id)) continue
+
           unclassifiedItems.push({
             id: item.id,
             orderId: order.id,
@@ -179,6 +195,9 @@ export async function GET(request: NextRequest) {
       if (!shopData) continue
 
       for (const item of order.items) {
+        // 이미 정산된 아이템 제외
+        if (settledOrderItemIds.has(item.id)) continue
+
         const thumbnailUrl = item.thumbnailUrl ||
           item.publishedProduct?.product?.collectedProduct?.post?.images?.[0]?.url || null
 
@@ -296,9 +315,9 @@ export async function POST(request: NextRequest) {
     const settledOrderItemIds = new Set(existingSettlementItems.map(i => i.orderItemId))
 
     // Shop 기준 주문 조회 (아직 정산되지 않은 주문만)
+    // Shop 소유권은 위에서 이미 확인됨, Order.userId는 주문한 고객이므로 제거
     const orders = await prisma.order.findMany({
       where: {
-        userId: user.userId,
         shopId: parseInt(shopId),
         status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
         orderedAt: { gte: start, lte: end },

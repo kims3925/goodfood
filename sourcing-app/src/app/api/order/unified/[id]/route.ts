@@ -212,20 +212,43 @@ export async function PATCH(
       }
 
       // 상태 변경 시 관련 날짜 필드도 업데이트
+      // 중간 단계를 건너뛸 경우 이전 단계의 날짜도 함께 채움
       const updateData: any = { status }
+      const now = new Date()
 
       switch (status) {
         case 'PAID':
-          updateData.paidAt = new Date()
+          // paidAt이 없으면 설정
+          if (!order.paidAt) {
+            updateData.paidAt = now
+          }
           break
         case 'SHIPPED':
-          updateData.shippedAt = new Date()
+          // paidAt이 없으면 설정 (중간 단계 채움)
+          if (!order.paidAt) {
+            updateData.paidAt = now
+          }
+          // shippedAt 설정
+          if (!order.shippedAt) {
+            updateData.shippedAt = now
+          }
           break
         case 'DELIVERED':
-          updateData.deliveredAt = new Date()
+          // paidAt이 없으면 설정 (중간 단계 채움)
+          if (!order.paidAt) {
+            updateData.paidAt = now
+          }
+          // shippedAt이 없으면 설정 (중간 단계 채움)
+          if (!order.shippedAt) {
+            updateData.shippedAt = now
+          }
+          // deliveredAt 설정
+          if (!order.deliveredAt) {
+            updateData.deliveredAt = now
+          }
           break
         case 'CANCELLED':
-          updateData.cancelledAt = new Date()
+          updateData.cancelledAt = now
           updateData.cancelledBy = 'ADMIN'
           break
       }

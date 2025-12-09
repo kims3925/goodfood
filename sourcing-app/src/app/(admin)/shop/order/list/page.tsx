@@ -9,7 +9,6 @@ import {
   FileSpreadsheet,
   ChevronLeft,
   ChevronRight,
-  Phone,
   Package,
   CheckCircle,
   Clock,
@@ -18,6 +17,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import Input from '@/components/ui/Input'
+import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
@@ -366,10 +366,11 @@ export default function UnifiedOrderListPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[8%]">출처</TableHead>
-                  <TableHead className="w-[14%]">주문번호</TableHead>
-                  <TableHead className="w-[12%]">고객명</TableHead>
-                  <TableHead className="w-[28%]">상품</TableHead>
-                  <TableHead className="w-[12%]">금액</TableHead>
+                  <TableHead className="w-[12%]">주문번호</TableHead>
+                  <TableHead className="w-[10%]">고객명</TableHead>
+                  <TableHead className="w-[12%]">전화번호</TableHead>
+                  <TableHead className="w-[22%]">상품</TableHead>
+                  <TableHead className="w-[10%]">금액</TableHead>
                   <TableHead className="w-[10%]">상태</TableHead>
                   <TableHead className="w-[16%]">주문일시</TableHead>
                 </TableRow>
@@ -391,15 +392,10 @@ export default function UnifiedOrderListPage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <div className="font-medium text-gray-900">{order.customerName}</div>
-                          {order.customerPhone && (
-                            <div className="text-xs text-gray-500 flex items-center gap-1">
-                              <Phone size={10} />
-                              {order.customerPhone}
-                            </div>
-                          )}
-                        </div>
+                        <span className="font-medium text-gray-900">{order.customerName}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-gray-600 text-sm">{formatPhoneNumber(order.customerPhone)}</span>
                       </TableCell>
                       <TableCell>
                         <div className="font-medium text-gray-900 truncate max-w-[250px]">

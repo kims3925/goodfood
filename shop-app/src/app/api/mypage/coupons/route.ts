@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
-import prisma from '@modules/common/utils/src/database/client'
+import prisma from '@bandauto/db'
 
 // 내 쿠폰 목록 조회
 export async function GET(request: NextRequest) {
@@ -40,14 +40,14 @@ export async function GET(request: NextRequest) {
 
     // 만료된 쿠폰 필터링
     const now = new Date()
-    const coupons = userCoupons.map((uc) => ({
+    const coupons = (userCoupons || []).map((uc) => ({
       ...uc,
-      isExpired: uc.expiredAt < now,
+      isExpired: uc.expiredAt ? uc.expiredAt < now : true,
     }))
 
     return NextResponse.json({
       success: true,
-      coupons,
+      coupons: coupons || [],
     })
   } catch (error) {
     console.error('Failed to fetch coupons:', error)

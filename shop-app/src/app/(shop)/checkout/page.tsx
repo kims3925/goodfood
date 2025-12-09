@@ -204,8 +204,8 @@ function CheckoutContent() {
         }
 
         // 사용 가능한 쿠폰만 필터링 (사용하지 않았고, 만료되지 않은)
-        if (couponData.success) {
-          const validCoupons = couponData.coupons.filter(
+        if (couponData.success && couponData.coupons) {
+          const validCoupons = (couponData.coupons || []).filter(
             (c: UserCoupon) => !c.isUsed && !c.isExpired
           )
           setAvailableCoupons(validCoupons)
@@ -321,7 +321,11 @@ function CheckoutContent() {
     return price?.toLocaleString('ko-KR') || '0'
   }
 
-  const calculateShipping = (subtotal: number) => {
+  const calculateShipping = (subtotal: number, coupon?: UserCoupon | null) => {
+    // 무료배송 쿠폰 적용 시
+    if (coupon?.coupon.discountType === 'FREE_SHIPPING') {
+      return 0
+    }
     // Shop 설정에서 무료배송 기준액과 기본 배송비 사용 (필수 설정)
     const freeShippingAmount = shop?.freeShippingAmount
     const shippingFee = shop?.defaultShippingFee

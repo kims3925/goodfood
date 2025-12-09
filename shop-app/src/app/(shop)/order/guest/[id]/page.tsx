@@ -19,6 +19,7 @@ import {
   Phone,
   User,
 } from 'lucide-react'
+import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
 
 // 주문 상태 매핑
 const orderStatusMap: Record<string, { label: string; color: string; icon: any }> = {
@@ -139,13 +140,12 @@ function GuestOrderDetailContent() {
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-'
     const date = new Date(dateString)
-    return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hour = String(date.getHours()).padStart(2, '0')
+    const minute = String(date.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day} ${hour}:${minute}`
   }
 
   const copyAccountNumber = () => {
@@ -383,7 +383,7 @@ function GuestOrderDetailContent() {
               </div>
               <div className="flex">
                 <span className="text-gray-500 w-24">연락처</span>
-                <span className="text-gray-900">{order.customer.phone}</span>
+                <span className="text-gray-900">{formatPhoneNumber(order.customer.phone)}</span>
               </div>
               {order.customer.email && (
                 <div className="flex">
@@ -408,7 +408,7 @@ function GuestOrderDetailContent() {
                 </div>
                 <div className="flex">
                   <span className="text-gray-500 w-24">연락처</span>
-                  <span className="text-gray-900">{order.shippingAddress.recipientPhone}</span>
+                  <span className="text-gray-900">{formatPhoneNumber(order.shippingAddress.recipientPhone)}</span>
                 </div>
                 <div className="flex">
                   <span className="text-gray-500 w-24">주소</span>
