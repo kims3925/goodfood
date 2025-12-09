@@ -32,10 +32,14 @@ interface OrderItem {
   quantity: number
   unitPrice: number
   totalPrice: number
+  wholesalePrice: number | null
+  marginRate: number | null
+  margin: number | null
   status: string
   orderedAt: string
   shopId: number | null
   shopName: string | null
+  isSettled: boolean
 }
 
 interface ShopData {
@@ -67,6 +71,10 @@ interface SettlementData {
     classifiedItems: number
     classifiedAmount: number
     shopCount: number
+    settledCount: number
+    settledAmount: number
+    unsettledCount: number
+    unsettledAmount: number
   }
 }
 
@@ -91,6 +99,7 @@ export default function SettlementListPage() {
     channelId: number | null
     totalAmount: number
     orderCount: number
+    items: OrderItem[]
   } | null>(null)
 
   const fetchData = useCallback(async () => {
@@ -140,6 +149,7 @@ export default function SettlementListPage() {
       channelId: shop.channelId,
       totalAmount: shop.totalAmount,
       orderCount: shop.itemCount,
+      items: shop.items,
     })
   }
 
@@ -150,6 +160,9 @@ export default function SettlementListPage() {
   // 쇼핑몰 카드 컴포넌트
   const ShopCard = ({ shop }: { shop: ShopData }) => {
     const isSelected = selectedShop?.id === shop.id
+    const settledCount = shop.items.filter(i => i.isSettled).length
+    const unsettledCount = shop.items.filter(i => !i.isSettled).length
+    const unsettledAmount = shop.items.filter(i => !i.isSettled).reduce((sum, i) => sum + i.totalPrice, 0)
 
     return (
       <div
@@ -193,7 +206,7 @@ export default function SettlementListPage() {
           </div>
 
           {/* 금액 표시 */}
-          <div className="mb-4">
+          <div className="mb-3">
             <div className="flex items-baseline gap-1">
               <span className="text-2xl font-bold text-blue-600">
                 {shop.totalAmount.toLocaleString()}
@@ -206,16 +219,34 @@ export default function SettlementListPage() {
             </div>
           </div>
 
+          {/* 정산 현황 */}
+          <div className="flex gap-2 mb-3 text-xs">
+            {unsettledCount > 0 && (
+              <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full">
+                미정산 {unsettledCount}건
+              </span>
+            )}
+            {settledCount > 0 && (
+              <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full">
+                정산완료 {settledCount}건
+              </span>
+            )}
+          </div>
+
           {/* 정산 버튼 */}
           <button
             onClick={(e) => {
               e.stopPropagation()
               openSettlementModal(shop)
             }}
-            className="w-full py-2 rounded-lg text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5 bg-blue-500 hover:bg-blue-600"
+            className={`w-full py-2 rounded-lg text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+              unsettledCount > 0
+                ? 'bg-blue-500 hover:bg-blue-600'
+                : 'bg-gray-400 hover:bg-gray-500'
+            }`}
           >
             <CheckCircle size={14} />
-            정산하기
+            {unsettledCount > 0 ? `정산하기 (${formatPrice(unsettledAmount)})` : '전체 정산 완료'}
           </button>
         </div>
       </div>
@@ -389,13 +420,15 @@ export default function SettlementListPage() {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">주문자</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">수량</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">금액</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">마진율</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">정산</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">주문일</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {selectedShop.items.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
+                        <tr key={item.id} className={`hover:bg-gray-50 ${item.isSettled ? 'bg-green-50/50' : ''}`}>
                           <td className="px-4 py-3 text-sm font-mono">
                             {item.orderId ? (
                               <a
@@ -427,6 +460,31 @@ export default function SettlementListPage() {
                           <td className="px-4 py-3 text-sm text-gray-600">{item.customerName}</td>
                           <td className="px-4 py-3 text-sm text-gray-900 text-right">{item.quantity}개</td>
                           <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">{formatPrice(item.totalPrice)}</td>
+                          <td className="px-4 py-3 text-sm text-right">
+                            {item.marginRate !== null ? (
+                              <span className={`font-medium ${
+                                item.marginRate >= 30 ? 'text-green-600' :
+                                item.marginRate >= 15 ? 'text-blue-600' :
+                                item.marginRate >= 0 ? 'text-orange-600' :
+                                'text-red-600'
+                              }`}>
+                                {item.marginRate}%
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {item.isSettled ? (
+                              <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                                완료
+                              </span>
+                            ) : (
+                              <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-700">
+                                미정산
+                              </span>
+                            )}
+                          </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                               item.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
@@ -548,6 +606,7 @@ export default function SettlementListPage() {
           periodEnd={endDate}
           totalAmount={settlementModal.totalAmount}
           orderCount={settlementModal.orderCount}
+          items={settlementModal.items}
           onClose={closeSettlementModal}
           onSuccess={() => {
             fetchData()

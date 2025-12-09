@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // 이미 정산된 주문 아이템 ID 조회 (중복 방지)
+    // 이미 정산된 주문 아이템 ID 조회 (정산 완료/미완료 구분용)
     const existingSettlementItems = await prisma.settlementItem.findMany({
       where: {
         settlement: {
@@ -115,12 +115,22 @@ export async function GET(request: NextRequest) {
         shop: {
           select: { id: true, name: true, subdomain: true },
         },
+        shippingAddress: {
+          select: { recipientName: true },
+        },
         items: {
           include: {
+            variant: {
+              select: { wholesalePrice: true },
+            },
             publishedProduct: {
               include: {
                 product: {
                   include: {
+                    variants: {
+                      take: 1,
+                      select: { wholesalePrice: true },
+                    },
                     collectedProduct: {
                       include: {
                         post: {
@@ -143,6 +153,26 @@ export async function GET(request: NextRequest) {
     // 미분류 주문 (shopId가 없는 경우)
     const unclassifiedItems: any[] = []
 
+    // 마진율 계산 헬퍼 함수
+    const calculateMarginRate = (unitPrice: number, wholesalePrice: number | null): number | null => {
+      if (!wholesalePrice || wholesalePrice <= 0 || unitPrice <= 0) return null
+      return Math.round(((unitPrice - wholesalePrice) / unitPrice) * 100 * 10) / 10  // 소수점 1자리
+    }
+
+    // 도매가 추출 헬퍼 함수 (variant -> product.variants[0] 순으로 시도)
+    const getWholesalePrice = (item: any): number | null => {
+      // 1. OrderItem에 연결된 variant의 wholesalePrice
+      if (item.variant?.wholesalePrice) {
+        return item.variant.wholesalePrice
+      }
+      // 2. Product의 첫 번째 variant의 wholesalePrice
+      const productVariant = item.publishedProduct?.product?.variants?.[0]
+      if (productVariant?.wholesalePrice) {
+        return productVariant.wholesalePrice
+      }
+      return null
+    }
+
     // 쇼핑몰 주문 아이템 처리
     for (const order of shopOrders) {
       const orderShopId = order.shopId
@@ -150,8 +180,10 @@ export async function GET(request: NextRequest) {
       if (!orderShopId) {
         // shopId가 없는 주문은 미분류
         for (const item of order.items) {
-          // 이미 정산된 아이템 제외
-          if (settledOrderItemIds.has(item.id)) continue
+          const isSettled = settledOrderItemIds.has(item.id)
+          const wholesalePrice = getWholesalePrice(item)
+          const marginRate = calculateMarginRate(Number(item.unitPrice), wholesalePrice)
+          const margin = wholesalePrice ? Number(item.unitPrice) - wholesalePrice : null
 
           unclassifiedItems.push({
             id: item.id,
@@ -163,10 +195,14 @@ export async function GET(request: NextRequest) {
             quantity: item.quantity,
             unitPrice: Number(item.unitPrice),
             totalPrice: Number(item.totalPrice),
+            wholesalePrice,
+            marginRate,
+            margin,
             status: order.status,
             orderedAt: order.orderedAt.toISOString(),
             shopId: null,
             shopName: null,
+            isSettled,
           })
         }
         continue
@@ -195,8 +231,10 @@ export async function GET(request: NextRequest) {
       if (!shopData) continue
 
       for (const item of order.items) {
-        // 이미 정산된 아이템 제외
-        if (settledOrderItemIds.has(item.id)) continue
+        const isSettled = settledOrderItemIds.has(item.id)
+        const wholesalePrice = getWholesalePrice(item)
+        const marginRate = calculateMarginRate(Number(item.unitPrice), wholesalePrice)
+        const margin = wholesalePrice ? Number(item.unitPrice) - wholesalePrice : null
 
         const thumbnailUrl = item.thumbnailUrl ||
           item.publishedProduct?.product?.collectedProduct?.post?.images?.[0]?.url || null
@@ -211,10 +249,14 @@ export async function GET(request: NextRequest) {
           quantity: item.quantity,
           unitPrice: Number(item.unitPrice),
           totalPrice: Number(item.totalPrice),
+          wholesalePrice,
+          marginRate,
+          margin,
           status: order.status,
           orderedAt: order.orderedAt.toISOString(),
           shopId: orderShopId,
           shopName: shopData.name,
+          isSettled,
         })
 
         shopData.itemCount++
@@ -226,6 +268,14 @@ export async function GET(request: NextRequest) {
     // 결과 정리 (주문이 있는 Shop만)
     const shopDataArray = Array.from(shopDataMap.values()).filter(s => s.itemCount > 0)
 
+    // 정산 완료/미완료 아이템 분리
+    const allItems = [
+      ...shopDataArray.flatMap(s => s.items),
+      ...unclassifiedItems
+    ]
+    const settledItems = allItems.filter(i => i.isSettled)
+    const unsettledItems = allItems.filter(i => !i.isSettled)
+
     // 통계 계산
     const summary = {
       totalItems: shopDataArray.reduce((sum, s) => sum + s.itemCount, 0) + unclassifiedItems.length,
@@ -236,6 +286,11 @@ export async function GET(request: NextRequest) {
       classifiedItems: shopDataArray.reduce((sum, s) => sum + s.itemCount, 0),
       classifiedAmount: shopDataArray.reduce((sum, s) => sum + s.totalAmount, 0),
       shopCount: shopDataArray.length,
+      // 정산 완료/미완료 통계
+      settledCount: settledItems.length,
+      settledAmount: settledItems.reduce((sum, i) => sum + i.totalPrice, 0),
+      unsettledCount: unsettledItems.length,
+      unsettledAmount: unsettledItems.reduce((sum, i) => sum + i.totalPrice, 0),
     }
 
     return NextResponse.json({
