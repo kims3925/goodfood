@@ -88,18 +88,19 @@ model SourcingApiConfig {
 }
 
 model AiApiConfig {
-  id         Int        @id @default(autoincrement())
-  userId     Int        @map("user_id")
-  provider   AiProvider
-  apiKey     String     @map("api_key") @db.VarChar(500)
-  model      String     @db.VarChar(100)
-  config     String?    @db.LongText
-  isActive   Boolean    @default(true) @map("is_active")
-  usageCount Int        @default(0) @map("usage_count")
-  lastUsedAt DateTime?  @map("last_used_at") @db.Timestamp(0)
-  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              Int        @id @default(autoincrement())
+  userId          Int        @map("user_id")
+  provider        AiProvider
+  apiKey          String     @map("api_key") @db.VarChar(500)
+  model           String     @db.VarChar(100)
+  config          String?    @db.LongText
+  isActive        Boolean    @default(true) @map("is_active")
+  usageCount      Int        @default(0) @map("usage_count")
+  totalTokensUsed BigInt     @default(0) @map("total_tokens_used")
+  lastUsedAt      DateTime?  @map("last_used_at") @db.Timestamp(0)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, provider])
   @@index([userId])

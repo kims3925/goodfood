@@ -241,8 +241,23 @@ export async function updateWorkflowProgress(
 // STATS QUERIES
 // =============================================
 
+// Raw SQL 결과 타입
+interface RawStatsResult {
+  totalPosts: bigint
+  periodCollected: bigint
+  pendingTransform: bigint
+  totalTransformed: bigint
+  periodTransformed: bigint
+  totalProducts: bigint
+  periodProducts: bigint
+  readyToPublish: bigint
+  totalPublishedProducts: bigint
+  periodPublishedProducts: bigint
+}
+
 /**
  * 자동화 통계 조회 (헤더용)
+ * 단일 Raw SQL 쿼리로 모든 통계를 한 번에 조회 (10개 쿼리 -> 1개 쿼리)
  */
 export async function getAutomationStats(
   userId: number,
@@ -262,119 +277,72 @@ export async function getAutomationStats(
     return today
   })()
 
-  // 병렬로 모든 통계 조회
-  const [
-    totalPosts,
-    periodCollected,
-    pendingTransform,
-    totalTransformed,
-    periodTransformedPosts,
-    totalProducts,
-    periodProductsCount,
-    readyToPublish,
-    allPublishedProducts,
-    periodPublishedProducts,
-  ] = await Promise.all([
-    // 전체 게시물 수
-    prisma.collectedPost.count({
-      where: { userId }
-    }),
+  // 단일 쿼리로 모든 통계 조회
+  const stats = await prisma.$queryRaw<RawStatsResult[]>`
+    SELECT
+      -- 전체 게시물 수
+      (SELECT COUNT(*) FROM collected_post WHERE user_id = ${userId}) as totalPosts,
 
-    // 기간 내 수집된 게시물 수
-    prisma.collectedPost.count({
-      where: {
-        userId,
-        createdAt: { gte: periodStart, lte: periodEnd }
-      }
-    }),
+      -- 기간 내 수집된 게시물 수
+      (SELECT COUNT(*) FROM collected_post
+       WHERE user_id = ${userId}
+       AND created_at >= ${periodStart} AND created_at <= ${periodEnd}) as periodCollected,
 
-    // AI 변환 대기 중인 게시물 수 (CollectedProduct가 없는 게시물)
-    prisma.collectedPost.count({
-      where: {
-        userId,
-        collectedProducts: {
-          none: {},
-        },
-      }
-    }),
+      -- AI 변환 대기 중인 게시물 수 (CollectedProduct가 없는 게시물)
+      (SELECT COUNT(*) FROM collected_post cp
+       WHERE cp.user_id = ${userId}
+       AND NOT EXISTS (SELECT 1 FROM collected_product cpr WHERE cpr.post_id = cp.id)) as pendingTransform,
 
-    // AI 변환 완료된 게시물 수 (CollectedProduct가 있는 게시물)
-    prisma.collectedPost.count({
-      where: {
-        userId,
-        collectedProducts: {
-          some: {},
-        },
-      }
-    }),
+      -- AI 변환 완료된 게시물 수 (CollectedProduct가 있는 게시물)
+      (SELECT COUNT(*) FROM collected_post cp
+       WHERE cp.user_id = ${userId}
+       AND EXISTS (SELECT 1 FROM collected_product cpr WHERE cpr.post_id = cp.id)) as totalTransformed,
 
-    // 기간 내 AI 변환 완료된 게시물 수
-    prisma.collectedProduct.findMany({
-      where: {
-        userId,
-        createdAt: { gte: periodStart, lte: periodEnd }
-      },
-      distinct: ['postId'],
-      select: { postId: true }
-    }),
+      -- 기간 내 AI 변환 완료된 게시물 수 (distinct postId)
+      (SELECT COUNT(DISTINCT post_id) FROM collected_product
+       WHERE user_id = ${userId}
+       AND created_at >= ${periodStart} AND created_at <= ${periodEnd}) as periodTransformed,
 
-    // 전체 상품 수
-    prisma.product.count({
-      where: { userId }
-    }),
+      -- 전체 상품 수
+      (SELECT COUNT(*) FROM product WHERE user_id = ${userId}) as totalProducts,
 
-    // 기간 내 등록된 상품 수
-    prisma.product.count({
-      where: {
-        userId,
-        createdAt: { gte: periodStart, lte: periodEnd }
-      }
-    }),
+      -- 기간 내 등록된 상품 수
+      (SELECT COUNT(*) FROM product
+       WHERE user_id = ${userId}
+       AND created_at >= ${periodStart} AND created_at <= ${periodEnd}) as periodProducts,
 
-    // 발행 준비된 상품 수 (미발행 상품)
-    prisma.product.count({
-      where: {
-        userId,
-        publishedProducts: {
-          none: {}
-        }
-      }
-    }),
+      -- 발행 준비된 상품 수 (미발행 상품)
+      (SELECT COUNT(*) FROM product p
+       WHERE p.user_id = ${userId}
+       AND NOT EXISTS (SELECT 1 FROM published_product pp WHERE pp.product_id = p.id)) as readyToPublish,
 
-    // 전체 발행된 상품 수 (distinct productId)
-    prisma.publishedProduct.findMany({
-      where: { userId },
-      distinct: ['productId'],
-      select: { productId: true }
-    }),
+      -- 전체 발행된 상품 수 (distinct productId)
+      (SELECT COUNT(DISTINCT product_id) FROM published_product WHERE user_id = ${userId}) as totalPublishedProducts,
 
-    // 기간 내 발행된 상품 수 (같은 상품은 1개로 카운트)
-    prisma.publishedProduct.findMany({
-      where: {
-        userId,
-        publishedAt: { gte: periodStart, lte: periodEnd }
-      },
-      distinct: ['productId'],
-      select: { productId: true }
-    }),
-  ])
+      -- 기간 내 발행된 상품 수 (distinct productId)
+      (SELECT COUNT(DISTINCT product_id) FROM published_product
+       WHERE user_id = ${userId}
+       AND published_at >= ${periodStart} AND published_at <= ${periodEnd}) as periodPublishedProducts
+  `
+
+  const result = stats[0]
 
   return {
     // 기존 필드 (이제 기간 기준)
-    todayCollected: periodCollected,
-    pendingTransform,
-    readyToPublish,
-    todayPublished: periodPublishedProducts.length,
+    todayCollected: Number(result.periodCollected),
+    pendingTransform: Number(result.pendingTransform),
+    readyToPublish: Number(result.readyToPublish),
+    todayPublished: Number(result.periodPublishedProducts),
 
     // 전체 진행률 계산용 추가 필드
-    totalPosts,
-    totalTransformed,
-    totalProducts,
-    totalPublishedProducts: allPublishedProducts.length,
+    totalPosts: Number(result.totalPosts),
+    totalTransformed: Number(result.totalTransformed),
+    totalProducts: Number(result.totalProducts),
+    totalPublishedProducts: Number(result.totalPublishedProducts),
 
     // 기간 내 통계
-    todayTransformed: periodTransformedPosts.length,
-    todayProducts: periodProductsCount,
+    todayTransformed: Number(result.periodTransformed),
+    todayProducts: Number(result.periodProducts),
   }
 }
 

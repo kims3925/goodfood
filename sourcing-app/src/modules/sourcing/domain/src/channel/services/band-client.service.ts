@@ -4,6 +4,7 @@
  */
 
 const BAND_API_BASE_URL = process.env.BAND_API_BASE_URL || 'https://openapi.band.us'
+const API_TIMEOUT_MS = 30000 // 30초 타임아웃
 
 interface BandApiResponse<T = any> {
   result_code: number
@@ -38,25 +39,39 @@ export class NaverBandClient {
     url.searchParams.append('content', content)
     url.searchParams.append('do_push', options.doPush ? 'true' : 'false')
 
-    const response = await fetch(url.toString(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
+    // 타임아웃 설정
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
 
-    const data: BandApiResponse<{ post_key: string }> = await response.json()
+    try {
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      })
 
-    if (data.result_code !== 1) {
-      const errorData = data.result_data as any
-      const errorMessage = this.getErrorMessage(
-        data.result_code,
-        errorData?.message || data.message
-      )
-      throw new Error(errorMessage)
+      clearTimeout(timeoutId)
+      const data: BandApiResponse<{ post_key: string }> = await response.json()
+
+      if (data.result_code !== 1) {
+        const errorData = data.result_data as any
+        const errorMessage = this.getErrorMessage(
+          data.result_code,
+          errorData?.message || data.message
+        )
+        throw new Error(errorMessage)
+      }
+
+      return { postKey: data.result_data!.post_key }
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+      if (error.name === 'AbortError') {
+        throw new Error('Band API 요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.')
+      }
+      throw error
     }
-
-    return { postKey: data.result_data!.post_key }
   }
 
   /**
@@ -74,25 +89,39 @@ export class NaverBandClient {
     url.searchParams.append('post_key', postKey)
     url.searchParams.append('body', content)
 
-    const response = await fetch(url.toString(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
+    // 타임아웃 설정
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
 
-    const data: BandApiResponse<{ comment_key: string }> = await response.json()
+    try {
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      })
 
-    if (data.result_code !== 1) {
-      const errorData = data.result_data as any
-      const errorMessage = this.getErrorMessage(
-        data.result_code,
-        errorData?.message || data.message
-      )
-      throw new Error(errorMessage)
+      clearTimeout(timeoutId)
+      const data: BandApiResponse<{ comment_key: string }> = await response.json()
+
+      if (data.result_code !== 1) {
+        const errorData = data.result_data as any
+        const errorMessage = this.getErrorMessage(
+          data.result_code,
+          errorData?.message || data.message
+        )
+        throw new Error(errorMessage)
+      }
+
+      return { commentKey: data.result_data!.comment_key }
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+      if (error.name === 'AbortError') {
+        throw new Error('Band API 요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.')
+      }
+      throw error
     }
-
-    return { commentKey: data.result_data!.comment_key }
   }
 
   /**
@@ -167,14 +196,30 @@ export class NaverBandClient {
     const url = new URL(`${BAND_API_BASE_URL}/v2.1/bands`)
     url.searchParams.append('access_token', this.accessToken)
 
-    const response = await fetch(url.toString())
-    const data: BandApiResponse<{ bands: Array<{ band_key: string; name: string; cover: string }> }> =
-      await response.json()
+    // 타임아웃 설정
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
 
-    if (data.result_code !== 1) {
-      throw new Error(this.getErrorMessage(data.result_code, data.message))
+    try {
+      const response = await fetch(url.toString(), {
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+      const data: BandApiResponse<{ bands: Array<{ band_key: string; name: string; cover: string }> }> =
+        await response.json()
+
+      if (data.result_code !== 1) {
+        throw new Error(this.getErrorMessage(data.result_code, data.message))
+      }
+
+      return data.result_data!.bands
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+      if (error.name === 'AbortError') {
+        throw new Error('Band API 요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.')
+      }
+      throw error
     }
-
-    return data.result_data!.bands
   }
 }

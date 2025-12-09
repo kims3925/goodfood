@@ -15,6 +15,7 @@ interface PublishedProductDetail {
   userId: number
   productId: number
   channelId: number | null
+  shopId: number | null
   publishedAt: string | null
   createdAt: string
   updatedAt: string
@@ -52,6 +53,27 @@ interface PublishedProductDetail {
         }>
       }
     } | null
+    // 같은 상품의 모든 발행 정보
+    publishedProducts: Array<{
+      id: number
+      channelId: number | null
+      shopId: number | null
+      publishedAt: string | null
+      createdAt: string
+      channel: {
+        id: number
+        name: string
+        coverUrl: string | null
+        platform: string
+        kind: string
+      } | null
+      shop: {
+        id: number
+        name: string
+        subdomain: string
+        isActive: boolean
+      } | null
+    }>
   }
   channel: {
     id: number
@@ -59,6 +81,12 @@ interface PublishedProductDetail {
     coverUrl: string | null
     platform: string
     kind: string
+  } | null
+  shop: {
+    id: number
+    name: string
+    subdomain: string
+    isActive: boolean
   } | null
   publishHistories: Array<{
     id: number
@@ -134,6 +162,17 @@ export default function PublishedProductDetailPage({
   const formatPrice = (price: number | null | undefined) => {
     if (price === null || price === undefined) return '-'
     return `₩${price.toLocaleString()}`
+  }
+
+  const formatDateTime = (dateString: string | null | undefined) => {
+    if (!dateString) return '-'
+    const date = new Date(dateString)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day} ${hours}:${minutes}`
   }
 
   // variant에서 대표 가격 추출
@@ -280,35 +319,70 @@ export default function PublishedProductDetailPage({
                     <Globe size={18} className="text-emerald-600" />
                   </div>
                   <span className="font-semibold text-slate-900">발행 정보</span>
+                  {product.product.publishedProducts.length > 0 && (
+                    <span className="px-2 py-0.5 bg-slate-200 rounded-full text-xs font-medium text-slate-600">
+                      {product.product.publishedProducts.length}개 발행처
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div className="p-6">
-                <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-                  <div className="flex items-center gap-3">
-                    {product.channel?.coverUrl ? (
-                      <img
-                        src={product.channel.coverUrl}
-                        alt={product.channel.name}
-                        className="w-12 h-12 rounded-xl object-cover ring-2 ring-slate-100"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
-                        <Store size={24} className="text-slate-500" />
+                {/* 발행처 목록 */}
+                <div className="space-y-3">
+                  {product.product.publishedProducts.map((pub) => {
+                    const isShopPublish = pub.shopId !== null
+                    const name = isShopPublish ? pub.shop?.name : pub.channel?.name
+                    const typeLabel = isShopPublish ? '쇼핑몰' : pub.channel?.platform || '채널'
+
+                    return (
+                      <div
+                        key={pub.id}
+                        className="flex items-center justify-between p-3 rounded-xl border bg-slate-50 border-slate-100 hover:border-slate-200 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          {/* 아이콘 */}
+                          {isShopPublish ? (
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center flex-shrink-0">
+                              <Store size={18} className="text-blue-600" />
+                            </div>
+                          ) : pub.channel?.coverUrl ? (
+                            <img
+                              src={pub.channel.coverUrl}
+                              alt={pub.channel.name}
+                              className="w-10 h-10 rounded-lg object-cover ring-1 ring-slate-200 flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center flex-shrink-0">
+                              <Store size={18} className="text-purple-600" />
+                            </div>
+                          )}
+                          {/* 발행처 정보 */}
+                          <div>
+                            <p className="font-medium text-slate-900">{name || '알 수 없음'}</p>
+                            <p className="text-xs text-slate-500">
+                              {formatDateTime(pub.publishedAt || pub.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                        {/* 발행 유형 뱃지 */}
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          isShopPublish
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-purple-100 text-purple-700'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            isShopPublish ? 'bg-blue-500' : 'bg-purple-500'
+                          }`}></span>
+                          {typeLabel}
+                        </span>
                       </div>
-                    )}
-                    <div>
-                      <p className="text-sm text-slate-500">발행 채널</p>
-                      <p className="font-semibold text-slate-900">{product.channel?.name || '쇼핑몰'}</p>
-                    </div>
-                  </div>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                    {product.channel?.platform || '쇼핑몰'}
-                  </span>
+                    )
+                  })}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+                {/* 현재 발행 정보 요약 */}
+                <div className="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-slate-100">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
                       <Calendar size={18} className="text-slate-500" />
@@ -316,9 +390,7 @@ export default function PublishedProductDetailPage({
                     <div>
                       <p className="text-slate-500 text-xs">발행일시</p>
                       <p className="font-medium text-slate-900">
-                        {product.publishedAt
-                          ? new Date(product.publishedAt).toLocaleString('ko-KR')
-                          : '-'}
+                        {formatDateTime(product.publishedAt)}
                       </p>
                     </div>
                   </div>
@@ -329,7 +401,7 @@ export default function PublishedProductDetailPage({
                     <div>
                       <p className="text-slate-500 text-xs">등록일시</p>
                       <p className="font-medium text-slate-900">
-                        {new Date(product.createdAt).toLocaleString('ko-KR')}
+                        {formatDateTime(product.createdAt)}
                       </p>
                     </div>
                   </div>
@@ -419,7 +491,7 @@ export default function PublishedProductDetailPage({
                               </div>
                               <div className="flex items-center gap-2 text-sm text-slate-500">
                                 <Calendar size={14} />
-                                {new Date(history.publishedAt).toLocaleString('ko-KR')}
+                                {formatDateTime(history.publishedAt)}
                               </div>
                             </div>
                           </div>

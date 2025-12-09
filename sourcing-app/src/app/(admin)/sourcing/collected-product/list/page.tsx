@@ -477,6 +477,11 @@ export default function CollectedProductListPage() {
     let failCount = 0
 
     for (let i = 0; i < selectedPosts.length; i++) {
+      // 첫 번째가 아니면 30초 대기 (API 제한 대응)
+      if (i > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 30000))
+      }
+
       setCurrentProcessingIndex(i + 1)
       const post = selectedPosts[i]
 
@@ -607,7 +612,7 @@ export default function CollectedProductListPage() {
                 <Package size={24} className="text-gray-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">전체 수집상품</p>
+                <p className="text-sm text-gray-500">수집상품</p>
                 <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
               </div>
             </div>
@@ -808,8 +813,23 @@ export default function CollectedProductListPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-gray-600 truncate">
-                        {product.post?.channel?.name || '-'}
+                      <div className="flex items-center gap-2">
+                        {product.post?.channel?.coverUrl ? (
+                          <img
+                            src={product.post.channel.coverUrl}
+                            alt={product.post.channel.name}
+                            className="w-9 h-9 rounded-lg object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                            <span className="text-gray-400 text-xs">No</span>
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-gray-900 truncate text-sm">
+                            {product.post?.channel?.name || '-'}
+                          </div>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>{getProductStatusSummary(product)}</TableCell>

@@ -597,9 +597,9 @@ export default function PublishPage() {
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">상품 발행</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">발행</h1>
           <p className="text-gray-600">
-            상품을 선택하여 채널에 발행합니다. 셀을 클릭하여 선택하고 발행 버튼을 누르세요.
+            상품을 선택하여 채널, 쇼핑몰에 발행합니다. 셀을 클릭하여 선택하고 발행 버튼을 누르세요.
           </p>
         </div>
 

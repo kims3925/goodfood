@@ -27,8 +27,25 @@ import type {
 // Band API 쿨다운 지연 시간 (10초)
 const DEFAULT_COOLDOWN_MS = 10000
 
+// 쿼터 에러 재시도 설정
+const MAX_QUOTA_RETRIES = 3
+const QUOTA_RETRY_BASE_DELAY_MS = 30000  // 30초 (30s, 60s, 120s 지연)
+
 // 지연 함수
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// 쿼터 에러 확인 함수
+function isQuotaError(error: any): boolean {
+  const message = error?.message || ''
+  return (
+    message.includes('쿼터') ||
+    message.includes('quota') ||
+    message.includes('rate limit') ||
+    message.includes('too many requests') ||
+    message.includes('429') ||
+    (error?.status === 429)
+  )
+}
 
 /**
  * 게시글 내용 생성
@@ -67,9 +84,9 @@ function buildPostContent(
 
 export class PublishService {
   /**
-   * 단일 상품을 단일 채널에 발행
+   * 단일 상품을 단일 채널에 발행 (쿼터 에러 시 재시도)
    */
-  async publishToChannel(params: PublishToChannelParams): Promise<PublishToChannelResult> {
+  async publishToChannel(params: PublishToChannelParams, retryCount: number = 0): Promise<PublishToChannelResult> {
     const { userId, productId, channelId } = params
 
     try {
@@ -165,25 +182,13 @@ export class PublishService {
         }
       }
 
-      // 4. API 토큰 확인
+      // 4. API 토큰 확인 - 토큰 없으면 실패 처리 (실제 채널에 발행 불가)
       if (!apiConfig?.accessToken) {
-        // API 토큰이 없으면 DB 기록만 생성 (수동 발행용)
-        const publishedProduct = await prisma.publishedProduct.create({
-          data: {
-            userId,
-            productId,
-            channelId,
-            publishedAt: new Date(),
-          },
-        })
-
         return {
-          success: true,
+          success: false,
           productId,
           channelId,
-          publishedProductId: publishedProduct.id,
-          skipped: true,
-          skipReason: 'API 토큰이 없어 DB 기록만 생성되었습니다.',
+          error: 'Band API 토큰이 설정되지 않았습니다. 설정 > API 연동에서 Band API를 설정해주세요.',
         }
       }
 
@@ -227,6 +232,14 @@ export class PublishService {
       }
     } catch (error: any) {
       console.error(`[PublishService] Error publishing product ${productId} to channel ${channelId}:`, error)
+
+      // 쿼터 에러이고 재시도 가능한 경우
+      if (isQuotaError(error) && retryCount < MAX_QUOTA_RETRIES) {
+        const retryDelay = Math.pow(2, retryCount) * QUOTA_RETRY_BASE_DELAY_MS  // 30s, 60s, 120s
+        console.log(`[PublishService] Quota error, retrying in ${retryDelay / 1000}s (attempt ${retryCount + 1}/${MAX_QUOTA_RETRIES})`)
+        await delay(retryDelay)
+        return this.publishToChannel(params, retryCount + 1)
+      }
 
       return {
         success: false,

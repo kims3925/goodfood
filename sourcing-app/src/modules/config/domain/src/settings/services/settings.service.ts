@@ -101,7 +101,12 @@ export class SettingsService {
 
     const geminiConfig = aiConfigs.find((c) => c.provider === 'GEMINI')
     if (geminiConfig) {
-      const config = geminiConfig.config ? JSON.parse(geminiConfig.config) : {}
+      let config: any = {}
+      try {
+        config = geminiConfig.config ? JSON.parse(geminiConfig.config) : {}
+      } catch {
+        config = {}
+      }
       settings.gemini = {
         apiKey: geminiConfig.apiKey || '',
         model: geminiConfig.model || 'gemini-2.5-flash',
@@ -111,7 +116,12 @@ export class SettingsService {
 
     const openaiConfig = aiConfigs.find((c) => c.provider === 'OPENAI')
     if (openaiConfig) {
-      const config = openaiConfig.config ? JSON.parse(openaiConfig.config) : {}
+      let config: any = {}
+      try {
+        config = openaiConfig.config ? JSON.parse(openaiConfig.config) : {}
+      } catch {
+        config = {}
+      }
       settings.openai = {
         apiKey: openaiConfig.apiKey || '',
         model: openaiConfig.model || 'gpt-4o-mini',

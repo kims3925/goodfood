@@ -191,23 +191,37 @@ export async function downloadAndSaveProductImage(imageUrl: string): Promise<{
   }
 }
 
+// 동시 다운로드 제한 (서버 부하 방지)
+const CONCURRENT_IMAGE_DOWNLOADS = 5
+
 /**
- * 여러 상품 이미지를 순차적으로 다운로드
+ * 여러 상품 이미지를 병렬로 다운로드 (동시 5개 제한)
  * @param imageUrls 이미지 URL 배열
  * @returns 저장된 이미지 정보 배열
  */
 export async function downloadAndSaveProductImages(
   imageUrls: string[]
 ): Promise<Array<{ fileName: string; url: string; fileSize: number; fileHash: string; isExisting: boolean }>> {
-  const results = []
+  const results: Array<{ fileName: string; url: string; fileSize: number; fileHash: string; isExisting: boolean }> = []
 
-  for (let i = 0; i < imageUrls.length; i++) {
-    try {
-      const result = await downloadAndSaveProductImage(imageUrls[i])
-      results.push(result)
-    } catch (error) {
-      console.error(`상품 이미지 다운로드 실패 (${i + 1}/${imageUrls.length}):`, error)
-      // 실패한 이미지는 건너뛰고 계속 진행
+  // 배치로 나눠서 병렬 처리
+  for (let i = 0; i < imageUrls.length; i += CONCURRENT_IMAGE_DOWNLOADS) {
+    const batch = imageUrls.slice(i, i + CONCURRENT_IMAGE_DOWNLOADS)
+
+    // 배치 내 병렬 다운로드
+    const batchResults = await Promise.allSettled(
+      batch.map((url) => downloadAndSaveProductImage(url))
+    )
+
+    // 성공한 결과만 수집
+    for (let j = 0; j < batchResults.length; j++) {
+      const result = batchResults[j]
+      if (result.status === 'fulfilled') {
+        results.push(result.value)
+      } else {
+        console.error(`상품 이미지 다운로드 실패 (${i + j + 1}/${imageUrls.length}):`, result.reason)
+        // 실패한 이미지는 건너뛰고 계속 진행
+      }
     }
   }
 

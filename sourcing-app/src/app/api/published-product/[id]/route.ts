@@ -62,6 +62,29 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
                 },
               },
             },
+            // 같은 상품의 모든 발행 정보 포함
+            publishedProducts: {
+              include: {
+                channel: {
+                  select: {
+                    id: true,
+                    name: true,
+                    coverUrl: true,
+                    platform: true,
+                    kind: true,
+                  },
+                },
+                shop: {
+                  select: {
+                    id: true,
+                    name: true,
+                    subdomain: true,
+                    isActive: true,
+                  },
+                },
+              },
+              orderBy: { createdAt: 'desc' },
+            },
           },
         },
         channel: {
@@ -71,6 +94,14 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
             coverUrl: true,
             platform: true,
             kind: true,
+          },
+        },
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            subdomain: true,
+            isActive: true,
           },
         },
         publishHistories: {

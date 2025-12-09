@@ -1124,6 +1124,7 @@ export interface BatchTransformResult {
   success: boolean
   draft?: ProductDraft
   error?: string
+  tokensUsed?: number  // 전체 배치의 토큰 사용량 (첫 번째 결과에만 포함)
 }
 
 /**
@@ -1555,7 +1556,7 @@ export async function transformPostsToProductsBatch(
   const parseResults = parseBatchAiResponse(aiResponse, postIds)
 
   // ProductDraft 생성
-  return parseResults.map((result, index) => {
+  const results: BatchTransformResult[] = parseResults.map((result, index) => {
     if (!result.success || !result.analysis) {
       return { postId: result.postId, success: false, error: result.error }
     }
@@ -1571,6 +1572,13 @@ export async function transformPostsToProductsBatch(
       }
     }
   })
+
+  // 첫 번째 결과에 전체 배치의 토큰 사용량 추가
+  if (results.length > 0 && aiResponse.tokensUsed) {
+    results[0].tokensUsed = aiResponse.tokensUsed
+  }
+
+  return results
 }
 
 // =============================================

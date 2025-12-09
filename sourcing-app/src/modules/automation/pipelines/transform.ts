@@ -2,9 +2,9 @@
  * Transform Pipeline
  * AI를 사용하여 수집된 게시물(CollectedPost)을 수집상품(CollectedProduct)으로 변환
  *
- * 배치 처리 방식 (TPM 15k 제한 대응):
- * - 10개 게시물당 1회 API 호출 (~38k tokens)
- * - 요청 간 60초 대기 (TPM 제한 회피)
+ * 배치 처리 방식 (API 할당량 제한 대응):
+ * - 10개 게시물당 1회 API 호출
+ * - 요청 간 1분(60초) 대기 (할당량 초과 방지)
  * - 제한 없이 모든 대기 게시물 처리
  *
  * Note: Product 생성은 이 파이프라인에서 하지 않음
@@ -31,11 +31,15 @@ import {
 // 배치 처리 설정 (TPM 15k 제한 대응)
 const BATCH_SIZE = 10  // 10개 게시물/요청
 
-// 요청 간 대기 시간
-const REQUEST_INTERVAL_MS = 7000  // 7초
+// 요청 간 대기 시간 (API 할당량 초과 방지)
+const REQUEST_INTERVAL_MS = 60000  // 60초 (1분)
 
 // 전체 파이프라인 타임아웃 (없음 - 모든 게시물 처리)
 const PIPELINE_TIMEOUT_MS = 0  // 타임아웃 비활성화
+
+// 재시도 설정 (TRANSIENT 에러 대응)
+const MAX_RETRIES = 3
+const RETRY_DELAY_MS = 10000  // 10초 (재시도마다 10s, 20s, 30s)
 
 // =============================================
 // TRANSFORM PIPELINE (BATCH MODE)
@@ -168,8 +172,8 @@ export async function runTransformPipeline(
         },
       }))
 
-      // 배치 변환 실행 (1회 API 호출)
-      const batchResults = await transformPostsToProductsBatch(
+      // 배치 변환 실행 (재시도 로직 포함)
+      const batchResults = await runBatchWithRetry(
         inputs,
         {
           apiKey: aiConfig.apiKey,
@@ -254,14 +258,22 @@ export async function runTransformPipeline(
         transformedPosts.push(transformedPost)
       }
 
-      // AI 사용량 업데이트 (배치당 1회)
+      // 배치에서 토큰 사용량 추출 (첫 번째 결과에 포함)
+      const tokensUsed = batchResults[0]?.tokensUsed || 0
+
+      // AI 사용량 업데이트 (배치당 1회 + 토큰 누적)
       await prisma.aiApiConfig.update({
         where: { id: aiConfig.id },
         data: {
           usageCount: { increment: 1 },  // 배치 1회 = API 1회
+          totalTokensUsed: { increment: BigInt(tokensUsed) },  // 토큰 누적
           lastUsedAt: new Date(),
         },
       })
+
+      if (tokensUsed > 0) {
+        console.log(`[Transform] Batch ${batchIndex + 1} used ${tokensUsed} tokens`)
+      }
 
       console.log(`[Transform] Batch ${batchIndex + 1} completed`)
 
@@ -346,5 +358,41 @@ export async function runTransformPipeline(
       retryablePostIds,
     },
     errors,
+  }
+}
+
+// =============================================
+// HELPER FUNCTIONS
+// =============================================
+
+/**
+ * 배치 변환 실행 (재시도 로직 포함)
+ * TRANSIENT 에러 발생 시 최대 3회 재시도 (10s, 20s, 30s 대기)
+ */
+async function runBatchWithRetry(
+  inputs: any[],
+  aiConfig: { apiKey: string; model: string; provider: any },
+  pricingPolicyContent: string | null,
+  retryCount: number = 0
+): Promise<BatchTransformResult[]> {
+  try {
+    return await transformPostsToProductsBatch(inputs, aiConfig, pricingPolicyContent)
+  } catch (error: any) {
+    // TRANSIENT 에러이고 재시도 가능한 경우
+    if (
+      error instanceof ProductTransformationError &&
+      error.isTransient() &&
+      retryCount < MAX_RETRIES
+    ) {
+      const delay = RETRY_DELAY_MS * (retryCount + 1)  // 10s, 20s, 30s
+      console.log(`[Transform] TRANSIENT error, retrying in ${delay / 1000}s (attempt ${retryCount + 1}/${MAX_RETRIES})`)
+      console.log(`[Transform] Error: ${error.message}`)
+
+      await new Promise((resolve) => setTimeout(resolve, delay))
+      return runBatchWithRetry(inputs, aiConfig, pricingPolicyContent, retryCount + 1)
+    }
+
+    // 재시도 불가능한 에러거나 최대 재시도 횟수 초과
+    throw error
   }
 }

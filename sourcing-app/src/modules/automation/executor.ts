@@ -325,11 +325,13 @@ export async function executeFullPipeline(
         limit: 10,  // 자동화 파이프라인: 최근 10개만 수집
       })
 
-      // 진행 상황 업데이트
+      // 진행 상황 및 details 업데이트 (단계별 누적 저장)
       totalItems += collectionResult.totalItems
       successCount += collectionResult.successCount
       failedCount += collectionResult.failedCount
-      await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+      await updateWorkflowProgress(logId, totalItems, successCount, failedCount, {
+        collection: collectionResult.details,
+      })
 
       console.log(`[FullPipeline] Collection completed: ${collectionResult.successCount} new posts`)
     }
@@ -344,11 +346,14 @@ export async function executeFullPipeline(
         transformPendingOnly: true,
       })
 
-      // 진행 상황 업데이트
+      // 진행 상황 및 details 업데이트 (단계별 누적 저장)
       totalItems += transformResult.totalItems
       successCount += transformResult.successCount
       failedCount += transformResult.failedCount
-      await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+      await updateWorkflowProgress(logId, totalItems, successCount, failedCount, {
+        collection: collectionResult?.details,
+        transform: transformResult.details,
+      })
 
       console.log(`[FullPipeline] Transform completed: ${transformResult.successCount} collected products created`)
     }
@@ -360,11 +365,15 @@ export async function executeFullPipeline(
         createPendingOnly: true,
       })
 
-      // 진행 상황 업데이트
+      // 진행 상황 및 details 업데이트 (단계별 누적 저장)
       totalItems += productCreateResult.totalItems
       successCount += productCreateResult.successCount
       failedCount += productCreateResult.failedCount
-      await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+      await updateWorkflowProgress(logId, totalItems, successCount, failedCount, {
+        collection: collectionResult?.details,
+        transform: transformResult?.details,
+        productCreate: productCreateResult.details,
+      })
 
       console.log(`[FullPipeline] Product Create completed: ${productCreateResult.successCount} products created`)
     }
@@ -386,11 +395,16 @@ export async function executeFullPipeline(
           publishReadyOnly: true,
         })
 
-        // 진행 상황 업데이트
+        // 진행 상황 및 details 업데이트 (단계별 누적 저장)
         totalItems += publishResult.totalItems
         successCount += publishResult.successCount
         failedCount += publishResult.failedCount
-        await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+        await updateWorkflowProgress(logId, totalItems, successCount, failedCount, {
+          collection: collectionResult?.details,
+          transform: transformResult?.details,
+          productCreate: productCreateResult?.details,
+          publish: publishResult.details,
+        })
 
         console.log(`[FullPipeline] Publish completed: ${publishResult.successCount} published`)
       }
@@ -584,10 +598,13 @@ export async function executeFullPipelineWithLock(
         limit: 10,  // 자동화 파이프라인: 최근 10개만 수집
       })
 
+      // 진행 상황 및 details 업데이트 (단계별 누적 저장)
       totalItems += collectionResult.totalItems
       successCount += collectionResult.successCount
       failedCount += collectionResult.failedCount
-      await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+      await updateWorkflowProgress(logId, totalItems, successCount, failedCount, {
+        collection: collectionResult.details,
+      })
 
       console.log(`[FullPipeline] Collection completed: ${collectionResult.successCount} new posts`)
     }
@@ -602,10 +619,14 @@ export async function executeFullPipelineWithLock(
         transformPendingOnly: true,
       })
 
+      // 진행 상황 및 details 업데이트 (단계별 누적 저장)
       totalItems += transformResult.totalItems
       successCount += transformResult.successCount
       failedCount += transformResult.failedCount
-      await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+      await updateWorkflowProgress(logId, totalItems, successCount, failedCount, {
+        collection: collectionResult?.details,
+        transform: transformResult.details,
+      })
 
       console.log(`[FullPipeline] Transform completed: ${transformResult.successCount} collected products created`)
     }
@@ -617,10 +638,15 @@ export async function executeFullPipelineWithLock(
         createPendingOnly: true,
       })
 
+      // 진행 상황 및 details 업데이트 (단계별 누적 저장)
       totalItems += productCreateResult.totalItems
       successCount += productCreateResult.successCount
       failedCount += productCreateResult.failedCount
-      await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+      await updateWorkflowProgress(logId, totalItems, successCount, failedCount, {
+        collection: collectionResult?.details,
+        transform: transformResult?.details,
+        productCreate: productCreateResult.details,
+      })
 
       console.log(`[FullPipeline] Product Create completed: ${productCreateResult.successCount} products created`)
     }
@@ -635,10 +661,16 @@ export async function executeFullPipelineWithLock(
           publishReadyOnly: true,
         })
 
+        // 진행 상황 및 details 업데이트 (단계별 누적 저장)
         totalItems += publishResult.totalItems
         successCount += publishResult.successCount
         failedCount += publishResult.failedCount
-        await updateWorkflowProgress(logId, totalItems, successCount, failedCount)
+        await updateWorkflowProgress(logId, totalItems, successCount, failedCount, {
+          collection: collectionResult?.details,
+          transform: transformResult?.details,
+          productCreate: productCreateResult?.details,
+          publish: publishResult.details,
+        })
 
         console.log(`[FullPipeline] Publish completed: ${publishResult.successCount} published`)
       }
