@@ -19,6 +19,7 @@ import {
   Phone,
   User,
 } from 'lucide-react'
+import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
 
 // 주문 상태 매핑
 const orderStatusMap: Record<string, { label: string; color: string; icon: any }> = {
@@ -383,7 +384,7 @@ function GuestOrderDetailContent() {
               </div>
               <div className="flex">
                 <span className="text-gray-500 w-24">연락처</span>
-                <span className="text-gray-900">{order.customer.phone}</span>
+                <span className="text-gray-900">{formatPhoneNumber(order.customer.phone)}</span>
               </div>
               {order.customer.email && (
                 <div className="flex">
@@ -408,7 +409,7 @@ function GuestOrderDetailContent() {
                 </div>
                 <div className="flex">
                   <span className="text-gray-500 w-24">연락처</span>
-                  <span className="text-gray-900">{order.shippingAddress.recipientPhone}</span>
+                  <span className="text-gray-900">{formatPhoneNumber(order.shippingAddress.recipientPhone)}</span>
                 </div>
                 <div className="flex">
                   <span className="text-gray-500 w-24">주소</span>

@@ -24,6 +24,7 @@ import {
   Building2,
   AlertCircle
 } from 'lucide-react'
+import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
 
 // 취소 사유 목록
 const CANCEL_REASONS = [
@@ -450,13 +451,14 @@ export default function OrderDetailPage() {
           </h2>
           <div className="relative">
             {/* Progress Line */}
-            <div className="absolute top-6 left-6 right-6 h-0.5 bg-gray-200"></div>
-            <div
-              className="absolute top-6 left-6 h-0.5 bg-[#FF6B6B] transition-all"
-              style={{
-                width: `${(deliverySteps.filter(s => s.completed).length - 1) / (deliverySteps.length - 1) * 100}%`
-              }}
-            ></div>
+            <div className="absolute top-6 left-6 right-6 h-0.5 bg-gray-200">
+              <div
+                className="absolute top-0 left-0 h-full bg-[#FF6B6B] transition-all"
+                style={{
+                  width: `${(deliverySteps.filter(s => s.completed).length - 1) / (deliverySteps.length - 1) * 100}%`
+                }}
+              ></div>
+            </div>
 
             <div className="relative flex justify-between">
               {deliverySteps.map((step, index) => (
@@ -556,7 +558,7 @@ export default function OrderDetailPage() {
                 <Phone className="w-4 h-4 text-gray-400 mt-0.5" />
                 <div>
                   <p className="text-gray-600">연락처</p>
-                  <p className="font-medium text-gray-900">{order.recipientPhone}</p>
+                  <p className="font-medium text-gray-900">{formatPhoneNumber(order.recipientPhone)}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -689,7 +691,7 @@ export default function OrderDetailPage() {
               </div>
               <div className="flex items-center gap-3">
                 <Phone className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-900">{order.customer.phone}</span>
+                <span className="text-gray-900">{formatPhoneNumber(order.customer.phone)}</span>
               </div>
               {order.customer.email && (
                 <div className="flex items-center gap-3">

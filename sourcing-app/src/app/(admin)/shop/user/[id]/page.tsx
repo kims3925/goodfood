@@ -24,6 +24,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 
@@ -602,7 +603,7 @@ export default function UserDetailPage() {
                               <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">기본 배송지</span>
                             )}
                           </div>
-                          <p className="text-sm text-gray-600">{address.recipientName} · {address.recipientPhone}</p>
+                          <p className="text-sm text-gray-600">{address.recipientName} · {formatPhoneNumber(address.recipientPhone)}</p>
                           <p className="text-sm text-gray-600 mt-1">
                             [{address.postalCode}] {address.address}
                             {address.addressDetail && ` ${address.addressDetail}`}

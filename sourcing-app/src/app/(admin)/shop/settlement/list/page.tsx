@@ -1,8 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 import {
   RefreshCw,
   Store,
@@ -13,7 +11,6 @@ import {
   ShoppingBag,
   Package,
   AlertCircle,
-  History,
   CheckCircle,
   ExternalLink,
   TrendingUp,
@@ -74,7 +71,6 @@ interface SettlementData {
 }
 
 export default function SettlementListPage() {
-  const router = useRouter()
   const toast = useToast()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<SettlementData | null>(null)
@@ -127,13 +123,13 @@ export default function SettlementListPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    const date = new Date(dateString)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hour = String(date.getHours()).padStart(2, '0')
+    const minute = String(date.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day} ${hour}:${minute}`
   }
 
   const openSettlementModal = (shop: ShopData) => {
@@ -171,19 +167,15 @@ export default function SettlementListPage() {
           {/* 쇼핑몰 정보 헤더 */}
           <div className="flex items-start gap-3 mb-4">
             {shop.logoUrl ? (
-              <Image
+              <img
                 src={shop.logoUrl}
                 alt={shop.name}
-                width={48}
-                height={48}
                 className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-gray-200 shadow-sm"
               />
             ) : shop.coverUrl ? (
-              <Image
+              <img
                 src={shop.coverUrl}
                 alt={shop.name}
-                width={48}
-                height={48}
                 className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-gray-200 shadow-sm"
               />
             ) : (
@@ -242,7 +234,7 @@ export default function SettlementListPage() {
         </div>
 
         {/* 통계 및 액션 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-blue-100 rounded-lg">
@@ -289,21 +281,6 @@ export default function SettlementListPage() {
               <div>
                 <p className="text-sm text-gray-500">데이터</p>
                 <p className="text-lg font-bold text-gray-600">새로고침</p>
-              </div>
-            </div>
-          </button>
-          {/* 정산 이력 카드 */}
-          <button
-            onClick={() => router.push('/shop/settlement/history')}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <History size={24} className="text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">정산</p>
-                <p className="text-lg font-bold text-blue-600">이력 보기</p>
               </div>
             </div>
           </button>
@@ -370,19 +347,15 @@ export default function SettlementListPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       {selectedShop.logoUrl ? (
-                        <Image
+                        <img
                           src={selectedShop.logoUrl}
                           alt={selectedShop.name}
-                          width={48}
-                          height={48}
                           className="w-12 h-12 rounded-lg object-cover"
                         />
                       ) : selectedShop.coverUrl ? (
-                        <Image
+                        <img
                           src={selectedShop.coverUrl}
                           alt={selectedShop.name}
-                          width={48}
-                          height={48}
                           className="w-12 h-12 rounded-lg object-cover"
                         />
                       ) : (
@@ -440,11 +413,9 @@ export default function SettlementListPage() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               {item.thumbnailUrl ? (
-                                <Image
+                                <img
                                   src={item.thumbnailUrl}
                                   alt={item.productName}
-                                  width={32}
-                                  height={32}
                                   className="w-8 h-8 rounded object-cover"
                                 />
                               ) : (

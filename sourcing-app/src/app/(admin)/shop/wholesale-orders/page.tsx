@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import {
   Package,
   Download,
@@ -15,9 +14,9 @@ import {
   ShoppingCart,
   Banknote,
   Store,
-  History,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 
@@ -218,20 +217,11 @@ export default function WholesaleOrdersPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
-        <div className="mb-8 flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">도매처 발주 관리</h1>
-            <p className="text-gray-600">
-              결제 완료된 주문을 도매처별로 집계하고 발주서를 생성합니다.
-            </p>
-          </div>
-          <Link
-            href="/shop/wholesale-orders/history"
-            className="flex items-center gap-2 px-4 py-2 text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
-          >
-            <History size={18} />
-            발주 이력
-          </Link>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">발주 관리</h1>
+          <p className="text-gray-600">
+            결제 완료된 주문을 도매처별로 집계하고 발주서를 생성합니다.
+          </p>
         </div>
 
         {/* 통계 및 액션 카드 */}
@@ -462,7 +452,7 @@ export default function WholesaleOrdersPage() {
                           <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatPrice(item.wholesalePrice)}</td>
                           <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">{formatPrice(item.totalAmount)}</td>
                           <td className="px-4 py-3 text-sm text-gray-900">{item.customerName}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{item.customerPhone}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{formatPhoneNumber(item.customerPhone)}</td>
                           <td className="px-4 py-3 text-sm text-gray-600 max-w-[250px] truncate" title={item.customerAddress}>
                             {item.customerAddress}
                           </td>

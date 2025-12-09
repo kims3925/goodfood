@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
       let cart = null
       if (currentUserId) {
         cart = await prisma.cart.findFirst({
-          where: { userId: currentUserId },
+          where: { userId: currentUserId, shopId },
           include: {
             items: {
               include: {
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
         })
       } else if (sessionId) {
         cart = await prisma.cart.findFirst({
-          where: { sessionId, userId: null },
+          where: { sessionId, userId: null, shopId },
           include: {
             items: {
               include: {

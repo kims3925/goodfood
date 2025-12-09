@@ -21,12 +21,66 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get('from') // YYYY-MM-DD
     const to = searchParams.get('to') // YYYY-MM-DD
 
-    // 도매처 목록 조회
+    // 도매처 목록 조회 (주문이 있는 도매처만)
+    // 먼저 주문이 있는 도매 채널 ID 목록을 가져옴
+    const channelsWithOrders = await prisma.orderItem.findMany({
+      where: {
+        order: {
+          status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+          paidAt: { not: null },
+        },
+        publishedProduct: {
+          userId: user.userId,
+          product: {
+            collectedProduct: {
+              post: {
+                channel: {
+                  kind: 'WHOLESALE',
+                  userId: user.userId,
+                },
+              },
+            },
+          },
+        },
+      },
+      select: {
+        publishedProduct: {
+          select: {
+            product: {
+              select: {
+                collectedProduct: {
+                  select: {
+                    post: {
+                      select: {
+                        channelId: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      distinct: ['publishedProductId'],
+    })
+
+    // 주문이 있는 채널 ID 추출
+    const channelIdsWithOrders = new Set<number>()
+    for (const item of channelsWithOrders) {
+      const channelId = item.publishedProduct?.product?.collectedProduct?.post?.channelId
+      if (channelId) {
+        channelIdsWithOrders.add(channelId)
+      }
+    }
+
+    // 주문이 있는 도매처만 조회
     const wholesaleChannels = await prisma.channel.findMany({
       where: {
         userId: user.userId,
         kind: 'WHOLESALE',
         isActive: true,
+        id: { in: Array.from(channelIdsWithOrders) },
       },
       select: {
         id: true,

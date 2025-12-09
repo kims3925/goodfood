@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 
@@ -619,7 +620,7 @@ export default function WholesaleOrderHistoryPage() {
                         <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatPrice(item.wholesalePrice)}</td>
                         <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">{formatPrice(item.totalAmount)}</td>
                         <td className="px-4 py-3 text-sm text-gray-900">{item.customerName}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{item.customerPhone}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{formatPhoneNumber(item.customerPhone)}</td>
                         <td className="px-4 py-3 text-sm text-gray-600 max-w-[250px] truncate" title={item.customerAddress}>
                           {item.customerAddress}
                         </td>

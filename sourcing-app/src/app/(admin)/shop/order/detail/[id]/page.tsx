@@ -18,11 +18,11 @@ import {
   Store,
   AlertCircle,
   ImageOff,
-  ShoppingBag,
   FileSpreadsheet,
   Building2,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
@@ -211,13 +211,13 @@ export default function UnifiedOrderDetailPage() {
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-'
-    return new Date(dateString).toLocaleString('ko-KR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    const date = new Date(dateString)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hour = String(date.getHours()).padStart(2, '0')
+    const minute = String(date.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day} ${hour}:${minute}`
   }
 
   if (isLoading) {
@@ -277,11 +277,11 @@ export default function UnifiedOrderDetailPage() {
           </div>
           <div className="p-4">
             <div className="flex flex-wrap items-center gap-3 mb-4">
-              {/* 출처 배지 */}
+              {/* 출처 배지 - 쇼핑몰명이 있으면 쇼핑몰명만 표시 */}
               {isShoppingMall ? (
                 <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
-                  <ShoppingBag size={16} />
-                  쇼핑몰 주문
+                  <Store size={16} />
+                  {order.shopName || '쇼핑몰 주문'}
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-700">
@@ -301,13 +301,6 @@ export default function UnifiedOrderDetailPage() {
                   무통장입금
                 </span>
               )}
-              {/* 쇼핑몰 이름 */}
-              {order.shopName && (
-                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-700">
-                  <Store size={16} />
-                  {order.shopName}
-                </span>
-              )}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
@@ -317,7 +310,7 @@ export default function UnifiedOrderDetailPage() {
               {order.customerPhone && (
                 <div>
                   <p className="text-sm text-gray-500 mb-1">연락처</p>
-                  <p className="font-medium text-gray-900">{order.customerPhone}</p>
+                  <p className="font-medium text-gray-900">{formatPhoneNumber(order.customerPhone)}</p>
                 </div>
               )}
               {order.user && (
@@ -428,7 +421,7 @@ export default function UnifiedOrderDetailPage() {
                       <Phone size={18} className="text-gray-400 mt-0.5" />
                       <div>
                         <p className="text-sm text-gray-500">연락처</p>
-                        <p className="font-medium text-gray-900">{order.shippingAddress.recipientPhone}</p>
+                        <p className="font-medium text-gray-900">{formatPhoneNumber(order.shippingAddress.recipientPhone)}</p>
                       </div>
                     </div>
                   </div>
@@ -543,12 +536,6 @@ export default function UnifiedOrderDetailPage() {
                   <span className="font-semibold text-gray-900">총 결제금액</span>
                   <span className="text-xl font-bold text-blue-600">{formatPrice(order.totalAmount)}</span>
                 </div>
-                {order.payment && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <p className="text-sm text-gray-500">결제 수단: {order.payment.method}</p>
-                    <p className="text-sm text-gray-500">결제 상태: {order.payment.status}</p>
-                  </div>
-                )}
               </div>
             </div>
 

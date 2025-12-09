@@ -43,10 +43,13 @@ export default function CouponsPage() {
       const data = await response.json()
 
       if (data.success) {
-        setCoupons(data.coupons)
+        setCoupons(data.coupons || [])
+      } else {
+        setCoupons([])
       }
     } catch (error) {
       console.error('Failed to fetch coupons:', error)
+      setCoupons([])
     } finally {
       setLoading(false)
     }
