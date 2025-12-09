@@ -25,6 +25,8 @@ interface PublishedChannel {
   channelCoverUrl: string | null
   platform: string | null
   shopId: number | null
+  shopName: string | null
+  shopSubdomain: string | null
   publishedAt: string | null
   createdAt: string
   updatedAt: string
@@ -66,7 +68,11 @@ export default function PublishedProductListPage() {
 
   // Filter states
   const [channels, setChannels] = useState<Channel[]>([])
+  const [shopCount, setShopCount] = useState(0)
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
+
+  // 발행처 수 = 채널 수 + Shop 수
+  const publishDestinationCount = channels.length + shopCount
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
@@ -85,6 +91,7 @@ export default function PublishedProductListPage() {
 
   useEffect(() => {
     loadChannels()
+    loadShopCount()
   }, [])
 
   const loadChannels = async () => {
@@ -96,6 +103,18 @@ export default function PublishedProductListPage() {
       }
     } catch (error) {
       console.error('채널 목록 조회 실패:', error)
+    }
+  }
+
+  const loadShopCount = async () => {
+    try {
+      const response = await fetch('/api/shop?limit=1')
+      const data = await response.json()
+      if (data.success) {
+        setShopCount(data.total || 0)
+      }
+    } catch (error) {
+      console.error('Shop 수 조회 실패:', error)
     }
   }
 
@@ -336,28 +355,50 @@ export default function PublishedProductListPage() {
 
   const getChannelBadges = (productGroup: PublishedProductGroup) => {
     if (!productGroup.publishedChannels || productGroup.publishedChannels.length === 0) {
-      return <span className="text-gray-400 text-sm">발행 채널 없음</span>
+      return <span className="text-gray-400 text-sm">발행처 없음</span>
     }
 
-    // channelId 기준으로 중복 제거 (channelId가 null인 경우 shopId로 구분)
-    const uniqueChannels = productGroup.publishedChannels.reduce((acc, channel) => {
-      const key = channel.channelId?.toString() || `shop-${channel.shopId}` || channel.publishId.toString()
-      if (!acc.has(key)) {
-        acc.set(key, channel)
+    // Shop 발행과 채널 발행 분리
+    const shopPublishes = productGroup.publishedChannels.filter(p => p.shopId !== null && p.channelId === null)
+    const channelPublishes = productGroup.publishedChannels.filter(p => p.channelId !== null)
+
+    // 중복 제거
+    const uniqueShops = new Map<number, PublishedChannel>()
+    shopPublishes.forEach(p => {
+      if (p.shopId && !uniqueShops.has(p.shopId)) {
+        uniqueShops.set(p.shopId, p)
       }
-      return acc
-    }, new Map<string, PublishedChannel>())
+    })
+
+    const uniqueChannels = new Map<number, PublishedChannel>()
+    channelPublishes.forEach(p => {
+      if (p.channelId && !uniqueChannels.has(p.channelId)) {
+        uniqueChannels.set(p.channelId, p)
+      }
+    })
 
     return (
       <div className="flex flex-wrap gap-1.5">
-        {Array.from(uniqueChannels.values()).map((channel) => (
+        {/* Shop 발행 뱃지 */}
+        {Array.from(uniqueShops.values()).map((publish) => (
           <span
-            key={channel.channelId || channel.publishId}
-            className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium"
-            title={channel.channelName || '알 수 없음'}
+            key={`shop-${publish.shopId}`}
+            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium"
+            title={publish.shopName || '쇼핑몰'}
           >
             <Store size={12} />
-            {channel.channelName || '알 수 없음'}
+            {publish.shopName || '쇼핑몰'}
+          </span>
+        ))}
+        {/* 채널 발행 뱃지 */}
+        {Array.from(uniqueChannels.values()).map((publish) => (
+          <span
+            key={`channel-${publish.channelId}`}
+            className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium"
+            title={publish.channelName || '채널'}
+          >
+            <Store size={12} />
+            {publish.channelName || '채널'}
           </span>
         ))}
       </div>
@@ -396,7 +437,7 @@ export default function PublishedProductListPage() {
                 <Package size={24} className="text-gray-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">전체 발행상품</p>
+                <p className="text-sm text-gray-500">발행상품</p>
                 <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
               </div>
             </div>
@@ -407,8 +448,8 @@ export default function PublishedProductListPage() {
                 <CheckCircle size={24} className="text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">발행 채널 수</p>
-                <p className="text-2xl font-bold text-green-600">{channels.length}</p>
+                <p className="text-sm text-gray-500">발행처 수</p>
+                <p className="text-2xl font-bold text-green-600">{publishDestinationCount}</p>
               </div>
             </div>
           </div>
@@ -429,7 +470,7 @@ export default function PublishedProductListPage() {
               <div>
                 <p className="text-sm text-gray-500">선택 삭제</p>
                 <p className={`text-lg font-bold ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                  {selectedIds.length}개 선택됨
+                  {products.filter(p => p.publishedChannels.some(ch => selectedIds.includes(ch.publishId))).length}개 상품 선택됨
                 </p>
               </div>
             </div>
@@ -509,7 +550,7 @@ export default function PublishedProductListPage() {
                     />
                   </TableHead>
                   <TableHead className="w-[32%]">상품명</TableHead>
-                  <TableHead className="w-[16%]">발행 채널</TableHead>
+                  <TableHead className="w-[16%]">발행처</TableHead>
                   <TableHead className="w-[16%]">생성일시</TableHead>
                   <TableHead className="w-[16%]">수정일시</TableHead>
                   <TableHead className="w-[16%]">발행일시</TableHead>
