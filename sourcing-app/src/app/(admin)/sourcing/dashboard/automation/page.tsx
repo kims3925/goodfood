@@ -837,35 +837,102 @@ export default function AutomationDashboardPage() {
 
         {/* Schedule Info */}
         <Card className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Clock size={20} className="text-blue-500" />
-            스케줄 정보
-          </h2>
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Timer size={18} className="text-gray-500" />
-              <div>
-                <p className="text-xs text-gray-500">실행 시간</p>
-                <p className="font-medium text-gray-900">
-                  {getSelectedHoursSummary(config?.selectedHours)}
-                </p>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Clock size={20} className="text-blue-500" />
+              스케줄 정보
+            </h2>
+            <Link href="/automation/settings">
+              <button className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                <Settings size={12} />
+                설정
+              </button>
+            </Link>
+          </div>
+
+          {/* 다음 실행 시간 - 강조 표시 */}
+          {config?.isEnabled && config?.selectedHours && config.selectedHours.length > 0 ? (
+            <div className="mb-4 p-4 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100 text-xs mb-1">다음 실행</p>
+                  <p className="text-2xl font-bold">
+                    {calculateNextExecution(config.selectedHours).nextTime}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-blue-100 text-xs mb-1">남은 시간</p>
+                  <p className="text-lg font-semibold text-blue-100">
+                    {countdown || '계산 중...'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-4 p-4 bg-gray-100 rounded-xl">
+              <div className="flex items-center gap-3 text-gray-500">
+                <Pause size={20} />
+                <div>
+                  <p className="font-medium text-gray-700">자동 실행 비활성화</p>
+                  <p className="text-xs">설정에서 스케줄을 활성화하세요</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {/* 실행 시간대 */}
+            <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+              <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                <Timer size={16} className="text-indigo-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500 mb-1">실행 시간대</p>
+                {config?.selectedHours && config.selectedHours.length > 0 ? (
+                  <div>
+                    <p className="font-medium text-gray-900 text-sm">
+                      {config.selectedHours.length === 24
+                        ? '매 시간 실행'
+                        : `하루 ${config.selectedHours.length}회`}
+                    </p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {[...config.selectedHours].sort((a, b) => a - b).slice(0, 8).map(hour => (
+                        <span
+                          key={hour}
+                          className="px-1.5 py-0.5 text-xs bg-indigo-100 text-indigo-700 rounded font-medium"
+                        >
+                          {hour.toString().padStart(2, '0')}:00
+                        </span>
+                      ))}
+                      {config.selectedHours.length > 8 && (
+                        <span className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 rounded">
+                          +{config.selectedHours.length - 8}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="font-medium text-gray-400 text-sm">설정 안됨</p>
+                )}
               </div>
             </div>
 
+            {/* 마지막 실행 */}
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <CheckCircle size={18} className="text-green-500" />
-              <div>
+              <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                <CheckCircle size={16} className="text-green-600" />
+              </div>
+              <div className="flex-1">
                 <p className="text-xs text-gray-500">마지막 실행</p>
-                <p className="font-medium text-gray-900">{formatTime(config?.lastRunAt || null)}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-              <TrendingUp size={18} className="text-blue-500" />
-              <div>
-                <p className="text-xs text-gray-500">다음 실행</p>
-                <p className="font-medium text-blue-600">
-                  {config?.isEnabled ? formatTime(config?.nextRunAt || null) : '비활성화'}
+                <p className="font-medium text-gray-900 text-sm">
+                  {config?.lastRunAt
+                    ? new Date(config.lastRunAt).toLocaleString('ko-KR', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    : '아직 실행 기록 없음'}
                 </p>
               </div>
             </div>
