@@ -193,6 +193,13 @@ export default function WholesaleOrderHistoryPage() {
     fetchHistory()
   }, [fetchHistory])
 
+  // 첫 로드 시 첫 번째 도매처 자동 선택
+  useEffect(() => {
+    if (!selectedChannelId && channels.length > 0 && !loading) {
+      setSelectedChannelId(channels[0].id)
+    }
+  }, [channels, loading])
+
   // 모달 열기
   const openModal = (date: string) => {
     setModalDate(date)
@@ -269,7 +276,6 @@ export default function WholesaleOrderHistoryPage() {
                 onChange={(e) => setSelectedChannelId(e.target.value ? parseInt(e.target.value) : null)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
               >
-                <option value="">도매처를 선택하세요</option>
                 {channels.map((channel) => (
                   <option key={channel.id} value={channel.id}>
                     {channel.name}
@@ -343,41 +349,13 @@ export default function WholesaleOrderHistoryPage() {
           </div>
         </div>
 
-        {/* 도매처 미선택 시 */}
-        {!selectedChannelId && !loading && (
+        {/* 발주 내역이 있는 도매처가 없는 경우 */}
+        {!loading && channels.length === 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12">
-            <div className="text-center mb-8">
+            <div className="text-center">
               <Store size={48} className="mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500 text-lg">도매처를 선택하여 발주 이력을 조회하세요.</p>
+              <p className="text-gray-500 text-lg">발주 내역이 있는 도매처가 없습니다.</p>
             </div>
-
-            {/* 도매처 카드 목록 */}
-            {channels.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 max-w-4xl mx-auto">
-                {channels.map((channel) => (
-                  <button
-                    key={channel.id}
-                    onClick={() => setSelectedChannelId(channel.id)}
-                    className="bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl p-4 transition-all text-center"
-                  >
-                    <div className="w-16 h-16 mx-auto mb-3 rounded-lg bg-gray-200 overflow-hidden">
-                      {channel.coverUrl ? (
-                        <img
-                          src={channel.coverUrl}
-                          alt={channel.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Store size={24} className="text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                    <p className="font-medium text-gray-900 truncate">{channel.name}</p>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         )}
 

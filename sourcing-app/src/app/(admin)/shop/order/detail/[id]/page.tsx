@@ -98,19 +98,37 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.R
   RECEIVED: { label: '수령완료', color: 'bg-teal-100 text-teal-700', icon: <CheckCircle size={16} /> },
 }
 
-// 일반 상태 옵션 (첫 번째 줄)
-const ORDER_STATUS_OPTIONS = [
-  { value: 'PENDING', label: '결제대기', color: 'bg-yellow-100 text-yellow-700' },
-  { value: 'PAID', label: '결제완료', color: 'bg-blue-100 text-blue-700' },
-  { value: 'SHIPPED', label: '배송중', color: 'bg-indigo-100 text-indigo-700' },
-  { value: 'DELIVERED', label: '배송완료', color: 'bg-green-100 text-green-700' },
-]
+// 주문 상태 흐름 정의
+const ORDER_STATUS_FLOW: Record<string, { next: string | null; nextLabel: string }> = {
+  PENDING: { next: 'PAID', nextLabel: '결제 확인' },
+  PAID: { next: 'SHIPPED', nextLabel: '배송 시작' },
+  SHIPPED: { next: 'DELIVERED', nextLabel: '배송 완료' },
+  DELIVERED: { next: null, nextLabel: '' },
+  CANCELLED: { next: null, nextLabel: '' },
+  REFUNDED: { next: null, nextLabel: '' },
+}
 
-// 취소/환불 상태 옵션 (두 번째 줄)
-const CANCEL_STATUS_OPTIONS = [
-  { value: 'CANCELLED', label: '주문취소', color: 'bg-red-100 text-red-700' },
-  { value: 'REFUNDED', label: '환불완료', color: 'bg-gray-100 text-gray-700' },
-]
+// 스테퍼 단계 정의
+const ORDER_STEPS = [
+  { key: 'PENDING', label: '주문접수', icon: Clock, dateField: 'createdAt' },
+  { key: 'PAID', label: '결제완료', icon: CreditCard, dateField: 'paidAt' },
+  { key: 'SHIPPED', label: '배송중', icon: Truck, dateField: 'shippedAt' },
+  { key: 'DELIVERED', label: '배송완료', icon: CheckCircle, dateField: 'deliveredAt' },
+] as const
+
+// 상태를 단계 인덱스로 변환
+const getStepIndex = (status: string): number => {
+  switch (status) {
+    case 'PENDING': return 0
+    case 'PAID': return 1
+    case 'SHIPPED': return 2
+    case 'DELIVERED': return 3
+    case 'CANCELLED':
+    case 'REFUNDED':
+      return -1 // 취소/환불은 별도 처리
+    default: return 0
+  }
+}
 
 export default function UnifiedOrderDetailPage() {
   const router = useRouter()
@@ -327,6 +345,132 @@ export default function UnifiedOrderDetailPage() {
           </div>
         </div>
 
+        {/* 주문 진행 상황 스테퍼 - 옵션 비교 */}
+        {isShoppingMall && !['CANCELLED', 'REFUNDED'].includes(order.status) && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+            <div className="p-6">
+                {/* 스테퍼 */}
+                <div className="flex items-center justify-center mb-8 max-w-4xl mx-auto">
+                  {ORDER_STEPS.map((step, index) => {
+                    const currentIndex = getStepIndex(order.status)
+                    const isCompleted = index < currentIndex
+                    const isCurrent = index === currentIndex
+                    const StepIcon = step.icon
+                    const dateValue = order[step.dateField as keyof UnifiedOrderDetail] as string | null
+
+                    return (
+                      <div key={step.key} className={`flex items-center ${index < ORDER_STEPS.length - 1 ? 'flex-1' : ''}`}>
+                        {/* 스텝 아이콘 & 라벨 */}
+                        <div className="flex flex-col items-center min-w-[100px]">
+                          <div
+                            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                              isCompleted
+                                ? 'bg-green-500 text-white'
+                                : isCurrent
+                                ? 'bg-blue-500 text-white ring-4 ring-blue-100'
+                                : 'bg-gray-200 text-gray-400'
+                            }`}
+                          >
+                            {isCompleted ? (
+                              <CheckCircle size={24} />
+                            ) : (
+                              <StepIcon size={24} />
+                            )}
+                          </div>
+                          <p
+                            className={`mt-2 text-sm font-medium ${
+                              isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'
+                            }`}
+                          >
+                            {step.label}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {dateValue ? formatDate(dateValue) : '-'}
+                          </p>
+                        </div>
+
+                        {/* 연결선 */}
+                        {index < ORDER_STEPS.length - 1 && (
+                          <div
+                            className={`flex-1 h-1 mx-4 rounded ${
+                              index < currentIndex ? 'bg-green-500' : 'bg-gray-200'
+                            }`}
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* 액션 버튼 */}
+                <div className="flex items-center justify-center gap-3 pt-4 border-t border-gray-100">
+                  {ORDER_STATUS_FLOW[order.status]?.next && (
+                    <Button
+                      variant="primary"
+                      onClick={() => handleStatusChange(ORDER_STATUS_FLOW[order.status].next!)}
+                      disabled={isUpdating}
+                      size="lg"
+                    >
+                      {order.status === 'PENDING' && <CreditCard size={18} />}
+                      {order.status === 'PAID' && <Truck size={18} />}
+                      {order.status === 'SHIPPED' && <CheckCircle size={18} />}
+                      {ORDER_STATUS_FLOW[order.status].nextLabel}
+                    </Button>
+                  )}
+                  {['PENDING', 'PAID'].includes(order.status) && (
+                    <Button
+                      variant="danger"
+                      onClick={() => handleStatusChange('CANCELLED')}
+                      disabled={isUpdating}
+                    >
+                      <XCircle size={18} />
+                      주문 취소
+                    </Button>
+                  )}
+                  {order.status === 'DELIVERED' && (
+                    <p className="text-green-600 font-medium flex items-center gap-2">
+                      <CheckCircle size={18} />
+                      배송이 완료되었습니다
+                    </p>
+                  )}
+                </div>
+            </div>
+          </div>
+        )}
+
+        {/* 취소/환불된 주문 표시 */}
+        {isShoppingMall && ['CANCELLED', 'REFUNDED'].includes(order.status) && (
+          <div className={`rounded-lg p-4 border mb-6 ${
+            order.status === 'CANCELLED' ? 'bg-red-50 border-red-200' : 'bg-purple-50 border-purple-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                order.status === 'CANCELLED' ? 'bg-red-100' : 'bg-purple-100'
+              }`}>
+                <XCircle size={20} className={order.status === 'CANCELLED' ? 'text-red-600' : 'text-purple-600'} />
+              </div>
+              <div className="flex-1">
+                <p className={`font-medium ${order.status === 'CANCELLED' ? 'text-red-900' : 'text-purple-900'}`}>
+                  {order.status === 'CANCELLED' ? '주문이 취소되었습니다' : '환불이 완료되었습니다'}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {formatDate(order.cancelledAt)}
+                </p>
+              </div>
+              {order.status === 'CANCELLED' && (
+                <Button
+                  variant="secondary"
+                  onClick={() => handleStatusChange('REFUNDED')}
+                  disabled={isUpdating}
+                >
+                  <CheckCircle size={16} />
+                  환불 완료 처리
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* 무통장입금 입금 확인 안내 */}
         {isShoppingMall && isBankTransfer && order.status === 'PENDING' && (
           <div className="bg-amber-50 rounded-lg p-4 border border-amber-200 mb-6">
@@ -445,66 +589,6 @@ export default function UnifiedOrderDetailPage() {
               </div>
             )}
 
-            {/* 주문 타임라인 */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <Calendar size={20} />
-                  주문 진행 상황
-                </h2>
-              </div>
-              <div className="p-4">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${order.createdAt ? 'bg-green-100' : 'bg-gray-100'}`}>
-                      <Clock size={16} className={order.createdAt ? 'text-green-600' : 'text-gray-400'} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">주문 접수</p>
-                      <p className="text-sm text-gray-500">{formatDate(order.createdAt)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${order.paidAt ? 'bg-green-100' : 'bg-gray-100'}`}>
-                      <CreditCard size={16} className={order.paidAt ? 'text-green-600' : 'text-gray-400'} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">결제 완료</p>
-                      <p className="text-sm text-gray-500">{formatDate(order.paidAt)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${order.shippedAt ? 'bg-green-100' : 'bg-gray-100'}`}>
-                      <Truck size={16} className={order.shippedAt ? 'text-green-600' : 'text-gray-400'} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">배송 시작</p>
-                      <p className="text-sm text-gray-500">{formatDate(order.shippedAt)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${order.deliveredAt ? 'bg-green-100' : 'bg-gray-100'}`}>
-                      <CheckCircle size={16} className={order.deliveredAt ? 'text-green-600' : 'text-gray-400'} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">배송 완료</p>
-                      <p className="text-sm text-gray-500">{formatDate(order.deliveredAt)}</p>
-                    </div>
-                  </div>
-                  {order.cancelledAt && (
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-red-100">
-                        <XCircle size={16} className="text-red-600" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-red-600">주문 취소</p>
-                        <p className="text-sm text-gray-500">{formatDate(order.cancelledAt)}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* 오른쪽: 결제 정보 + 상태 변경 */}
@@ -539,108 +623,6 @@ export default function UnifiedOrderDetailPage() {
               </div>
             </div>
 
-            {/* 상태 변경 */}
-            {isShoppingMall && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div className="p-4 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">주문 상태 변경</h2>
-                </div>
-                <div className="p-4 space-y-2">
-                  {/* 일반 상태 (첫 번째 줄) */}
-                  <div className="flex flex-wrap gap-2">
-                    {ORDER_STATUS_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => handleStatusChange(option.value)}
-                        disabled={isUpdating || option.value === order.status}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                          option.value === order.status
-                            ? `${option.color} ring-2 ring-offset-1 ring-current`
-                            : 'bg-white border border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50'
-                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  {/* 취소/환불 상태 (두 번째 줄) */}
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {CANCEL_STATUS_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => handleStatusChange(option.value)}
-                        disabled={isUpdating || option.value === order.status}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                          option.value === order.status
-                            ? `${option.color} ring-2 ring-offset-1 ring-current`
-                            : 'bg-white border border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50'
-                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {order.status === 'PAID' && (
-                    <Button
-                      variant="primary"
-                      onClick={() => handleStatusChange('SHIPPED')}
-                      disabled={isUpdating}
-                      className="w-full"
-                    >
-                      <Truck size={16} />
-                      배송 시작
-                    </Button>
-                  )}
-                  {order.status === 'SHIPPED' && (
-                    <Button
-                      variant="primary"
-                      onClick={() => handleStatusChange('DELIVERED')}
-                      disabled={isUpdating}
-                      className="w-full"
-                    >
-                      <CheckCircle size={16} />
-                      배송 완료
-                    </Button>
-                  )}
-                  {['PENDING', 'PAID'].includes(order.status) && (
-                    <Button
-                      variant="danger"
-                      onClick={() => handleStatusChange('CANCELLED')}
-                      disabled={isUpdating}
-                      className="w-full"
-                    >
-                      <XCircle size={16} />
-                      주문 취소
-                    </Button>
-                  )}
-                  {order.status === 'DELIVERED' && (
-                    <p className="text-center text-sm text-gray-500 py-2">
-                      배송이 완료된 주문입니다.
-                    </p>
-                  )}
-                  {order.status === 'CANCELLED' && (
-                    <p className="text-center text-sm text-red-500 py-2">
-                      취소된 주문입니다.
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 밴드 주문 안내 */}
-            {!isShoppingMall && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div className="p-4 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">주문 상태</h2>
-                </div>
-                <div className="p-4">
-                  <p className="text-sm text-gray-500">
-                    밴드 주문은 현재 상태 변경을 지원하지 않습니다.
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
