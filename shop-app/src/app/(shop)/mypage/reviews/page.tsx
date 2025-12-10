@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Star, Package, X, Pencil, Trash2, MoreVertical } from 'lucide-react'
+import Image from 'next/image'
 
 interface WritableItem {
   orderItemId: number
@@ -422,12 +423,14 @@ export default function ReviewsPage() {
                   className="bg-white border border-gray-200 rounded-lg p-6"
                 >
                   <div className="flex gap-4 items-center">
-                    <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                    <div className="relative w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                       {item.thumbnailUrl ? (
-                        <img
+                        <Image
                           src={item.thumbnailUrl}
                           alt={item.productName}
-                          className="w-full h-full object-cover"
+                          fill
+                          sizes="80px"
+                          className="object-cover"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -478,12 +481,14 @@ export default function ReviewsPage() {
                 >
                   {/* 상품 정보 */}
                   <div className="flex gap-4 mb-4 pb-4 border-b border-gray-100">
-                    <div className="w-16 h-16 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                    <div className="relative w-16 h-16 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                       {review.orderItem?.thumbnailUrl || review.product.thumbnailUrl ? (
-                        <img
+                        <Image
                           src={review.orderItem?.thumbnailUrl || review.product.thumbnailUrl || ''}
                           alt={review.orderItem?.productName || review.product.name}
-                          className="w-full h-full object-cover"
+                          fill
+                          sizes="64px"
+                          className="object-cover"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -535,12 +540,14 @@ export default function ReviewsPage() {
                   {/* 이미지 */}
                   {review.images && review.images.length > 0 && (
                     <div className="flex gap-2 flex-wrap">
-                      {review.images.map((img: string, idx: number) => (
-                        <div key={idx} className="w-24 h-24 bg-gray-100 rounded-md overflow-hidden">
-                          <img
-                            src={img}
+                      {review.images.map((reviewImg: string, idx: number) => (
+                        <div key={idx} className="relative w-24 h-24 bg-gray-100 rounded-md overflow-hidden">
+                          <Image
+                            src={reviewImg}
                             alt={`리뷰 이미지 ${idx + 1}`}
-                            className="w-full h-full object-cover"
+                            fill
+                            sizes="96px"
+                            className="object-cover"
                           />
                         </div>
                       ))}
@@ -624,12 +631,14 @@ export default function ReviewsPage() {
             <div className="p-6">
               {/* 상품 정보 */}
               <div className="flex gap-4 mb-6 pb-6 border-b border-gray-100">
-                <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                <div className="relative w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                   {selectedItem.thumbnailUrl ? (
-                    <img
+                    <Image
                       src={selectedItem.thumbnailUrl}
                       alt={selectedItem.productName}
-                      className="w-full h-full object-cover"
+                      fill
+                      sizes="80px"
+                      className="object-cover"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
@@ -732,12 +741,14 @@ export default function ReviewsPage() {
             <div className="p-6">
               {/* 상품 정보 */}
               <div className="flex gap-4 mb-6 pb-6 border-b border-gray-100">
-                <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                <div className="relative w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                   {editingReview.orderItem?.thumbnailUrl || editingReview.product.thumbnailUrl ? (
-                    <img
+                    <Image
                       src={editingReview.orderItem?.thumbnailUrl || editingReview.product.thumbnailUrl || ''}
                       alt={editingReview.orderItem?.productName || editingReview.product.name}
-                      className="w-full h-full object-cover"
+                      fill
+                      sizes="80px"
+                      className="object-cover"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">

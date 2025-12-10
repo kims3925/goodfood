@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { RotateCcw, Package, Calendar, CreditCard, ChevronRight } from 'lucide-react'
 
 interface OrderItem {
@@ -219,12 +220,14 @@ export default function ReturnsPage() {
                   <div className="space-y-4">
                     {order.items.slice(0, 2).map((item) => (
                       <div key={item.id} className="flex gap-4">
-                        <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                        <div className="relative w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                           {item.thumbnailUrl ? (
-                            <img
+                            <Image
                               src={item.thumbnailUrl}
                               alt={item.productName}
-                              className="w-full h-full object-cover"
+                              fill
+                              sizes="80px"
+                              className="object-cover"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">

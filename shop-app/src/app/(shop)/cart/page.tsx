@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useSession } from 'next-auth/react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Minus, Plus, X, ShoppingBag, Check, Truck } from 'lucide-react'
@@ -430,11 +431,13 @@ export default function CartPage() {
 
                       {/* 상품 이미지 */}
                       <Link href={`/product/${item.productId}`} className="flex-shrink-0">
-                        <div className="w-[60px] h-[78px] bg-gray-100 rounded overflow-hidden">
-                          <img
+                        <div className="relative w-[60px] h-[78px] bg-gray-100 rounded overflow-hidden">
+                          <Image
                             src={item.image || '/placeholder.jpg'}
                             alt={item.name}
-                            className="w-full h-full object-cover"
+                            fill
+                            sizes="60px"
+                            className="object-cover"
                           />
                         </div>
                       </Link>

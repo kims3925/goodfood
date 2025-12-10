@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Heart, ShoppingCart, Trash2 } from 'lucide-react'
 import { ConfirmModal } from '@/modules/common/ui-kit/src/ui'
 
@@ -118,10 +119,12 @@ export default function WishlistPage() {
               <Link href={`/product/${item.product.id}`}>
                 <div className="aspect-square bg-gray-100 relative">
                   {item.product.thumbnailUrl ? (
-                    <img
+                    <Image
                       src={item.product.thumbnailUrl}
                       alt={item.product.name}
-                      className="w-full h-full object-cover"
+                      fill
+                      sizes="(max-width: 768px) 50vw, 33vw"
+                      className="object-cover"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">

@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowLeft, Package, User, MapPin, CreditCard, Truck, Plus, Check, Building2, Wallet, AlertCircle, Ticket, X, ChevronDown } from 'lucide-react'
 import TossPaymentWidget from '@/modules/payments/components/TossPaymentWidget'
 import { useShop } from '@/contexts/ShopContext'
@@ -758,11 +759,15 @@ function CheckoutContent() {
                     <div className="space-y-4">
                       {cartItems.map((item) => (
                         <div key={item.id} className="flex gap-4">
-                          <img
-                            src={item.image || '/placeholder.jpg'}
-                            alt={item.name}
-                            className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
-                          />
+                          <div className="relative w-16 h-16 flex-shrink-0">
+                            <Image
+                              src={item.image || '/placeholder.jpg'}
+                              alt={item.name}
+                              fill
+                              sizes="64px"
+                              className="object-cover rounded-lg"
+                            />
+                          </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-medium text-gray-900 text-sm line-clamp-2">{item.name}</h3>
                             {item.optionSummary && (
@@ -780,11 +785,15 @@ function CheckoutContent() {
                     </div>
                   ) : product && (
                     <div className="flex gap-4">
-                      <img
-                        src={product.images?.[0] || '/placeholder.jpg'}
-                        alt={product.title}
-                        className="w-20 h-20 object-cover rounded-lg"
-                      />
+                      <div className="relative w-20 h-20 flex-shrink-0">
+                        <Image
+                          src={product.images?.[0] || '/placeholder.jpg'}
+                          alt={product.title}
+                          fill
+                          sizes="80px"
+                          className="object-cover rounded-lg"
+                        />
+                      </div>
                       <div className="flex-1">
                         <h3 className="font-medium text-gray-900 mb-1">{product.title}</h3>
                         <p className="text-sm text-gray-600 mb-2">{product.category}</p>

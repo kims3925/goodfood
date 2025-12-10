@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   ArrowLeft,
   Package,
@@ -348,11 +349,15 @@ function GuestOrderDetailContent() {
             <div className="space-y-4">
               {order.items.map((item) => (
                 <div key={item.id} className="flex gap-4 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
-                  <img
-                    src={item.thumbnailUrl || '/placeholder.jpg'}
-                    alt={item.productName}
-                    className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
-                  />
+                  <div className="relative w-20 h-20 flex-shrink-0">
+                    <Image
+                      src={item.thumbnailUrl || '/placeholder.jpg'}
+                      alt={item.productName}
+                      fill
+                      sizes="80px"
+                      className="object-cover rounded-lg"
+                    />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-gray-900 text-sm line-clamp-2">{item.productName}</h3>
                     {item.optionSummary && (

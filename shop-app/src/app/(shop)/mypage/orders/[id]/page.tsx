@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   Package,
   ArrowLeft,
@@ -510,12 +511,14 @@ export default function OrderDetailPage() {
             <div className="space-y-4">
               {order.items.map((item) => (
                 <div key={item.id} className="flex gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                  <div className="relative w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                     {item.thumbnailUrl ? (
-                      <img
+                      <Image
                         src={item.thumbnailUrl}
                         alt={item.productName}
-                        className="w-full h-full object-cover"
+                        fill
+                        sizes="96px"
+                        className="object-cover"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">

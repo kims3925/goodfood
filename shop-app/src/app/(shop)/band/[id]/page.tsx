@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   Store,
   ShoppingCart,
@@ -331,10 +332,12 @@ export default function BandProductsPage() {
                     <div key={product.id} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
                       <Link href={`/product/${product.id}?bandId=${bandId}`} className="block group">
                         <div className="relative aspect-square overflow-hidden bg-gray-100">
-                          <img
+                          <Image
                             src={product.images[0] || '/placeholder.jpg'}
                             alt={product.title}
-                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                            fill
+                            sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                            className="object-cover transition-transform group-hover:scale-105"
                           />
                           <button
                             onClick={(e) => handleAddToCart(product, e)}

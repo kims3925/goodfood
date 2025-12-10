@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { MessageSquare, CheckCircle, Clock } from 'lucide-react'
+import Image from 'next/image'
 
 interface InquiryReply {
   id: number
@@ -138,12 +139,14 @@ export default function InquiriesPage() {
               <div className="p-6">
                 {inquiry.publishedProduct?.product && (
                   <div className="flex gap-3 mb-4 pb-4 border-b border-gray-100">
-                    <div className="w-12 h-12 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                    <div className="relative w-12 h-12 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                       {inquiry.publishedProduct.product.thumbnailUrl ? (
-                        <img
+                        <Image
                           src={inquiry.publishedProduct.product.thumbnailUrl}
                           alt={inquiry.publishedProduct.product.name}
-                          className="w-full h-full object-cover"
+                          fill
+                          sizes="48px"
+                          className="object-cover"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">

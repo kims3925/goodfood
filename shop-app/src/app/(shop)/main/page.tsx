@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ChevronLeft, ChevronRight, ShoppingCart, Sparkles, Package } from 'lucide-react'
 import { useCartNotification } from '@/contexts/CartNotificationContext'
 import { useShop } from '@/contexts/ShopContext'
@@ -118,10 +119,13 @@ export default function StorePage() {
       {bannerUrl && (
         <section className="w-full">
           <div className="relative w-full aspect-[4/1] md:aspect-[5/1] lg:aspect-[6/1] overflow-hidden">
-            <img
+            <Image
               src={bannerUrl}
               alt={`${shopName || '쇼핑몰'} 배너`}
-              className="w-full h-full object-cover"
+              fill
+              sizes="100vw"
+              className="object-cover"
+              priority
             />
           </div>
         </section>
@@ -159,10 +163,12 @@ export default function StorePage() {
                           <div key={`${slideIndex}-${productIndex}-${product.id}`} className="w-[140px] sm:w-[160px] md:w-[180px] lg:w-[220px] flex-shrink-0">
                             <Link href={`/product/${product.id}`} className="block group">
                               <div className="relative aspect-[220/280] rounded-lg overflow-hidden bg-gray-100">
-                                <img
+                                <Image
                                   src={product.images[0] || '/placeholder.jpg'}
                                   alt={product.title}
-                                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                  fill
+                                  sizes="(max-width: 640px) 140px, (max-width: 768px) 160px, (max-width: 1024px) 180px, 220px"
+                                  className="object-cover transition-transform group-hover:scale-105"
                                 />
                                 <button
                                   onClick={(e) => handleAddToCart(product, e)}
@@ -254,10 +260,12 @@ export default function StorePage() {
                   className="group block"
                 >
                   <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200 hover:border-rose-400 transition-all hover:shadow-lg">
-                    <img
+                    <Image
                       src={product.images[0] || '/placeholder.jpg'}
                       alt={product.title}
-                      className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      fill
+                      sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+                      className="object-cover transition-transform group-hover:scale-105"
                     />
                     <button
                       onClick={(e) => handleAddToCart(product, e)}

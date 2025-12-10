@@ -1,45 +1,86 @@
 # Bandauto v1.0.0 AWS 배포 가이드
 
+## 현재 배포 상태
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| EC2 인스턴스 | ✅ 완료 | IP: `15.165.39.32` |
+| 서버 초기 설정 | ✅ 완료 | Node.js 20, PM2, Nginx |
+| MariaDB | ✅ 완료 | DB: `sourcing_db`, User: `banduser` |
+| 환경 변수 | ✅ 완료 | db/.env, shop-app/.env.local, sourcing-app/.env |
+| 로컬 빌드 테스트 | ✅ 완료 | 빌드 에러 모두 수정됨 |
+| GitHub 푸시 | ⏳ 대기 | release-1 브랜치로 푸시 필요 |
+| 서버 배포 | ⏳ 대기 | git pull 및 빌드 필요 |
+| PM2/Nginx 설정 | ⏳ 대기 | |
+| HTTP 테스트 | ⏳ 대기 | |
+
+---
+
 ## 배포 체크리스트
 
 ### Phase 1: AWS EC2 인스턴스 생성
-- [ ] EC2 인스턴스 생성 (Ubuntu 22.04, t3.small, 서울 리전)
-- [ ] 보안 그룹 설정 (22, 80, 443 포트)
-- [ ] 탄력적 IP 할당 및 연결
-- [ ] 키페어(.pem) 다운로드 및 안전한 곳에 보관
+- [x] EC2 인스턴스 생성 (Ubuntu 22.04, t3.small, 서울 리전)
+- [x] 보안 그룹 설정 (22, 80 포트)
+- [x] 탄력적 IP 할당 및 연결 → `15.165.39.32`
+- [x] 키페어(.pem) 다운로드 및 안전한 곳에 보관
 
 ### Phase 2: 서버 초기 설정
-- [ ] SSH 접속 확인
-- [ ] 시스템 업데이트 (`sudo apt update && sudo apt upgrade -y`)
-- [ ] Git, build-essential 설치
+- [x] SSH 접속 확인
+- [x] 시스템 업데이트 (`sudo apt update && sudo apt upgrade -y`)
+- [x] Git, build-essential 설치
 
 ### Phase 3: Node.js 환경 설정
-- [ ] Node.js 20 LTS 설치
-- [ ] PM2 전역 설치
+- [x] Node.js 20 LTS 설치
+- [x] PM2 전역 설치
 
-### Phase 4: 프로젝트 배포
-- [ ] GitHub에서 코드 클론
-- [ ] 환경 변수 파일 생성 (.env)
+### Phase 4: 데이터베이스 설정 (MariaDB)
+- [x] MariaDB 설치 (`sudo apt install mariadb-server`)
+- [x] 보안 설정 (`sudo mysql_secure_installation`)
+- [x] 데이터베이스 생성 (`sourcing_db`)
+- [x] 사용자 생성 및 권한 부여 (`banduser`)
+
+### Phase 5: 환경 변수 설정
+- [x] db/.env 생성 (MariaDB 연결 문자열)
+- [x] shop-app/.env.local 생성
+- [x] sourcing-app/.env 생성
+- [x] 이미지 저장 디렉토리 생성 (`~/assets/images/`)
+
+### Phase 6: 로컬 빌드 테스트 및 에러 수정
+- [x] TOSS_ERROR_CODES 상수 수정
+- [x] 더미 데이터 스크립트 삭제 (seed-settlement-*.ts)
+- [x] recipientPhone 프로퍼티 접근 수정
+- [x] Buffer 타입 에러 수정 (Uint8Array 래핑)
+- [x] orderTest 모델 관련 코드 삭제
+- [x] currentUser.id → currentUser.userId 수정
+- [x] BAND_UPLOAD_URL 상수 추가
+- [x] subdomain 프로퍼티 경로 수정
+- [x] shop-app 빌드 성공 ✅
+- [x] sourcing-app 빌드 성공 ✅
+
+### Phase 7: 프로젝트 배포
+- [ ] GitHub에 코드 푸시 (release-1 브랜치)
+- [ ] AWS 서버에서 git pull
 - [ ] 의존성 설치 (`npm install`)
 - [ ] Prisma 클라이언트 생성 및 DB 스키마 적용
-- [ ] shop-app, sourcing-app 빌드
+- [ ] shop-app 빌드
+- [ ] sourcing-app 빌드
 
-### Phase 5: PM2로 앱 실행
+### Phase 8: PM2로 앱 실행
 - [ ] shop-app 실행 (포트 3000)
 - [ ] sourcing-app 실행 (포트 3001)
 - [ ] 자동 시작 설정 (`pm2 startup && pm2 save`)
 
-### Phase 6: Nginx 설정
-- [ ] Nginx 설치
-- [ ] 리버스 프록시 설정 파일 생성
+### Phase 9: Nginx 설정
+- [ ] Nginx 설정 파일 생성
+- [ ] 리버스 프록시 설정
 - [ ] 설정 활성화 및 Nginx 재시작
 
-### Phase 7: HTTP 테스트
-- [ ] shop-app 접속 확인
-- [ ] sourcing-app 접속 확인
+### Phase 10: HTTP 테스트
+- [ ] shop-app 접속 확인 (`http://15.165.39.32:3000`)
+- [ ] sourcing-app 접속 확인 (`http://15.165.39.32:3001`)
 - [ ] 로그인/기본 기능 테스트
 
-### Phase 8: HTTPS 적용
+### Phase 11: HTTPS 적용 (선택)
 - [ ] DNS A 레코드 설정
 - [ ] Certbot 설치
 - [ ] SSL 인증서 발급
@@ -53,8 +94,115 @@
 |------|-----|
 | shop-app | 고객용 쇼핑몰 (포트 3000) |
 | sourcing-app | 관리자 대시보드 (포트 3001) |
-| 데이터베이스 | Prisma + SQLite |
+| 데이터베이스 | MariaDB (Prisma ORM) |
 | 프레임워크 | Next.js 14.2.3 |
+| EC2 IP | 15.165.39.32 |
+| 브랜치 | release-1 |
+
+---
+
+## 🚀 남은 배포 단계 빠른 명령어
+
+### 1. 로컬에서 GitHub 푸시
+```bash
+cd C:\Users\hsw48\Desktop\bandauto
+git add .
+git commit -m "fix: 빌드 에러 수정 및 테스트 코드 삭제"
+git push origin hong
+# 또는 release-1 브랜치로 푸시
+git push origin hong:release-1
+```
+
+### 2. AWS 서버 SSH 접속
+```bash
+ssh -i "your-key.pem" ubuntu@15.165.39.32
+```
+
+### 3. 서버에서 코드 풀 및 빌드
+```bash
+cd ~/bandauto
+git pull origin release-1
+
+# 의존성 설치
+npm install
+
+# Prisma 설정
+cd db
+npx prisma generate --schema prisma
+npx prisma db push --schema prisma
+cd ..
+
+# 빌드 (메모리 부족 시 스왑 추가 필요)
+cd shop-app && npm run build && cd ..
+cd sourcing-app && npm run build && cd ..
+```
+
+### 4. PM2로 앱 실행
+```bash
+cd ~/bandauto/shop-app
+pm2 start npm --name "shop-app" -- start
+
+cd ~/bandauto/sourcing-app
+pm2 start npm --name "sourcing-app" -- start
+
+pm2 status
+pm2 startup  # 출력된 명령어 실행
+pm2 save
+```
+
+### 5. Nginx 설정 (IP 직접 접속용)
+```bash
+sudo nano /etc/nginx/sites-available/bandauto
+```
+
+```nginx
+# 기본 서버 (shop-app)
+server {
+    listen 80 default_server;
+    server_name _;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# sourcing-app (포트 3001 직접 접속)
+server {
+    listen 3001;
+    server_name _;
+
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+```bash
+sudo ln -sf /etc/nginx/sites-available/bandauto /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+### 6. 테스트
+- shop-app: http://15.165.39.32
+- sourcing-app: http://15.165.39.32:3001
 
 ---
 
@@ -158,8 +306,10 @@ cd bandauto
 nano db/.env
 ```
 ```env
-DATABASE_URL="file:./prod.db"
+# 형식: mysql://사용자:비밀번호@호스트:포트/데이터베이스
+DATABASE_URL="mysql://banduser:<비밀번호>@localhost:3306/sourcing_db"
 ```
+> ⚠️ `<비밀번호>` 부분에 MariaDB 설정 시 지정한 실제 비밀번호를 입력하세요.
 
 ```bash
 # shop-app/.env.local
@@ -428,13 +578,14 @@ pm2 monit                   # PM2 실시간 모니터링
 
 ### 백업
 ```bash
-# SQLite DB 백업 (중요!)
-cp ~/bandauto/db/prisma/prod.db ~/backups/prod_$(date +%Y%m%d).db
+# MariaDB 백업 (중요!)
+mysqldump -u banduser -p sourcing_db > ~/backups/sourcing_$(date +%Y%m%d).sql
 
 # 자동 백업 cron 설정 (매일 새벽 3시)
 crontab -e
-# 추가: 0 3 * * * cp ~/bandauto/db/prisma/prod.db ~/backups/prod_$(date +\%Y\%m\%d).db
+# 추가: 0 3 * * * mysqldump -u banduser -p<비밀번호> sourcing_db > ~/backups/sourcing_$(date +\%Y\%m\%d).sql
 ```
+> ⚠️ cron에서 `-p` 뒤에 비밀번호를 직접 입력해야 합니다 (공백 없이 붙여서).
 
 ---
 

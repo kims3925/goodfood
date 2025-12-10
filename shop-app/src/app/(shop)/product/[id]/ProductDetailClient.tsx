@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowLeft, Heart, Share2, Minus, Plus, Star, ChevronDown } from 'lucide-react'
 import { useCartNotification } from '@/contexts/CartNotificationContext'
 
@@ -341,11 +342,14 @@ export default function ProductDetailClient() {
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
           {/* Product Images - 고정 너비 */}
           <div className="w-full lg:w-[430px] flex-shrink-0 space-y-3">
-            <div className="w-full h-[430px] bg-white rounded-lg overflow-hidden border border-gray-200">
-              <img
+            <div className="relative w-full h-[430px] bg-white rounded-lg overflow-hidden border border-gray-200">
+              <Image
                 src={product.images[selectedImage]}
                 alt={product.title}
-                className="w-full h-full object-cover"
+                fill
+                sizes="430px"
+                className="object-cover"
+                priority
               />
             </div>
             {/* 썸네일 이미지 - 4열 고정 그리드 */}
@@ -354,11 +358,11 @@ export default function ProductDetailClient() {
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
-                  className={`aspect-square rounded-lg overflow-hidden border-2 ${
+                  className={`relative aspect-square rounded-lg overflow-hidden border-2 ${
                     selectedImage === index ? 'border-[#FF6B6B]' : 'border-gray-200'
                   }`}
                 >
-                  <img src={image} alt="" className="w-full h-full object-cover" />
+                  <Image src={image} alt="" fill sizes="100px" className="object-cover" />
                 </button>
               ))}
             </div>
@@ -559,7 +563,9 @@ export default function ProductDetailClient() {
               <div className="space-y-4">
                 <p className="text-gray-700">{product.description}</p>
                 {product.detailImages && product.detailImages.map((image: string, index: number) => (
-                  <img key={index} src={image} alt="" className="w-full rounded-lg" />
+                  <div key={index} className="relative w-full">
+                    <Image src={image} alt="" width={800} height={800} sizes="100vw" className="w-full h-auto rounded-lg" />
+                  </div>
                 ))}
               </div>
             )}
@@ -670,13 +676,16 @@ export default function ProductDetailClient() {
                         {/* 리뷰 이미지 */}
                         {review.images && review.images.length > 0 && (
                           <div className="flex gap-2 mt-3 overflow-x-auto">
-                            {review.images.map((image: string, idx: number) => (
-                              <img
-                                key={idx}
-                                src={image}
-                                alt={`리뷰 이미지 ${idx + 1}`}
-                                className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
-                              />
+                            {review.images.map((reviewImage: string, idx: number) => (
+                              <div key={idx} className="relative w-20 h-20 flex-shrink-0">
+                                <Image
+                                  src={reviewImage}
+                                  alt={`리뷰 이미지 ${idx + 1}`}
+                                  fill
+                                  sizes="80px"
+                                  className="object-cover rounded-lg"
+                                />
+                              </div>
                             ))}
                           </div>
                         )}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { Search, ShoppingCart, User, MapPin, ChevronDown, Phone, HelpCircle, MessageSquare, LogOut } from 'lucide-react'
 import { CartNotificationProvider, useCartNotification } from '@/contexts/CartNotificationContext'
@@ -190,9 +191,11 @@ function StoreLayoutContent({
             {/* Logo - 로고 이미지 + Shop 이름 */}
             <Link href="/main" className="kurly-logo flex items-center gap-2">
               {logoUrl && (
-                <img
+                <Image
                   src={logoUrl}
                   alt={`${shopName} 로고`}
+                  width={120}
+                  height={48}
                   className="h-8 md:h-10 lg:h-12 w-auto object-contain"
                 />
               )}
@@ -293,7 +296,7 @@ function StoreLayoutContent({
                         className="flex items-center gap-2 hover:opacity-70"
                       >
                         {s.logoUrl ? (
-                          <img src={s.logoUrl} alt={s.name} className="h-4 w-auto" />
+                          <Image src={s.logoUrl} alt={s.name} width={48} height={16} className="h-4 w-auto" />
                         ) : null}
                         <span>{s.name}</span>
                       </a>
