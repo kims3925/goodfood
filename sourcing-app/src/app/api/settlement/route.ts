@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
     const shopOrders = await prisma.order.findMany({
       where: {
         shop: { userId: user.userId },  // Shop 소유자 기준으로 필터링
-        status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+        status: 'DELIVERED',  // 배송완료된 주문만 정산 대상
         shopId: { not: null },
         ...(Object.keys(dateFilter).length > 0 ? { orderedAt: dateFilter } : {}),
       },
@@ -374,7 +374,7 @@ export async function POST(request: NextRequest) {
     const orders = await prisma.order.findMany({
       where: {
         shopId: parseInt(shopId),
-        status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+        status: 'DELIVERED',  // 배송완료된 주문만 정산 대상
         ...(filterStart || filterEnd ? {
           orderedAt: {
             ...(filterStart ? { gte: filterStart } : {}),

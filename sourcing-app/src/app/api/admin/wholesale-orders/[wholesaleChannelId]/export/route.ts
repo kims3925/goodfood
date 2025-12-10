@@ -206,14 +206,9 @@ export async function GET(
         ? `(${addr.postalCode}) ${addr.address} ${addr.addressDetail}`
         : `(${addr?.postalCode || ''}) ${addr?.address || ''}`
 
-      // 주문일시 포맷
-      const orderedAt = new Date(item.order.orderedAt).toLocaleString('ko-KR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+      // 주문일시 포맷 (YYYY-MM-DD HH:mm)
+      const orderDate = new Date(item.order.orderedAt)
+      const orderedAt = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}-${String(orderDate.getDate()).padStart(2, '0')} ${String(orderDate.getHours()).padStart(2, '0')}:${String(orderDate.getMinutes()).padStart(2, '0')}`
 
       // optionSummary 결정: item → variant → product의 첫 번째 variant
       let optionSummary = item.optionSummary || item.variant?.optionSummary || null
