@@ -241,16 +241,31 @@ export class BandManualLoginService {
 
   /**
    * 쿠키 직접 저장 (서버 환경용)
-   * 브라우저 개발자 도구에서 복사한 쿠키 문자열을 직접 저장
+   * 브라우저 개발자 도구에서 복사한 쿠키를 JSON 배열 형식으로 저장
+   *
+   * 쿠키 추출 방법:
+   * 1. band.us 접속 후 F12 → Application → Cookies
+   * 2. 콘솔(Console)에서 실행:
+   *    copy(JSON.stringify(await cookieStore.getAll()))
+   * 3. 붙여넣기
    */
   async saveSessionCookieDirect(channelId: number, cookieString: string): Promise<{ success: boolean; error?: string }> {
     try {
       console.log(`[BandManualLogin] Saving cookie directly for channel ${channelId}`)
 
-      // 쿠키 형식 검증
+      const trimmed = cookieString.trim()
+
+      // JSON 배열 형식만 지원
+      if (!trimmed.startsWith('[')) {
+        return {
+          success: false,
+          error: 'JSON 배열 형식만 지원합니다. 콘솔에서 copy(JSON.stringify(await cookieStore.getAll())) 실행 후 붙여넣기 하세요.'
+        }
+      }
+
       let cookies: any[]
       try {
-        cookies = JSON.parse(cookieString)
+        cookies = JSON.parse(trimmed)
         if (!Array.isArray(cookies)) {
           return { success: false, error: '쿠키는 JSON 배열 형식이어야 합니다.' }
         }
@@ -265,6 +280,12 @@ export class BandManualLoginService {
 
       if (validCookies.length === 0) {
         return { success: false, error: 'Band 또는 Naver 관련 쿠키가 없습니다.' }
+      }
+
+      // band_session 쿠키 필수 확인
+      const hasBandSession = validCookies.some(c => c.name === 'band_session')
+      if (!hasBandSession) {
+        return { success: false, error: 'band_session 쿠키가 포함되어 있지 않습니다.' }
       }
 
       // DB에 세션 저장

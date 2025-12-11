@@ -162,17 +162,64 @@ class BandBrowserPool {
 
   /**
    * 쿠키 문자열 파싱
-   * JSON 배열 형식 또는 레거시 문자열 형식 지원
+   * JSON 배열 형식 지원 (Playwright 형식 및 cookieStore.getAll() 형식 모두 지원)
    */
   private parseCookies(cookieString: string): Cookie[] {
     // JSON 형식인지 확인
     if (cookieString.startsWith('[')) {
       try {
-        const parsed = JSON.parse(cookieString) as Cookie[]
-        console.log(`[BandBrowserPool] Parsed ${parsed.length} cookies from JSON`)
-        return parsed
+        const parsed = JSON.parse(cookieString) as any[]
+
+        // cookieStore.getAll() 형식인지 확인 (domain이 점으로 시작 안 함)
+        const needsConversion = parsed.some(c => c.domain && !c.domain.startsWith('.') && !c.domain.startsWith('auth') && !c.domain.startsWith('www'))
+
+        if (needsConversion) {
+          console.log(`[BandBrowserPool] Converting cookieStore format to Playwright format`)
+          // cookieStore 형식을 Playwright 형식으로 변환 + 필요한 도메인 추가
+          const convertedCookies: Cookie[] = []
+
+          for (const c of parsed) {
+            // 도메인 정규화 (band.us -> .band.us)
+            let domain = c.domain || '.band.us'
+            if (domain === 'band.us') {
+              domain = '.band.us'
+            }
+
+            // expires 변환 (밀리초 -> 초, null -> -1)
+            let expires = -1
+            if (c.expires && typeof c.expires === 'number') {
+              // 밀리초인 경우 (1799217375909 같은 큰 숫자)
+              expires = c.expires > 9999999999 ? Math.floor(c.expires / 1000) : c.expires
+            }
+
+            const baseCookie = {
+              name: c.name,
+              value: c.value,
+              path: c.path || '/',
+              expires,
+              httpOnly: c.httpOnly || false,
+              secure: c.secure || false,
+              sameSite: (c.sameSite?.charAt(0).toUpperCase() + c.sameSite?.slice(1).toLowerCase()) as 'Strict' | 'Lax' | 'None' || 'Lax',
+            }
+
+            // .band.us 도메인
+            convertedCookies.push({ ...baseCookie, domain: '.band.us' })
+
+            // auth.band.us 도메인 (인증에 필수)
+            convertedCookies.push({ ...baseCookie, domain: 'auth.band.us' })
+
+            // www.band.us 도메인
+            convertedCookies.push({ ...baseCookie, domain: 'www.band.us' })
+          }
+
+          console.log(`[BandBrowserPool] Converted ${parsed.length} cookies to ${convertedCookies.length} cookies (added auth/www domains)`)
+          return convertedCookies
+        }
+
+        console.log(`[BandBrowserPool] Parsed ${parsed.length} cookies from JSON (Playwright format)`)
+        return parsed as Cookie[]
       } catch (e) {
-        console.error('[BandBrowserPool] Failed to parse cookies as JSON, trying legacy format')
+        console.error('[BandBrowserPool] Failed to parse cookies as JSON:', e)
       }
     }
 
@@ -197,11 +244,23 @@ class BandBrowserPool {
         cookieName.startsWith(n) || cookieName.includes('naver')
       )
 
-      // Band 도메인
+      // Band 도메인 (.band.us)
       cookies.push({
         name: cookieName,
         value: cookieValue,
         domain: '.band.us',
+        path: '/',
+        expires: -1,
+        httpOnly: false,
+        secure: true,
+        sameSite: 'Lax' as const,
+      })
+
+      // Band 인증 도메인 (auth.band.us) - 로그인 유지에 필수
+      cookies.push({
+        name: cookieName,
+        value: cookieValue,
+        domain: 'auth.band.us',
         path: '/',
         expires: -1,
         httpOnly: false,
@@ -224,7 +283,7 @@ class BandBrowserPool {
       }
     }
 
-    console.log(`[BandBrowserPool] Parsed ${cookies.length} cookies from legacy string`)
+    console.log(`[BandBrowserPool] Parsed ${cookies.length} cookies from legacy string (including auth.band.us)`)
     return cookies
   }
 

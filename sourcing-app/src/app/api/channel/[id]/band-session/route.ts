@@ -6,6 +6,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { manualLoginService } from '@/modules/band-playwright/band-manual-login.service'
 
+// CORS 헤더 (band.us에서 쿠키 전송 허용)
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+}
+
+/**
+ * OPTIONS: CORS preflight
+ */
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders })
+}
+
 /**
  * GET: 세션 상태 조회
  */
@@ -75,7 +89,7 @@ export async function POST(
 }
 
 /**
- * PUT: 쿠키 직접 저장 (서버 환경용)
+ * PUT: 쿠키 직접 저장 (서버 환경용, CORS 허용)
  */
 export async function PUT(
   request: NextRequest,
@@ -85,7 +99,7 @@ export async function PUT(
   const channelId = parseInt(params.id, 10)
 
   if (isNaN(channelId)) {
-    return NextResponse.json({ success: false, error: '잘못된 채널 ID입니다.' }, { status: 400 })
+    return NextResponse.json({ success: false, error: '잘못된 채널 ID입니다.' }, { status: 400, headers: corsHeaders })
   }
 
   try {
@@ -93,22 +107,22 @@ export async function PUT(
     const { cookieString } = body
 
     if (!cookieString || typeof cookieString !== 'string') {
-      return NextResponse.json({ success: false, error: '쿠키 문자열이 필요합니다.' }, { status: 400 })
+      return NextResponse.json({ success: false, error: '쿠키 문자열이 필요합니다.' }, { status: 400, headers: corsHeaders })
     }
 
     const result = await manualLoginService.saveSessionCookieDirect(channelId, cookieString)
 
     if (!result.success) {
-      return NextResponse.json({ success: false, error: result.error }, { status: 400 })
+      return NextResponse.json({ success: false, error: result.error }, { status: 400, headers: corsHeaders })
     }
 
     return NextResponse.json({
       success: true,
       message: '세션 쿠키가 저장되었습니다.',
-    })
+    }, { headers: corsHeaders })
   } catch (error: any) {
     console.error('쿠키 직접 저장 실패:', error)
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    return NextResponse.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders })
   }
 }
 

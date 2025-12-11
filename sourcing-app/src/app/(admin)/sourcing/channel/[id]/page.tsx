@@ -1038,13 +1038,37 @@ export default function ChannelDetailPage({
 
                           {showCookieInput && (
                             <div className="mt-3 space-y-3">
+                              {/* 방법 1: 자동 전송 (권장) */}
+                              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <p className="text-xs text-green-800 font-medium mb-2">방법 1: 자동 전송 (권장)</p>
+                                <ol className="text-xs text-green-700 space-y-1 list-decimal list-inside mb-2">
+                                  <li>Chrome으로 <a href="https://band.us" target="_blank" rel="noopener noreferrer" className="underline font-medium">band.us</a>에 로그인</li>
+                                  <li>F12 → Console 탭에서 아래 명령어 실행:</li>
+                                </ol>
+                                <div className="p-2 bg-gray-800 rounded text-xs text-green-400 font-mono break-all">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const apiUrl = `${window.location.origin}/api/channel/${id}/band-session`
+                                      const script = `fetch('${apiUrl}',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cookieString:JSON.stringify(await cookieStore.getAll())})}).then(r=>r.json()).then(d=>alert(d.success?'세션 저장 완료!':'오류: '+d.error))`
+                                      navigator.clipboard.writeText(script)
+                                      toast.success('클립보드에 복사됨! band.us 콘솔에 붙여넣기 하세요.')
+                                    }}
+                                    className="text-left hover:text-green-300 w-full"
+                                    title="클릭하여 복사"
+                                  >
+                                    fetch('{typeof window !== 'undefined' ? window.location.origin : ''}/api/channel/{id}/band-session'...) <span className="text-yellow-400">[클릭하여 복사]</span>
+                                  </button>
+                                </div>
+                                <p className="text-xs text-green-600 mt-2">→ 실행하면 쿠키가 자동으로 서버에 저장됩니다!</p>
+                              </div>
+
+                              {/* 방법 2: 수동 복사/붙여넣기 */}
                               <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                <p className="text-xs text-yellow-800 font-medium mb-1">쿠키 추출 방법:</p>
+                                <p className="text-xs text-yellow-800 font-medium mb-1">방법 2: 수동 복사/붙여넣기</p>
                                 <ol className="text-xs text-yellow-700 space-y-1 list-decimal list-inside">
-                                  <li>로컬 PC에서 Chrome으로 band.us에 로그인</li>
-                                  <li>F12(개발자 도구) → Application → Cookies</li>
-                                  <li>band.us 쿠키를 우클릭 → Copy all as JSON</li>
-                                  <li>아래에 붙여넣기</li>
+                                  <li>band.us 콘솔에서 실행: <code className="bg-yellow-100 px-1">copy(JSON.stringify(await cookieStore.getAll()))</code></li>
+                                  <li>아래에 Ctrl+V로 붙여넣기</li>
                                 </ol>
                               </div>
 
@@ -1052,7 +1076,7 @@ export default function ChannelDetailPage({
                                 value={cookieInputValue}
                                 onChange={(e) => setCookieInputValue(e.target.value)}
                                 placeholder='[{"name": "...", "value": "...", "domain": ".band.us", ...}]'
-                                className="w-full h-32 p-3 text-xs font-mono border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white resize-none"
+                                className="w-full h-24 p-3 text-xs font-mono border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white resize-none"
                               />
 
                               <div className="flex gap-2">
