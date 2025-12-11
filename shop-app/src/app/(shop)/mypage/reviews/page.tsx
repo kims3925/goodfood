@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Star, Package, X, Pencil, Trash2, MoreVertical } from 'lucide-react'
+import { useShopUrl } from '@/hooks/useShopUrl'
+import Image from 'next/image'
 
 interface WritableItem {
   orderItemId: number
@@ -56,6 +58,7 @@ interface Pagination {
 export default function ReviewsPage() {
   const { data: session, status: sessionStatus } = useSession()
   const router = useRouter()
+  const { getPath, getApiPath } = useShopUrl()
   const [activeTab, setActiveTab] = useState<'writable' | 'written'>('writable')
   const [writableItems, setWritableItems] = useState<WritableItem[]>([])
   const [writtenReviews, setWrittenReviews] = useState<WrittenReview[]>([])
@@ -91,7 +94,7 @@ export default function ReviewsPage() {
   useEffect(() => {
     if (sessionStatus === 'loading') return
     if (!session) {
-      router.push('/auth/login?callbackUrl=/mypage/reviews')
+      router.push(getPath('/auth/login?callbackUrl=/mypage/reviews'))
       return
     }
     fetchCounts()
@@ -113,8 +116,8 @@ export default function ReviewsPage() {
   const fetchCounts = async () => {
     try {
       const [writableRes, writtenRes] = await Promise.all([
-        fetch('/api/mypage/reviews?tab=writable&limit=1'),
-        fetch('/api/mypage/reviews?tab=written&limit=1'),
+        fetch(getApiPath('/api/mypage/reviews?tab=writable&limit=1')),
+        fetch(getApiPath('/api/mypage/reviews?tab=written&limit=1')),
       ])
       const [writableData, writtenData] = await Promise.all([
         writableRes.json(),
@@ -139,7 +142,7 @@ export default function ReviewsPage() {
       params.set('page', currentPage.toString())
       params.set('limit', '10')
 
-      const response = await fetch(`/api/mypage/reviews?${params}`)
+      const response = await fetch(getApiPath(`/api/mypage/reviews?${params}`))
       const data = await response.json()
 
       if (data.success) {
@@ -191,7 +194,7 @@ export default function ReviewsPage() {
 
     try {
       setSubmitting(true)
-      const response = await fetch('/api/mypage/reviews', {
+      const response = await fetch(getApiPath('/api/mypage/reviews'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -245,7 +248,7 @@ export default function ReviewsPage() {
 
     try {
       setSubmitting(true)
-      const response = await fetch(`/api/mypage/reviews/${editingReview.id}`, {
+      const response = await fetch(getApiPath(`/api/mypage/reviews/${editingReview.id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -287,7 +290,7 @@ export default function ReviewsPage() {
 
     try {
       setDeleting(true)
-      const response = await fetch(`/api/mypage/reviews/${deletingReviewId}`, {
+      const response = await fetch(getApiPath(`/api/mypage/reviews/${deletingReviewId}`), {
         method: 'DELETE',
       })
 
@@ -422,12 +425,14 @@ export default function ReviewsPage() {
                   className="bg-white border border-gray-200 rounded-lg p-6"
                 >
                   <div className="flex gap-4 items-center">
-                    <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                    <div className="relative w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                       {item.thumbnailUrl ? (
-                        <img
+                        <Image
                           src={item.thumbnailUrl}
                           alt={item.productName}
-                          className="w-full h-full object-cover"
+                          fill
+                          sizes="80px"
+                          className="object-cover"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -478,12 +483,14 @@ export default function ReviewsPage() {
                 >
                   {/* 상품 정보 */}
                   <div className="flex gap-4 mb-4 pb-4 border-b border-gray-100">
-                    <div className="w-16 h-16 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                    <div className="relative w-16 h-16 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                       {review.orderItem?.thumbnailUrl || review.product.thumbnailUrl ? (
-                        <img
+                        <Image
                           src={review.orderItem?.thumbnailUrl || review.product.thumbnailUrl || ''}
                           alt={review.orderItem?.productName || review.product.name}
-                          className="w-full h-full object-cover"
+                          fill
+                          sizes="64px"
+                          className="object-cover"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -535,12 +542,14 @@ export default function ReviewsPage() {
                   {/* 이미지 */}
                   {review.images && review.images.length > 0 && (
                     <div className="flex gap-2 flex-wrap">
-                      {review.images.map((img: string, idx: number) => (
-                        <div key={idx} className="w-24 h-24 bg-gray-100 rounded-md overflow-hidden">
-                          <img
-                            src={img}
+                      {review.images.map((reviewImg: string, idx: number) => (
+                        <div key={idx} className="relative w-24 h-24 bg-gray-100 rounded-md overflow-hidden">
+                          <Image
+                            src={reviewImg}
                             alt={`리뷰 이미지 ${idx + 1}`}
-                            className="w-full h-full object-cover"
+                            fill
+                            sizes="96px"
+                            className="object-cover"
                           />
                         </div>
                       ))}
@@ -624,12 +633,14 @@ export default function ReviewsPage() {
             <div className="p-6">
               {/* 상품 정보 */}
               <div className="flex gap-4 mb-6 pb-6 border-b border-gray-100">
-                <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                <div className="relative w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                   {selectedItem.thumbnailUrl ? (
-                    <img
+                    <Image
                       src={selectedItem.thumbnailUrl}
                       alt={selectedItem.productName}
-                      className="w-full h-full object-cover"
+                      fill
+                      sizes="80px"
+                      className="object-cover"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
@@ -732,12 +743,14 @@ export default function ReviewsPage() {
             <div className="p-6">
               {/* 상품 정보 */}
               <div className="flex gap-4 mb-6 pb-6 border-b border-gray-100">
-                <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                <div className="relative w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                   {editingReview.orderItem?.thumbnailUrl || editingReview.product.thumbnailUrl ? (
-                    <img
+                    <Image
                       src={editingReview.orderItem?.thumbnailUrl || editingReview.product.thumbnailUrl || ''}
                       alt={editingReview.orderItem?.productName || editingReview.product.name}
-                      className="w-full h-full object-cover"
+                      fill
+                      sizes="80px"
+                      className="object-cover"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">

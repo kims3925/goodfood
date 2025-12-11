@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface NotificationProduct {
   title: string
@@ -21,6 +22,7 @@ interface CartNotificationContextType {
 const CartNotificationContext = createContext<CartNotificationContextType | undefined>(undefined)
 
 export function CartNotificationProvider({ children }: { children: ReactNode }) {
+  const { getApiPath } = useShopUrl()
   const [isVisible, setIsVisible] = useState(false)
   const [product, setProduct] = useState<NotificationProduct | null>(null)
   const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null)
@@ -31,7 +33,7 @@ export function CartNotificationProvider({ children }: { children: ReactNode }) 
     try {
       const sessionId = localStorage.getItem('sessionId')
       if (sessionId) {
-        const response = await fetch(`/api/cart?sessionId=${sessionId}`)
+        const response = await fetch(getApiPath(`/api/cart?sessionId=${sessionId}`))
         const data = await response.json()
         if (data.success && data.cart?.items) {
           // 상품 종류 수가 아닌 전체 수량 합계로 변경
@@ -44,7 +46,7 @@ export function CartNotificationProvider({ children }: { children: ReactNode }) 
     } catch (error) {
       console.error('Failed to load cart count:', error)
     }
-  }, [])
+  }, [getApiPath])
 
   // 초기 로드 시 장바구니 수량 가져오기
   useEffect(() => {

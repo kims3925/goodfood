@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/modules/auth/auth.service'
 
 /**
  * GET /api/shop/check-duplicate
- * 서브도메인 또는 쇼핑몰명 중복 체크
+ * 도메인 또는 쇼핑몰명 중복 체크
  */
 export async function GET(request: NextRequest) {
   try {
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       name?: { isDuplicate: boolean; message?: string }
     } = {}
 
-    // 서브도메인 중복 체크
+    // 도메인 중복 체크
     if (subdomain) {
       const existingBySubdomain = await prisma.shop.findFirst({
         where: {
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
       result.subdomain = {
         isDuplicate: !!existingBySubdomain,
-        message: existingBySubdomain ? '이미 사용 중인 서브도메인입니다.' : undefined,
+        message: existingBySubdomain ? '이미 사용 중인 도메인입니다.' : undefined,
       }
     }
 

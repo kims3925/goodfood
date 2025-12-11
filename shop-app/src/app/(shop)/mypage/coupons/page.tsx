@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { Tag, Plus } from 'lucide-react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface Coupon {
   id: number
@@ -24,6 +25,7 @@ interface Coupon {
 
 export default function CouponsPage() {
   const { data: session } = useSession()
+  const { getApiPath } = useShopUrl()
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [loading, setLoading] = useState(true)
   const [couponCode, setCouponCode] = useState('')
@@ -39,7 +41,7 @@ export default function CouponsPage() {
   const fetchCoupons = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/mypage/coupons')
+      const response = await fetch(getApiPath('/api/mypage/coupons'))
       const data = await response.json()
 
       if (data.success) {
@@ -61,7 +63,7 @@ export default function CouponsPage() {
     }
 
     try {
-      const response = await fetch('/api/mypage/coupons', {
+      const response = await fetch(getApiPath('/api/mypage/coupons'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ couponCode }),

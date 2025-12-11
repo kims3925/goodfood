@@ -108,6 +108,7 @@ export async function GET(request: NextRequest) {
       },
       include: {
         shop: true,
+        shippingAddress: true,
         items: {
           include: {
             publishedProduct: true,
@@ -123,6 +124,9 @@ export async function GET(request: NextRequest) {
         userId: user.userId,
         status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
         orderedAt: { gte: prevStart, lte: prevEnd },
+      },
+      include: {
+        shippingAddress: true,
       },
     })
 
@@ -142,8 +146,8 @@ export async function GET(request: NextRequest) {
     const previousOrderCount = previousOrders.length
 
     // 고유 고객 수 (전화번호 기준)
-    const currentCustomers = new Set(currentOrders.map(o => o.recipientPhone)).size
-    const previousCustomers = new Set(previousOrders.map(o => o.recipientPhone)).size
+    const currentCustomers = new Set(currentOrders.map(o => o.shippingAddress?.recipientPhone).filter(Boolean)).size
+    const previousCustomers = new Set(previousOrders.map(o => o.shippingAddress?.recipientPhone).filter(Boolean)).size
 
     // 전환율 (임시: 주문 대비 결제 완료 비율)
     const paidOrders = allOrders.filter(o => ['PAID', 'SHIPPED', 'DELIVERED'].includes(o.status)).length

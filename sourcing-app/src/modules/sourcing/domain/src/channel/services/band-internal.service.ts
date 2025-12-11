@@ -6,6 +6,7 @@
  */
 
 const BAND_API_KR_URL = 'https://api-kr.band.us'
+const BAND_UPLOAD_URL = 'https://api-kr.band.us/v1/upload_image'
 
 interface BandInternalApiResponse<T = any> {
   result_code: number
@@ -86,7 +87,7 @@ export class BandInternalClient {
    */
   async uploadImage(imageBuffer: Buffer, filename: string): Promise<UploadedImage> {
     const formData = new FormData()
-    const blob = new Blob([imageBuffer], { type: this.getMimeType(filename) })
+    const blob = new Blob([new Uint8Array(imageBuffer)], { type: this.getMimeType(filename) })
     formData.append('file', blob, filename)
 
     const response = await fetch(BAND_UPLOAD_URL, {

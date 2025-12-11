@@ -20,6 +20,7 @@ import {
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
+import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 
 interface Reply {
   id: number
@@ -267,7 +268,7 @@ export default function InquiryDetailPage({ params }: { params: { id: string } }
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">연락처</p>
-                      <p className="font-medium text-gray-900">{inquiry.user.phone}</p>
+                      <p className="font-medium text-gray-900">{formatPhoneNumber(inquiry.user.phone || null)}</p>
                     </div>
                   </div>
                 )}

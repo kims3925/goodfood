@@ -68,7 +68,7 @@ export async function GET(
     const shop = await prisma.shop.findFirst({
       where: {
         id,
-        userId: currentUser.id,
+        userId: currentUser.userId,
       },
       include: {
         theme: true,
@@ -129,7 +129,7 @@ export async function PUT(
     const existingShop = await prisma.shop.findFirst({
       where: {
         id,
-        userId: currentUser.id,
+        userId: currentUser.userId,
       },
       include: {
         theme: true,
@@ -159,12 +159,12 @@ export async function PUT(
       theme,
     } = body
 
-    // 서브도메인 변경 시 중복 체크
+    // 도메인 변경 시 중복 체크
     if (subdomain && subdomain !== existingShop.subdomain) {
       const subdomainRegex = /^[a-z0-9-]+$/
       if (!subdomainRegex.test(subdomain)) {
         return NextResponse.json(
-          { success: false, error: '서브도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.' },
+          { success: false, error: '도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.' },
           { status: 400 }
         )
       }
@@ -175,7 +175,7 @@ export async function PUT(
 
       if (duplicateShop) {
         return NextResponse.json(
-          { success: false, error: '이미 사용 중인 서브도메인입니다.' },
+          { success: false, error: '이미 사용 중인 도메인입니다.' },
           { status: 400 }
         )
       }
@@ -307,7 +307,7 @@ export async function DELETE(
     const shop = await prisma.shop.findFirst({
       where: {
         id,
-        userId: currentUser.id,
+        userId: currentUser.userId,
       },
       include: {
         theme: true,

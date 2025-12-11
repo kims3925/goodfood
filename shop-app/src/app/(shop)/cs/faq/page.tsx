@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ChevronDown, ChevronLeft, Search } from 'lucide-react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface FAQItem {
   id: number
@@ -87,6 +88,7 @@ const faqData: FAQItem[] = [
 const categories = ['전체', '주문/결제', '배송', '교환/환불', '회원']
 
 export default function FAQPage() {
+  const { getPath } = useShopUrl()
   const [selectedCategory, setSelectedCategory] = useState('전체')
   const [searchQuery, setSearchQuery] = useState('')
   const [openItems, setOpenItems] = useState<number[]>([])
@@ -108,7 +110,7 @@ export default function FAQPage() {
     <div className="kurly-container py-8">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
-        <Link href="/cs" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+        <Link href={getPath('/cs')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
           <ChevronLeft className="w-5 h-5" />
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">자주 묻는 질문</h1>
@@ -184,7 +186,7 @@ export default function FAQPage() {
       <div className="mt-10 text-center bg-gray-50 rounded-xl p-6">
         <p className="text-gray-600 mb-4">원하는 답변을 찾지 못하셨나요?</p>
         <Link
-          href="/cs/inquiry"
+          href={getPath('/cs/inquiry')}
           className="inline-flex items-center gap-2 px-6 py-3 bg-[#FF6B6B] text-white font-medium rounded-lg hover:bg-[#FF5252] transition-colors"
         >
           1:1 문의하기

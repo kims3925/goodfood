@@ -4,14 +4,17 @@ import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowLeft, Heart, Share2, Minus, Plus, Star, ChevronDown } from 'lucide-react'
 import { useCartNotification } from '@/contexts/CartNotificationContext'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 export default function ProductDetailClient() {
   const params = useParams()
   const searchParams = useSearchParams()
   const { data: session } = useSession()
   const { showNotification, refreshCartCount } = useCartNotification()
+  const { getPath, getApiPath } = useShopUrl()
   const bandId = searchParams.get('bandId')
   const [product, setProduct] = useState<any>(null)
   const [quantity, setQuantity] = useState(1)
@@ -55,8 +58,8 @@ export default function ProductDetailClient() {
     try {
       setIsLoading(true)
       const apiUrl = bandId
-        ? `/api/shop/products/${params.id}?bandId=${bandId}`
-        : `/api/shop/products/${params.id}`
+        ? getApiPath(`/api/shop/products/${params.id}?bandId=${bandId}`)
+        : getApiPath(`/api/shop/products/${params.id}`)
       const response = await fetch(apiUrl)
       const data = await response.json()
 
@@ -82,7 +85,7 @@ export default function ProductDetailClient() {
     if (!session) return
 
     try {
-      const response = await fetch('/api/mypage/wishlist')
+      const response = await fetch(getApiPath('/api/mypage/wishlist'))
       const data = await response.json()
 
       if (data.success) {
@@ -103,7 +106,7 @@ export default function ProductDetailClient() {
     try {
       setReviewsLoading(true)
       const response = await fetch(
-        `/api/shop/products/${product.publishedProductId}/reviews?page=${reviewPage}&limit=5&sortBy=${reviewSortBy}`
+        getApiPath(`/api/shop/products/${product.publishedProductId}/reviews?page=${reviewPage}&limit=5&sortBy=${reviewSortBy}`)
       )
       const data = await response.json()
 
@@ -148,7 +151,7 @@ export default function ProductDetailClient() {
 
   const handleToggleWishlist = async () => {
     if (!session) {
-      window.location.href = '/auth/login'
+      window.location.href = getPath('/auth/login')
       return
     }
 
@@ -166,7 +169,7 @@ export default function ProductDetailClient() {
 
       if (isWishlisted) {
         // 찜 해제 - 먼저 찜 목록에서 해당 상품의 wishlist ID를 찾아야 함
-        const response = await fetch('/api/mypage/wishlist')
+        const response = await fetch(getApiPath('/api/mypage/wishlist'))
         const data = await response.json()
 
         if (data.success) {
@@ -175,7 +178,7 @@ export default function ProductDetailClient() {
           )
 
           if (wishlistItem) {
-            const deleteResponse = await fetch(`/api/mypage/wishlist/${wishlistItem.id}`, {
+            const deleteResponse = await fetch(getApiPath(`/api/mypage/wishlist/${wishlistItem.id}`), {
               method: 'DELETE',
             })
             const deleteData = await deleteResponse.json()
@@ -189,7 +192,7 @@ export default function ProductDetailClient() {
         // 찜 추가
         console.log('[Wishlist] Adding product:', productIdNum)
 
-        const response = await fetch('/api/mypage/wishlist', {
+        const response = await fetch(getApiPath('/api/mypage/wishlist'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ productId: productIdNum }),
@@ -246,7 +249,7 @@ export default function ProductDetailClient() {
         quantity
       }
 
-      const response = await fetch('/api/cart', {
+      const response = await fetch(getApiPath('/api/cart'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -279,7 +282,7 @@ export default function ProductDetailClient() {
       return
     }
     // 비회원도 바로구매 가능 (checkout 페이지에서 비회원 주문 처리)
-    const checkoutUrl = `/checkout?publishedProductId=${product.publishedProductId}&variantId=${selectedVariant.id}&quantity=${quantity}`
+    const checkoutUrl = getPath(`/checkout?publishedProductId=${product.publishedProductId}&variantId=${selectedVariant.id}&quantity=${quantity}`)
     window.location.href = checkoutUrl
   }
 
@@ -304,7 +307,7 @@ export default function ProductDetailClient() {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
         <p className="text-gray-500 mb-4">상품을 찾을 수 없습니다.</p>
-        <Link href="/main" className="text-blue-600 hover:underline">쇼핑몰 홈으로 돌아가기</Link>
+        <Link href={getPath('/main')} className="text-blue-600 hover:underline">쇼핑몰 홈으로 돌아가기</Link>
       </div>
     )
   }
@@ -314,7 +317,7 @@ export default function ProductDetailClient() {
       {/* Mobile Header */}
       <header className="sticky top-0 z-40 bg-white border-b md:hidden">
         <div className="flex items-center justify-between p-4">
-          <Link href="/main" className="p-1">
+          <Link href={getPath('/main')} className="p-1">
             <ArrowLeft className="h-6 w-6" />
           </Link>
           <h1 className="text-sm font-medium flex-1 text-center line-clamp-1 px-2">
@@ -341,11 +344,14 @@ export default function ProductDetailClient() {
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
           {/* Product Images - 고정 너비 */}
           <div className="w-full lg:w-[430px] flex-shrink-0 space-y-3">
-            <div className="w-full h-[430px] bg-white rounded-lg overflow-hidden border border-gray-200">
-              <img
+            <div className="relative w-full h-[430px] bg-white rounded-lg overflow-hidden border border-gray-200">
+              <Image
                 src={product.images[selectedImage]}
                 alt={product.title}
-                className="w-full h-full object-cover"
+                fill
+                sizes="430px"
+                className="object-cover"
+                priority
               />
             </div>
             {/* 썸네일 이미지 - 4열 고정 그리드 */}
@@ -354,11 +360,11 @@ export default function ProductDetailClient() {
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
-                  className={`aspect-square rounded-lg overflow-hidden border-2 ${
+                  className={`relative aspect-square rounded-lg overflow-hidden border-2 ${
                     selectedImage === index ? 'border-[#FF6B6B]' : 'border-gray-200'
                   }`}
                 >
-                  <img src={image} alt="" className="w-full h-full object-cover" />
+                  <Image src={image} alt="" fill sizes="100px" className="object-cover" />
                 </button>
               ))}
             </div>
@@ -559,7 +565,9 @@ export default function ProductDetailClient() {
               <div className="space-y-4">
                 <p className="text-gray-700">{product.description}</p>
                 {product.detailImages && product.detailImages.map((image: string, index: number) => (
-                  <img key={index} src={image} alt="" className="w-full rounded-lg" />
+                  <div key={index} className="relative w-full">
+                    <Image src={image} alt="" width={800} height={800} sizes="100vw" className="w-full h-auto rounded-lg" />
+                  </div>
                 ))}
               </div>
             )}
@@ -670,13 +678,16 @@ export default function ProductDetailClient() {
                         {/* 리뷰 이미지 */}
                         {review.images && review.images.length > 0 && (
                           <div className="flex gap-2 mt-3 overflow-x-auto">
-                            {review.images.map((image: string, idx: number) => (
-                              <img
-                                key={idx}
-                                src={image}
-                                alt={`리뷰 이미지 ${idx + 1}`}
-                                className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
-                              />
+                            {review.images.map((reviewImage: string, idx: number) => (
+                              <div key={idx} className="relative w-20 h-20 flex-shrink-0">
+                                <Image
+                                  src={reviewImage}
+                                  alt={`리뷰 이미지 ${idx + 1}`}
+                                  fill
+                                  sizes="80px"
+                                  className="object-cover rounded-lg"
+                                />
+                              </div>
                             ))}
                           </div>
                         )}

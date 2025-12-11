@@ -141,7 +141,6 @@ const orderIncludeOptions = {
     },
   },
   payment: true,
-  shippingAddress: true,
 }
 
 /**

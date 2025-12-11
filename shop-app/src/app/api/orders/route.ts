@@ -79,7 +79,6 @@ export async function POST(req: NextRequest) {
       result = await orderService.createOrderFromCart({
         userId,
         shopId: shopId || undefined,  // Shop 기반 주문 필터링
-        customerInfo,
         shippingAddress,
       })
     } else {
@@ -99,7 +98,6 @@ export async function POST(req: NextRequest) {
           variantId: item.variantId ? parseInt(item.variantId) : undefined,
           quantity: item.quantity || 1,
         })),
-        customerInfo,
         shippingAddress,
       })
     }

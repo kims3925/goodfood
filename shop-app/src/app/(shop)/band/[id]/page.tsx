@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   Store,
   ShoppingCart,
@@ -12,6 +13,7 @@ import {
   ArrowUpDown,
 } from 'lucide-react'
 import { useCartNotification } from '@/contexts/CartNotificationContext'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface Product {
   id: string
@@ -59,6 +61,7 @@ export default function BandProductsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showNotification } = useCartNotification()
+  const { getPath, getApiPath } = useShopUrl()
   const bandId = params.id as string
 
   const [band, setBand] = useState<BandInfo | null>(null)
@@ -145,7 +148,7 @@ export default function BandProductsPage() {
       if (selectedFilter && selectedFilter.min > 0) queryParams.set('minPrice', selectedFilter.min.toString())
       if (selectedFilter && selectedFilter.max > 0) queryParams.set('maxPrice', selectedFilter.max.toString())
 
-      const response = await fetch(`/api/shop/bands/${bandId}?${queryParams.toString()}`)
+      const response = await fetch(getApiPath(`/api/shop/bands/${bandId}?${queryParams.toString()}`))
       const data = await response.json()
 
       if (data.success) {
@@ -176,7 +179,7 @@ export default function BandProductsPage() {
     }
 
     try {
-      const response = await fetch('/api/cart', {
+      const response = await fetch(getApiPath('/api/cart'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -252,7 +255,7 @@ export default function BandProductsPage() {
             <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/30" />
             <div className="relative h-full px-6 flex items-center">
               <Link
-                href="/main"
+                href={getPath('/main')}
                 className="absolute top-4 left-4 flex items-center gap-2 text-white/80 hover:text-white transition-colors"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -329,12 +332,14 @@ export default function BandProductsPage() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {products.map((product) => (
                     <div key={product.id} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-                      <Link href={`/product/${product.id}?bandId=${bandId}`} className="block group">
+                      <Link href={getPath(`/product/${product.id}?bandId=${bandId}`)} className="block group">
                         <div className="relative aspect-square overflow-hidden bg-gray-100">
-                          <img
+                          <Image
                             src={product.images[0] || '/placeholder.jpg'}
                             alt={product.title}
-                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                            fill
+                            sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                            className="object-cover transition-transform group-hover:scale-105"
                           />
                           <button
                             onClick={(e) => handleAddToCart(product, e)}
