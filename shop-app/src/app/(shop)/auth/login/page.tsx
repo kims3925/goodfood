@@ -1,16 +1,18 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, Suspense } from 'react'
 import { signIn, useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, Mail, Lock, Loader2 } from 'lucide-react'
+import { useShop } from '@/contexts/ShopContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
 
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: session, status } = useSession()
+  const { shop } = useShop()
   const { getPath } = useShopUrl()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,13 +20,11 @@ function LoginContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // 샵 테마 색상 (기본값: #FF6B6B)
+  const shopName = shop?.name
   const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
-  const shopName = shop?.name || 'ABC마켓'
-
   const callbackUrl = searchParams.get('callbackUrl') || getPath('/main')
 
-  // 이미 로그인된 사용자 리다이렉트
+  // 로그인된 사용자는 리다이렉트
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
       const user = session.user as any
@@ -34,7 +34,7 @@ function LoginContent() {
         router.replace(callbackUrl)
       }
     }
-  }, [session, status, router, callbackUrl, getPath])
+  }, [status, session, router, callbackUrl, getPath])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,11 +54,9 @@ function LoginContent() {
         return
       }
 
-      // 로그인 성공 - 세션을 확인하여 온보딩 필요 여부 체크
-      // useSession이 자동으로 업데이트되어 useEffect에서 리다이렉트 처리됨
       router.refresh()
     } catch (err) {
-      setError('로그인 중 오류가 발생했습니다.')
+      setError('로그인 중 문제가 발생했습니다.')
       setIsLoading(false)
     }
   }
@@ -80,7 +78,7 @@ function LoginContent() {
       <div className="max-w-md w-full">
         {/* Shop Name */}
         <div className="text-center mb-4">
-          <Link href="/main" className="inline-block">
+          <Link href={getPath('/main')} className="inline-block">
             <h1 className="text-4xl font-black" style={{ color: primaryColor }}>
               {shopName}
             </h1>
@@ -155,7 +153,7 @@ function LoginContent() {
                 />
                 <span className="text-gray-600">로그인 상태 유지</span>
               </label>
-              <Link href="/auth/forgot-password" className="hover:underline" style={{ color: primaryColor }}>
+              <Link href={getPath('/auth/forgot-password')} className="hover:underline" style={{ color: primaryColor }}>
                 비밀번호 찾기
               </Link>
             </div>
@@ -181,7 +179,7 @@ function LoginContent() {
           {/* Signup Link */}
           <p className="mt-6 text-center text-gray-600">
             아직 회원이 아니신가요?{' '}
-            <Link href="/auth/signup" className="font-medium hover:underline" style={{ color: primaryColor }}>
+            <Link href={getPath('/auth/signup')} className="font-medium hover:underline" style={{ color: primaryColor }}>
               회원가입
             </Link>
           </p>
