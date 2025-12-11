@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/Table'
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
+import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 
 type UserRole = 'USER' | 'MANAGER' | 'ADMIN'
 
@@ -331,7 +332,7 @@ export default function UserListPage() {
                             {user.phone && (
                               <div className="text-sm text-gray-500 flex items-center gap-1">
                                 <Phone className="w-3 h-3" />
-                                {user.phone}
+                                {formatPhoneNumber(user.phone)}
                               </div>
                             )}
                           </div>

@@ -8,6 +8,7 @@ import { Search, ShoppingCart, User, MapPin, ChevronDown, Phone, HelpCircle, Mes
 import { CartNotificationProvider, useCartNotification } from '@/contexts/CartNotificationContext'
 import CartNotificationBubble from '@/components/cart/CartNotificationBubble'
 import { useShop } from '@/contexts/ShopContext'
+import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
 
 function StoreLayoutContent({
   children,
@@ -150,7 +151,7 @@ function StoreLayoutContent({
                     />
                     <div className="absolute top-full right-0 w-[200px] bg-white border border-gray-200 shadow-lg z-50 py-2 mt-1 rounded-md">
                       <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="font-bold text-lg text-abc-coral">{contactPhone}</p>
+                        <p className="font-bold text-lg text-abc-coral">{formatPhoneNumber(contactPhone)}</p>
                         <p className="text-gray-500 text-xs mt-1">월~토 오전 7시 ~ 오후 6시</p>
                       </div>
                       <Link
@@ -265,7 +266,7 @@ function StoreLayoutContent({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
             <div>
               <h4 className="font-bold text-gray-900 mb-3 md:mb-4">고객행복센터</h4>
-              <p className="text-xl md:text-2xl font-bold mb-2 text-abc-coral">{contactPhone}</p>
+              <p className="text-xl md:text-2xl font-bold mb-2 text-abc-coral">{formatPhoneNumber(contactPhone)}</p>
               <p className="text-xs md:text-sm text-gray-600">월~토 오전 7시 ~ 오후 6시</p>
             </div>
             <div>

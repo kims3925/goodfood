@@ -391,6 +391,22 @@ export default function ShopDetailPage({
     return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
   }
 
+  const formatPhoneNumber = (phone: string | null) => {
+    if (!phone) return '-'
+    const cleaned = phone.replace(/\D/g, '')
+    if (cleaned.length === 11) {
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 7)}-${cleaned.slice(7)}`
+    } else if (cleaned.length === 10) {
+      if (cleaned.startsWith('02')) {
+        return `${cleaned.slice(0, 2)}-${cleaned.slice(2, 6)}-${cleaned.slice(6)}`
+      }
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+    } else if (cleaned.length === 9 && cleaned.startsWith('02')) {
+      return `${cleaned.slice(0, 2)}-${cleaned.slice(2, 5)}-${cleaned.slice(5)}`
+    }
+    return phone
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -723,7 +739,7 @@ export default function ShopDetailPage({
                         placeholder="02-1234-5678"
                       />
                     ) : (
-                      <p className="text-gray-900">{shop.contactPhone || '-'}</p>
+                      <p className="text-gray-900">{formatPhoneNumber(shop.contactPhone)}</p>
                     )}
                   </div>
                   <div>
