@@ -4,9 +4,11 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Search, Package, AlertCircle, Phone, Hash } from 'lucide-react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 export default function GuestOrderLookupPage() {
   const router = useRouter()
+  const { getPath, getApiPath } = useShopUrl()
   const [orderNumber, setOrderNumber] = useState('')
   const [phone, setPhone] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -43,7 +45,7 @@ export default function GuestOrderLookupPage() {
     try {
       setIsLoading(true)
 
-      const response = await fetch('/api/guest-orders/lookup', {
+      const response = await fetch(getApiPath('/api/guest-orders/lookup'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -58,7 +60,7 @@ export default function GuestOrderLookupPage() {
 
       if (data.success) {
         // 주문 상세 페이지로 이동 (토큰 포함)
-        router.push(`/order/guest/${data.order.id}?token=${encodeURIComponent(data.accessToken)}`)
+        router.push(getPath(`/order/guest/${data.order.id}?token=${encodeURIComponent(data.accessToken)}`))
       } else {
         setError(data.error || '주문을 찾을 수 없습니다')
       }
@@ -77,7 +79,7 @@ export default function GuestOrderLookupPage() {
           {/* 헤더 */}
           <div className="flex items-center gap-4 mb-8">
             <Link
-              href="/main"
+              href={getPath('/main')}
               className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -176,7 +178,7 @@ export default function GuestOrderLookupPage() {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-500 mb-2">회원이시라면?</p>
             <Link
-              href="/auth/login?redirect=/mypage/orders"
+              href={getPath('/auth/login?redirect=/mypage/orders')}
               className="text-[#FF6B6B] text-sm font-medium hover:underline"
             >
               로그인하고 주문 내역 보기

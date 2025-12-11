@@ -5,30 +5,32 @@ import { signIn, useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, Mail, Lock, Loader2 } from 'lucide-react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: session, status } = useSession()
+  const { getPath } = useShopUrl()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const callbackUrl = searchParams.get('callbackUrl') || '/main'
+  const callbackUrl = searchParams.get('callbackUrl') || getPath('/main')
 
   // 이미 로그인된 사용자 리다이렉트
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
       const user = session.user as any
       if (user.pendingSignup) {
-        router.replace('/auth/complete')
+        router.replace(getPath('/auth/complete'))
       } else {
         router.replace(callbackUrl)
       }
     }
-  }, [session, status, router, callbackUrl])
+  }, [session, status, router, callbackUrl, getPath])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,7 +73,7 @@ function LoginContent() {
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-4">
-          <Link href="/main" className="inline-block">
+          <Link href={getPath('/main')} className="inline-block">
             <h1 className="text-4xl font-black text-[#FF6B6B]">ABC마켓</h1>
           </Link>
           <p className="mt-2 text-gray-600">신선한 식품을 빠르게 배송합니다</p>
@@ -139,7 +141,7 @@ function LoginContent() {
                 <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-[#FF6B6B] focus:ring-[#FF6B6B]" />
                 <span className="text-gray-600">로그인 상태 유지</span>
               </label>
-              <Link href="/auth/forgot-password" className="text-[#FF6B6B] hover:underline">
+              <Link href={getPath('/auth/forgot-password')} className="text-[#FF6B6B] hover:underline">
                 비밀번호 찾기
               </Link>
             </div>
@@ -164,7 +166,7 @@ function LoginContent() {
           {/* Signup Link */}
           <p className="mt-6 text-center text-gray-600">
             아직 회원이 아니신가요?{' '}
-            <Link href="/auth/signup" className="text-[#FF6B6B] font-medium hover:underline">
+            <Link href={getPath('/auth/signup')} className="text-[#FF6B6B] font-medium hover:underline">
               회원가입
             </Link>
           </p>

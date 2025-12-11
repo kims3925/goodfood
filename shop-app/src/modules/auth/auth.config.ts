@@ -36,19 +36,14 @@ async function logSignIn(opts: {
 }
 
 // 쿠키 도메인 설정
-// .lvh.me로 설정하면 모든 서브도메인에서 세션 공유
+// 경로 기반 라우팅으로 변경되어 서브도메인 간 세션 공유 불필요
 function getCookieDomain(): string | undefined {
   // 환경변수에서 명시적으로 설정된 경우 사용
   if (process.env.COOKIE_DOMAIN) {
     return process.env.COOKIE_DOMAIN
   }
 
-  // 개발 환경: 모든 서브도메인에서 세션 공유
-  if (process.env.NODE_ENV !== 'production') {
-    return '.lvh.me'
-  }
-
-  // 프로덕션: 환경변수에서 루트 도메인 가져오기 (예: .shop.com)
+  // 개발/프로덕션 모두 undefined로 설정 (현재 호스트에서만 쿠키 사용)
   return undefined
 }
 

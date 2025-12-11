@@ -14,33 +14,35 @@ import {
   FileText,
   ChevronRight
 } from 'lucide-react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 export default function MyPage() {
   const { data: session } = useSession()
+  const { getPath } = useShopUrl()
 
   const menuItems = [
     {
       title: '주문 관리',
       items: [
-        { icon: ShoppingBag, label: '주문내역', href: '/mypage/orders', description: '주문 및 배송 조회' },
-        { icon: RotateCcw, label: '취소/반품 내역', href: '/mypage/returns', description: '취소 및 반품 관리' },
+        { icon: ShoppingBag, label: '주문내역', href: getPath('/mypage/orders'), description: '주문 및 배송 조회' },
+        { icon: RotateCcw, label: '취소/반품 내역', href: getPath('/mypage/returns'), description: '취소 및 반품 관리' },
       ],
     },
     {
       title: '쇼핑 활동',
       items: [
-        { icon: Tag, label: '쿠폰', href: '/mypage/coupons', description: '보유 쿠폰 확인' },
-        { icon: Heart, label: '찜한 상품', href: '/mypage/wishlist', description: '관심 상품 보기' },
-        { icon: Star, label: '상품 후기', href: '/mypage/reviews', description: '내가 작성한 후기' },
-        { icon: MessageSquare, label: '상품 문의', href: '/mypage/inquiries', description: '문의 내역 확인' },
+        { icon: Tag, label: '쿠폰', href: getPath('/mypage/coupons'), description: '보유 쿠폰 확인' },
+        { icon: Heart, label: '찜한 상품', href: getPath('/mypage/wishlist'), description: '관심 상품 보기' },
+        { icon: Star, label: '상품 후기', href: getPath('/mypage/reviews'), description: '내가 작성한 후기' },
+        { icon: MessageSquare, label: '상품 문의', href: getPath('/mypage/inquiries'), description: '문의 내역 확인' },
       ],
     },
     {
       title: '회원 정보',
       items: [
-        { icon: User, label: '회원 정보 관리', href: '/mypage/profile', description: '개인정보 수정' },
-        { icon: MapPin, label: '배송지 관리', href: '/mypage/addresses', description: '배송지 등록 및 관리' },
-        { icon: FileText, label: '개인정보처리방침', href: '/mypage/privacy', description: '개인정보 보호' },
+        { icon: User, label: '회원 정보 관리', href: getPath('/mypage/profile'), description: '개인정보 수정' },
+        { icon: MapPin, label: '배송지 관리', href: getPath('/mypage/addresses'), description: '배송지 등록 및 관리' },
+        { icon: FileText, label: '개인정보처리방침', href: getPath('/mypage/privacy'), description: '개인정보 보호' },
       ],
     },
   ]

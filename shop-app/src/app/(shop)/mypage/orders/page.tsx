@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Package, ChevronRight, Calendar, CreditCard } from 'lucide-react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface OrderItem {
   id: number
@@ -74,6 +75,7 @@ const statusColors: Record<string, string> = {
 export default function OrdersPage() {
   const { data: session, status: sessionStatus } = useSession()
   const router = useRouter()
+  const { getPath, getApiPath } = useShopUrl()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null)
@@ -83,7 +85,7 @@ export default function OrdersPage() {
   useEffect(() => {
     if (sessionStatus === 'loading') return
     if (!session) {
-      router.push('/auth/login?callbackUrl=/mypage/orders')
+      router.push(getPath('/auth/login?callbackUrl=/mypage/orders'))
       return
     }
     fetchOrders()
@@ -97,7 +99,7 @@ export default function OrdersPage() {
       params.set('page', currentPage.toString())
       params.set('limit', '10')
 
-      const response = await fetch(`/api/mypage/orders?${params}`)
+      const response = await fetch(getApiPath(`/api/mypage/orders?${params}`))
       const data = await response.json()
 
       if (data.success) {
@@ -191,7 +193,7 @@ export default function OrdersPage() {
             {selectedStatus ? `${statusLabels[selectedStatus]} 주문이 없습니다` : '주문 내역이 없습니다'}
           </p>
           <Link
-            href="/main"
+            href={getPath('/main')}
             className="inline-block px-6 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] transition-colors"
           >
             쇼핑 시작하기
@@ -291,7 +293,7 @@ export default function OrdersPage() {
                   {/* 액션 버튼 */}
                   <div className="mt-4 flex gap-2">
                     <Link
-                      href={`/mypage/orders/${order.id}`}
+                      href={getPath(`/mypage/orders/${order.id}`)}
                       className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-center font-medium transition-colors flex items-center justify-center gap-1"
                     >
                       주문상세
@@ -299,7 +301,7 @@ export default function OrdersPage() {
                     </Link>
                     {order.hasWritableReview && (
                       <Link
-                        href="/mypage/reviews"
+                        href={getPath('/mypage/reviews')}
                         className="flex-1 px-4 py-2.5 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] text-center font-medium transition-colors"
                       >
                         후기작성

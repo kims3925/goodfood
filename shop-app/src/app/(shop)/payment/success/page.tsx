@@ -15,6 +15,7 @@ import {
   Copy,
   Check
 } from 'lucide-react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface PaymentInfo {
   paymentKey: string
@@ -64,6 +65,7 @@ const ALREADY_PROCESSED_ERRORS = [
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams()
+  const { getPath, getApiPath } = useShopUrl()
   const [status, setStatus] = useState<PageStatus>('loading')
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null)
   const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null)
@@ -88,7 +90,7 @@ function PaymentSuccessContent() {
       setIsGuestOrder(isGuest)
 
       // 회원/비회원에 따라 다른 API 호출
-      const confirmApiUrl = isGuest ? '/api/guest-payments/confirm' : '/api/payments/confirm'
+      const confirmApiUrl = getApiPath(isGuest ? '/api/guest-payments/confirm' : '/api/payments/confirm')
 
       const response = await fetch(confirmApiUrl, {
         method: 'POST',
@@ -133,7 +135,7 @@ function PaymentSuccessContent() {
   // 결제 상태 조회 (이미 처리된 결제 정보 가져오기)
   const fetchPaymentStatus = async (): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/payments/status?orderId=${orderId}`)
+      const response = await fetch(getApiPath(`/api/payments/status?orderId=${orderId}`))
       const data = await response.json()
 
       if (data.success && data.payment) {
@@ -299,7 +301,7 @@ function PaymentSuccessContent() {
             <p className="text-gray-500 text-center mb-6">{error}</p>
             <div className="w-full space-y-3">
               <Link
-                href="/main"
+                href={getPath('/main')}
                 className="block w-full bg-gray-900 text-white text-center py-3.5 rounded-xl font-semibold hover:bg-gray-800 transition-colors"
               >
                 쇼핑몰 홈으로
@@ -527,7 +529,7 @@ function PaymentSuccessContent() {
         {/* 액션 버튼 */}
         <div className="flex flex-col sm:flex-row gap-3">
           <Link
-            href="/main"
+            href={getPath('/main')}
             className="flex-1 bg-gray-900 text-white text-center py-4 rounded-xl font-semibold hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -535,11 +537,11 @@ function PaymentSuccessContent() {
           </Link>
           {isGuestOrder ? (
             <Link
-              href={
+              href={getPath(
                 guestAccessToken && orderInfo?.id
                   ? `/order/guest/${orderInfo.id}?token=${encodeURIComponent(guestAccessToken)}`
                   : `/order/lookup?orderNumber=${paymentInfo?.orderId || ''}`
-              }
+              )}
               className="flex-1 border-2 border-gray-200 text-gray-700 text-center py-4 rounded-xl font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
             >
               <Clock className="w-5 h-5" />
@@ -547,7 +549,7 @@ function PaymentSuccessContent() {
             </Link>
           ) : (
             <Link
-              href="/mypage/orders"
+              href={getPath('/mypage/orders')}
               className="flex-1 border-2 border-gray-200 text-gray-700 text-center py-4 rounded-xl font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
             >
               <Clock className="w-5 h-5" />

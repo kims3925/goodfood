@@ -8,6 +8,7 @@ import Image from 'next/image'
 import { ArrowLeft, Package, User, MapPin, CreditCard, Truck, Plus, Check, Building2, Wallet, AlertCircle, Ticket, X, ChevronDown } from 'lucide-react'
 import TossPaymentWidget from '@/modules/payments/components/TossPaymentWidget'
 import { useShop } from '@/contexts/ShopContext'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 declare global {
   interface Window {
@@ -73,7 +74,8 @@ function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: session, status } = useSession()
-  const { shop } = useShop() // 서브도메인 Shop 정보
+  const { shop } = useShop() // Shop 정보
+  const { getPath, getApiPath } = useShopUrl()
   const fromCart = searchParams.get('fromCart') === 'true'
   const publishedProductId = searchParams.get('publishedProductId') // productId → publishedProductId로 변경
   const variantId = searchParams.get('variantId')
@@ -181,9 +183,9 @@ function CheckoutContent() {
       // 회원인 경우 프로필, 배송지 및 쿠폰 로드
       if (session) {
         const [profileResponse, addressResponse, couponResponse] = await Promise.all([
-          fetch('/api/mypage/profile'),
-          fetch('/api/mypage/addresses'),
-          fetch('/api/mypage/coupons'),
+          fetch(getApiPath('/api/mypage/profile')),
+          fetch(getApiPath('/api/mypage/addresses')),
+          fetch(getApiPath('/api/mypage/coupons')),
         ])
 
         const profileData = await profileResponse.json()
@@ -269,18 +271,18 @@ function CheckoutContent() {
 
   const loadCartItems = async () => {
     try {
-      const response = await fetch('/api/cart')
+      const response = await fetch(getApiPath('/api/cart'))
       const data = await response.json()
 
       if (data.success && data.cart?.items?.length > 0) {
         setCartItems(data.cart.items)
       } else {
         // 장바구니가 비어있으면 장바구니 페이지로 이동
-        window.location.href = '/cart'
+        router.push(getPath('/cart'))
       }
     } catch (error) {
       console.error('장바구니 로딩 실패:', error)
-      window.location.href = '/cart'
+      router.push(getPath('/cart'))
     }
   }
 
@@ -288,7 +290,7 @@ function CheckoutContent() {
     try {
       setIsLoading(true)
       // publishedProductId를 통해 상품 조회
-      const response = await fetch(`/api/shop/product-publish/${publishedProductId}`)
+      const response = await fetch(getApiPath(`/api/shop/product-publish/${publishedProductId}`))
       const data = await response.json()
 
       if (data.success && data.publishedProduct) {
@@ -514,7 +516,7 @@ function CheckoutContent() {
       // 무통장입금 분기
       if (paymentMethod === 'BANK_TRANSFER') {
         // 비회원/회원 구분하여 API 호출
-        const apiUrl = isGuest ? '/api/guest-orders/bank-transfer' : '/api/orders/bank-transfer'
+        const apiUrl = getApiPath(isGuest ? '/api/guest-orders/bank-transfer' : '/api/orders/bank-transfer')
 
         const response = await fetch(apiUrl, {
           method: 'POST',
@@ -544,13 +546,13 @@ function CheckoutContent() {
             params.append('orderId', data.order.id.toString())
           }
 
-          router.push(`/order/bank-transfer/complete?${params.toString()}`)
+          router.push(getPath(`/order/bank-transfer/complete?${params.toString()}`))
         } else {
           alert(data.error || '주문 생성에 실패했습니다.')
         }
       } else {
         // 토스 결제 플로우 (회원/비회원 모두 지원)
-        const apiUrl = isGuest ? '/api/guest-orders/prepare' : '/api/orders/prepare'
+        const apiUrl = getApiPath(isGuest ? '/api/guest-orders/prepare' : '/api/orders/prepare')
 
         const response = await fetch(apiUrl, {
           method: 'POST',
@@ -615,7 +617,7 @@ function CheckoutContent() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-500 mb-4">상품을 찾을 수 없습니다.</p>
-          <Link href="/main" className="text-blue-600 hover:underline">쇼핑몰 홈으로 돌아가기</Link>
+          <Link href={getPath('/main')} className="text-blue-600 hover:underline">쇼핑몰 홈으로 돌아가기</Link>
         </div>
       </div>
     )
@@ -737,7 +739,7 @@ function CheckoutContent() {
             {/* Header */}
             <div className="flex items-center gap-4 mb-6">
               <Link
-                href={fromCart ? '/cart' : `/product/${product?.id || publishedProductId}`}
+                href={getPath(fromCart ? '/cart' : `/product/${product?.id || publishedProductId}`)}
                 className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -918,7 +920,7 @@ function CheckoutContent() {
 
                       <button
                         type="button"
-                        onClick={() => router.push('/mypage/addresses')}
+                        onClick={() => router.push(getPath('/mypage/addresses'))}
                         className="w-full py-3 border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:border-[#FF6B6B] hover:text-[#FF6B6B] transition-colors flex items-center justify-center gap-2 text-sm"
                       >
                         <Plus className="w-4 h-4" />
@@ -932,7 +934,7 @@ function CheckoutContent() {
                     <div className="text-center py-8 bg-gray-50 rounded-lg mb-4">
                       <p className="text-gray-600 mb-4">등록된 배송지가 없습니다</p>
                       <button
-                        onClick={() => router.push('/mypage/addresses')}
+                        onClick={() => router.push(getPath('/mypage/addresses'))}
                         className="px-6 py-2 bg-[#FF6B6B] text-white rounded-lg hover:bg-[#FF5252] transition-colors inline-flex items-center gap-2"
                       >
                         <Plus className="w-4 h-4" />

@@ -23,6 +23,7 @@ import {
   ChevronUp,
   ExternalLink
 } from 'lucide-react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 import {
   TOSS_ERROR_CODES,
   getErrorMessage,
@@ -37,6 +38,7 @@ import {
 function PaymentFailContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { getPath, getApiPath } = useShopUrl()
   const [failureInfo, setFailureInfo] = useState<{
     message: string
     code: string
@@ -60,7 +62,7 @@ function PaymentFailContent() {
       setIsDeleting(true)
       console.log('결제 실패로 인한 주문 상태 업데이트:', orderNumber)
 
-      const response = await fetch(`/api/orders/${orderNumber}/fail`, {
+      const response = await fetch(getApiPath(`/api/orders/${orderNumber}/fail`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -291,7 +293,7 @@ function PaymentFailContent() {
             </button>
           ) : (
             <Link
-              href="/cart"
+              href={getPath('/cart')}
               className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-center py-4 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 font-medium"
             >
               <CreditCard className="w-5 h-5" />
@@ -299,7 +301,7 @@ function PaymentFailContent() {
             </Link>
           )}
           <Link
-            href="/main"
+            href={getPath('/main')}
             className="flex-1 bg-white border-2 border-gray-200 text-gray-700 text-center py-4 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all shadow-md flex items-center justify-center gap-2 font-medium"
           >
             <ArrowLeft className="w-5 h-5" />

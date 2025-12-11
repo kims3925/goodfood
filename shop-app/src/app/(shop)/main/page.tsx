@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { ChevronLeft, ChevronRight, ShoppingCart, Sparkles, Package } from 'lucide-react'
 import { useCartNotification } from '@/contexts/CartNotificationContext'
 import { useShop } from '@/contexts/ShopContext'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface Product {
   id: string
@@ -28,6 +29,7 @@ interface Product {
 export default function StorePage() {
   const { showNotification } = useCartNotification()
   const { shop } = useShop()
+  const { getApiPath, getPath } = useShopUrl()
   const [shopProducts, setShopProducts] = useState<Product[]>([])
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([])
   const [currentSlide, setCurrentSlide] = useState(0)
@@ -52,7 +54,7 @@ export default function StorePage() {
   const loadShopProducts = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/shop/sections?limit=50')
+      const response = await fetch(getApiPath('/api/shop/sections?limit=50'))
       const data = await response.json()
 
       if (data.success) {
@@ -84,7 +86,7 @@ export default function StorePage() {
     }
 
     try {
-      const response = await fetch('/api/cart', {
+      const response = await fetch(getApiPath('/api/cart'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -161,7 +163,7 @@ export default function StorePage() {
                         .slice(slideIndex * cardsPerView, (slideIndex + 1) * cardsPerView)
                         .map((product, productIndex) => (
                           <div key={`${slideIndex}-${productIndex}-${product.id}`} className="w-[140px] sm:w-[160px] md:w-[180px] lg:w-[220px] flex-shrink-0">
-                            <Link href={`/product/${product.id}`} className="block group">
+                            <Link href={getPath(`/product/${product.id}`)} className="block group">
                               <div className="relative aspect-[220/280] rounded-lg overflow-hidden bg-gray-100">
                                 <Image
                                   src={product.images[0] || '/placeholder.jpg'}

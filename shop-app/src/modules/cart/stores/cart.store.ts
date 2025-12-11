@@ -2,6 +2,15 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
 /**
+ * API 경로에 shop slug 추가
+ */
+function buildApiPath(path: string, slug?: string): string {
+  if (!slug) return path
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `/${slug}${normalizedPath}`
+}
+
+/**
  * 장바구니 아이템 인터페이스
  */
 export interface CartItem {
@@ -185,7 +194,8 @@ export const useCartStore = create<CartState>()(
 export async function addToCartWithAPI(
   productId: string,
   quantity: number = 1,
-  userId?: string
+  userId?: string,
+  slug?: string
 ): Promise<void> {
   const store = useCartStore.getState()
   const sessionId = store.sessionId
@@ -198,7 +208,7 @@ export async function addToCartWithAPI(
   store.setError(null)
 
   try {
-    const response = await fetch('/api/cart', {
+    const response = await fetch(buildApiPath('/api/cart', slug), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId, userId, productId, quantity })
@@ -227,7 +237,8 @@ export async function addToCartWithAPI(
  */
 export async function syncCartWithServer(
   sessionId: string,
-  userId?: string
+  userId?: string,
+  slug?: string
 ): Promise<void> {
   const store = useCartStore.getState()
   store.setLoading(true)
@@ -236,7 +247,7 @@ export async function syncCartWithServer(
     const params = new URLSearchParams({ sessionId })
     if (userId) params.append('userId', userId)
 
-    const response = await fetch(`/api/cart?${params.toString()}`)
+    const response = await fetch(buildApiPath(`/api/cart?${params.toString()}`, slug))
     const result = await response.json()
 
     if (result.success && result.cart) {

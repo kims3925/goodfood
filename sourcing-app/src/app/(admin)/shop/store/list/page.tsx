@@ -454,7 +454,7 @@ function ShopListContent() {
                         <div className="flex items-center gap-1">
                           <Globe size={14} className="text-gray-400" />
                           <span className="text-sm font-mono text-blue-600">
-                            {shop.subdomain}.{process.env.NEXT_PUBLIC_DOMAIN}
+                            {process.env.NEXT_PUBLIC_DOMAIN}/{shop.subdomain}
                           </span>
                         </div>
                       </TableCell>

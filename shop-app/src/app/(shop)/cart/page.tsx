@@ -8,6 +8,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Minus, Plus, X, ShoppingBag, Check, Truck } from 'lucide-react'
 import { ConfirmModal } from '@/modules/common/ui-kit/src/ui'
 import { useShop } from '@/contexts/ShopContext'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface CartItem {
   id: number
@@ -36,6 +37,7 @@ interface Cart {
 export default function CartPage() {
   const { data: session } = useSession()
   const { shop } = useShop()
+  const { getPath, getApiPath } = useShopUrl()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [cart, setCart] = useState<Cart | null>(null)
@@ -54,7 +56,7 @@ export default function CartPage() {
   const loadCart = useCallback(async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/cart', {
+      const response = await fetch(getApiPath('/api/cart'), {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -113,7 +115,7 @@ export default function CartPage() {
     const autoAddToCart = async () => {
       setIsAutoAdding(true)
       try {
-        const response = await fetch('/api/cart', {
+        const response = await fetch(getApiPath('/api/cart'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -132,7 +134,7 @@ export default function CartPage() {
       } finally {
         setIsAutoAdding(false)
         // URL에서 add 파라미터 제거 (히스토리 교체)
-        router.replace('/cart', { scroll: false })
+        router.replace(getPath('/cart'), { scroll: false })
       }
     }
 
@@ -202,7 +204,7 @@ export default function CartPage() {
 
     // 백그라운드에서 API 호출
     try {
-      const response = await fetch(`/api/cart/items/${itemId}`, {
+      const response = await fetch(getApiPath(`/api/cart/items/${itemId}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quantity: newQuantity }),
@@ -252,7 +254,7 @@ export default function CartPage() {
 
     // 백그라운드에서 API 호출
     try {
-      const response = await fetch(`/api/cart/items/${itemId}`, {
+      const response = await fetch(getApiPath(`/api/cart/items/${itemId}`), {
         method: 'DELETE',
         credentials: 'include',
       })
@@ -278,7 +280,7 @@ export default function CartPage() {
   // 실제 장바구니 비우기 처리
   const confirmClearCart = async () => {
     try {
-      await fetch('/api/cart', { method: 'DELETE', credentials: 'include' })
+      await fetch(getApiPath('/api/cart'), { method: 'DELETE', credentials: 'include' })
       setCart(null)
       setSelectedItems([])
     } catch (error) {
@@ -315,7 +317,7 @@ export default function CartPage() {
   const confirmRemoveSelected = async () => {
     try {
       for (const itemId of selectedItems) {
-        await fetch(`/api/cart/items/${itemId}`, { method: 'DELETE', credentials: 'include' })
+        await fetch(getApiPath(`/api/cart/items/${itemId}`), { method: 'DELETE', credentials: 'include' })
       }
       await loadCart()
     } catch (error) {
@@ -373,7 +375,7 @@ export default function CartPage() {
             <p className="text-gray-500 text-lg mb-2">장바구니에 담긴 상품이 없습니다</p>
             <p className="text-gray-400 text-sm mb-8">원하는 상품을 장바구니에 담아보세요!</p>
             <Link
-              href="/main"
+              href={getPath('/main')}
               className="px-10 py-3 border border-[#FF6B6B] text-[#FF6B6B] rounded-md hover:bg-[#FF6B6B] hover:text-white transition-colors font-medium"
             >
               쇼핑 계속하기
@@ -430,7 +432,7 @@ export default function CartPage() {
                       </div>
 
                       {/* 상품 이미지 */}
-                      <Link href={`/product/${item.productId}`} className="flex-shrink-0">
+                      <Link href={getPath(`/product/${item.productId}`)} className="flex-shrink-0">
                         <div className="relative w-[60px] h-[78px] bg-gray-100 rounded overflow-hidden">
                           <Image
                             src={item.image || '/placeholder.jpg'}
@@ -444,7 +446,7 @@ export default function CartPage() {
 
                       {/* 상품 정보 */}
                       <div className="flex-1 min-w-0">
-                        <Link href={`/product/${item.productId}`}>
+                        <Link href={getPath(`/product/${item.productId}`)}>
                           <h3 className="text-[15px] text-gray-900 font-medium line-clamp-2 hover:underline">
                             {item.name}
                           </h3>
@@ -550,7 +552,7 @@ export default function CartPage() {
                 <div className="p-5 pb-4 space-y-3">
                   {/* 회원/비회원 공통 주문하기 버튼 */}
                   <Link
-                    href="/checkout?fromCart=true"
+                    href={getPath('/checkout?fromCart=true')}
                     className={`w-full py-4 rounded-md text-center font-semibold text-base block transition-colors ${
                       selectedItems.length > 0
                         ? 'bg-[#FF6B6B] text-white hover:bg-[#ff5252]'
@@ -570,7 +572,7 @@ export default function CartPage() {
                   {/* 비회원인 경우 로그인 버튼 추가 */}
                   {!session && selectedItems.length > 0 && (
                     <Link
-                      href="/auth/login"
+                      href={getPath('/auth/login')}
                       className="w-full py-3 rounded-md text-center font-medium text-sm block border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
                     >
                       로그인하고 주문하기

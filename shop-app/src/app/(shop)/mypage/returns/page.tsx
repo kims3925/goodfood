@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { RotateCcw, Package, Calendar, CreditCard, ChevronRight } from 'lucide-react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface OrderItem {
   id: number
@@ -56,6 +57,7 @@ const statusColors: Record<string, string> = {
 export default function ReturnsPage() {
   const { data: session, status: sessionStatus } = useSession()
   const router = useRouter()
+  const { getPath, getApiPath } = useShopUrl()
   const [orders, setOrders] = useState<CancelledOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedType, setSelectedType] = useState<string | null>(null)
@@ -65,7 +67,7 @@ export default function ReturnsPage() {
   useEffect(() => {
     if (sessionStatus === 'loading') return
     if (!session) {
-      router.push('/auth/login?callbackUrl=/mypage/returns')
+      router.push(getPath('/auth/login?callbackUrl=/mypage/returns'))
       return
     }
     fetchCancelledOrders()
@@ -79,7 +81,7 @@ export default function ReturnsPage() {
       params.set('page', currentPage.toString())
       params.set('limit', '10')
 
-      const response = await fetch(`/api/mypage/returns?${params}`)
+      const response = await fetch(getApiPath(`/api/mypage/returns?${params}`))
       const data = await response.json()
 
       if (data.success) {
@@ -181,7 +183,7 @@ export default function ReturnsPage() {
               : '취소/반품 내역이 없습니다'}
           </p>
           <Link
-            href="/mypage/orders"
+            href={getPath('/mypage/orders')}
             className="inline-block px-6 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] transition-colors"
           >
             주문 내역 보기
@@ -298,7 +300,7 @@ export default function ReturnsPage() {
                   {/* 액션 버튼 */}
                   <div className="mt-4">
                     <Link
-                      href={`/mypage/orders/${order.id}`}
+                      href={getPath(`/mypage/orders/${order.id}`)}
                       className="w-full px-4 py-2.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-center font-medium transition-colors flex items-center justify-center gap-1"
                     >
                       주문 상세보기

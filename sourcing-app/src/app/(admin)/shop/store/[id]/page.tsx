@@ -118,14 +118,14 @@ export default function ShopDetailPage({
   const subdomainDebounceRef = useRef<NodeJS.Timeout | null>(null)
   const nameDebounceRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Shop URL 도메인 (.env의 NEXT_PUBLIC_DOMAIN 사용)
+  // Shop URL 도메인 (.env의 NEXT_PUBLIC_SHOP_DOMAIN 사용)
   const shopBaseDomain = useMemo(() => {
-    return process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'
+    return process.env.NEXT_PUBLIC_SHOP_DOMAIN || `shop.${process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'}`
   }, [])
 
   const getShopUrl = useCallback((subdomainValue: string) => {
-    const protocol = shopBaseDomain.includes('lvh.me') ? 'http' : 'https'
-    return `${protocol}://${subdomainValue}.${shopBaseDomain}`
+    const protocol = shopBaseDomain.includes('lvh.me') || shopBaseDomain.includes('localhost') ? 'http' : 'https'
+    return `${protocol}://${shopBaseDomain}/${subdomainValue}`
   }, [shopBaseDomain])
 
   // 서브도메인 중복 체크
@@ -459,7 +459,7 @@ export default function ShopDetailPage({
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1"
                   >
-                    {shop.subdomain}.{shopBaseDomain}
+                    {shopBaseDomain}/{shop.subdomain}
                     <ExternalLink size={12} />
                   </a>
                 </div>
@@ -565,18 +565,18 @@ export default function ShopDetailPage({
                   {isEditMode ? (
                     <>
                       <div className="flex items-center">
+                        <span className="px-3 py-2 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-gray-500 text-sm whitespace-nowrap">
+                          {shopBaseDomain}/
+                        </span>
                         <Input
                           value={subdomain}
                           onChange={(e) => handleSubdomainChange(e.target.value)}
                           placeholder="myshop"
-                          className={`rounded-r-none ${
+                          className={`rounded-l-none ${
                             subdomainCheck.isDuplicate === true ? 'border-red-500 focus:ring-red-500' :
                             subdomainCheck.isDuplicate === false ? 'border-green-500 focus:ring-green-500' : ''
                           }`}
                         />
-                        <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-500 text-sm whitespace-nowrap">
-                          .{shopBaseDomain}
-                        </span>
                       </div>
                       {subdomainCheck.checking && (
                         <div className="flex items-center gap-1 mt-1 text-gray-500 text-xs">
@@ -598,7 +598,7 @@ export default function ShopDetailPage({
                       )}
                     </>
                   ) : (
-                    <p className="text-gray-900 font-mono">{shop.subdomain}<span className="text-gray-400">.{shopBaseDomain}</span></p>
+                    <p className="text-gray-900 font-mono"><span className="text-gray-400">{shopBaseDomain}/</span>{shop.subdomain}</p>
                   )}
                 </div>
                 <div>

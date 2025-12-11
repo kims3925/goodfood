@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Star, Package, X, Pencil, Trash2, MoreVertical } from 'lucide-react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 import Image from 'next/image'
 
 interface WritableItem {
@@ -57,6 +58,7 @@ interface Pagination {
 export default function ReviewsPage() {
   const { data: session, status: sessionStatus } = useSession()
   const router = useRouter()
+  const { getPath, getApiPath } = useShopUrl()
   const [activeTab, setActiveTab] = useState<'writable' | 'written'>('writable')
   const [writableItems, setWritableItems] = useState<WritableItem[]>([])
   const [writtenReviews, setWrittenReviews] = useState<WrittenReview[]>([])
@@ -92,7 +94,7 @@ export default function ReviewsPage() {
   useEffect(() => {
     if (sessionStatus === 'loading') return
     if (!session) {
-      router.push('/auth/login?callbackUrl=/mypage/reviews')
+      router.push(getPath('/auth/login?callbackUrl=/mypage/reviews'))
       return
     }
     fetchCounts()
@@ -114,8 +116,8 @@ export default function ReviewsPage() {
   const fetchCounts = async () => {
     try {
       const [writableRes, writtenRes] = await Promise.all([
-        fetch('/api/mypage/reviews?tab=writable&limit=1'),
-        fetch('/api/mypage/reviews?tab=written&limit=1'),
+        fetch(getApiPath('/api/mypage/reviews?tab=writable&limit=1')),
+        fetch(getApiPath('/api/mypage/reviews?tab=written&limit=1')),
       ])
       const [writableData, writtenData] = await Promise.all([
         writableRes.json(),
@@ -140,7 +142,7 @@ export default function ReviewsPage() {
       params.set('page', currentPage.toString())
       params.set('limit', '10')
 
-      const response = await fetch(`/api/mypage/reviews?${params}`)
+      const response = await fetch(getApiPath(`/api/mypage/reviews?${params}`))
       const data = await response.json()
 
       if (data.success) {
@@ -192,7 +194,7 @@ export default function ReviewsPage() {
 
     try {
       setSubmitting(true)
-      const response = await fetch('/api/mypage/reviews', {
+      const response = await fetch(getApiPath('/api/mypage/reviews'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -246,7 +248,7 @@ export default function ReviewsPage() {
 
     try {
       setSubmitting(true)
-      const response = await fetch(`/api/mypage/reviews/${editingReview.id}`, {
+      const response = await fetch(getApiPath(`/api/mypage/reviews/${editingReview.id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -288,7 +290,7 @@ export default function ReviewsPage() {
 
     try {
       setDeleting(true)
-      const response = await fetch(`/api/mypage/reviews/${deletingReviewId}`, {
+      const response = await fetch(getApiPath(`/api/mypage/reviews/${deletingReviewId}`), {
         method: 'DELETE',
       })
 

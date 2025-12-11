@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, Mail, Lock, User, Phone, Loader2, Check, AlertCircle, CheckCircle } from 'lucide-react'
 import { useShop } from '@/contexts/ShopContext'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface FieldErrors {
   name?: string
@@ -17,6 +18,7 @@ interface FieldErrors {
 export default function SignupPage() {
   const router = useRouter()
   const { shop } = useShop()
+  const { getPath, getApiPath } = useShopUrl()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -169,7 +171,7 @@ export default function SignupPage() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/auth/signup', {
+      const response = await fetch(getApiPath('/api/auth/signup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -189,7 +191,7 @@ export default function SignupPage() {
       }
 
       // 회원가입 성공 - 로그인 페이지로 이동
-      router.push('/auth/login?signup=success')
+      router.push(getPath('/auth/login?signup=success'))
     } catch (err) {
       setError('회원가입 중 오류가 발생했습니다.')
     } finally {
@@ -472,7 +474,7 @@ export default function SignupPage() {
           {/* Login Link */}
           <p className="mt-6 text-center text-gray-600">
             이미 회원이신가요?{' '}
-            <Link href="/auth/login" className="text-[#FF6B6B] font-medium hover:underline">
+            <Link href={getPath('/auth/login')} className="text-[#FF6B6B] font-medium hover:underline">
               로그인
             </Link>
           </p>

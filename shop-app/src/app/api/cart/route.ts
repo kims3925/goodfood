@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
 import { getCartService } from '@/modules/cart/services/cart.service'
 import { v4 as uuidv4 } from 'uuid'
+import prisma from '@bandauto/db'
 
 // 세션 만료 시간 (7일)
 const SESSION_EXPIRY_DAYS = 7
@@ -40,7 +41,15 @@ async function getCurrentUserId(): Promise<number | null> {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return null
-    return typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
+    const userId = typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
+
+    // User 존재 여부 확인 (삭제된 사용자 처리)
+    const userExists = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true }
+    })
+
+    return userExists ? userId : null
   } catch {
     return null
   }

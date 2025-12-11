@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Heart, ShoppingCart, Trash2 } from 'lucide-react'
 import { ConfirmModal } from '@/modules/common/ui-kit/src/ui'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface Wishlist {
   id: number
@@ -22,6 +23,7 @@ interface Wishlist {
 
 export default function WishlistPage() {
   const { data: session } = useSession()
+  const { getPath, getApiPath } = useShopUrl()
   const [wishlists, setWishlists] = useState<Wishlist[]>([])
   const [loading, setLoading] = useState(true)
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
@@ -36,7 +38,7 @@ export default function WishlistPage() {
   const fetchWishlists = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/mypage/wishlist')
+      const response = await fetch(getApiPath('/api/mypage/wishlist'))
       const data = await response.json()
 
       if (data.success) {
@@ -58,7 +60,7 @@ export default function WishlistPage() {
     if (!pendingRemoveId) return
 
     try {
-      const response = await fetch(`/api/mypage/wishlist/${pendingRemoveId}`, {
+      const response = await fetch(getApiPath(`/api/mypage/wishlist/${pendingRemoveId}`), {
         method: 'DELETE',
       })
 
@@ -103,7 +105,7 @@ export default function WishlistPage() {
           <Heart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">찜한 상품이 없습니다</p>
           <Link
-            href="/main"
+            href={getPath('/main')}
             className="inline-block px-6 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252]"
           >
             쇼핑 시작하기
@@ -116,7 +118,7 @@ export default function WishlistPage() {
               key={item.id}
               className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
             >
-              <Link href={`/product/${item.product.id}`}>
+              <Link href={getPath(`/product/${item.product.id}`)}>
                 <div className="aspect-square bg-gray-100 relative">
                   {item.product.thumbnailUrl ? (
                     <Image
@@ -135,7 +137,7 @@ export default function WishlistPage() {
               </Link>
 
               <div className="p-4">
-                <Link href={`/product/${item.product.id}`}>
+                <Link href={getPath(`/product/${item.product.id}`)}>
                   <h3 className="font-medium text-gray-900 mb-2 line-clamp-2 hover:text-[#FF6B6B]">
                     {item.product.name}
                   </h3>
@@ -155,7 +157,7 @@ export default function WishlistPage() {
 
                 <div className="flex gap-2">
                   <Link
-                    href={`/product/${item.product.id}`}
+                    href={getPath(`/product/${item.product.id}`)}
                     className="flex-1 px-4 py-2 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] text-center text-sm"
                   >
                     상품보기

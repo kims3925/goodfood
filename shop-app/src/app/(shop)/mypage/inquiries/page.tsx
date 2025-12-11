@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { MessageSquare, CheckCircle, Clock } from 'lucide-react'
 import Image from 'next/image'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface InquiryReply {
   id: number
@@ -45,6 +46,7 @@ const inquiryTypeLabels: Record<string, string> = {
 
 export default function InquiriesPage() {
   const { data: session } = useSession()
+  const { getApiPath } = useShopUrl()
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -57,7 +59,7 @@ export default function InquiriesPage() {
   const fetchInquiries = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/mypage/inquiries')
+      const response = await fetch(getApiPath('/api/mypage/inquiries'))
       const data = await response.json()
 
       if (data.success) {

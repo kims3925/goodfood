@@ -21,6 +21,7 @@ import {
   User,
 } from 'lucide-react'
 import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 // 주문 상태 매핑
 const orderStatusMap: Record<string, { label: string; color: string; icon: any }> = {
@@ -88,6 +89,7 @@ function GuestOrderDetailContent() {
   const params = useParams()
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { getPath, getApiPath } = useShopUrl()
   const orderId = params.id as string
   const token = searchParams.get('token') || ''
 
@@ -113,7 +115,7 @@ function GuestOrderDetailContent() {
       setIsLoading(true)
       setError('')
 
-      const response = await fetch(`/api/guest-orders/${orderId}`, {
+      const response = await fetch(getApiPath(`/api/guest-orders/${orderId}`), {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -166,7 +168,7 @@ function GuestOrderDetailContent() {
     try {
       setIsCancelling(true)
 
-      const response = await fetch(`/api/guest-orders/${orderId}/cancel`, {
+      const response = await fetch(getApiPath(`/api/guest-orders/${orderId}/cancel`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -214,7 +216,7 @@ function GuestOrderDetailContent() {
           <h2 className="text-lg font-semibold text-gray-900 mb-2">주문 조회 실패</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <Link
-            href="/order/lookup"
+            href={getPath('/order/lookup')}
             className="inline-flex items-center gap-2 px-6 py-3 bg-[#FF6B6B] text-white rounded-lg font-medium hover:bg-[#FF5252] transition-colors"
           >
             주문 조회 페이지로 이동
@@ -233,7 +235,7 @@ function GuestOrderDetailContent() {
           {/* 헤더 */}
           <div className="flex items-center gap-4 mb-6">
             <Link
-              href="/order/lookup"
+              href={getPath('/order/lookup')}
               className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -473,14 +475,14 @@ function GuestOrderDetailContent() {
           {/* 하단 버튼 */}
           <div className="space-y-3">
             <Link
-              href="/main"
+              href={getPath('/main')}
               className="w-full py-4 bg-[#FF6B6B] text-white rounded-lg font-semibold text-center flex items-center justify-center gap-2 hover:bg-[#FF5252] transition-colors"
             >
               <ShoppingBag className="w-5 h-5" />
               쇼핑 계속하기
             </Link>
             <Link
-              href="/order/lookup"
+              href={getPath('/order/lookup')}
               className="w-full py-4 bg-gray-100 text-gray-700 rounded-lg font-semibold text-center flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
             >
               다른 주문 조회하기

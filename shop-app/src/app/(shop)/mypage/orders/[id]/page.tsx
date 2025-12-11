@@ -26,6 +26,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 // 취소 사유 목록
 const CANCEL_REASONS = [
@@ -147,6 +148,7 @@ export default function OrderDetailPage() {
   const { data: session, status: sessionStatus } = useSession()
   const params = useParams()
   const router = useRouter()
+  const { getPath, getApiPath } = useShopUrl()
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -164,7 +166,7 @@ export default function OrderDetailPage() {
   useEffect(() => {
     if (sessionStatus === 'loading') return
     if (!session) {
-      router.push('/auth/login?callbackUrl=/mypage/orders')
+      router.push(getPath('/auth/login?callbackUrl=/mypage/orders'))
       return
     }
     fetchOrder()
@@ -173,7 +175,7 @@ export default function OrderDetailPage() {
   const fetchOrder = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/mypage/orders/${orderId}`)
+      const response = await fetch(getApiPath(`/api/mypage/orders/${orderId}`))
       const data = await response.json()
 
       if (data.success) {
@@ -273,7 +275,7 @@ export default function OrderDetailPage() {
     try {
       setCancelLoading(true)
 
-      const response = await fetch(`/api/orders/${order.id}/cancel`, {
+      const response = await fetch(getApiPath(`/api/orders/${order.id}/cancel`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -324,7 +326,7 @@ export default function OrderDetailPage() {
           <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">{error || '주문을 찾을 수 없습니다'}</p>
           <Link
-            href="/mypage/orders"
+            href={getPath('/mypage/orders')}
             className="inline-flex items-center gap-2 px-6 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252]"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -342,7 +344,7 @@ export default function OrderDetailPage() {
     <div className="kurly-container py-8">
       {/* 뒤로가기 */}
       <Link
-        href="/mypage/orders"
+        href={getPath('/mypage/orders')}
         className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -717,7 +719,7 @@ export default function OrderDetailPage() {
           <div className="space-y-3">
             {order.hasWritableReview && (
               <Link
-                href="/mypage/reviews"
+                href={getPath('/mypage/reviews')}
                 className="block w-full px-4 py-3 bg-[#FF6B6B] text-white text-center rounded-lg font-medium hover:bg-[#FF5252] transition-colors"
               >
                 후기 작성하기

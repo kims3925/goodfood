@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { User } from 'lucide-react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 export default function ProfilePage() {
   const { data: session } = useSession()
+  const { getApiPath } = useShopUrl()
   const [loading, setLoading] = useState(true)
   const [formData, setFormData] = useState({
     name: '',
@@ -24,7 +26,7 @@ export default function ProfilePage() {
   const fetchProfile = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/mypage/profile')
+      const response = await fetch(getApiPath('/api/mypage/profile'))
       const data = await response.json()
 
       if (data.success) {
@@ -51,7 +53,7 @@ export default function ProfilePage() {
     }
 
     try {
-      const response = await fetch('/api/mypage/profile', {
+      const response = await fetch(getApiPath('/api/mypage/profile'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

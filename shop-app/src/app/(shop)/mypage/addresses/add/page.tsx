@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 declare global {
   interface Window {
@@ -13,6 +14,7 @@ declare global {
 export default function AddAddressPage() {
   const router = useRouter()
   const { data: session } = useSession()
+  const { getPath, getApiPath } = useShopUrl()
   const [formData, setFormData] = useState({
     label: '',
     recipientName: '',
@@ -64,7 +66,7 @@ export default function AddAddressPage() {
     e.preventDefault()
 
     if (!session) {
-      router.push('/auth/login')
+      router.push(getPath('/auth/login'))
       return
     }
 
@@ -75,7 +77,7 @@ export default function AddAddressPage() {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/mypage/addresses', {
+      const response = await fetch(getApiPath('/api/mypage/addresses'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,7 +88,7 @@ export default function AddAddressPage() {
       const data = await response.json()
 
       if (data.success) {
-        router.push('/mypage/addresses')
+        router.push(getPath('/mypage/addresses'))
       }
     } catch (error) {
       console.error('Failed to add address:', error)

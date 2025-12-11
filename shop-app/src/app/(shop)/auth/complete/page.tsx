@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 export default function AuthCompletePage() {
   const router = useRouter()
   const { data: session, status, update } = useSession()
+  const { getApiPath } = useShopUrl()
   const [agreeTos, setAgreeTos] = useState(false)
   const [agreePrivacy, setAgreePrivacy] = useState(false)
   const [agreeMarketing, setAgreeMarketing] = useState(false)
@@ -36,7 +38,7 @@ export default function AuthCompletePage() {
 
     try {
       setSubmitting(true)
-      const res = await fetch('/api/auth/complete', {
+      const res = await fetch(getApiPath('/api/auth/complete'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agreeTos, agreePrivacy, agreeMarketing }),
