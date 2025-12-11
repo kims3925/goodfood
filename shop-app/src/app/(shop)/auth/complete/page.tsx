@@ -8,7 +8,7 @@ import { useShopUrl } from '@/hooks/useShopUrl'
 export default function AuthCompletePage() {
   const router = useRouter()
   const { data: session, status, update } = useSession()
-  const { getApiPath } = useShopUrl()
+  const { getApiPath, getPath } = useShopUrl()
   const [agreeTos, setAgreeTos] = useState(false)
   const [agreePrivacy, setAgreePrivacy] = useState(false)
   const [agreeMarketing, setAgreeMarketing] = useState(false)
@@ -23,9 +23,9 @@ export default function AuthCompletePage() {
       return
     }
     if (!(session.user as any).pendingSignup) {
-      router.replace('/')
+      router.replace(getPath('/main'))
     }
-  }, [session, status, router])
+  }, [session, status, router, getPath])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,7 +51,7 @@ export default function AuthCompletePage() {
 
       // 세션 갱신 후 홈으로 이동
       await update()
-      router.replace('/')
+      router.replace(getPath('/main'))
     } catch (err: any) {
       setError(err.message || '온보딩에 실패했습니다.')
     } finally {

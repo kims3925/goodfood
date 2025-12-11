@@ -117,11 +117,47 @@ function CheckoutContent() {
 
   // 에러 상태 및 섹션 ref
   const [errors, setErrors] = useState<{
-    customerInfo?: string
+    customerName?: string
+    customerPhone?: string
+    customerEmail?: string
+    recipientName?: string
+    recipientPhone?: string
     shippingAddress?: string
+    detailAddress?: string
   }>({})
   const customerInfoRef = useRef<HTMLDivElement>(null)
   const shippingAddressRef = useRef<HTMLDivElement>(null)
+
+  // 유효성 검증 함수들
+  const validateName = (name: string): string | null => {
+    if (!name.trim()) return '이름을 입력해주세요.'
+    if (name.trim().length < 2) return '이름은 2자 이상 입력해주세요.'
+    if (name.trim().length > 20) return '이름은 20자 이하로 입력해주세요.'
+    return null
+  }
+
+  const validatePhone = (phone: string): string | null => {
+    if (!phone.trim()) return '휴대폰 번호를 입력해주세요.'
+    const phoneRegex = /^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$/
+    if (!phoneRegex.test(phone.replace(/-/g, '').replace(/\s/g, ''))) {
+      return '올바른 휴대폰 번호를 입력해주세요. (예: 010-1234-5678)'
+    }
+    return null
+  }
+
+  const validateEmail = (email: string): string | null => {
+    if (!email.trim()) return null // 이메일은 선택사항
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return '올바른 이메일 주소를 입력해주세요.'
+    }
+    return null
+  }
+
+  const validateAddress = (address: string): string | null => {
+    if (!address.trim()) return '주소를 입력해주세요. (주소 검색 버튼을 클릭하세요)'
+    return null
+  }
 
   // Daum 우편번호 API (레이어 방식)
   const openAddressSearch = () => {
@@ -453,21 +489,33 @@ function CheckoutContent() {
     const isGuest = !session?.user?.id
 
     // 에러 초기화
-    const newErrors: { customerInfo?: string; shippingAddress?: string } = {}
+    const newErrors: {
+      customerName?: string
+      customerPhone?: string
+      customerEmail?: string
+      recipientName?: string
+      recipientPhone?: string
+      shippingAddress?: string
+      detailAddress?: string
+    } = {}
 
-    // 폼 검증 - 주문자 정보 (비회원일 때만 검증)
-    if (isGuest && (!formData.customerName || !formData.customerPhone)) {
-      newErrors.customerInfo = '주문자 이름과 휴대폰 번호를 입력해주세요.'
+    // 비회원일 때 주문자 정보 검증
+    if (isGuest) {
+      const customerNameError = validateName(formData.customerName)
+      if (customerNameError) newErrors.customerName = customerNameError
+
+      const customerPhoneError = validatePhone(formData.customerPhone)
+      if (customerPhoneError) newErrors.customerPhone = customerPhoneError
+
+      const customerEmailError = validateEmail(formData.customerEmail)
+      if (customerEmailError) newErrors.customerEmail = customerEmailError
     }
 
-    // 폼 검증 - 배송지 정보
-    if (!formData.shippingAddress.address) {
-      newErrors.shippingAddress = '배송지 주소를 입력해주세요.'
-    }
+    // 배송지 주소 검증
+    const addressError = validateAddress(formData.shippingAddress.address)
+    if (addressError) newErrors.shippingAddress = addressError
 
-    // 수령인 정보 결정
-    // 회원: 항상 회원 정보 사용 (formData에 자동 세팅됨)
-    // 비회원: 직접 입력한 정보 사용
+    // 수령인 정보 결정 및 검증
     let recipientName: string
     let recipientPhone: string
 
@@ -477,20 +525,26 @@ function CheckoutContent() {
       recipientPhone = formData.customerPhone
 
       // 회원도 수령인 정보 검증 (프로필에 정보가 없을 수 있음)
-      if (!recipientName || !recipientPhone) {
-        newErrors.shippingAddress = '회원 정보에 이름 또는 전화번호가 없습니다. 마이페이지에서 정보를 업데이트해주세요.'
+      const memberNameError = validateName(recipientName)
+      if (memberNameError) {
+        newErrors.recipientName = '회원 정보에 이름이 없습니다. 마이페이지에서 정보를 업데이트해주세요.'
+      }
+
+      const memberPhoneError = validatePhone(recipientPhone)
+      if (memberPhoneError) {
+        newErrors.recipientPhone = '회원 정보에 전화번호가 없습니다. 마이페이지에서 정보를 업데이트해주세요.'
       }
     } else {
       // 비회원인 경우 입력된 수령인 정보 사용
       recipientName = formData.recipientName
       recipientPhone = formData.recipientPhone
 
-      // 비회원 수령인 정보 필수 검증
-      if (!recipientName || !recipientPhone) {
-        if (!newErrors.shippingAddress) {
-          newErrors.shippingAddress = '수령인 정보를 입력해주세요.'
-        }
-      }
+      // 비회원 수령인 정보 검증
+      const recipientNameError = validateName(recipientName)
+      if (recipientNameError) newErrors.recipientName = recipientNameError
+
+      const recipientPhoneError = validatePhone(recipientPhone)
+      if (recipientPhoneError) newErrors.recipientPhone = recipientPhoneError
     }
 
     // 에러가 있으면 상태 업데이트 후 첫 번째 에러 섹션으로 스크롤
@@ -498,9 +552,9 @@ function CheckoutContent() {
       setErrors(newErrors)
 
       // 첫 번째 에러 섹션으로 스크롤
-      if (newErrors.customerInfo && customerInfoRef.current) {
+      if ((newErrors.customerName || newErrors.customerPhone || newErrors.customerEmail) && customerInfoRef.current) {
         customerInfoRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      } else if (newErrors.shippingAddress && shippingAddressRef.current) {
+      } else if ((newErrors.recipientName || newErrors.recipientPhone || newErrors.shippingAddress || newErrors.detailAddress) && shippingAddressRef.current) {
         shippingAddressRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
       return
@@ -853,12 +907,6 @@ function CheckoutContent() {
                       <User className="w-5 h-5 text-gray-600" />
                       주문자 정보
                     </h2>
-                    {errors.customerInfo && (
-                      <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600">
-                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                        <span className="text-sm">{errors.customerInfo}</span>
-                      </div>
-                    )}
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -867,10 +915,21 @@ function CheckoutContent() {
                         <input
                           type="text"
                           value={formData.customerName}
-                          onChange={(e) => handleFormChange('customerName', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
+                          onChange={(e) => {
+                            handleFormChange('customerName', e.target.value)
+                            if (errors.customerName) setErrors(prev => ({ ...prev, customerName: undefined }))
+                          }}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent ${
+                            errors.customerName ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                          }`}
                           placeholder="홍길동"
                         />
+                        {errors.customerName && (
+                          <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            {errors.customerName}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -879,10 +938,21 @@ function CheckoutContent() {
                         <input
                           type="tel"
                           value={formData.customerPhone}
-                          onChange={(e) => handleFormChange('customerPhone', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
+                          onChange={(e) => {
+                            handleFormChange('customerPhone', e.target.value)
+                            if (errors.customerPhone) setErrors(prev => ({ ...prev, customerPhone: undefined }))
+                          }}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent ${
+                            errors.customerPhone ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                          }`}
                           placeholder="010-1234-5678"
                         />
+                        {errors.customerPhone && (
+                          <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            {errors.customerPhone}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -891,10 +961,21 @@ function CheckoutContent() {
                         <input
                           type="email"
                           value={formData.customerEmail}
-                          onChange={(e) => handleFormChange('customerEmail', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
+                          onChange={(e) => {
+                            handleFormChange('customerEmail', e.target.value)
+                            if (errors.customerEmail) setErrors(prev => ({ ...prev, customerEmail: undefined }))
+                          }}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent ${
+                            errors.customerEmail ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                          }`}
                           placeholder="example@email.com"
                         />
+                        {errors.customerEmail && (
+                          <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            {errors.customerEmail}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -906,28 +987,6 @@ function CheckoutContent() {
                     <MapPin className="w-5 h-5 text-gray-600" />
                     배송지 정보
                   </h2>
-                  {errors.shippingAddress && (
-                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      <span className="text-sm">{errors.shippingAddress}</span>
-                    </div>
-                  )}
-
-                  {/* 회원: 수령인 정보 표시 (회원 정보 자동 적용) */}
-                  {session && (
-                    <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <User className="w-4 h-4 text-gray-600" />
-                        <span className="text-sm font-medium text-gray-700">수령인 정보</span>
-                      </div>
-                      <div className="text-sm text-gray-900">
-                        <span className="font-medium">{formData.customerName}</span>
-                        <span className="mx-2 text-gray-300">|</span>
-                        <span>{formData.customerPhone}</span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">* 회원 정보가 수령인으로 자동 적용됩니다</p>
-                    </div>
-                  )}
 
                   {/* 회원: 배송지 선택 */}
                   {session && addresses.length > 0 && (
@@ -956,6 +1015,9 @@ function CheckoutContent() {
                                   </span>
                                 )}
                               </div>
+                              <p className="text-sm font-medium text-gray-900 mb-1">
+                                {formData.customerName} · {formData.customerPhone}
+                              </p>
                               <p className="text-sm text-gray-600">
                                 ({address.postalCode}) {address.address}
                               </p>
@@ -984,6 +1046,12 @@ function CheckoutContent() {
                   {/* 회원: 등록된 배송지 없음 */}
                   {session && addresses.length === 0 && (
                     <div className="text-center py-8 bg-gray-50 rounded-lg mb-4">
+                      {errors.shippingAddress && (
+                        <p className="mb-3 text-sm text-red-500 flex items-center justify-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          {errors.shippingAddress}
+                        </p>
+                      )}
                       <p className="text-gray-600 mb-4">등록된 배송지가 없습니다</p>
                       <button
                         onClick={() => router.push(getPath('/mypage/addresses'))}
@@ -1006,11 +1074,22 @@ function CheckoutContent() {
                           <input
                             type="text"
                             value={formData.recipientName}
-                            onChange={(e) => handleFormChange('recipientName', e.target.value)}
+                            onChange={(e) => {
+                              handleFormChange('recipientName', e.target.value)
+                              if (errors.recipientName) setErrors(prev => ({ ...prev, recipientName: undefined }))
+                            }}
                             placeholder="이름"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
+                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent ${
+                              errors.recipientName ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                            }`}
                             required
                           />
+                          {errors.recipientName && (
+                            <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              {errors.recipientName}
+                            </p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1019,11 +1098,22 @@ function CheckoutContent() {
                           <input
                             type="tel"
                             value={formData.recipientPhone}
-                            onChange={(e) => handleFormChange('recipientPhone', e.target.value)}
+                            onChange={(e) => {
+                              handleFormChange('recipientPhone', e.target.value)
+                              if (errors.recipientPhone) setErrors(prev => ({ ...prev, recipientPhone: undefined }))
+                            }}
                             placeholder="01012345678"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
+                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent ${
+                              errors.recipientPhone ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                            }`}
                             required
                           />
+                          {errors.recipientPhone && (
+                            <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              {errors.recipientPhone}
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -1036,13 +1126,18 @@ function CheckoutContent() {
                             type="text"
                             value={formData.shippingAddress.zipCode}
                             placeholder="우편번호"
-                            className="w-32 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                            className={`w-32 px-3 py-2 border rounded-lg bg-gray-50 ${
+                              errors.shippingAddress ? 'border-red-500' : 'border-gray-300'
+                            }`}
                             readOnly
                             required
                           />
                           <button
                             type="button"
-                            onClick={openAddressSearch}
+                            onClick={() => {
+                              openAddressSearch()
+                              if (errors.shippingAddress) setErrors(prev => ({ ...prev, shippingAddress: undefined }))
+                            }}
                             className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm"
                           >
                             주소 검색
@@ -1052,22 +1147,41 @@ function CheckoutContent() {
                           type="text"
                           value={formData.shippingAddress.address}
                           placeholder="기본 주소"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 mb-2"
+                          className={`w-full px-3 py-2 border rounded-lg bg-gray-50 mb-2 ${
+                            errors.shippingAddress ? 'border-red-500' : 'border-gray-300'
+                          }`}
                           readOnly
                           required
                         />
+                        {errors.shippingAddress && (
+                          <p className="mb-2 text-sm text-red-500 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            {errors.shippingAddress}
+                          </p>
+                        )}
                         <input
                           type="text"
                           value={formData.shippingAddress.detailAddress}
-                          onChange={(e) => handleFormChange('shippingAddress.detailAddress', e.target.value)}
+                          onChange={(e) => {
+                            handleFormChange('shippingAddress.detailAddress', e.target.value)
+                            if (errors.detailAddress) setErrors(prev => ({ ...prev, detailAddress: undefined }))
+                          }}
                           placeholder="상세 주소를 입력해주세요"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent ${
+                            errors.detailAddress ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                          }`}
                         />
+                        {errors.detailAddress && (
+                          <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            {errors.detailAddress}
+                          </p>
+                        )}
                       </div>
 
                       <div className="bg-[#FFF5F5] border border-[#FFE5E5] rounded-lg p-4">
                         <p className="text-sm text-gray-800">
-                          💡 회원가입하시면 배송지를 저장하고 다음에도 빠르게 주문할 수 있습니다
+                          회원가입하시면 배송지를 저장하고 다음에도 빠르게 주문할 수 있습니다
                         </p>
                       </div>
                     </div>

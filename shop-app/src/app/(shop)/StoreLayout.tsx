@@ -103,8 +103,8 @@ function StoreLayoutContent({
                           <button
                             onClick={() => {
                               setIsUserMenuOpen(false)
-                              // 현재 서브도메인 유지하며 메인페이지로 리다이렉트
-                              signOut({ callbackUrl: `${window.location.origin}/main` })
+                              // 현재 쇼핑몰 경로 유지하며 메인페이지로 리다이렉트
+                              signOut({ callbackUrl: `${window.location.origin}${getPath('/main')}` })
                             }}
                             className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700 w-full"
                           >
