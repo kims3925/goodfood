@@ -33,6 +33,15 @@ export async function GET(
         bankName: true,
         bankAccount: true,
         accountHolder: true,
+        theme: {
+          select: {
+            primaryColor: true,
+            secondaryColor: true,
+            logoUrl: true,
+            faviconUrl: true,
+            bannerUrl: true,
+          },
+        },
       },
     })
 

@@ -130,10 +130,8 @@ export default function ChannelDetailPage({
   const [manualLoginSessionId, setManualLoginSessionId] = useState<string | null>(null)
   const [manualLoginStatus, setManualLoginStatus] = useState<string>('idle') // idle, waiting, completed, failed
 
-  // Shop URL 도메인 (.env의 NEXT_PUBLIC_DOMAIN 사용)
-  const shopBaseDomain = useMemo(() => {
-    return process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'
-  }, [])
+  // Shop URL 기본 주소 (경로 기반 라우팅)
+  const shopBaseUrl = process.env.NEXT_PUBLIC_SHOP_BASE_URL || 'http://localhost:3000'
 
   // Shop 목록 로드
   const loadShops = useCallback(async () => {
@@ -753,7 +751,7 @@ export default function ChannelDetailPage({
                               <option value="">Shop을 선택하세요</option>
                               {shops.map((shop) => (
                                 <option key={shop.id} value={shop.id}>
-                                  {shop.name} ({shop.subdomain}.{shopBaseDomain})
+                                  {shop.name} ({shopBaseUrl}/{shop.subdomain})
                                 </option>
                               ))}
                             </select>
@@ -770,7 +768,7 @@ export default function ChannelDetailPage({
                               {channel.shop ? (
                                 <>
                                   <p className="font-medium text-slate-900">{channel.shop.name}</p>
-                                  <p className="text-sm text-indigo-600 font-mono">{channel.shop.subdomain}.{shopBaseDomain}</p>
+                                  <p className="text-sm text-indigo-600 font-mono">{shopBaseUrl}/{channel.shop.subdomain}</p>
                                 </>
                               ) : (
                                 <p className="text-slate-400">연결된 Shop이 없습니다</p>

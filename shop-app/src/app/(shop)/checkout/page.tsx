@@ -193,14 +193,9 @@ function CheckoutContent() {
         const couponData = await couponResponse.json()
 
         // 회원 프로필 정보로 주문자 정보 자동 세팅
-        if (profileData.success && profileData.user) {
-          setFormData(prev => ({
-            ...prev,
-            customerName: profileData.user.name || '',
-            customerPhone: profileData.user.phone || '',
-            customerEmail: profileData.user.email || '',
-          }))
-        }
+        const userName = profileData.success && profileData.user ? profileData.user.name || '' : ''
+        const userPhone = profileData.success && profileData.user ? profileData.user.phone || '' : ''
+        const userEmail = profileData.success && profileData.user ? profileData.user.email || '' : ''
 
         if (addressData.success) {
           setAddresses(addressData.addresses)
@@ -209,9 +204,12 @@ function CheckoutContent() {
           const defaultAddress = addressData.addresses.find((addr: Address) => addr.isDefault)
           if (defaultAddress) {
             setSelectedAddressId(defaultAddress.id)
-            // 배송지 정보 자동 입력
+            // 배송지 정보 자동 입력 (프로필 + 배송지)
             setFormData(prev => ({
               ...prev,
+              customerName: userName,
+              customerPhone: userPhone,
+              customerEmail: userEmail,
               recipientName: defaultAddress.recipientName,
               recipientPhone: defaultAddress.recipientPhone,
               shippingAddress: {
@@ -220,7 +218,27 @@ function CheckoutContent() {
                 zipCode: defaultAddress.postalCode,
               }
             }))
+          } else {
+            // 기본 배송지가 없으면 주문자 정보로 수령인 정보도 설정 (sameAsCustomer=true)
+            setFormData(prev => ({
+              ...prev,
+              customerName: userName,
+              customerPhone: userPhone,
+              customerEmail: userEmail,
+              recipientName: userName,
+              recipientPhone: userPhone,
+            }))
           }
+        } else {
+          // 배송지 조회 실패해도 프로필 정보는 설정
+          setFormData(prev => ({
+            ...prev,
+            customerName: userName,
+            customerPhone: userPhone,
+            customerEmail: userEmail,
+            recipientName: userName,
+            recipientPhone: userPhone,
+          }))
         }
 
         // 사용 가능한 쿠폰만 필터링 (사용하지 않았고, 만료되지 않은)

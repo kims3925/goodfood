@@ -118,15 +118,12 @@ export default function ShopDetailPage({
   const subdomainDebounceRef = useRef<NodeJS.Timeout | null>(null)
   const nameDebounceRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Shop URL 도메인 (.env의 NEXT_PUBLIC_SHOP_DOMAIN 사용)
-  const shopBaseDomain = useMemo(() => {
-    return process.env.NEXT_PUBLIC_SHOP_DOMAIN || `shop.${process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'}`
-  }, [])
+  // Shop URL 기본 주소 (경로 기반 라우팅)
+  const shopBaseUrl = process.env.NEXT_PUBLIC_SHOP_BASE_URL || 'http://localhost:3000'
 
   const getShopUrl = useCallback((subdomainValue: string) => {
-    const protocol = shopBaseDomain.includes('lvh.me') || shopBaseDomain.includes('localhost') ? 'http' : 'https'
-    return `${protocol}://${shopBaseDomain}/${subdomainValue}`
-  }, [shopBaseDomain])
+    return `${shopBaseUrl}/${subdomainValue}`
+  }, [shopBaseUrl])
 
   // 도메인 중복 체크
   const checkSubdomainDuplicate = useCallback(async (value: string) => {
@@ -459,7 +456,7 @@ export default function ShopDetailPage({
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1"
                   >
-                    {shopBaseDomain}/{shop.subdomain}
+                    {shopBaseUrl}/{shop.subdomain}
                     <ExternalLink size={12} />
                   </a>
                 </div>
@@ -566,7 +563,7 @@ export default function ShopDetailPage({
                     <>
                       <div className="flex items-center">
                         <span className="px-3 py-2 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-gray-500 text-sm whitespace-nowrap">
-                          {shopBaseDomain}/
+                          {shopBaseUrl}/
                         </span>
                         <Input
                           value={subdomain}
@@ -598,7 +595,7 @@ export default function ShopDetailPage({
                       )}
                     </>
                   ) : (
-                    <p className="text-gray-900 font-mono"><span className="text-gray-400">{shopBaseDomain}/</span>{shop.subdomain}</p>
+                    <p className="text-gray-900 font-mono"><span className="text-gray-400">{shopBaseUrl}/</span>{shop.subdomain}</p>
                   )}
                 </div>
                 <div>

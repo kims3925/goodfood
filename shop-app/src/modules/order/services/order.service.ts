@@ -41,12 +41,14 @@ export interface OrderItem {
 export interface CreateOrderFromCartDTO {
   userId: number
   shopId?: number  // Shop 기반 주문 필터링
+  shopSlug?: string  // 경로 기반 결제 콜백 URL용
   shippingAddress: ShippingAddress
 }
 
 export interface CreateOrderFromItemsDTO {
   userId: number
   shopId?: number  // Shop 기반 주문 필터링
+  shopSlug?: string  // 경로 기반 결제 콜백 URL용
   items: OrderItem[]
   shippingAddress: ShippingAddress
 }
@@ -132,7 +134,7 @@ export class OrderService {
     order: OrderResponse
     payment: PaymentRequestData
   }> {
-    const { userId, shopId, shippingAddress } = data
+    const { userId, shopId, shopSlug, shippingAddress } = data
 
     // 입력 검증
     this.validateShippingAddress(shippingAddress)
@@ -208,6 +210,11 @@ export class OrderService {
     const order = await this.orderRepository.create(orderInput)
 
     // TossPayments 결제 요청 정보 생성 (주문자 정보는 user에서)
+    // 경로 기반 URL: /{shopSlug}/payment/success
+    const baseUrl = process.env.NEXT_PUBLIC_SHOP_DOMAIN || 'localhost:3000'
+    const protocol = baseUrl.includes('localhost') ? 'http' : 'https'
+    const shopPath = shopSlug ? `/${shopSlug}` : ''
+
     const paymentRequest: PaymentRequestData = {
       orderId: order.orderNumber,
       orderName:
@@ -217,8 +224,8 @@ export class OrderService {
       amount: totalAmount,
       customerName: user.name || '고객',
       customerEmail: user.email || '',
-      successUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/success`,
-      failUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/fail`,
+      successUrl: `${protocol}://${baseUrl}${shopPath}/payment/success`,
+      failUrl: `${protocol}://${baseUrl}${shopPath}/payment/fail`,
     }
 
     return {
@@ -234,7 +241,7 @@ export class OrderService {
     order: OrderResponse
     payment: PaymentRequestData
   }> {
-    const { userId, shopId, items, shippingAddress } = data
+    const { userId, shopId, shopSlug, items, shippingAddress } = data
 
     // 입력 검증
     this.validateShippingAddress(shippingAddress)
@@ -331,6 +338,11 @@ export class OrderService {
     const order = await this.orderRepository.create(orderInput)
 
     // TossPayments 결제 요청 정보 생성 (주문자 정보는 user에서)
+    // 경로 기반 URL: /{shopSlug}/payment/success
+    const baseUrl = process.env.NEXT_PUBLIC_SHOP_DOMAIN || 'localhost:3000'
+    const protocol = baseUrl.includes('localhost') ? 'http' : 'https'
+    const shopPath = shopSlug ? `/${shopSlug}` : ''
+
     const paymentRequest: PaymentRequestData = {
       orderId: order.orderNumber,
       orderName:
@@ -340,8 +352,8 @@ export class OrderService {
       amount: totalAmount,
       customerName: user.name || '고객',
       customerEmail: user.email || '',
-      successUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/success`,
-      failUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/payment/fail`,
+      successUrl: `${protocol}://${baseUrl}${shopPath}/payment/success`,
+      failUrl: `${protocol}://${baseUrl}${shopPath}/payment/fail`,
     }
 
     return {

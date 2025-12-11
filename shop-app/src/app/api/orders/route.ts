@@ -28,6 +28,10 @@ function getShopId(req: NextRequest): number | null {
   return shopIdHeader ? parseInt(shopIdHeader) : null
 }
 
+function getShopSlug(req: NextRequest): string | null {
+  return req.headers.get('x-shop-slug')
+}
+
 const orderService = getOrderService()
 
 /**
@@ -45,8 +49,9 @@ export async function POST(req: NextRequest) {
       userId,
     } = body
 
-    // Shop ID 확인 (middleware에서 설정)
+    // Shop 정보 확인 (middleware에서 설정)
     const shopId = getShopId(req)
+    const shopSlug = getShopSlug(req)
 
     // 고객 정보 검증
     if (!customerInfo?.name || !customerInfo?.phone) {
@@ -79,6 +84,7 @@ export async function POST(req: NextRequest) {
       result = await orderService.createOrderFromCart({
         userId,
         shopId: shopId || undefined,  // Shop 기반 주문 필터링
+        shopSlug: shopSlug || undefined,  // 경로 기반 결제 콜백 URL용
         shippingAddress,
       })
     } else {
@@ -93,6 +99,7 @@ export async function POST(req: NextRequest) {
       result = await orderService.createOrderFromItems({
         userId,
         shopId: shopId || undefined,  // Shop 기반 주문 필터링
+        shopSlug: shopSlug || undefined,  // 경로 기반 결제 콜백 URL용
         items: items.map((item: any) => ({
           publishedProductId: parseInt(item.publishedProductId),
           variantId: item.variantId ? parseInt(item.variantId) : undefined,

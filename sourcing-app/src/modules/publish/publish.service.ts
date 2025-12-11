@@ -186,13 +186,11 @@ export class PublishService {
         }
       }
 
-      // 4. 주문 링크 생성 (연결된 Shop이 있는 경우)
+      // 4. 주문 링크 생성 (연결된 Shop이 있는 경우) - 경로 기반 URL
       let orderLink: string | undefined
       if (channel.shop?.subdomain && channel.shop.isActive) {
-        const baseDomain = process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'
-        const protocol = baseDomain.includes('lvh.me') || baseDomain.includes('localhost') ? 'http' : 'https'
-        const shopUrl = `${protocol}://${channel.shop.subdomain}.${baseDomain}`
-        orderLink = `${shopUrl}/product/${productId}`
+        const shopBaseUrl = process.env.NEXT_PUBLIC_SHOP_BASE_URL || 'http://localhost:3000'
+        orderLink = `${shopBaseUrl}/${channel.shop.subdomain}/product/${productId}`
       }
 
       // 5. 이미지 URL 목록 준비
@@ -444,13 +442,11 @@ export class PublishService {
       }
     }
 
-    // 주문 링크 생성 함수
+    // 주문 링크 생성 함수 - 경로 기반 URL
     const getOrderLink = (productId: number): string | undefined => {
       if (channel.shop?.subdomain && channel.shop.isActive) {
-        const baseDomain = process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'
-        const protocol = baseDomain.includes('lvh.me') || baseDomain.includes('localhost') ? 'http' : 'https'
-        const shopUrl = `${protocol}://${channel.shop.subdomain}.${baseDomain}`
-        return `${shopUrl}/product/${productId}`
+        const shopBaseUrl = process.env.NEXT_PUBLIC_SHOP_BASE_URL || 'http://localhost:3000'
+        return `${shopBaseUrl}/${channel.shop.subdomain}/product/${productId}`
       }
       return undefined
     }

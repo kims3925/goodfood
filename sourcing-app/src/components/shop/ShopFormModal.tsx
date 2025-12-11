@@ -239,6 +239,9 @@ export default function ShopFormModal({
                     도메인 <span className="text-red-500">*</span>
                   </label>
                   <div className="flex items-center gap-2">
+                    <span className="text-gray-500 text-sm whitespace-nowrap">
+                      {process.env.NEXT_PUBLIC_SHOP_BASE_URL || 'http://localhost:3000'}/
+                    </span>
                     <Input
                       type="text"
                       value={subdomain}
@@ -246,7 +249,6 @@ export default function ShopFormModal({
                       placeholder="myshop"
                       className="flex-1"
                     />
-                    <span className="text-gray-500 text-sm whitespace-nowrap">.{process.env.NEXT_PUBLIC_DOMAIN}</span>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">영문 소문자, 숫자, 하이픈만 사용</p>
                 </div>

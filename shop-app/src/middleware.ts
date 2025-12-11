@@ -20,6 +20,14 @@ interface ShopData {
   subdomain: string // DB 필드명은 유지 (slug로 사용)
   name: string
   isActive: boolean
+  coverUrl?: string | null
+  theme?: {
+    primaryColor?: string | null
+    secondaryColor?: string | null
+    logoUrl?: string | null
+    faviconUrl?: string | null
+    bannerUrl?: string | null
+  } | null
 }
 
 // Shop slug로 시작하지 않는 시스템 경로들
