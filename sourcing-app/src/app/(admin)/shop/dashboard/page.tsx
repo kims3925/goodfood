@@ -62,6 +62,7 @@ interface DashboardData {
     amount: number
     status: string
     time: string
+    isGuest?: boolean
   }[]
   topProducts: {
     rank: number
@@ -459,11 +460,22 @@ export default function ShopDashboardPage() {
                   className="flex items-center justify-between rounded-xl bg-gray-50 p-4 transition-colors hover:bg-gray-100"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-600">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${
+                      order.isGuest
+                        ? 'bg-gray-200 text-gray-600'
+                        : 'bg-indigo-100 text-indigo-600'
+                    }`}>
                       {order.customer}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">#{order.orderNumber}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-900">#{order.orderNumber}</p>
+                        {order.isGuest && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-200 text-gray-600 rounded">
+                            비회원
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500">{order.time}</p>
                     </div>
                   </div>

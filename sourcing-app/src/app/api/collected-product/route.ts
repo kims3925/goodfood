@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
         name: name || null,
         description: description || null,
         currency: currency || 'KRW',
-        rawMetadata: rawMetadata || null,
+        rawMetadata: rawMetadata ? JSON.stringify(rawMetadata) : null,
       },
       include: {
         post: {

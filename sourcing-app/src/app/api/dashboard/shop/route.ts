@@ -227,8 +227,9 @@ export async function GET(request: NextRequest) {
         color: statusColors[status] || '#9CA3AF',
       }))
 
-    // === 최근 주문 5건 ===
-    const recentOrdersData = await prisma.order.findMany({
+    // === 최근 주문 5건 (회원 + 비회원) ===
+    // 회원 주문 조회
+    const memberOrdersData = await prisma.order.findMany({
       where: {
         shop: { userId: user.userId },
       },
@@ -236,19 +237,71 @@ export async function GET(request: NextRequest) {
         user: {
           select: { name: true },
         },
+        shippingAddress: {
+          select: { recipientName: true },
+        },
       },
       orderBy: { orderedAt: 'desc' },
       take: 5,
     })
 
-    const recentOrders = recentOrdersData.map(order => ({
-      id: order.id,
-      orderNumber: order.orderNumber,
-      customer: order.user?.name ? order.user.name.substring(0, 1) + '**' : '미지정',
-      amount: Number(order.totalAmount),
-      status: order.status,
-      time: formatRelativeTime(order.orderedAt),
-    }))
+    // 비회원 주문 조회 (GuestOrder)
+    const guestOrdersData = await prisma.guestOrder.findMany({
+      where: {
+        shop: { userId: user.userId },
+      },
+      include: {
+        shippingAddress: {
+          select: { recipientName: true },
+        },
+      },
+      orderBy: { orderedAt: 'desc' },
+      take: 5,
+    })
+
+    // 회원 주문 매핑
+    const memberOrders = memberOrdersData.map(order => {
+      const customerName = order.user?.name || order.shippingAddress?.recipientName || '미지정'
+      const maskedName = customerName.length > 1
+        ? customerName.substring(0, 1) + '*'.repeat(Math.min(customerName.length - 1, 2))
+        : customerName
+
+      return {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        customer: maskedName,
+        amount: Number(order.totalAmount),
+        status: order.status,
+        time: formatRelativeTime(order.orderedAt),
+        orderedAt: order.orderedAt,
+        isGuest: false,
+      }
+    })
+
+    // 비회원 주문 매핑
+    const guestOrders = guestOrdersData.map(order => {
+      const customerName = order.guestName || order.shippingAddress?.recipientName || '미지정'
+      const maskedName = customerName.length > 1
+        ? customerName.substring(0, 1) + '*'.repeat(Math.min(customerName.length - 1, 2))
+        : customerName
+
+      return {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        customer: maskedName,
+        amount: Number(order.totalAmount),
+        status: order.status,
+        time: formatRelativeTime(order.orderedAt),
+        orderedAt: order.orderedAt,
+        isGuest: true,
+      }
+    })
+
+    // 회원 + 비회원 주문 합쳐서 최신순 정렬 후 5건만
+    const recentOrders = [...memberOrders, ...guestOrders]
+      .sort((a, b) => b.orderedAt.getTime() - a.orderedAt.getTime())
+      .slice(0, 5)
+      .map(({ orderedAt, ...rest }) => rest) // orderedAt 필드 제거
 
     // === 인기 상품 TOP 5 ===
     const orderItems = currentOrders.flatMap(o => o.items)
