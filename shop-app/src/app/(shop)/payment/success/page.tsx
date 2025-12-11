@@ -144,30 +144,12 @@ function PaymentSuccessContent() {
         return true
       }
 
-      // 상태 조회 실패해도 토스가 successUrl로 보냈으므로 기본 성공 처리
-      setPaymentInfo({
-        paymentKey: paymentKey!,
-        orderId: orderId!,
-        amount: parseInt(amount!),
-        method: 'CARD',
-        methodLabel: '카드',
-        status: 'DONE',
-        approvedAt: new Date().toISOString()
-      })
-      return true
+      // 상태 조회 실패 - 에러로 처리
+      console.error('결제 상태 조회 실패: 결제 정보를 찾을 수 없음')
+      return false
     } catch (error) {
       console.error('결제 상태 조회 실패:', error)
-      // 조회 실패해도 토스가 successUrl로 보냈으므로 기본 성공 처리
-      setPaymentInfo({
-        paymentKey: paymentKey!,
-        orderId: orderId!,
-        amount: parseInt(amount!),
-        method: 'CARD',
-        methodLabel: '카드',
-        status: 'DONE',
-        approvedAt: new Date().toISOString()
-      })
-      return true
+      return false
     }
   }
 
@@ -187,6 +169,7 @@ function PaymentSuccessContent() {
       if (success) {
         hasProcessedRef.current = true
         setStatus('success')
+        isProcessingRef.current = false
         return
       }
     } catch (error: any) {
@@ -200,22 +183,22 @@ function PaymentSuccessContent() {
         if (statusResult) {
           hasProcessedRef.current = true
           setStatus('success')
+          isProcessingRef.current = false
           return
         }
       }
-    }
 
-    // 실패 시 상태 조회로 한번 더 시도
-    console.log('confirmPayment 실패, 결제 상태 조회 시도')
-    const statusResult = await fetchPaymentStatus()
-    if (statusResult) {
-      hasProcessedRef.current = true
-      setStatus('success')
-    } else {
-      setError('결제 확인에 실패했습니다. 주문 내역에서 확인해주세요.')
+      // 결제 실패 - 에러 메시지 표시
+      const errorMessage = error?.message || '결제 승인에 실패했습니다.'
+      setError(errorMessage)
       setStatus('error')
+      isProcessingRef.current = false
+      return
     }
 
+    // confirmPayment가 false를 반환한 경우 (예상치 못한 상황)
+    setError('결제 확인에 실패했습니다. 주문 내역에서 확인해주세요.')
+    setStatus('error')
     isProcessingRef.current = false
   }
 

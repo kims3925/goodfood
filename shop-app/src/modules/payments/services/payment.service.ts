@@ -49,6 +49,13 @@ export interface OrderPrepareData {
     discountAmount: number
     isFreeShipping: boolean
   }
+  // 금액 정보 (prepare 단계에서 계산된 값 - confirm 시 재계산 방지)
+  amounts?: {
+    subtotal: number
+    shippingFee: number
+    discountAmount: number
+    totalAmount: number
+  }
 }
 
 export interface ConfirmPaymentDTO {
@@ -392,23 +399,48 @@ export class PaymentService {
       }
     }
 
-    // 금액 계산
-    const subtotal = orderItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
+    // 금액 정보: prepareData에 저장된 값 우선 사용 (금액 불일치 방지)
+    let subtotal: number
+    let shippingFee: number
+    let discountAmount: number
+    let totalAmount: number
 
-    // Shop의 배송비 설정 조회
-    let shippingFee = 0
-    if (prepareData.shopId) {
-      const shop = await prisma.shop.findUnique({
-        where: { id: prepareData.shopId },
-        select: { freeShippingAmount: true, defaultShippingFee: true },
-      })
-      if (shop?.freeShippingAmount != null && shop?.defaultShippingFee != null) {
-        shippingFee = subtotal >= shop.freeShippingAmount ? 0 : shop.defaultShippingFee
+    if (prepareData.amounts) {
+      // prepare 단계에서 계산된 금액 사용 (권장)
+      subtotal = prepareData.amounts.subtotal
+      shippingFee = prepareData.amounts.shippingFee
+      discountAmount = prepareData.amounts.discountAmount
+      totalAmount = prepareData.amounts.totalAmount
+      console.log('주문 금액 (prepareData에서 로드):', { subtotal, shippingFee, discountAmount, totalAmount })
+    } else {
+      // 레거시: prepareData에 금액 정보 없으면 재계산 (하위 호환)
+      console.warn('주문 금액 재계산 (prepareData.amounts 없음)')
+      subtotal = orderItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
+
+      // Shop의 배송비 설정 조회
+      shippingFee = 0
+      if (prepareData.shopId) {
+        const shop = await prisma.shop.findUnique({
+          where: { id: prepareData.shopId },
+          select: { freeShippingAmount: true, defaultShippingFee: true },
+        })
+        if (shop?.freeShippingAmount != null && shop?.defaultShippingFee != null) {
+          shippingFee = subtotal >= shop.freeShippingAmount ? 0 : shop.defaultShippingFee
+        }
       }
-    }
 
-    const discountAmount = 0
-    const totalAmount = subtotal + shippingFee - discountAmount
+      // 쿠폰 할인 금액 적용
+      discountAmount = 0
+      if (prepareData.coupon) {
+        if (prepareData.coupon.isFreeShipping) {
+          shippingFee = 0
+        } else {
+          discountAmount = prepareData.coupon.discountAmount
+        }
+      }
+
+      totalAmount = subtotal + shippingFee - discountAmount
+    }
 
     // 주문 생성 (주문자 정보는 user 테이블에서, 수령인 정보는 shippingAddress에)
     const order = await prisma.order.create({

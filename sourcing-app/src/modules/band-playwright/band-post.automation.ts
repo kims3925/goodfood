@@ -22,6 +22,8 @@ const MAX_IMAGES = 20
 const IMAGE_UPLOAD_TIMEOUT_MS = 60000
 // 게시 타임아웃
 const POST_TIMEOUT_MS = 30000
+// 개별 아이템 발행 전체 타임아웃 (3분) - 초과 시 텍스트 전용 발행으로 폴백
+const ITEM_PUBLISH_TIMEOUT_MS = 3 * 60 * 1000
 // 디버그 스크린샷 저장 경로
 const DEBUG_SCREENSHOT_DIR = '/tmp/band-playwright-debug'
 
@@ -1179,6 +1181,78 @@ export class BandPostAutomation {
   }
 
   /**
+   * 텍스트 전용 발행 (이미지 없이 쇼핑몰 링크 + 내용만)
+   * 이미지 발행이 3분 타임아웃 시 폴백으로 사용
+   */
+  private async createTextOnlyPost(
+    page: Page,
+    content: string,
+    shopUrl: string | undefined,
+    currentBandNo: string,
+    beforePostKey: string | null
+  ): Promise<{ success: boolean; postKey?: string; error?: string }> {
+    console.log('[BandPostAutomation] Creating text-only post (fallback mode)')
+
+    try {
+      // 기존 레이어 닫기
+      await this.closeWriteLayerIfOpen(page)
+      await page.waitForTimeout(1000)
+
+      // 글쓰기 레이어 열기
+      await this.openWriteLayer(page)
+
+      // 쇼핑몰 링크가 있으면 본문 앞에 추가
+      let finalContent = content
+      if (shopUrl) {
+        finalContent = `🛒 상품 구매하기: ${shopUrl}\n\n${content}`
+      }
+
+      // 본문 입력
+      await this.inputContent(page, finalContent)
+      await this.saveDebugScreenshot(page, 'text-only-content-entered')
+
+      // 게시 버튼 클릭
+      await this.submitPost(page)
+
+      // 게시 완료 대기 및 postKey 추출
+      await page.waitForTimeout(3000)
+      const postKey = await this.extractNewPostKey(page, currentBandNo, beforePostKey)
+
+      console.log(`[BandPostAutomation] Text-only post created: ${postKey}`)
+      return { success: true, postKey }
+    } catch (error: any) {
+      console.error('[BandPostAutomation] Text-only post failed:', error)
+      await this.saveDebugScreenshot(page, 'text-only-error')
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * 타임아웃과 함께 Promise 실행
+   */
+  private async withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+    errorMessage: string
+  ): Promise<T> {
+    let timeoutId: NodeJS.Timeout
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error(errorMessage))
+      }, timeoutMs)
+    })
+
+    try {
+      const result = await Promise.race([promise, timeoutPromise])
+      clearTimeout(timeoutId!)
+      return result
+    } catch (error) {
+      clearTimeout(timeoutId!)
+      throw error
+    }
+  }
+
+  /**
    * 배치 발행: 같은 채널에 여러 상품을 효율적으로 발행
    * 페이지를 한 번만 열고, 밴드 페이지에 한 번만 이동하여 여러 글을 작성
    */
@@ -1220,75 +1294,87 @@ export class BandPostAutomation {
 
         console.log(`[BandPostAutomation] Publishing item ${i + 1}/${items.length}: product ${item.productId}`)
 
+        // 발행 전 최신 게시물 postKey 저장
+        const beforePostKey = await this.getLatestPostKey(page, currentBandNo)
+        console.log(`[BandPostAutomation] Latest postKey before publish: ${beforePostKey || 'none'}`)
+
         try {
-          // 발행 전 최신 게시물 postKey 저장
-          const beforePostKey = await this.getLatestPostKey(page, currentBandNo)
-          console.log(`[BandPostAutomation] Latest postKey before publish: ${beforePostKey || 'none'}`)
+          // 3분 타임아웃과 함께 이미지 포함 발행 시도
+          const publishWithImagesPromise = (async () => {
+            await this.saveDebugScreenshot(page, `batch-${i + 1}-before`)
 
-          await this.saveDebugScreenshot(page, `batch-${i + 1}-before`)
+            // 2-1. 글쓰기 레이어 열기
+            console.log('[BandPostAutomation] Opening write layer')
+            await this.openWriteLayer(page)
 
-          // 2-1. 글쓰기 레이어 열기
-          console.log('[BandPostAutomation] Opening write layer')
-          await this.openWriteLayer(page)
+            // 2-2. 이미지 다운로드 (먼저 준비)
+            const imagesToUpload = item.imageUrls.slice(0, MAX_IMAGES)
+            let downloadedImages: string[] = []
+            if (imagesToUpload.length > 0) {
+              console.log(`[BandPostAutomation] Downloading ${imagesToUpload.length} images`)
+              downloadedImages = await this.downloadImages(imagesToUpload)
+              tempFiles.push(...downloadedImages)
+            }
 
-          // 2-2. 이미지 다운로드 (먼저 준비)
-          const imagesToUpload = item.imageUrls.slice(0, MAX_IMAGES)
-          let downloadedImages: string[] = []
-          if (imagesToUpload.length > 0) {
-            console.log(`[BandPostAutomation] Downloading ${imagesToUpload.length} images`)
-            downloadedImages = await this.downloadImages(imagesToUpload)
-            tempFiles.push(...downloadedImages)
-          }
+            // 2-3. 본문 입력 (이미지보다 먼저 입력 - 밴드에서 텍스트가 이미지 위에 표시됨)
+            console.log('[BandPostAutomation] Inputting content')
+            await this.inputContent(page, item.content)
 
-          // 2-3. 본문 입력 (이미지보다 먼저 입력 - 밴드에서 텍스트가 이미지 위에 표시됨)
-          console.log('[BandPostAutomation] Inputting content')
-          await this.inputContent(page, item.content)
+            // 2-4. 이미지 업로드 (본문 입력 후 - 이미지가 본문 아래에 배치됨)
+            let uploadedImageCount = 0
+            if (downloadedImages.length > 0) {
+              console.log(`[BandPostAutomation] Downloaded ${downloadedImages.length} images, now uploading...`)
+              await this.saveDebugScreenshot(page, `batch-${i + 1}-before-upload`)
 
-          // 2-4. 이미지 업로드 (본문 입력 후 - 이미지가 본문 아래에 배치됨)
-          let uploadedImageCount = 0
-          if (downloadedImages.length > 0) {
-            console.log(`[BandPostAutomation] Downloaded ${downloadedImages.length} images, now uploading...`)
-            await this.saveDebugScreenshot(page, `batch-${i + 1}-before-upload`)
-
-            // 이미지 업로드 시도 (최대 2번)
-            for (let uploadAttempt = 0; uploadAttempt < 2; uploadAttempt++) {
-              try {
-                uploadedImageCount = await this.uploadImagesWithVerification(page, downloadedImages)
-                if (uploadedImageCount > 0) {
-                  console.log(`[BandPostAutomation] Successfully uploaded ${uploadedImageCount} images`)
-                  break
+              // 이미지 업로드 시도 (최대 2번)
+              for (let uploadAttempt = 0; uploadAttempt < 2; uploadAttempt++) {
+                try {
+                  uploadedImageCount = await this.uploadImagesWithVerification(page, downloadedImages)
+                  if (uploadedImageCount > 0) {
+                    console.log(`[BandPostAutomation] Successfully uploaded ${uploadedImageCount} images`)
+                    break
+                  }
+                } catch (uploadError: any) {
+                  console.warn(`[BandPostAutomation] Image upload attempt ${uploadAttempt + 1} failed:`, uploadError.message)
+                  if (uploadAttempt === 0) {
+                    // 첫 번째 시도 실패 시, 글쓰기 레이어 닫고 다시 열기
+                    console.log('[BandPostAutomation] Retrying image upload...')
+                    await page.keyboard.press('Escape')
+                    await page.waitForTimeout(1000)
+                    await this.openWriteLayer(page)
+                    await page.waitForTimeout(1000)
+                    // 본문 다시 입력
+                    await this.inputContent(page, item.content)
+                  }
                 }
-              } catch (uploadError: any) {
-                console.warn(`[BandPostAutomation] Image upload attempt ${uploadAttempt + 1} failed:`, uploadError.message)
-                if (uploadAttempt === 0) {
-                  // 첫 번째 시도 실패 시, 글쓰기 레이어 닫고 다시 열기
-                  console.log('[BandPostAutomation] Retrying image upload...')
-                  await page.keyboard.press('Escape')
-                  await page.waitForTimeout(1000)
-                  await this.openWriteLayer(page)
-                  await page.waitForTimeout(1000)
-                  // 본문 다시 입력
-                  await this.inputContent(page, item.content)
-                }
+              }
+
+              await this.saveDebugScreenshot(page, `batch-${i + 1}-after-upload`)
+
+              if (uploadedImageCount === 0) {
+                console.warn(`[BandPostAutomation] No images uploaded for item ${i + 1}, continuing with text only`)
               }
             }
 
-            await this.saveDebugScreenshot(page, `batch-${i + 1}-after-upload`)
+            // 2-5. 게시 버튼 클릭
+            console.log('[BandPostAutomation] Submitting post')
+            await this.submitPost(page)
 
-            if (uploadedImageCount === 0) {
-              console.warn(`[BandPostAutomation] No images uploaded for item ${i + 1}, continuing with text only`)
-            }
-          }
+            await this.saveDebugScreenshot(page, `batch-${i + 1}-after`)
 
-          // 2-5. 게시 버튼 클릭
-          console.log('[BandPostAutomation] Submitting post')
-          await this.submitPost(page)
+            // 2-6. 게시 완료 대기 및 postKey 추출
+            await page.waitForTimeout(3000)
+            const postKey = await this.extractNewPostKey(page, currentBandNo, beforePostKey)
 
-          await this.saveDebugScreenshot(page, `batch-${i + 1}-after`)
+            return { postKey, uploadedImageCount }
+          })()
 
-          // 2-6. 게시 완료 대기 및 postKey 추출
-          await page.waitForTimeout(3000)
-          const postKey = await this.extractNewPostKey(page, currentBandNo, beforePostKey)
+          // 3분 타임아웃 적용
+          const { postKey, uploadedImageCount } = await this.withTimeout(
+            publishWithImagesPromise,
+            ITEM_PUBLISH_TIMEOUT_MS,
+            `이미지 발행 타임아웃 (${ITEM_PUBLISH_TIMEOUT_MS / 1000}초)`
+          )
 
           console.log(`[BandPostAutomation] Item ${i + 1} published successfully: postKey=${postKey}, images=${uploadedImageCount}`)
 
@@ -1322,6 +1408,73 @@ export class BandPostAutomation {
           }
 
         } catch (itemError: any) {
+          // 타임아웃 에러인 경우 텍스트 전용 발행으로 폴백
+          const isTimeout = itemError.message?.includes('타임아웃')
+
+          if (isTimeout) {
+            console.log(`[BandPostAutomation] Item ${i + 1} timed out, falling back to text-only post`)
+            await this.saveDebugScreenshot(page, `batch-${i + 1}-timeout`)
+
+            // 페이지 상태 초기화
+            try {
+              await this.closeWriteLayerIfOpen(page)
+              await page.waitForTimeout(1000)
+              await page.reload({ waitUntil: 'networkidle' })
+              await page.waitForTimeout(2000)
+
+              // 밴드 페이지로 다시 이동
+              if (!page.url().includes(`/band/${currentBandNo}`)) {
+                await this.navigateToBand(page, bandKey, bandName)
+              }
+
+              // 텍스트 전용 발행 시도
+              const textResult = await this.createTextOnlyPost(
+                page,
+                item.content,
+                item.shopUrl,
+                currentBandNo,
+                beforePostKey
+              )
+
+              if (textResult.success) {
+                console.log(`[BandPostAutomation] Item ${i + 1} published as text-only: postKey=${textResult.postKey}`)
+
+                const itemResult: BandBatchItemResult = {
+                  productId: item.productId,
+                  success: true,
+                  postKey: textResult.postKey,
+                  imageCount: 0, // 텍스트 전용이므로 0
+                }
+
+                if (onItemSuccess) {
+                  try {
+                    await onItemSuccess(itemResult)
+                  } catch (dbError: any) {
+                    console.error(`[BandPostAutomation] DB save failed for product ${item.productId}:`, dbError.message)
+                  }
+                }
+
+                results.push(itemResult)
+                successCount++
+
+                if (onProgress) {
+                  await onProgress(i + 1, items.length, itemResult)
+                }
+
+                // 임시 파일 정리 후 다음 아이템으로
+                this.cleanupTempFiles(tempFiles)
+                if (i < items.length - 1) {
+                  console.log('[BandPostAutomation] Waiting 2s before next post...')
+                  await page.waitForTimeout(2000)
+                }
+                continue
+              }
+            } catch (fallbackError: any) {
+              console.error(`[BandPostAutomation] Text-only fallback also failed:`, fallbackError.message)
+            }
+          }
+
+          // 일반 에러 또는 폴백 실패
           console.error(`[BandPostAutomation] Item ${i + 1} failed:`, itemError.message)
           await this.saveDebugScreenshot(page, `batch-${i + 1}-error`)
 

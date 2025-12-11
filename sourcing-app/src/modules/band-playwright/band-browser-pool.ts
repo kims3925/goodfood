@@ -192,6 +192,15 @@ class BandBrowserPool {
               expires = c.expires > 9999999999 ? Math.floor(c.expires / 1000) : c.expires
             }
 
+            // sameSite 변환 (소문자 -> 첫글자 대문자)
+            let sameSite: 'Strict' | 'Lax' | 'None' = 'Lax'
+            if (c.sameSite) {
+              const s = c.sameSite.toLowerCase()
+              if (s === 'strict') sameSite = 'Strict'
+              else if (s === 'none') sameSite = 'None'
+              else sameSite = 'Lax'
+            }
+
             const baseCookie = {
               name: c.name,
               value: c.value,
@@ -199,7 +208,7 @@ class BandBrowserPool {
               expires,
               httpOnly: c.httpOnly || false,
               secure: c.secure || false,
-              sameSite: (c.sameSite?.charAt(0).toUpperCase() + c.sameSite?.slice(1).toLowerCase()) as 'Strict' | 'Lax' | 'None' || 'Lax',
+              sameSite,
             }
 
             // .band.us 도메인
@@ -208,11 +217,20 @@ class BandBrowserPool {
             // auth.band.us 도메인 (인증에 필수)
             convertedCookies.push({ ...baseCookie, domain: 'auth.band.us' })
 
+            // .auth.band.us 도메인
+            convertedCookies.push({ ...baseCookie, domain: '.auth.band.us' })
+
             // www.band.us 도메인
             convertedCookies.push({ ...baseCookie, domain: 'www.band.us' })
+
+            // nid.naver.com 도메인 (네이버 로그인 세션)
+            convertedCookies.push({ ...baseCookie, domain: '.nid.naver.com' })
+
+            // .naver.com 도메인 (네이버 인증)
+            convertedCookies.push({ ...baseCookie, domain: '.naver.com' })
           }
 
-          console.log(`[BandBrowserPool] Converted ${parsed.length} cookies to ${convertedCookies.length} cookies (added auth/www domains)`)
+          console.log(`[BandBrowserPool] Converted ${parsed.length} cookies to ${convertedCookies.length} cookies (added all required domains)`)
           return convertedCookies
         }
 

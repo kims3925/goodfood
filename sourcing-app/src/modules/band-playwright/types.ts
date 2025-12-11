@@ -36,6 +36,7 @@ export interface BandBatchPublishParams {
     productId: number
     content: string
     imageUrls: string[]
+    shopUrl?: string    // 쇼핑몰 상품 URL (타임아웃 시 폴백용)
   }[]
   /**
    * Band API 성공 직후 즉시 호출되는 콜백

@@ -57,6 +57,13 @@ interface OrderPrepareData {
     discountAmount: number
     isFreeShipping: boolean
   }
+  // 금액 정보 (prepare 단계에서 계산된 값 - confirm 시 재계산 방지)
+  amounts: {
+    subtotal: number
+    shippingFee: number
+    discountAmount: number
+    totalAmount: number
+  }
 }
 
 // Shop ID 가져오기 (미들웨어에서 설정)
@@ -351,6 +358,13 @@ export async function POST(req: NextRequest) {
         deliveryMemo: shippingAddress.deliveryMemo,
       },
       coupon: validCoupon,
+      // 금액 정보 (confirm 시 재계산 방지를 위해 저장)
+      amounts: {
+        subtotal,
+        shippingFee,
+        discountAmount,
+        totalAmount,
+      },
     }
 
     // 쿠키에 주문 정보 저장 (암호화된 JSON)
