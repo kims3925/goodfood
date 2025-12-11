@@ -77,9 +77,22 @@ export async function GET(
       )
     }
 
+    // rawMetadata를 JSON 파싱하여 반환
+    let parsedMetadata = null
+    if (collectedProduct.rawMetadata) {
+      try {
+        parsedMetadata = JSON.parse(collectedProduct.rawMetadata)
+      } catch (error) {
+        console.error('rawMetadata 파싱 실패:', error)
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      data: collectedProduct,
+      data: {
+        ...collectedProduct,
+        rawMetadata: parsedMetadata,
+      },
     })
   } catch (error) {
     console.error('수집상품 상세 조회 실패:', error)

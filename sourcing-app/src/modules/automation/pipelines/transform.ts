@@ -219,7 +219,7 @@ export async function runTransformPipeline(
                 name: result.draft.name,
                 description: result.draft.description || null,
                 currency: result.draft.currency || 'KRW',
-                rawMetadata: JSON.parse(JSON.stringify({
+                rawMetadata: JSON.stringify({
                   category: result.draft.categoryId,
                   options: result.draft.options,
                   variants: result.draft.variants,
@@ -227,7 +227,7 @@ export async function runTransformPipeline(
                     shippingFee: result.draft.shippingFee ?? null,
                     shippingInfo: result.draft.shippingInfo ?? null,
                   },
-                })),
+                }),
               },
             })
 
