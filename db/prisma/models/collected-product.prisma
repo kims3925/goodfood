@@ -1,0 +1,18 @@
+model CollectedProduct {
+  id          Int           @id @default(autoincrement())
+  userId      Int           @map("user_id")
+  postId      Int           @map("collected_post_id")
+  name        String?       @db.VarChar(500)
+  description String?       @db.Text
+  currency    String        @default("KRW") @db.VarChar(10)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
+  rawMetadata String?       @map("raw_metadata") @db.LongText
+  post        CollectedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products    Product[]
+
+  @@index([userId])
+  @@index([postId])
+  @@map("collected_product")
+}

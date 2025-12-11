@@ -1,0 +1,141 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../src/generated"
+  previewFeatures = ["prismaSchemaFolder"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  MANAGER
+  ADMIN
+}
+
+enum SourcingPlatform {
+  BAND
+  ALIEXPRESS
+}
+
+enum ChannelKind {
+  WHOLESALE
+  RETAIL
+}
+
+enum ChannelPlatform {
+  BAND
+  NAVER_CAFE
+  ALIEXPRESS
+  SMARTSTORE
+  COUPANG
+  CUSTOM
+}
+
+enum AiProvider {
+  GEMINI
+  OPENAI
+}
+
+enum WorkflowType {
+  COLLECT
+  TRANSFORM
+  PUBLISH
+  FULL_PIPELINE1
+}
+
+enum WorkflowStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  PARTIAL_SUCCESS
+}
+
+enum TriggerType {
+  MANUAL
+  SCHEDULED
+}
+
+enum PublishStatus {
+  SUCCESS
+  FAILED
+  PENDING
+}
+
+enum CustomerOrderStatus {
+  PENDING
+  PAID
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum TossPaymentMethod {
+  CARD
+  VIRTUAL_ACCOUNT
+  TRANSFER
+  MOBILE
+  CULTURE_GIFT
+  BOOK_GIFT
+  GAME_GIFT
+  BANK_TRANSFER
+}
+
+enum TossPaymentStatus {
+  READY
+  IN_PROGRESS
+  WAITING_FOR_DEPOSIT
+  DONE
+  CANCELED
+  PARTIAL_CANCELED
+  ABORTED
+  EXPIRED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FIXED
+  FREE_SHIPPING
+}
+
+enum InquiryType {
+  PRODUCT
+  DELIVERY
+  ORDER
+  PAYMENT
+  RETURN
+  EXCHANGE
+  GENERAL
+}
+
+enum InquiryStatus {
+  PENDING
+  ANSWERED
+}
+
+enum ReturnType {
+  CANCEL
+  RETURN
+  EXCHANGE
+}
+
+enum ReturnStatus {
+  REQUESTED
+  REVIEWING
+  APPROVED
+  REJECTED
+  PROCESSING
+  COMPLETED
+}
+
+enum RefundMethod {
+  CREDIT_CARD
+  BANK_TRANSFER
+  POINTS
+}

@@ -1,0 +1,56 @@
+model Order {
+  id              Int                 @id @default(autoincrement())
+  userId          Int                 @map("user_id")
+  orderNumber     String              @unique @map("order_number") @db.VarChar(50)
+  status          CustomerOrderStatus @default(PENDING)
+  subtotalAmount  Decimal             @map("subtotal_amount") @db.Decimal(12, 2)
+  shippingFee     Decimal             @default(0.00) @map("shipping_fee") @db.Decimal(10, 2)
+  discountAmount  Decimal             @default(0.00) @map("discount_amount") @db.Decimal(10, 2)
+  totalAmount     Decimal             @map("total_amount") @db.Decimal(12, 2)
+  orderedAt       DateTime            @default(now()) @map("ordered_at") @db.Timestamp(0)
+  paidAt          DateTime?           @map("paid_at") @db.Timestamp(0)
+  shippedAt       DateTime?           @map("shipped_at") @db.Timestamp(0)
+  deliveredAt     DateTime?           @map("delivered_at") @db.Timestamp(0)
+  cancelledAt     DateTime?           @map("cancelled_at") @db.Timestamp(0)
+  cancelReason    String?             @map("cancel_reason") @db.VarChar(500)
+  cancelledBy     String?             @map("cancelled_by") @db.VarChar(20)
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamp(0)
+  shopId          Int?                @map("shop_id")
+  shop            Shop?               @relation(fields: [shopId], references: [id])
+  user            User                @relation(fields: [userId], references: [id])
+  items           OrderItem[]
+  payment         Payment?
+  shippingAddress ShippingAddress?
+
+  @@index([userId])
+  @@index([shopId])
+  @@index([orderNumber])
+  @@index([status])
+  @@index([orderedAt])
+  @@index([userId, status])
+  @@map("order")
+}
+
+model OrderItem {
+  id                 Int              @id @default(autoincrement())
+  orderId            Int              @map("order_id")
+  publishedProductId Int              @map("published_product_id")
+  variantId          Int?             @map("variant_id")
+  productName        String           @map("product_name") @db.VarChar(500)
+  optionSummary      String?          @map("option_summary") @db.VarChar(500)
+  thumbnailUrl       String?          @map("thumbnail_url") @db.VarChar(1000)
+  quantity           Int
+  unitPrice          Decimal          @map("unit_price") @db.Decimal(10, 2)
+  totalPrice         Decimal          @map("total_price") @db.Decimal(12, 2)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  order              Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  publishedProduct   PublishedProduct @relation(fields: [publishedProductId], references: [id])
+  variant            ProductVariant?  @relation(fields: [variantId], references: [id])
+  review             Review?
+
+  @@index([orderId])
+  @@index([publishedProductId])
+  @@index([variantId])
+  @@map("order_item")
+}

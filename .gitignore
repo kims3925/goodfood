@@ -40,6 +40,9 @@ next-env.d.ts
 prisma/*.db
 prisma/*.db-journal
 
+# Prisma generated files
+db/src/generated/
+
 # IDE
 .vscode/
 .idea/
@@ -222,6 +225,16 @@ data/
 # Cloud storage
 .storage/
 
-# Config files (AI settings, etc.)
-.config/
-*.config.json
+nul
+.mcp.json
+db/src/generated/libquery_engine-darwin-arm64.dylib.node
+db/src/generated/query_engine-windows.dll.node
+db/src/generated/libquery_engine-darwin-arm64.dylib.node
+sourcing-app/nohup.out
+shop-app/nohup.out
+docs/refactoring/SOURCING_ANALYSIS.md
+AGENTS.md
+QUICK_REFERENCE.txt
+shop-app/.env.production.example
+sourcing-app/docs/스크린샷 2025-12-10 오전 11.09.30.png
+sourcing-app/.env.example

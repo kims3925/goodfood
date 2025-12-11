@@ -1,0 +1,63 @@
+export interface ProductListParams {
+  userId: number
+  collectedProductId?: number
+  postId?: number
+  search?: string
+  channelId?: number
+  sourcePlatform?: string
+  startDate?: string
+  endDate?: string
+  page?: number
+  limit?: number
+}
+
+export interface OptionGroupInput {
+  groupName: string
+  values: string[]
+}
+
+export interface VariantInput {
+  optionSummary?: string
+  options?: Record<string, string>
+  wholesalePrice?: number
+  price?: number
+}
+
+export interface ProductCreateInput {
+  userId: number
+  postId?: number
+  collectedProductId?: number
+  name: string
+  description?: string
+  categoryId?: string
+  currency?: string
+  shippingFee?: number
+  shippingInfo?: string
+  thumbnailUrl?: string | null
+  imageUrls?: string[]
+  options?: OptionGroupInput[]
+  variants?: VariantInput[]
+}
+
+export interface OptionInput {
+  groupName: string
+  value: string
+  sortOrder?: number
+}
+
+export interface ProductUpdateInput {
+  name?: string
+  description?: string
+  categoryId?: string
+  shippingFee?: number
+  shippingInfo?: string
+  options?: OptionInput[]
+  variants?: VariantInput[]
+}
+
+export interface PaginatedResult<T> {
+  data: T[]
+  total: number
+  page: number
+  limit: number
+}

@@ -1,0 +1,18 @@
+model UserAddress {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  label          String?  @db.VarChar(50)
+  recipientName  String   @map("recipient_name") @db.VarChar(100)
+  recipientPhone String   @map("recipient_phone") @db.VarChar(20)
+  postalCode     String   @map("postal_code") @db.VarChar(10)
+  address        String   @db.VarChar(500)
+  addressDetail  String?  @map("address_detail") @db.VarChar(500)
+  isDefault      Boolean  @default(false) @map("is_default")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isDefault])
+  @@map("user_address")
+}

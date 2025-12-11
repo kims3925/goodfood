@@ -1,0 +1,54 @@
+model CollectedPost {
+  id                Int                    @id @default(autoincrement())
+  userId            Int                    @map("user_id")
+  externalId        String                 @map("external_id") @db.VarChar(255)
+  title             String                 @db.VarChar(500)
+  content           String                 @db.Text
+  author            String?                @db.VarChar(100)
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  channelId         Int                    @map("channel_id")
+  channel           Channel                @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments          CollectedPostComment[]
+  images            CollectedPostImage[]
+  collectedProducts CollectedProduct[]
+
+  @@unique([channelId, externalId])
+  @@index([userId])
+  @@index([channelId])
+  @@index([createdAt])
+  @@index([externalId])
+  @@map("collected_post")
+}
+
+model CollectedPostImage {
+  id        Int           @id @default(autoincrement())
+  postId    Int           @map("collected_post_id")
+  url       String        @db.VarChar(1000)
+  fileSize  Int?          @map("file_size")
+  sortOrder Int           @default(0) @map("sort_order")
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  fileHash  String?       @map("file_hash") @db.VarChar(64)
+  fileName  String?       @map("file_name") @db.VarChar(255)
+  post      CollectedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([sortOrder])
+  @@index([fileHash])
+  @@map("collected_post_image")
+}
+
+model CollectedPostComment {
+  id        Int           @id @default(autoincrement())
+  postId    Int           @map("collected_post_id")
+  author    String        @db.VarChar(100)
+  content   String        @db.Text
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  post      CollectedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([createdAt])
+  @@map("collected_post_comment")
+}

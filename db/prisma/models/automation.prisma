@@ -1,0 +1,58 @@
+model PricingPolicy {
+  id                Int                @id @default(autoincrement())
+  userId            Int                @map("user_id")
+  name              String             @db.VarChar(100)
+  description       String?            @db.Text
+  content           String             @db.Text
+  isActive          Boolean            @default(true) @map("is_active")
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamp(0)
+  automationConfigs AutomationConfig[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "pricing_policy_user_id_fkey")
+  @@map("pricing_policy")
+}
+
+model AutomationConfig {
+  id               Int            @id @default(autoincrement())
+  userId           Int            @unique @map("user_id")
+  isEnabled        Boolean        @default(false) @map("is_enabled")
+  cronExpression   String?        @map("cron_expression") @db.VarChar(50)
+  aiProvider       AiProvider     @default(GEMINI) @map("ai_provider")
+  pricingPolicyId  Int?           @map("pricing_policy_id")
+  lastRunAt        DateTime?      @map("last_run_at") @db.Timestamp(0)
+  nextRunAt        DateTime?      @map("next_run_at") @db.Timestamp(0)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamp(0)
+  channelIds       String?        @map("channel_ids") @db.LongText
+  retailChannelIds String?        @map("retail_channel_ids") @db.LongText
+  shopIds          String?        @map("shop_ids") @db.LongText
+  pricingPolicy    PricingPolicy? @relation(fields: [pricingPolicyId], references: [id])
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([isEnabled])
+  @@index([pricingPolicyId], map: "automation_config_pricing_policy_id_fkey")
+  @@map("automation_config")
+}
+
+model WorkflowLog {
+  id           Int            @id @default(autoincrement())
+  userId       Int            @map("user_id")
+  workflowType WorkflowType   @map("workflow_type")
+  triggerType  TriggerType    @default(MANUAL) @map("trigger_type")
+  status       WorkflowStatus @default(PENDING)
+  startedAt    DateTime       @default(now()) @map("started_at") @db.Timestamp(0)
+  completedAt  DateTime?      @map("completed_at") @db.Timestamp(0)
+  totalItems   Int            @default(0) @map("total_items")
+  successCount Int            @default(0) @map("success_count")
+  failedCount  Int            @default(0) @map("failed_count")
+  details      String?        @db.LongText
+  errorMessage String?        @map("error_message") @db.Text
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, workflowType, startedAt])
+  @@index([status])
+  @@index([triggerType])
+  @@map("workflow_log")
+}

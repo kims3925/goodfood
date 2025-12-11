@@ -1,0 +1,28 @@
+model ReturnRequest {
+  id            Int          @id @default(autoincrement())
+  userId        Int          @map("user_id")
+  orderId       Int          @map("order_id")
+  requestType   ReturnType   @map("request_type")
+  reason        String       @db.Text
+  reasonDetail  String?      @map("reason_detail") @db.Text
+  refundAmount  Decimal      @map("refund_amount") @db.Decimal(12, 2)
+  refundMethod  RefundMethod @map("refund_method")
+  bankName      String?      @map("bank_name") @db.VarChar(50)
+  accountNumber String?      @map("account_number") @db.VarChar(50)
+  accountHolder String?      @map("account_holder") @db.VarChar(50)
+  status        ReturnStatus @default(REQUESTED)
+  images        String?      @db.LongText
+  adminMemo     String?      @map("admin_memo") @db.Text
+  requestedAt   DateTime     @default(now()) @map("requested_at") @db.Timestamp(0)
+  processedAt   DateTime?    @map("processed_at") @db.Timestamp(0)
+  completedAt   DateTime?    @map("completed_at") @db.Timestamp(0)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamp(0)
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([status])
+  @@index([userId, status])
+  @@map("return_request")
+}
