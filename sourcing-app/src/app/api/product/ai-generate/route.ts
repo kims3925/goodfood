@@ -126,7 +126,6 @@ export async function POST(request: NextRequest) {
         apiKey: aiConfig.apiKey,
         model: aiConfig.model,
         temperature: config?.temperature || 0.7,
-        maxTokens: config?.maxTokens || 8192,
       },
       policyContent: policyContent || undefined,
       customPrompt,
