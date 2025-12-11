@@ -118,17 +118,17 @@ export default function ShopDetailPage({
   const subdomainDebounceRef = useRef<NodeJS.Timeout | null>(null)
   const nameDebounceRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Shop URL 도메인 (.env의 NEXT_PUBLIC_DOMAIN 사용)
+  // Shop URL 도메인 (.env의 NEXT_PUBLIC_SHOP_DOMAIN 사용)
   const shopBaseDomain = useMemo(() => {
-    return process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'
+    return process.env.NEXT_PUBLIC_SHOP_DOMAIN || `shop.${process.env.NEXT_PUBLIC_DOMAIN || 'bandauto.com'}`
   }, [])
 
   const getShopUrl = useCallback((subdomainValue: string) => {
-    const protocol = shopBaseDomain.includes('lvh.me') ? 'http' : 'https'
-    return `${protocol}://${subdomainValue}.${shopBaseDomain}`
+    const protocol = shopBaseDomain.includes('lvh.me') || shopBaseDomain.includes('localhost') ? 'http' : 'https'
+    return `${protocol}://${shopBaseDomain}/${subdomainValue}`
   }, [shopBaseDomain])
 
-  // 서브도메인 중복 체크
+  // 도메인 중복 체크
   const checkSubdomainDuplicate = useCallback(async (value: string) => {
     if (!value.trim() || value === shop?.subdomain) {
       setSubdomainCheck({ checking: false, isDuplicate: null })
@@ -174,7 +174,7 @@ export default function ShopDetailPage({
     }
   }, [id, shop?.name])
 
-  // 서브도메인 변경 핸들러
+  // 도메인 변경 핸들러
   const handleSubdomainChange = (value: string) => {
     const lowerValue = value.toLowerCase()
     setSubdomain(lowerValue)
@@ -263,19 +263,19 @@ export default function ShopDetailPage({
     }
 
     if (!subdomain.trim()) {
-      toast.error('서브도메인을 입력해주세요.')
+      toast.error('도메인을 입력해주세요.')
       return
     }
 
     const subdomainRegex = /^[a-z0-9-]+$/
     if (!subdomainRegex.test(subdomain)) {
-      toast.error('서브도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.')
+      toast.error('도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.')
       return
     }
 
     // 중복 체크 검증
     if (subdomainCheck.isDuplicate) {
-      toast.error('이미 사용 중인 서브도메인입니다.')
+      toast.error('이미 사용 중인 도메인입니다.')
       return
     }
 
@@ -391,6 +391,22 @@ export default function ShopDetailPage({
     return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
   }
 
+  const formatPhoneNumber = (phone: string | null) => {
+    if (!phone) return '-'
+    const cleaned = phone.replace(/\D/g, '')
+    if (cleaned.length === 11) {
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 7)}-${cleaned.slice(7)}`
+    } else if (cleaned.length === 10) {
+      if (cleaned.startsWith('02')) {
+        return `${cleaned.slice(0, 2)}-${cleaned.slice(2, 6)}-${cleaned.slice(6)}`
+      }
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+    } else if (cleaned.length === 9 && cleaned.startsWith('02')) {
+      return `${cleaned.slice(0, 2)}-${cleaned.slice(2, 5)}-${cleaned.slice(5)}`
+    }
+    return phone
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -443,7 +459,7 @@ export default function ShopDetailPage({
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1"
                   >
-                    {shop.subdomain}.{shopBaseDomain}
+                    {shopBaseDomain}/{shop.subdomain}
                     <ExternalLink size={12} />
                   </a>
                 </div>
@@ -545,22 +561,22 @@ export default function ShopDetailPage({
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">서브도메인</label>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">도메인</label>
                   {isEditMode ? (
                     <>
                       <div className="flex items-center">
+                        <span className="px-3 py-2 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-gray-500 text-sm whitespace-nowrap">
+                          {shopBaseDomain}/
+                        </span>
                         <Input
                           value={subdomain}
                           onChange={(e) => handleSubdomainChange(e.target.value)}
                           placeholder="myshop"
-                          className={`rounded-r-none ${
+                          className={`rounded-l-none ${
                             subdomainCheck.isDuplicate === true ? 'border-red-500 focus:ring-red-500' :
                             subdomainCheck.isDuplicate === false ? 'border-green-500 focus:ring-green-500' : ''
                           }`}
                         />
-                        <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-500 text-sm whitespace-nowrap">
-                          .{shopBaseDomain}
-                        </span>
                       </div>
                       {subdomainCheck.checking && (
                         <div className="flex items-center gap-1 mt-1 text-gray-500 text-xs">
@@ -577,12 +593,12 @@ export default function ShopDetailPage({
                       {!subdomainCheck.checking && subdomainCheck.isDuplicate === false && (
                         <div className="flex items-center gap-1 mt-1 text-green-600 text-xs">
                           <CheckCircle size={12} />
-                          <span>사용 가능한 서브도메인입니다.</span>
+                          <span>사용 가능한 도메인입니다.</span>
                         </div>
                       )}
                     </>
                   ) : (
-                    <p className="text-gray-900 font-mono">{shop.subdomain}<span className="text-gray-400">.{shopBaseDomain}</span></p>
+                    <p className="text-gray-900 font-mono"><span className="text-gray-400">{shopBaseDomain}/</span>{shop.subdomain}</p>
                   )}
                 </div>
                 <div>
@@ -723,7 +739,7 @@ export default function ShopDetailPage({
                         placeholder="02-1234-5678"
                       />
                     ) : (
-                      <p className="text-gray-900">{shop.contactPhone || '-'}</p>
+                      <p className="text-gray-900">{formatPhoneNumber(shop.contactPhone)}</p>
                     )}
                   </div>
                   <div>

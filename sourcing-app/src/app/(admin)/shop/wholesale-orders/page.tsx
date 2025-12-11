@@ -121,7 +121,7 @@ export default function WholesaleOrdersPage() {
         from: selectedDate,
         to: selectedDate,
         page: page.toString(),
-        limit: '50',
+        limit: '10',
       })
 
       const res = await fetch(`/api/admin/wholesale-orders/${channelId}/items?${params}`)
@@ -195,12 +195,13 @@ export default function WholesaleOrdersPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ko-KR', {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    const date = new Date(dateString)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day} ${hours}:${minutes}`
   }
 
   // 총합계 계산
@@ -461,12 +462,12 @@ export default function WholesaleOrdersPage() {
               )}
 
               {/* 테이블 */}
-              <div className="flex-1 overflow-auto p-6">
+              <div className="p-6">
                 {detailLoading ? (
                   <div className="flex justify-center py-16">
                     <Loading />
                   </div>
-                ) : orderItems && orderItems.items.length > 0 ? (
+                ) : (
                   <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                     <table className="w-full">
                       <thead>
@@ -483,7 +484,8 @@ export default function WholesaleOrdersPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {orderItems.items.map((item, idx) => (
+                        {/* 실제 데이터 행 */}
+                        {orderItems?.items.map((item, idx) => (
                           <tr key={item.orderItemId} className={`border-b border-gray-100 ${idx % 2 === 1 ? 'bg-gray-50/50' : ''}`}>
                             <td className="py-4 px-5 text-sm text-gray-900 max-w-[200px] truncate" title={item.productName}>
                               {item.productName}
@@ -504,45 +506,60 @@ export default function WholesaleOrdersPage() {
                             <td className="py-4 px-5 text-sm text-gray-500 whitespace-nowrap">{formatDate(item.orderedAt)}</td>
                           </tr>
                         ))}
+                        {/* 빈 행 (최소 10행 유지) */}
+                        {Array.from({ length: Math.max(0, 10 - (orderItems?.items.length || 0)) }).map((_, idx) => (
+                          <tr key={`empty-${idx}`} className={`border-b border-gray-100 ${(orderItems?.items.length || 0) + idx % 2 === 1 ? 'bg-gray-50/50' : ''}`}>
+                            <td className="py-4 px-5 text-sm text-gray-400">{!orderItems?.items.length && idx === 4 ? '데이터가 없습니다' : ''}</td>
+                            <td className="py-4 px-5"></td>
+                            <td className="py-4 px-5"></td>
+                            <td className="py-4 px-5"></td>
+                            <td className="py-4 px-5"></td>
+                            <td className="py-4 px-5"></td>
+                            <td className="py-4 px-5"></td>
+                            <td className="py-4 px-5"></td>
+                            <td className="py-4 px-5"></td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
-                  </div>
-                ) : (
-                  <div className="py-16 text-center">
-                    <Package size={48} className="mx-auto text-gray-300 mb-4" />
-                    <p className="text-gray-500">주문 내역이 없습니다.</p>
                   </div>
                 )}
               </div>
 
-              {/* 페이지네이션 */}
-              {orderItems && orderItems.pagination.totalPages > 1 && (
-                <div className="px-8 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
-                  <p className="text-sm text-gray-600">
-                    총 <span className="font-semibold text-gray-900">{orderItems.pagination.total}건</span> 중{' '}
-                    <span className="font-medium">{(detailPage - 1) * 50 + 1}-{Math.min(detailPage * 50, orderItems.pagination.total)}건</span>
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => fetchDetails(selectedChannel.wholesaleChannelId, detailPage - 1)}
-                      disabled={detailPage === 1}
-                      className="p-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ChevronLeft size={18} />
-                    </button>
-                    <span className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg">
-                      {detailPage} / {orderItems.pagination.totalPages}
-                    </span>
-                    <button
-                      onClick={() => fetchDetails(selectedChannel.wholesaleChannelId, detailPage + 1)}
-                      disabled={detailPage === orderItems.pagination.totalPages}
-                      className="p-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ChevronRight size={18} />
-                    </button>
-                  </div>
+              {/* 페이지네이션 - 항상 표시 */}
+              <div className="px-8 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+                <p className="text-sm text-gray-600">
+                  {orderItems ? (
+                    <>
+                      총 <span className="font-semibold text-gray-900">{orderItems.pagination.total}건</span>
+                      {orderItems.pagination.total > 0 && (
+                        <> 중 <span className="font-medium">{(detailPage - 1) * 10 + 1}-{Math.min(detailPage * 10, orderItems.pagination.total)}건</span></>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-gray-400">로딩 중...</span>
+                  )}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => fetchDetails(selectedChannel.wholesaleChannelId, detailPage - 1)}
+                    disabled={!orderItems || detailPage === 1}
+                    className="p-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <span className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg min-w-[80px] text-center">
+                    {orderItems ? `${detailPage} / ${Math.max(1, orderItems.pagination.totalPages)}` : '- / -'}
+                  </span>
+                  <button
+                    onClick={() => fetchDetails(selectedChannel.wholesaleChannelId, detailPage + 1)}
+                    disabled={!orderItems || detailPage >= orderItems.pagination.totalPages}
+                    className="p-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         )}

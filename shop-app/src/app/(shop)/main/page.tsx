@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import Image from 'next/image'
 import { ChevronLeft, ChevronRight, ShoppingCart, Sparkles, Package } from 'lucide-react'
 import { useCartNotification } from '@/contexts/CartNotificationContext'
 import { useShop } from '@/contexts/ShopContext'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface Product {
   id: string
@@ -28,6 +30,7 @@ interface Product {
 export default function StorePage() {
   const { showNotification } = useCartNotification()
   const { shop } = useShop()
+  const { getApiPath, getPath } = useShopUrl()
   const [shopProducts, setShopProducts] = useState<Product[]>([])
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([])
   const [currentSlide, setCurrentSlide] = useState(0)
@@ -52,7 +55,7 @@ export default function StorePage() {
   const loadShopProducts = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/shop/sections?limit=50')
+      const response = await fetch(getApiPath('/api/shop/sections?limit=50'))
       const data = await response.json()
 
       if (data.success) {
@@ -84,7 +87,7 @@ export default function StorePage() {
     }
 
     try {
-      const response = await fetch('/api/cart', {
+      const response = await fetch(getApiPath('/api/cart'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -123,9 +126,9 @@ export default function StorePage() {
               src={bannerUrl}
               alt={`${shopName || '쇼핑몰'} 배너`}
               fill
+              sizes="100vw"
               className="object-cover"
               priority
-              unoptimized
             />
           </div>
         </section>
@@ -161,15 +164,14 @@ export default function StorePage() {
                         .slice(slideIndex * cardsPerView, (slideIndex + 1) * cardsPerView)
                         .map((product, productIndex) => (
                           <div key={`${slideIndex}-${productIndex}-${product.id}`} className="w-[140px] sm:w-[160px] md:w-[180px] lg:w-[220px] flex-shrink-0">
-                            <Link href={`/product/${product.id}`} className="block group">
+                            <Link href={getPath(`/product/${product.id}`)} className="block group">
                               <div className="relative aspect-[220/280] rounded-lg overflow-hidden bg-gray-100">
                                 <Image
                                   src={product.images[0] || '/placeholder.jpg'}
                                   alt={product.title}
                                   fill
-                                  className="object-cover transition-transform group-hover:scale-105"
                                   sizes="(max-width: 640px) 140px, (max-width: 768px) 160px, (max-width: 1024px) 180px, 220px"
-                                  unoptimized
+                                  className="object-cover transition-transform group-hover:scale-105"
                                 />
                                 <button
                                   onClick={(e) => handleAddToCart(product, e)}
@@ -265,9 +267,8 @@ export default function StorePage() {
                       src={product.images[0] || '/placeholder.jpg'}
                       alt={product.title}
                       fill
-                      className="object-cover transition-transform group-hover:scale-105"
                       sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
-                      unoptimized
+                      className="object-cover transition-transform group-hover:scale-105"
                     />
                     <button
                       onClick={(e) => handleAddToCart(product, e)}

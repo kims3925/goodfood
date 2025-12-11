@@ -44,7 +44,7 @@ interface Channel {
   // Shop 연결
   shopId: number | null
   shop: Shop | null
-  // 서브도메인 멀티채널 쇼핑몰 필드
+  // 도메인 멀티채널 쇼핑몰 필드
   subdomain: string | null
   displayName: string | null
   freeShippingAmount: number | null
@@ -98,7 +98,7 @@ export default function ChannelDetailPage({
   const [bankAccount, setBankAccount] = useState('')
   const [bankName, setBankName] = useState('')
 
-  // 서브도메인 쇼핑몰 필드
+  // 도메인 쇼핑몰 필드
   const [subdomain, setSubdomain] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [freeShippingAmount, setFreeShippingAmount] = useState<number | null>(null)
@@ -340,7 +340,7 @@ export default function ChannelDetailPage({
         setBankName(ch.bankName || '')
         // Shop 연결
         setSelectedShopId(ch.shopId || null)
-        // 서브도메인 쇼핑몰 필드
+        // 도메인 쇼핑몰 필드
         setSubdomain(ch.subdomain || '')
         setDisplayName(ch.displayName || '')
         setFreeShippingAmount(ch.freeShippingAmount)
@@ -486,7 +486,7 @@ export default function ChannelDetailPage({
       setBankName(channel.bankName || '')
       // Shop 연결 복원
       setSelectedShopId(channel.shopId || null)
-      // 서브도메인 쇼핑몰 필드 복원
+      // 도메인 쇼핑몰 필드 복원
       setSubdomain(channel.subdomain || '')
       setDisplayName(channel.displayName || '')
       setFreeShippingAmount(channel.freeShippingAmount)

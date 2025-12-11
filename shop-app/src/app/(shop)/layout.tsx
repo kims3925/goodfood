@@ -44,6 +44,7 @@ async function getRelatedShops(currentShopId: number, userId: number | null): Pr
 async function getShopFromHeaders(): Promise<ShopInfo | null> {
   const headersList = await headers()
   const shopId = headersList.get('x-shop-id')
+  const shopSlug = headersList.get('x-shop-slug')
 
   if (!shopId) return null
 

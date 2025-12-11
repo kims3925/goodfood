@@ -24,7 +24,7 @@ const nextConfig = {
       { source: '/user/:path*', destination: '/shop/user/:path*', permanent: true },
       { source: '/cs/:path*', destination: '/shop/cs/:path*', permanent: true },
       // 기본 리다이렉트
-      { source: '/', destination: '/sourcing/dashboard/automation', permanent: false },
+      { source: '/', destination: '/sourcing/automation/settings', permanent: false },
     ]
   },
   webpack: (config) => {

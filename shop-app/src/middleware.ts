@@ -11,147 +11,163 @@ declare global {
 global.shopCacheRef = shopCache
 
 // 캐시 무효화 함수 (외부에서 호출 가능)
-export function invalidateShopCache(subdomain: string) {
-  shopCache.delete(subdomain)
+export function invalidateShopCache(slug: string) {
+  shopCache.delete(slug)
 }
 
 interface ShopData {
   id: number
-  subdomain: string
+  subdomain: string // DB 필드명은 유지 (slug로 사용)
   name: string
   isActive: boolean
 }
 
+// Shop slug로 시작하지 않는 시스템 경로들
+const SYSTEM_PATHS = [
+  '/api',
+  '/auth',
+  '/_next',
+  '/images',
+  '/favicon',
+]
+
 export async function middleware(request: NextRequest) {
   const url = request.nextUrl.clone()
-  const hostname = request.headers.get('host') || ''
   const pathname = url.pathname
 
-  // 정적 파일, _next, internal API 등은 건너뜀
+  // 정적 파일, _next 등은 건너뜀
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/images') ||
     pathname.startsWith('/favicon') ||
-    pathname.includes('.') ||
-    pathname.startsWith('/api/internal')
+    pathname.includes('.')
   ) {
     return NextResponse.next()
   }
 
-  // API 요청도 Shop 헤더가 필요 (Shop별 상품/장바구니 분리)
-  const isApiRequest = pathname.startsWith('/api')
-
-  // 인증 관련 페이지는 건너뜀
-  if (pathname.startsWith('/auth') || pathname.startsWith('/api/auth')) {
+  // Internal API는 건너뜀
+  if (pathname.startsWith('/api/internal')) {
     return NextResponse.next()
   }
 
-  // Shop 식별
-  const shopInfo = await identifyShop(hostname, url.searchParams, request)
+  // NextAuth API는 shop context 없이도 허용
+  // NextAuth 콜백 URL은 /api/auth/... 형태로 고정되어 있음
+  if (pathname.startsWith('/api/auth')) {
+    return NextResponse.next()
+  }
+
+  // 경로에서 Shop slug 추출
+  const { slug, actualPath } = extractShopSlug(pathname)
+
+  // API 요청 처리 (slug가 있는 경우)
+  // /shop1/api/... → slug=shop1, actualPath=/api/...
+  const isApiRequest = actualPath.startsWith('/api')
+
+  // 인증 관련 페이지 (slug 컨텍스트 내에서)
+  // /shop1/auth/... → slug=shop1, actualPath=/auth/...
+  if (actualPath.startsWith('/auth') || actualPath.startsWith('/api/auth')) {
+    if (!slug) {
+      return new NextResponse('Shop not found', { status: 404 })
+    }
+    // Shop 정보 조회
+    const shop = await fetchShopBySlug(slug, request)
+    if (!shop || !shop.isActive) {
+      return new NextResponse('Shop not found', { status: 404 })
+    }
+
+    // URL rewrite + 헤더 추가
+    url.pathname = actualPath
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-shop-id', String(shop.id))
+    requestHeaders.set('x-shop-slug', shop.subdomain)
+
+    return NextResponse.rewrite(url, {
+      request: { headers: requestHeaders },
+    })
+  }
+
+  // Shop slug가 없으면 루트 페이지 (Shop 선택 페이지 또는 404)
+  if (!slug) {
+    // 개발 환경: 쿼리 파라미터로 Shop 지정 (?shop=xxx)
+    const queryShop = url.searchParams.get('shop')
+    if (queryShop) {
+      const shop = await fetchShopBySlug(queryShop, request)
+      if (shop && shop.isActive) {
+        // 해당 Shop으로 리다이렉트
+        url.pathname = `/${shop.subdomain}${pathname === '/' ? '/main' : pathname}`
+        url.searchParams.delete('shop')
+        return NextResponse.redirect(url)
+      }
+    }
+    return new NextResponse('Shop not found. Please access via shop URL like /your-shop/main', { status: 404 })
+  }
+
+  // Shop 정보 조회
+  const shop = await fetchShopBySlug(slug, request)
 
   // Shop 미식별 시 접근 불가
-  if (!shopInfo.shopId) {
+  if (!shop || !shop.isActive) {
     if (isApiRequest) {
       return NextResponse.json({ error: 'Shop not found' }, { status: 404 })
     }
-    // Shop이 없으면 404 페이지 표시
     return new NextResponse('Shop not found', { status: 404 })
   }
 
-  // Shop 정보를 request headers에 추가
-  // 주의: HTTP 헤더는 ASCII만 지원하므로 한글 이름은 제외 (layout에서 DB 조회)
-  const requestHeaders = new Headers(request.headers)
-  requestHeaders.set('x-shop-id', String(shopInfo.shopId))
-  requestHeaders.set('x-shop-subdomain', shopInfo.subdomain || '')
+  // /shop1 접속 시 /shop1/main으로 리다이렉트
+  if (actualPath === '/') {
+    url.pathname = `/${slug}/main`
+    return NextResponse.redirect(url)
+  }
 
-  return NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
+  // URL rewrite: /shop1/main → /main (내부적으로)
+  url.pathname = actualPath
+
+  // Shop 정보를 request headers에 추가
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-shop-id', String(shop.id))
+  requestHeaders.set('x-shop-slug', shop.subdomain)
+
+  return NextResponse.rewrite(url, {
+    request: { headers: requestHeaders },
   })
 }
 
-interface ShopIdentifyResult {
-  shopId: number | null
-  subdomain: string | null
-  shopName: string | null
+interface ExtractResult {
+  slug: string | null
+  actualPath: string
 }
 
-async function identifyShop(
-  hostname: string,
-  searchParams: URLSearchParams,
-  request: NextRequest
-): Promise<ShopIdentifyResult> {
-  // 1. 개발 환경: 쿼리 파라미터 우선 (?shop=xxx)
-  const queryShop = searchParams.get('shop') || searchParams.get('channel') // 하위호환
-  if (queryShop) {
-    const shop = await fetchShopBySubdomain(queryShop, request)
-    if (shop && shop.isActive) {
-      return {
-        shopId: shop.id,
-        subdomain: shop.subdomain,
-        shopName: shop.name,
-      }
-    }
+function extractShopSlug(pathname: string): ExtractResult {
+  // /로 시작하면 첫 번째 / 제거 후 분리
+  const segments = pathname.split('/').filter(Boolean)
+
+  if (segments.length === 0) {
+    return { slug: null, actualPath: '/' }
   }
 
-  // 2. 서브도메인 파싱
-  const subdomain = extractSubdomain(hostname)
+  const firstSegment = segments[0]
 
-  // 루트 도메인 접속 (서브도메인 없음)
-  if (!subdomain || subdomain === 'www') {
-    return { shopId: null, subdomain: null, shopName: null }
+  // 시스템 경로인 경우 slug 없음
+  if (SYSTEM_PATHS.some(path => pathname.startsWith(path))) {
+    return { slug: null, actualPath: pathname }
   }
 
-  // 3. 서브도메인으로 Shop 조회
-  const shop = await fetchShopBySubdomain(subdomain, request)
-
-  if (!shop || !shop.isActive) {
-    return { shopId: null, subdomain: null, shopName: null }
-  }
+  // 첫 번째 세그먼트가 slug
+  const slug = firstSegment
+  const remainingPath = '/' + segments.slice(1).join('/')
 
   return {
-    shopId: shop.id,
-    subdomain: shop.subdomain,
-    shopName: shop.name,
+    slug,
+    actualPath: remainingPath || '/main', // 기본 경로는 /main
   }
 }
 
-function extractSubdomain(hostname: string): string | null {
-  // 포트 제거
-  const hostWithoutPort = hostname.replace(/:\d+$/, '')
-
-  // localhost는 서브도메인 없음
-  if (hostWithoutPort === 'localhost') {
-    return null
-  }
-
-  // lvh.me 사용 (로컬 개발용)
-  // 예: shop1.lvh.me:3000 -> shop1
-  if (hostWithoutPort.includes('lvh.me')) {
-    const parts = hostWithoutPort.split('.')
-    if (parts.length >= 3 && parts[0] !== 'www') {
-      return parts[0]
-    }
-    return null
-  }
-
-  // 프로덕션 도메인
-  // 예: shop1.shop.com -> shop1
-  const parts = hostWithoutPort.split('.')
-  if (parts.length >= 3 && parts[0] !== 'www') {
-    return parts[0]
-  }
-
-  return null
-}
-
-async function fetchShopBySubdomain(
-  subdomain: string,
+async function fetchShopBySlug(
+  slug: string,
   request: NextRequest
 ): Promise<ShopData | null> {
   // 캐시 확인
-  const cached = shopCache.get(subdomain)
+  const cached = shopCache.get(slug)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data
   }
@@ -160,9 +176,7 @@ async function fetchShopBySubdomain(
     // Internal API 호출
     const protocol = request.headers.get('x-forwarded-proto') || 'http'
     const host = request.headers.get('host') || 'localhost:3000'
-    // lvh.me 서브도메인의 경우 lvh.me:3000으로 요청
-    const baseHost = host.includes('lvh.me') ? 'lvh.me:3000' : host.replace(/^[^.]+\./, '')
-    const baseUrl = `${protocol}://${baseHost}`
+    const baseUrl = `${protocol}://${host}`
 
     // 프로덕션 환경에서는 INTERNAL_API_KEY 필수
     const internalKey = process.env.INTERNAL_API_KEY
@@ -172,7 +186,7 @@ async function fetchShopBySubdomain(
     }
     const apiKey = internalKey || 'dev-internal-key'
 
-    const res = await fetch(`${baseUrl}/api/internal/shop/${subdomain}`, {
+    const res = await fetch(`${baseUrl}/api/internal/shop/${slug}`, {
       headers: {
         'x-internal-key': apiKey,
       },
@@ -180,7 +194,7 @@ async function fetchShopBySubdomain(
     })
 
     if (!res.ok) {
-      shopCache.set(subdomain, { data: null, timestamp: Date.now() })
+      shopCache.set(slug, { data: null, timestamp: Date.now() })
       return null
     }
 
@@ -188,7 +202,7 @@ async function fetchShopBySubdomain(
     const shop = data.shop as ShopData | null
 
     // 캐시 저장
-    shopCache.set(subdomain, { data: shop, timestamp: Date.now() })
+    shopCache.set(slug, { data: shop, timestamp: Date.now() })
 
     return shop
   } catch (error) {

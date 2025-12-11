@@ -37,24 +37,19 @@ async function logSignIn(opts: {
 }
 
 // 쿠키 도메인 설정
-// .lvh.me로 설정하면 모든 서브도메인에서 세션 공유
+// 경로 기반 라우팅으로 변경되어 도메인 간 세션 공유 불필요
 function getCookieDomain(): string | undefined {
   // 환경변수에서 명시적으로 설정된 경우 사용
   if (process.env.COOKIE_DOMAIN) {
     return process.env.COOKIE_DOMAIN
   }
 
-  // 개발 환경: 모든 서브도메인에서 세션 공유
-  if (process.env.NODE_ENV !== 'production') {
-    return '.lvh.me'
-  }
-
-  // 프로덕션: 환경변수에서 루트 도메인 가져오기 (예: .shop.com)
+  // 개발/프로덕션 모두 undefined로 설정 (현재 호스트에서만 쿠키 사용)
   return undefined
 }
 
 export const authOptions: NextAuthOptions = {
-  // 서브도메인 간 세션 공유를 위한 쿠키 설정
+  // 도메인 간 세션 공유를 위한 쿠키 설정
   cookies: {
     sessionToken: {
       name:
@@ -169,7 +164,7 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/error',
   },
   callbacks: {
-    // 서브도메인 간 리다이렉트 허용
+    // 도메인 간 리다이렉트 허용
     async redirect({ url, baseUrl }) {
       // 상대 경로는 그대로 허용
       if (url.startsWith('/')) {
@@ -185,8 +180,7 @@ export const authOptions: NextAuthOptions = {
           return url
         }
 
-        // 서브도메인 허용 (.lvh.me, 프로덕션 도메인)
-        // hostname 사용 (포트 제외) - host는 포트 포함이라 비교 실패할 수 있음
+        // 도메인 허용 (.lvh.me, 프로덕션 도메인)
         const allowedDomains = ['.lvh.me', process.env.COOKIE_DOMAIN].filter(Boolean)
         const isAllowedSubdomain = allowedDomains.some(
           (domain) => domain && urlObj.hostname.endsWith(domain.replace(/^\./, ''))

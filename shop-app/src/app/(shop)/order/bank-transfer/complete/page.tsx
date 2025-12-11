@@ -5,9 +5,11 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle, Building2, Clock, Copy, ShoppingBag, FileText, AlertCircle } from 'lucide-react'
 import { useState } from 'react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 function BankTransferCompleteContent() {
   const searchParams = useSearchParams()
+  const { getPath } = useShopUrl()
   const [copied, setCopied] = useState(false)
 
   const orderNumber = searchParams.get('orderNumber') || ''
@@ -49,7 +51,7 @@ function BankTransferCompleteContent() {
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">주문 정보를 찾을 수 없습니다.</p>
           <Link
-            href="/main"
+            href={getPath('/main')}
             className="text-[#FF6B6B] hover:underline"
           >
             쇼핑몰 홈으로 이동
@@ -180,7 +182,7 @@ function BankTransferCompleteContent() {
             {/* 액션 버튼 */}
             <div className="p-6 space-y-3">
               <Link
-                href="/main"
+                href={getPath('/main')}
                 className="w-full py-4 bg-[#FF6B6B] text-white rounded-xl font-semibold text-center flex items-center justify-center gap-2 hover:bg-[#FF5252] transition-colors"
               >
                 <ShoppingBag className="w-5 h-5" />
@@ -188,7 +190,7 @@ function BankTransferCompleteContent() {
               </Link>
               {isGuest ? (
                 <Link
-                  href={`/order/guest/${orderId}?token=${encodeURIComponent(accessToken)}`}
+                  href={getPath(`/order/guest/${orderId}?token=${encodeURIComponent(accessToken)}`)}
                   className="w-full py-4 bg-gray-100 text-gray-700 rounded-xl font-semibold text-center flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
                 >
                   <FileText className="w-5 h-5" />
@@ -196,7 +198,7 @@ function BankTransferCompleteContent() {
                 </Link>
               ) : (
                 <Link
-                  href="/mypage/orders"
+                  href={getPath('/mypage/orders')}
                   className="w-full py-4 bg-gray-100 text-gray-700 rounded-xl font-semibold text-center flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
                 >
                   <FileText className="w-5 h-5" />

@@ -5,13 +5,13 @@ import { signIn, useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, Mail, Lock, Loader2 } from 'lucide-react'
-import { useShop } from '@/contexts/ShopContext'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: session, status } = useSession()
-  const { shop } = useShop()
+  const { getPath } = useShopUrl()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -22,19 +22,19 @@ function LoginContent() {
   const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
   const shopName = shop?.name || 'ABC마켓'
 
-  const callbackUrl = searchParams.get('callbackUrl') || '/main'
+  const callbackUrl = searchParams.get('callbackUrl') || getPath('/main')
 
   // 이미 로그인된 사용자 리다이렉트
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
       const user = session.user as any
       if (user.pendingSignup) {
-        router.replace('/auth/complete')
+        router.replace(getPath('/auth/complete'))
       } else {
         router.replace(callbackUrl)
       }
     }
-  }, [session, status, router, callbackUrl])
+  }, [session, status, router, callbackUrl, getPath])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

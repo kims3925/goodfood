@@ -336,7 +336,7 @@ export async function POST(req: NextRequest) {
       } catch (error: any) {
         console.error('토스 결제 승인 실패:', error)
         return createErrorResponse(
-          error.code || TOSS_ERROR_CODES.FAILED_PAYMENT_INTERNAL_SYSTEM_PROCESSING,
+          error.code || TOSS_ERROR_CODES.UNKNOWN_ERROR,
           error.message || '결제 승인에 실패했습니다',
           400
         )

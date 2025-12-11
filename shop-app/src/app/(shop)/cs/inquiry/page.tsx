@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { ChevronLeft, Send, MessageSquare, Clock, CheckCircle } from 'lucide-react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface Reply {
   id: number
@@ -35,6 +36,7 @@ const inquiryTypes = [
 
 export default function InquiryPage() {
   const { data: session, status } = useSession()
+  const { getPath, getApiPath } = useShopUrl()
   const [activeTab, setActiveTab] = useState<'write' | 'list'>('write')
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -57,7 +59,7 @@ export default function InquiryPage() {
   const loadInquiries = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/cs/inquiry')
+      const response = await fetch(getApiPath('/api/cs/inquiry'))
       const data = await response.json()
       if (data.success) {
         setInquiries(data.inquiries)
@@ -73,7 +75,7 @@ export default function InquiryPage() {
     e.preventDefault()
 
     if (!session) {
-      window.location.href = '/auth/login'
+      window.location.href = getPath('/auth/login')
       return
     }
 
@@ -83,7 +85,7 @@ export default function InquiryPage() {
 
     try {
       setIsSubmitting(true)
-      const response = await fetch('/api/cs/inquiry', {
+      const response = await fetch(getApiPath('/api/cs/inquiry'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -129,7 +131,7 @@ export default function InquiryPage() {
     <div className="kurly-container py-8">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
-        <Link href="/cs" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+        <Link href={getPath('/cs')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
           <ChevronLeft className="w-5 h-5" />
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">1:1 문의</h1>
@@ -165,7 +167,7 @@ export default function InquiryPage() {
           {!session && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800">
               로그인 후 문의하실 수 있습니다.{' '}
-              <Link href="/auth/login" className="underline font-medium">
+              <Link href={getPath('/auth/login')} className="underline font-medium">
                 로그인하기
               </Link>
             </div>
@@ -233,7 +235,7 @@ export default function InquiryPage() {
             <div className="text-center py-12">
               <p className="text-gray-500 mb-4">로그인 후 문의내역을 확인할 수 있습니다</p>
               <Link
-                href="/auth/login"
+                href={getPath('/auth/login')}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-[#FF6B6B] text-white font-medium rounded-lg hover:bg-[#FF5252] transition-colors"
               >
                 로그인하기

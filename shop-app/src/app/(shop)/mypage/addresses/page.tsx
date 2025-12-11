@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { MapPin, Plus, Edit2, Trash2, Check } from 'lucide-react'
 import { ConfirmModal } from '@/modules/common/ui-kit/src/ui'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 declare global {
   interface Window {
@@ -26,6 +27,7 @@ interface Address {
 export default function AddressesPage() {
   const router = useRouter()
   const { data: session } = useSession()
+  const { getApiPath } = useShopUrl()
   const [addresses, setAddresses] = useState<Address[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -84,7 +86,7 @@ export default function AddressesPage() {
   const fetchAddresses = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/mypage/addresses')
+      const response = await fetch(getApiPath('/api/mypage/addresses'))
       const data = await response.json()
 
       if (data.success) {
@@ -102,8 +104,8 @@ export default function AddressesPage() {
 
     try {
       const url = editingId
-        ? `/api/mypage/addresses/${editingId}`
-        : '/api/mypage/addresses'
+        ? getApiPath(`/api/mypage/addresses/${editingId}`)
+        : getApiPath('/api/mypage/addresses')
 
       const response = await fetch(url, {
         method: editingId ? 'PUT' : 'POST',
@@ -147,7 +149,7 @@ export default function AddressesPage() {
     if (!pendingDeleteId) return
 
     try {
-      const response = await fetch(`/api/mypage/addresses/${pendingDeleteId}`, {
+      const response = await fetch(getApiPath(`/api/mypage/addresses/${pendingDeleteId}`), {
         method: 'DELETE',
       })
 

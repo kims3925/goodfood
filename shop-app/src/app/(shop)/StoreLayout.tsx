@@ -3,11 +3,14 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { Search, ShoppingCart, User, MapPin, ChevronDown, Phone, HelpCircle, MessageSquare, LogOut } from 'lucide-react'
 import { CartNotificationProvider, useCartNotification } from '@/contexts/CartNotificationContext'
 import CartNotificationBubble from '@/components/cart/CartNotificationBubble'
 import { useShop } from '@/contexts/ShopContext'
+import { useShopUrl } from '@/hooks/useShopUrl'
+import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
 
 function StoreLayoutContent({
   children,
@@ -16,6 +19,7 @@ function StoreLayoutContent({
 }) {
   const { data: session, status } = useSession()
   const { shop } = useShop()
+  const { getPath, slug } = useShopUrl()
   const { cartCount } = useCartNotification()
   const [searchQuery, setSearchQuery] = useState('')
   const [isCustomerServiceOpen, setIsCustomerServiceOpen] = useState(false)
@@ -27,25 +31,24 @@ function StoreLayoutContent({
   const contactPhone = shop?.contactPhone || '1234-5678'
   const relatedShops = shop?.relatedShops || []
 
-  // 서브도메인 기반 URL 생성
-  const getShopUrl = (subdomain: string) => {
-    // 개발 환경에서는 lvh.me 사용
+  // 경로 기반 URL 생성 (다른 Shop으로 이동)
+  const getShopUrl = (shopSlug: string) => {
+    // 개발 환경
     const isDev = process.env.NODE_ENV !== 'production'
 
     if (isDev) {
-      return `http://${subdomain}.lvh.me:3000/main`
+      return `/${shopSlug}/main`
     }
 
-    // 프로덕션: 환경변수에서 루트 도메인 사용
-    const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'shop.com'
-    return `https://${subdomain}.${rootDomain}/main`
+    // 프로덕션: 같은 도메인, 경로만 변경
+    return `/${shopSlug}/main`
   }
 
-  
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     if (searchQuery.trim()) {
-      window.location.href = `?search=${encodeURIComponent(searchQuery)}`
+      window.location.href = `${getPath('/main')}?search=${encodeURIComponent(searchQuery)}`
     }
   }
 
@@ -82,7 +85,7 @@ function StoreLayoutContent({
                         />
                         <div className="absolute top-full right-0 w-[160px] bg-white border border-gray-200 shadow-lg z-50 py-2 mt-1 rounded-md">
                           <Link
-                            href="/mypage"
+                            href={getPath('/mypage')}
                             className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
                             onClick={() => setIsUserMenuOpen(false)}
                           >
@@ -90,7 +93,7 @@ function StoreLayoutContent({
                             마이페이지
                           </Link>
                           <Link
-                            href="/mypage/orders"
+                            href={getPath('/mypage/orders')}
                             className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
                             onClick={() => setIsUserMenuOpen(false)}
                           >
@@ -117,15 +120,15 @@ function StoreLayoutContent({
               ) : (
                 <>
                   {/* Logged Out State */}
-                  <Link href="/auth/signup" className="hover:text-abc-coral px-2">
+                  <Link href={getPath('/auth/signup')} className="hover:text-abc-coral px-2">
                     회원가입
                   </Link>
                   <span className="text-gray-300">|</span>
-                  <Link href="/auth/login" className="hover:text-abc-coral px-2">
+                  <Link href={getPath('/auth/login')} className="hover:text-abc-coral px-2">
                     로그인
                   </Link>
                   <span className="text-gray-300">|</span>
-                  <Link href="/order/lookup" className="hover:text-abc-coral px-2">
+                  <Link href={getPath('/order/lookup')} className="hover:text-abc-coral px-2">
                     비회원 주문조회
                   </Link>
                 </>
@@ -150,11 +153,11 @@ function StoreLayoutContent({
                     />
                     <div className="absolute top-full right-0 w-[200px] bg-white border border-gray-200 shadow-lg z-50 py-2 mt-1 rounded-md">
                       <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="font-bold text-lg text-abc-coral">{contactPhone}</p>
+                        <p className="font-bold text-lg text-abc-coral">{formatPhoneNumber(contactPhone)}</p>
                         <p className="text-gray-500 text-xs mt-1">월~토 오전 7시 ~ 오후 6시</p>
                       </div>
                       <Link
-                        href="/cs/faq"
+                        href={getPath('/cs/faq')}
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
                         onClick={() => setIsCustomerServiceOpen(false)}
                       >
@@ -162,7 +165,7 @@ function StoreLayoutContent({
                         자주묻는질문
                       </Link>
                       <Link
-                        href="/cs/inquiry"
+                        href={getPath('/cs/inquiry')}
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
                         onClick={() => setIsCustomerServiceOpen(false)}
                       >
@@ -170,7 +173,7 @@ function StoreLayoutContent({
                         1:1 문의
                       </Link>
                       <Link
-                        href="/cs"
+                        href={getPath('/cs')}
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
                         onClick={() => setIsCustomerServiceOpen(false)}
                       >
@@ -189,7 +192,7 @@ function StoreLayoutContent({
         <div className="kurly-container">
           <div className="kurly-header-top">
             {/* Logo - 로고 이미지 + Shop 이름 */}
-            <Link href="/main" className="kurly-logo flex items-center gap-2">
+            <Link href={getPath('/main')} className="kurly-logo flex items-center gap-2">
               {logoUrl && (
                 <Image
                   src={logoUrl}
@@ -226,18 +229,18 @@ function StoreLayoutContent({
 
             {/* Header Icons */}
             <div className="kurly-header-icons">
-              <Link href="/mypage/addresses" className="kurly-header-icon hidden md:flex">
+              <Link href={getPath('/mypage/addresses')} className="kurly-header-icon hidden md:flex">
                 <MapPin className="w-5 h-5 md:w-6 md:h-6" />
                 <span className="kurly-header-icon-text">배송지</span>
               </Link>
-              <Link href="/mypage/wishlist" className="kurly-header-icon hidden sm:flex">
+              <Link href={getPath('/mypage/wishlist')} className="kurly-header-icon hidden sm:flex">
                 <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
                 <span className="kurly-header-icon-text">찜하기</span>
               </Link>
               <div className="relative">
-                <Link href="/cart" className="kurly-header-icon relative">
+                <Link href={getPath('/cart')} className="kurly-header-icon relative">
                   <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />
                   {cartCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-4 h-4 md:w-5 md:h-5 bg-abc-coral text-white text-[10px] md:text-xs rounded-full flex items-center justify-center">
@@ -266,24 +269,24 @@ function StoreLayoutContent({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
             <div>
               <h4 className="font-bold text-gray-900 mb-3 md:mb-4">고객행복센터</h4>
-              <p className="text-xl md:text-2xl font-bold mb-2 text-abc-coral">{contactPhone}</p>
+              <p className="text-xl md:text-2xl font-bold mb-2 text-abc-coral">{formatPhoneNumber(contactPhone)}</p>
               <p className="text-xs md:text-sm text-gray-600">월~토 오전 7시 ~ 오후 6시</p>
             </div>
             <div>
               <h4 className="font-bold text-gray-900 mb-3 md:mb-4">{shopName}</h4>
               <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-600">
-                <li><Link href="/about" className="hover:opacity-70">회사소개</Link></li>
-                <li><Link href="/careers" className="hover:opacity-70">채용정보</Link></li>
-                <li><Link href="/terms" className="hover:opacity-70">이용약관</Link></li>
-                <li><Link href="/privacy" className="hover:opacity-70">개인정보처리방침</Link></li>
+                <li><Link href={getPath('/about')} className="hover:opacity-70">회사소개</Link></li>
+                <li><Link href={getPath('/careers')} className="hover:opacity-70">채용정보</Link></li>
+                <li><Link href={getPath('/terms')} className="hover:opacity-70">이용약관</Link></li>
+                <li><Link href={getPath('/privacy')} className="hover:opacity-70">개인정보처리방침</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-bold text-gray-900 mb-3 md:mb-4">고객센터</h4>
               <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-600">
-                <li><Link href="/cs" className="hover:opacity-70">고객센터</Link></li>
-                <li><Link href="/cs/faq" className="hover:opacity-70">자주묻는질문</Link></li>
-                <li><Link href="/cs/inquiry" className="hover:opacity-70">1:1문의</Link></li>
+                <li><Link href={getPath('/cs')} className="hover:opacity-70">고객센터</Link></li>
+                <li><Link href={getPath('/cs/faq')} className="hover:opacity-70">자주묻는질문</Link></li>
+                <li><Link href={getPath('/cs/inquiry')} className="hover:opacity-70">1:1문의</Link></li>
               </ul>
             </div>
             {relatedShops.length > 0 ? (

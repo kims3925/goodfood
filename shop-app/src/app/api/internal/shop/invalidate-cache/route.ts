@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'subdomain is required' }, { status: 400 })
     }
 
-    // 전역 캐시 참조에서 특정 서브도메인 캐시 삭제
+    // 전역 캐시 참조에서 특정 도메인 캐시 삭제
     if (global.shopCacheRef) {
       global.shopCacheRef.delete(subdomain)
     }

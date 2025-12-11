@@ -36,6 +36,7 @@ interface UnifiedOrder {
   status: string
   statusLabel: string
   createdAt: string
+  isGuestOrder?: boolean
   address?: string
   deliveryMemo?: string
   paymentMethod?: string
@@ -387,15 +388,24 @@ export default function UnifiedOrderListPage() {
                     >
                       <TableCell>{getSourceBadge(order)}</TableCell>
                       <TableCell>
-                        <span className="font-mono text-sm text-gray-900">
-                          {order.orderNumber}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-sm text-gray-900">
+                            {order.orderNumber}
+                          </span>
+                          {order.isGuestOrder && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap">
+                              비회원
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <span className="font-medium text-gray-900">{order.customerName}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-gray-600 text-sm">{formatPhoneNumber(order.customerPhone)}</span>
+                        <span className="text-gray-600 text-sm">
+                          {order.customerPhone ? formatPhoneNumber(order.customerPhone) : '-'}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <div className="font-medium text-gray-900 truncate max-w-[250px]">

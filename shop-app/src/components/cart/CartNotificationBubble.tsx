@@ -2,6 +2,7 @@
 
 import { useCartNotification } from '@/contexts/CartNotificationContext'
 import { X } from 'lucide-react'
+import Image from 'next/image'
 
 export default function CartNotificationBubble() {
   const { isVisible, product, hideNotification } = useCartNotification()
@@ -17,14 +18,13 @@ export default function CartNotificationBubble() {
       <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-3 min-w-[280px] max-w-[320px]">
         <div className="flex items-start gap-3">
           {/* 상품 이미지 */}
-          <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-            <img
-              src={product.image}
+          <div className="relative w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+            <Image
+              src={product.image || '/images/placeholder.png'}
               alt={product.title}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = '/images/placeholder.png'
-              }}
+              fill
+              sizes="56px"
+              className="object-cover"
             />
           </div>
 

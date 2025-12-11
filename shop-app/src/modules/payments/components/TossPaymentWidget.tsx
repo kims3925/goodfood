@@ -2,6 +2,7 @@
 
 import { loadTossPayments, ANONYMOUS } from '@tosspayments/tosspayments-sdk'
 import { useEffect, useState } from 'react'
+import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface PaymentWidgetProps {
   orderId: string
@@ -29,6 +30,7 @@ export default function TossPaymentWidget({
   onPaymentFail,
   onPaymentCancel
 }: PaymentWidgetProps) {
+  const { getPath, getApiPath } = useShopUrl()
   const [ready, setReady] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [widgets, setWidgets] = useState<WidgetsInstance | null>(null)
@@ -47,7 +49,7 @@ export default function TossPaymentWidget({
     async function fetchClientKey() {
       console.log('[TossWidget] 클라이언트 키 로딩 시작')
       try {
-        const response = await fetch('/api/shop/settings')
+        const response = await fetch(getApiPath('/api/shop/settings'))
         const data = await response.json()
 
         if (data.success && data.settings?.tossClientKey) {
@@ -163,8 +165,8 @@ export default function TossPaymentWidget({
       const paymentParams = {
         orderId,
         orderName,
-        successUrl: `${window.location.origin}/payment/success`,
-        failUrl: `${window.location.origin}/payment/fail`,
+        successUrl: `${window.location.origin}${getPath('/payment/success')}`,
+        failUrl: `${window.location.origin}${getPath('/payment/fail')}`,
         customerEmail,
         customerName,
         customerMobilePhone: customerPhone
