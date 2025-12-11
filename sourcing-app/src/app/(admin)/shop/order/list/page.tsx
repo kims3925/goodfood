@@ -383,7 +383,7 @@ export default function UnifiedOrderListPage() {
                 ) : (
                   orders.map((order) => (
                     <TableRow
-                      key={`${order.source}-${order.id}`}
+                      key={`${order.source}-${order.isGuestOrder ? 'guest' : 'member'}-${order.id}`}
                       className="hover:bg-gray-50 cursor-pointer"
                       onClick={() => router.push(`/shop/order/detail/${order.orderNumber}?source=${order.source}`)}
                     >
