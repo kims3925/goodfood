@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { Search, ShoppingCart, User, MapPin, ChevronDown, Phone, HelpCircle, MessageSquare, LogOut } from 'lucide-react'
 import { CartNotificationProvider, useCartNotification } from '@/contexts/CartNotificationContext'
