@@ -385,7 +385,7 @@ export default function UnifiedOrderListPage() {
                     <TableRow
                       key={`${order.source}-${order.id}`}
                       className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/shop/order/detail/${order.id}?source=${order.source}`)}
+                      onClick={() => router.push(`/shop/order/detail/${order.orderNumber}?source=${order.source}`)}
                     >
                       <TableCell>{getSourceBadge(order)}</TableCell>
                       <TableCell>
