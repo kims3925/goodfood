@@ -234,7 +234,7 @@ export class ProductRepository {
   }
 
   async create(data: ProductCreateInput & { thumbnailUrl?: string | null; imageUrls?: string[] }) {
-    // 1. 상품 생성 (options와 variants 포함)
+    // 상품 생성 (options와 variants 포함)
     const product = await prisma.product.create({
       data: {
         userId: data.userId,
@@ -276,29 +276,21 @@ export class ProductRepository {
         variants: data.variants?.length
           ? {
               create: data.variants.map((v) => ({
-                optionSummary: v.optionSummary || null,
-                wholesalePrice: v.wholesalePrice || null,
-                price: v.price || 0,
+                optionSummary: v.optionSummary ?? null,
+                wholesalePrice: v.wholesalePrice ?? null,  // ?? 사용하여 0도 유지
+                price: v.price ?? 0,
               })),
             }
           : undefined,
       },
     })
 
-    // 2. 이미지 URL이 있으면 다운로드하여 ProductImage에 저장
+    // 이미지 URL이 있으면 다운로드하여 ProductImage에 저장
     if (data.imageUrls && data.imageUrls.length > 0) {
       try {
-        console.log(`[Product Create] 이미지 다운로드 시작: ${data.imageUrls.length}개`)
         const downloadedImages = await downloadAndSaveProductImages(data.imageUrls)
 
         if (downloadedImages.length > 0) {
-          // 중복 이미지 로그
-          const existingCount = downloadedImages.filter((img) => img.isExisting).length
-          if (existingCount > 0) {
-            console.log(`[Product Create] 중복 이미지 재사용: ${existingCount}개`)
-          }
-
-          // ProductImage 레코드 생성 (해시, 파일명, 파일크기 포함)
           await prisma.productImage.createMany({
             data: downloadedImages.map((img, index) => ({
               productId: product.id,
@@ -317,11 +309,8 @@ export class ProductRepository {
               data: { thumbnailUrl: downloadedImages[0].url },
             })
           }
-
-          console.log(`[Product Create] 이미지 저장 완료: ${downloadedImages.length}개`)
         }
-      } catch (error) {
-        console.error('[Product Create] 이미지 다운로드/저장 실패:', error)
+      } catch {
         // 이미지 저장 실패해도 상품은 생성됨
       }
     }
@@ -359,9 +348,9 @@ export class ProductRepository {
         await prisma.productVariant.createMany({
           data: data.variants.map((v: any) => ({
             productId: id,
-            optionSummary: v.optionSummary || null,
-            wholesalePrice: v.wholesalePrice || null,
-            price: v.price || 0,
+            optionSummary: v.optionSummary ?? null,
+            wholesalePrice: v.wholesalePrice ?? null,  // ?? 사용하여 0도 유지
+            price: v.price ?? 0,
           })),
         })
       }

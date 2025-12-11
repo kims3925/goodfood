@@ -50,6 +50,7 @@ interface CollectedProduct {
   price: number | null
   wholesalePrice: number | null
   createdAt: string
+  rawMetadata: string | null  // JSON string containing options, variants, shipping info
   post: {
     id: number
     title: string
@@ -200,6 +201,7 @@ export default function ProductsPage() {
 
     setIsConverting(true)
     try {
+      // 서비스에서 rawMetadata를 자동으로 파싱하므로, 기본 정보만 전달
       const response = await fetch('/api/product', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -207,7 +209,6 @@ export default function ProductsPage() {
           collectedProductId: selectedCollectedId,
           name: selectedCP.name || selectedCP.post.title || '상품명 미지정',
           description: selectedCP.description || '',
-          price: selectedCP.price || null,
           currency: selectedCP.currency || 'KRW',
         }),
       })
@@ -221,8 +222,7 @@ export default function ProductsPage() {
       } else {
         alert(data.error || '상품 등록에 실패했습니다.')
       }
-    } catch (error) {
-      console.error('상품 등록 실패:', error)
+    } catch {
       alert('상품 등록 중 오류가 발생했습니다.')
     } finally {
       setIsConverting(false)

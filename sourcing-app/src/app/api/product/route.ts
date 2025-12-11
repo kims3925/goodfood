@@ -79,8 +79,6 @@ export async function POST(request: NextRequest) {
       imageUrls,
     } = body
 
-    console.log('[Product Create] Request:', { postId, name, optionsCount: options?.length, variantsCount: variants?.length, imageUrlsCount: imageUrls?.length })
-
     if (!name) {
       return NextResponse.json(
         { success: false, error: 'name이 필요합니다.' },
@@ -109,8 +107,6 @@ export async function POST(request: NextRequest) {
       variants,
       imageUrls,
     })
-
-    console.log('[Product Create] Success:', product.id)
 
     return NextResponse.json({ success: true, data: product })
   } catch (error: any) {
