@@ -53,70 +53,164 @@ export async function GET(
     }
 
     // 해당 도매처의 결제 완료 이상 상태 주문 아이템 조회 (PAID, SHIPPED, DELIVERED)
-    const items = await prisma.orderItem.findMany({
-      where: {
-        order: {
-          status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
-          paidAt: {
-            not: null,
-            gte: fromDate,
-            lte: toDate,
-          },
+    const statuses: ('PAID' | 'SHIPPED' | 'DELIVERED')[] = ['PAID', 'SHIPPED', 'DELIVERED']
+    const whereCondition = {
+      order: {
+        status: { in: statuses },
+        paidAt: {
+          not: null,
+          gte: fromDate,
+          lte: toDate,
         },
-        publishedProduct: {
-          userId: user.userId,
-          product: {
-            collectedProduct: {
-              post: {
-                channelId: channelId,
-              },
+      },
+      publishedProduct: {
+        userId: user.userId,
+        product: {
+          collectedProduct: {
+            post: {
+              channelId: channelId,
             },
           },
         },
       },
-      include: {
-        order: {
-          select: {
-            orderNumber: true,
-            orderedAt: true,
-            shippingAddress: {
-              select: {
-                recipientName: true,
-                recipientPhone: true,
-                postalCode: true,
-                address: true,
-                addressDetail: true,
-              },
+    }
+
+    const guestWhereCondition = {
+      guestOrder: {
+        status: { in: statuses },
+        paidAt: {
+          not: null,
+          gte: fromDate,
+          lte: toDate,
+        },
+      },
+      publishedProduct: {
+        userId: user.userId,
+        product: {
+          collectedProduct: {
+            post: {
+              channelId: channelId,
             },
           },
         },
-        publishedProduct: {
-          include: {
-            product: {
-              include: {
-                variants: {
-                  select: {
-                    optionSummary: true,
-                    wholesalePrice: true,
+      },
+    }
+
+    const [items, guestItems] = await Promise.all([
+      prisma.orderItem.findMany({
+        where: whereCondition,
+        include: {
+          order: {
+            select: {
+              orderNumber: true,
+              orderedAt: true,
+              shippingAddress: {
+                select: {
+                  recipientName: true,
+                  recipientPhone: true,
+                  postalCode: true,
+                  address: true,
+                  addressDetail: true,
+                },
+              },
+            },
+          },
+          publishedProduct: {
+            include: {
+              product: {
+                include: {
+                  variants: {
+                    select: {
+                      optionSummary: true,
+                      wholesalePrice: true,
+                    },
                   },
                 },
               },
             },
           },
-        },
-        variant: {
-          select: {
-            wholesalePrice: true,
-            optionSummary: true,
+          variant: {
+            select: {
+              wholesalePrice: true,
+              optionSummary: true,
+            },
           },
         },
-      },
-      orderBy: {
-        order: {
-          orderedAt: 'desc',
+        orderBy: {
+          order: {
+            orderedAt: 'desc',
+          },
         },
-      },
-    })
+      }),
+      prisma.guestOrderItem.findMany({
+        where: guestWhereCondition,
+        include: {
+          guestOrder: {
+            select: {
+              orderNumber: true,
+              orderedAt: true,
+              shippingAddress: {
+                select: {
+                  recipientName: true,
+                  recipientPhone: true,
+                  postalCode: true,
+                  address: true,
+                  addressDetail: true,
+                },
+              },
+            },
+          },
+          publishedProduct: {
+            include: {
+              product: {
+                include: {
+                  variants: {
+                    select: {
+                      optionSummary: true,
+                      wholesalePrice: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          variant: {
+            select: {
+              wholesalePrice: true,
+              optionSummary: true,
+            },
+          },
+        },
+        orderBy: {
+          guestOrder: {
+            orderedAt: 'desc',
+          },
+        },
+      }),
+    ])
+
+    // 통합 및 정렬
+    const allItems = [
+      ...items.map(item => ({
+        ...item,
+        order: item.order,
+        isGuestOrder: false,
+      })),
+      ...guestItems.map(item => ({
+        ...item,
+        order: {
+          orderNumber: item.guestOrder.orderNumber,
+          orderedAt: item.guestOrder.orderedAt,
+          shippingAddress: item.guestOrder.shippingAddress,
+        },
+        isGuestOrder: true,
+      })),
+    ]
+
+    // 시간순 정렬
+    allItems.sort((a, b) =>
+      new Date(b.order.orderedAt).getTime() - new Date(a.order.orderedAt).getTime()
+    )
 
     // 엑셀 생성
     const workbook = new ExcelJS.Workbook()
@@ -177,7 +271,7 @@ export async function GET(
     let totalAmount = 0
     let rowIndex = 7
 
-    for (const item of items) {
+    for (const item of allItems) {
       let wholesalePrice = Number(item.variant?.wholesalePrice || 0)
 
       // variantId가 null인 경우 Product의 variants에서 찾기

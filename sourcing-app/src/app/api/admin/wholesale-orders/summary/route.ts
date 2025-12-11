@@ -33,8 +33,7 @@ export async function GET(request: NextRequest) {
     const toDate = new Date(to)
     toDate.setHours(23, 59, 59, 999)
 
-    // 결제 완료 이상 상태의 주문만 조회 (PAID, SHIPPED, DELIVERED)
-    // 도매처 경로: OrderItem → PublishedProduct → Product → CollectedProduct → CollectedPost → Channel(WHOLESALE)
+    // 1. 회원 주문 조회 (PAID, SHIPPED, DELIVERED)
     const orderItems = await prisma.orderItem.findMany({
       where: {
         order: {
@@ -107,18 +106,109 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // 도매처별 집계
+    // 2. 비회원 주문 조회 (PAID, SHIPPED, DELIVERED)
+    const guestOrderItems = await prisma.guestOrderItem.findMany({
+      where: {
+        guestOrder: {
+          status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+          paidAt: {
+            not: null,
+            gte: fromDate,
+            lte: toDate,
+          },
+        },
+        publishedProduct: {
+          userId: user.userId,
+          product: {
+            collectedProduct: {
+              post: {
+                channel: {
+                  kind: 'WHOLESALE',
+                  ...(wholesaleChannelId && { id: parseInt(wholesaleChannelId) }),
+                },
+              },
+            },
+          },
+        },
+      },
+      include: {
+        guestOrder: {
+          select: {
+            id: true,
+            orderNumber: true,
+            orderedAt: true,
+          },
+        },
+        publishedProduct: {
+          include: {
+            product: {
+              include: {
+                variants: {
+                  select: {
+                    id: true,
+                    optionSummary: true,
+                    wholesalePrice: true,
+                  },
+                },
+                collectedProduct: {
+                  include: {
+                    post: {
+                      include: {
+                        channel: {
+                          select: {
+                            id: true,
+                            name: true,
+                            kind: true,
+                            coverUrl: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        variant: {
+          select: {
+            id: true,
+            wholesalePrice: true,
+          },
+        },
+      },
+    })
+
+    // 3. 회원/비회원 주문을 통합 형식으로 변환
+    const allOrderItems = [
+      ...orderItems.map(item => ({
+        ...item,
+        order: item.order,
+        isGuestOrder: false,
+      })),
+      ...guestOrderItems.map(item => ({
+        ...item,
+        order: {
+          id: item.guestOrder.id,
+          orderNumber: item.guestOrder.orderNumber,
+          orderedAt: item.guestOrder.orderedAt,
+        },
+        isGuestOrder: true,
+      })),
+    ]
+
+    // 4. 도매처별 집계
     const wholesaleSummaryMap = new Map<number, {
       wholesaleChannelId: number
       wholesaleChannelName: string
       wholesaleChannelCoverUrl: string | null
-      totalOrders: Set<number>
+      totalOrders: Set<string>
       totalQuantity: number
       totalAmount: number
-      items: typeof orderItems
+      items: typeof allOrderItems
     }>()
 
-    for (const item of orderItems) {
+    for (const item of allOrderItems) {
       const channel = item.publishedProduct?.product?.collectedProduct?.post?.channel
       if (!channel || channel.kind !== 'WHOLESALE') continue
 
@@ -157,7 +247,8 @@ export async function GET(request: NextRequest) {
       }
 
       const summary = wholesaleSummaryMap.get(channel.id)!
-      summary.totalOrders.add(item.order.id)
+      // 회원/비회원 주문 모두 주문번호로 구별
+      summary.totalOrders.add(item.order.orderNumber)
       summary.totalQuantity += item.quantity
       summary.totalAmount += itemAmount
       summary.items.push(item)

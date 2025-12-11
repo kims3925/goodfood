@@ -40,7 +40,7 @@ export async function GET(
     const toDate = new Date(to)
     toDate.setHours(23, 59, 59, 999)
 
-    // 해당 도매처의 결제 완료 이상 상태 주문 아이템 조회 (PAID, SHIPPED, DELIVERED)
+    // 1. 회원 주문 아이템 조회 (PAID, SHIPPED, DELIVERED)
     const statuses: ('PAID' | 'SHIPPED' | 'DELIVERED')[] = ['PAID', 'SHIPPED', 'DELIVERED']
     const whereCondition = {
       order: {
@@ -63,7 +63,28 @@ export async function GET(
       },
     }
 
-    const [items, total] = await Promise.all([
+    const guestWhereCondition = {
+      guestOrder: {
+        status: { in: statuses },
+        paidAt: {
+          not: null,
+          gte: fromDate,
+          lte: toDate,
+        },
+      },
+      publishedProduct: {
+        userId: user.userId,
+        product: {
+          collectedProduct: {
+            post: {
+              channelId: channelId,
+            },
+          },
+        },
+      },
+    }
+
+    const [items, guestItems, totalMember, totalGuest] = await Promise.all([
       prisma.orderItem.findMany({
         where: whereCondition,
         include: {
@@ -123,15 +144,128 @@ export async function GET(
             orderedAt: 'desc',
           },
         },
-        skip: (page - 1) * limit,
-        take: limit,
+      }),
+      // 2. 비회원 주문 아이템 조회
+      prisma.guestOrderItem.findMany({
+        where: guestWhereCondition,
+        include: {
+          guestOrder: {
+            select: {
+              id: true,
+              orderNumber: true,
+              orderedAt: true,
+              shippingAddress: {
+                select: {
+                  recipientName: true,
+                  recipientPhone: true,
+                  postalCode: true,
+                  address: true,
+                  addressDetail: true,
+                },
+              },
+              shop: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          publishedProduct: {
+            include: {
+              product: {
+                include: {
+                  variants: {
+                    select: {
+                      id: true,
+                      optionSummary: true,
+                      wholesalePrice: true,
+                    },
+                  },
+                },
+              },
+              channel: {
+                select: {
+                  id: true,
+                  name: true,
+                  kind: true,
+                },
+              },
+            },
+          },
+          variant: {
+            select: {
+              wholesalePrice: true,
+              optionSummary: true,
+            },
+          },
+        },
+        orderBy: {
+          guestOrder: {
+            orderedAt: 'desc',
+          },
+        },
       }),
       prisma.orderItem.count({ where: whereCondition }),
+      prisma.guestOrderItem.count({ where: guestWhereCondition }),
     ])
 
-    // 전체 합계 계산 (페이지네이션 무관) - variants도 포함해서 조회
-    const allItems = await prisma.orderItem.findMany({
+    // 3. 통합 및 페이지네이션
+    const allItems = [
+      ...items.map(item => ({
+        ...item,
+        order: item.order,
+        isGuestOrder: false,
+      })),
+      ...guestItems.map(item => ({
+        ...item,
+        order: {
+          id: item.guestOrder.id,
+          orderNumber: item.guestOrder.orderNumber,
+          orderedAt: item.guestOrder.orderedAt,
+          shippingAddress: item.guestOrder.shippingAddress,
+          shop: item.guestOrder.shop,
+        },
+        isGuestOrder: true,
+      })),
+    ]
+
+    // 시간순 정렬
+    allItems.sort((a, b) =>
+      new Date(b.order.orderedAt).getTime() - new Date(a.order.orderedAt).getTime()
+    )
+
+    const total = totalMember + totalGuest
+    const paginatedItems = allItems.slice((page - 1) * limit, page * limit)
+
+    // 4. 전체 합계 계산 (페이지네이션 무관)
+    const allItemsForSum = await prisma.orderItem.findMany({
       where: whereCondition,
+      include: {
+        publishedProduct: {
+          include: {
+            product: {
+              include: {
+                variants: {
+                  select: {
+                    optionSummary: true,
+                    wholesalePrice: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        variant: {
+          select: {
+            wholesalePrice: true,
+          },
+        },
+      },
+    })
+
+    const allGuestItemsForSum = await prisma.guestOrderItem.findMany({
+      where: guestWhereCondition,
       include: {
         publishedProduct: {
           include: {
@@ -157,7 +291,7 @@ export async function GET(
 
     let totalQuantity = 0
     let totalAmount = 0
-    for (const item of allItems) {
+    for (const item of allItemsForSum) {
       let wholesalePrice = item.variant?.wholesalePrice || 0
 
       // variantId가 null인 경우 Product의 variants에서 찾기
@@ -179,8 +313,29 @@ export async function GET(
       totalAmount += Number(wholesalePrice) * item.quantity
     }
 
-    // 응답 데이터 포맷
-    const formattedItems = items.map(item => {
+    for (const item of allGuestItemsForSum) {
+      let wholesalePrice = item.variant?.wholesalePrice || 0
+
+      if (!item.variant && item.publishedProduct?.product?.variants?.length) {
+        if (item.optionSummary) {
+          const matchedVariant = item.publishedProduct.product.variants.find(
+            v => v.optionSummary === item.optionSummary
+          )
+          if (matchedVariant) {
+            wholesalePrice = matchedVariant.wholesalePrice || 0
+          }
+        }
+        if (Number(wholesalePrice) === 0) {
+          wholesalePrice = item.publishedProduct.product.variants[0].wholesalePrice || 0
+        }
+      }
+
+      totalQuantity += item.quantity
+      totalAmount += Number(wholesalePrice) * item.quantity
+    }
+
+    // 5. 응답 데이터 포맷
+    const formattedItems = paginatedItems.map(item => {
       let wholesalePrice = item.variant?.wholesalePrice || 0
 
       // variantId가 null인 경우 Product의 variants에서 찾기
