@@ -43,7 +43,13 @@ export async function POST(request: NextRequest) {
 
     const aiConfig = await settingsService.saveAiSettings(currentUser.userId, provider, settings)
 
-    return NextResponse.json({ success: true, data: aiConfig })
+    // BigInt를 String으로 변환하여 JSON 직렬화 가능하게 만듦
+    const serializedConfig = {
+      ...aiConfig,
+      totalTokensUsed: aiConfig.totalTokensUsed?.toString() || '0',
+    }
+
+    return NextResponse.json({ success: true, data: serializedConfig })
   } catch (error: any) {
     console.error('AI 설정 저장 실패:', error)
     console.error('Error code:', error.code)
