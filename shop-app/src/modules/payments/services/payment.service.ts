@@ -394,7 +394,19 @@ export class PaymentService {
 
     // 금액 계산
     const subtotal = orderItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
-    const shippingFee = subtotal >= 30000 ? 0 : 3000
+
+    // Shop의 배송비 설정 조회
+    let shippingFee = 0
+    if (prepareData.shopId) {
+      const shop = await prisma.shop.findUnique({
+        where: { id: prepareData.shopId },
+        select: { freeShippingAmount: true, defaultShippingFee: true },
+      })
+      if (shop?.freeShippingAmount != null && shop?.defaultShippingFee != null) {
+        shippingFee = subtotal >= shop.freeShippingAmount ? 0 : shop.defaultShippingFee
+      }
+    }
+
     const discountAmount = 0
     const totalAmount = subtotal + shippingFee - discountAmount
 

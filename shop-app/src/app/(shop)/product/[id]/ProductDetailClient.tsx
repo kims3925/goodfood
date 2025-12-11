@@ -698,11 +698,13 @@ export default function ProductDetailClient() {
                 <div>
                   <h3 className="font-medium mb-2">배송 안내</h3>
                   <ul className="space-y-1 text-gray-600">
-                    {product.shippingInfo?.defaultShippingFee != null && (
-                      <li>• 배송비: {formatPrice(product.shippingInfo.defaultShippingFee)}원{product.shippingInfo?.freeShippingAmount != null && ` (${formatPrice(product.shippingInfo.freeShippingAmount)}원 이상 무료)`}</li>
+                    {product.shippingInfo?.defaultShippingFee > 0 && (
+                      <li>• 배송비: {formatPrice(product.shippingInfo.defaultShippingFee)}원
+                        {product.shippingInfo?.freeShippingAmount > 0 &&
+                          ` (${formatPrice(product.shippingInfo.freeShippingAmount)}원 이상 무료배송)`}
+                      </li>
                     )}
                     <li>• 배송기간: 결제 후 2-3일 이내</li>
-                    <li>• 택배사: CJ대한통운</li>
                   </ul>
                 </div>
 

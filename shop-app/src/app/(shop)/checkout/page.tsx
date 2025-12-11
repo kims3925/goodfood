@@ -165,6 +165,8 @@ function CheckoutContent() {
   }, [])
 
   useEffect(() => {
+    // 세션 로딩 중에는 대기
+    if (status === 'loading') return
     loadCheckoutData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromCart, publishedProductId, session, status])
@@ -192,7 +194,7 @@ function CheckoutContent() {
         const addressData = await addressResponse.json()
         const couponData = await couponResponse.json()
 
-        // 회원 프로필 정보로 주문자 정보 자동 세팅
+        // 회원 프로필 정보로 주문자 및 수령인 정보 자동 세팅
         const userName = profileData.success && profileData.user ? profileData.user.name || '' : ''
         const userPhone = profileData.success && profileData.user ? profileData.user.phone || '' : ''
         const userEmail = profileData.success && profileData.user ? profileData.user.email || '' : ''
@@ -204,14 +206,14 @@ function CheckoutContent() {
           const defaultAddress = addressData.addresses.find((addr: Address) => addr.isDefault)
           if (defaultAddress) {
             setSelectedAddressId(defaultAddress.id)
-            // 배송지 정보 자동 입력 (프로필 + 배송지)
+            // 배송지 주소 정보만 사용, 수령인은 항상 회원 정보 사용
             setFormData(prev => ({
               ...prev,
               customerName: userName,
               customerPhone: userPhone,
               customerEmail: userEmail,
-              recipientName: defaultAddress.recipientName,
-              recipientPhone: defaultAddress.recipientPhone,
+              recipientName: userName,
+              recipientPhone: userPhone,
               shippingAddress: {
                 address: defaultAddress.address,
                 detailAddress: defaultAddress.addressDetail || '',
@@ -219,7 +221,7 @@ function CheckoutContent() {
               }
             }))
           } else {
-            // 기본 배송지가 없으면 주문자 정보로 수령인 정보도 설정 (sameAsCustomer=true)
+            // 기본 배송지가 없으면 회원 정보로 설정
             setFormData(prev => ({
               ...prev,
               customerName: userName,
@@ -269,15 +271,14 @@ function CheckoutContent() {
 
   // 비회원도 토스결제 가능하도록 기본값 유지 (TOSS)
 
-  // 배송지 선택 시 formData 업데이트
+  // 배송지 선택 시 formData 업데이트 (주소만, 수령인은 회원 정보 유지)
   const handleAddressSelect = (addressId: number) => {
     setSelectedAddressId(addressId)
     const selected = addresses.find(addr => addr.id === addressId)
     if (selected) {
       setFormData(prev => ({
         ...prev,
-        recipientName: selected.recipientName,
-        recipientPhone: selected.recipientPhone,
+        // 수령인 정보는 회원 정보 유지
         shippingAddress: {
           address: selected.address,
           detailAddress: selected.addressDetail || '',
@@ -464,12 +465,31 @@ function CheckoutContent() {
       newErrors.shippingAddress = '배송지 주소를 입력해주세요.'
     }
 
-    const recipientName = formData.sameAsCustomer ? formData.customerName : formData.recipientName
-    const recipientPhone = formData.sameAsCustomer ? formData.customerPhone : formData.recipientPhone
+    // 수령인 정보 결정
+    // 회원: 항상 회원 정보 사용 (formData에 자동 세팅됨)
+    // 비회원: 직접 입력한 정보 사용
+    let recipientName: string
+    let recipientPhone: string
 
-    if (!recipientName || !recipientPhone) {
-      if (!newErrors.shippingAddress) {
-        newErrors.shippingAddress = '수령인 정보를 입력해주세요.'
+    if (!isGuest && session?.user) {
+      // 회원인 경우 formData에서 가져옴 (loadCheckoutData에서 회원 정보로 자동 세팅됨)
+      recipientName = formData.customerName
+      recipientPhone = formData.customerPhone
+
+      // 회원도 수령인 정보 검증 (프로필에 정보가 없을 수 있음)
+      if (!recipientName || !recipientPhone) {
+        newErrors.shippingAddress = '회원 정보에 이름 또는 전화번호가 없습니다. 마이페이지에서 정보를 업데이트해주세요.'
+      }
+    } else {
+      // 비회원인 경우 입력된 수령인 정보 사용
+      recipientName = formData.recipientName
+      recipientPhone = formData.recipientPhone
+
+      // 비회원 수령인 정보 필수 검증
+      if (!recipientName || !recipientPhone) {
+        if (!newErrors.shippingAddress) {
+          newErrors.shippingAddress = '수령인 정보를 입력해주세요.'
+        }
       }
     }
 
@@ -893,6 +913,22 @@ function CheckoutContent() {
                     </div>
                   )}
 
+                  {/* 회원: 수령인 정보 표시 (회원 정보 자동 적용) */}
+                  {session && (
+                    <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <User className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-700">수령인 정보</span>
+                      </div>
+                      <div className="text-sm text-gray-900">
+                        <span className="font-medium">{formData.customerName}</span>
+                        <span className="mx-2 text-gray-300">|</span>
+                        <span>{formData.customerPhone}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">* 회원 정보가 수령인으로 자동 적용됩니다</p>
+                    </div>
+                  )}
+
                   {/* 회원: 배송지 선택 */}
                   {session && addresses.length > 0 && (
                     <div className="space-y-3 mb-4">
@@ -920,8 +956,6 @@ function CheckoutContent() {
                                   </span>
                                 )}
                               </div>
-                              <p className="font-medium text-gray-900 text-sm">{address.recipientName}</p>
-                              <p className="text-sm text-gray-600">{address.recipientPhone}</p>
                               <p className="text-sm text-gray-600">
                                 ({address.postalCode}) {address.address}
                               </p>

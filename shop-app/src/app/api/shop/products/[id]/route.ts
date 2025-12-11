@@ -99,6 +99,7 @@ export async function GET(
     // 채널 정보 가져오기 (published_product -> channel)
     const publishedProduct = product.publishedProducts[0]
     const channel = publishedProduct?.channel
+    const shop = publishedProduct?.shop
     const channelName = channel?.name || null
     const publishChannelId = channel?.id || null
     const publishedProductId = publishedProduct?.id || null
@@ -106,7 +107,7 @@ export async function GET(
     // 판매자 정보 가져오기 (collectedProduct -> post -> channel)
     const sellerName = product.collectedProduct?.post?.channel?.name || null
 
-    // 배송 정보 파싱
+    // 배송 정보 파싱 (상품별 배송 정보)
     let parsedShippingInfo: any = {}
     if (product.shippingInfo) {
       try {
@@ -116,6 +117,10 @@ export async function GET(
         parsedShippingInfo = { info: product.shippingInfo }
       }
     }
+
+    // Shop 배송 설정 (쇼핑몰 전역 설정)
+    const shopShippingFee = shop?.defaultShippingFee ?? null
+    const shopFreeShippingAmount = shop?.freeShippingAmount ?? null
 
     const formattedProduct = {
       id: product.id.toString(),
@@ -135,8 +140,9 @@ export async function GET(
       sellerName,
       shippingFee: product.shippingFee,
       shippingInfo: {
-        defaultShippingFee: product.shippingFee,
-        freeShippingAmount: parsedShippingInfo.freeShippingAmount,
+        // Shop 설정 우선, 없으면 상품별 설정 사용
+        defaultShippingFee: shopShippingFee ?? product.shippingFee ?? 0,
+        freeShippingAmount: shopFreeShippingAmount ?? parsedShippingInfo.freeShippingAmount ?? 0,
         ...parsedShippingInfo,
       },
       // variants 정보 (가격은 variant에서 가져옴)
