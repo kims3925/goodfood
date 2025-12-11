@@ -51,7 +51,36 @@ export class BandPostAutomation {
   private async navigateToBand(page: Page, bandKey: string, bandName: string): Promise<void> {
     console.log(`[BandPostAutomation] Navigating to band: bandName="${bandName}" (bandKey=${bandKey})`)
 
-    // Band 홈으로 이동해서 채널명으로 밴드 찾기
+    // 방법 1: bandKey로 직접 URL 이동 시도 (가장 빠름)
+    if (bandKey && bandKey.startsWith('AAC')) {
+      console.log(`[BandPostAutomation] Trying direct URL navigation with bandKey...`)
+      const directUrl = `https://band.us/band/${bandKey}`
+      await page.goto(directUrl, {
+        waitUntil: 'networkidle',
+        timeout: POST_TIMEOUT_MS,
+      })
+
+      // 로그인 리다이렉트 체크
+      const currentUrl = page.url()
+      if (currentUrl.includes('signin') || currentUrl.includes('login')) {
+        throw new BandPlaywrightError(
+          '로그인이 필요합니다. 세션이 만료되었을 수 있습니다.',
+          BandPlaywrightErrorCode.SESSION_EXPIRED
+        )
+      }
+
+      // 밴드 페이지로 이동했는지 확인
+      if (currentUrl.includes('/band/') && !currentUrl.includes('/home')) {
+        console.log(`[BandPostAutomation] Successfully navigated to band via direct URL: ${currentUrl}`)
+        await page.waitForTimeout(2000)
+        await this.saveDebugScreenshot(page, 'band-direct-nav')
+        return
+      }
+
+      console.log(`[BandPostAutomation] Direct URL navigation failed, falling back to search...`)
+    }
+
+    // 방법 2: Band 홈에서 채널명으로 밴드 찾기 (폴백)
     console.log(`[BandPostAutomation] Searching band by name in Band home...`)
     await page.goto('https://band.us/home', {
       waitUntil: 'networkidle',
