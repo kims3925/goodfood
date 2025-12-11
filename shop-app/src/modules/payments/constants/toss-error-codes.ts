@@ -64,6 +64,10 @@ export const TOSS_ERROR_CODES = {
   // 재시도 관련 (커스텀)
   EXCEED_MAX_PAYMENT_RETRY: 'EXCEED_MAX_PAYMENT_RETRY',
   RETRY_TOO_SOON: 'RETRY_TOO_SOON',
+
+  // 내부 시스템 에러
+  FAILED_PAYMENT_INTERNAL_SYSTEM_PROCESSING: 'FAILED_PAYMENT_INTERNAL_SYSTEM_PROCESSING',
+  INTERNAL_SYSTEM_ERROR: 'INTERNAL_SYSTEM_ERROR',
 } as const
 
 export type TossErrorCode = keyof typeof TOSS_ERROR_CODES
@@ -103,6 +107,8 @@ export const TOSS_ERROR_MESSAGES: Record<string, string> = {
   [TOSS_ERROR_CODES.UNKNOWN_ERROR]: '알 수 없는 오류가 발생했습니다.',
   [TOSS_ERROR_CODES.EXCEED_MAX_PAYMENT_RETRY]: '최대 재시도 횟수를 초과했습니다.',
   [TOSS_ERROR_CODES.RETRY_TOO_SOON]: '너무 빠르게 재시도하고 있습니다.',
+  [TOSS_ERROR_CODES.FAILED_PAYMENT_INTERNAL_SYSTEM_PROCESSING]: '결제 처리 중 내부 시스템 오류가 발생했습니다.',
+  [TOSS_ERROR_CODES.INTERNAL_SYSTEM_ERROR]: '내부 시스템 오류가 발생했습니다.',
 }
 
 // 해결 방법 메시지 매핑
@@ -140,6 +146,8 @@ export const TOSS_ERROR_SOLUTIONS: Record<string, string> = {
   [TOSS_ERROR_CODES.UNKNOWN_ERROR]: '잠시 후 다시 시도하거나 고객센터에 문의해 주세요.',
   [TOSS_ERROR_CODES.EXCEED_MAX_PAYMENT_RETRY]: '장바구니에서 새로운 주문을 생성해 주세요.',
   [TOSS_ERROR_CODES.RETRY_TOO_SOON]: '30초 후 다시 시도해 주세요.',
+  [TOSS_ERROR_CODES.FAILED_PAYMENT_INTERNAL_SYSTEM_PROCESSING]: '잠시 후 다시 시도하거나 고객센터에 문의해 주세요.',
+  [TOSS_ERROR_CODES.INTERNAL_SYSTEM_ERROR]: '잠시 후 다시 시도하거나 고객센터에 문의해 주세요.',
 }
 
 // 재시도 가능한 에러 코드

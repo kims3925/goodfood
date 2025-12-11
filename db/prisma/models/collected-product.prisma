@@ -5,9 +5,9 @@ model CollectedProduct {
   name        String?       @db.VarChar(500)
   description String?       @db.Text
   currency    String        @default("KRW") @db.VarChar(10)
-  rawMetadata Json?         @map("raw_metadata")
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
+  rawMetadata String?       @map("raw_metadata") @db.LongText
   post        CollectedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   products    Product[]

@@ -7,7 +7,7 @@
  */
 
 import prisma from '@bandauto/db'
-import { getBatchContext } from '../context'
+import { getBatchContext, checkCancellation } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { downloadAndSaveProductImages } from '@/modules/utils/imageUtils'
 import {
@@ -100,6 +100,23 @@ export async function runProductCreatePipeline(
 
   // 각 수집상품 처리
   for (const collectedProduct of collectedProducts) {
+    // 취소 체크: 각 상품 생성 전에 확인
+    if (await checkCancellation()) {
+      console.log(`[ProductCreate] Cancelled by user`)
+      return {
+        success: false,
+        totalItems: collectedProducts.length,
+        successCount: createdProducts.filter((p) => p.status === 'success').length,
+        failedCount: createdProducts.filter((p) => p.status === 'failed').length,
+        details: {
+          createdProducts,
+          totalCreated,
+          cancelled: true,
+        },
+        errors: [...errors, { itemId: 0, message: '사용자에 의해 취소됨', timestamp: new Date() }],
+      }
+    }
+
     // 파이프라인 타임아웃 체크
     if (Date.now() - pipelineStartTime > PIPELINE_TIMEOUT_MS) {
       console.log(`[ProductCreate] Pipeline timeout reached, stopping...`)

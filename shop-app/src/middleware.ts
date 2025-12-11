@@ -164,11 +164,17 @@ async function fetchShopBySubdomain(
     const baseHost = host.includes('lvh.me') ? 'lvh.me:3000' : host.replace(/^[^.]+\./, '')
     const baseUrl = `${protocol}://${baseHost}`
 
-    const internalKey = process.env.INTERNAL_API_KEY || 'dev-internal-key'
+    // 프로덕션 환경에서는 INTERNAL_API_KEY 필수
+    const internalKey = process.env.INTERNAL_API_KEY
+    if (!internalKey && process.env.NODE_ENV === 'production') {
+      console.error('INTERNAL_API_KEY is required in production')
+      return null
+    }
+    const apiKey = internalKey || 'dev-internal-key'
 
     const res = await fetch(`${baseUrl}/api/internal/shop/${subdomain}`, {
       headers: {
-        'x-internal-key': internalKey,
+        'x-internal-key': apiKey,
       },
       cache: 'no-store',
     })

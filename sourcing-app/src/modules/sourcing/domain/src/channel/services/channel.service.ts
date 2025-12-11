@@ -157,8 +157,8 @@ export class ChannelService {
     }
 
     // shop-app 채널 캐시 무효화 (RETAIL 채널만, subdomain이 있는 경우)
-    if (existing.kind === ChannelKind.RETAIL && existing.subdomain) {
-      await this.invalidateEcommerceChannelCache(existing.subdomain)
+    if (existing.kind === ChannelKind.RETAIL && existing.shop?.subdomain) {
+      await this.invalidateEcommerceChannelCache(existing.shop.subdomain)
     }
 
     return channelRepository.delete(id)

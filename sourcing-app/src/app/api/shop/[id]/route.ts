@@ -68,7 +68,7 @@ export async function GET(
     const shop = await prisma.shop.findFirst({
       where: {
         id,
-        userId: currentUser.id,
+        userId: currentUser.userId,
       },
       include: {
         theme: true,
@@ -129,7 +129,7 @@ export async function PUT(
     const existingShop = await prisma.shop.findFirst({
       where: {
         id,
-        userId: currentUser.id,
+        userId: currentUser.userId,
       },
       include: {
         theme: true,
@@ -307,7 +307,7 @@ export async function DELETE(
     const shop = await prisma.shop.findFirst({
       where: {
         id,
-        userId: currentUser.id,
+        userId: currentUser.userId,
       },
       include: {
         theme: true,

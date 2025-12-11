@@ -375,34 +375,6 @@ export default function ProductDetailClient() {
               <p className="text-sm text-gray-500 leading-relaxed">{product.description}</p>
             </div>
 
-            {/* Shipping & Seller Info */}
-            <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">
-                    택배배송 {product.shippingInfo?.defaultShippingFee != null && `· ${formatPrice(product.shippingInfo.defaultShippingFee)}원`}
-                  </p>
-                  {product.shippingInfo?.freeShippingAmount != null && (
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {formatPrice(product.shippingInfo.freeShippingAmount)}원 이상 무료배송
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-gray-700">{product.sellerName || product.bandName || '판매자'}</p>
-              </div>
-            </div>
 
             {/* Option & Quantity Selection */}
             <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">

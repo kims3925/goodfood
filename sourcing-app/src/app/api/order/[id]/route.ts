@@ -157,6 +157,12 @@ export async function PATCH(
 
         // 결제 완료 상태인 경우 토스페이먼츠 결제 취소
         if (existingOrder.status === 'PAID' && existingOrder.payment?.paymentKey) {
+          if (!TOSS_SECRET_KEY) {
+            return NextResponse.json(
+              { success: false, error: 'TOSS_PAYMENTS_SECRET_KEY 환경변수가 설정되지 않아 결제 취소가 불가능합니다.' },
+              { status: 500 }
+            )
+          }
           try {
             const authHeader = Buffer.from(`${TOSS_SECRET_KEY}:`).toString('base64')
             const cancelReason = body.cancelReason || '관리자에 의한 주문 취소'

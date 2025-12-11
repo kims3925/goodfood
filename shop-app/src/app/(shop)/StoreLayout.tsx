@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { Search, ShoppingCart, User, MapPin, ChevronDown, Phone, HelpCircle, MessageSquare, LogOut } from 'lucide-react'
 import { CartNotificationProvider, useCartNotification } from '@/contexts/CartNotificationContext'
@@ -100,7 +101,7 @@ function StoreLayoutContent({
                           <button
                             onClick={() => {
                               setIsUserMenuOpen(false)
-                              // 현재 도메인 유지하며 로그아웃
+                              // 현재 서브도메인 유지하며 메인페이지로 리다이렉트
                               signOut({ callbackUrl: `${window.location.origin}/main` })
                             }}
                             className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700 w-full"
@@ -190,10 +191,13 @@ function StoreLayoutContent({
             {/* Logo - 로고 이미지 + Shop 이름 */}
             <Link href="/main" className="kurly-logo flex items-center gap-2">
               {logoUrl && (
-                <img
+                <Image
                   src={logoUrl}
                   alt={`${shopName} 로고`}
+                  width={120}
+                  height={48}
                   className="h-8 md:h-10 lg:h-12 w-auto object-contain"
+                  unoptimized
                 />
               )}
               <span className="text-xl md:text-2xl lg:text-3xl font-black text-abc-coral">
@@ -293,7 +297,7 @@ function StoreLayoutContent({
                         className="flex items-center gap-2 hover:opacity-70"
                       >
                         {s.logoUrl ? (
-                          <img src={s.logoUrl} alt={s.name} className="h-4 w-auto" />
+                          <Image src={s.logoUrl} alt={s.name} width={60} height={16} className="h-4 w-auto" unoptimized />
                         ) : null}
                         <span>{s.name}</span>
                       </a>

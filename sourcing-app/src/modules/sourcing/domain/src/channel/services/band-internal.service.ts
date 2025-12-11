@@ -6,6 +6,8 @@
  */
 
 const BAND_API_KR_URL = 'https://api-kr.band.us'
+// TODO: 실제 Band 이미지 업로드 URL 파악 필요 (현재 미사용 - Playwright로 대체)
+const BAND_UPLOAD_URL = 'https://api-kr.band.us/photo/upload'
 
 interface BandInternalApiResponse<T = any> {
   result_code: number
@@ -86,7 +88,9 @@ export class BandInternalClient {
    */
   async uploadImage(imageBuffer: Buffer, filename: string): Promise<UploadedImage> {
     const formData = new FormData()
-    const blob = new Blob([imageBuffer], { type: this.getMimeType(filename) })
+    // Uint8Array로 변환하여 타입 문제 해결
+    const uint8Array = new Uint8Array(imageBuffer)
+    const blob = new Blob([uint8Array], { type: this.getMimeType(filename) })
     formData.append('file', blob, filename)
 
     const response = await fetch(BAND_UPLOAD_URL, {

@@ -1,6 +1,9 @@
 import prisma from '@bandauto/db'
 import type { OrderListParams, OrderCreateInput } from '../types/order.types'
 
+// OrderTest 모델 타입 (Prisma에 정의되지 않은 경우를 위한 타입 단언)
+const orderTestModel = (prisma as any).orderTest
+
 export class OrderRepository {
   async findMany(params: OrderListParams) {
     const { userId, search = '', page = 1, limit = 20 } = params
@@ -14,9 +17,9 @@ export class OrderRepository {
       ]
     }
 
-    const total = await prisma.orderTest.count({ where })
+    const total = await orderTestModel.count({ where })
 
-    const orders = await (prisma.orderTest as any).findMany({
+    const orders = await orderTestModel.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
@@ -44,7 +47,7 @@ export class OrderRepository {
   }
 
   async create(data: OrderCreateInput) {
-    return (prisma.orderTest as any).create({
+    return orderTestModel.create({
       data: {
         userId: data.userId,
         productId: data.productId,

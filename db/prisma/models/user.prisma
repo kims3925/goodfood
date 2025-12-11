@@ -1,6 +1,5 @@
 model User {
   id                 Int                 @id @default(autoincrement())
-  shopId             Int?                @map("shop_id")
   email              String              @unique @db.VarChar(255)
   password           String?             @db.VarChar(255)
   name               String?             @db.VarChar(100)
@@ -13,13 +12,12 @@ model User {
   privacyAgreedAt    DateTime?           @map("privacy_agreed_at") @db.Timestamp(0)
   signupCompletedAt  DateTime?           @map("signup_completed_at") @db.Timestamp(0)
   tosAgreedAt        DateTime?           @map("tos_agreed_at") @db.Timestamp(0)
-  registeredShop     Shop?               @relation("ShopCustomers", fields: [shopId], references: [id])
+  shopId             Int?                @map("shop_id")
   aiApiConfigs       AiApiConfig[]
   aiPromptConfigs    AiPromptConfig[]
   automationConfig   AutomationConfig?
   carts              Cart[]
   channels           Channel[]
-  shops              Shop[]
   collectedPosts     CollectedPost[]
   collectedProducts  CollectedProduct[]
   inquiries          Inquiry[]
@@ -30,13 +28,15 @@ model User {
   publishedProducts  PublishedProduct[]
   returnRequests     ReturnRequest[]
   reviews            Review[]
+  settlements        Settlement[]
+  shops              Shop[]
   sourcingApiConfigs SourcingApiConfig[]
+  registeredShop     Shop?               @relation("ShopCustomers", fields: [shopId], references: [id])
   addresses          UserAddress[]
   userCoupons        UserCoupon[]
   loginLogs          UserLoginLog[]
   wishlists          Wishlist[]
   workflowLogs       WorkflowLog[]
-  settlements        Settlement[]
 
   @@index([shopId])
   @@index([email])
@@ -63,22 +63,21 @@ model UserLoginLog {
 }
 
 model SourcingApiConfig {
-  id                 Int              @id @default(autoincrement())
-  userId             Int              @map("user_id")
-  platform           SourcingPlatform
-  apiKey             String?          @map("api_key") @db.VarChar(500)
-  accessToken        String?          @map("access_token") @db.Text
-  refreshToken       String?          @map("refresh_token") @db.Text
-  tokenExpiry        DateTime?        @map("token_expiry") @db.Timestamp(0)
-  metadata           String?          @db.LongText
-  isActive           Boolean          @default(true) @map("is_active")
-  lastSyncedAt       DateTime?        @map("last_synced_at") @db.Timestamp(0)
-  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt          DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  // 밴드 내부 API용 (수동 쿠키 입력)
-  bandSessionCookie  String?          @map("band_session_cookie") @db.Text
-  bandCookieExpiry   DateTime?        @map("band_cookie_expiry") @db.Timestamp(0)
-  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                Int              @id @default(autoincrement())
+  userId            Int              @map("user_id")
+  platform          SourcingPlatform
+  apiKey            String?          @map("api_key") @db.VarChar(500)
+  accessToken       String?          @map("access_token") @db.Text
+  refreshToken      String?          @map("refresh_token") @db.Text
+  tokenExpiry       DateTime?        @map("token_expiry") @db.Timestamp(0)
+  metadata          String?          @db.LongText
+  isActive          Boolean          @default(true) @map("is_active")
+  lastSyncedAt      DateTime?        @map("last_synced_at") @db.Timestamp(0)
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  bandCookieExpiry  DateTime?        @map("band_cookie_expiry") @db.Timestamp(0)
+  bandSessionCookie String?          @map("band_session_cookie") @db.Text
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, platform])
   @@index([userId])
@@ -96,10 +95,10 @@ model AiApiConfig {
   config          String?    @db.LongText
   isActive        Boolean    @default(true) @map("is_active")
   usageCount      Int        @default(0) @map("usage_count")
-  totalTokensUsed BigInt     @default(0) @map("total_tokens_used")
   lastUsedAt      DateTime?  @map("last_used_at") @db.Timestamp(0)
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  totalTokensUsed BigInt     @default(0) @map("total_tokens_used")
   user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, provider])
@@ -112,7 +111,7 @@ model AiApiConfig {
 model AiPromptConfig {
   id          Int      @id @default(autoincrement())
   userId      Int      @map("user_id")
-  promptType  String   @map("prompt_type") @db.VarChar(50) // e.g., "product_extraction"
+  promptType  String   @map("prompt_type") @db.VarChar(50)
   name        String   @db.VarChar(100)
   prompt      String   @db.LongText
   description String?  @db.VarChar(500)

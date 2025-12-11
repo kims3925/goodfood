@@ -12,7 +12,7 @@
  */
 
 import prisma, { AiProvider } from '@bandauto/db'
-import { getBatchContext } from '../context'
+import { getBatchContext, checkCancellation } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { transformPostsToProductsBatch, BatchTransformResult } from '@/modules/transformation/product.transformer'
 import { settingsService } from '@/modules/config/domain/src/settings'
@@ -151,6 +151,25 @@ export async function runTransformPipeline(
 
   // 각 배치 처리
   for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    // 취소 체크: 각 배치 처리 전에 확인
+    if (await checkCancellation()) {
+      console.log(`[Transform] Cancelled by user before batch ${batchIndex + 1}`)
+      return {
+        success: false,
+        totalItems: posts.length,
+        successCount: transformedPosts.filter((p) => p.status === 'success').length,
+        failedCount: transformedPosts.filter((p) => p.status === 'failed').length,
+        details: {
+          transformedPosts,
+          createdProducts,
+          skippedCount: 0,
+          retryablePostIds: [],
+          cancelled: true,
+        },
+        errors: [...errors, { itemId: 0, message: '사용자에 의해 취소됨', timestamp: new Date() }],
+      }
+    }
+
     const batch = batches[batchIndex]
 
     // 첫 번째 요청이 아니면 대기 (TPM 제한 대응)
@@ -322,7 +341,9 @@ export async function runTransformPipeline(
       await updateWorkflowProgress(workflowLogId, posts.length, currentSuccess, currentFailed, {
         transform: {
           transformedPosts: transformedPosts.slice(-10), // 최근 10개만
-          batchProgress: `${batchIndex + 1}/${batches.length}`,
+          batchProgress: { current: batchIndex + 1, total: batches.length },
+          totalSuccess: currentSuccess,  // 실시간 총 성공 건수
+          totalFailed: currentFailed,    // 실시간 총 실패 건수
           errors: errors.slice(-5),
         },
       })

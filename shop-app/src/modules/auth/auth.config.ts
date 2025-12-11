@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from '@/modules/common/utils/src/database/client'
 import bcrypt from 'bcryptjs'
 import { headers } from 'next/headers'
+import { checkRateLimit, getClientIp, RATE_LIMIT_PRESETS } from '@/lib/rate-limit'
 
 function getRequestMeta() {
   try {
@@ -106,6 +107,29 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
+        // Rate Limiting 체크
+        try {
+          const h = headers()
+          const ip = getClientIp(h)
+          const rateLimitResult = checkRateLimit(`login:${ip}`, RATE_LIMIT_PRESETS.login)
+
+          if (!rateLimitResult.success) {
+            console.log('[Auth] Rate limit 초과:', ip)
+            // 로그인 실패 로그 기록
+            await logSignIn({
+              provider: 'credentials',
+              email: credentials.email,
+              success: false,
+            })
+            throw new Error('너무 많은 로그인 시도입니다. 잠시 후 다시 시도해주세요.')
+          }
+        } catch (error: any) {
+          if (error.message?.includes('로그인 시도')) {
+            throw error
+          }
+          // headers() 호출 실패 시 무시 (개발 환경에서 발생 가능)
+        }
+
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         })
@@ -162,9 +186,10 @@ export const authOptions: NextAuthOptions = {
         }
 
         // 서브도메인 허용 (.lvh.me, 프로덕션 도메인)
+        // hostname 사용 (포트 제외) - host는 포트 포함이라 비교 실패할 수 있음
         const allowedDomains = ['.lvh.me', process.env.COOKIE_DOMAIN].filter(Boolean)
         const isAllowedSubdomain = allowedDomains.some(
-          (domain) => domain && urlObj.host.endsWith(domain.replace(/^\./, ''))
+          (domain) => domain && urlObj.hostname.endsWith(domain.replace(/^\./, ''))
         )
 
         if (isAllowedSubdomain) {

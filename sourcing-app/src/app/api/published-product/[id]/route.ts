@@ -2,26 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
-type RouteContext = { params: { id: string } }
+type RouteContext = { params: Promise<{ id: string }> }
 
-const unauthorizedResponse = NextResponse.json(
+const unauthorizedResponse = () => NextResponse.json(
   { success: false, error: '로그인이 필요합니다.' },
   { status: 401 }
 )
 
-const invalidIdResponse = NextResponse.json(
+const invalidIdResponse = () => NextResponse.json(
   { success: false, error: '유효하지 않은 id입니다.' },
   { status: 400 }
 )
 
-const notFoundResponse = NextResponse.json(
+const notFoundResponse = () => NextResponse.json(
   { success: false, error: '발행상품을 찾을 수 없습니다.' },
   { status: 404 }
 )
 
-const parsePublishedProductId = (params?: RouteContext['params']) => {
-  const publishedProductId = parseInt(params?.id || '', 10)
-  if (!params?.id || Number.isNaN(publishedProductId)) {
+const parsePublishedProductId = (id?: string) => {
+  const publishedProductId = parseInt(id || '', 10)
+  if (!id || Number.isNaN(publishedProductId)) {
     return null
   }
   return publishedProductId
@@ -32,12 +32,13 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return unauthorizedResponse
+      return unauthorizedResponse()
     }
 
-    const publishedProductId = parsePublishedProductId(params)
+    const { id } = await params
+    const publishedProductId = parsePublishedProductId(id)
     if (publishedProductId === null) {
-      return invalidIdResponse
+      return invalidIdResponse()
     }
 
     const publishedProduct = await prisma.publishedProduct.findFirst({
@@ -112,7 +113,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     })
 
     if (!publishedProduct) {
-      return notFoundResponse
+      return notFoundResponse()
     }
 
     return NextResponse.json({
@@ -121,8 +122,9 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     })
   } catch (error) {
     console.error('발행상품 상세 조회 실패:', error)
+    console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
     return NextResponse.json(
-      { success: false, error: '발행상품 상세 조회에 실패했습니다.' },
+      { success: false, error: '발행상품 상세 조회에 실패했습니다.', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }
@@ -133,12 +135,13 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return unauthorizedResponse
+      return unauthorizedResponse()
     }
 
-    const publishedProductId = parsePublishedProductId(params)
+    const { id } = await params
+    const publishedProductId = parsePublishedProductId(id)
     if (publishedProductId === null) {
-      return invalidIdResponse
+      return invalidIdResponse()
     }
 
     // 발행상품 확인
@@ -150,7 +153,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     })
 
     if (!existingProduct) {
-      return notFoundResponse
+      return notFoundResponse()
     }
 
     const body = await request.json()
@@ -186,12 +189,13 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return unauthorizedResponse
+      return unauthorizedResponse()
     }
 
-    const publishedProductId = parsePublishedProductId(params)
+    const { id } = await params
+    const publishedProductId = parsePublishedProductId(id)
     if (publishedProductId === null) {
-      return invalidIdResponse
+      return invalidIdResponse()
     }
 
     // 발행상품 확인
@@ -203,7 +207,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     })
 
     if (!existingProduct) {
-      return notFoundResponse
+      return notFoundResponse()
     }
 
     await prisma.publishedProduct.delete({

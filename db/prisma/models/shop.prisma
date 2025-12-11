@@ -1,29 +1,28 @@
 model Shop {
-  id                 Int       @id @default(autoincrement())
-  userId             Int       @map("user_id")
-  subdomain          String    @unique @db.VarChar(63)
-  name               String    @db.VarChar(255)
-  coverUrl           String?   @map("cover_url") @db.VarChar(500)
-  bankName           String?   @map("bank_name") @db.VarChar(50)
-  bankAccount        String?   @map("bank_account") @db.VarChar(50)
-  accountHolder      String?   @map("account_holder") @db.VarChar(100)
-  freeShippingAmount Int?      @map("free_shipping_amount")
-  defaultShippingFee Int?      @map("default_shipping_fee")
-  contactPhone       String?   @map("contact_phone") @db.VarChar(20)
-  contactEmail       String?   @map("contact_email") @db.VarChar(255)
-  isActive           Boolean   @default(true) @map("is_active")
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  customers          User[]             @relation("ShopCustomers")
-  theme              ShopTheme?
+  id                 Int                @id @default(autoincrement())
+  userId             Int                @map("user_id")
+  subdomain          String             @unique @db.VarChar(63)
+  name               String             @db.VarChar(255)
+  coverUrl           String?            @map("cover_url") @db.VarChar(500)
+  bankName           String?            @map("bank_name") @db.VarChar(50)
+  bankAccount        String?            @map("bank_account") @db.VarChar(50)
+  accountHolder      String?            @map("account_holder") @db.VarChar(100)
+  freeShippingAmount Int?               @map("free_shipping_amount")
+  defaultShippingFee Int?               @map("default_shipping_fee")
+  contactPhone       String?            @map("contact_phone") @db.VarChar(20)
+  contactEmail       String?            @map("contact_email") @db.VarChar(255)
+  isActive           Boolean            @default(true) @map("is_active")
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamp(0)
   carts              Cart[]
-  orders             Order[]
-  guestOrders        GuestOrder[]
-  publishedProducts  PublishedProduct[]
   channels           Channel[]
+  guestOrders        GuestOrder[]
+  orders             Order[]
+  publishedProducts  PublishedProduct[]
   settlements        Settlement[]
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme              ShopTheme?
+  customers          User[]             @relation("ShopCustomers")
 
   @@index([userId])
   @@index([subdomain])
@@ -41,7 +40,6 @@ model ShopTheme {
   bannerUrl      String?  @map("banner_url") @db.VarChar(500)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
-
   shop           Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
   @@map("shop_theme")

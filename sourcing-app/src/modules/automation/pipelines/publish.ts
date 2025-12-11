@@ -7,7 +7,7 @@
  */
 
 import prisma, { ChannelKind } from '@bandauto/db'
-import { getBatchContext } from '../context'
+import { getBatchContext, checkCancellation } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { publishService } from '@/modules/publish'
 import {
@@ -206,6 +206,22 @@ export async function runPublishPipeline(
   // PublishService를 사용하여 각 채널에 순차 발행 (실시간 진행 상황 추적)
   // 각 채널을 순차적으로 처리하면서 진행 상황을 업데이트
   for (const channel of retailChannels) {
+    // 취소 체크: 각 채널 발행 전에 확인
+    if (await checkCancellation()) {
+      console.log(`[Publish Pipeline] Cancelled by user before channel ${channel.id}`)
+      return {
+        success: false,
+        totalItems,
+        successCount: currentSuccess,
+        failedCount: currentFailed,
+        details: {
+          publishedProducts,
+          channelResults,
+          cancelled: true,
+        },
+        errors: [...errors, { itemId: 'cancelled', message: '사용자에 의해 취소됨', timestamp: new Date() }],
+      }
+    }
     // 해당 채널에 아직 발행되지 않은 상품만 필터링
     const unpublishedProductIds = productIds.filter(productId => {
       const publishedChannels = publishedChannelsMap.get(productId)
@@ -232,8 +248,12 @@ export async function runPublishPipeline(
       userId,
       productIds: unpublishedProductIds,
       channelId: channel.id,
-      // 각 상품 발행 후 실시간 진행 상황 업데이트
+      // 각 상품 발행 후 실시간 진행 상황 업데이트 및 취소 체크
       onProgress: workflowLogId ? async (current, total, productResult) => {
+        // 취소 체크
+        if (await checkCancellation()) {
+          throw new Error('CANCELLED')
+        }
         // 개별 상품 결과 추가
         publishedProducts.push({
           productId: productResult.productId,
@@ -323,6 +343,22 @@ export async function runPublishPipeline(
     console.log(`[Publish Pipeline] Also publishing to ${shopIds.length} shop(s): ${shopIds.join(', ')}`)
 
     for (const shopId of shopIds) {
+      // 취소 체크: 각 Shop 발행 전에 확인
+      if (await checkCancellation()) {
+        console.log(`[Publish Pipeline] Cancelled by user before shop ${shopId}`)
+        return {
+          success: false,
+          totalItems,
+          successCount: totalSuccess,
+          failedCount: totalFailed,
+          details: {
+            publishedProducts,
+            channelResults,
+            cancelled: true,
+          },
+          errors: [...errors, { itemId: 'cancelled', message: '사용자에 의해 취소됨', timestamp: new Date() }],
+        }
+      }
       const shopResult = await publishService.publishShopBatch({
         userId,
         productIds,

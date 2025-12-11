@@ -1,22 +1,23 @@
-// Channel: 소싱 채널 (BAND, NAVER_CAFE 등) 관리
-// 쇼핑몰 관련 설정은 Shop 테이블로 분리됨
 model Channel {
-  id                 Int                @id @default(autoincrement())
-  userId             Int                @map("user_id")
-  kind               ChannelKind
-  platform           ChannelPlatform
-  channelKey         String             @map("channel_key") @db.VarChar(255)
-  name               String             @db.VarChar(255)
-  coverUrl           String?            @map("cover_url") @db.VarChar(500)
-  shopId             Int?               @map("shop_id")
-  isActive           Boolean            @default(true) @map("is_active")
-  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt          DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shop               Shop?              @relation(fields: [shopId], references: [id], onDelete: SetNull)
-  collectedPosts     CollectedPost[]
-  publishedProducts  PublishedProduct[]
+  id                Int                @id @default(autoincrement())
+  userId            Int                @map("user_id")
+  kind              ChannelKind
+  platform          ChannelPlatform
+  channelKey        String             @map("channel_key") @db.VarChar(255)
+  name              String             @db.VarChar(255)
+  coverUrl          String?            @map("cover_url") @db.VarChar(500)
+  isActive          Boolean            @default(true) @map("is_active")
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  shopId            Int?               @map("shop_id")
+  bandSessionCookie String?            @map("band_session_cookie") @db.Text
+  naverId           String?            @map("naver_id") @db.VarChar(255)
+  naverPassword     String?            @map("naver_password") @db.VarChar(500)
+  sessionExpiresAt  DateTime?          @map("session_expires_at")
+  shop              Shop?              @relation(fields: [shopId], references: [id])
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectedPosts    CollectedPost[]
+  publishedProducts PublishedProduct[]
 
   @@unique([userId, channelKey])
   @@index([userId])

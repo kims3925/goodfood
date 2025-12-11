@@ -10,9 +10,9 @@ datasource db {
 }
 
 enum UserRole {
-  USER    // 일반 사용자 (쇼핑몰 접근 불가)
-  MANAGER // 쇼핑몰 관리자 (자신의 채널만 접근)
-  ADMIN   // 슈퍼 관리자 (모든 채널 접근)
+  USER
+  MANAGER
+  ADMIN
 }
 
 enum SourcingPlatform {
@@ -100,8 +100,8 @@ enum TossPaymentStatus {
 enum DiscountType {
   PERCENTAGE
   FIXED_AMOUNT
-  FIXED         // 정액 (별칭 - 기존 FIXED_AMOUNT와 동일)
-  FREE_SHIPPING // 무료배송
+  FIXED
+  FREE_SHIPPING
 }
 
 enum InquiryType {

@@ -5,8 +5,17 @@
 
 import jwt from 'jsonwebtoken'
 
-// JWT 시크릿 (환경변수에서 가져오거나 기본값 사용)
-const GUEST_TOKEN_SECRET = process.env.GUEST_TOKEN_SECRET || process.env.NEXTAUTH_SECRET || 'guest-order-secret-key'
+// JWT 시크릿 (환경변수에서 가져옴)
+// 프로덕션 환경에서는 반드시 환경 변수 설정 필요
+function getGuestTokenSecret(): string {
+  const secret = process.env.GUEST_TOKEN_SECRET || process.env.NEXTAUTH_SECRET
+  if (!secret && process.env.NODE_ENV === 'production') {
+    throw new Error('GUEST_TOKEN_SECRET or NEXTAUTH_SECRET is required in production')
+  }
+  return secret || 'dev-guest-order-secret-key'
+}
+
+const GUEST_TOKEN_SECRET = getGuestTokenSecret()
 const TOKEN_EXPIRY = '1h' // 1시간
 
 export interface GuestTokenPayload {

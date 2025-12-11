@@ -93,6 +93,9 @@ export class ChannelRepository {
         channelKey: data.channelKey,
         name: data.name,
         coverUrl: data.coverUrl,
+        // BAND 플랫폼 전용 필드
+        naverId: data.naverId || null,
+        naverPassword: data.naverPassword || null,
       },
     })
   }

@@ -80,6 +80,9 @@ export {
   getActiveAutomationContexts,
   withBatchContext,
   withUserContext,
+  checkCancellation,
+  throwIfCancelled,
+  CancellationError,
 } from './context'
 
 // Workflow Service

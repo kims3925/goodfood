@@ -2,19 +2,19 @@ model PublishedProduct {
   id               Int              @id @default(autoincrement())
   userId           Int              @map("user_id")
   productId        Int              @map("product_id")
-  channelId        Int?             @map("channel_id")
-  shopId           Int?             @map("shop_id")
   publishedAt      DateTime?        @map("published_at") @db.Timestamp(0)
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamp(0)
+  channelId        Int?             @map("channel_id")
+  shopId           Int?             @map("shop_id")
   cartItems        CartItem[]
+  guestOrderItems  GuestOrderItem[]
   inquiries        Inquiry[]
   orderItems       OrderItem[]
-  guestOrderItems  GuestOrderItem[]
   publishHistories PublishHistory[]
   channel          Channel?         @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  shop             Shop?            @relation(fields: [shopId], references: [id], onDelete: Cascade)
   product          Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  shop             Shop?            @relation(fields: [shopId], references: [id], onDelete: Cascade)
   user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([productId, channelId])

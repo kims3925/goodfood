@@ -7,7 +7,7 @@
  * BatchContext를 통해 사용자 정보를 주입하여 처리.
  */
 
-import prisma from '@bandauto/db'
+import prisma, { WorkflowStatus } from '@bandauto/db'
 import { BatchContext } from './types'
 
 // =============================================
@@ -15,6 +15,49 @@ import { BatchContext } from './types'
 // =============================================
 
 let currentContext: BatchContext | null = null
+
+// =============================================
+// CANCELLATION CHECK
+// =============================================
+
+/**
+ * 현재 워크플로우가 취소되었는지 확인
+ * 각 파이프라인 단계에서 주기적으로 호출하여 취소 시 즉시 중단
+ */
+export async function checkCancellation(): Promise<boolean> {
+  const context = getBatchContext()
+  if (!context?.workflowLogId) {
+    return false
+  }
+
+  const workflow = await prisma.workflowLog.findUnique({
+    where: { id: context.workflowLogId },
+    select: { status: true },
+  })
+
+  // RUNNING이 아니면 취소된 것으로 간주 (FAILED = 취소됨)
+  return workflow?.status !== WorkflowStatus.RUNNING
+}
+
+/**
+ * 취소 체크 후 취소되었으면 에러 throw
+ * 파이프라인에서 간단히 호출 가능
+ */
+export async function throwIfCancelled(): Promise<void> {
+  if (await checkCancellation()) {
+    throw new CancellationError('워크플로우가 사용자에 의해 취소되었습니다')
+  }
+}
+
+/**
+ * 취소 에러 클래스
+ */
+export class CancellationError extends Error {
+  constructor(message: string = '워크플로우가 취소되었습니다') {
+    super(message)
+    this.name = 'CancellationError'
+  }
+}
 
 /**
  * 배치 컨텍스트 설정

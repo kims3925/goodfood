@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma, { ChannelKind } from '@bandauto/db'
 
-// 환경변수에서 설정 (없으면 기본값 사용)
-const WEBHOOK_SECRET = process.env.ORDER_WEBHOOK_SECRET || 'your-webhook-secret'
+// OrderTest 모델 타입 단언
+const orderTestModel = (prisma as any).orderTest
+
+// 환경변수에서 설정
+const WEBHOOK_SECRET = process.env.ORDER_WEBHOOK_SECRET
 const DEFAULT_USER_ID = parseInt(process.env.DEFAULT_USER_ID || '1')
 
 /**
@@ -32,9 +35,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    // Webhook Secret 검증 (선택적)
+    // Webhook Secret 검증
     const webhookSecret = request.headers.get('x-webhook-secret')
-    if (WEBHOOK_SECRET !== 'your-webhook-secret' && webhookSecret !== WEBHOOK_SECRET) {
+    if (WEBHOOK_SECRET && webhookSecret !== WEBHOOK_SECRET) {
       return NextResponse.json(
         { success: false, error: 'Webhook 인증 실패' },
         { status: 401, headers }
@@ -206,7 +209,7 @@ export async function POST(request: NextRequest) {
     }
 
     // === OrderTest 생성 ===
-    const order = await prisma.orderTest.create({
+    const order = await orderTestModel.create({
       data: {
         userId: DEFAULT_USER_ID,
         publishedProductId,

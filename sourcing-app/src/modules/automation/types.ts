@@ -89,6 +89,7 @@ export interface TransformResult extends PipelineResult {
     createdProducts: number      // 생성된 CollectedProduct 수
     skippedCount: number         // 스킵된 항목 수 (일시적 에러)
     retryablePostIds: number[]   // 재처리 가능한 postId 목록
+    cancelled?: boolean          // 사용자 취소 여부
   }
 }
 
@@ -114,6 +115,7 @@ export interface ProductCreateResult extends PipelineResult {
   details: {
     createdProducts: CreatedProductResult[]
     totalCreated: number
+    cancelled?: boolean          // 사용자 취소 여부
   }
 }
 
@@ -143,6 +145,7 @@ export interface PublishResult extends PipelineResult {
       productId: number
       reason: string
     }[]
+    cancelled?: boolean          // 사용자 취소 여부
   }
 }
 

@@ -476,8 +476,8 @@ export class OrderService {
   private getShippingInfo(order: OrderWithRelations) {
     const addr = order.shippingAddress
     return {
-      recipientName: addr?.recipient || '',
-      recipientPhone: addr?.phone || '',
+      recipientName: addr?.recipientName || '',
+      recipientPhone: addr?.recipientPhone || '',
       postalCode: addr?.postalCode || '',
       address: addr?.address || '',
       addressDetail: addr?.addressDetail || null,

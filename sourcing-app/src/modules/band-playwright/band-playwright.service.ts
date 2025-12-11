@@ -1,0 +1,200 @@
+/**
+ * Band Playwright Service
+ * Playwright를 사용하여 Band에 이미지 포함 게시물 발행
+ */
+
+import { browserPool } from './band-browser-pool'
+import { sessionManager } from './band-session-manager'
+import { postAutomation } from './band-post.automation'
+import {
+  BandPublishParams,
+  BandPublishResult,
+  BandBatchPublishParams,
+  BandBatchPublishResult,
+  BandCredentials,
+  BandPlaywrightError,
+  BandPlaywrightErrorCode,
+} from './types'
+
+export class BandPlaywrightService {
+  /**
+   * Playwright를 사용하여 이미지 포함 게시물 발행
+   */
+  async publishWithImages(
+    params: BandPublishParams,
+    credentials?: BandCredentials,
+    retryCount: number = 0
+  ): Promise<BandPublishResult> {
+    const { channelId, bandKey, content, imageUrls } = params
+
+    console.log(`[BandPlaywrightService] Publishing to band ${bandKey} with ${imageUrls.length} images`)
+
+    try {
+      // 1. 세션 확보
+      const session = await sessionManager.getValidSession(channelId, credentials)
+
+      if (!session) {
+        return {
+          success: false,
+          error: '세션을 획득할 수 없습니다. 네이버 계정 정보를 확인해주세요.',
+        }
+      }
+
+      // 2. 브라우저 컨텍스트 가져오기 (쿠키 주입)
+      const context = await browserPool.getContext(channelId, session.cookies)
+      const page = await context.newPage()
+
+      try {
+        // 3. 글 작성 + 이미지 업로드
+        const result = await postAutomation.createPostWithImages(page, params)
+
+        return result
+      } finally {
+        await page.close()
+        await browserPool.releaseContext(channelId)
+      }
+    } catch (error: any) {
+      console.error('[BandPlaywrightService] Publish failed:', error)
+
+      // 세션 만료 에러인 경우 재시도
+      if (
+        error instanceof BandPlaywrightError &&
+        error.code === BandPlaywrightErrorCode.SESSION_EXPIRED &&
+        retryCount < 1
+      ) {
+        console.log('[BandPlaywrightService] Session expired, retrying with new session')
+        await sessionManager.invalidateSession(channelId)
+        return this.publishWithImages(params, credentials, retryCount + 1)
+      }
+
+      // CAPTCHA 에러는 재시도 불가
+      if (
+        error instanceof BandPlaywrightError &&
+        error.code === BandPlaywrightErrorCode.CAPTCHA_REQUIRED
+      ) {
+        return {
+          success: false,
+          error: 'CAPTCHA 인증이 필요합니다. 채널 설정에서 Band 로그인을 다시 해주세요.',
+        }
+      }
+
+      // 로그인 실패 에러
+      if (
+        error instanceof BandPlaywrightError &&
+        error.code === BandPlaywrightErrorCode.LOGIN_FAILED
+      ) {
+        return {
+          success: false,
+          error: error.message || '로그인에 실패했습니다. 네이버 계정 정보를 확인해주세요.',
+        }
+      }
+
+      return {
+        success: false,
+        error: error.message || '발행 중 오류가 발생했습니다.',
+      }
+    }
+  }
+
+  /**
+   * 배치 발행: 같은 채널에 여러 상품을 효율적으로 발행
+   * 페이지를 한 번만 열고 여러 글을 작성
+   */
+  async publishBatchWithImages(
+    params: BandBatchPublishParams,
+    credentials?: BandCredentials,
+    retryCount: number = 0
+  ): Promise<BandBatchPublishResult> {
+    const { channelId, bandKey, bandName, items } = params
+
+    console.log(`[BandPlaywrightService] Batch publishing ${items.length} items to band "${bandName}"`)
+
+    try {
+      // 1. 세션 확보
+      const session = await sessionManager.getValidSession(channelId, credentials)
+
+      if (!session) {
+        return {
+          success: false,
+          total: items.length,
+          successCount: 0,
+          failedCount: items.length,
+          results: items.map(item => ({
+            productId: item.productId,
+            success: false,
+            error: '세션을 획득할 수 없습니다. 네이버 계정 정보를 확인해주세요.',
+          })),
+        }
+      }
+
+      // 2. 브라우저 컨텍스트 가져오기 (쿠키 주입)
+      const context = await browserPool.getContext(channelId, session.cookies)
+      const page = await context.newPage()
+
+      try {
+        // 3. 배치 글 작성
+        const result = await postAutomation.createBatchPosts(page, params)
+        return result
+      } finally {
+        await page.close()
+        await browserPool.releaseContext(channelId)
+      }
+    } catch (error: any) {
+      console.error('[BandPlaywrightService] Batch publish failed:', error)
+
+      // 세션 만료 에러인 경우 재시도
+      if (
+        error instanceof BandPlaywrightError &&
+        error.code === BandPlaywrightErrorCode.SESSION_EXPIRED &&
+        retryCount < 1
+      ) {
+        console.log('[BandPlaywrightService] Session expired, retrying with new session')
+        await sessionManager.invalidateSession(channelId)
+        return this.publishBatchWithImages(params, credentials, retryCount + 1)
+      }
+
+      return {
+        success: false,
+        total: items.length,
+        successCount: 0,
+        failedCount: items.length,
+        results: items.map(item => ({
+          productId: item.productId,
+          success: false,
+          error: error.message || '배치 발행 중 오류가 발생했습니다.',
+        })),
+      }
+    }
+  }
+
+  /**
+   * 세션 테스트
+   */
+  async testSession(channelId: number): Promise<boolean> {
+    return sessionManager.testSession(channelId)
+  }
+
+  /**
+   * 세션 무효화 (재로그인 필요 시)
+   */
+  async invalidateSession(channelId: number): Promise<void> {
+    await sessionManager.invalidateSession(channelId)
+  }
+
+  /**
+   * 브라우저 풀 예열 (배치 발행 전)
+   */
+  async warmUp(): Promise<void> {
+    await browserPool.warmUp()
+  }
+
+  /**
+   * 리소스 정리 (서버 종료 시)
+   */
+  async cleanup(): Promise<void> {
+    await browserPool.cleanup()
+  }
+}
+
+// 싱글톤 인스턴스
+export const bandPlaywrightService = new BandPlaywrightService()

@@ -4,7 +4,7 @@
  */
 
 import prisma, { WorkflowType, WorkflowStatus, TriggerType } from '@bandauto/db'
-import { setBatchContext, clearBatchContext, createBatchContextFromUserId } from './context'
+import { setBatchContext, clearBatchContext, createBatchContextFromUserId, throwIfCancelled, CancellationError } from './context'
 import { runCollectionPipeline } from './pipelines/collection'
 import { runTransformPipeline } from './pipelines/transform'
 import { runProductCreatePipeline } from './pipelines/product-create'
@@ -454,13 +454,18 @@ export async function executeFullPipeline(
       overallStatus,
     }
   } catch (error: any) {
-    console.error('[FullPipeline] Error:', error)
-    await failWorkflowLog(logId, error.message, {
-      collection: collectionResult?.details,
-      transform: transformResult?.details,
-      productCreate: productCreateResult?.details,
-      publish: publishResult?.details,
-    })
+    // 취소 에러는 로깅만 하고 넘어감
+    if (error instanceof CancellationError) {
+      console.log(`[FullPipeline] Cancelled by user`)
+    } else {
+      console.error('[FullPipeline] Error:', error)
+      await failWorkflowLog(logId, error.message, {
+        collection: collectionResult?.details,
+        transform: transformResult?.details,
+        productCreate: productCreateResult?.details,
+        publish: publishResult?.details,
+      })
+    }
 
     return {
       success: false,
@@ -592,6 +597,7 @@ export async function executeFullPipelineWithLock(
 
     // 1. 수집 단계
     if (!options?.skipCollection) {
+      await throwIfCancelled() // 취소 체크
       console.log('[FullPipeline] Step 1: Collection')
       collectionResult = await runCollectionPipeline({
         channelIds: parseNumberArray(automationConfig.channelIds),
@@ -611,6 +617,7 @@ export async function executeFullPipelineWithLock(
 
     // 2. 변환 단계
     if (!options?.skipTransform) {
+      await throwIfCancelled() // 취소 체크
       console.log('[FullPipeline] Step 2: Transform')
       transformResult = await runTransformPipeline({
         aiProvider: automationConfig.aiProvider,
@@ -633,6 +640,7 @@ export async function executeFullPipelineWithLock(
 
     // 3. 상품 생성 단계
     if (!options?.skipProductCreate) {
+      await throwIfCancelled() // 취소 체크
       console.log('[FullPipeline] Step 3: Product Create')
       productCreateResult = await runProductCreatePipeline({
         createPendingOnly: true,
@@ -653,6 +661,7 @@ export async function executeFullPipelineWithLock(
 
     // 4. 발행 단계
     if (!options?.skipPublish) {
+      await throwIfCancelled() // 취소 체크
       const channelIdsForPublish = parseNumberArray(automationConfig.retailChannelIds)
       if (channelIdsForPublish.length) {
         console.log('[FullPipeline] Step 4: Publish')
@@ -677,6 +686,9 @@ export async function executeFullPipelineWithLock(
     }
 
     const completedAt = new Date()
+
+    // 마지막으로 취소 체크 (완료 전)
+    await throwIfCancelled()
 
     // 상태 결정
     let overallStatus: WorkflowStatus
@@ -707,7 +719,7 @@ export async function executeFullPipelineWithLock(
       })
     }
 
-    console.log(`[FullPipeline] Completed with status: ${overallStatus}`)
+    console.log(`[FullPipeline] Completed with status: ${overallStatus} (workflow: ${logId})`)
 
     return {
       success: overallStatus === WorkflowStatus.COMPLETED,
@@ -720,6 +732,35 @@ export async function executeFullPipelineWithLock(
       overallStatus,
     }
   } catch (error: any) {
+    // 취소 에러는 별도 처리 (이미 DB에서 FAILED로 마킹됨)
+    if (error instanceof CancellationError) {
+      console.log(`[FullPipeline] Cancelled by user (workflow: ${logId})`)
+      // 취소 시에도 현재까지의 details를 저장 (이미 FAILED 상태)
+      await prisma.workflowLog.update({
+        where: { id: logId },
+        data: {
+          details: JSON.stringify({
+            collection: collectionResult?.details,
+            transform: transformResult?.details,
+            productCreate: productCreateResult?.details,
+            publish: publishResult?.details,
+            cancelledAt: new Date().toISOString(),
+          }),
+        },
+      })
+
+      return {
+        success: false,
+        startedAt,
+        completedAt: new Date(),
+        collection: collectionResult,
+        transform: transformResult,
+        productCreate: productCreateResult,
+        publish: publishResult,
+        overallStatus: WorkflowStatus.FAILED,
+      }
+    }
+
     console.error('[FullPipeline] Error:', error)
     await failWorkflowLog(logId, error.message, {
       collection: collectionResult?.details,

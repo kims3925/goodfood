@@ -5,16 +5,22 @@ import { signIn, useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, Mail, Lock, Loader2 } from 'lucide-react'
+import { useShop } from '@/contexts/ShopContext'
 
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: session, status } = useSession()
+  const { shop } = useShop()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // 샵 테마 색상 (기본값: #FF6B6B)
+  const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
+  const shopName = shop?.name || 'ABC마켓'
 
   const callbackUrl = searchParams.get('callbackUrl') || '/main'
 
@@ -61,7 +67,10 @@ function LoginContent() {
   if (status === 'loading') {
     return (
       <div className="bg-gray-50 flex justify-center py-12 px-4">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#FF6B6B]" />
+        <div
+          className="animate-spin rounded-full h-10 w-10 border-b-2"
+          style={{ borderColor: primaryColor }}
+        />
       </div>
     )
   }
@@ -69,12 +78,13 @@ function LoginContent() {
   return (
     <div className="bg-gray-50 flex justify-center py-6 px-4">
       <div className="max-w-md w-full">
-        {/* Logo */}
+        {/* Shop Name */}
         <div className="text-center mb-4">
           <Link href="/main" className="inline-block">
-            <h1 className="text-4xl font-black text-[#FF6B6B]">ABC마켓</h1>
+            <h1 className="text-4xl font-black" style={{ color: primaryColor }}>
+              {shopName}
+            </h1>
           </Link>
-          <p className="mt-2 text-gray-600">신선한 식품을 빠르게 배송합니다</p>
         </div>
 
         {/* Login Form */}
@@ -101,7 +111,8 @@ function LoginContent() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="example@email.com"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none transition"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:border-transparent outline-none transition"
+                  style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
                   required
                 />
               </div>
@@ -120,7 +131,8 @@ function LoginContent() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="비밀번호를 입력하세요"
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none transition"
+                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-md focus:ring-2 focus:border-transparent outline-none transition"
+                  style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
                   required
                 />
                 <button
@@ -136,10 +148,14 @@ function LoginContent() {
             {/* Remember & Forgot */}
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-[#FF6B6B] focus:ring-[#FF6B6B]" />
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-gray-300"
+                  style={{ accentColor: primaryColor }}
+                />
                 <span className="text-gray-600">로그인 상태 유지</span>
               </label>
-              <Link href="/auth/forgot-password" className="text-[#FF6B6B] hover:underline">
+              <Link href="/auth/forgot-password" className="hover:underline" style={{ color: primaryColor }}>
                 비밀번호 찾기
               </Link>
             </div>
@@ -148,7 +164,8 @@ function LoginContent() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-[#FF6B6B] text-white font-bold rounded-md hover:bg-[#ff5252] disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              className="w-full py-3 text-white font-bold rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 hover:opacity-90"
+              style={{ backgroundColor: primaryColor }}
             >
               {isLoading ? (
                 <>
@@ -164,7 +181,7 @@ function LoginContent() {
           {/* Signup Link */}
           <p className="mt-6 text-center text-gray-600">
             아직 회원이 아니신가요?{' '}
-            <Link href="/auth/signup" className="text-[#FF6B6B] font-medium hover:underline">
+            <Link href="/auth/signup" className="font-medium hover:underline" style={{ color: primaryColor }}>
               회원가입
             </Link>
           </p>
@@ -177,7 +194,7 @@ function LoginContent() {
 function LoginFallback() {
   return (
     <div className="bg-gray-50 flex justify-center py-12 px-4">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#FF6B6B]" />
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-400" />
     </div>
   )
 }

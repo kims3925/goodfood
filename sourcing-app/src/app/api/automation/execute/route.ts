@@ -450,10 +450,39 @@ export async function GET() {
           ? JSON.parse(running.details)
           : running.details
 
-        // 현재 단계 판단 및 단계별 진행 상태
+        // 현재 단계 판단 - 가장 마지막으로 시작된 단계가 현재 진행 중인 단계
+        // 각 단계가 존재하면 해당 단계가 시작된 것이므로, 가장 마지막 단계를 현재 단계로 설정
+        if (details.publish) {
+          // publish 단계가 있으면 publish 진행 중 (또는 완료)
+          currentStage = running.status === 'RUNNING' ? 'publish' : null
+        } else if (details.productCreate) {
+          // productCreate 단계가 있으면 productCreate 진행 중
+          currentStage = 'productCreate'
+        } else if (details.transform) {
+          // transform 단계가 있으면 transform 진행 중
+          currentStage = 'transform'
+        } else if (details.collection) {
+          // collection만 있으면 collection 진행 중 (거의 즉시 완료되므로 드묾)
+          currentStage = 'collection'
+        } else {
+          // 아무 단계도 없으면 collection 대기 중
+          currentStage = 'collection'
+        }
+
+        // 단계별 진행 상태 (completed는 다음 단계가 시작했거나 전체 완료 여부로 판단)
+        const hasNextStageStarted = (stage: string) => {
+          switch (stage) {
+            case 'collection': return !!details.transform
+            case 'transform': return !!details.productCreate
+            case 'productCreate': return !!details.publish
+            case 'publish': return running.status !== 'RUNNING' // 워크플로우 완료 여부
+            default: return false
+          }
+        }
+
         stageProgress = {
           collection: details.collection ? {
-            completed: true,
+            completed: hasNextStageStarted('collection'),
             totalNewPosts: details.collection.totalNewPosts || 0,
             channelResults: details.collection.channelResults?.map((ch: any) => ({
               channelName: ch.channelName,
@@ -462,43 +491,32 @@ export async function GET() {
             })) || [],
           } : null,
           transform: details.transform ? {
-            completed: !details.transform.batchProgress || details.transform.batchProgress.current >= details.transform.batchProgress.total,
-            total: details.transform.transformedPosts?.length || 0,
-            success: details.transform.transformedPosts?.filter((p: any) => p.status === 'success').length || 0,
-            failed: details.transform.transformedPosts?.filter((p: any) => p.status !== 'success').length || 0,
+            completed: hasNextStageStarted('transform'),
+            total: details.transform.totalSuccess !== undefined
+              ? (details.transform.totalSuccess + (details.transform.totalFailed || 0))
+              : (details.transform.transformedPosts?.length || 0),
+            success: details.transform.totalSuccess !== undefined
+              ? details.transform.totalSuccess
+              : (details.transform.transformedPosts?.filter((p: any) => p.status === 'success').length || 0),
+            failed: details.transform.totalFailed !== undefined
+              ? details.transform.totalFailed
+              : (details.transform.transformedPosts?.filter((p: any) => p.status !== 'success').length || 0),
             batchProgress: details.transform.batchProgress || null,
           } : null,
           productCreate: details.productCreate ? {
-            completed: true,
+            completed: hasNextStageStarted('productCreate'),
             total: details.productCreate.createdProducts?.length || 0,
             success: details.productCreate.createdProducts?.filter((p: any) => p.status === 'success').length || 0,
             failed: details.productCreate.createdProducts?.filter((p: any) => p.status !== 'success').length || 0,
           } : null,
           publish: details.publish ? {
-            completed: true,
+            completed: hasNextStageStarted('publish'),
             total: details.publish.publishedProducts?.length || 0,
             success: details.publish.publishedProducts?.filter((p: any) => p.status?.toUpperCase() === 'SUCCESS').length || 0,
-            failed: details.publish.publishedProducts?.filter((p: any) => p.status?.toUpperCase() !== 'SUCCESS').length || 0,
+            failed: details.publish.publishedProducts?.filter((p: any) => p.status?.toUpperCase() === 'FAILED').length || 0,
             currentChannel: details.publish.currentChannel || null,
             currentProgress: details.publish.currentProgress || null,
           } : null,
-        }
-
-        // 현재 진행 중인 단계 판단
-        if (details.publish?.currentProgress && !stageProgress.publish?.completed) {
-          currentStage = 'publish'
-        } else if (details.productCreate && !details.publish) {
-          currentStage = 'productCreate'
-        } else if (details.transform?.batchProgress && details.transform.batchProgress.current < details.transform.batchProgress.total) {
-          currentStage = 'transform'
-        } else if (details.transform && !details.productCreate) {
-          currentStage = 'productCreate'
-        } else if (details.collection && !details.transform) {
-          currentStage = 'transform'
-        } else if (!details.collection) {
-          currentStage = 'collection'
-        } else if (details.publish) {
-          currentStage = 'publish'
         }
       } catch (e) {
         console.error('Failed to parse workflow details:', e)

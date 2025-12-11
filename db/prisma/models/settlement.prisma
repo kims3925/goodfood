@@ -1,11 +1,3 @@
-// 정산 상태
-enum SettlementStatus {
-  PENDING   // 대기중
-  COMPLETED // 완료
-  CANCELLED // 취소
-}
-
-// 정산
 model Settlement {
   id          Int              @id @default(autoincrement())
   userId      Int              @map("user_id")
@@ -19,10 +11,9 @@ model Settlement {
   settledAt   DateTime?        @map("settled_at") @db.Timestamp(0)
   createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamp(0)
-
-  user  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shop  Shop              @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  items SettlementItem[]
+  shop        Shop             @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       SettlementItem[]
 
   @@index([userId])
   @@index([shopId])
@@ -32,22 +23,26 @@ model Settlement {
   @@map("settlement")
 }
 
-// 정산 항목 (정산에 포함된 주문 아이템)
 model SettlementItem {
-  id           Int      @id @default(autoincrement())
-  settlementId Int      @map("settlement_id")
-  orderItemId  Int      @map("order_item_id")
-  orderId      Int      @map("order_id")
+  id           Int        @id @default(autoincrement())
+  settlementId Int        @map("settlement_id")
+  orderItemId  Int        @map("order_item_id")
+  orderId      Int        @map("order_id")
   quantity     Int
-  unitPrice    Decimal  @map("unit_price") @db.Decimal(10, 2)
-  totalPrice   Decimal  @map("total_price") @db.Decimal(12, 2)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-
-  settlement Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  unitPrice    Decimal    @map("unit_price") @db.Decimal(10, 2)
+  totalPrice   Decimal    @map("total_price") @db.Decimal(12, 2)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
+  settlement   Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
 
   @@unique([settlementId, orderItemId])
   @@index([settlementId])
   @@index([orderItemId])
   @@index([orderId])
   @@map("settlement_item")
+}
+
+enum SettlementStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
 }

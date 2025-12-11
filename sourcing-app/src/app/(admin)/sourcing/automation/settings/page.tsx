@@ -779,7 +779,7 @@ export default function AutomationSettingsPage() {
                     </p>
                   </div>
                   <a
-                    href="/sourcing/settings/shop"
+                    href="/shop/store/list"
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white text-sm font-medium rounded-lg transition-colors"
                   >
                     <ShoppingBag size={14} />
@@ -932,7 +932,7 @@ export default function AutomationSettingsPage() {
                         </p>
                       </div>
                       <a
-                        href="/sourcing/settings/policy"
+                        href="/sourcing/policy/list"
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
                       >
                         <FileText size={14} />

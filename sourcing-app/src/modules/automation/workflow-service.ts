@@ -529,8 +529,18 @@ export async function getDailyWorkflowStats(userId: number, days: number = 7) {
   return Object.values(dailyStats)
 }
 
+// 시간대별 통계 Raw SQL 결과 타입
+interface HourlyStatsRawResult {
+  hour: number
+  collect: bigint
+  transform: bigint
+  productCreate: bigint
+  publish: bigint
+}
+
 /**
- * 기간별 시간대별 워크플로우 통계 조회
+ * 기간별 시간대별 통계 조회 (실제 DB 테이블 기반)
+ * WorkflowLog가 아닌 실제 데이터 테이블에서 시간대별 집계
  * @param userId 사용자 ID
  * @param startDate 시작 날짜 (기본값: 오늘 00:00:00)
  * @param endDate 종료 날짜 (기본값: 오늘 23:59:59)
@@ -553,81 +563,61 @@ export async function getHourlyWorkflowStats(
     return today
   })()
 
-  const logs = await prisma.workflowLog.findMany({
-    where: {
-      userId,
-      startedAt: { gte: start, lte: end },
-    },
-  })
+  // 단일 Raw SQL 쿼리로 시간대별 통계 조회 (한국 시간 KST 기준)
+  const stats = await prisma.$queryRaw<HourlyStatsRawResult[]>`
+    SELECT
+      hours.hour,
+      COALESCE(cp_stats.cnt, 0) as collect,
+      COALESCE(cpr_stats.cnt, 0) as transform,
+      COALESCE(p_stats.cnt, 0) as productCreate,
+      COALESCE(pp_stats.cnt, 0) as publish
+    FROM (
+      SELECT 0 as hour UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5
+      UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11
+      UNION SELECT 12 UNION SELECT 13 UNION SELECT 14 UNION SELECT 15 UNION SELECT 16 UNION SELECT 17
+      UNION SELECT 18 UNION SELECT 19 UNION SELECT 20 UNION SELECT 21 UNION SELECT 22 UNION SELECT 23
+    ) hours
+    LEFT JOIN (
+      SELECT HOUR(CONVERT_TZ(created_at, '+00:00', '+09:00')) as hour, COUNT(*) as cnt
+      FROM collected_post
+      WHERE user_id = ${userId}
+        AND created_at >= ${start}
+        AND created_at <= ${end}
+      GROUP BY HOUR(CONVERT_TZ(created_at, '+00:00', '+09:00'))
+    ) cp_stats ON hours.hour = cp_stats.hour
+    LEFT JOIN (
+      SELECT HOUR(CONVERT_TZ(created_at, '+00:00', '+09:00')) as hour, COUNT(*) as cnt
+      FROM collected_product
+      WHERE user_id = ${userId}
+        AND created_at >= ${start}
+        AND created_at <= ${end}
+      GROUP BY HOUR(CONVERT_TZ(created_at, '+00:00', '+09:00'))
+    ) cpr_stats ON hours.hour = cpr_stats.hour
+    LEFT JOIN (
+      SELECT HOUR(CONVERT_TZ(created_at, '+00:00', '+09:00')) as hour, COUNT(*) as cnt
+      FROM product
+      WHERE user_id = ${userId}
+        AND created_at >= ${start}
+        AND created_at <= ${end}
+      GROUP BY HOUR(CONVERT_TZ(created_at, '+00:00', '+09:00'))
+    ) p_stats ON hours.hour = p_stats.hour
+    LEFT JOIN (
+      SELECT HOUR(CONVERT_TZ(published_at, '+00:00', '+09:00')) as hour, COUNT(*) as cnt
+      FROM published_product
+      WHERE user_id = ${userId}
+        AND published_at >= ${start}
+        AND published_at <= ${end}
+      GROUP BY HOUR(CONVERT_TZ(published_at, '+00:00', '+09:00'))
+    ) pp_stats ON hours.hour = pp_stats.hour
+    ORDER BY hours.hour
+  `
 
-  // 시간대별 그룹화 (0-23시) - 기간 내 모든 데이터 합산
-  const hourlyStats = Array.from({ length: 24 }, (_, hour) => ({
-    hour,
-    collect: 0,
-    transform: 0,
-    productCreate: 0,
-    publish: 0,
+  // bigint를 number로 변환하여 반환
+  return stats.map(row => ({
+    hour: Number(row.hour),
+    collect: Number(row.collect),
+    transform: Number(row.transform),
+    productCreate: Number(row.productCreate),
+    publish: Number(row.publish),
   }))
-
-  for (const log of logs) {
-    const hour = log.startedAt.getHours()
-    const workflowType = log.workflowType
-
-    // FULL_PIPELINE1 (자동화 전체 파이프라인)은 details에서 각 단계별 성공 카운트 추출
-    if (workflowType === 'FULL_PIPELINE1') {
-      if (log.details) {
-        try {
-          const details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details
-
-          // 1. 수집(collect): totalNewPosts 또는 channelResults에서 newPosts 합계
-          if (details.collection) {
-            if (typeof details.collection.totalNewPosts === 'number') {
-              hourlyStats[hour].collect += details.collection.totalNewPosts
-            } else if (Array.isArray(details.collection.channelResults)) {
-              const sum = details.collection.channelResults.reduce(
-                (acc: number, ch: { newPosts?: number }) => acc + (ch.newPosts || 0), 0
-              )
-              hourlyStats[hour].collect += sum
-            }
-          }
-
-          // 2. 변환(transform): transformedPosts에서 status === 'success' 개수
-          if (Array.isArray(details.transform?.transformedPosts)) {
-            const successCount = details.transform.transformedPosts.filter(
-              (p: { status: string }) => p.status === 'success'
-            ).length
-            hourlyStats[hour].transform += successCount
-          }
-
-          // 3. 상품등록(productCreate): createdProducts에서 status === 'success' 개수
-          if (Array.isArray(details.productCreate?.createdProducts)) {
-            const successCount = details.productCreate.createdProducts.filter(
-              (p: { status: string }) => p.status === 'success'
-            ).length
-            hourlyStats[hour].productCreate += successCount
-          }
-
-          // 4. 발행(publish): publishedProducts에서 status가 SUCCESS/success인 개수 (채널별 발행 횟수)
-          if (Array.isArray(details.publish?.publishedProducts)) {
-            const successCount = details.publish.publishedProducts.filter(
-              (p: { status: string }) => p.status?.toUpperCase() === 'SUCCESS'
-            ).length
-            hourlyStats[hour].publish += successCount
-          }
-        } catch (e) {
-          // details 파싱 실패 시 무시
-          console.error('[getHourlyWorkflowStats] Failed to parse details:', e)
-        }
-      }
-    } else {
-      // 개별 워크플로우 타입 (COLLECT, TRANSFORM, PUBLISH)
-      const typeKey = workflowType.toLowerCase() as keyof typeof hourlyStats[0]
-      if (typeKey in hourlyStats[hour] && typeKey !== 'hour') {
-        (hourlyStats[hour] as Record<string, number>)[typeKey] =
-          ((hourlyStats[hour] as Record<string, number>)[typeKey] || 0) + (log.successCount || 0)
-      }
-    }
-  }
-
-  return hourlyStats
 }

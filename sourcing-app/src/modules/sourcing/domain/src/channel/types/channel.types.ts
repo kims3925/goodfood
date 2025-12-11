@@ -16,6 +16,9 @@ export interface ChannelCreateInput {
   channelKey: string
   name: string
   coverUrl?: string | null
+  // BAND 플랫폼 전용 필드
+  naverId?: string | null
+  naverPassword?: string | null
 }
 
 export interface ChannelUpdateInput {

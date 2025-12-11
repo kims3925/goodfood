@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Store,
@@ -16,6 +16,8 @@ import {
   AlertTriangle,
   ExternalLink,
   Trash2,
+  Loader2,
+  AlertOctagon,
 } from 'lucide-react'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -119,6 +121,34 @@ export default function PublishPage() {
     publishId: number
   } | null>(null)
   const [isUnpublishing, setIsUnpublishing] = useState(false)
+
+  // 발행 진행 모달 상태
+  interface PublishProgressItem {
+    productId: number
+    productName: string
+    targetId: number
+    targetName: string
+    targetType: 'shop' | 'channel'
+    status: 'pending' | 'publishing' | 'success' | 'failed'
+    message?: string
+  }
+  const [showPublishProgress, setShowPublishProgress] = useState(false)
+  const [publishProgressItems, setPublishProgressItems] = useState<PublishProgressItem[]>([])
+  const [currentPublishIndex, setCurrentPublishIndex] = useState(0)
+
+  // 페이지 이탈 경고 (발행 중일 때)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isPublishing) {
+        e.preventDefault()
+        e.returnValue = '발행이 진행 중입니다. 페이지를 나가면 발행이 취소될 수 있습니다.'
+        return e.returnValue
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isPublishing])
 
   // 초기 로드
   useEffect(() => {
@@ -392,6 +422,41 @@ export default function PublishPage() {
   const handlePublishSelected = async () => {
     if (selectedCells.size === 0) return
     if (isPublishing) return  // 중복 호출 방지
+
+    // 발행 진행 항목 준비
+    const progressItems: PublishProgressItem[] = []
+
+    selectedCells.forEach((key) => {
+      const { type, productId, targetId } = parseCellKey(key)
+      if (!isPublished(productId, type, targetId)) {
+        const product = getProduct(productId)
+        let targetName = ''
+
+        if (type === 'shop') {
+          const shop = shops.find((s) => s.id === targetId)
+          targetName = shop?.name || `Shop ${targetId}`
+        } else {
+          const channel = channels.find((c) => c.id === targetId)
+          targetName = channel?.name || `채널 ${targetId}`
+        }
+
+        progressItems.push({
+          productId,
+          productName: product?.name || `상품 ${productId}`,
+          targetId,
+          targetName,
+          targetType: type,
+          status: 'pending',
+        })
+      }
+    })
+
+    if (progressItems.length === 0) return
+
+    // 발행 진행 모달 표시
+    setPublishProgressItems(progressItems)
+    setCurrentPublishIndex(0)
+    setShowPublishProgress(true)
     setIsPublishing(true)
 
     try {
@@ -418,10 +483,29 @@ export default function PublishPage() {
       let totalSkipped = 0
       let totalFailed = 0
       const errorMessages: string[] = []
+      let processedIndex = 0
 
       // Shop 발행 처리
       for (const [shopId, productIds] of Object.entries(shopToProducts)) {
         if (productIds.length > 0) {
+          // 현재 발행 중인 항목들 업데이트
+          const shopItems = progressItems.filter(
+            (item) => item.targetType === 'shop' && item.targetId === Number(shopId)
+          )
+          shopItems.forEach((item) => {
+            const idx = progressItems.findIndex(
+              (p) => p.productId === item.productId && p.targetId === item.targetId && p.targetType === item.targetType
+            )
+            if (idx !== -1) {
+              setPublishProgressItems((prev) => {
+                const updated = [...prev]
+                updated[idx] = { ...updated[idx], status: 'publishing' }
+                return updated
+              })
+              setCurrentPublishIndex(idx)
+            }
+          })
+
           const response = await fetch('/api/shop/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -432,24 +516,63 @@ export default function PublishPage() {
 
           if (data.results) {
             for (const result of data.results) {
+              const itemIdx = progressItems.findIndex(
+                (p) => p.productId === result.productId && p.targetId === Number(shopId) && p.targetType === 'shop'
+              )
+
               if (result.status === 'SUCCESS') {
                 successfulCells.add(cellKey(result.productId, 'shop', Number(shopId)))
                 totalSuccess++
+                if (itemIdx !== -1) {
+                  setPublishProgressItems((prev) => {
+                    const updated = [...prev]
+                    updated[itemIdx] = { ...updated[itemIdx], status: 'success' }
+                    return updated
+                  })
+                }
               } else if (result.status === 'SKIPPED') {
                 successfulCells.add(cellKey(result.productId, 'shop', Number(shopId)))
                 totalSkipped++
+                if (itemIdx !== -1) {
+                  setPublishProgressItems((prev) => {
+                    const updated = [...prev]
+                    updated[itemIdx] = { ...updated[itemIdx], status: 'success', message: '이미 발행됨' }
+                    return updated
+                  })
+                }
               } else if (result.status === 'FAILED') {
                 totalFailed++
                 if (result.message) {
                   errorMessages.push(result.message)
                 }
+                if (itemIdx !== -1) {
+                  setPublishProgressItems((prev) => {
+                    const updated = [...prev]
+                    updated[itemIdx] = { ...updated[itemIdx], status: 'failed', message: result.message }
+                    return updated
+                  })
+                }
               }
+              processedIndex++
             }
           } else if (!data.success) {
             totalFailed += productIds.length
             if (data.error) {
               errorMessages.push(data.error)
             }
+            // 모든 항목 실패 처리
+            shopItems.forEach((item) => {
+              const idx = progressItems.findIndex(
+                (p) => p.productId === item.productId && p.targetId === item.targetId && p.targetType === item.targetType
+              )
+              if (idx !== -1) {
+                setPublishProgressItems((prev) => {
+                  const updated = [...prev]
+                  updated[idx] = { ...updated[idx], status: 'failed', message: data.error }
+                  return updated
+                })
+              }
+            })
           }
         }
       }
@@ -457,6 +580,24 @@ export default function PublishPage() {
       // 채널 발행 처리
       for (const [channelId, productIds] of Object.entries(channelToProducts)) {
         if (productIds.length > 0) {
+          // 현재 발행 중인 항목들 업데이트
+          const channelItems = progressItems.filter(
+            (item) => item.targetType === 'channel' && item.targetId === Number(channelId)
+          )
+          channelItems.forEach((item) => {
+            const idx = progressItems.findIndex(
+              (p) => p.productId === item.productId && p.targetId === item.targetId && p.targetType === item.targetType
+            )
+            if (idx !== -1) {
+              setPublishProgressItems((prev) => {
+                const updated = [...prev]
+                updated[idx] = { ...updated[idx], status: 'publishing' }
+                return updated
+              })
+              setCurrentPublishIndex(idx)
+            }
+          })
+
           const response = await fetch('/api/shop/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -467,24 +608,63 @@ export default function PublishPage() {
 
           if (data.results) {
             for (const result of data.results) {
+              const itemIdx = progressItems.findIndex(
+                (p) => p.productId === result.productId && p.targetId === Number(channelId) && p.targetType === 'channel'
+              )
+
               if (result.status === 'SUCCESS') {
                 successfulCells.add(cellKey(result.productId, 'channel', Number(channelId)))
                 totalSuccess++
+                if (itemIdx !== -1) {
+                  setPublishProgressItems((prev) => {
+                    const updated = [...prev]
+                    updated[itemIdx] = { ...updated[itemIdx], status: 'success' }
+                    return updated
+                  })
+                }
               } else if (result.status === 'SKIPPED') {
                 successfulCells.add(cellKey(result.productId, 'channel', Number(channelId)))
                 totalSkipped++
+                if (itemIdx !== -1) {
+                  setPublishProgressItems((prev) => {
+                    const updated = [...prev]
+                    updated[itemIdx] = { ...updated[itemIdx], status: 'success', message: '이미 발행됨' }
+                    return updated
+                  })
+                }
               } else if (result.status === 'FAILED') {
                 totalFailed++
                 if (result.message) {
                   errorMessages.push(result.message)
                 }
+                if (itemIdx !== -1) {
+                  setPublishProgressItems((prev) => {
+                    const updated = [...prev]
+                    updated[itemIdx] = { ...updated[itemIdx], status: 'failed', message: result.message }
+                    return updated
+                  })
+                }
               }
+              processedIndex++
             }
           } else if (!data.success) {
             totalFailed += productIds.length
             if (data.error) {
               errorMessages.push(data.error)
             }
+            // 모든 항목 실패 처리
+            channelItems.forEach((item) => {
+              const idx = progressItems.findIndex(
+                (p) => p.productId === item.productId && p.targetId === item.targetId && p.targetType === item.targetType
+              )
+              if (idx !== -1) {
+                setPublishProgressItems((prev) => {
+                  const updated = [...prev]
+                  updated[idx] = { ...updated[idx], status: 'failed', message: data.error }
+                  return updated
+                })
+              }
+            })
           }
         }
       }
@@ -518,6 +698,7 @@ export default function PublishPage() {
       toast.error('발행 중 오류가 발생했습니다. 다시 시도해주세요.')
     } finally {
       setIsPublishing(false)
+      // 모달은 사용자가 닫을 때까지 유지
     }
   }
 
@@ -611,7 +792,7 @@ export default function PublishPage() {
                 <Package size={24} className="text-gray-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">전체 상품</p>
+                <p className="text-sm text-gray-500">상품</p>
                 <p className="text-2xl font-bold text-gray-900">{stats.totalProducts}</p>
               </div>
             </div>
@@ -799,20 +980,20 @@ export default function PublishPage() {
                   {products.map((product) => (
                     <tr key={product.id} className="hover:bg-gray-50">
                       <td
-                        className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 p-2 cursor-pointer hover:bg-gray-100"
+                        className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 p-2 cursor-pointer hover:bg-gray-100 min-w-[200px] max-w-[300px]"
                         onClick={() => handleSelectRow(product.id)}
                         title="행 전체 선택/해제"
                       >
                         <div className="flex items-center gap-2">
                           {product.thumbnailUrl ? (
-                            <img src={product.thumbnailUrl} alt="" className="w-8 h-8 rounded object-cover" />
+                            <img src={product.thumbnailUrl} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
                           ) : (
-                            <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center flex-shrink-0">
                               <Package size={14} className="text-gray-400" />
                             </div>
                           )}
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium text-gray-900 truncate max-w-[70px]">{product.name}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium text-gray-900 truncate" title={product.name}>{product.name}</div>
                           </div>
                         </div>
                       </td>
@@ -1068,6 +1249,157 @@ export default function PublishPage() {
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 발행 진행 모달 */}
+      {showPublishProgress && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden max-h-[80vh] flex flex-col">
+            {/* 헤더 */}
+            <div className={`p-6 border-b ${isPublishing ? 'bg-blue-50 border-blue-100' : 'bg-green-50 border-green-100'}`}>
+              <div className="flex items-center gap-3">
+                <div className={`p-3 rounded-full ${isPublishing ? 'bg-blue-100' : 'bg-green-100'}`}>
+                  {isPublishing ? (
+                    <Loader2 size={24} className="text-blue-600 animate-spin" />
+                  ) : (
+                    <CheckCircle size={24} className="text-green-600" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    {isPublishing ? '발행 진행 중...' : '발행 완료'}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {isPublishing
+                      ? '페이지를 나가거나 새로고침하면 발행이 취소될 수 있습니다.'
+                      : `${publishProgressItems.filter((i) => i.status === 'success').length}개 성공, ${publishProgressItems.filter((i) => i.status === 'failed').length}개 실패`}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 경고 메시지 (발행 중일 때만) */}
+            {isPublishing && (
+              <div className="bg-amber-50 border-b border-amber-100 px-6 py-3 flex items-center gap-2">
+                <AlertOctagon size={16} className="text-amber-600 flex-shrink-0" />
+                <p className="text-sm text-amber-800">
+                  발행이 완료될 때까지 이 창을 닫지 마세요.
+                </p>
+              </div>
+            )}
+
+            {/* 진행 항목 목록 */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-2">
+                {publishProgressItems.map((item, index) => (
+                  <div
+                    key={`${item.productId}-${item.targetId}-${item.targetType}`}
+                    className={`p-3 rounded-lg border ${
+                      item.status === 'publishing'
+                        ? 'bg-blue-50 border-blue-200'
+                        : item.status === 'success'
+                        ? 'bg-green-50 border-green-200'
+                        : item.status === 'failed'
+                        ? 'bg-red-50 border-red-200'
+                        : 'bg-gray-50 border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* 상태 아이콘 */}
+                      <div className="flex-shrink-0">
+                        {item.status === 'publishing' ? (
+                          <Loader2 size={18} className="text-blue-500 animate-spin" />
+                        ) : item.status === 'success' ? (
+                          <CheckCircle size={18} className="text-green-500" />
+                        ) : item.status === 'failed' ? (
+                          <XCircle size={18} className="text-red-500" />
+                        ) : (
+                          <div className="w-[18px] h-[18px] rounded-full border-2 border-gray-300" />
+                        )}
+                      </div>
+
+                      {/* 상품/타겟 정보 */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {item.productName}
+                        </p>
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          <span>→</span>
+                          <span className={`px-1.5 py-0.5 rounded text-xs ${
+                            item.targetType === 'shop' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {item.targetType === 'shop' ? 'Shop' : '밴드'}
+                          </span>
+                          <span className="truncate">{item.targetName}</span>
+                        </p>
+                      </div>
+
+                      {/* 상태 텍스트 */}
+                      <div className="flex-shrink-0 text-right">
+                        <span className={`text-xs font-medium ${
+                          item.status === 'publishing'
+                            ? 'text-blue-600'
+                            : item.status === 'success'
+                            ? 'text-green-600'
+                            : item.status === 'failed'
+                            ? 'text-red-600'
+                            : 'text-gray-400'
+                        }`}>
+                          {item.status === 'publishing'
+                            ? '발행 중...'
+                            : item.status === 'success'
+                            ? '완료'
+                            : item.status === 'failed'
+                            ? '실패'
+                            : '대기'}
+                        </span>
+                        {item.message && (
+                          <p className="text-xs text-gray-500 mt-0.5 max-w-[150px] truncate" title={item.message}>
+                            {item.message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 진행률 바 */}
+            <div className="px-6 py-3 border-t border-gray-200 bg-gray-50">
+              <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                <span>진행률</span>
+                <span>
+                  {publishProgressItems.filter((i) => i.status === 'success' || i.status === 'failed').length} / {publishProgressItems.length}
+                </span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-300"
+                  style={{
+                    width: `${(publishProgressItems.filter((i) => i.status === 'success' || i.status === 'failed').length / publishProgressItems.length) * 100}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* 푸터 (발행 완료 후에만 표시) */}
+            {!isPublishing && (
+              <div className="p-4 border-t border-gray-200">
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    setShowPublishProgress(false)
+                    setPublishProgressItems([])
+                  }}
+                >
+                  닫기
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}

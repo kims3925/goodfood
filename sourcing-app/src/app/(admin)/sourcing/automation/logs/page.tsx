@@ -60,6 +60,14 @@ const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; bgCo
     textColor: 'text-emerald-600',
     borderColor: 'border-emerald-200'
   },
+  // API에서 COMPLETED/PARTIAL_SUCCESS를 SUCCESS로 변환하므로 SUCCESS도 추가
+  SUCCESS: {
+    label: '성공',
+    icon: <CheckCircle size={14} />,
+    bgColor: 'bg-emerald-50',
+    textColor: 'text-emerald-600',
+    borderColor: 'border-emerald-200'
+  },
   FAILED: {
     label: '실패',
     icon: <XCircle size={14} />,
