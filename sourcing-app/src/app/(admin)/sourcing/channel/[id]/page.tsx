@@ -130,6 +130,11 @@ export default function ChannelDetailPage({
   const [manualLoginSessionId, setManualLoginSessionId] = useState<string | null>(null)
   const [manualLoginStatus, setManualLoginStatus] = useState<string>('idle') // idle, waiting, completed, failed
 
+  // 쿠키 직접 입력 관련 상태
+  const [showCookieInput, setShowCookieInput] = useState(false)
+  const [cookieInputValue, setCookieInputValue] = useState('')
+  const [isSavingCookie, setIsSavingCookie] = useState(false)
+
   // Shop URL 기본 주소 (경로 기반 라우팅)
   const shopBaseUrl = process.env.NEXT_PUBLIC_SHOP_BASE_URL || 'http://localhost:3000'
 
@@ -315,6 +320,38 @@ export default function ChannelDetailPage({
     } catch (error) {
       console.error('세션 삭제 실패:', error)
       toast.error('세션 삭제 중 오류가 발생했습니다.')
+    }
+  }
+
+  // 쿠키 직접 저장
+  const handleSaveCookieDirect = async () => {
+    if (!cookieInputValue.trim()) {
+      toast.error('쿠키 JSON을 입력해주세요.')
+      return
+    }
+
+    setIsSavingCookie(true)
+    try {
+      const response = await fetch(`/api/channel/${id}/band-session`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cookieString: cookieInputValue }),
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success('세션 쿠키가 저장되었습니다.')
+        setCookieInputValue('')
+        setShowCookieInput(false)
+        loadBandSessionStatus()
+      } else {
+        toast.error(data.error || '쿠키 저장에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('쿠키 저장 실패:', error)
+      toast.error('쿠키 저장 중 오류가 발생했습니다.')
+    } finally {
+      setIsSavingCookie(false)
     }
   }
 
@@ -830,8 +867,8 @@ export default function ChannelDetailPage({
                       )}
                     </div>
 
-                    {/* BAND 플랫폼 네이버 계정 정보 섹션 */}
-                    {channel.platform === 'BAND' && (
+                    {/* BAND 플랫폼 네이버 계정 정보 섹션 (소매 채널만) */}
+                    {channel.platform === 'BAND' && channel.kind === 'RETAIL' && (
                       <div className="p-4 bg-green-50 rounded-xl">
                         <div className="flex items-center gap-2 mb-3">
                           <KeyRound size={16} className="text-green-600" />
@@ -908,8 +945,8 @@ export default function ChannelDetailPage({
                       </div>
                     )}
 
-                    {/* BAND 수동 세션 관리 섹션 */}
-                    {channel.platform === 'BAND' && (
+                    {/* BAND 수동 세션 관리 섹션 - RETAIL 채널만 표시 (도매 채널은 세션 불필요) */}
+                    {channel.platform === 'BAND' && channel.kind === 'RETAIL' && (
                       <div className="p-4 bg-purple-50 rounded-xl">
                         <div className="flex items-center gap-2 mb-3">
                           <KeyRound size={16} className="text-purple-600" />
@@ -987,6 +1024,70 @@ export default function ChannelDetailPage({
                           2단계 인증이 설정된 네이버 계정은 이 방법을 사용하세요.
                           버튼을 클릭하면 브라우저가 열리고, 직접 로그인하면 세션이 자동 저장됩니다.
                         </p>
+
+                        {/* 쿠키 직접 입력 섹션 */}
+                        <div className="mt-4 pt-4 border-t border-purple-200">
+                          <button
+                            type="button"
+                            onClick={() => setShowCookieInput(!showCookieInput)}
+                            className="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center gap-1"
+                          >
+                            <FileText size={14} />
+                            {showCookieInput ? '쿠키 직접 입력 닫기' : '쿠키 직접 입력 (서버용)'}
+                          </button>
+
+                          {showCookieInput && (
+                            <div className="mt-3 space-y-3">
+                              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <p className="text-xs text-yellow-800 font-medium mb-1">쿠키 추출 방법:</p>
+                                <ol className="text-xs text-yellow-700 space-y-1 list-decimal list-inside">
+                                  <li>로컬 PC에서 Chrome으로 band.us에 로그인</li>
+                                  <li>F12(개발자 도구) → Application → Cookies</li>
+                                  <li>band.us 쿠키를 우클릭 → Copy all as JSON</li>
+                                  <li>아래에 붙여넣기</li>
+                                </ol>
+                              </div>
+
+                              <textarea
+                                value={cookieInputValue}
+                                onChange={(e) => setCookieInputValue(e.target.value)}
+                                placeholder='[{"name": "...", "value": "...", "domain": ".band.us", ...}]'
+                                className="w-full h-32 p-3 text-xs font-mono border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white resize-none"
+                              />
+
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="primary"
+                                  onClick={handleSaveCookieDirect}
+                                  disabled={isSavingCookie || !cookieInputValue.trim()}
+                                  className="flex-1 !py-2 !bg-purple-600 hover:!bg-purple-700"
+                                >
+                                  {isSavingCookie ? (
+                                    <>
+                                      <Loader2 size={14} className="animate-spin" />
+                                      저장 중...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Save size={14} />
+                                      쿠키 저장
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  onClick={() => {
+                                    setCookieInputValue('')
+                                    setShowCookieInput(false)
+                                  }}
+                                  className="!py-2"
+                                >
+                                  취소
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

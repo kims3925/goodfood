@@ -238,6 +238,52 @@ export class BandManualLoginService {
     })
     console.log(`[BandManualLogin] Session deleted for channel ${channelId}`)
   }
+
+  /**
+   * 쿠키 직접 저장 (서버 환경용)
+   * 브라우저 개발자 도구에서 복사한 쿠키 문자열을 직접 저장
+   */
+  async saveSessionCookieDirect(channelId: number, cookieString: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log(`[BandManualLogin] Saving cookie directly for channel ${channelId}`)
+
+      // 쿠키 형식 검증
+      let cookies: any[]
+      try {
+        cookies = JSON.parse(cookieString)
+        if (!Array.isArray(cookies)) {
+          return { success: false, error: '쿠키는 JSON 배열 형식이어야 합니다.' }
+        }
+      } catch {
+        return { success: false, error: '유효한 JSON 형식이 아닙니다.' }
+      }
+
+      // 필수 쿠키 확인 (band.us 또는 naver.com 도메인)
+      const validCookies = cookies.filter(
+        (c) => c.domain && (c.domain.includes('band.us') || c.domain.includes('naver.com'))
+      )
+
+      if (validCookies.length === 0) {
+        return { success: false, error: 'Band 또는 Naver 관련 쿠키가 없습니다.' }
+      }
+
+      // DB에 세션 저장
+      const expiresAt = new Date(Date.now() + SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
+      await prisma.channel.update({
+        where: { id: channelId },
+        data: {
+          bandSessionCookie: JSON.stringify(validCookies),
+          sessionExpiresAt: expiresAt,
+        },
+      })
+
+      console.log(`[BandManualLogin] Direct cookie saved for channel ${channelId} (${validCookies.length} cookies)`)
+      return { success: true }
+    } catch (error: any) {
+      console.error(`[BandManualLogin] Failed to save cookie directly:`, error)
+      return { success: false, error: error.message }
+    }
+  }
 }
 
 export const manualLoginService = new BandManualLoginService()
