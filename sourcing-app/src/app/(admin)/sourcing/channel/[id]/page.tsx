@@ -1038,9 +1038,9 @@ export default function ChannelDetailPage({
 
                           {showCookieInput && (
                             <div className="mt-3 space-y-3">
-                              {/* 방법 1: 자동 전송 (권장) */}
+                              {/* 쿠키 추출 방법 */}
                               <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                                <p className="text-xs text-green-800 font-medium mb-2">방법 1: 자동 전송 (권장)</p>
+                                <p className="text-xs text-green-800 font-medium mb-2">쿠키 추출 방법:</p>
                                 <ol className="text-xs text-green-700 space-y-1 list-decimal list-inside mb-2">
                                   <li>Chrome으로 <a href="https://band.us" target="_blank" rel="noopener noreferrer" className="underline font-medium">band.us</a>에 로그인</li>
                                   <li>F12 → Console 탭에서 아래 명령어 실행:</li>
@@ -1049,27 +1049,17 @@ export default function ChannelDetailPage({
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const apiUrl = `${window.location.origin}/api/channel/${id}/band-session`
-                                      const script = `fetch('${apiUrl}',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cookieString:JSON.stringify(await cookieStore.getAll())})}).then(r=>r.json()).then(d=>alert(d.success?'세션 저장 완료!':'오류: '+d.error))`
+                                      const script = `copy(JSON.stringify(await cookieStore.getAll()))`
                                       navigator.clipboard.writeText(script)
-                                      toast.success('클립보드에 복사됨! band.us 콘솔에 붙여넣기 하세요.')
+                                      toast.success('클립보드에 복사됨! band.us 콘솔에 붙여넣기 후 Enter')
                                     }}
                                     className="text-left hover:text-green-300 w-full"
                                     title="클릭하여 복사"
                                   >
-                                    fetch('{typeof window !== 'undefined' ? window.location.origin : ''}/api/channel/{id}/band-session'...) <span className="text-yellow-400">[클릭하여 복사]</span>
+                                    copy(JSON.stringify(await cookieStore.getAll())) <span className="text-yellow-400">[클릭하여 복사]</span>
                                   </button>
                                 </div>
-                                <p className="text-xs text-green-600 mt-2">→ 실행하면 쿠키가 자동으로 서버에 저장됩니다!</p>
-                              </div>
-
-                              {/* 방법 2: 수동 복사/붙여넣기 */}
-                              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                <p className="text-xs text-yellow-800 font-medium mb-1">방법 2: 수동 복사/붙여넣기</p>
-                                <ol className="text-xs text-yellow-700 space-y-1 list-decimal list-inside">
-                                  <li>band.us 콘솔에서 실행: <code className="bg-yellow-100 px-1">copy(JSON.stringify(await cookieStore.getAll()))</code></li>
-                                  <li>아래에 Ctrl+V로 붙여넣기</li>
-                                </ol>
+                                <p className="text-xs text-green-600 mt-2">3. 아래 입력창에 Ctrl+V로 붙여넣기</p>
                               </div>
 
                               <textarea
