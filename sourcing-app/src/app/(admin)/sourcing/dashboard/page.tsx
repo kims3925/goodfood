@@ -244,15 +244,45 @@ export default function AutomationDashboardPage() {
         fetch('/api/automation/logs?limit=5'),
       ])
 
-      const statsData = await statsRes.json()
-      const configData = await configRes.json()
-      const executeData = await executeRes.json()
-      const logsData = await logsRes.json()
+      // 각 응답을 개별적으로 처리 (404 등 에러 시에도 다른 데이터는 표시)
+      if (statsRes.ok) {
+        try {
+          const statsData = await statsRes.json()
+          if (statsData.success) setStats(statsData.data)
+        } catch (e) {
+          console.error('stats 파싱 실패:', e)
+        }
+      }
 
-      if (statsData.success) setStats(statsData.data)
-      if (configData.success) setConfig(configData.data)
-      if (executeData.success) setRunningWorkflow(executeData.data.workflow)
-      if (logsData.success) setRecentLogs(logsData.data || [])
+      if (configRes.ok) {
+        try {
+          const configData = await configRes.json()
+          if (configData.success) setConfig(configData.data)
+        } catch (e) {
+          console.error('config 파싱 실패:', e)
+        }
+      }
+
+      if (executeRes.ok) {
+        try {
+          const executeData = await executeRes.json()
+          if (executeData.success) setRunningWorkflow(executeData.data.workflow)
+        } catch (e) {
+          console.error('execute 파싱 실패:', e)
+        }
+      }
+
+      if (logsRes.ok) {
+        try {
+          const logsData = await logsRes.json()
+          if (logsData.success) setRecentLogs(logsData.data || [])
+        } catch (e) {
+          console.error('logs 파싱 실패:', e)
+        }
+      } else {
+        // logs API가 없으면 빈 배열로 설정 (404 에러 방지)
+        setRecentLogs([])
+      }
     } catch (error) {
       console.error('데이터 로드 실패:', error)
     } finally {
