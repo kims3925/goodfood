@@ -79,8 +79,12 @@ bandauto/
 
 ### 1. 의존성 설치
 ```bash
+# v1.1 브랜치 클론
+git clone -b 1.1 https://github.com/abcpharm00002-spec/bandauto.git
+cd bandauto
+
+# 의존성 설치
 npm install
-```
 
 ### 2. 데이터베이스 초기화
 ```bash
