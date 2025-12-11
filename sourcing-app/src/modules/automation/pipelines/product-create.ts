@@ -145,13 +145,19 @@ export async function runProductCreatePipeline(
     }
 
     try {
-      console.log(`[ProductCreate] Processing collectedProduct ${collectedProduct.id}: ${collectedProduct.name?.substring(0, 50)}...`)
-
       // rawMetadata에서 AI 분석 결과 추출
-      const metadata = collectedProduct.rawMetadata as any || {}
+      let metadata: any = {}
+      if (collectedProduct.rawMetadata) {
+        try {
+          metadata = typeof collectedProduct.rawMetadata === 'string'
+            ? JSON.parse(collectedProduct.rawMetadata)
+            : collectedProduct.rawMetadata
+        } catch {
+          // 파싱 실패 시 빈 객체 사용
+        }
+      }
       const options = metadata.options || []
       const variants = metadata.variants || []
-      // shipping 객체 또는 직접 shippingFee/shippingInfo 필드 둘 다 지원
       const shipping = metadata.shipping || {
         shippingFee: metadata.shippingFee ?? null,
         shippingInfo: metadata.shippingInfo ?? null,
@@ -186,9 +192,9 @@ export async function runProductCreatePipeline(
           variants: variants.length
             ? {
                 create: variants.map((v: any) => ({
-                  optionSummary: v.optionSummary || null,
-                  wholesalePrice: v.wholesalePrice || null,
-                  price: v.price || 0,
+                  optionSummary: v.optionSummary ?? null,
+                  wholesalePrice: v.wholesalePrice ?? null,  // ?? 사용하여 0도 유지
+                  price: v.price ?? 0,
                 })),
               }
             : undefined,
@@ -198,11 +204,9 @@ export async function runProductCreatePipeline(
       // 이미지 다운로드 및 ProductImage 저장
       if (imageUrls.length > 0) {
         try {
-          console.log(`[ProductCreate] 이미지 다운로드 시작: ${imageUrls.length}개`)
           const downloadedImages = await downloadAndSaveProductImages(imageUrls)
 
           if (downloadedImages.length > 0) {
-            // ProductImage 레코드 생성
             await prisma.productImage.createMany({
               data: downloadedImages.map((img, index) => ({
                 productId: product.id,
@@ -214,16 +218,12 @@ export async function runProductCreatePipeline(
               })),
             })
 
-            // 첫 번째 이미지를 썸네일로 업데이트
             await prisma.product.update({
               where: { id: product.id },
               data: { thumbnailUrl: downloadedImages[0].url },
             })
-
-            console.log(`[ProductCreate] 이미지 저장 완료: ${downloadedImages.length}개`)
           }
-        } catch (imageError) {
-          console.error(`[ProductCreate] 이미지 다운로드/저장 실패 (상품은 생성됨):`, imageError)
+        } catch {
           // 이미지 실패해도 상품 생성은 성공으로 처리
         }
       }
@@ -233,10 +233,7 @@ export async function runProductCreatePipeline(
       result.productName = product.name
       totalCreated++
       consecutiveFailures = 0
-
-      console.log(`[ProductCreate] Created product ${product.id} from collectedProduct ${collectedProduct.id}`)
     } catch (error: any) {
-      console.error(`[ProductCreate] Error processing collectedProduct ${collectedProduct.id}:`, error)
       result.status = 'failed'
       result.error = error.message
       consecutiveFailures++
