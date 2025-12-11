@@ -235,3 +235,6 @@ shop-app/nohup.out
 docs/refactoring/SOURCING_ANALYSIS.md
 AGENTS.md
 QUICK_REFERENCE.txt
+sourcing-app/.env.example
+.gitignore
+shop-app/.env.production.example
