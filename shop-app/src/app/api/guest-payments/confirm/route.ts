@@ -311,7 +311,19 @@ export async function POST(req: NextRequest) {
         (sum, item) => sum + item.unitPrice * item.quantity,
         0
       )
-      const shippingFee = subtotal >= 30000 ? 0 : 3000
+
+      // Shop의 배송비 설정 조회
+      let shippingFee = 0
+      if (shopId) {
+        const shop = await prisma.shop.findUnique({
+          where: { id: shopId },
+          select: { freeShippingAmount: true, defaultShippingFee: true },
+        })
+        if (shop?.freeShippingAmount != null && shop?.defaultShippingFee != null) {
+          shippingFee = subtotal >= shop.freeShippingAmount ? 0 : shop.defaultShippingFee
+        }
+      }
+
       const totalAmount = subtotal + shippingFee
 
       if (totalAmount !== amount) {

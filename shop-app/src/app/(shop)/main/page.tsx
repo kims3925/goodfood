@@ -258,7 +258,7 @@ export default function StorePage() {
               {shopProducts.map((product) => (
                 <Link
                   key={`product-${product.publishedProductId || product.id}`}
-                  href={`/product/${product.id}`}
+                  href={getPath(`/product/${product.id}`)}
                   className="group block"
                 >
                   <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200 hover:border-rose-400 transition-all hover:shadow-lg">
