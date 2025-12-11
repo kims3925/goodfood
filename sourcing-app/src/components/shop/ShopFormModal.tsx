@@ -85,7 +85,7 @@ export default function ShopFormModal({
 
     // Validation - 기본 정보
     if (!subdomain.trim()) {
-      toast.error('서브도메인을 입력해주세요.')
+      toast.error('도메인을 입력해주세요.')
       return
     }
 
@@ -97,7 +97,7 @@ export default function ShopFormModal({
     // Subdomain format validation
     const subdomainRegex = /^[a-z0-9-]+$/
     if (!subdomainRegex.test(subdomain)) {
-      toast.error('서브도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.')
+      toast.error('도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.')
       return
     }
 
@@ -236,7 +236,7 @@ export default function ShopFormModal({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    서브도메인 <span className="text-red-500">*</span>
+                    도메인 <span className="text-red-500">*</span>
                   </label>
                   <div className="flex items-center gap-2">
                     <Input

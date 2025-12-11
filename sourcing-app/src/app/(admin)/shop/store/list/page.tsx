@@ -239,7 +239,7 @@ function ShopListContent() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">쇼핑몰 관리</h1>
           <p className="text-gray-600">
-            멀티 서브도메인 쇼핑몰을 관리합니다.
+            쇼핑몰의 도메인 및 정보를 관리합니다.
           </p>
         </div>
 
@@ -373,7 +373,7 @@ function ShopListContent() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                 <Input
                   type="text"
-                  placeholder="쇼핑몰명, 서브도메인으로 검색..."
+                  placeholder="쇼핑몰명, 도메인으로 검색..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 w-80"

@@ -68,6 +68,7 @@ interface UnifiedOrderDetail {
   orderNumber: string
   status: string
   statusLabel: string
+  isGuestOrder?: boolean
   customerName: string
   customerPhone: string | null
   shippingAddress: ShippingAddress | null
@@ -280,7 +281,14 @@ export default function UnifiedOrderDetailPage() {
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">주문 상세</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-gray-900">주문 상세</h1>
+              {order.isGuestOrder && (
+                <span className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-700 whitespace-nowrap">
+                  비회원
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-500 font-mono">{order.orderNumber}</p>
           </div>
         </div>

@@ -17,6 +17,7 @@ export interface UnifiedOrder {
   status: string
   statusLabel: string
   createdAt: string
+  isGuestOrder?: boolean
   // 상세 정보
   address?: string
   deliveryMemo?: string
@@ -184,6 +185,121 @@ export async function GET(request: NextRequest) {
               status: order.status,
               statusLabel: statusLabels[order.status] || order.status,
               createdAt: order.orderedAt.toISOString(),
+              isGuestOrder: false,
+              address: addr ? `${addr.address} ${addr.addressDetail || ''}`.trim() : '',
+              deliveryMemo: addr?.deliveryMemo || undefined,
+              paymentMethod: order.payment?.method || undefined,
+              shopId: order.shop?.id || null,
+              shopName: order.shop?.name || null,
+              shopSubdomain: order.shop?.subdomain || null,
+            })
+          }
+
+          // 2. 비회원 주문 조회
+          // 비회원 주문 카운트 조회 (상태별)
+          const guestCountBaseWhere: any = {
+            items: {
+              some: {
+                publishedProductId: { in: publishedProductIds },
+              },
+            },
+          }
+          if (shopId) {
+            guestCountBaseWhere.shopId = parseInt(shopId)
+          }
+          if (search) {
+            guestCountBaseWhere.OR = [
+              { orderNumber: { contains: search } },
+              { guestName: { contains: search } },
+              { guestPhone: { contains: search } },
+              { shippingAddress: { recipientName: { contains: search } } },
+              { shippingAddress: { recipientPhone: { contains: search } } },
+            ]
+          }
+
+          try {
+            const [guestPendingCount, guestPaidCount, guestShippedCount, guestDeliveredCount, guestCancelledCount, guestRefundedCount] = await Promise.all([
+              prisma.guestOrder.count({ where: { ...guestCountBaseWhere, status: 'PENDING' } }),
+              prisma.guestOrder.count({ where: { ...guestCountBaseWhere, status: 'PAID' } }),
+              prisma.guestOrder.count({ where: { ...guestCountBaseWhere, status: 'SHIPPED' } }),
+              prisma.guestOrder.count({ where: { ...guestCountBaseWhere, status: 'DELIVERED' } }),
+              prisma.guestOrder.count({ where: { ...guestCountBaseWhere, status: 'CANCELLED' } }),
+              prisma.guestOrder.count({ where: { ...guestCountBaseWhere, status: 'REFUNDED' } }),
+            ])
+
+            statusCounts.PENDING += guestPendingCount
+            statusCounts.PAID += guestPaidCount
+            statusCounts.SHIPPED += guestShippedCount
+            statusCounts.DELIVERED += guestDeliveredCount
+            statusCounts.CANCELLED += guestCancelledCount + guestRefundedCount
+          } catch (guestCountError) {
+            console.error('비회원 주문 상태별 카운트 조회 실패:', guestCountError)
+          }
+
+          const guestOrders = await prisma.guestOrder.findMany({
+            where: {
+              items: {
+                some: {
+                  publishedProductId: { in: publishedProductIds },
+                },
+              },
+              ...(shopId && { shopId: parseInt(shopId) }),
+              ...(search && {
+                OR: [
+                  { orderNumber: { contains: search } },
+                  { guestName: { contains: search } },
+                  { guestPhone: { contains: search } },
+                  { shippingAddress: { recipientName: { contains: search } } },
+                  { shippingAddress: { recipientPhone: { contains: search } } },
+                ],
+              }),
+              ...(status && status === 'CANCELLED'
+                ? { status: { in: ['CANCELLED', 'REFUNDED'] } }
+                : status ? { status: status as any } : {}),
+            },
+            include: {
+              shop: {
+                select: {
+                  id: true,
+                  name: true,
+                  subdomain: true,
+                },
+              },
+              shippingAddress: true,
+              items: {
+                select: {
+                  productName: true,
+                },
+              },
+              payment: {
+                select: {
+                  method: true,
+                },
+              },
+            },
+            orderBy: { orderedAt: 'desc' },
+          })
+
+          for (const order of guestOrders) {
+            const productNames = order.items.map(i => i.productName)
+            const productSummary = productNames.length > 1
+              ? `${productNames[0]} 외 ${productNames.length - 1}개`
+              : productNames[0] || '상품 없음'
+
+            const addr = order.shippingAddress
+            unifiedOrders.push({
+              id: order.id,
+              source: 'SHOPPING_MALL',
+              orderNumber: order.orderNumber,
+              customerName: addr?.recipientName || order.guestName,
+              customerPhone: addr?.recipientPhone || order.guestPhone,
+              productSummary,
+              itemCount: order.items.length,
+              totalAmount: Number(order.totalAmount),
+              status: order.status,
+              statusLabel: statusLabels[order.status] || order.status,
+              createdAt: order.orderedAt.toISOString(),
+              isGuestOrder: true,
               address: addr ? `${addr.address} ${addr.addressDetail || ''}`.trim() : '',
               deliveryMemo: addr?.deliveryMemo || undefined,
               paymentMethod: order.payment?.method || undefined,

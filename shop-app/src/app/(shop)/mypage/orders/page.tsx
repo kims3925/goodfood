@@ -38,6 +38,7 @@ interface Order {
   deliveredAt: string | null
   items: OrderItem[]
   hasWritableReview: boolean
+  isGuestOrder?: boolean
   payment: {
     status: string
     method: string
@@ -214,6 +215,11 @@ export default function OrdersPage() {
                     <span className="text-sm font-medium text-gray-900">
                       주문번호: <span className="font-mono">{order.orderNumber}</span>
                     </span>
+                    {order.isGuestOrder && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap">
+                        비회원
+                      </span>
+                    )}
                   </div>
                   <span
                     className={`px-3 py-1 rounded-full text-sm font-medium inline-block ${

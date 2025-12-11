@@ -107,28 +107,28 @@ export async function POST(request: NextRequest) {
     // 필수 필드 검증
     if (!subdomain || !name) {
       return NextResponse.json(
-        { success: false, error: '서브도메인과 쇼핑몰명은 필수입니다.' },
+        { success: false, error: '도메인과 쇼핑몰명은 필수입니다.' },
         { status: 400 }
       )
     }
 
-    // 서브도메인 형식 검증 (영문, 숫자, 하이픈만 허용)
+    // 도메인 형식 검증 (영문, 숫자, 하이픈만 허용)
     const subdomainRegex = /^[a-z0-9-]+$/
     if (!subdomainRegex.test(subdomain)) {
       return NextResponse.json(
-        { success: false, error: '서브도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.' },
+        { success: false, error: '도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.' },
         { status: 400 }
       )
     }
 
-    // 서브도메인 중복 체크
+    // 도메인 중복 체크
     const existingShop = await prisma.shop.findUnique({
       where: { subdomain },
     })
 
     if (existingShop) {
       return NextResponse.json(
-        { success: false, error: '이미 사용 중인 서브도메인입니다.' },
+        { success: false, error: '이미 사용 중인 도메인입니다.' },
         { status: 400 }
       )
     }

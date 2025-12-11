@@ -128,7 +128,7 @@ export default function ShopDetailPage({
     return `${protocol}://${shopBaseDomain}/${subdomainValue}`
   }, [shopBaseDomain])
 
-  // 서브도메인 중복 체크
+  // 도메인 중복 체크
   const checkSubdomainDuplicate = useCallback(async (value: string) => {
     if (!value.trim() || value === shop?.subdomain) {
       setSubdomainCheck({ checking: false, isDuplicate: null })
@@ -174,7 +174,7 @@ export default function ShopDetailPage({
     }
   }, [id, shop?.name])
 
-  // 서브도메인 변경 핸들러
+  // 도메인 변경 핸들러
   const handleSubdomainChange = (value: string) => {
     const lowerValue = value.toLowerCase()
     setSubdomain(lowerValue)
@@ -263,19 +263,19 @@ export default function ShopDetailPage({
     }
 
     if (!subdomain.trim()) {
-      toast.error('서브도메인을 입력해주세요.')
+      toast.error('도메인을 입력해주세요.')
       return
     }
 
     const subdomainRegex = /^[a-z0-9-]+$/
     if (!subdomainRegex.test(subdomain)) {
-      toast.error('서브도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.')
+      toast.error('도메인은 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.')
       return
     }
 
     // 중복 체크 검증
     if (subdomainCheck.isDuplicate) {
-      toast.error('이미 사용 중인 서브도메인입니다.')
+      toast.error('이미 사용 중인 도메인입니다.')
       return
     }
 
@@ -561,7 +561,7 @@ export default function ShopDetailPage({
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">서브도메인</label>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">도메인</label>
                   {isEditMode ? (
                     <>
                       <div className="flex items-center">
@@ -593,7 +593,7 @@ export default function ShopDetailPage({
                       {!subdomainCheck.checking && subdomainCheck.isDuplicate === false && (
                         <div className="flex items-center gap-1 mt-1 text-green-600 text-xs">
                           <CheckCircle size={12} />
-                          <span>사용 가능한 서브도메인입니다.</span>
+                          <span>사용 가능한 도메인입니다.</span>
                         </div>
                       )}
                     </>

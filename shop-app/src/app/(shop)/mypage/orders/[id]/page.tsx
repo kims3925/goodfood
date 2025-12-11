@@ -92,6 +92,7 @@ interface Order {
   id: number
   orderNumber: string
   status: string
+  isGuestOrder?: boolean
   shippingAddress: ShippingAddress | null
   subtotalAmount: number
   shippingFee: number
@@ -360,6 +361,11 @@ export default function OrderDetailPage() {
               <span className={`px-3 py-1 rounded-full text-sm font-medium border ${statusColors[order.status] || 'text-gray-600 bg-gray-50 border-gray-200'}`}>
                 {statusLabels[order.status] || order.status}
               </span>
+              {order.isGuestOrder && (
+                <span className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-700 whitespace-nowrap">
+                  비회원
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 text-gray-600">
               <span className="font-mono">{order.orderNumber}</span>

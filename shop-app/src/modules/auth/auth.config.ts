@@ -36,7 +36,7 @@ async function logSignIn(opts: {
 }
 
 // 쿠키 도메인 설정
-// 경로 기반 라우팅으로 변경되어 서브도메인 간 세션 공유 불필요
+// 경로 기반 라우팅으로 변경되어 도메인 간 세션 공유 불필요
 function getCookieDomain(): string | undefined {
   // 환경변수에서 명시적으로 설정된 경우 사용
   if (process.env.COOKIE_DOMAIN) {
@@ -48,7 +48,7 @@ function getCookieDomain(): string | undefined {
 }
 
 export const authOptions: NextAuthOptions = {
-  // 서브도메인 간 세션 공유를 위한 쿠키 설정
+  // 도메인 간 세션 공유를 위한 쿠키 설정
   cookies: {
     sessionToken: {
       name:
@@ -140,7 +140,7 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/error',
   },
   callbacks: {
-    // 서브도메인 간 리다이렉트 허용
+    // 도메인 간 리다이렉트 허용
     async redirect({ url, baseUrl }) {
       // 상대 경로는 그대로 허용
       if (url.startsWith('/')) {
@@ -156,7 +156,7 @@ export const authOptions: NextAuthOptions = {
           return url
         }
 
-        // 서브도메인 허용 (.lvh.me, 프로덕션 도메인)
+        // 도메인 허용 (.lvh.me, 프로덕션 도메인)
         const allowedDomains = ['.lvh.me', process.env.COOKIE_DOMAIN].filter(Boolean)
         const isAllowedSubdomain = allowedDomains.some(
           (domain) => domain && urlObj.host.endsWith(domain.replace(/^\./, ''))
