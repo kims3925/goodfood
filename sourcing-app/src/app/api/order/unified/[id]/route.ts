@@ -24,10 +24,10 @@ export async function GET(
     const source = searchParams.get('source') // SHOPPING_MALL or GOOGLE_FORM
 
     if (source === 'SHOPPING_MALL') {
-      // 먼저 회원 주문 조회
+      // 먼저 회원 주문 조회 (orderNumber로 조회)
       const order = await prisma.order.findFirst({
         where: {
-          id: parseInt(id),
+          orderNumber: id,
           items: {
             some: {
               publishedProduct: {
@@ -137,10 +137,10 @@ export async function GET(
         })
       }
 
-      // 회원 주문이 없으면 비회원 주문 조회
+      // 회원 주문이 없으면 비회원 주문 조회 (orderNumber로 조회)
       const guestOrder = await prisma.guestOrder.findFirst({
         where: {
-          id: parseInt(id),
+          orderNumber: id,
           items: {
             some: {
               publishedProduct: {
@@ -285,10 +285,10 @@ export async function PATCH(
     }
 
     if (source === 'SHOPPING_MALL') {
-      // 먼저 회원 주문 조회
+      // 먼저 회원 주문 조회 (orderNumber로 조회)
       const order = await prisma.order.findFirst({
         where: {
-          id: parseInt(id),
+          orderNumber: id,
           items: {
             some: {
               publishedProduct: {
@@ -354,7 +354,7 @@ export async function PATCH(
       }
 
         await prisma.order.update({
-          where: { id: parseInt(id) },
+          where: { orderNumber: id },
           data: updateData,
         })
 
@@ -364,10 +364,10 @@ export async function PATCH(
         })
       }
 
-      // 회원 주문이 없으면 비회원 주문 조회
+      // 회원 주문이 없으면 비회원 주문 조회 (orderNumber로 조회)
       const guestOrder = await prisma.guestOrder.findFirst({
         where: {
-          id: parseInt(id),
+          orderNumber: id,
           items: {
             some: {
               publishedProduct: {
@@ -430,7 +430,7 @@ export async function PATCH(
       }
 
       await prisma.guestOrder.update({
-        where: { id: parseInt(id) },
+        where: { orderNumber: id },
         data: updateData,
       })
 

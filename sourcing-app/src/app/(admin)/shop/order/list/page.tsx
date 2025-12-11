@@ -120,7 +120,8 @@ export default function UnifiedOrderListPage() {
           setStatusCounts(data.data.statusCounts)
         }
       } else {
-        toast.error('주문 목록을 불러오는데 실패했습니다.')
+        // 데이터가 없는 경우는 정상이므로 에러 메시지 표시하지 않음
+        console.warn('주문 목록 조회 실패:', data.error)
       }
     } catch (error) {
       console.error('주문 로드 실패:', error)
@@ -384,7 +385,7 @@ export default function UnifiedOrderListPage() {
                     <TableRow
                       key={`${order.source}-${order.id}`}
                       className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/shop/order/detail/${order.id}?source=${order.source}`)}
+                      onClick={() => router.push(`/shop/order/detail/${order.orderNumber}?source=${order.source}`)}
                     >
                       <TableCell>{getSourceBadge(order)}</TableCell>
                       <TableCell>

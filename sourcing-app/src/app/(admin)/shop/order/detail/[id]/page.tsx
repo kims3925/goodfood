@@ -137,7 +137,7 @@ export default function UnifiedOrderDetailPage() {
   const searchParams = useSearchParams()
   const toast = useToast()
 
-  const orderId = parseInt(params.id as string)
+  const orderNumber = params.id as string
   const source = (searchParams.get('source') || 'SHOPPING_MALL') as OrderSource
 
   const [order, setOrder] = useState<UnifiedOrderDetail | null>(null)
@@ -148,17 +148,17 @@ export default function UnifiedOrderDetailPage() {
   const [pendingStatus, setPendingStatus] = useState<string | null>(null)
 
   useEffect(() => {
-    if (orderId) {
+    if (orderNumber) {
       loadOrder()
     }
-  }, [orderId, source])
+  }, [orderNumber, source])
 
   const loadOrder = async () => {
     try {
       setIsLoading(true)
       setError(null)
 
-      const response = await fetch(`/api/order/unified/${orderId}?source=${source}`)
+      const response = await fetch(`/api/order/unified/${orderNumber}?source=${source}`)
       const data = await response.json()
 
       if (data.success) {
@@ -190,7 +190,7 @@ export default function UnifiedOrderDetailPage() {
 
     setIsUpdating(true)
     try {
-      const response = await fetch(`/api/order/unified/${orderId}`, {
+      const response = await fetch(`/api/order/unified/${orderNumber}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

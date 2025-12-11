@@ -23,36 +23,38 @@ export async function GET(request: NextRequest) {
 
     // 도매처 목록 조회 (주문이 있는 도매처만)
     // 먼저 주문이 있는 도매 채널 ID 목록을 가져옴
-    const channelsWithOrders = await prisma.orderItem.findMany({
-      where: {
-        order: {
-          status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
-          paidAt: { not: null },
-        },
-        publishedProduct: {
-          userId: user.userId,
-          product: {
-            collectedProduct: {
-              post: {
-                channel: {
-                  kind: 'WHOLESALE',
-                  userId: user.userId,
+    const [channelsWithOrders, channelsWithGuestOrders] = await Promise.all([
+      prisma.orderItem.findMany({
+        where: {
+          order: {
+            status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+            paidAt: { not: null },
+          },
+          publishedProduct: {
+            userId: user.userId,
+            product: {
+              collectedProduct: {
+                post: {
+                  channel: {
+                    kind: 'WHOLESALE',
+                    userId: user.userId,
+                  },
                 },
               },
             },
           },
         },
-      },
-      select: {
-        publishedProduct: {
-          select: {
-            product: {
-              select: {
-                collectedProduct: {
-                  select: {
-                    post: {
-                      select: {
-                        channelId: true,
+        select: {
+          publishedProduct: {
+            select: {
+              product: {
+                select: {
+                  collectedProduct: {
+                    select: {
+                      post: {
+                        select: {
+                          channelId: true,
+                        },
                       },
                     },
                   },
@@ -61,13 +63,60 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-      },
-      distinct: ['publishedProductId'],
-    })
+        distinct: ['publishedProductId'],
+      }),
+      prisma.guestOrderItem.findMany({
+        where: {
+          guestOrder: {
+            status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+            paidAt: { not: null },
+          },
+          publishedProduct: {
+            userId: user.userId,
+            product: {
+              collectedProduct: {
+                post: {
+                  channel: {
+                    kind: 'WHOLESALE',
+                    userId: user.userId,
+                  },
+                },
+              },
+            },
+          },
+        },
+        select: {
+          publishedProduct: {
+            select: {
+              product: {
+                select: {
+                  collectedProduct: {
+                    select: {
+                      post: {
+                        select: {
+                          channelId: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        distinct: ['publishedProductId'],
+      }),
+    ])
 
-    // 주문이 있는 채널 ID 추출
+    // 주문이 있는 채널 ID 추출 (회원 + 비회원)
     const channelIdsWithOrders = new Set<number>()
     for (const item of channelsWithOrders) {
+      const channelId = item.publishedProduct?.product?.collectedProduct?.post?.channelId
+      if (channelId) {
+        channelIdsWithOrders.add(channelId)
+      }
+    }
+    for (const item of channelsWithGuestOrders) {
       const channelId = item.publishedProduct?.product?.collectedProduct?.post?.channelId
       if (channelId) {
         channelIdsWithOrders.add(channelId)
@@ -106,70 +155,126 @@ export async function GET(request: NextRequest) {
     const toDate = to ? new Date(to) : new Date()
     toDate.setHours(23, 59, 59, 999)
 
-    // 해당 도매처의 발주 데이터 조회
-    const orderItems = await prisma.orderItem.findMany({
-      where: {
-        order: {
-          status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
-          paidAt: {
-            not: null,
-            gte: fromDate,
-            lte: toDate,
-          },
-        },
-        publishedProduct: {
-          userId: user.userId,
-          product: {
-            collectedProduct: {
-              post: {
-                channel: {
-                  id: parseInt(wholesaleChannelId),
-                  kind: 'WHOLESALE',
-                },
-              },
+    // 해당 도매처의 발주 데이터 조회 (회원 + 비회원)
+    const [orderItems, guestOrderItems] = await Promise.all([
+      prisma.orderItem.findMany({
+        where: {
+          order: {
+            status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+            paidAt: {
+              not: null,
+              gte: fromDate,
+              lte: toDate,
             },
           },
-        },
-      },
-      include: {
-        order: {
-          select: {
-            id: true,
-            orderNumber: true,
-            paidAt: true,
-          },
-        },
-        variant: {
-          select: {
-            wholesalePrice: true,
-          },
-        },
-        publishedProduct: {
-          include: {
+          publishedProduct: {
+            userId: user.userId,
             product: {
-              include: {
-                variants: {
-                  select: {
-                    optionSummary: true,
-                    wholesalePrice: true,
+              collectedProduct: {
+                post: {
+                  channel: {
+                    id: parseInt(wholesaleChannelId),
+                    kind: 'WHOLESALE',
                   },
                 },
               },
             },
           },
         },
-      },
-    })
+        include: {
+          order: {
+            select: {
+              id: true,
+              orderNumber: true,
+              paidAt: true,
+            },
+          },
+          variant: {
+            select: {
+              wholesalePrice: true,
+            },
+          },
+          publishedProduct: {
+            include: {
+              product: {
+                include: {
+                  variants: {
+                    select: {
+                      optionSummary: true,
+                      wholesalePrice: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.guestOrderItem.findMany({
+        where: {
+          guestOrder: {
+            status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+            paidAt: {
+              not: null,
+              gte: fromDate,
+              lte: toDate,
+            },
+          },
+          publishedProduct: {
+            userId: user.userId,
+            product: {
+              collectedProduct: {
+                post: {
+                  channel: {
+                    id: parseInt(wholesaleChannelId),
+                    kind: 'WHOLESALE',
+                  },
+                },
+              },
+            },
+          },
+        },
+        include: {
+          guestOrder: {
+            select: {
+              id: true,
+              orderNumber: true,
+              paidAt: true,
+            },
+          },
+          variant: {
+            select: {
+              wholesalePrice: true,
+            },
+          },
+          publishedProduct: {
+            include: {
+              product: {
+                include: {
+                  variants: {
+                    select: {
+                      optionSummary: true,
+                      wholesalePrice: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ])
 
     // 일별 집계
     const dailyMap = new Map<string, {
       date: string
-      orderCount: Set<number>
+      orderCount: Set<string>
       itemCount: number
       totalQuantity: number
       totalAmount: number
     }>()
 
+    // 회원 주문 집계
     for (const item of orderItems) {
       if (!item.order.paidAt) continue
 
@@ -204,7 +309,48 @@ export async function GET(request: NextRequest) {
       }
 
       const daily = dailyMap.get(dateKey)!
-      daily.orderCount.add(item.order.id)
+      daily.orderCount.add(item.order.orderNumber)
+      daily.itemCount += 1
+      daily.totalQuantity += item.quantity
+      daily.totalAmount += itemAmount
+    }
+
+    // 비회원 주문 집계
+    for (const item of guestOrderItems) {
+      if (!item.guestOrder.paidAt) continue
+
+      const dateKey = item.guestOrder.paidAt.toISOString().split('T')[0]
+
+      // 도매가 계산
+      let wholesalePrice = item.variant?.wholesalePrice || 0
+      if (!item.variant && item.publishedProduct?.product?.variants?.length) {
+        if (item.optionSummary) {
+          const matched = item.publishedProduct.product.variants.find(
+            v => v.optionSummary === item.optionSummary
+          )
+          if (matched) {
+            wholesalePrice = matched.wholesalePrice || 0
+          }
+        }
+        if (Number(wholesalePrice) === 0) {
+          wholesalePrice = item.publishedProduct.product.variants[0].wholesalePrice || 0
+        }
+      }
+
+      const itemAmount = Number(wholesalePrice) * item.quantity
+
+      if (!dailyMap.has(dateKey)) {
+        dailyMap.set(dateKey, {
+          date: dateKey,
+          orderCount: new Set(),
+          itemCount: 0,
+          totalQuantity: 0,
+          totalAmount: 0,
+        })
+      }
+
+      const daily = dailyMap.get(dateKey)!
+      daily.orderCount.add(item.guestOrder.orderNumber)
       daily.itemCount += 1
       daily.totalQuantity += item.quantity
       daily.totalAmount += itemAmount
