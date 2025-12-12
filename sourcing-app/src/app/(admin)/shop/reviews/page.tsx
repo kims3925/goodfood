@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
 import {
   RefreshCw,
   Star,
@@ -13,7 +12,6 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  ExternalLink,
 } from 'lucide-react'
 import Loading from '@/components/ui/Loading'
 
@@ -334,7 +332,7 @@ export default function ReviewListPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">No.</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상품</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">쇼핑몰</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">평점</th>
@@ -344,21 +342,14 @@ export default function ReviewListPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {data.reviews.map((review) => (
+                  {data.reviews.map((review, index) => (
                     <tr
                       key={review.id}
                       className="hover:bg-gray-50 cursor-pointer"
                       onClick={() => window.location.href = `/shop/reviews/${review.id}`}
                     >
-                      <td className="px-4 py-3 text-sm font-mono">
-                        <Link
-                          href={`/shop/reviews/${review.id}`}
-                          className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          #{review.id}
-                          <ExternalLink size={12} />
-                        </Link>
+                      <td className="px-4 py-3 text-sm text-center text-gray-500">
+                        {(data.pagination.page - 1) * data.pagination.limit + index + 1}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -373,12 +364,12 @@ export default function ReviewListPage() {
                               <Store size={16} className="text-gray-400" />
                             </div>
                           )}
-                          <div className="max-w-[200px]">
-                            <p className="text-sm font-medium text-gray-900 truncate">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-900">
                               {review.orderItem?.productName || '-'}
                             </p>
                             {review.orderItem?.optionSummary && (
-                              <p className="text-xs text-gray-500 truncate">
+                              <p className="text-xs text-gray-500">
                                 {review.orderItem.optionSummary}
                               </p>
                             )}
