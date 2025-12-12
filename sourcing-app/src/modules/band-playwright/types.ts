@@ -15,6 +15,8 @@ export interface BandPublishParams {
   bandName: string      // 밴드 이름 (Band 홈에서 채널 찾기용)
   content: string
   imageUrls: string[]   // 상품 이미지 URL 목록
+  /** 단계별 진행 콜백 (실시간 상태 업데이트용) */
+  onStageProgress?: BandStageProgressCallback
 }
 
 export interface BandPublishResult {
@@ -45,6 +47,11 @@ export interface BandBatchPublishParams {
    * onItemSuccess 이후에 호출됨
    */
   onProgress?: (current: number, total: number, result: BandBatchItemResult) => Promise<void>
+  /**
+   * 상품별 단계 진행 콜백 (실시간 상태 업데이트용)
+   * productId와 함께 현재 단계 정보를 전달
+   */
+  onStageProgress?: (productId: number, progress: Omit<PublishDetailedProgress, 'productId' | 'productName'>) => void | Promise<void>
 }
 
 export interface BandBatchItemResult {

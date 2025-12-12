@@ -13,8 +13,22 @@ import {
   BandBatchItemResult,
   BandBatchPublishResult,
   BandPlaywrightError,
-  BandPlaywrightErrorCode
+  BandPlaywrightErrorCode,
+  BandStageProgressCallback
 } from './types'
+import type { PublishStage } from '../publish/types'
+
+// 단계별 라벨 (한국어)
+const STAGE_LABELS: Record<PublishStage, string> = {
+  preparing: '준비 중',
+  downloading: '이미지 다운로드 중',
+  uploading: '이미지 업로드 중',
+  entering: '내용 입력 중',
+  submitting: '게시물 등록 중',
+  completed: '완료',
+  failed: '실패',
+  skipped: '건너뜀',
+}
 
 // Band 최대 이미지 수
 const MAX_IMAGES = 20
@@ -221,12 +235,30 @@ export class BandPostAutomation {
     page: Page,
     params: BandPublishParams
   ): Promise<BandPublishResult> {
-    const { bandKey, bandName, content, imageUrls } = params
+    const { bandKey, bandName, content, imageUrls, onStageProgress } = params
     const tempFiles: string[] = []
+
+    // 단계 진행 알림 헬퍼
+    const reportStage = async (
+      stage: PublishStage,
+      imageProgress?: { current: number; total: number }
+    ) => {
+      if (onStageProgress) {
+        await onStageProgress({
+          stage,
+          stageLabel: STAGE_LABELS[stage],
+          imageProgress,
+          publishMethod: 'playwright',
+        })
+      }
+    }
 
     try {
       console.log(`[밴드자동화] 게시물 작성 시작: ${bandName} (key: ${bandKey})`)
       console.log(`[밴드자동화] 내용 길이: ${content.length}, 이미지: ${imageUrls.length}개`)
+
+      // 0. 준비 단계
+      await reportStage('preparing')
 
       // 1. 밴드 페이지로 이동
       await this.navigateToBand(page, bandKey, bandName)
@@ -297,25 +329,45 @@ export class BandPostAutomation {
 
       // 3. 이미지 다운로드 및 업로드
       const imagesToUpload = imageUrls.slice(0, MAX_IMAGES)
-      if (imagesToUpload.length > 0) {
-        console.log(`[밴드자동화] 3단계: ${imagesToUpload.length}개 이미지 다운로드`)
-        const downloadedImages = await this.downloadImages(imagesToUpload)
+      const totalImages = imagesToUpload.length
+      if (totalImages > 0) {
+        // 다운로드 단계
+        await reportStage('downloading', { current: 0, total: totalImages })
+        console.log(`[밴드자동화] 3단계: ${totalImages}개 이미지 다운로드`)
+
+        const downloadedImages = await this.downloadImagesWithProgress(
+          imagesToUpload,
+          async (current, total) => {
+            await reportStage('downloading', { current, total })
+          }
+        )
         tempFiles.push(...downloadedImages)
         console.log(`[밴드자동화] ${downloadedImages.length}개 이미지 다운로드 완료`)
 
         if (downloadedImages.length > 0) {
+          // 업로드 단계
+          await reportStage('uploading', { current: 0, total: downloadedImages.length })
           console.log('[밴드자동화] 4단계: 이미지 업로드')
-          await this.uploadImages(page, downloadedImages)
+
+          await this.uploadImagesWithProgress(
+            page,
+            downloadedImages,
+            async (current, total) => {
+              await reportStage('uploading', { current, total })
+            }
+          )
           await this.saveDebugScreenshot(page, 'step4-images-uploaded')
         }
       }
 
       // 4. 본문 입력
+      await reportStage('entering')
       console.log('[밴드자동화] 5단계: 본문 입력')
       await this.inputContent(page, content)
       await this.saveDebugScreenshot(page, 'step5-content-entered')
 
       // 5. 게시 버튼 클릭
+      await reportStage('submitting')
       console.log('[밴드자동화] 6단계: 게시물 등록')
       await this.submitPost(page)
       await this.saveDebugScreenshot(page, 'step6-post-submitted')
@@ -327,6 +379,9 @@ export class BandPostAutomation {
 
       console.log(`[밴드자동화] 게시물 작성 성공: ${postKey}`)
 
+      // 완료 단계
+      await reportStage('completed', { current: tempFiles.length, total: tempFiles.length })
+
       return {
         success: true,
         postKey,
@@ -335,6 +390,16 @@ export class BandPostAutomation {
     } catch (error: any) {
       console.error('[밴드자동화] 게시물 작성 실패:', error)
       await this.saveDebugScreenshot(page, 'error')
+
+      // 실패 단계
+      if (onStageProgress) {
+        await onStageProgress({
+          stage: 'failed',
+          stageLabel: STAGE_LABELS.failed,
+          error: error.message,
+          publishMethod: 'playwright',
+        })
+      }
 
       if (error instanceof BandPlaywrightError) {
         return { success: false, error: error.message }
@@ -369,6 +434,32 @@ export class BandPostAutomation {
         if (result.status === 'fulfilled' && result.value) {
           downloaded.push(result.value)
         }
+      }
+    }
+
+    return downloaded
+  }
+
+  /**
+   * 이미지 다운로드 (진행률 콜백 포함)
+   */
+  private async downloadImagesWithProgress(
+    imageUrls: string[],
+    onProgress?: (current: number, total: number) => void | Promise<void>
+  ): Promise<string[]> {
+    const tempDir = os.tmpdir()
+    const downloaded: string[] = []
+    const total = imageUrls.length
+
+    // 순차 다운로드 (진행률 추적을 위해)
+    for (let i = 0; i < imageUrls.length; i++) {
+      const result = await this.downloadSingleImage(imageUrls[i], tempDir, i)
+      if (result) {
+        downloaded.push(result)
+      }
+      // 진행률 콜백
+      if (onProgress) {
+        await onProgress(i + 1, total)
       }
     }
 
@@ -625,6 +716,121 @@ export class BandPostAutomation {
   }
 
   /**
+   * 이미지 업로드 (진행률 콜백 포함)
+   */
+  private async uploadImagesWithProgress(
+    page: Page,
+    imagePaths: string[],
+    onProgress?: (current: number, total: number) => void | Promise<void>
+  ): Promise<void> {
+    // 기존 uploadImages와 동일한 로직, 단 waitForUploadComplete에 콜백 전달
+    console.log(`[밴드자동화] ${imagePaths.length}개 이미지 업로드 시작 (진행률 추적)`)
+
+    // 글쓰기 레이어 컨테이너 확인 (레이어 팝업 우선)
+    const writeLayerContainers = [
+      '[data-viewname="DPostWriteLayerView"]',
+      '.layerContainer .cPostWrite',
+      '.layerContainerView .cPostWrite',
+      '.cPostWrite:not(.-standby)',
+      '.postWriteLayer',
+    ]
+
+    let writeLayerContainer = null
+    for (const selector of writeLayerContainers) {
+      writeLayerContainer = await page.$(selector)
+      if (writeLayerContainer && await writeLayerContainer.isVisible()) {
+        console.log(`[밴드자동화] 글쓰기 레이어 발견: ${selector}`)
+        break
+      }
+      writeLayerContainer = null
+    }
+
+    // 사진 버튼 찾기
+    const imageButtonSelectors = [
+      '[data-viewname="DPostWriteLayerView"] button.photo',
+      '[data-viewname="DPostWriteLayerView"] button[data-attachment="photo"]',
+      '.layerContainer button.photo',
+      'button.photo[data-attachment="photo"]',
+      'button[data-attachment="photo"]',
+      '.toolbarList button.photo',
+      '.postToolbar button.photo',
+      '.cPostWrite button.photo',
+      '.writeToolbar .photo',
+      'button[aria-label*="사진"]',
+      '.btnPhoto',
+      '[data-uiselector="postWriteAddPhoto"]',
+    ]
+
+    let imageButton = null
+    for (const selector of imageButtonSelectors) {
+      if (writeLayerContainer) {
+        imageButton = await writeLayerContainer.$(selector)
+        if (imageButton && await imageButton.isVisible()) {
+          console.log(`[밴드자동화] 글쓰기 레이어에서 사진 버튼 발견: ${selector}`)
+          break
+        }
+      }
+      imageButton = await page.$(selector)
+      if (imageButton && await imageButton.isVisible()) {
+        console.log(`[밴드자동화] 사진 버튼 발견: ${selector}`)
+        break
+      }
+      imageButton = null
+    }
+
+    // file input 직접 찾기 (버튼이 없을 경우)
+    if (!imageButton) {
+      console.warn('[밴드자동화] 사진 버튼을 찾을 수 없음, file input 직접 시도')
+      const fileInput = await page.$('input[type="file"][accept*="image"]')
+      if (fileInput) {
+        console.log('[밴드자동화] file input 발견, 파일 직접 설정')
+        await fileInput.setInputFiles(imagePaths)
+        await fileInput.evaluate((el) => {
+          el.dispatchEvent(new Event('change', { bubbles: true }))
+          el.dispatchEvent(new Event('input', { bubbles: true }))
+        })
+        await page.waitForTimeout(1500)
+        await this.clickAttachButtonIfPresent(page)
+        await this.waitForUploadCompleteWithProgress(page, imagePaths.length, onProgress)
+        return
+      }
+      throw new BandPlaywrightError(
+        '이미지 업로드 버튼을 찾을 수 없습니다.',
+        BandPlaywrightErrorCode.UPLOAD_TIMEOUT
+      )
+    }
+
+    // 파일 선택 대화상자 처리
+    try {
+      const [fileChooser] = await Promise.all([
+        page.waitForEvent('filechooser', { timeout: 10000 }),
+        imageButton.click(),
+      ])
+      await fileChooser.setFiles(imagePaths)
+    } catch {
+      console.warn('[밴드자동화] 파일 선택창 이벤트 실패, hidden input 시도...')
+      const fileInput = await page.$('input[type="file"][accept*="image"]') ||
+                        await page.$('input[type="file"]')
+      if (fileInput) {
+        await fileInput.setInputFiles(imagePaths)
+        await fileInput.evaluate((el) => {
+          el.dispatchEvent(new Event('change', { bubbles: true }))
+          el.dispatchEvent(new Event('input', { bubbles: true }))
+        })
+      } else {
+        throw new BandPlaywrightError(
+          '파일 선택창을 열 수 없습니다.',
+          BandPlaywrightErrorCode.UPLOAD_TIMEOUT
+        )
+      }
+    }
+
+    await page.waitForTimeout(1500)
+    await this.clickAttachButtonIfPresent(page)
+    await this.waitForUploadCompleteWithProgress(page, imagePaths.length, onProgress)
+  }
+
+  /**
    * 이미지 업로드 완료 대기 (개선됨)
    * 실제 업로드 상태를 확인하고 게시 버튼 활성화를 대기
    * 상태 변화가 없으면 조기 타임아웃
@@ -745,6 +951,106 @@ export class BandPostAutomation {
 
     // 타임아웃
     const uploadedCount = await this.countUploadedImages(page)
+    const elapsed = Math.floor((Date.now() - startTime) / 1000)
+    console.warn(`[이미지업로드] 타임아웃 (${elapsed}초). 업로드됨: ${uploadedCount}/${expectedCount}`)
+  }
+
+  /**
+   * 이미지 업로드 완료 대기 (진행률 콜백 포함)
+   */
+  private async waitForUploadCompleteWithProgress(
+    page: Page,
+    expectedCount: number,
+    onProgress?: (current: number, total: number) => void | Promise<void>
+  ): Promise<void> {
+    const maxWaitTime = IMAGE_UPLOAD_TIMEOUT_MS
+    const startTime = Date.now()
+    const MAX_NO_PROGRESS_COUNT = 40
+
+    console.log(`[이미지업로드] ${expectedCount}개 이미지 업로드 대기 중 (진행률 추적)`)
+
+    const loadingIndicators = [
+      '.uploading', '.progress', '[class*="loading"]',
+      '.photoLoading', '.cPostWrite .loading', '.cPostWrite [class*="progress"]',
+    ]
+
+    let lastUploadedCount = -1
+    let noProgressCount = 0
+    let lastIsLoading = false
+
+    while (Date.now() - startTime < maxWaitTime) {
+      // 로딩 인디케이터 확인
+      let isLoading = false
+      for (const selector of loadingIndicators) {
+        try {
+          const el = await page.$(selector)
+          if (el && await el.isVisible()) {
+            isLoading = true
+            break
+          }
+        } catch {
+          // 무시
+        }
+      }
+
+      if (isLoading !== lastIsLoading) {
+        lastIsLoading = isLoading
+      }
+
+      if (!isLoading) {
+        const uploadedCount = await this.countUploadedImages(page)
+
+        // 진행률 콜백 호출 (업로드 수가 변경될 때)
+        if (uploadedCount !== lastUploadedCount && onProgress) {
+          await onProgress(uploadedCount, expectedCount)
+        }
+
+        if (uploadedCount === lastUploadedCount) {
+          noProgressCount++
+        } else {
+          noProgressCount = 0
+          lastUploadedCount = uploadedCount
+        }
+
+        if (noProgressCount >= MAX_NO_PROGRESS_COUNT) {
+          console.warn(`[이미지업로드] ${MAX_NO_PROGRESS_COUNT * 0.5}초간 진행 없음 - 타임아웃`)
+          break
+        }
+
+        if (uploadedCount >= expectedCount) {
+          console.log(`[이미지업로드] 업로드 완료: ${uploadedCount}개`)
+          if (onProgress) {
+            await onProgress(expectedCount, expectedCount)
+          }
+
+          // 게시 버튼 활성화 확인
+          const submitButton = await page.$('button._btnSubmitPost')
+          if (submitButton && await submitButton.isEnabled().catch(() => false)) {
+            return
+          }
+
+          // 게시 버튼 활성화 대기 (최대 5초)
+          for (let i = 0; i < 10; i++) {
+            await page.waitForTimeout(500)
+            const btn = await page.$('button._btnSubmitPost')
+            if (btn && await btn.isEnabled().catch(() => false)) {
+              return
+            }
+          }
+          return
+        }
+      } else {
+        noProgressCount = 0
+      }
+
+      await page.waitForTimeout(500)
+    }
+
+    // 타임아웃 시에도 현재 상태로 콜백
+    const uploadedCount = await this.countUploadedImages(page)
+    if (onProgress) {
+      await onProgress(uploadedCount, expectedCount)
+    }
     const elapsed = Math.floor((Date.now() - startTime) / 1000)
     console.warn(`[이미지업로드] 타임아웃 (${elapsed}초). 업로드됨: ${uploadedCount}/${expectedCount}`)
   }
