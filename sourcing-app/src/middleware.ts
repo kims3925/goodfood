@@ -19,6 +19,16 @@ export async function middleware(request: NextRequest) {
     '/api/images/',        // 이미지 API
   ]
 
+  // Chrome Extension에서 band-session API 접근 허용 (PUT, POST 메서드)
+  if (pathname.includes('/band-session') && (request.method === 'PUT' || request.method === 'POST')) {
+    return NextResponse.next()
+  }
+
+  // CORS preflight 요청 허용
+  if (request.method === 'OPTIONS') {
+    return NextResponse.next()
+  }
+
   // 공개 경로는 통과
   if (publicPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next()
