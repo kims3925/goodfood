@@ -118,3 +118,79 @@ export interface PublishShopBatchResult {
   results: PublishToShopResult[]
   errors: string[]
 }
+
+// ============================================
+// 실시간 진행 상태 타입 (SSE용)
+// ============================================
+
+/**
+ * 발행 단계
+ */
+export type PublishStage =
+  | 'preparing'      // 준비 중
+  | 'downloading'    // 이미지 다운로드 중
+  | 'uploading'      // 이미지 업로드 중
+  | 'entering'       // 내용 입력 중
+  | 'submitting'     // 발행 제출 중
+  | 'completed'      // 완료
+  | 'failed'         // 실패
+  | 'skipped'        // 건너뜀
+
+/**
+ * 상세 진행 상태
+ */
+export interface PublishDetailedProgress {
+  productId: number
+  productName: string
+  stage: PublishStage
+  stageLabel: string           // 사용자에게 표시할 단계 라벨
+  imageProgress?: {
+    current: number            // 현재 업로드된 이미지 수
+    total: number              // 전체 이미지 수
+  }
+  error?: string               // 실패 시 에러 메시지
+  publishMethod?: 'playwright' | 'api'
+}
+
+/**
+ * SSE 이벤트 타입
+ */
+export type PublishSSEEventType =
+  | 'batch_start'          // 배치 발행 시작
+  | 'product_start'        // 개별 상품 발행 시작
+  | 'stage_update'         // 단계 변경
+  | 'image_progress'       // 이미지 업로드 진행률
+  | 'product_complete'     // 개별 상품 발행 완료
+  | 'batch_complete'       // 배치 발행 완료
+  | 'error'                // 에러 발생
+
+/**
+ * SSE 이벤트
+ */
+export interface PublishSSEEvent {
+  type: PublishSSEEventType
+  timestamp: number
+  data: {
+    // 배치 정보
+    channelId?: number
+    channelName?: string
+    totalProducts?: number
+    currentIndex?: number
+
+    // 상품별 진행 상태
+    progress?: PublishDetailedProgress
+
+    // 완료 통계
+    successCount?: number
+    failedCount?: number
+    skippedCount?: number
+
+    // 에러 정보
+    error?: string
+  }
+}
+
+/**
+ * 단계별 콜백 함수 타입
+ */
+export type PublishStageCallback = (progress: PublishDetailedProgress) => void | Promise<void>

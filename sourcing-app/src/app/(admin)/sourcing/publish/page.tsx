@@ -131,6 +131,14 @@ export default function PublishPage() {
     targetType: 'shop' | 'channel'
     status: 'pending' | 'publishing' | 'success' | 'failed'
     message?: string
+    // 상세 진행 상태 (SSE용)
+    stage?: string
+    stageLabel?: string
+    imageProgress?: {
+      current: number
+      total: number
+    }
+    publishMethod?: 'playwright' | 'api'
   }
   const [showPublishProgress, setShowPublishProgress] = useState(false)
   const [publishProgressItems, setPublishProgressItems] = useState<PublishProgressItem[]>([])
@@ -577,81 +585,163 @@ export default function PublishPage() {
         }
       }
 
-      // 채널 발행 처리
+      // 채널 발행 처리 (SSE 스트리밍)
       for (const [channelId, productIds] of Object.entries(channelToProducts)) {
         if (productIds.length > 0) {
-          // 현재 발행 중인 항목들 업데이트
+          // 현재 발행 중인 항목들을 대기 상태로 설정
           const channelItems = progressItems.filter(
             (item) => item.targetType === 'channel' && item.targetId === Number(channelId)
           )
-          channelItems.forEach((item) => {
-            const idx = progressItems.findIndex(
-              (p) => p.productId === item.productId && p.targetId === item.targetId && p.targetType === item.targetType
-            )
-            if (idx !== -1) {
-              setPublishProgressItems((prev) => {
-                const updated = [...prev]
-                updated[idx] = { ...updated[idx], status: 'publishing' }
-                return updated
-              })
-              setCurrentPublishIndex(idx)
+
+          // SSE 스트리밍으로 발행
+          try {
+            const response = await fetch('/api/shop/publish/stream', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ productIds, channelId: Number(channelId) }),
+            })
+
+            if (!response.ok) {
+              const errorData = await response.json()
+              throw new Error(errorData.error || '발행 요청 실패')
             }
-          })
 
-          const response = await fetch('/api/shop/publish', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ productIds, channelId: Number(channelId) }),
-          })
+            const reader = response.body?.getReader()
+            if (!reader) throw new Error('스트림을 읽을 수 없습니다.')
 
-          const data = await response.json()
+            const decoder = new TextDecoder()
+            let buffer = ''
 
-          if (data.results) {
-            for (const result of data.results) {
-              const itemIdx = progressItems.findIndex(
-                (p) => p.productId === result.productId && p.targetId === Number(channelId) && p.targetType === 'channel'
-              )
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
 
-              if (result.status === 'SUCCESS') {
-                successfulCells.add(cellKey(result.productId, 'channel', Number(channelId)))
-                totalSuccess++
-                if (itemIdx !== -1) {
-                  setPublishProgressItems((prev) => {
-                    const updated = [...prev]
-                    updated[itemIdx] = { ...updated[itemIdx], status: 'success' }
-                    return updated
-                  })
-                }
-              } else if (result.status === 'SKIPPED') {
-                successfulCells.add(cellKey(result.productId, 'channel', Number(channelId)))
-                totalSkipped++
-                if (itemIdx !== -1) {
-                  setPublishProgressItems((prev) => {
-                    const updated = [...prev]
-                    updated[itemIdx] = { ...updated[itemIdx], status: 'success', message: '이미 발행됨' }
-                    return updated
-                  })
-                }
-              } else if (result.status === 'FAILED') {
-                totalFailed++
-                if (result.message) {
-                  errorMessages.push(result.message)
-                }
-                if (itemIdx !== -1) {
-                  setPublishProgressItems((prev) => {
-                    const updated = [...prev]
-                    updated[itemIdx] = { ...updated[itemIdx], status: 'failed', message: result.message }
-                    return updated
-                  })
+              buffer += decoder.decode(value, { stream: true })
+              const lines = buffer.split('\n\n')
+              buffer = lines.pop() || ''
+
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const event = JSON.parse(line.slice(6))
+
+                    if (event.type === 'product_start') {
+                      // 상품 발행 시작
+                      const itemIdx = progressItems.findIndex(
+                        (p) => p.productId === event.data.progress.productId &&
+                               p.targetId === Number(channelId) &&
+                               p.targetType === 'channel'
+                      )
+                      if (itemIdx !== -1) {
+                        setPublishProgressItems((prev) => {
+                          const updated = [...prev]
+                          updated[itemIdx] = {
+                            ...updated[itemIdx],
+                            status: 'publishing',
+                            stage: event.data.progress.stage,
+                            stageLabel: event.data.progress.stageLabel,
+                            imageProgress: event.data.progress.imageProgress,
+                          }
+                          return updated
+                        })
+                        setCurrentPublishIndex(itemIdx)
+                      }
+                    } else if (event.type === 'stage_update' || event.type === 'image_progress') {
+                      // 단계 변경 또는 이미지 진행률 업데이트
+                      const itemIdx = progressItems.findIndex(
+                        (p) => p.productId === event.data.progress.productId &&
+                               p.targetId === Number(channelId) &&
+                               p.targetType === 'channel'
+                      )
+                      if (itemIdx !== -1) {
+                        setPublishProgressItems((prev) => {
+                          const updated = [...prev]
+                          updated[itemIdx] = {
+                            ...updated[itemIdx],
+                            stage: event.data.progress.stage,
+                            stageLabel: event.data.progress.stageLabel,
+                            imageProgress: event.data.progress.imageProgress,
+                            publishMethod: event.data.progress.publishMethod,
+                          }
+                          return updated
+                        })
+                      }
+                    } else if (event.type === 'product_complete') {
+                      // 상품 발행 완료
+                      const progress = event.data.progress
+                      const itemIdx = progressItems.findIndex(
+                        (p) => p.productId === progress.productId &&
+                               p.targetId === Number(channelId) &&
+                               p.targetType === 'channel'
+                      )
+
+                      if (progress.stage === 'completed') {
+                        successfulCells.add(cellKey(progress.productId, 'channel', Number(channelId)))
+                        totalSuccess++
+                        if (itemIdx !== -1) {
+                          setPublishProgressItems((prev) => {
+                            const updated = [...prev]
+                            updated[itemIdx] = {
+                              ...updated[itemIdx],
+                              status: 'success',
+                              stage: progress.stage,
+                              stageLabel: progress.stageLabel,
+                              imageProgress: progress.imageProgress,
+                              publishMethod: progress.publishMethod,
+                            }
+                            return updated
+                          })
+                        }
+                      } else if (progress.stage === 'skipped') {
+                        successfulCells.add(cellKey(progress.productId, 'channel', Number(channelId)))
+                        totalSkipped++
+                        if (itemIdx !== -1) {
+                          setPublishProgressItems((prev) => {
+                            const updated = [...prev]
+                            updated[itemIdx] = {
+                              ...updated[itemIdx],
+                              status: 'success',
+                              message: '이미 발행됨',
+                              stage: progress.stage,
+                              stageLabel: progress.stageLabel,
+                            }
+                            return updated
+                          })
+                        }
+                      } else if (progress.stage === 'failed') {
+                        totalFailed++
+                        if (progress.error) {
+                          errorMessages.push(progress.error)
+                        }
+                        if (itemIdx !== -1) {
+                          setPublishProgressItems((prev) => {
+                            const updated = [...prev]
+                            updated[itemIdx] = {
+                              ...updated[itemIdx],
+                              status: 'failed',
+                              message: progress.error,
+                              stage: progress.stage,
+                              stageLabel: progress.stageLabel,
+                            }
+                            return updated
+                          })
+                        }
+                      }
+                      processedIndex++
+                    } else if (event.type === 'error') {
+                      // 에러 발생
+                      errorMessages.push(event.data.error)
+                    }
+                  } catch (parseError) {
+                    console.error('SSE 파싱 오류:', parseError)
+                  }
                 }
               }
-              processedIndex++
             }
-          } else if (!data.success) {
+          } catch (error: any) {
+            console.error('SSE 스트림 오류:', error)
             totalFailed += productIds.length
-            if (data.error) {
-              errorMessages.push(data.error)
-            }
+            errorMessages.push(error.message || '발행 중 오류가 발생했습니다.')
             // 모든 항목 실패 처리
             channelItems.forEach((item) => {
               const idx = progressItems.findIndex(
@@ -660,7 +750,7 @@ export default function PublishPage() {
               if (idx !== -1) {
                 setPublishProgressItems((prev) => {
                   const updated = [...prev]
-                  updated[idx] = { ...updated[idx], status: 'failed', message: data.error }
+                  updated[idx] = { ...updated[idx], status: 'failed', message: error.message }
                   return updated
                 })
               }
@@ -1349,13 +1439,34 @@ export default function PublishPage() {
                             : 'text-gray-400'
                         }`}>
                           {item.status === 'publishing'
-                            ? '발행 중...'
+                            ? (item.stageLabel || '발행 중...')
                             : item.status === 'success'
                             ? '완료'
                             : item.status === 'failed'
                             ? '실패'
                             : '대기'}
                         </span>
+                        {/* 이미지 진행률 표시 */}
+                        {item.status === 'publishing' && item.imageProgress && (
+                          <div className="mt-1">
+                            <div className="flex items-center gap-1 text-xs text-blue-500">
+                              <span>{item.imageProgress.current}/{item.imageProgress.total}</span>
+                              <span>이미지</span>
+                            </div>
+                            <div className="w-20 h-1 bg-blue-100 rounded-full overflow-hidden mt-0.5">
+                              <div
+                                className="h-full bg-blue-500 transition-all duration-200"
+                                style={{ width: `${(item.imageProgress.current / item.imageProgress.total) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {/* 발행 방법 표시 */}
+                        {item.status === 'success' && item.publishMethod && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {item.publishMethod === 'playwright' ? '이미지 포함' : '텍스트만'}
+                          </p>
+                        )}
                         {item.message && (
                           <p className="text-xs text-gray-500 mt-0.5 max-w-[150px] truncate" title={item.message}>
                             {item.message}

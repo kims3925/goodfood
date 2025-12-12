@@ -26,6 +26,9 @@ import type {
   PublishToShopResult,
   PublishShopBatchParams,
   PublishShopBatchResult,
+  PublishDetailedProgress,
+  PublishSSEEvent,
+  PublishStageCallback,
 } from './types'
 
 // Band API 쿨다운 지연 시간 (10초)
@@ -619,6 +622,430 @@ export class PublishService {
       skippedCount,
       results,
       errors,
+    }
+  }
+
+  /**
+   * 단일 상품을 단일 채널에 발행 (상세 진행 콜백 포함)
+   * SSE 스트리밍을 위한 메서드
+   */
+  async publishToChannelWithProgress(
+    params: PublishToChannelParams & {
+      onStageProgress?: PublishStageCallback
+    },
+    retryCount: number = 0
+  ): Promise<PublishToChannelResult> {
+    const { userId, productId, channelId, onStageProgress } = params
+
+    try {
+      // 1. 채널 정보 조회
+      const channel = await prisma.channel.findFirst({
+        where: {
+          id: channelId,
+          userId,
+          kind: ChannelKind.RETAIL,
+          isActive: true,
+        },
+        include: {
+          shop: {
+            select: {
+              id: true,
+              subdomain: true,
+              name: true,
+              isActive: true,
+            },
+          },
+        },
+      })
+
+      const channelSession = await prisma.channel.findFirst({
+        where: { id: channelId },
+        select: {
+          bandSessionCookie: true,
+          sessionExpiresAt: true,
+        },
+      })
+
+      if (!channel) {
+        return {
+          success: false,
+          productId,
+          channelId,
+          error: '채널을 찾을 수 없거나 발행 권한이 없습니다.',
+        }
+      }
+
+      const apiConfig = await prisma.sourcingApiConfig.findFirst({
+        where: {
+          userId,
+          platform: 'BAND',
+          isActive: true,
+        },
+      })
+
+      // 2. 상품 정보 조회
+      const product = await prisma.product.findFirst({
+        where: {
+          id: productId,
+          userId,
+        },
+        include: {
+          variants: {
+            select: {
+              id: true,
+              price: true,
+              wholesalePrice: true,
+            },
+          },
+          images: {
+            orderBy: { sortOrder: 'asc' },
+            select: { url: true },
+          },
+          collectedProduct: {
+            include: {
+              post: {
+                select: {
+                  content: true,
+                },
+              },
+            },
+          },
+        },
+      })
+
+      if (!product) {
+        return {
+          success: false,
+          productId,
+          channelId,
+          error: '상품을 찾을 수 없습니다.',
+        }
+      }
+
+      // 3. 이미 발행 여부 확인
+      const existingPublish = await prisma.publishedProduct.findFirst({
+        where: {
+          productId,
+          channelId,
+        },
+      })
+
+      if (existingPublish) {
+        // 건너뜀 상태 알림
+        if (onStageProgress) {
+          await onStageProgress({
+            productId,
+            productName: product.name,
+            stage: 'skipped',
+            stageLabel: '건너뜀 (이미 발행됨)',
+          })
+        }
+        return {
+          success: true,
+          productId,
+          channelId,
+          publishedProductId: existingPublish.id,
+          skipped: true,
+          skipReason: '이미 발행된 상품입니다.',
+        }
+      }
+
+      // 4. 주문 링크 생성
+      let orderLink: string | undefined
+      if (channel.shop?.subdomain && channel.shop.isActive) {
+        const shopBaseUrl = process.env.NEXT_PUBLIC_SHOP_BASE_URL || 'http://localhost:3000'
+        orderLink = `${shopBaseUrl}/${channel.shop.subdomain}/product/${productId}`
+      }
+
+      // 5. 게시물 내용 생성
+      const postContent = buildPostContent(product, { orderLink })
+      const imageUrls = (product.images?.map(img => img.url) || []).slice(0, 20)
+
+      // 6. 발행 방식 결정 및 실행
+      let postKey: string | undefined
+      let publishMethod: 'playwright' | 'api' = 'api'
+      let imageCount = 0
+
+      const hasValidSession = channelSession?.bandSessionCookie &&
+        channelSession.sessionExpiresAt &&
+        new Date(channelSession.sessionExpiresAt) > new Date()
+
+      // Playwright 발행 시도 (세션 유효하고 이미지 있을 때)
+      if (hasValidSession && imageUrls.length > 0) {
+        try {
+          console.log(`[PublishService] Playwright 발행 시도 (${imageUrls.length}개 이미지) - 진행률 추적`)
+
+          const playwrightResult = await bandPlaywrightService.publishWithImages({
+            channelId,
+            bandKey: channel.channelKey,
+            bandName: channel.name,
+            content: postContent,
+            imageUrls,
+            // 진행률 콜백 전달
+            onStageProgress: onStageProgress
+              ? (progress) => onStageProgress({
+                  productId,
+                  productName: product.name,
+                  ...progress,
+                })
+              : undefined,
+          })
+
+          if (playwrightResult.success && playwrightResult.postKey) {
+            postKey = playwrightResult.postKey
+            publishMethod = 'playwright'
+            imageCount = imageUrls.length
+            console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
+          } else {
+            console.log(`[PublishService] Playwright 발행 실패: ${playwrightResult.error}, Band API로 폴백`)
+          }
+        } catch (error: any) {
+          console.log(`[PublishService] Playwright 발행 오류, Band API로 폴백:`, error.message)
+        }
+      }
+
+      // Band API 폴백
+      if (!postKey) {
+        if (!apiConfig?.accessToken) {
+          if (onStageProgress) {
+            await onStageProgress({
+              productId,
+              productName: product.name,
+              stage: 'failed',
+              stageLabel: '실패',
+              error: 'Band API 토큰이 설정되지 않았습니다.',
+            })
+          }
+          return {
+            success: false,
+            productId,
+            channelId,
+            error: 'Band API 토큰이 설정되지 않았습니다. 설정 > API 연동에서 Band API를 설정해주세요.',
+          }
+        }
+
+        // API 발행 진행 상태 알림
+        if (onStageProgress) {
+          await onStageProgress({
+            productId,
+            productName: product.name,
+            stage: 'submitting',
+            stageLabel: '게시물 등록 중 (API)',
+            publishMethod: 'api',
+          })
+        }
+
+        const bandClient = new NaverBandClient(apiConfig.accessToken)
+        const result = await bandClient.createPost(channel.channelKey, postContent, {
+          doPush: false,
+        })
+        postKey = result.postKey
+        publishMethod = 'api'
+        console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만)`)
+      }
+
+      // 7. PublishedProduct 레코드 생성
+      const publishedProduct = await prisma.publishedProduct.create({
+        data: {
+          userId,
+          productId,
+          channelId,
+          publishedAt: new Date(),
+        },
+      })
+
+      // 완료 상태 알림
+      if (onStageProgress) {
+        await onStageProgress({
+          productId,
+          productName: product.name,
+          stage: 'completed',
+          stageLabel: '완료',
+          imageProgress: { current: imageCount, total: imageCount },
+          publishMethod,
+        })
+      }
+
+      return {
+        success: true,
+        productId,
+        channelId,
+        postKey,
+        publishedProductId: publishedProduct.id,
+        imageCount,
+        publishMethod,
+      }
+    } catch (error: any) {
+      console.error(`[PublishService] Error publishing product ${productId} to channel ${channelId}:`, error)
+
+      // 실패 상태 알림
+      if (onStageProgress) {
+        await onStageProgress({
+          productId,
+          productName: `Product ${productId}`,
+          stage: 'failed',
+          stageLabel: '실패',
+          error: error.message,
+        })
+      }
+
+      // 쿼터 에러 재시도
+      if (isQuotaError(error) && retryCount < MAX_QUOTA_RETRIES) {
+        const delayMs = QUOTA_RETRY_BASE_DELAY_MS * Math.pow(2, retryCount)
+        console.log(`[PublishService] 쿼터 에러 발생, ${delayMs / 1000}초 후 재시도 (${retryCount + 1}/${MAX_QUOTA_RETRIES})...`)
+        await delay(delayMs)
+        return this.publishToChannelWithProgress({ userId, productId, channelId, onStageProgress }, retryCount + 1)
+      }
+
+      return {
+        success: false,
+        productId,
+        channelId,
+        error: error.message || '발행 중 오류가 발생했습니다.',
+      }
+    }
+  }
+
+  /**
+   * 배치 발행 (SSE 스트리밍용)
+   * Generator 함수로 각 상품 발행 시 SSE 이벤트를 yield
+   */
+  async *publishBatchWithStream(params: {
+    userId: number
+    productIds: number[]
+    channelId: number
+  }): AsyncGenerator<PublishSSEEvent, void, unknown> {
+    const { userId, productIds, channelId } = params
+
+    // 채널 정보 조회
+    const channel = await prisma.channel.findFirst({
+      where: {
+        id: channelId,
+        userId,
+        kind: ChannelKind.RETAIL,
+        isActive: true,
+      },
+    })
+
+    if (!channel) {
+      yield {
+        type: 'error',
+        timestamp: Date.now(),
+        data: {
+          error: '채널을 찾을 수 없습니다.',
+        },
+      }
+      return
+    }
+
+    // 배치 시작 이벤트
+    yield {
+      type: 'batch_start',
+      timestamp: Date.now(),
+      data: {
+        channelId,
+        channelName: channel.name,
+        totalProducts: productIds.length,
+      },
+    }
+
+    let successCount = 0
+    let failedCount = 0
+    let skippedCount = 0
+    let lastPublishMethod: 'playwright' | 'api' | null = null
+
+    for (let i = 0; i < productIds.length; i++) {
+      const productId = productIds[i]
+
+      // 상품 발행 시작 이벤트
+      yield {
+        type: 'product_start',
+        timestamp: Date.now(),
+        data: {
+          channelId,
+          channelName: channel.name,
+          totalProducts: productIds.length,
+          currentIndex: i,
+          progress: {
+            productId,
+            productName: `상품 ${productId}`,
+            stage: 'preparing',
+            stageLabel: '준비 중',
+          },
+        },
+      }
+
+      // 쿨다운 대기
+      if (i > 0 && lastPublishMethod) {
+        const cooldownMs = lastPublishMethod === 'playwright' ? PLAYWRIGHT_COOLDOWN_MS : BAND_API_COOLDOWN_MS
+        await delay(cooldownMs)
+      }
+
+      // 발행 진행 - 진행 콜백으로 각 단계 전달
+      const result = await this.publishToChannelWithProgress({
+        userId,
+        productId,
+        channelId,
+        onStageProgress: async (progress) => {
+          // 단계 변경 이벤트를 yield할 수 없으므로 개별 발행 함수에서 처리
+          // 여기서는 빈 처리 (이벤트는 product_complete에서 종합)
+        },
+      })
+
+      if (result.publishMethod) {
+        lastPublishMethod = result.publishMethod
+      }
+
+      // 결과 집계
+      if (result.success) {
+        if (result.skipped) {
+          skippedCount++
+        } else {
+          successCount++
+        }
+      } else {
+        failedCount++
+      }
+
+      // 상품 완료 이벤트
+      yield {
+        type: 'product_complete',
+        timestamp: Date.now(),
+        data: {
+          channelId,
+          channelName: channel.name,
+          totalProducts: productIds.length,
+          currentIndex: i,
+          successCount,
+          failedCount,
+          skippedCount,
+          progress: {
+            productId,
+            productName: `상품 ${productId}`,
+            stage: result.success ? (result.skipped ? 'skipped' : 'completed') : 'failed',
+            stageLabel: result.success ? (result.skipped ? '건너뜀' : '완료') : '실패',
+            imageProgress: result.imageCount
+              ? { current: result.imageCount, total: result.imageCount }
+              : undefined,
+            error: result.error,
+            publishMethod: result.publishMethod,
+          },
+        },
+      }
+    }
+
+    // 배치 완료 이벤트
+    yield {
+      type: 'batch_complete',
+      timestamp: Date.now(),
+      data: {
+        channelId,
+        channelName: channel.name,
+        totalProducts: productIds.length,
+        successCount,
+        failedCount,
+        skippedCount,
+      },
     }
   }
 }
