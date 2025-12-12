@@ -99,10 +99,10 @@ export async function GET(request: NextRequest) {
 
     const { start, end, prevStart, prevEnd, days } = getDateRange(period, startDate, endDate)
 
-    // 현재 기간 주문 조회
-    const currentOrders = await prisma.order.findMany({
+    // 현재 기간 회원 주문 조회
+    const currentMemberOrders = await prisma.order.findMany({
       where: {
-        userId: user.userId,
+        shop: { userId: user.userId },
         status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
         orderedAt: { gte: start, lte: end },
       },
@@ -118,10 +118,25 @@ export async function GET(request: NextRequest) {
       orderBy: { orderedAt: 'desc' },
     })
 
-    // 이전 기간 주문 조회 (비교용)
-    const previousOrders = await prisma.order.findMany({
+    // 현재 기간 비회원 주문 조회
+    const currentGuestOrders = await prisma.guestOrder.findMany({
       where: {
-        userId: user.userId,
+        shop: { userId: user.userId },
+        status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+        orderedAt: { gte: start, lte: end },
+      },
+      include: {
+        shop: true,
+        shippingAddress: true,
+        items: true,
+      },
+      orderBy: { orderedAt: 'desc' },
+    })
+
+    // 이전 기간 회원 주문 조회 (비교용)
+    const previousMemberOrders = await prisma.order.findMany({
+      where: {
+        shop: { userId: user.userId },
         status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
         orderedAt: { gte: prevStart, lte: prevEnd },
       },
@@ -130,29 +145,60 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // 전체 주문 상태 조회 (상태 분포용)
-    const allOrders = await prisma.order.findMany({
+    // 이전 기간 비회원 주문 조회 (비교용)
+    const previousGuestOrders = await prisma.guestOrder.findMany({
       where: {
-        userId: user.userId,
+        shop: { userId: user.userId },
+        status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+        orderedAt: { gte: prevStart, lte: prevEnd },
+      },
+      include: {
+        shippingAddress: true,
+      },
+    })
+
+    // 전체 회원 주문 상태 조회 (상태 분포용)
+    const allMemberOrders = await prisma.order.findMany({
+      where: {
+        shop: { userId: user.userId },
         orderedAt: { gte: start, lte: end },
       },
     })
 
-    // === KPI 통계 계산 ===
-    const currentRevenue = currentOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0)
-    const previousRevenue = previousOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0)
+    // 전체 비회원 주문 상태 조회 (상태 분포용)
+    const allGuestOrders = await prisma.guestOrder.findMany({
+      where: {
+        shop: { userId: user.userId },
+        orderedAt: { gte: start, lte: end },
+      },
+    })
 
-    const currentOrderCount = currentOrders.length
-    const previousOrderCount = previousOrders.length
+    // === KPI 통계 계산 (회원 + 비회원) ===
+    const currentMemberRevenue = currentMemberOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0)
+    const currentGuestRevenue = currentGuestOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0)
+    const currentRevenue = currentMemberRevenue + currentGuestRevenue
 
-    // 고유 고객 수 (전화번호 기준)
-    const currentCustomers = new Set(currentOrders.map(o => o.shippingAddress?.recipientPhone).filter(Boolean)).size
-    const previousCustomers = new Set(previousOrders.map(o => o.shippingAddress?.recipientPhone).filter(Boolean)).size
+    const previousMemberRevenue = previousMemberOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0)
+    const previousGuestRevenue = previousGuestOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0)
+    const previousRevenue = previousMemberRevenue + previousGuestRevenue
 
-    // 전환율 (임시: 주문 대비 결제 완료 비율)
-    const paidOrders = allOrders.filter(o => ['PAID', 'SHIPPED', 'DELIVERED'].includes(o.status)).length
-    const totalOrders = allOrders.length
-    const conversionRate = totalOrders > 0 ? Math.round((paidOrders / totalOrders) * 1000) / 10 : 0
+    const currentOrderCount = currentMemberOrders.length + currentGuestOrders.length
+    const previousOrderCount = previousMemberOrders.length + previousGuestOrders.length
+
+    // 고유 고객 수 (전화번호 기준 - 회원 + 비회원)
+    const currentMemberPhones = currentMemberOrders.map(o => o.shippingAddress?.recipientPhone).filter(Boolean)
+    const currentGuestPhones = currentGuestOrders.map(o => o.guestPhone).filter(Boolean)
+    const currentCustomers = new Set([...currentMemberPhones, ...currentGuestPhones]).size
+
+    const previousMemberPhones = previousMemberOrders.map(o => o.shippingAddress?.recipientPhone).filter(Boolean)
+    const previousGuestPhones = previousGuestOrders.map(o => o.guestPhone).filter(Boolean)
+    const previousCustomers = new Set([...previousMemberPhones, ...previousGuestPhones]).size
+
+    // 전환율 (임시: 주문 대비 결제 완료 비율 - 회원 + 비회원)
+    const paidMemberOrders = allMemberOrders.filter(o => ['PAID', 'SHIPPED', 'DELIVERED'].includes(o.status)).length
+    const paidGuestOrders = allGuestOrders.filter(o => ['PAID', 'SHIPPED', 'DELIVERED'].includes(o.status)).length
+    const totalOrders = allMemberOrders.length + allGuestOrders.length
+    const conversionRate = totalOrders > 0 ? Math.round(((paidMemberOrders + paidGuestOrders) / totalOrders) * 1000) / 10 : 0
 
     const stats = {
       revenue: {
@@ -173,7 +219,7 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    // === 매출 추이 차트 ===
+    // === 매출 추이 차트 (회원 + 비회원) ===
     const revenueByDay = new Map<string, number>()
 
     // 기간 내 모든 날짜 초기화
@@ -183,8 +229,15 @@ export async function GET(request: NextRequest) {
       revenueByDay.set(formatDate(date), 0)
     }
 
-    // 주문 데이터로 매출 집계
-    for (const order of currentOrders) {
+    // 회원 주문 데이터로 매출 집계
+    for (const order of currentMemberOrders) {
+      const dateKey = formatDate(order.orderedAt)
+      const current = revenueByDay.get(dateKey) || 0
+      revenueByDay.set(dateKey, current + Number(order.totalAmount))
+    }
+
+    // 비회원 주문 데이터로 매출 집계
+    for (const order of currentGuestOrders) {
       const dateKey = formatDate(order.orderedAt)
       const current = revenueByDay.get(dateKey) || 0
       revenueByDay.set(dateKey, current + Number(order.totalAmount))
@@ -214,10 +267,14 @@ export async function GET(request: NextRequest) {
       REFUNDED: '환불',
     }
 
-    const statusCounts = allOrders.reduce((acc, order) => {
-      acc[order.status] = (acc[order.status] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
+    // 회원 + 비회원 주문 상태 합산
+    const statusCounts: Record<string, number> = {}
+    for (const order of allMemberOrders) {
+      statusCounts[order.status] = (statusCounts[order.status] || 0) + 1
+    }
+    for (const order of allGuestOrders) {
+      statusCounts[order.status] = (statusCounts[order.status] || 0) + 1
+    }
 
     const orderStatusChart = Object.entries(statusCounts)
       .filter(([_, count]) => count > 0)
@@ -303,23 +360,41 @@ export async function GET(request: NextRequest) {
       .slice(0, 5)
       .map(({ orderedAt, ...rest }) => rest) // orderedAt 필드 제거
 
-    // === 인기 상품 TOP 5 ===
-    const orderItems = currentOrders.flatMap(o => o.items)
+    // === 인기 상품 TOP 5 (회원 + 비회원) ===
+    const memberOrderItems = currentMemberOrders.flatMap(o => o.items)
+    const guestOrderItems = currentGuestOrders.flatMap(o => o.items)
 
-    const productSales = orderItems.reduce((acc, item) => {
+    const productSales: Record<string, { name: string; sales: number; revenue: number; thumbnailUrl: string | null }> = {}
+
+    // 회원 주문 아이템 집계
+    for (const item of memberOrderItems) {
       const key = item.productName
-      if (!acc[key]) {
-        acc[key] = {
+      if (!productSales[key]) {
+        productSales[key] = {
           name: item.productName,
           sales: 0,
           revenue: 0,
           thumbnailUrl: item.thumbnailUrl,
         }
       }
-      acc[key].sales += item.quantity
-      acc[key].revenue += Number(item.totalPrice)
-      return acc
-    }, {} as Record<string, { name: string; sales: number; revenue: number; thumbnailUrl: string | null }>)
+      productSales[key].sales += item.quantity
+      productSales[key].revenue += Number(item.totalPrice)
+    }
+
+    // 비회원 주문 아이템 집계
+    for (const item of guestOrderItems) {
+      const key = item.productName
+      if (!productSales[key]) {
+        productSales[key] = {
+          name: item.productName,
+          sales: 0,
+          revenue: 0,
+          thumbnailUrl: item.thumbnailUrl,
+        }
+      }
+      productSales[key].sales += item.quantity
+      productSales[key].revenue += Number(item.totalPrice)
+    }
 
     const topProducts = Object.values(productSales)
       .sort((a, b) => b.sales - a.sales)
@@ -332,23 +407,40 @@ export async function GET(request: NextRequest) {
         thumbnailUrl: product.thumbnailUrl,
       }))
 
-    // === 쇼핑몰별 매출 ===
+    // === 쇼핑몰별 매출 (회원 + 비회원) ===
     const shopColors = ['#10B981', '#6366F1', '#F59E0B', '#3B82F6', '#EF4444', '#8B5CF6', '#EC4899']
 
-    const shopRevenues = currentOrders.reduce((acc, order) => {
+    const shopRevenues: Record<number, { id: number; name: string; revenue: number }> = {}
+
+    // 회원 주문으로 쇼핑몰별 매출 집계
+    for (const order of currentMemberOrders) {
       const shopId = order.shopId || 0
       const shopName = order.shop?.name || '미분류'
 
-      if (!acc[shopId]) {
-        acc[shopId] = {
+      if (!shopRevenues[shopId]) {
+        shopRevenues[shopId] = {
           id: shopId,
           name: shopName,
           revenue: 0,
         }
       }
-      acc[shopId].revenue += Number(order.totalAmount)
-      return acc
-    }, {} as Record<number, { id: number; name: string; revenue: number }>)
+      shopRevenues[shopId].revenue += Number(order.totalAmount)
+    }
+
+    // 비회원 주문으로 쇼핑몰별 매출 집계
+    for (const order of currentGuestOrders) {
+      const shopId = order.shopId || 0
+      const shopName = order.shop?.name || '미분류'
+
+      if (!shopRevenues[shopId]) {
+        shopRevenues[shopId] = {
+          id: shopId,
+          name: shopName,
+          revenue: 0,
+        }
+      }
+      shopRevenues[shopId].revenue += Number(order.totalAmount)
+    }
 
     const totalShopRevenue = Object.values(shopRevenues).reduce((sum, s) => sum + s.revenue, 0)
 

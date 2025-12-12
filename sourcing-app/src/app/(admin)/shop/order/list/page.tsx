@@ -79,7 +79,7 @@ export default function UnifiedOrderListPage() {
 
   const router = useRouter()
 
-  const itemsPerPage = 20
+  const itemsPerPage = 10
 
   // Shop 목록 로드
   useEffect(() => {
@@ -367,41 +367,50 @@ export default function UnifiedOrderListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[4%] text-center">No.</TableHead>
                   <TableHead className="w-[8%]">출처</TableHead>
-                  <TableHead className="w-[12%]">주문번호</TableHead>
-                  <TableHead className="w-[10%]">고객명</TableHead>
-                  <TableHead className="w-[12%]">전화번호</TableHead>
-                  <TableHead className="w-[22%]">상품</TableHead>
-                  <TableHead className="w-[10%]">금액</TableHead>
-                  <TableHead className="w-[10%]">상태</TableHead>
-                  <TableHead className="w-[16%]">주문일시</TableHead>
+                  <TableHead className="w-[11%]">주문번호</TableHead>
+                  <TableHead className="w-[9%]">고객명</TableHead>
+                  <TableHead className="w-[7%]">회원유형</TableHead>
+                  <TableHead className="w-[11%]">전화번호</TableHead>
+                  <TableHead className="w-[20%]">상품</TableHead>
+                  <TableHead className="w-[9%]">금액</TableHead>
+                  <TableHead className="w-[9%]">상태</TableHead>
+                  <TableHead className="w-[15%]">주문일시</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {orders.length === 0 ? (
                   <TableEmpty message="주문이 없습니다." />
                 ) : (
-                  orders.map((order) => (
+                  orders.map((order, index) => (
                     <TableRow
                       key={`${order.source}-${order.isGuestOrder ? 'guest' : 'member'}-${order.id}`}
                       className="hover:bg-gray-50 cursor-pointer"
                       onClick={() => router.push(`/shop/order/detail/${order.orderNumber}?source=${order.source}`)}
                     >
+                      <TableCell className="text-center text-gray-500">
+                        {(page - 1) * itemsPerPage + index + 1}
+                      </TableCell>
                       <TableCell>{getSourceBadge(order)}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-sm text-gray-900">
-                            {order.orderNumber}
-                          </span>
-                          {order.isGuestOrder && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap">
-                              비회원
-                            </span>
-                          )}
-                        </div>
+                        <span className="font-mono text-sm text-gray-900">
+                          {order.orderNumber}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <span className="font-medium text-gray-900">{order.customerName}</span>
+                      </TableCell>
+                      <TableCell>
+                        {order.isGuestOrder ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                            비회원
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                            회원
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span className="text-gray-600 text-sm">

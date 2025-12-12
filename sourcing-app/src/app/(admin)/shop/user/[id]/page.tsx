@@ -29,6 +29,7 @@ import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 
 type UserRole = 'USER' | 'MANAGER' | 'ADMIN'
+type MemberType = 'MEMBER' | 'GUEST'
 type OrderStatus = 'PENDING' | 'PAID' | 'PREPARING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'REFUNDED'
 type InquiryStatus = 'PENDING' | 'ANSWERED' | 'CLOSED'
 type InquiryType = 'PRODUCT' | 'SHIPPING' | 'PAYMENT' | 'RETURN' | 'OTHER'
@@ -148,6 +149,22 @@ const roleColors: Record<UserRole, string> = {
   USER: 'bg-green-100 text-green-700',
   MANAGER: 'bg-blue-100 text-blue-700',
   ADMIN: 'bg-purple-100 text-purple-700',
+}
+
+const memberTypeLabels: Record<MemberType, string> = {
+  MEMBER: '회원',
+  GUEST: '비회원',
+}
+
+const memberTypeColors: Record<MemberType, string> = {
+  MEMBER: 'bg-emerald-100 text-emerald-700',
+  GUEST: 'bg-orange-100 text-orange-700',
+}
+
+// 회원 유형 판별 헬퍼
+const getMemberType = (user: UserDetail): MemberType => {
+  if (user.role !== 'USER') return 'MEMBER'
+  return user.signupCompletedAt ? 'MEMBER' : 'GUEST'
 }
 
 const orderStatusLabels: Record<OrderStatus, string> = {
@@ -315,6 +332,11 @@ export default function UserDetailPage() {
                   <h1 className="text-2xl font-bold text-gray-900">
                     {user.name || '(이름 없음)'}
                   </h1>
+                  {user.role === 'USER' && (
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${memberTypeColors[getMemberType(user)]}`}>
+                      {memberTypeLabels[getMemberType(user)]}
+                    </span>
+                  )}
                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
                     {roleLabels[user.role]}
                   </span>
@@ -450,7 +472,7 @@ export default function UserDetailPage() {
                         )}
                       </div>
                       <div className="mt-3 flex justify-end">
-                        <Link href={`/shop/order/detail/${order.id}`}>
+                        <Link href={`/shop/order/detail/${order.orderNumber}`}>
                           <Button variant="ghost" size="sm">
                             상세보기 <ChevronRight className="w-4 h-4" />
                           </Button>
