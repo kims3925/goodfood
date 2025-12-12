@@ -1439,10 +1439,7 @@ export class BandPostAutomation {
           const beforePostKey = await this.getLatestPostKey(page, currentBandNo)
           console.log(`[밴드자동화] Latest postKey before publish: ${beforePostKey || 'none'}`)
 
-        try {
-          // 3분 타임아웃과 함께 이미지 포함 발행 시도
-          const publishWithImagesPromise = (async () => {
-            await this.saveDebugScreenshot(page, `batch-${i + 1}-before`)
+          await this.saveDebugScreenshot(page, `batch-${i + 1}-before`)
 
           // 2-1. 글쓰기 레이어 열기
           console.log('[밴드자동화] Opening write layer')
@@ -1490,7 +1487,7 @@ export class BandPostAutomation {
               }
             }
 
-              await this.saveDebugScreenshot(page, `batch-${i + 1}-after-upload`)
+            await this.saveDebugScreenshot(page, `batch-${i + 1}-after-upload`)
 
             if (uploadedImageCount === 0) {
               console.warn(`[밴드자동화] No images uploaded for item ${i + 1}, continuing with text only`)
@@ -1501,7 +1498,7 @@ export class BandPostAutomation {
           console.log('[밴드자동화] Submitting post')
           await this.submitPost(page)
 
-            await this.saveDebugScreenshot(page, `batch-${i + 1}-after`)
+          await this.saveDebugScreenshot(page, `batch-${i + 1}-after`)
 
           // 2-6. 게시 완료 대기 및 postKey 추출
           await page.waitForTimeout(3000)

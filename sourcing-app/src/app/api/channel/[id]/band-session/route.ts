@@ -90,44 +90,6 @@ export async function POST(
 }
 
 /**
- * PUT: 쿠키 직접 저장 (서버 환경용, CORS 허용)
- */
-export async function PUT(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  const params = await context.params
-  const channelId = parseInt(params.id, 10)
-
-  if (isNaN(channelId)) {
-    return NextResponse.json({ success: false, error: '잘못된 채널 ID입니다.' }, { status: 400, headers: corsHeaders })
-  }
-
-  try {
-    const body = await request.json()
-    const { cookieString } = body
-
-    if (!cookieString || typeof cookieString !== 'string') {
-      return NextResponse.json({ success: false, error: '쿠키 문자열이 필요합니다.' }, { status: 400, headers: corsHeaders })
-    }
-
-    const result = await manualLoginService.saveSessionCookieDirect(channelId, cookieString)
-
-    if (!result.success) {
-      return NextResponse.json({ success: false, error: result.error }, { status: 400, headers: corsHeaders })
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: '세션 쿠키가 저장되었습니다.',
-    }, { headers: corsHeaders })
-  } catch (error: any) {
-    console.error('쿠키 직접 저장 실패:', error)
-    return NextResponse.json({ success: false, error: error.message }, { status: 500, headers: corsHeaders })
-  }
-}
-
-/**
  * DELETE: 세션 삭제
  */
 export async function DELETE(
