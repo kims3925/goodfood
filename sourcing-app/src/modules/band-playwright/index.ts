@@ -6,11 +6,9 @@
 export { bandPlaywrightService, BandPlaywrightService } from './band-playwright.service'
 export { browserPool } from './band-browser-pool'
 export { sessionManager } from './band-session-manager'
-export { loginAutomation } from './band-login.automation'
 export { postAutomation } from './band-post.automation'
 
 export type {
-  BandCredentials,
   BandSession,
   BandPublishParams,
   BandPublishResult,

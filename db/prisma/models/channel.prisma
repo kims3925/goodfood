@@ -11,8 +11,6 @@ model Channel {
   updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   shopId            Int?               @map("shop_id")
   bandSessionCookie String?            @map("band_session_cookie") @db.Text
-  naverId           String?            @map("naver_id") @db.VarChar(255)
-  naverPassword     String?            @map("naver_password") @db.VarChar(500)
   sessionExpiresAt  DateTime?          @map("session_expires_at")
   shop              Shop?              @relation(fields: [shopId], references: [id])
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)

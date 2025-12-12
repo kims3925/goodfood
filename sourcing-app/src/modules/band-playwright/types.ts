@@ -2,10 +2,6 @@
  * Band Playwright 자동화 타입 정의
  */
 
-export interface BandCredentials {
-  naverId: string
-  naverPassword: string
-}
 
 export interface BandSession {
   cookies: string

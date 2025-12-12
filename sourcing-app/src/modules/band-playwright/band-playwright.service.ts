@@ -11,7 +11,6 @@ import {
   BandPublishResult,
   BandBatchPublishParams,
   BandBatchPublishResult,
-  BandCredentials,
   BandPlaywrightError,
   BandPlaywrightErrorCode,
 } from './types'
@@ -22,7 +21,6 @@ export class BandPlaywrightService {
    */
   async publishWithImages(
     params: BandPublishParams,
-    credentials?: BandCredentials,
     retryCount: number = 0
   ): Promise<BandPublishResult> {
     const { channelId, bandKey, content, imageUrls } = params
@@ -31,12 +29,12 @@ export class BandPlaywrightService {
 
     try {
       // 1. 세션 확보
-      const session = await sessionManager.getValidSession(channelId, credentials)
+      const session = await sessionManager.getValidSession(channelId)
 
       if (!session) {
         return {
           success: false,
-          error: '세션을 획득할 수 없습니다. 네이버 계정 정보를 확인해주세요.',
+          error: '세션을 획득할 수 없습니다. 채널 설정에서 쿠키를 등록해주세요.',
         }
       }
 
@@ -64,7 +62,7 @@ export class BandPlaywrightService {
       ) {
         console.log('[BandPlaywrightService] Session expired, retrying with new session')
         await sessionManager.invalidateSession(channelId)
-        return this.publishWithImages(params, credentials, retryCount + 1)
+        return this.publishWithImages(params, retryCount + 1)
       }
 
       // CAPTCHA 에러는 재시도 불가
@@ -102,7 +100,6 @@ export class BandPlaywrightService {
    */
   async publishBatchWithImages(
     params: BandBatchPublishParams,
-    credentials?: BandCredentials,
     retryCount: number = 0
   ): Promise<BandBatchPublishResult> {
     const { channelId, bandKey, bandName, items } = params
@@ -111,7 +108,7 @@ export class BandPlaywrightService {
 
     try {
       // 1. 세션 확보
-      const session = await sessionManager.getValidSession(channelId, credentials)
+      const session = await sessionManager.getValidSession(channelId)
 
       if (!session) {
         return {
@@ -122,7 +119,7 @@ export class BandPlaywrightService {
           results: items.map(item => ({
             productId: item.productId,
             success: false,
-            error: '세션을 획득할 수 없습니다. 네이버 계정 정보를 확인해주세요.',
+            error: '세션을 획득할 수 없습니다. 채널 설정에서 쿠키를 등록해주세요.',
           })),
         }
       }
@@ -150,7 +147,7 @@ export class BandPlaywrightService {
       ) {
         console.log('[BandPlaywrightService] Session expired, retrying with new session')
         await sessionManager.invalidateSession(channelId)
-        return this.publishBatchWithImages(params, credentials, retryCount + 1)
+        return this.publishBatchWithImages(params, retryCount + 1)
       }
 
       return {
