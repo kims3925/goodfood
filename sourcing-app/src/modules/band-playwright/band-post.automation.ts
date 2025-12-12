@@ -14,7 +14,6 @@ import {
   BandBatchPublishResult,
   BandPlaywrightError,
   BandPlaywrightErrorCode,
-  BandStageProgressCallback
 } from './types'
 import type { PublishStage } from '../publish/types'
 

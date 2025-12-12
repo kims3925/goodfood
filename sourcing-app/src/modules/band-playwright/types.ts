@@ -2,6 +2,10 @@
  * Band Playwright 자동화 타입 정의
  */
 
+import type { PublishDetailedProgress } from '../publish/types'
+
+// 단계별 진행 콜백 타입
+export type BandStageProgressCallback = (progress: Omit<PublishDetailedProgress, 'productId' | 'productName'>) => void | Promise<void>
 
 export interface BandSession {
   cookies: string
