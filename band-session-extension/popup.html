@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Band Session Helper</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 16px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      color: #333;
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .status-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 12px;
+      border: 1px solid #e5e7eb;
+      text-align: center;
+    }
+
+    .status-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .status-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .status-desc {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    .status-card.success {
+      background: #f0fdf4;
+      border-color: #86efac;
+    }
+
+    .status-card.success .status-title {
+      color: #166534;
+    }
+
+    .status-card.warning {
+      background: #fffbeb;
+      border-color: #fcd34d;
+    }
+
+    .status-card.warning .status-title {
+      color: #92400e;
+    }
+
+    .status-card.error {
+      background: #fef2f2;
+      border-color: #fca5a5;
+    }
+
+    .status-card.error .status-title {
+      color: #991b1b;
+    }
+
+    .status-card.loading {
+      background: #eff6ff;
+      border-color: #93c5fd;
+    }
+
+    .status-card.loading .status-title {
+      color: #1e40af;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: #7c3aed;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #6d28d9;
+    }
+
+    .btn-primary:disabled {
+      background: #c4b5fd;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #374151;
+      margin-top: 8px;
+    }
+
+    .btn-secondary:hover {
+      background: #d1d5db;
+    }
+
+    .btn-success {
+      background: #22c55e;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #16a34a;
+    }
+
+    .result-info {
+      margin-top: 12px;
+      padding: 12px;
+      background: #f0fdf4;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #166534;
+    }
+
+    .result-info .label {
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #fff;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Band Session Helper</h1>
+    <p>Band 세션을 자동으로 저장합니다</p>
+  </div>
+
+  <!-- 로딩 상태 -->
+  <div id="loadingState" class="status-card loading">
+    <div class="status-icon">🔄</div>
+    <div class="status-title">상태 확인 중...</div>
+    <div class="status-desc">잠시만 기다려주세요</div>
+  </div>
+
+  <!-- Band 로그인 필요 -->
+  <div id="needBandLogin" class="status-card warning hidden">
+    <div class="status-icon">🔐</div>
+    <div class="status-title">Band 로그인이 필요합니다</div>
+    <div class="status-desc">Band에 로그인한 후<br>다시 이 버튼을 클릭해주세요</div>
+  </div>
+
+  <!-- Sourcing App 로그인 필요 -->
+  <div id="needAppLogin" class="status-card error hidden">
+    <div class="status-icon">⚠️</div>
+    <div class="status-title">Sourcing App 로그인 필요</div>
+    <div class="status-desc">snsauto.abcpharm.net에<br>먼저 로그인해주세요</div>
+  </div>
+
+  <!-- 저장 준비 완료 -->
+  <div id="readyToSave" class="status-card success hidden">
+    <div class="status-icon">✅</div>
+    <div class="status-title">저장 준비 완료!</div>
+    <div class="status-desc">Band 세션을 저장할 수 있습니다</div>
+  </div>
+
+  <!-- 저장 완료 -->
+  <div id="saveComplete" class="status-card success hidden">
+    <div class="status-icon">🎉</div>
+    <div class="status-title">저장 완료!</div>
+    <div class="status-desc" id="saveResultDesc">세션이 저장되었습니다</div>
+  </div>
+
+  <!-- 에러 -->
+  <div id="errorState" class="status-card error hidden">
+    <div class="status-icon">❌</div>
+    <div class="status-title">오류 발생</div>
+    <div class="status-desc" id="errorDesc">알 수 없는 오류가 발생했습니다</div>
+  </div>
+
+  <!-- 버튼 영역 -->
+  <div id="buttonArea">
+    <button class="btn btn-primary hidden" id="saveBtn">
+      <span id="saveBtnText">세션 저장하기</span>
+      <div class="spinner hidden" id="saveSpinner"></div>
+    </button>
+    <button class="btn btn-secondary hidden" id="openBandBtn">Band 열기</button>
+    <button class="btn btn-secondary hidden" id="openAppBtn">Sourcing App 열기</button>
+    <button class="btn btn-secondary hidden" id="retryBtn">다시 확인</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
