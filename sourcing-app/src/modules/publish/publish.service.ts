@@ -1,7 +1,10 @@
 /**
  * Publish Service
  * 상품을 소매채널(Band 등)에 발행하는 핵심 서비스
- * Band API를 통해 텍스트만 발행 (이미지 없음)
+ *
+ * 발행 방식:
+ * 1. Playwright (세션 있을 때): 이미지 포함 발행
+ * 2. Band API (폴백): 텍스트만 발행
  *
  * 이 서비스는 다음에서 사용됩니다:
  * - 발행 페이지 API (/api/shop/publish)
@@ -10,6 +13,7 @@
 
 import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { NaverBandClient } from '@/modules/sourcing/domain/src/channel'
+import { bandPlaywrightService } from '@/modules/band-playwright/band-playwright.service'
 import type {
   PublishToChannelParams,
   PublishToChannelResult,
@@ -25,7 +29,9 @@ import type {
 } from './types'
 
 // Band API 쿨다운 지연 시간 (10초)
-const DEFAULT_COOLDOWN_MS = 10000
+const BAND_API_COOLDOWN_MS = 10000
+// Playwright 발행 쿨다운 지연 시간 (2초)
+const PLAYWRIGHT_COOLDOWN_MS = 2000
 
 // 쿼터 에러 재시도 설정
 const MAX_QUOTA_RETRIES = 3
@@ -92,7 +98,7 @@ export class PublishService {
     const { userId, productId, channelId } = params
 
     try {
-      // 1. 채널 정보 조회 (연결된 Shop 정보 포함)
+      // 1. 채널 정보 조회 (연결된 Shop 정보 + Playwright 세션 포함)
       const channel = await prisma.channel.findFirst({
         where: {
           id: channelId,
@@ -109,6 +115,15 @@ export class PublishService {
               isActive: true,
             },
           },
+        },
+      })
+
+      // Playwright 세션 정보 별도 조회 (bandSessionCookie, sessionExpiresAt)
+      const channelSession = await prisma.channel.findFirst({
+        where: { id: channelId },
+        select: {
+          bandSessionCookie: true,
+          sessionExpiresAt: true,
         },
       })
 
@@ -198,24 +213,66 @@ export class PublishService {
       // 5. 게시물 내용 생성 (쇼핑몰URL → 상품내용 → 쇼핑몰URL)
       const postContent = buildPostContent(product, { orderLink })
 
-      // 6. API 토큰 확인 - 토큰 없으면 실패 처리
-      if (!apiConfig?.accessToken) {
-        return {
-          success: false,
-          productId,
-          channelId,
-          error: 'Band API 토큰이 설정되지 않았습니다. 설정 > API 연동에서 Band API를 설정해주세요.',
+      // 이미지 URL 추출 (최대 20개)
+      const imageUrls = (product.images?.map(img => img.url) || []).slice(0, 20)
+
+      // 6. 발행 방식 결정 및 실행
+      let postKey: string | undefined
+      let publishMethod: 'playwright' | 'api' = 'api'
+      let imageCount = 0
+
+      // Playwright 세션 유효성 확인
+      const hasValidSession = channelSession?.bandSessionCookie &&
+        channelSession.sessionExpiresAt &&
+        new Date(channelSession.sessionExpiresAt) > new Date()
+
+      // 6-1. Playwright 발행 시도 (세션이 유효하고 이미지가 있는 경우)
+      if (hasValidSession && imageUrls.length > 0) {
+        try {
+          console.log(`[PublishService] Playwright 발행 시도 (${imageUrls.length}개 이미지)`)
+
+          const playwrightResult = await bandPlaywrightService.publishWithImages({
+            channelId,
+            bandKey: channel.channelKey,
+            bandName: channel.name,
+            content: postContent,
+            imageUrls,
+          })
+
+          if (playwrightResult.success && playwrightResult.postKey) {
+            postKey = playwrightResult.postKey
+            publishMethod = 'playwright'
+            imageCount = imageUrls.length
+            console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
+          } else {
+            console.log(`[PublishService] Playwright 발행 실패: ${playwrightResult.error}, Band API로 폴백`)
+          }
+        } catch (error: any) {
+          console.log(`[PublishService] Playwright 발행 오류, Band API로 폴백:`, error.message)
         }
       }
 
-      // 7. Band API로 게시물 작성 (텍스트만)
-      const bandClient = new NaverBandClient(apiConfig.accessToken)
+      // 6-2. Playwright 실패 시 Band API로 폴백 (텍스트만)
+      if (!postKey) {
+        if (!apiConfig?.accessToken) {
+          return {
+            success: false,
+            productId,
+            channelId,
+            error: 'Band API 토큰이 설정되지 않았습니다. 설정 > API 연동에서 Band API를 설정해주세요.',
+          }
+        }
 
-      const { postKey } = await bandClient.createPost(channel.channelKey, postContent, {
-        doPush: false, // 푸시 알림 비활성화
-      })
+        const bandClient = new NaverBandClient(apiConfig.accessToken)
+        const result = await bandClient.createPost(channel.channelKey, postContent, {
+          doPush: false, // 푸시 알림 비활성화
+        })
+        postKey = result.postKey
+        publishMethod = 'api'
+        console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만)`)
+      }
 
-      // 8. PublishedProduct 레코드 생성
+      // 7. PublishedProduct 레코드 생성
       const publishedProduct = await prisma.publishedProduct.create({
         data: {
           userId,
@@ -226,7 +283,7 @@ export class PublishService {
       })
 
       console.log(
-        `[PublishService] Published product ${productId} to channel ${channel.name} -> post_key: ${postKey}${orderLink ? ` with order link` : ''}`
+        `[PublishService] Published product ${productId} to channel ${channel.name} -> post_key: ${postKey} (${publishMethod}${orderLink ? ', with order link' : ''})`
       )
 
       return {
@@ -235,6 +292,8 @@ export class PublishService {
         channelId,
         postKey,
         publishedProductId: publishedProduct.id,
+        imageCount,
+        publishMethod,
       }
     } catch (error: any) {
       console.error(`[PublishService] Error publishing product ${productId} to channel ${channelId}:`, error)
@@ -258,7 +317,7 @@ export class PublishService {
 
   /**
    * 여러 상품을 단일 채널에 발행 (배치)
-   * Band API를 통해 텍스트만 발행 (쇼핑몰URL → 상품내용 → 쇼핑몰URL)
+   * Playwright 세션이 있으면 이미지 포함, 없으면 Band API로 텍스트만 발행
    */
   async publishBatch(params: PublishBatchParams): Promise<PublishBatchResult> {
     const { userId, productIds, channelId, onProgress } = params
@@ -311,25 +370,32 @@ export class PublishService {
       },
     })
 
-    console.log(`[PublishService] Using Band API for ${productIds.length} products`)
+    console.log(`[PublishService] Batch publishing ${productIds.length} products to channel ${channel.name}`)
 
     const results: PublishToChannelResult[] = []
     const errors: string[] = []
     let successCount = 0
     let failedCount = 0
     let skippedCount = 0
+    let lastPublishMethod: 'playwright' | 'api' | null = null
 
     for (let i = 0; i < productIds.length; i++) {
       const productId = productIds[i]
 
-      // 첫 번째가 아니면 쿨다운 대기 (Band API 제한)
-      if (i > 0 && apiConfig) {
-        console.log(`[PublishService] Waiting ${DEFAULT_COOLDOWN_MS / 1000}s for Band API cooldown...`)
-        await delay(DEFAULT_COOLDOWN_MS)
+      // 첫 번째가 아니면 쿨다운 대기 (발행 방식에 따라 다름)
+      if (i > 0 && lastPublishMethod) {
+        const cooldownMs = lastPublishMethod === 'playwright' ? PLAYWRIGHT_COOLDOWN_MS : BAND_API_COOLDOWN_MS
+        console.log(`[PublishService] Waiting ${cooldownMs / 1000}s for ${lastPublishMethod} cooldown...`)
+        await delay(cooldownMs)
       }
 
       const result = await this.publishToChannel({ userId, productId, channelId })
       results.push(result)
+
+      // 다음 쿨다운을 위해 발행 방식 저장
+      if (result.publishMethod) {
+        lastPublishMethod = result.publishMethod
+      }
 
       if (result.success) {
         if (result.skipped) {

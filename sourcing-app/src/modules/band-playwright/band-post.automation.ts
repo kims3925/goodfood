@@ -390,7 +390,7 @@ export class BandPostAutomation {
         // 로컬 서버 URL (개발: localhost:3001, 프로덕션: 환경변수)
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
         fullUrl = `${baseUrl}${imageUrl}`
-        console.log(`[밴드자동화] Converted relative URL: ${imageUrl} -> ${fullUrl}`)
+        console.log(`[밴드자동화] 상대 URL 변환: ${imageUrl} -> ${fullUrl}`)
       }
 
       const response = await fetch(fullUrl, {
@@ -400,7 +400,7 @@ export class BandPostAutomation {
       })
 
       if (!response.ok) {
-        console.error(`[밴드자동화] Failed to download image: ${imageUrl}`)
+        console.error(`[밴드자동화] 이미지 다운로드 실패: ${imageUrl}`)
         return null
       }
 
@@ -411,7 +411,7 @@ export class BandPostAutomation {
       fs.writeFileSync(tempPath, buffer)
       return tempPath
     } catch (error) {
-      console.error(`[밴드자동화] Image download error: ${imageUrl}`, error)
+      console.error(`[밴드자동화] 이미지 다운로드 오류: ${imageUrl}`, error)
       return null
     }
   }
@@ -425,7 +425,7 @@ export class BandPostAutomation {
 
     // 업로드된 이미지 확인
     const uploadedCount = await this.countUploadedImages(page)
-    console.log(`[밴드자동화] Verified ${uploadedCount} images uploaded`)
+    console.log(`[밴드자동화] 업로드된 이미지 확인: ${uploadedCount}개`)
 
     return uploadedCount
   }
@@ -456,7 +456,7 @@ export class BandPostAutomation {
           }
         }
         if (visibleItems.length > 0) {
-          console.log(`[밴드자동화] Found ${visibleItems.length} uploaded images with: ${selector}`)
+          console.log(`[밴드자동화] ${visibleItems.length}개 업로드된 이미지 발견: ${selector}`)
           return visibleItems.length
         }
       } catch {
@@ -751,10 +751,22 @@ export class BandPostAutomation {
 
   /**
    * "첨부하기" 버튼 클릭 (팝업이 있는 경우)
+   * Band의 "사진 올리기" 팝업에서 첨부하기 버튼을 클릭
    */
   private async clickAttachButtonIfPresent(page: Page): Promise<void> {
-    // 다양한 "첨부하기" 버튼 셀렉터
+    // 팝업이 열릴 시간 대기
+    await page.waitForTimeout(1000)
+
+    // 다양한 "첨부하기" 버튼 셀렉터 (role="dialog" 팝업 포함)
     const attachButtonSelectors = [
+      // role="dialog" 팝업 내 버튼 (DLayerContainerInnerView)
+      '[role="dialog"] button.confirm',
+      '[role="dialog"] button._btnConfirmAttach',
+      '[role="dialog"] .uButton.-confirm',
+      '[role="dialog"] .layerFooter button',
+      // view-name 기반
+      '[view-name="DLayerContainerInnerView"] button',
+      // 기존 셀렉터
       'button._btnConfirmAttach',
       '.layerFooter button.confirm',
       '.layerFooter button._confirm',
@@ -763,16 +775,49 @@ export class BandPostAutomation {
     ]
 
     for (const selector of attachButtonSelectors) {
-      const attachButton = await page.$(selector)
-      if (attachButton && await attachButton.isVisible()) {
-        console.log(`[밴드자동화] Found attach button: ${selector}, clicking...`)
-        await attachButton.click()
-        await page.waitForTimeout(1500)
-        return
+      try {
+        const attachButton = await page.$(selector)
+        if (attachButton && await attachButton.isVisible()) {
+          const buttonText = await attachButton.textContent()
+          console.log(`[밴드자동화] 첨부하기 버튼 발견: ${selector}, 텍스트="${buttonText?.trim()}", 클릭...`)
+          await attachButton.click()
+          await page.waitForTimeout(1500)
+          // 팝업이 닫혔는지 확인
+          const dialogStillOpen = await page.$('[role="dialog"]')
+          if (!dialogStillOpen || !(await dialogStillOpen.isVisible())) {
+            console.log('[밴드자동화] 첨부하기 버튼 클릭 후 팝업 닫힘')
+          }
+          return
+        }
+      } catch {
+        // 무시
       }
     }
 
-    // 텍스트로 버튼 찾기
+    // 텍스트로 버튼 찾기 (role="dialog" 팝업 내 우선)
+    const dialogButtons = await page.$$('[role="dialog"] button')
+    for (const btn of dialogButtons) {
+      try {
+        const text = await btn.textContent()
+        const buttonText = text?.trim() || ''
+        if (
+          (buttonText.includes('첨부하기') || buttonText.includes('확인') || buttonText === '완료' || buttonText === '올리기') &&
+          !buttonText.includes('취소')
+        ) {
+          const isVisible = await btn.isVisible()
+          if (isVisible) {
+            console.log(`[밴드자동화] 다이얼로그 내 첨부 버튼 발견: "${buttonText}"`)
+            await btn.click()
+            await page.waitForTimeout(1500)
+            return
+          }
+        }
+      } catch {
+        // 무시
+      }
+    }
+
+    // 일반 버튼에서도 검색
     const buttons = await page.$$('button')
     for (const btn of buttons) {
       try {
@@ -786,12 +831,12 @@ export class BandPostAutomation {
           if (isVisible) {
             // 모달 내부의 버튼인지 확인 (레이어 팝업)
             const parentLayer = await btn.evaluate(el => {
-              const layer = el.closest('.layerContainer, .uLayer, [class*="Layer"]')
-              return layer ? layer.className : null
+              const layer = el.closest('.layerContainer, .uLayer, [class*="Layer"], [role="dialog"]')
+              return layer ? (layer.getAttribute('role') || layer.className) : null
             })
 
             if (parentLayer) {
-              console.log(`[밴드자동화] Found attach button by text: "${buttonText}" in layer: ${parentLayer}`)
+              console.log(`[밴드자동화] 레이어 내 첨부 버튼 발견: "${buttonText}" (레이어: ${parentLayer})`)
               await btn.click()
               await page.waitForTimeout(1500)
               return
@@ -803,7 +848,7 @@ export class BandPostAutomation {
       }
     }
 
-    console.log('[밴드자동화] No attach button popup found (images may be attached directly)')
+    console.log('[밴드자동화] 첨부하기 버튼 팝업 없음 (이미지가 직접 첨부되었을 수 있음)')
   }
 
   /**
@@ -811,6 +856,43 @@ export class BandPostAutomation {
    * Band UI 패턴에 따라 레이어 팝업 내 에디터 또는 인라인 에디터에 입력
    */
   private async inputContent(page: Page, content: string): Promise<void> {
+    // 사진 올리기 팝업이 열려있으면 먼저 닫기 (첨부하기 버튼 클릭 또는 취소)
+    const photoDialog = await page.$('[role="dialog"]')
+    if (photoDialog && await photoDialog.isVisible()) {
+      console.log('[밴드자동화] 사진 올리기 팝업이 열려있음, 첨부하기 버튼 클릭 시도...')
+
+      // 첨부하기/확인 버튼 찾기
+      const confirmButton = await page.$('[role="dialog"] button.confirm, [role="dialog"] button._btnConfirmAttach')
+      if (confirmButton && await confirmButton.isVisible()) {
+        await confirmButton.click()
+        await page.waitForTimeout(1500)
+      } else {
+        // 텍스트로 버튼 찾기
+        const dialogButtons = await page.$$('[role="dialog"] button')
+        for (const btn of dialogButtons) {
+          const text = await btn.textContent()
+          const buttonText = text?.trim() || ''
+          if ((buttonText.includes('첨부') || buttonText.includes('확인') || buttonText === '완료' || buttonText === '올리기') && !buttonText.includes('취소')) {
+            if (await btn.isVisible()) {
+              console.log(`[밴드자동화] 팝업 닫기 버튼 클릭: "${buttonText}"`)
+              await btn.click()
+              await page.waitForTimeout(1500)
+              break
+            }
+          }
+        }
+      }
+
+      // 팝업이 닫혔는지 확인
+      const stillOpen = await page.$('[role="dialog"]')
+      if (stillOpen && await stillOpen.isVisible()) {
+        // ESC 키로 닫기 시도
+        console.log('[밴드자동화] 팝업이 아직 열려있음, ESC 키로 닫기 시도...')
+        await page.keyboard.press('Escape')
+        await page.waitForTimeout(1000)
+      }
+    }
+
     // 에디터 셀렉터 (우선순위 순 - 레이어 팝업 우선)
     const editorSelectors = [
       // 레이어 팝업 내 에디터 (우선순위 높음)
@@ -840,7 +922,7 @@ export class BandPostAutomation {
           })
           if (!isFakeEditor) {
             editor = candidate
-            console.log(`[밴드자동화] Found editor: ${selector}`)
+            console.log(`[밴드자동화] 에디터 발견: ${selector}`)
             break
           }
         }
@@ -878,11 +960,11 @@ export class BandPostAutomation {
         }
       }
 
-      console.log('[밴드자동화] Content entered via keyboard typing')
+      console.log('[밴드자동화] 키보드 입력으로 본문 작성 완료')
     } else {
       // textarea인 경우
       await editor.fill(content)
-      console.log('[밴드자동화] Content entered via textarea')
+      console.log('[밴드자동화] textarea로 본문 작성 완료')
     }
 
     await page.waitForTimeout(1000)
@@ -890,9 +972,9 @@ export class BandPostAutomation {
     // 게시 버튼이 활성화될 때까지 대기
     try {
       await page.waitForSelector('button._btnSubmitPost:not([disabled])', { timeout: 5000 })
-      console.log('[밴드자동화] Submit button is now enabled')
+      console.log('[밴드자동화] 게시 버튼 활성화됨')
     } catch {
-      console.warn('[밴드자동화] Submit button may still be disabled')
+      console.warn('[밴드자동화] 게시 버튼이 아직 비활성화 상태일 수 있음')
     }
   }
 
@@ -920,7 +1002,7 @@ export class BandPostAutomation {
         }
       }
       if (visibleImages.length > 0) {
-        console.log(`[밴드자동화] Found ${visibleImages.length} attached images in layer popup: ${selector}`)
+        console.log(`[밴드자동화] 발견 ${visibleImages.length} attached images in layer popup: ${selector}`)
         return true
       }
     }
@@ -944,7 +1026,7 @@ export class BandPostAutomation {
         }
       }
       if (visibleImages.length > 0) {
-        console.log(`[밴드자동화] Found ${visibleImages.length} attached images: ${selector}`)
+        console.log(`[밴드자동화] 발견 ${visibleImages.length} attached images: ${selector}`)
         return true
       }
     }
@@ -960,7 +1042,7 @@ export class BandPostAutomation {
     for (const selector of countSelectors) {
       const thumbnailCount = await page.$eval(selector, (el) => el.textContent || '').catch(() => '')
       if (thumbnailCount && /\d+/.test(thumbnailCount)) {
-        console.log(`[밴드자동화] Found thumbnail count indicator: ${thumbnailCount}`)
+        console.log(`[밴드자동화] 발견 thumbnail count indicator: ${thumbnailCount}`)
         return true
       }
     }
@@ -984,13 +1066,13 @@ export class BandPostAutomation {
     }
 
     // 게시 버튼이 활성화될 때까지 대기 (최대 15초)
-    console.log('[밴드자동화] Waiting for submit button to be enabled...')
+    console.log('[밴드자동화] 게시 버튼 활성화 대기...')
     for (let i = 0; i < 30; i++) {
       submitButton = await page.$('button._btnSubmitPost')
       if (submitButton) {
         const isEnabled = await submitButton.isEnabled().catch(() => false)
         if (isEnabled) {
-          console.log(`[밴드자동화] Submit button enabled after ${i * 500}ms`)
+          console.log(`[밴드자동화] 게시 버튼 활성화됨 (소요: ${i * 500}ms`)
           break
         }
       }
@@ -999,7 +1081,7 @@ export class BandPostAutomation {
 
     const isVisible = await submitButton?.isVisible() ?? false
     const isEnabled = await submitButton?.isEnabled() ?? false
-    console.log(`[밴드자동화] Submit button status: visible=${isVisible}, enabled=${isEnabled}`)
+    console.log(`[밴드자동화] 게시 버튼 상태: visible=${isVisible}, enabled=${isEnabled}`)
 
     if (!isEnabled) {
       // 버튼이 비활성화된 경우 - 이미지 업로드 미완료 또는 내용 없음
@@ -1039,7 +1121,7 @@ export class BandPostAutomation {
           const status = response.status()
           const json = await response.json().catch(() => null)
 
-          console.log(`[밴드자동화] Captured create_post API response: status=${status}`)
+          console.log(`[밴드자동화] create_post API 응답 캡처: status=${status}`)
 
           if (status === 200 && json) {
             if (json.result_code === 1 && json.result_data?.post?.post_no) {
@@ -1047,19 +1129,19 @@ export class BandPostAutomation {
                 success: true,
                 postNo: json.result_data.post.post_no,
               }
-              console.log(`[밴드자동화] API success! post_no=${apiResponse.postNo}`)
+              console.log(`[밴드자동화] API 성공! post_no=${apiResponse.postNo}`)
             } else {
               apiResponse = {
                 success: false,
                 error: json.message || `result_code=${json.result_code}`,
               }
-              console.log(`[밴드자동화] API failed: ${apiResponse.error}`)
+              console.log(`[밴드자동화] API 실패: ${apiResponse.error}`)
             }
           } else {
             apiResponse = { success: false, error: `HTTP ${status}` }
           }
         } catch (e) {
-          console.warn('[밴드자동화] Failed to parse API response:', e)
+          console.warn('[밴드자동화] API 응답 파싱 실패:', e)
         }
       }
     }
@@ -1072,11 +1154,11 @@ export class BandPostAutomation {
       await submitButton!.scrollIntoViewIfNeeded()
       await page.waitForTimeout(500)
 
-      console.log('[밴드자동화] Clicking submit button with API monitoring...')
+      console.log('[밴드자동화] API 모니터링과 함께 게시 버튼 클릭...')
 
       // 게시 버튼 클릭 (force 옵션)
       await submitButton!.click({ force: true, timeout: 5000 })
-      console.log('[밴드자동화] Submit button clicked')
+      console.log('[밴드자동화] 게시 버튼 클릭됨')
 
       // API 응답 대기 (최대 15초)
       for (let i = 0; i < 30; i++) {
@@ -1090,7 +1172,7 @@ export class BandPostAutomation {
       const response = apiResponse as ApiResponseType // 명시적 타입 단언
       if (response !== null) {
         if (response.success) {
-          console.log(`[밴드자동화] Post created successfully via API! post_no=${response.postNo}`)
+          console.log(`[밴드자동화] API로 게시물 생성 성공! post_no=${response.postNo}`)
           return // 성공
         } else {
           throw new BandPlaywrightError(
@@ -1101,7 +1183,7 @@ export class BandPostAutomation {
       }
 
       // API 응답을 받지 못한 경우 - UI 기반 폴백 로직
-      console.log('[밴드자동화] No API response captured, falling back to UI check...')
+      console.log('[밴드자동화] API 응답 없음, UI 확인으로 전환...')
       await this.submitPostFallbackCheck(page)
 
     } finally {
@@ -1127,7 +1209,7 @@ export class BandPostAutomation {
       const writeLayerPopup = await page.$('[data-viewname="DPostWriteLayerView"]')
       if (!writeLayerPopup || !(await writeLayerPopup.isVisible().catch(() => false))) {
         // 레이어 팝업이 닫혔으면 성공
-        console.log('[밴드자동화] Write layer popup closed - post successful')
+        console.log('[밴드자동화] 글쓰기 레이어 팝업 닫힘 - 게시 성공')
         return
       }
 
@@ -1136,7 +1218,7 @@ export class BandPostAutomation {
       if (layerContainer) {
         const isVisible = await layerContainer.isVisible().catch(() => false)
         if (!isVisible) {
-          console.log('[밴드자동화] Layer container closed - post successful')
+          console.log('[밴드자동화] 레이어 컨테이너 닫힘 - 게시 성공')
           return
         }
       }
@@ -1157,13 +1239,13 @@ export class BandPostAutomation {
           // 레이어 팝업 내 에디터가 아직 보이면 실패
           if (isInPopup && await anyEditor.isVisible().catch(() => false)) {
             // 레이어 내 에디터가 아직 열려있음 - 계속 대기
-            console.log(`[밴드자동화] Check ${attempt + 1}/10: Editor still in popup layer`)
+            console.log(`[밴드자동화] 확인 ${attempt + 1}/10: Editor still in popup layer`)
           } else if (!await anyEditor.isVisible().catch(() => false)) {
-            console.log('[밴드자동화] CKEditor deactivated - post successful')
+            console.log('[밴드자동화] CKEditor 비활성화됨 - 게시 성공')
             return
           }
         } else {
-          console.log('[밴드자동화] No CKEditor found - post successful')
+          console.log('[밴드자동화] CKEditor 없음 - 게시 성공')
           return
         }
       }
@@ -1181,7 +1263,7 @@ export class BandPostAutomation {
 
         if (!isInPopup && await standbyForm.isVisible().catch(() => false)) {
           // 레이어 팝업 바깥의 폼이 -standby 상태 - 인라인 에디터가 접힘
-          console.log('[밴드자동화] Form returned to standby (inline) - post successful')
+          console.log('[밴드자동화] 폼이 대기 상태로 복귀 - 게시 성공')
           return
         }
       }
@@ -1194,7 +1276,7 @@ export class BandPostAutomation {
 
       const hasImages = await this.hasAttachedImages(page)
 
-      console.log(`[밴드자동화] Check ${attempt + 1}/10: content="${contentAfter.substring(0, 30)}...", hasImages=${hasImages}`)
+      console.log(`[밴드자동화] 확인 ${attempt + 1}/10: content="${contentAfter.substring(0, 30)}...", hasImages=${hasImages}`)
 
       // 레이어 팝업이 아직 열려있는 상태에서 내용만 비어있으면 아직 실패
       // (게시 클릭 후 처리 중일 수 있음)
@@ -1207,7 +1289,7 @@ export class BandPostAutomation {
     if (toastMessage && await toastMessage.isVisible().catch(() => false)) {
       const text = await toastMessage.textContent()
       if (text?.includes('게시') || text?.includes('등록') || text?.includes('완료')) {
-        console.log(`[밴드자동화] Toast message found: "${text}" - post successful`)
+        console.log(`[밴드자동화] 토스트 메시지 발견: "${text}" - post successful`)
         return
       }
     }
@@ -1252,19 +1334,19 @@ export class BandPostAutomation {
     // URL에서 postKey 추출 (게시 후 해당 게시물 페이지로 이동한 경우)
     const postMatch = currentUrl.match(/\/post\/(\d+)/)
     if (postMatch && postMatch[1] !== beforePostKey) {
-      console.log(`[밴드자동화] Extracted NEW postKey from URL: ${postMatch[1]}`)
+      console.log(`[밴드자동화] 새 postKey 추출됨 from URL: ${postMatch[1]}`)
       return postMatch[1]
     }
 
     // 최근 게시물에서 추출 시도
     const latestPostKey = await this.getLatestPostKey(page, bandNo)
     if (latestPostKey && latestPostKey !== beforePostKey) {
-      console.log(`[밴드자동화] Extracted NEW postKey from recent post: ${latestPostKey}`)
+      console.log(`[밴드자동화] 새 postKey 추출됨 from recent post: ${latestPostKey}`)
       return latestPostKey
     }
 
     // 페이지 새로고침 후 다시 시도
-    console.log('[밴드자동화] New postKey not found, refreshing page...')
+    console.log('[밴드자동화] 새 postKey를 찾을 수 없음, 페이지 새로고침...')
     await page.reload({ waitUntil: 'networkidle' })
     await page.waitForTimeout(2000)
 
@@ -1272,14 +1354,14 @@ export class BandPostAutomation {
     const refreshedUrl = page.url()
     const refreshedMatch = refreshedUrl.match(/\/post\/(\d+)/)
     if (refreshedMatch && refreshedMatch[1] !== beforePostKey) {
-      console.log(`[밴드자동화] Extracted NEW postKey after refresh: ${refreshedMatch[1]}`)
+      console.log(`[밴드자동화] 새 postKey 추출됨 after refresh: ${refreshedMatch[1]}`)
       return refreshedMatch[1]
     }
 
     // 최근 게시물 링크에서 다시 시도
     const refreshedLatestKey = await this.getLatestPostKey(page, bandNo)
     if (refreshedLatestKey && refreshedLatestKey !== beforePostKey) {
-      console.log(`[밴드자동화] Extracted NEW postKey from refreshed page: ${refreshedLatestKey}`)
+      console.log(`[밴드자동화] 새 postKey 추출됨 from refreshed page: ${refreshedLatestKey}`)
       return refreshedLatestKey
     }
 
@@ -1326,7 +1408,7 @@ export class BandPostAutomation {
           fs.unlinkSync(file)
         }
       } catch (error) {
-        console.error(`[밴드자동화] Failed to cleanup temp file: ${file}`, error)
+        console.error(`[밴드자동화] 임시 파일 정리 실패: ${file}`, error)
       }
     }
   }
@@ -1416,7 +1498,7 @@ export class BandPostAutomation {
     let successCount = 0
     let failedCount = 0
 
-    console.log(`[밴드자동화] Starting batch publish: ${items.length} items to band "${bandName}"`)
+    console.log(`[밴드자동화] 배치 발행 시작: ${items.length} items to band "${bandName}"`)
 
     try {
       // 1. 밴드 페이지로 한 번만 이동
@@ -1424,7 +1506,7 @@ export class BandPostAutomation {
 
       // 현재 URL 확인 (로그인 리다이렉트 체크)
       const currentUrl = page.url()
-      console.log(`[밴드자동화] Current URL: ${currentUrl}`)
+      console.log(`[밴드자동화] 현재 URL: ${currentUrl}`)
 
       if (currentUrl.includes('signin') || currentUrl.includes('login')) {
         await this.saveDebugScreenshot(page, 'login-redirect')
@@ -1443,36 +1525,36 @@ export class BandPostAutomation {
         const item = items[i]
         const tempFiles: string[] = []
 
-        console.log(`[밴드자동화] Publishing item ${i + 1}/${items.length}: product ${item.productId}`)
+        console.log(`[밴드자동화] 발행 중 ${i + 1}/${items.length}: product ${item.productId}`)
 
         try {
           // 발행 전 최신 게시물 postKey 저장
           const beforePostKey = await this.getLatestPostKey(page, currentBandNo)
-          console.log(`[밴드자동화] Latest postKey before publish: ${beforePostKey || 'none'}`)
+          console.log(`[밴드자동화] 발행 전 최신 postKey: ${beforePostKey || 'none'}`)
 
           await this.saveDebugScreenshot(page, `batch-${i + 1}-before`)
 
           // 2-1. 글쓰기 레이어 열기
-          console.log('[밴드자동화] Opening write layer')
+          console.log('[밴드자동화] 글쓰기 레이어 열기')
           await this.openWriteLayer(page)
 
           // 2-2. 이미지 다운로드 (먼저 준비)
           const imagesToUpload = item.imageUrls.slice(0, MAX_IMAGES)
           let downloadedImages: string[] = []
           if (imagesToUpload.length > 0) {
-            console.log(`[밴드자동화] Downloading ${imagesToUpload.length} images`)
+            console.log(`[밴드자동화] 다운로드 중 ${imagesToUpload.length} images`)
             downloadedImages = await this.downloadImages(imagesToUpload)
             tempFiles.push(...downloadedImages)
           }
 
           // 2-3. 본문 입력 (이미지보다 먼저 입력 - 밴드에서 텍스트가 이미지 위에 표시됨)
-          console.log('[밴드자동화] Inputting content')
+          console.log('[밴드자동화] 본문 입력 중')
           await this.inputContent(page, item.content)
 
           // 2-4. 이미지 업로드 (본문 입력 후 - 이미지가 본문 아래에 배치됨)
           let uploadedImageCount = 0
           if (downloadedImages.length > 0) {
-            console.log(`[밴드자동화] Downloaded ${downloadedImages.length} images, now uploading...`)
+            console.log(`[밴드자동화] 다운로드 완료 ${downloadedImages.length} images, now uploading...`)
             await this.saveDebugScreenshot(page, `batch-${i + 1}-before-upload`)
 
             // 이미지 업로드 시도 (최대 2번)
@@ -1480,14 +1562,14 @@ export class BandPostAutomation {
               try {
                 uploadedImageCount = await this.uploadImagesWithVerification(page, downloadedImages)
                 if (uploadedImageCount > 0) {
-                  console.log(`[밴드자동화] Successfully uploaded ${uploadedImageCount} images`)
+                  console.log(`[밴드자동화] 업로드 성공: ${uploadedImageCount} images`)
                   break
                 }
               } catch (uploadError: any) {
-                console.warn(`[밴드자동화] Image upload attempt ${uploadAttempt + 1} failed:`, uploadError.message)
+                console.warn(`[밴드자동화] 이미지 업로드 시도 ${uploadAttempt + 1} failed:`, uploadError.message)
                 if (uploadAttempt === 0) {
                   // 첫 번째 시도 실패 시, 글쓰기 레이어 닫고 다시 열기
-                  console.log('[밴드자동화] Retrying image upload...')
+                  console.log('[밴드자동화] 이미지 업로드 재시도...')
                   await page.keyboard.press('Escape')
                   await page.waitForTimeout(1000)
                   await this.openWriteLayer(page)
@@ -1501,12 +1583,12 @@ export class BandPostAutomation {
             await this.saveDebugScreenshot(page, `batch-${i + 1}-after-upload`)
 
             if (uploadedImageCount === 0) {
-              console.warn(`[밴드자동화] No images uploaded for item ${i + 1}, continuing with text only`)
+              console.warn(`[밴드자동화] 이미지 업로드 없음 (항목 ${i + 1}, continuing with text only`)
             }
           }
 
           // 2-5. 게시 버튼 클릭
-          console.log('[밴드자동화] Submitting post')
+          console.log('[밴드자동화] 게시물 제출 중')
           await this.submitPost(page)
 
           await this.saveDebugScreenshot(page, `batch-${i + 1}-after`)
@@ -1530,10 +1612,10 @@ export class BandPostAutomation {
             try {
               const publishedProductId = await onItemSuccess(itemResult)
               if (publishedProductId) {
-                console.log(`[밴드자동화] DB saved immediately: publishedProductId=${publishedProductId}`)
+                console.log(`[밴드자동화] DB 즉시 저장: publishedProductId=${publishedProductId}`)
               }
             } catch (dbError: any) {
-              console.error(`[밴드자동화] DB save failed for product ${item.productId}:`, dbError.message)
+              console.error(`[밴드자동화] DB 저장 실패 (상품 ${item.productId}:`, dbError.message)
               // DB 저장 실패해도 Band 발행은 성공했으므로 성공으로 처리
             }
           }
@@ -1573,27 +1655,27 @@ export class BandPostAutomation {
 
           // 다른 에러는 계속 진행 - 페이지 상태 복구
           try {
-            console.log('[밴드자동화] Recovering from error...')
+            console.log('[밴드자동화] 오류 복구 중...')
 
             // 1. 글쓰기 레이어 강제 닫기
             await this.closeWriteLayerIfOpen(page)
             await page.waitForTimeout(1000)
 
             // 2. 페이지 새로고침 (상태 완전 초기화)
-            console.log('[밴드자동화] Refreshing page to reset state')
+            console.log('[밴드자동화] 상태 초기화를 위해 페이지 새로고침')
             await page.reload({ waitUntil: 'networkidle' })
             await page.waitForTimeout(2000)
 
             // 3. 밴드 페이지가 아닌 경우 다시 이동
             const currentUrl = page.url()
             if (!currentUrl.includes(`/band/${currentBandNo}`)) {
-              console.log('[밴드자동화] Navigating back to band page')
+              console.log('[밴드자동화] 밴드 페이지로 돌아가기')
               await this.navigateToBand(page, bandKey, bandName)
             }
 
-            console.log('[밴드자동화] Recovery successful, continuing with next item')
+            console.log('[밴드자동화] 복구 성공, 다음 항목 진행')
           } catch (navError) {
-            console.error('[밴드자동화] Failed to recover:', navError)
+            console.error('[밴드자동화] 복구 실패:', navError)
             // 복구 실패 시 전체 중단
             break
           }
@@ -1604,13 +1686,13 @@ export class BandPostAutomation {
 
         // 다음 게시물 전 짧은 대기 (Band 서버 부하 방지)
         if (i < items.length - 1) {
-          console.log('[밴드자동화] Waiting 2s before next post...')
+          console.log('[밴드자동화] 다음 게시물 전 2초 대기...')
           await page.waitForTimeout(2000)
         }
       }
 
     } catch (error: any) {
-      console.error('[밴드자동화] Batch publish failed:', error)
+      console.error('[밴드자동화] 배치 발행 실패:', error)
 
       // 아직 처리되지 않은 항목들을 실패로 처리
       const processedCount = results.length
@@ -1624,7 +1706,7 @@ export class BandPostAutomation {
       }
     }
 
-    console.log(`[밴드자동화] Batch publish completed: ${successCount} success, ${failedCount} failed`)
+    console.log(`[밴드자동화] 배치 발행 완료: ${successCount} success, ${failedCount} failed`)
 
     return {
       success: failedCount === 0,
@@ -1646,7 +1728,7 @@ export class BandPostAutomation {
     // 1. 레이어 팝업 확인 (우선순위 높음)
     const writeLayerPopup = await page.$('[data-viewname="DPostWriteLayerView"]')
     if (writeLayerPopup && await writeLayerPopup.isVisible()) {
-      console.log('[밴드자동화] Write layer popup found, attempting to close...')
+      console.log('[밴드자동화] 글쓰기 레이어 팝업 발견, 닫기 시도...')
 
       // 레이어 팝업의 닫기/취소 버튼 셀렉터
       const popupCloseSelectors = [
@@ -1661,7 +1743,7 @@ export class BandPostAutomation {
       for (const selector of popupCloseSelectors) {
         const closeBtn = await page.$(selector)
         if (closeBtn && await closeBtn.isVisible()) {
-          console.log(`[밴드자동화] Clicking layer close button: ${selector}`)
+          console.log(`[밴드자동화] 레이어 닫기 버튼 클릭: ${selector}`)
           await closeBtn.click()
           await page.waitForTimeout(1000)
 
@@ -1672,7 +1754,7 @@ export class BandPostAutomation {
       }
 
       // X 버튼을 찾지 못했으면 Escape 키 시도
-      console.log('[밴드자동화] Pressing Escape to close layer popup')
+      console.log('[밴드자동화] ESC 키로 레이어 팝업 닫기')
       await page.keyboard.press('Escape')
       await page.waitForTimeout(1000)
       await this.clickConfirmDialogIfPresent(page)
@@ -1685,12 +1767,12 @@ export class BandPostAutomation {
       // DPostEditorView 내부 에디터도 확인
       const editorViewEditor = await page.$('[data-viewname="DPostEditorView"] [contenteditable="true"]')
       if (!editorViewEditor || !(await editorViewEditor.isVisible())) {
-        console.log('[밴드자동화] No active editor to close')
+        console.log('[밴드자동화] 닫을 활성 에디터 없음')
         return
       }
     }
 
-    console.log('[밴드자동화] Active inline editor found, attempting to close...')
+    console.log('[밴드자동화] 활성 인라인 에디터 발견, 닫기 시도...')
 
     // 인라인 에디터의 취소 버튼 클릭
     const cancelButtonSelectors = [
@@ -1703,7 +1785,7 @@ export class BandPostAutomation {
     for (const selector of cancelButtonSelectors) {
       const cancelBtn = await page.$(selector)
       if (cancelBtn && await cancelBtn.isVisible()) {
-        console.log(`[밴드자동화] Clicking cancel button: ${selector}`)
+        console.log(`[밴드자동화] 취소 버튼 클릭: ${selector}`)
         await cancelBtn.click()
         await page.waitForTimeout(1000)
         await this.clickConfirmDialogIfPresent(page)
@@ -1712,7 +1794,7 @@ export class BandPostAutomation {
     }
 
     // Escape 키 시도
-    console.log('[밴드자동화] Pressing Escape to close editor')
+    console.log('[밴드자동화] ESC 키로 에디터 닫기')
     await page.keyboard.press('Escape')
     await page.waitForTimeout(1000)
     await this.clickConfirmDialogIfPresent(page)
@@ -1734,7 +1816,7 @@ export class BandPostAutomation {
     for (const selector of confirmSelectors) {
       const confirmBtn = await page.$(selector)
       if (confirmBtn && await confirmBtn.isVisible()) {
-        console.log(`[밴드자동화] Clicking confirm button on discard dialog: ${selector}`)
+        console.log(`[밴드자동화] 작성 취소 다이얼로그 확인 버튼 클릭: ${selector}`)
         await confirmBtn.click()
         await page.waitForTimeout(500)
         return
@@ -1759,7 +1841,7 @@ export class BandPostAutomation {
       // 레이어 내의 에디터 찾기
       const popupEditor = await existingLayerPopup.$('[contenteditable="true"]')
       if (popupEditor && await popupEditor.isVisible()) {
-        console.log('[밴드자동화] Layer popup already open with editor')
+        console.log('[밴드자동화] 에디터가 있는 레이어 팝업이 이미 열려있음')
         return
       }
     }
@@ -1767,14 +1849,14 @@ export class BandPostAutomation {
     // 2. 인라인 에디터가 이미 활성화되어 있는지 확인
     const activeEditorCheck = await page.$('.cPostWrite [contenteditable="true"].cke_editable')
     if (activeEditorCheck && await activeEditorCheck.isVisible()) {
-      console.log('[밴드자동화] Editor already active (cke_editable found)')
+      console.log('[밴드자동화] 에디터가 이미 활성화됨 (cke_editable found)')
       return
     }
 
     // DPostEditorView 내의 에디터 확인
     const editorViewCheck = await page.$('[data-viewname="DPostEditorView"] [contenteditable="true"]')
     if (editorViewCheck && await editorViewCheck.isVisible()) {
-      console.log('[밴드자동화] Editor already active (DPostEditorView found)')
+      console.log('[밴드자동화] 에디터가 이미 활성화됨 (DPostEditorView found)')
       return
     }
 
@@ -1783,7 +1865,7 @@ export class BandPostAutomation {
     await page.waitForTimeout(1000)
 
     const currentUrl = page.url()
-    console.log(`[밴드자동화] Current URL: ${currentUrl}`)
+    console.log(`[밴드자동화] 현재 URL: ${currentUrl}`)
 
     // 4. 글쓰기 영역 클릭
     const writeAreaSelectors = [
@@ -1805,20 +1887,20 @@ export class BandPostAutomation {
       try {
         const element = await page.$(selector)
         if (element && await element.isVisible()) {
-          console.log(`[밴드자동화] Found write area: ${selector}, clicking...`)
+          console.log(`[밴드자동화] 글쓰기 영역 발견: ${selector}, clicking...`)
           await this.saveDebugScreenshot(page, 'before-click-write-area')
           await element.click()
           clicked = true
           break
         }
       } catch (e) {
-        console.log(`[밴드자동화] Selector ${selector} failed:`, (e as Error).message)
+        console.log(`[밴드자동화] 셀렉터 ${selector} failed:`, (e as Error).message)
       }
     }
 
     if (!clicked) {
       // 마지막 시도: 페이지 새로고침 후 재시도
-      console.log('[밴드자동화] No write area found, refreshing page...')
+      console.log('[밴드자동화] 글쓰기 영역을 찾을 수 없음, 페이지 새로고침...')
       await page.reload({ waitUntil: 'networkidle' })
       await page.waitForTimeout(2000)
       await page.evaluate(() => window.scrollTo(0, 0))
@@ -1828,7 +1910,7 @@ export class BandPostAutomation {
         try {
           const element = await page.$(selector)
           if (element && await element.isVisible()) {
-            console.log(`[밴드자동화] Found write area after refresh: ${selector}`)
+            console.log(`[밴드자동화] 새로고침 후 글쓰기 영역 발견: ${selector}`)
             await element.click()
             clicked = true
             break
@@ -1840,7 +1922,7 @@ export class BandPostAutomation {
     }
 
     // 5. 에디터가 활성화될 때까지 대기 (최대 10초)
-    console.log('[밴드자동화] Waiting for editor to become active...')
+    console.log('[밴드자동화] 에디터 활성화 대기...')
     await this.saveDebugScreenshot(page, 'after-click-write-area')
 
     // 레이어 팝업 + 인라인 에디터 모두 확인
@@ -1862,7 +1944,7 @@ export class BandPostAutomation {
       for (const selector of editorSelectors) {
         const editor = await page.$(selector)
         if (editor && await editor.isVisible()) {
-          console.log(`[밴드자동화] Editor activated: ${selector}`)
+          console.log(`[밴드자동화] 에디터 활성화됨: ${selector}`)
           await page.waitForTimeout(500)
           return
         }
@@ -1872,7 +1954,7 @@ export class BandPostAutomation {
       const layerPopup = await page.$('[data-viewname="DPostWriteLayerView"]')
       if (layerPopup && await layerPopup.isVisible()) {
         // 레이어가 열렸지만 에디터를 아직 못찾음 - 계속 대기
-        console.log(`[밴드자동화] Layer popup visible, waiting for editor... (${i + 1}/20)`)
+        console.log(`[밴드자동화] 레이어 팝업 표시됨, 에디터 대기... (${i + 1}/20)`)
         continue
       }
 
@@ -1884,7 +1966,7 @@ export class BandPostAutomation {
           return !inFakeEditor
         })
         if (isRealEditor) {
-          console.log('[밴드자동화] Fallback: Editor found in .cPostWrite')
+          console.log('[밴드자동화] 폴백: .cPostWrite에서 에디터 발견')
           await page.waitForTimeout(500)
           return
         }

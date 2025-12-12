@@ -2,6 +2,55 @@
 
 BandAuto는 도매 밴드 상품 자동화부터 AI 상세페이지 생성, 토스페이먼츠 통합 쇼핑몰까지 제공하는 풀스택 자동화 플랫폼입니다.
 
+## 🌿 브랜치 전략
+
+### 브랜치 구조
+
+```
+main                    # 프로덕션 브랜치 (안정 버전)
+├── release-1           # 릴리즈 준비 브랜치 (QA/테스트)
+│   ├── hong            # 개발자 브랜치 (홍)
+│   └── Lee             # 개발자 브랜치 (이)
+└── 1.1, 1.2, ...       # 버전 태그
+```
+
+### 브랜치별 용도
+
+| 브랜치 | 용도 | 배포 환경 |
+|--------|------|-----------|
+| `main` | 프로덕션 코드, 안정 버전만 머지 | Production |
+| `release-1` | 릴리즈 준비, QA 테스트 | Staging |
+| `hong`, `Lee` | 개발자별 작업 브랜치 | Local |
+| `1.1`, `1.2`, ... | 버전 태그/릴리즈 히스토리 | - |
+
+### 개발 워크플로우
+
+```bash
+# 1. 개발자 브랜치에서 작업
+git checkout hong
+git pull origin release-1
+# ... 작업 ...
+git commit -m "feat: 새 기능 추가"
+git push origin hong
+
+# 2. release-1로 머지 (PR 또는 직접)
+git checkout release-1
+git merge hong
+git push origin release-1
+
+# 3. QA 완료 후 main으로 머지
+git checkout main
+git merge release-1
+git push origin main
+git tag v1.x.x
+```
+
+### 머지 규칙
+
+- **main ← release-1**: QA 완료 후에만 머지
+- **release-1 ← 개발자 브랜치**: 기능 완료 시 머지
+- **main 직접 커밋 금지**: 반드시 release-1 통해서
+
 ## 🏗️ 프로젝트 구조
 
 이 프로젝트는 **2개의 독립적인 Next.js 앱**과 **공유 모듈**로 구성된 모노레포입니다:
@@ -362,6 +411,90 @@ POST   /api/payments/webhook  # 웹훅 수신
 2. 공통 기능은 `modules/common/`에 추가
 3. 앱 간 직접 모듈 참조 금지
 4. 모든 문서는 `docs/`에 보관
+
+## 🚀 AWS EC2 배포 가이드
+
+### 서버 요구사항
+
+| 항목 | 최소 사양 | 권장 사양 |
+|------|-----------|-----------|
+| 인스턴스 | t3.small | t3.medium |
+| 메모리 | 2GB | 4GB |
+| 디스크 | 10GB | 20GB |
+| OS | Ubuntu 22.04 LTS | Ubuntu 22.04 LTS |
+
+### 배포 순서
+
+```bash
+# 1. 시스템 패키지 업데이트
+sudo apt-get update && sudo apt-get upgrade -y
+
+# 2. Node.js 설치 (v20 LTS)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# 3. Playwright 시스템 의존성 설치
+npx playwright install-deps chromium
+npx playwright install chromium
+
+# 4. 한글 폰트 설치
+sudo apt-get install -y fonts-noto-cjk
+
+# 5. PM2 설치 (프로세스 관리)
+sudo npm install -g pm2
+
+# 6. 프로젝트 클론
+git clone https://github.com/ABC-Group-Tech/bandauto.git
+cd bandauto
+
+# 7. 의존성 설치
+npm install
+
+# 8. 환경변수 설정
+cp sourcing-app/.env.example sourcing-app/.env.local
+# .env.local 편집...
+
+# 9. 데이터베이스 초기화
+cd db && npx prisma generate --schema prisma && npx prisma db push --schema prisma
+
+# 10. 빌드 및 실행
+cd ../sourcing-app && npm run build
+pm2 start ecosystem.config.js
+```
+
+### PM2 관리 명령어
+
+```bash
+pm2 status              # 상태 확인
+pm2 logs                # 로그 확인
+pm2 restart all         # 재시작
+pm2 stop all            # 중지
+pm2 save                # 현재 상태 저장
+pm2 startup             # 서버 재부팅 시 자동 시작 설정
+```
+
+### Playwright 관련 설정
+
+Playwright는 `headless: true`로 실행되므로 Xvfb 불필요.
+
+**자동 정리:**
+- 디버그 스크린샷: 3시간 후 자동 삭제
+- 저장 경로: `/tmp/band-playwright-debug/`
+
+### 환경변수 체크리스트
+
+```env
+# 필수
+DATABASE_URL="file:./dev.db"
+NEXTAUTH_SECRET="your-secret-key"
+NEXTAUTH_URL="http://your-domain:3001"
+
+# Band 자동화
+# (Chrome Extension으로 세션 등록)
+
+# AI (선택)
+GEMINI_API_KEY="your-gemini-key"
+```
 
 ## 📄 라이센스
 

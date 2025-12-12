@@ -18,6 +18,9 @@ export interface PublishToChannelResult {
   error?: string
   skipped?: boolean
   skipReason?: string
+  // 발행 방법 및 이미지 정보
+  imageCount?: number
+  publishMethod?: 'playwright' | 'api'
 }
 
 export interface PublishBatchParams {
