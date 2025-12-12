@@ -1,6 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@bandauto/db'
+import prisma, { Prisma } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
+
+const Decimal = Prisma.Decimal
+
+// 토스페이먼츠 결제 취소 함수
+async function cancelTossPayment(
+  paymentKey: string,
+  cancelReason: string,
+  cancelAmount?: number
+): Promise<{ success: boolean; error?: string; data?: any }> {
+  const TOSS_SECRET_KEY = process.env.TOSS_PAYMENTS_SECRET_KEY || ''
+  const TOSS_API_URL = 'https://api.tosspayments.com/v1/payments'
+
+  if (!TOSS_SECRET_KEY) {
+    return { success: false, error: '토스페이먼츠 시크릿 키가 설정되지 않았습니다.' }
+  }
+
+  try {
+    const authHeader = Buffer.from(`${TOSS_SECRET_KEY}:`).toString('base64')
+
+    const requestBody: any = { cancelReason }
+    if (cancelAmount !== undefined) {
+      requestBody.cancelAmount = cancelAmount
+    }
+
+    const response = await fetch(`${TOSS_API_URL}/${paymentKey}/cancel`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${authHeader}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      console.error('토스페이먼츠 결제 취소 실패:', data)
+      return { success: false, error: data.message || '결제 취소에 실패했습니다.', data }
+    }
+
+    return { success: true, data }
+  } catch (error: any) {
+    console.error('토스페이먼츠 결제 취소 오류:', error)
+    return { success: false, error: error.message || '결제 취소 중 오류가 발생했습니다.' }
+  }
+}
 
 /**
  * GET /api/order/unified/[id]
@@ -297,6 +343,9 @@ export async function PATCH(
             },
           },
         },
+        include: {
+          payment: true, // 결제 취소를 위해 payment 포함
+        },
       })
 
       // 회원 주문이 있으면 처리
@@ -350,6 +399,39 @@ export async function PATCH(
         case 'CANCELLED':
           updateData.cancelledAt = now
           updateData.cancelledBy = 'ADMIN'
+
+          // 결제가 완료된 상태인 경우 토스페이먼츠 결제 취소 API 호출
+          if (order.payment && order.payment.paymentKey && ['DONE', 'PARTIAL_CANCELED'].includes(order.payment.status)) {
+            const paymentAmount = Number(order.payment.amount)
+            const alreadyCancelledAmount = Number(order.payment.cancelledAmount || 0)
+            const remainingAmount = paymentAmount - alreadyCancelledAmount
+
+            if (remainingAmount > 0) {
+              const cancelResult = await cancelTossPayment(
+                order.payment.paymentKey,
+                body.cancelReason || '관리자에 의한 주문 취소',
+                remainingAmount
+              )
+
+              if (!cancelResult.success) {
+                return NextResponse.json(
+                  { success: false, error: `결제 취소 실패: ${cancelResult.error}` },
+                  { status: 400 }
+                )
+              }
+
+              // 결제 정보도 업데이트
+              await prisma.payment.update({
+                where: { id: order.payment.id },
+                data: {
+                  status: 'CANCELED',
+                  cancelReason: body.cancelReason || '관리자에 의한 주문 취소',
+                  cancelledAmount: new Decimal(paymentAmount),
+                  cancelledAt: now,
+                }
+              })
+            }
+          }
           break
       }
 
@@ -375,6 +457,9 @@ export async function PATCH(
               },
             },
           },
+        },
+        include: {
+          payment: true, // 결제 취소를 위해 payment 포함
         },
       })
 
@@ -426,6 +511,39 @@ export async function PATCH(
         case 'CANCELLED':
           updateData.cancelledAt = now
           updateData.cancelledBy = 'ADMIN'
+
+          // 결제가 완료된 상태인 경우 토스페이먼츠 결제 취소 API 호출
+          if (guestOrder.payment && guestOrder.payment.paymentKey && ['DONE', 'PARTIAL_CANCELED'].includes(guestOrder.payment.status)) {
+            const paymentAmount = Number(guestOrder.payment.amount)
+            const alreadyCancelledAmount = Number(guestOrder.payment.cancelledAmount || 0)
+            const remainingAmount = paymentAmount - alreadyCancelledAmount
+
+            if (remainingAmount > 0) {
+              const cancelResult = await cancelTossPayment(
+                guestOrder.payment.paymentKey,
+                body.cancelReason || '관리자에 의한 주문 취소',
+                remainingAmount
+              )
+
+              if (!cancelResult.success) {
+                return NextResponse.json(
+                  { success: false, error: `결제 취소 실패: ${cancelResult.error}` },
+                  { status: 400 }
+                )
+              }
+
+              // 결제 정보도 업데이트
+              await prisma.guestPayment.update({
+                where: { id: guestOrder.payment.id },
+                data: {
+                  status: 'CANCELED',
+                  cancelReason: body.cancelReason || '관리자에 의한 주문 취소',
+                  cancelledAmount: new Decimal(paymentAmount),
+                  cancelledAt: now,
+                }
+              })
+            }
+          }
           break
       }
 

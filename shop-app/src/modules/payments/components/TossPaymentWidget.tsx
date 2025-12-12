@@ -17,8 +17,6 @@ interface PaymentWidgetProps {
   onPaymentCancel?: () => void
 }
 
-type WidgetsInstance = Awaited<ReturnType<Awaited<ReturnType<typeof loadTossPayments>>['widgets']>>
-
 export default function TossPaymentWidget({
   orderId,
   orderName,
@@ -31,128 +29,53 @@ export default function TossPaymentWidget({
   onPaymentCancel
 }: PaymentWidgetProps) {
   const { getPath, getApiPath } = useShopUrl()
-  const [ready, setReady] = useState(false)
   const [processing, setProcessing] = useState(false)
-  const [widgets, setWidgets] = useState<WidgetsInstance | null>(null)
   const [clientKey, setClientKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [ready, setReady] = useState(false)
 
-  // 1. 클라이언트 키 가져오기 (prop으로 전달받으면 API 호출 스킵)
+  // 클라이언트 키 가져오기 (prop으로 전달받으면 API 호출 스킵)
   useEffect(() => {
     // prop으로 클라이언트 키가 전달된 경우 바로 사용
     if (propClientKey) {
-      console.log('[TossWidget] prop으로 전달된 클라이언트 키 사용')
+      console.log('[TossPayment] prop으로 전달된 클라이언트 키 사용')
       setClientKey(propClientKey)
+      setReady(true)
       return
     }
 
     async function fetchClientKey() {
-      console.log('[TossWidget] 클라이언트 키 로딩 시작')
+      console.log('[TossPayment] 클라이언트 키 로딩 시작')
       try {
         const response = await fetch(getApiPath('/api/shop/settings'))
         const data = await response.json()
 
         if (data.success && data.settings?.tossClientKey) {
-          console.log('[TossWidget] 클라이언트 키 로드 성공:', data.settings.tossClientKey.substring(0, 20) + '...')
+          console.log('[TossPayment] 클라이언트 키 로드 성공:', data.settings.tossClientKey.substring(0, 20) + '...')
           setClientKey(data.settings.tossClientKey)
+          setReady(true)
         } else {
-          console.error('[TossWidget] 클라이언트 키 없음:', data)
+          console.error('[TossPayment] 클라이언트 키 없음:', data)
           setError('토스 클라이언트 키가 설정되지 않았습니다')
         }
       } catch (err) {
-        console.error('[TossWidget] 설정 로드 실패:', err)
+        console.error('[TossPayment] 설정 로드 실패:', err)
         setError('설정을 불러오는데 실패했습니다')
       }
     }
 
     fetchClientKey()
-  }, [propClientKey])
+  }, [propClientKey, getApiPath])
 
-  // 2. 결제위젯 초기화
-  useEffect(() => {
-    if (!clientKey) return
-
-    async function initWidgets() {
-      if (!clientKey) return
-      console.log('[TossWidget] SDK 로딩 시작')
-      try {
-        const tossPayments = await loadTossPayments(clientKey)
-        console.log('[TossWidget] SDK 로드 완료')
-
-        // customerKey 생성 (회원: 이메일 기반, 비회원: ANONYMOUS)
-        const customerKey = customerEmail
-          ? customerEmail.replace(/[^a-zA-Z0-9\-_]/g, '_').substring(0, 50)
-          : ANONYMOUS
-        console.log('[TossWidget] customerKey:', customerKey)
-
-        const widgetsInstance = tossPayments.widgets({ customerKey })
-        console.log('[TossWidget] 위젯 인스턴스 생성 완료')
-        setWidgets(widgetsInstance)
-      } catch (err) {
-        console.error('[TossWidget] 결제 위젯 초기화 실패:', err)
-        setError('결제 위젯을 초기화하는데 실패했습니다')
-      }
-    }
-
-    initWidgets()
-  }, [clientKey, customerEmail])
-
-  // 3. 위젯 렌더링
-  useEffect(() => {
-    if (!widgets) return
-
-    async function renderWidgets() {
-      if (!widgets) return
-      console.log('[TossWidget] 위젯 렌더링 시작, amount:', amount)
-      try {
-        // 금액 설정
-        await widgets.setAmount({
-          currency: 'KRW',
-          value: amount
-        })
-        console.log('[TossWidget] 금액 설정 완료')
-
-        // 결제수단 & 약관 위젯 렌더링
-        await Promise.all([
-          widgets.renderPaymentMethods({
-            selector: '#payment-method',
-            variantKey: 'DEFAULT'
-          }),
-          widgets.renderAgreement({
-            selector: '#agreement',
-            variantKey: 'AGREEMENT'
-          })
-        ])
-        console.log('[TossWidget] 위젯 렌더링 완료')
-
-        setReady(true)
-      } catch (err) {
-        console.error('[TossWidget] 위젯 렌더링 실패:', err)
-        setError('결제 위젯을 표시하는데 실패했습니다')
-      }
-    }
-
-    renderWidgets()
-  }, [widgets, amount])
-
-  // 4. 금액 변경 시 업데이트
-  useEffect(() => {
-    if (!widgets || !ready) return
-
-    widgets.setAmount({
-      currency: 'KRW',
-      value: amount
-    })
-  }, [widgets, amount, ready])
-
-  // 결제 요청
+  // 결제 요청 (개별연동 방식 - payment() 사용)
   const handlePayment = async () => {
-    if (!widgets) {
-      console.error('결제 위젯이 초기화되지 않았습니다')
+    if (!clientKey) {
+      console.error('[TossPayment] 클라이언트 키가 없습니다')
+      setError('결제 설정을 불러오는데 실패했습니다')
       return
     }
 
-    console.log('=== 결제 요청 시작 ===')
+    console.log('=== 결제 요청 시작 (개별연동) ===')
     console.log('orderId:', orderId)
     console.log('orderName:', orderName)
     console.log('amount:', amount)
@@ -162,19 +85,42 @@ export default function TossPaymentWidget({
     try {
       setProcessing(true)
 
-      const paymentParams = {
+      // SDK 로드
+      const tossPayments = await loadTossPayments(clientKey)
+      console.log('[TossPayment] SDK 로드 완료')
+
+      // customerKey 생성 (회원: 이메일 기반, 비회원: ANONYMOUS)
+      const customerKey = customerEmail
+        ? customerEmail.replace(/[^a-zA-Z0-9\-_]/g, '_').substring(0, 50)
+        : ANONYMOUS
+      console.log('[TossPayment] customerKey:', customerKey)
+
+      // 개별연동: payment() 객체 사용
+      const payment = tossPayments.payment({ customerKey })
+      console.log('[TossPayment] payment 인스턴스 생성 완료')
+
+      // 결제창 호출 (카드 + 간편결제 통합)
+      await payment.requestPayment({
+        method: 'CARD', // 카드 + 간편결제 통합결제창
+        amount: {
+          currency: 'KRW',
+          value: amount
+        },
         orderId,
         orderName,
         successUrl: `${window.location.origin}${getPath('/payment/success')}`,
         failUrl: `${window.location.origin}${getPath('/payment/fail')}`,
         customerEmail,
         customerName,
-        customerMobilePhone: customerPhone
-      }
-      console.log('결제 파라미터:', paymentParams)
-
-      await widgets.requestPayment(paymentParams)
-      console.log('requestPayment 호출 완료 (리다이렉트 대기)')
+        customerMobilePhone: customerPhone,
+        card: {
+          useEscrow: false,
+          flowMode: 'DEFAULT',
+          useCardPoint: false,
+          useAppCardOnly: false,
+        }
+      })
+      console.log('[TossPayment] requestPayment 호출 완료 (리다이렉트 대기)')
 
       // 리다이렉트 방식이므로 여기까지 도달하지 않음
     } catch (err: any) {
@@ -237,7 +183,7 @@ export default function TossPaymentWidget({
       {!ready && !processing && (
         <div className="p-8 flex items-center justify-center min-h-[200px]">
           <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <span className="ml-3 text-gray-600">결제 위젯 로딩 중...</span>
+          <span className="ml-3 text-gray-600">결제 준비 중...</span>
         </div>
       )}
 
@@ -260,15 +206,18 @@ export default function TossPaymentWidget({
         </div>
       </div>
 
-      {/* 토스 결제 위젯 영역 - 최소 너비 확보 */}
+      {/* 결제 버튼 영역 */}
       <div className="p-6">
-        <div id="payment-method" className="min-w-[320px] w-full" />
-        <div id="agreement" className="mt-6 min-w-[320px] w-full" />
+        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+          <p className="text-sm text-gray-600 text-center">
+            결제하기 버튼을 누르면 토스페이먼츠 결제창이 열립니다.
+          </p>
+        </div>
 
         <button
           onClick={handlePayment}
           disabled={!ready || processing}
-          className="w-full mt-8 bg-blue-600 text-white py-4 rounded-xl hover:bg-blue-700 transition-colors font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-blue-600 text-white py-4 rounded-xl hover:bg-blue-700 transition-colors font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {processing ? '결제 처리 중...' : `${amount.toLocaleString()}원 결제하기`}
         </button>
