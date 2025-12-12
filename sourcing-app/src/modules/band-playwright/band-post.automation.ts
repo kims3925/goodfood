@@ -547,6 +547,13 @@ export class BandPostAutomation {
         })
         console.log('[밴드자동화] change/input 이벤트 발생')
 
+        // 파일 선택 후 잠시 대기
+        await page.waitForTimeout(1500)
+
+        // "첨부하기" 버튼 먼저 클릭
+        await this.clickAttachButtonIfPresent(page)
+
+        // 업로드 완료 대기
         await this.waitForUploadComplete(page, imagePaths.length)
         return
       }
@@ -606,11 +613,15 @@ export class BandPostAutomation {
       }
     }
 
-    // 업로드 완료 대기
-    await this.waitForUploadComplete(page, imagePaths.length)
+    // 파일 선택 후 잠시 대기 (Band UI가 파일 인식하도록)
+    await page.waitForTimeout(1500)
 
-    // "사진 올리기" 팝업에서 "첨부하기" 버튼 클릭 (필요한 경우)
+    // "사진 올리기" 팝업에서 "첨부하기" 버튼 클릭 (먼저!)
+    // Band는 파일 선택 후 "첨부하기" 버튼을 눌러야 이미지가 글쓰기 영역에 추가됨
     await this.clickAttachButtonIfPresent(page)
+
+    // 첨부하기 버튼 클릭 후 업로드 완료 대기
+    await this.waitForUploadComplete(page, imagePaths.length)
   }
 
   /**
