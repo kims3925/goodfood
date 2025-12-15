@@ -75,7 +75,7 @@ pipeline {
 
                     # Install dependencies
                     echo ">>> Installing dependencies..."
-                    npm ci
+                    npm ci --legacy-peer-deps
 
                     # Generate Prisma client
                     echo ">>> Generating Prisma client..."
