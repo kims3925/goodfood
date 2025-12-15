@@ -7,9 +7,9 @@ pipeline {
 
     environment {
         PROJECT_PATH = '/home/ubuntu/bandauto'
-        NEXTAUTH_SECRET = credentials('idLNaBHG48ECE+Z4+YiU8V6jMFFsTASrW5J+9kWhJbs=')
-        GUEST_TOKEN_SECRET = credentials('z+ZBVfhnXOAATlUpJGrlco3s7cFMAt7OyWR45Lr0Wr8=')
-        JWT_SECRET = credentials('kzGRIiKTWeplDupb1d8idDDq3E3zu+22Ux+RUSyzIT8=')
+        NEXTAUTH_SECRET = credentials('nextauth-secret')
+        GUEST_TOKEN_SECRET = credentials('guest-secret')
+        JWT_SECRET = credentials('jwt-secret')
     }
 
     options {
