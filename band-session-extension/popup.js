@@ -1,6 +1,6 @@
 // 서버 URL
-const SERVER_URL = 'http://localhost:3001';
-const APP_DOMAIN = 'localhost';
+const SERVER_URL = 'http://snsauto.abcpharm.net:3001';
+const APP_DOMAIN = 'snsauto.abcpharm.net';
 
 // DOM 요소
 const loadingState = document.getElementById('loadingState');
