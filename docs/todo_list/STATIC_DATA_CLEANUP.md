@@ -39,12 +39,6 @@ const workflowSteps = [
   },
   {
     step: 3,
-    title: '쇼핑몰 업로드',
-    count: 8,   // ❌ 하드코딩된 카운트
-    href: '/strokepay/upload',
-  },
-  {
-    step: 4,
     title: '소매밴드 포스팅',
     count: 0,   // ❌ 하드코딩된 카운트
     href: '/retail/publish',
@@ -164,13 +158,6 @@ const workflowSteps = [
     description: 'AI를 통한 상품 설명 생성',
     icon: '🤖',
     duration: '5-10분',  // ❌ 정적 정보
-  },
-  {
-    id: 'uploading',
-    name: '스룩페이 업로드',
-    description: '엑셀 생성 및 대량 업로드',
-    icon: '📤',
-    duration: '3-7분',  // ❌ 정적 정보
   },
   {
     id: 'publishing',

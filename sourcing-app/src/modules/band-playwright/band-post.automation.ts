@@ -341,7 +341,17 @@ export class BandPostAutomation {
           }
         )
         tempFiles.push(...downloadedImages)
-        console.log(`[밴드자동화] ${downloadedImages.length}개 이미지 다운로드 완료`)
+        console.log(`[밴드자동화] ${downloadedImages.length}/${totalImages}개 이미지 다운로드 완료`)
+
+        // 이미지 다운로드 실패 확인 - 하나라도 실패하면 전체 실패
+        const failedCount = totalImages - downloadedImages.length
+        if (failedCount > 0) {
+          console.error(`[밴드자동화] 이미지 다운로드 실패: ${failedCount}/${totalImages}개 실패`)
+          throw new BandPlaywrightError(
+            `이미지 다운로드 실패: ${failedCount}개 이미지를 다운로드할 수 없습니다.`,
+            BandPlaywrightErrorCode.UPLOAD_TIMEOUT
+          )
+        }
 
         if (downloadedImages.length > 0) {
           // 업로드 단계
@@ -490,7 +500,7 @@ export class BandPostAutomation {
       })
 
       if (!response.ok) {
-        console.error(`[밴드자동화] 이미지 다운로드 실패: ${imageUrl}`)
+        console.error(`[밴드자동화] 이미지 다운로드 실패: ${imageUrl} (HTTP ${response.status}: ${response.statusText})`)
         return null
       }
 
@@ -948,10 +958,18 @@ export class BandPostAutomation {
       await page.waitForTimeout(500)
     }
 
-    // 타임아웃
+    // 타임아웃 - 실패 처리
     const uploadedCount = await this.countUploadedImages(page)
     const elapsed = Math.floor((Date.now() - startTime) / 1000)
-    console.warn(`[이미지업로드] 타임아웃 (${elapsed}초). 업로드됨: ${uploadedCount}/${expectedCount}`)
+    console.error(`[이미지업로드] 타임아웃 (${elapsed}초). 업로드됨: ${uploadedCount}/${expectedCount}`)
+
+    // 업로드된 이미지가 예상보다 적으면 에러
+    if (uploadedCount < expectedCount) {
+      throw new BandPlaywrightError(
+        `이미지 업로드 실패: ${expectedCount}개 중 ${uploadedCount}개만 업로드됨 (타임아웃)`,
+        BandPlaywrightErrorCode.UPLOAD_TIMEOUT
+      )
+    }
   }
 
   /**
@@ -1045,13 +1063,21 @@ export class BandPostAutomation {
       await page.waitForTimeout(500)
     }
 
-    // 타임아웃 시에도 현재 상태로 콜백
+    // 타임아웃 - 실패 처리
     const uploadedCount = await this.countUploadedImages(page)
     if (onProgress) {
       await onProgress(uploadedCount, expectedCount)
     }
     const elapsed = Math.floor((Date.now() - startTime) / 1000)
-    console.warn(`[이미지업로드] 타임아웃 (${elapsed}초). 업로드됨: ${uploadedCount}/${expectedCount}`)
+    console.error(`[이미지업로드] 타임아웃 (${elapsed}초). 업로드됨: ${uploadedCount}/${expectedCount}`)
+
+    // 업로드된 이미지가 예상보다 적으면 에러
+    if (uploadedCount < expectedCount) {
+      throw new BandPlaywrightError(
+        `이미지 업로드 실패: ${expectedCount}개 중 ${uploadedCount}개만 업로드됨 (타임아웃)`,
+        BandPlaywrightErrorCode.UPLOAD_TIMEOUT
+      )
+    }
   }
 
   /**

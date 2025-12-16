@@ -26,8 +26,7 @@ const TYPE_LABELS: Record<string, string> = {
   COLLECT: '게시물 수집',
   TRANSFORM: 'AI 변환',
   PUBLISH: '소매밴드 발행',
-  FULL_PIPELINE: '전체 파이프라인',
-  FULL_PIPELINE1: '전체 파이프라인',
+  FULL_PIPELINE: '파이프라인 실행',
 }
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
@@ -35,7 +34,6 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   TRANSFORM: <Bot size={16} />,
   PUBLISH: <Send size={16} />,
   FULL_PIPELINE: <Zap size={16} />,
-  FULL_PIPELINE1: <Zap size={16} />,
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; bgColor: string; textColor: string; borderColor: string }> = {
@@ -120,7 +118,6 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
       case 'PUBLISH':
         return ['publish']
       case 'FULL_PIPELINE':
-      case 'FULL_PIPELINE1':
       default:
         return ['collection', 'transform', 'productCreate', 'publish']
     }
@@ -552,15 +549,15 @@ export default function AutomationLogsPage() {
         limit: '10',
       })
       if (selectedType) {
-        params.set('type', selectedType)
+        params.set('workflowType', selectedType)
       }
 
       const response = await fetch(`/api/automation/logs?${params}`)
       const data = await response.json()
 
       if (data.success) {
-        setLogs(data.data)
-        setTotalPages(data.totalPages)
+        setLogs(data.data.logs || [])
+        setTotalPages(data.data.pagination?.totalPages || 1)
       }
     } catch (error) {
       console.error('로그 로드 실패:', error)
@@ -611,6 +608,103 @@ export default function AutomationLogsPage() {
     if (minutes < 60) return `${minutes}분 ${remainingSecs}초`
     const hours = Math.floor(minutes / 60)
     return `${hours}시간 ${minutes % 60}분`
+  }
+
+  // 기술적 에러 메시지를 유저 친화적인 문장으로 변환
+  const formatErrorMessage = (errorMessage: string | null): string => {
+    if (!errorMessage) return ''
+
+    // Prisma 관련 에러
+    if (errorMessage.includes('prisma') || errorMessage.includes('Prisma')) {
+      if (errorMessage.includes('update')) {
+        return '데이터를 업데이트하는 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.'
+      }
+      if (errorMessage.includes('create')) {
+        return '데이터를 저장하는 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.'
+      }
+      if (errorMessage.includes('delete')) {
+        return '데이터를 삭제하는 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.'
+      }
+      return '데이터베이스 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.'
+    }
+
+    // 네트워크 관련 에러
+    if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('Connection refused')) {
+      return '서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.'
+    }
+    if (errorMessage.includes('ETIMEDOUT') || errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+      return '요청 시간이 초과되었습니다. 네트워크 상태를 확인하고 다시 시도해주세요.'
+    }
+    if (errorMessage.includes('ENOTFOUND')) {
+      return '서버를 찾을 수 없습니다. 네트워크 연결을 확인해주세요.'
+    }
+
+    // API 관련 에러
+    if (errorMessage.includes('rate limit') || errorMessage.includes('Rate limit') || errorMessage.includes('429')) {
+      return 'API 호출 한도를 초과했습니다. 잠시 후 다시 시도해주세요.'
+    }
+    if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+      return '인증에 실패했습니다. API 키 설정을 확인해주세요.'
+    }
+    if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+      return '접근 권한이 없습니다. API 설정을 확인해주세요.'
+    }
+    if (errorMessage.includes('404') || errorMessage.includes('Not found')) {
+      return '요청한 데이터를 찾을 수 없습니다.'
+    }
+    if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
+      return '서버에서 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+    }
+
+    // AI 관련 에러
+    if (errorMessage.includes('AI') || errorMessage.includes('Gemini') || errorMessage.includes('OpenAI') || errorMessage.includes('Claude')) {
+      if (errorMessage.includes('quota') || errorMessage.includes('limit')) {
+        return 'AI 서비스 사용량 한도에 도달했습니다. 잠시 후 다시 시도해주세요.'
+      }
+      if (errorMessage.includes('API key') || errorMessage.includes('api_key')) {
+        return 'AI API 키가 올바르지 않습니다. 설정을 확인해주세요.'
+      }
+      return 'AI 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.'
+    }
+
+    // 밴드/채널 관련 에러
+    if (errorMessage.includes('채널') || errorMessage.includes('channel') || errorMessage.includes('Channel')) {
+      if (errorMessage.includes('없') || errorMessage.includes('not found')) {
+        return '발행할 채널을 찾을 수 없습니다. 채널 설정을 확인해주세요.'
+      }
+      return '채널 처리 중 문제가 발생했습니다.'
+    }
+
+    // 상품 관련 에러
+    if (errorMessage.includes('상품') || errorMessage.includes('product') || errorMessage.includes('Product')) {
+      if (errorMessage.includes('없') || errorMessage.includes('not found')) {
+        return '처리할 상품을 찾을 수 없습니다.'
+      }
+      return '상품 처리 중 문제가 발생했습니다.'
+    }
+
+    // 사용자 취소
+    if (errorMessage.includes('취소') || errorMessage.includes('cancel') || errorMessage.includes('Cancel')) {
+      return '사용자에 의해 작업이 취소되었습니다.'
+    }
+
+    // 자동 종료
+    if (errorMessage.includes('자동 종료') || errorMessage.includes('응답이 없어')) {
+      return '작업이 오래 걸려 자동으로 종료되었습니다. 네트워크 상태를 확인해주세요.'
+    }
+
+    // 한글이 포함된 경우 그대로 표시 (이미 유저 친화적일 가능성)
+    if (/[가-힣]/.test(errorMessage) && errorMessage.length < 100) {
+      return errorMessage
+    }
+
+    // 너무 긴 에러 메시지는 요약
+    if (errorMessage.length > 100) {
+      return '작업 처리 중 오류가 발생했습니다. 자세한 내용은 관리자에게 문의해주세요.'
+    }
+
+    // 기타 에러
+    return '작업 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.'
   }
 
   return (
@@ -786,7 +880,7 @@ export default function AutomationLogsPage() {
                       <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-xl">
                         <div className="flex items-start gap-2">
                           <XCircle size={16} className="text-red-500 mt-0.5 shrink-0" />
-                          <p className="text-sm text-red-700">{log.errorMessage}</p>
+                          <p className="text-sm text-red-700">{formatErrorMessage(log.errorMessage)}</p>
                         </div>
                       </div>
                     )}

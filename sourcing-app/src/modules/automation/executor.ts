@@ -24,6 +24,7 @@ import {
   ProductCreateResult,
   PublishResult,
 } from './types'
+import { createPipelineNotification } from './notification-helper'
 
 // =============================================
 // HELPER FUNCTIONS
@@ -288,7 +289,7 @@ export async function executeFullPipeline(
   const startedAt = new Date()
   const logId = await createWorkflowLog({
     userId,
-    workflowType: WorkflowType.FULL_PIPELINE1,
+    workflowType: WorkflowType.FULL_PIPELINE,
     triggerType,
   })
 
@@ -443,7 +444,8 @@ export async function executeFullPipeline(
 
     console.log(`[FullPipeline] Completed with status: ${overallStatus}`)
 
-    return {
+    // 파이프라인 완료 알림 생성
+    const pipelineResult: FullPipelineResult = {
       success: overallStatus === WorkflowStatus.COMPLETED,
       startedAt,
       completedAt,
@@ -453,10 +455,37 @@ export async function executeFullPipeline(
       publish: publishResult,
       overallStatus,
     }
+
+    await createPipelineNotification({
+      result: pipelineResult,
+      workflowLogId: logId,
+    })
+
+    return pipelineResult
   } catch (error: any) {
     // 취소 에러는 로깅만 하고 넘어감
     if (error instanceof CancellationError) {
       console.log(`[FullPipeline] Cancelled by user`)
+
+      // 취소 시에도 알림 생성
+      const cancelledResult: FullPipelineResult = {
+        success: false,
+        startedAt,
+        completedAt: new Date(),
+        collection: collectionResult,
+        transform: transformResult,
+        productCreate: productCreateResult,
+        publish: publishResult,
+        overallStatus: WorkflowStatus.FAILED,
+      }
+
+      await createPipelineNotification({
+        result: cancelledResult,
+        workflowLogId: logId,
+        errorMessage: '사용자에 의해 작업이 취소되었습니다.',
+      })
+
+      return cancelledResult
     } else {
       console.error('[FullPipeline] Error:', error)
       await failWorkflowLog(logId, error.message, {
@@ -465,17 +494,26 @@ export async function executeFullPipeline(
         productCreate: productCreateResult?.details,
         publish: publishResult?.details,
       })
-    }
 
-    return {
-      success: false,
-      startedAt,
-      completedAt: new Date(),
-      collection: collectionResult,
-      transform: transformResult,
-      productCreate: productCreateResult,
-      publish: publishResult,
-      overallStatus: WorkflowStatus.FAILED,
+      // 에러 발생 시 알림 생성
+      const errorResult: FullPipelineResult = {
+        success: false,
+        startedAt,
+        completedAt: new Date(),
+        collection: collectionResult,
+        transform: transformResult,
+        productCreate: productCreateResult,
+        publish: publishResult,
+        overallStatus: WorkflowStatus.FAILED,
+      }
+
+      await createPipelineNotification({
+        result: errorResult,
+        workflowLogId: logId,
+        errorMessage: error.message,
+      })
+
+      return errorResult
     }
   } finally {
     clearBatchContext()
@@ -557,7 +595,7 @@ export async function executeFullPipelineWithLock(
   triggerType: TriggerType = TriggerType.MANUAL
 ): Promise<FullPipelineResult | null> {
   // 1. Lock 획득 시도 (워크플로우 생성과 중복 체크를 원자적으로 수행)
-  const logId = await acquireExecutionLock(userId, WorkflowType.FULL_PIPELINE1, triggerType)
+  const logId = await acquireExecutionLock(userId, WorkflowType.FULL_PIPELINE, triggerType)
 
   if (!logId) {
     console.log(`[Executor] Lock 획득 실패 - 이미 실행 중인 작업이 있음 (user: ${userId})`)
@@ -721,7 +759,8 @@ export async function executeFullPipelineWithLock(
 
     console.log(`[FullPipeline] Completed with status: ${overallStatus} (workflow: ${logId})`)
 
-    return {
+    // 파이프라인 완료 알림 생성
+    const pipelineResult: FullPipelineResult = {
       success: overallStatus === WorkflowStatus.COMPLETED,
       startedAt,
       completedAt,
@@ -731,6 +770,13 @@ export async function executeFullPipelineWithLock(
       publish: publishResult,
       overallStatus,
     }
+
+    await createPipelineNotification({
+      result: pipelineResult,
+      workflowLogId: logId,
+    })
+
+    return pipelineResult
   } catch (error: any) {
     // 취소 에러는 별도 처리 (이미 DB에서 FAILED로 마킹됨)
     if (error instanceof CancellationError) {
@@ -749,7 +795,8 @@ export async function executeFullPipelineWithLock(
         },
       })
 
-      return {
+      // 취소 시에도 알림 생성
+      const cancelledResult: FullPipelineResult = {
         success: false,
         startedAt,
         completedAt: new Date(),
@@ -759,6 +806,14 @@ export async function executeFullPipelineWithLock(
         publish: publishResult,
         overallStatus: WorkflowStatus.FAILED,
       }
+
+      await createPipelineNotification({
+        result: cancelledResult,
+        workflowLogId: logId,
+        errorMessage: '사용자에 의해 작업이 취소되었습니다.',
+      })
+
+      return cancelledResult
     }
 
     console.error('[FullPipeline] Error:', error)
@@ -769,7 +824,8 @@ export async function executeFullPipelineWithLock(
       publish: publishResult?.details,
     })
 
-    return {
+    // 에러 발생 시 알림 생성
+    const errorResult: FullPipelineResult = {
       success: false,
       startedAt,
       completedAt: new Date(),
@@ -779,6 +835,14 @@ export async function executeFullPipelineWithLock(
       publish: publishResult,
       overallStatus: WorkflowStatus.FAILED,
     }
+
+    await createPipelineNotification({
+      result: errorResult,
+      workflowLogId: logId,
+      errorMessage: error.message,
+    })
+
+    return errorResult
   } finally {
     clearBatchContext()
   }

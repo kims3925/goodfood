@@ -3,6 +3,7 @@ model PublishedProduct {
   userId           Int              @map("user_id")
   productId        Int              @map("product_id")
   publishedAt      DateTime?        @map("published_at") @db.Timestamp(0)
+  isActive         Boolean          @default(true) @map("is_active")
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamp(0)
   channelId        Int?             @map("channel_id")

@@ -14,7 +14,6 @@ import {
   Users,
   MessageSquare,
   Settings,
-  ScrollText,
   Link2,
   Bot,
   ShoppingBag,
@@ -69,10 +68,9 @@ export const sourcingMenuItems: MenuItem[] = [
     label: '설정',
     icon: Settings,
     children: [
-      { label: '정책', href: '/sourcing/policy/list', icon: ScrollText },
       { label: 'API', href: '/sourcing/settings/api', icon: Link2 },
       { label: 'AI', href: '/sourcing/settings/ai', icon: Bot },
-      { label: '프롬프트', href: '/sourcing/settings/prompt', icon: FileText },
+      { label: '프롬프트 / 가격 정책', href: '/sourcing/settings/prompt', icon: FileText },
     ],
   },
 ]

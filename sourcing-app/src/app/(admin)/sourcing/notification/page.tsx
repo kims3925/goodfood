@@ -6,22 +6,23 @@ import {
   Bell,
   Calendar,
   Search,
-  CheckCircle,
-  AlertCircle,
-  Info,
   ChevronLeft,
   ChevronRight,
   X,
-  Check,
   Trash2,
   Filter,
   Mail,
   MailOpen,
+  Package,
+  Zap,
+  Upload,
+  AlertCircle,
+  Info,
 } from 'lucide-react'
 import Loading from '@/components/ui/Loading'
 
-// 알림 타입
-type NotificationType = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'
+// 알림 타입 (소싱용)
+type NotificationType = 'COLLECT' | 'TRANSFORM' | 'PUBLISH' | 'ERROR' | 'INFO'
 
 interface Notification {
   id: number
@@ -49,30 +50,36 @@ interface NotificationData {
 }
 
 // 타입별 아이콘 및 색상
-const typeConfig: Record<NotificationType, { icon: React.ReactNode; bg: string; text: string; border: string }> = {
-  INFO: {
-    icon: <Info size={16} />,
-    bg: 'bg-blue-100',
-    text: 'text-blue-600',
-    border: 'border-blue-200',
-  },
-  SUCCESS: {
-    icon: <CheckCircle size={16} />,
+const typeConfig: Record<NotificationType, { icon: React.ReactNode; bg: string; text: string; label: string }> = {
+  COLLECT: {
+    icon: <Package size={16} />,
     bg: 'bg-green-100',
     text: 'text-green-600',
-    border: 'border-green-200',
+    label: '수집',
   },
-  WARNING: {
-    icon: <AlertCircle size={16} />,
+  TRANSFORM: {
+    icon: <Zap size={16} />,
     bg: 'bg-yellow-100',
     text: 'text-yellow-600',
-    border: 'border-yellow-200',
+    label: 'AI변환',
+  },
+  PUBLISH: {
+    icon: <Upload size={16} />,
+    bg: 'bg-blue-100',
+    text: 'text-blue-600',
+    label: '발행',
   },
   ERROR: {
     icon: <AlertCircle size={16} />,
     bg: 'bg-red-100',
     text: 'text-red-600',
-    border: 'border-red-200',
+    label: '오류',
+  },
+  INFO: {
+    icon: <Info size={16} />,
+    bg: 'bg-gray-100',
+    text: 'text-gray-600',
+    label: '정보',
   },
 }
 
@@ -219,6 +226,25 @@ export default function SourcingNotificationPage() {
     )
   }
 
+  // 알림 클릭 시 해당 페이지로 이동
+  const handleNotificationClick = async (notification: Notification) => {
+    if (notification.link) {
+      // 읽지 않은 알림인 경우에만 읽음 처리 (API 호출 완료 후 이동)
+      if (!notification.isRead) {
+        try {
+          await fetch('/api/admin/notifications/read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [notification.id] }),
+          })
+        } catch (error) {
+          console.error('읽음 처리 실패:', error)
+        }
+      }
+      window.location.href = notification.link
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -226,12 +252,12 @@ export default function SourcingNotificationPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">알림 관리</h1>
           <p className="text-gray-600">
-            소싱 관련 시스템 알림을 확인하고 관리합니다.
+            소싱 관련 수집, AI변환, 발행 알림을 확인하고 관리합니다.
           </p>
         </div>
 
-        {/* 통계 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        {/* 통계 및 액션 카드 */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-blue-100 rounded-lg">
@@ -265,18 +291,47 @@ export default function SourcingNotificationPage() {
               </div>
             </div>
           </div>
+          {/* 읽음 처리 카드 */}
           <button
-            onClick={fetchData}
-            disabled={loading}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-gray-300 hover:bg-gray-50 transition-colors cursor-pointer text-left disabled:opacity-50"
+            onClick={() => handleMarkAsRead(selectedIds)}
+            disabled={selectedIds.length === 0}
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
+              selectedIds.length > 0
+                ? 'hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
+                : 'opacity-50 cursor-not-allowed'
+            }`}
           >
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <RefreshCw size={24} className={`text-gray-600 ${loading ? 'animate-spin' : ''}`} />
+              <div className={`p-3 rounded-lg ${selectedIds.length > 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                <MailOpen size={24} className={selectedIds.length > 0 ? 'text-blue-600' : 'text-gray-400'} />
               </div>
               <div>
-                <p className="text-sm text-gray-500">데이터</p>
-                <p className="text-lg font-bold text-gray-600">새로고침</p>
+                <p className="text-sm text-gray-500">읽음 처리</p>
+                <p className={`text-lg font-bold ${selectedIds.length > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
+                  {selectedIds.length}개 선택됨
+                </p>
+              </div>
+            </div>
+          </button>
+          {/* 삭제 카드 */}
+          <button
+            onClick={() => handleDelete(selectedIds)}
+            disabled={selectedIds.length === 0}
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
+              selectedIds.length > 0
+                ? 'hover:border-red-300 hover:bg-red-50 cursor-pointer'
+                : 'opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-3 rounded-lg ${selectedIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
+                <Trash2 size={24} className={selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'} />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">선택 삭제</p>
+                <p className={`text-lg font-bold ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                  {selectedIds.length}개 선택됨
+                </p>
               </div>
             </div>
           </button>
@@ -294,10 +349,11 @@ export default function SourcingNotificationPage() {
                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">전체 타입</option>
-                <option value="INFO">정보</option>
-                <option value="SUCCESS">성공</option>
-                <option value="WARNING">경고</option>
+                <option value="COLLECT">수집</option>
+                <option value="TRANSFORM">AI변환</option>
+                <option value="PUBLISH">발행</option>
                 <option value="ERROR">오류</option>
+                <option value="INFO">정보</option>
               </select>
             </div>
 
@@ -367,33 +423,6 @@ export default function SourcingNotificationPage() {
           </div>
         </div>
 
-        {/* 선택된 알림 액션 */}
-        {selectedIds.length > 0 && (
-          <div className="bg-blue-50 rounded-xl border border-blue-200 mb-6 p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-blue-700">
-                <span className="font-semibold">{selectedIds.length}</span>개 선택됨
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleMarkAsRead(selectedIds)}
-                  className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors flex items-center gap-1"
-                >
-                  <Check size={14} />
-                  읽음 처리
-                </button>
-                <button
-                  onClick={() => handleDelete(selectedIds)}
-                  className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors flex items-center gap-1"
-                >
-                  <Trash2 size={14} />
-                  삭제
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* 메인 콘텐츠 */}
         {loading ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12">
@@ -426,13 +455,18 @@ export default function SourcingNotificationPage() {
                     key={notification.id}
                     className={`p-4 hover:bg-gray-50 transition-colors ${
                       !notification.isRead ? 'bg-blue-50/30' : ''
-                    }`}
+                    } ${notification.link ? 'cursor-pointer' : ''}`}
+                    onClick={() => notification.link && handleNotificationClick(notification)}
                   >
                     <div className="flex items-start gap-4">
                       <input
                         type="checkbox"
                         checked={selectedIds.includes(notification.id)}
-                        onChange={() => handleSelect(notification.id)}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          handleSelect(notification.id)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
                         className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                       <div className={`p-2 rounded-lg ${config.bg}`}>
@@ -440,6 +474,9 @@ export default function SourcingNotificationPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
+                          <span className={`px-2 py-0.5 text-xs rounded-full ${config.bg} ${config.text}`}>
+                            {config.label}
+                          </span>
                           <h3 className={`text-sm font-medium ${!notification.isRead ? 'text-gray-900' : 'text-gray-700'}`}>
                             {notification.title}
                           </h3>
@@ -449,24 +486,6 @@ export default function SourcingNotificationPage() {
                         </div>
                         <p className="text-sm text-gray-600 line-clamp-2">{notification.message}</p>
                         <p className="text-xs text-gray-400 mt-2">{formatDate(notification.createdAt)}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!notification.isRead && (
-                          <button
-                            onClick={() => handleMarkAsRead([notification.id])}
-                            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="읽음 처리"
-                          >
-                            <Check size={16} />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDelete([notification.id])}
-                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          title="삭제"
-                        >
-                          <Trash2 size={16} />
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -504,7 +523,7 @@ export default function SourcingNotificationPage() {
             <Bell size={48} className="mx-auto text-gray-300 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">알림이 없습니다</h3>
             <p className="text-gray-500">
-              {hasFilters ? '검색 조건에 맞는 알림이 없습니다.' : '아직 알림이 없습니다.'}
+              {hasFilters ? '검색 조건에 맞는 알림이 없습니다.' : '수집, AI변환, 발행 등 이벤트 발생 시 알림이 표시됩니다.'}
             </p>
           </div>
         )}

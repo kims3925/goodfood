@@ -157,13 +157,14 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     }
 
     const body = await request.json()
-    const { status, externalId, externalUrl, errorMessage } = body
+    const { status, externalId, externalUrl, errorMessage, isActive } = body
 
     const updateData: any = {}
     if (status !== undefined) updateData.status = status
     if (externalId !== undefined) updateData.externalId = externalId
     if (externalUrl !== undefined) updateData.externalUrl = externalUrl
     if (errorMessage !== undefined) updateData.errorMessage = errorMessage
+    if (isActive !== undefined) updateData.isActive = isActive
     if (status === 'SUCCESS') updateData.publishedAt = new Date()
 
     const updatedProduct = await prisma.publishedProduct.update({

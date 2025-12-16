@@ -105,11 +105,14 @@ export async function updateWorkflowLog(
   logId: number,
   update: WorkflowLogUpdate
 ): Promise<void> {
+  // details를 분리하여 JSON.stringify 처리 (객체가 직접 DB에 전달되는 것 방지)
+  const { details, ...rest } = update
+
   await prisma.workflowLog.update({
     where: { id: logId },
     data: {
-      ...update,
-      details: update.details ? JSON.stringify(update.details) : undefined,
+      ...rest,
+      ...(details !== undefined && { details: JSON.stringify(details) }),
     }
   })
 }

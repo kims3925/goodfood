@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     ])
 
     // 응답 데이터 변환
-    const data = products.map((product) => ({
+    const data = products.map((product: any) => ({
       productId: product.id,
       product: {
         id: product.id,
@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
         thumbnailUrl: product.thumbnailUrl,
         collectedProduct: product.collectedProduct,
       },
-      publishedChannels: product.publishedProducts.map((pp) => {
+      publishedChannels: product.publishedProducts.map((pp: any) => {
         // Shop 발행과 채널 발행을 구분하여 반환
         // Shop 발행: shopId가 있고 channelId가 없는 경우
         // 채널 발행: channelId가 있는 경우
@@ -143,6 +143,7 @@ export async function GET(request: NextRequest) {
           shopId: pp.shopId,
           shopName: pp.shop?.name || null,
           shopSubdomain: pp.shop?.subdomain || null,
+          isActive: pp.isActive,
           publishedAt: pp.publishedAt,
           createdAt: pp.createdAt,
           updatedAt: pp.updatedAt,

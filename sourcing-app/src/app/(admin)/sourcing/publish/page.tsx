@@ -766,22 +766,7 @@ export default function PublishPage() {
         return next
       })
 
-      // 결과 알림
-      if (totalFailed > 0) {
-        // 중복 제거 후 첫 번째 에러 메시지 표시
-        const uniqueErrors = [...new Set(errorMessages)]
-        const firstError = uniqueErrors[0]
-        if (firstError) {
-          toast.error(`발행 실패: ${firstError}`)
-        } else {
-          toast.warning(`발행 결과: 성공 ${totalSuccess}개, 건너뜀 ${totalSkipped}개, 실패 ${totalFailed}개`)
-        }
-      } else if (totalSuccess > 0) {
-        toast.success(`${totalSuccess}개 상품 발행 완료`)
-      } else if (totalSkipped > 0) {
-        toast.info(`${totalSkipped}개 상품 이미 발행됨`)
-      }
-
+      // 발행 결과는 모달에서 확인하므로 토스트 제거
       loadProducts()
     } catch (error) {
       console.error('발행 실패:', error)
@@ -1347,29 +1332,64 @@ export default function PublishPage() {
       {showPublishProgress && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" />
-          <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden max-h-[80vh] flex flex-col">
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-xl w-full mx-4 overflow-hidden max-h-[80vh] flex flex-col">
             {/* 헤더 */}
-            <div className={`p-6 border-b ${isPublishing ? 'bg-blue-50 border-blue-100' : 'bg-green-50 border-green-100'}`}>
-              <div className="flex items-center gap-3">
-                <div className={`p-3 rounded-full ${isPublishing ? 'bg-blue-100' : 'bg-green-100'}`}>
-                  {isPublishing ? (
-                    <Loader2 size={24} className="text-blue-600 animate-spin" />
-                  ) : (
-                    <CheckCircle size={24} className="text-green-600" />
-                  )}
+            {(() => {
+              const successCount = publishProgressItems.filter((i) => i.status === 'success').length
+              const failedCount = publishProgressItems.filter((i) => i.status === 'failed').length
+              const allFailed = !isPublishing && failedCount > 0 && successCount === 0
+              const hasFailed = !isPublishing && failedCount > 0
+
+              return (
+                <div className={`p-6 border-b ${
+                  isPublishing
+                    ? 'bg-blue-50 border-blue-100'
+                    : allFailed
+                    ? 'bg-red-50 border-red-100'
+                    : hasFailed
+                    ? 'bg-amber-50 border-amber-100'
+                    : 'bg-green-50 border-green-100'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`p-3 rounded-full ${
+                      isPublishing
+                        ? 'bg-blue-100'
+                        : allFailed
+                        ? 'bg-red-100'
+                        : hasFailed
+                        ? 'bg-amber-100'
+                        : 'bg-green-100'
+                    }`}>
+                      {isPublishing ? (
+                        <Loader2 size={24} className="text-blue-600 animate-spin" />
+                      ) : allFailed ? (
+                        <XCircle size={24} className="text-red-600" />
+                      ) : hasFailed ? (
+                        <AlertTriangle size={24} className="text-amber-600" />
+                      ) : (
+                        <CheckCircle size={24} className="text-green-600" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">
+                        {isPublishing
+                          ? '발행 진행 중...'
+                          : allFailed
+                          ? '발행 실패'
+                          : hasFailed
+                          ? '발행 일부 실패'
+                          : '발행 완료'}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {isPublishing
+                          ? '페이지를 나가거나 새로고침하면 발행이 취소될 수 있습니다.'
+                          : `${successCount}개 성공, ${failedCount}개 실패`}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">
-                    {isPublishing ? '발행 진행 중...' : '발행 완료'}
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    {isPublishing
-                      ? '페이지를 나가거나 새로고침하면 발행이 취소될 수 있습니다.'
-                      : `${publishProgressItems.filter((i) => i.status === 'success').length}개 성공, ${publishProgressItems.filter((i) => i.status === 'failed').length}개 실패`}
-                  </p>
-                </div>
-              </div>
-            </div>
+              )
+            })()}
 
             {/* 경고 메시지 (발행 중일 때만) */}
             {isPublishing && (
@@ -1467,13 +1487,14 @@ export default function PublishPage() {
                             {item.publishMethod === 'playwright' ? '이미지 포함' : '텍스트만'}
                           </p>
                         )}
-                        {item.message && (
-                          <p className="text-xs text-gray-500 mt-0.5 max-w-[150px] truncate" title={item.message}>
-                            {item.message}
-                          </p>
-                        )}
                       </div>
                     </div>
+                    {/* 실패 사유 표시 (별도 줄) */}
+                    {item.status === 'failed' && item.message && (
+                      <div className="mt-2 p-2 bg-red-100 rounded text-xs text-red-700">
+                        <span className="font-medium">실패 사유:</span> {item.message}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -139,6 +139,26 @@ export class PublishService {
         }
       }
 
+      // 소매채널에 쇼핑몰이 연결되어 있는지 확인
+      if (!channel.shop || !channel.shop.isActive) {
+        return {
+          success: false,
+          productId,
+          channelId,
+          error: '소매채널에 쇼핑몰이 연결되어 있지 않습니다. 채널 설정에서 쇼핑몰을 연결해주세요.',
+        }
+      }
+
+      // 쇼핑몰에 subdomain이 설정되어 있는지 확인 (주문 링크 생성에 필요)
+      if (!channel.shop.subdomain) {
+        return {
+          success: false,
+          productId,
+          channelId,
+          error: '쇼핑몰에 도메인이 설정되어 있지 않습니다. 쇼핑몰 설정에서 도메인을 설정해주세요.',
+        }
+      }
+
       // 사용자의 Band API 설정 조회
       const apiConfig = await prisma.sourcingApiConfig.findFirst({
         where: {
@@ -230,33 +250,44 @@ export class PublishService {
         new Date(channelSession.sessionExpiresAt) > new Date()
 
       // 6-1. Playwright 발행 시도 (세션이 유효하고 이미지가 있는 경우)
+      // 소매밴드 발행은 Playwright로만 진행 - 실패 시 API 폴백 없이 즉시 실패 처리
       if (hasValidSession && imageUrls.length > 0) {
-        try {
-          console.log(`[PublishService] Playwright 발행 시도 (${imageUrls.length}개 이미지)`)
+        console.log(`[PublishService] Playwright 발행 시도 (${imageUrls.length}개 이미지)`)
 
-          const playwrightResult = await bandPlaywrightService.publishWithImages({
+        const playwrightResult = await bandPlaywrightService.publishWithImages({
+          channelId,
+          bandKey: channel.channelKey,
+          bandName: channel.name,
+          content: postContent,
+          imageUrls,
+        })
+
+        if (playwrightResult.success && playwrightResult.postKey) {
+          postKey = playwrightResult.postKey
+          publishMethod = 'playwright'
+          imageCount = imageUrls.length
+          console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
+        } else {
+          // Playwright 발행 실패 시 즉시 실패 반환 (API 폴백 없음)
+          console.error(`[PublishService] Playwright 발행 실패: ${playwrightResult.error}`)
+          return {
+            success: false,
+            productId,
             channelId,
-            bandKey: channel.channelKey,
-            bandName: channel.name,
-            content: postContent,
-            imageUrls,
-          })
-
-          if (playwrightResult.success && playwrightResult.postKey) {
-            postKey = playwrightResult.postKey
-            publishMethod = 'playwright'
-            imageCount = imageUrls.length
-            console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
-          } else {
-            console.log(`[PublishService] Playwright 발행 실패: ${playwrightResult.error}, Band API로 폴백`)
+            error: playwrightResult.error || '소매밴드 발행에 실패했습니다. (이미지 업로드 또는 게시글 등록 실패)',
           }
-        } catch (error: any) {
-          console.log(`[PublishService] Playwright 발행 오류, Band API로 폴백:`, error.message)
         }
-      }
-
-      // 6-2. Playwright 실패 시 Band API로 폴백 (텍스트만)
-      if (!postKey) {
+      } else if (imageUrls.length > 0 && !hasValidSession) {
+        // 이미지가 있지만 세션이 없는 경우 - 발행 불가
+        console.error(`[PublishService] 세션 없음 - 이미지 포함 발행 불가`)
+        return {
+          success: false,
+          productId,
+          channelId,
+          error: '밴드 세션이 없거나 만료되었습니다. 채널 설정에서 밴드 로그인을 해주세요.',
+        }
+      } else if (imageUrls.length === 0) {
+        // 이미지가 없는 경우 - Band API로 텍스트만 발행
         if (!apiConfig?.accessToken) {
           return {
             success: false,
@@ -272,7 +303,7 @@ export class PublishService {
         })
         postKey = result.postKey
         publishMethod = 'api'
-        console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만)`)
+        console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
       }
 
       // 7. PublishedProduct 레코드 생성
@@ -675,6 +706,44 @@ export class PublishService {
         }
       }
 
+      // 소매채널에 쇼핑몰이 연결되어 있는지 확인
+      if (!channel.shop || !channel.shop.isActive) {
+        if (onStageProgress) {
+          await onStageProgress({
+            productId,
+            productName: `상품 ${productId}`,
+            stage: 'failed',
+            stageLabel: '실패',
+            error: '소매채널에 쇼핑몰이 연결되어 있지 않습니다.',
+          })
+        }
+        return {
+          success: false,
+          productId,
+          channelId,
+          error: '소매채널에 쇼핑몰이 연결되어 있지 않습니다. 채널 설정에서 쇼핑몰을 연결해주세요.',
+        }
+      }
+
+      // 쇼핑몰에 subdomain이 설정되어 있는지 확인 (주문 링크 생성에 필요)
+      if (!channel.shop.subdomain) {
+        if (onStageProgress) {
+          await onStageProgress({
+            productId,
+            productName: `상품 ${productId}`,
+            stage: 'failed',
+            stageLabel: '실패',
+            error: '쇼핑몰에 도메인이 설정되어 있지 않습니다.',
+          })
+        }
+        return {
+          success: false,
+          productId,
+          channelId,
+          error: '쇼핑몰에 도메인이 설정되어 있지 않습니다. 쇼핑몰 설정에서 도메인을 설정해주세요.',
+        }
+      }
+
       const apiConfig = await prisma.sourcingApiConfig.findFirst({
         where: {
           userId,
@@ -771,41 +840,78 @@ export class PublishService {
         new Date(channelSession.sessionExpiresAt) > new Date()
 
       // Playwright 발행 시도 (세션 유효하고 이미지 있을 때)
+      // 소매밴드 발행은 Playwright로만 진행 - 실패 시 API 폴백 없이 즉시 실패 처리
       if (hasValidSession && imageUrls.length > 0) {
-        try {
-          console.log(`[PublishService] Playwright 발행 시도 (${imageUrls.length}개 이미지) - 진행률 추적`)
+        console.log(`[PublishService] Playwright 발행 시도 (${imageUrls.length}개 이미지) - 진행률 추적`)
 
-          const playwrightResult = await bandPlaywrightService.publishWithImages({
-            channelId,
-            bandKey: channel.channelKey,
-            bandName: channel.name,
-            content: postContent,
-            imageUrls,
-            // 진행률 콜백 전달
-            onStageProgress: onStageProgress
-              ? (progress) => onStageProgress({
-                  productId,
-                  productName: product.name,
-                  ...progress,
-                })
-              : undefined,
-          })
+        const playwrightResult = await bandPlaywrightService.publishWithImages({
+          channelId,
+          bandKey: channel.channelKey,
+          bandName: channel.name,
+          content: postContent,
+          imageUrls,
+          // 진행률 콜백 전달
+          onStageProgress: onStageProgress
+            ? (progress) => onStageProgress({
+                productId,
+                productName: product.name,
+                ...progress,
+              })
+            : undefined,
+        })
 
-          if (playwrightResult.success && playwrightResult.postKey) {
-            postKey = playwrightResult.postKey
-            publishMethod = 'playwright'
-            imageCount = imageUrls.length
-            console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
-          } else {
-            console.log(`[PublishService] Playwright 발행 실패: ${playwrightResult.error}, Band API로 폴백`)
+        if (playwrightResult.success && playwrightResult.postKey) {
+          postKey = playwrightResult.postKey
+          publishMethod = 'playwright'
+          imageCount = imageUrls.length
+          console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
+        } else {
+          // Playwright 발행 실패 시 즉시 실패 반환 (API 폴백 없음)
+          const errorMessage = playwrightResult.error || '소매밴드 발행에 실패했습니다. (이미지 업로드 또는 게시글 등록 실패)'
+          console.error(`[PublishService] Playwright 발행 실패: ${errorMessage}`)
+
+          // 실패 상태 콜백 호출
+          if (onStageProgress) {
+            await onStageProgress({
+              productId,
+              productName: product.name,
+              stage: 'failed',
+              stageLabel: '실패',
+              error: errorMessage,
+              publishMethod: 'playwright',
+            })
           }
-        } catch (error: any) {
-          console.log(`[PublishService] Playwright 발행 오류, Band API로 폴백:`, error.message)
-        }
-      }
 
-      // Band API 폴백
-      if (!postKey) {
+          return {
+            success: false,
+            productId,
+            channelId,
+            error: errorMessage,
+          }
+        }
+      } else if (imageUrls.length > 0 && !hasValidSession) {
+        // 이미지가 있지만 세션이 없는 경우 - 발행 불가
+        const errorMessage = '밴드 세션이 없거나 만료되었습니다. 채널 설정에서 밴드 로그인을 해주세요.'
+        console.error(`[PublishService] 세션 없음 - 이미지 포함 발행 불가`)
+
+        if (onStageProgress) {
+          await onStageProgress({
+            productId,
+            productName: product.name,
+            stage: 'failed',
+            stageLabel: '실패',
+            error: errorMessage,
+          })
+        }
+
+        return {
+          success: false,
+          productId,
+          channelId,
+          error: errorMessage,
+        }
+      } else if (imageUrls.length === 0) {
+        // 이미지가 없는 경우 - Band API로 텍스트만 발행
         if (!apiConfig?.accessToken) {
           if (onStageProgress) {
             await onStageProgress({
@@ -841,7 +947,7 @@ export class PublishService {
         })
         postKey = result.postKey
         publishMethod = 'api'
-        console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만)`)
+        console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
       }
 
       // 7. PublishedProduct 레코드 생성

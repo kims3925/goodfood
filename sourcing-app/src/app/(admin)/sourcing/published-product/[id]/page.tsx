@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Store, Trash2, ImageIcon, Package, Calendar, Globe, History, DollarSign, Clock, AlertCircle, CheckCircle, Info, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Store, Trash2, ImageIcon, Package, Calendar, Globe, History, DollarSign, Clock, AlertCircle, CheckCircle, Info, ExternalLink, ToggleLeft, ToggleRight, Power } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -16,6 +16,7 @@ interface PublishedProductDetail {
   productId: number
   channelId: number | null
   shopId: number | null
+  isActive: boolean
   publishedAt: string | null
   createdAt: string
   updatedAt: string
@@ -58,6 +59,7 @@ interface PublishedProductDetail {
       id: number
       channelId: number | null
       shopId: number | null
+      isActive: boolean
       publishedAt: string | null
       createdAt: string
       channel: {
@@ -156,6 +158,29 @@ export default function PublishedProductDetailPage({
     } finally {
       setIsDeleting(false)
       setShowDeleteConfirm(false)
+    }
+  }
+
+  // 발행상품 활성화/비활성화 토글
+  const handleToggleActive = async (publishId: number, currentIsActive: boolean) => {
+    try {
+      const response = await fetch(`/api/published-product/${publishId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !currentIsActive }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success(currentIsActive ? '발행상품이 비활성화되었습니다.' : '발행상품이 활성화되었습니다.')
+        loadProduct()
+      } else {
+        toast.error('상태 변경에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('상태 변경 실패:', error)
+      toast.error('상태 변경에 실패했습니다.')
     }
   }
 
@@ -365,17 +390,36 @@ export default function PublishedProductDetailPage({
                             </p>
                           </div>
                         </div>
-                        {/* 발행 유형 뱃지 */}
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          isShopPublish
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-purple-100 text-purple-700'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            isShopPublish ? 'bg-blue-500' : 'bg-purple-500'
-                          }`}></span>
-                          {typeLabel}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {/* 활성화 토글 */}
+                          <button
+                            onClick={() => handleToggleActive(pub.id, pub.isActive)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
+                              pub.isActive
+                                ? 'text-green-700 bg-green-50 hover:bg-green-100'
+                                : 'text-gray-500 bg-gray-100 hover:bg-gray-200'
+                            }`}
+                            title={pub.isActive ? '활성화됨 (클릭하여 비활성화)' : '비활성화됨 (클릭하여 활성화)'}
+                          >
+                            {pub.isActive ? (
+                              <ToggleRight size={14} />
+                            ) : (
+                              <ToggleLeft size={14} />
+                            )}
+                            {pub.isActive ? '활성' : '비활성'}
+                          </button>
+                          {/* 발행 유형 뱃지 */}
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                            isShopPublish
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-purple-100 text-purple-700'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              isShopPublish ? 'bg-blue-500' : 'bg-purple-500'
+                            }`}></span>
+                            {typeLabel}
+                          </span>
+                        </div>
                       </div>
                     )
                   })}

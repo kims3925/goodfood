@@ -256,76 +256,6 @@ export default function ProductsPage() {
     setSelectAll(newSelectedCount === paginatedProducts.length)
   }
 
-  // 스룩페이 등록 함수 (선택된 상품)
-  const handleStrokePayRegistration = async () => {
-    if (selectedProducts.length === 0) {
-      return
-    }
-
-    await processStrokePayRegistration(selectedProducts, `선택된 ${selectedProducts.length}개`)
-  }
-
-  // 전체 상품 스룩페이 등록 함수
-  const handleAllProductsRegistration = async () => {
-    if (products.length === 0) {
-      return
-    }
-
-    const allProductIds = products.map(p => p.id)
-    await processStrokePayRegistration(allProductIds, `전체 ${products.length}개`)
-  }
-
-  // 공통 스룩페이 등록 처리 함수
-  const processStrokePayRegistration = async (productIds: number[], description: string) => {
-    try {
-      // 1. 엑셀 파일 생성
-      const response = await fetch('/api/products/generate-excel', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          productIds: productIds
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('엑셀 파일 생성에 실패했습니다.')
-      }
-
-      // 2. 엑셀 파일 다운로드
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      const filename = `strokepay_products_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-
-      // 3. 자동화 업로드 시작
-      const automationResponse = await fetch('/api/strokepay/automation/upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          excelFilePath: filename,
-          productIds: productIds
-        })
-      })
-
-      if (automationResponse.ok) {
-      } else {
-      }
-      
-    } catch (error) {
-      console.error('스룩페이 등록 오류:', error)
-    }
-  }
-
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const matchesSearch = product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -562,50 +492,6 @@ export default function ProductsPage() {
     }
   }
 
-  // 스룩페이 엑셀 다운로드 핸들러
-  const handleStrokePayExport = async () => {
-    try {
-      const response = await fetch('/api/products/generate-excel', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (response.ok) {
-        // 파일 다운로드 처리
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        
-        // 파일명 추출 (Content-Disposition 헤더에서)
-        const contentDisposition = response.headers.get('Content-Disposition')
-        let fileName = `strokepay_products_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`
-        
-        if (contentDisposition) {
-          const fileNameMatch = contentDisposition.match(/filename="(.+)"/)
-          if (fileNameMatch) {
-            fileName = fileNameMatch[1]
-          }
-        }
-        
-        a.download = fileName
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        window.URL.revokeObjectURL(url)
-        
-        console.log('스룩페이 엑셀 파일 다운로드 완료')
-      } else {
-        const errorData = await response.json()
-        console.error('엑셀 생성 실패:', errorData.error)
-      }
-    } catch (error) {
-      console.error('엑셀 다운로드 오류:', error)
-    }
-  }
-
   // 선택된 상품 일괄 삭제
   const handleSelectedDelete = () => {
     if (selectedProducts.length === 0) {
@@ -776,13 +662,6 @@ export default function ProductsPage() {
                 <Plus className="h-4 w-4" />
                 상품 등록
               </button>
-              <button
-                onClick={handleStrokePayExport}
-                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                스룩페이 등록
-              </button>
             </div>
           </div>
         </div>
@@ -855,22 +734,6 @@ export default function ProductsPage() {
                 >
                   <Trash2 className="h-4 w-4" />
                   선택삭제 ({selectedProducts.length})
-                </button>
-                <button
-                  onClick={handleStrokePayRegistration}
-                  disabled={selectedProducts.length === 0}
-                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Download className="h-4 w-4" />
-                  스룩페이 등록 ({selectedProducts.length})
-                </button>
-                <button
-                  onClick={handleAllProductsRegistration}
-                  disabled={products.length === 0}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Package className="h-4 w-4" />
-                  전체 등록 ({products.length})
                 </button>
               </div>
             </div>
@@ -1363,119 +1226,6 @@ export default function ProductsPage() {
                           )}
                         </div>
                       )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 스룩페이/소매밴드 최종 게시 내용 */}
-                <div className="mt-8">
-                  <div className="border-t-2 border-green-300 pt-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <span className="w-3 h-3 bg-green-500 rounded-full"></span>
-                      📱 스룩페이/소매밴드 최종 게시 내용
-                      <span className="text-xs bg-green-200 text-green-700 px-2 py-1 rounded-full">
-                        실제 업로드 내용
-                      </span>
-                      {selectedProduct.wholesaleBandName && (
-                        <span className="text-xs text-gray-600">
-                          ({selectedProduct.wholesaleBandName})
-                        </span>
-                      )}
-                    </h3>
-
-                    <div className="bg-white border-2 border-green-300 rounded-lg p-6 space-y-6">
-                      {/* 최종 제목 */}
-                      <div>
-                        <div className="text-sm font-medium text-green-600 mb-2">📌 게시 제목</div>
-                        <div className="text-xl font-bold text-gray-900 bg-gray-50 p-4 rounded border flex items-center gap-2">
-                          <span className={`w-4 h-4 ${getWholesaleBandColor(selectedProduct.wholesaleBandName)} rounded-sm flex-shrink-0`}></span>
-                          {selectedProduct.hookingTitle || selectedProduct.title}
-                        </div>
-                      </div>
-
-                      {/* 최종 내용 */}
-                      <div>
-                        <div className="text-sm font-medium text-green-600 mb-2">📝 게시 내용</div>
-                        <div className="bg-gray-50 p-4 rounded border">
-                          <div className="whitespace-pre-wrap text-gray-900 text-base leading-relaxed">
-                            {(() => {
-                              // 최종 게시 내용 조합
-                              const finalContent = []
-
-                              // 후킹 내용이 있으면 사용, 없으면 상세 내용 사용
-                              const mainContent = selectedProduct.hookingContent || selectedProduct.detailedContent || selectedProduct.description
-                              if (mainContent) {
-                                finalContent.push(mainContent)
-                              }
-
-                              // 가격 정보 표시 (고객용 최종 게시 내용 - 공급가격 제외)
-                              let priceAdded = false
-
-                              // 판매가만 표시 (고객이 실제 구매할 가격)
-                              const sellingPrice = getSellingPrice(selectedProduct)
-                              if (sellingPrice) {
-                                finalContent.push('')
-                                finalContent.push('💰 판매가격:')
-                                finalContent.push(`${sellingPrice.toLocaleString()}원`)
-                                priceAdded = true
-                              }
-
-                              // 가격 옵션 표시 (고객용 - 판매가격으로)
-                              if (selectedProduct.priceInfo) {
-                                try {
-                                  const priceData = JSON.parse(selectedProduct.priceInfo)
-                                  if (priceData.priceOptions && priceData.priceOptions.length > 0) {
-                                    finalContent.push('')
-                                    finalContent.push('📋 가격 옵션:')
-                                    priceData.priceOptions.forEach((option: any, index: number) => {
-                                      const optionName = option.option || `옵션${index + 1}`
-                                      const price = option.price || 0
-                                      finalContent.push(`${index + 1}. ${optionName}: ${price.toLocaleString()}원`)
-                                    })
-                                    priceAdded = true
-                                  }
-                                } catch (e) {
-                                  // JSON 파싱 실패시 무시
-                                }
-                              }
-
-                              // 판매가가 없으면 기본 가격 표시
-                              if (!priceAdded) {
-                                const basePrice = selectedProduct.salePrice
-                                if (basePrice) {
-                                  finalContent.push('')
-                                  finalContent.push('💰 판매가격:')
-                                  finalContent.push(`${basePrice.toLocaleString()}원`)
-                                }
-                              }
-
-                              // 배송 정보 추가
-                              if (selectedProduct.shippingFee !== null && selectedProduct.shippingFee !== undefined) {
-                                finalContent.push('')
-                                if (selectedProduct.shippingFee === 0) {
-                                  finalContent.push('🚚 배송비: 무료배송')
-                                } else {
-                                  finalContent.push(`🚚 배송비: ${selectedProduct.shippingFee.toLocaleString()}원`)
-                                }
-                              }
-
-                              // 마감 정보 추가
-                              if (selectedProduct.hasDeadline && selectedProduct.deadlineInfo) {
-                                finalContent.push('')
-                                finalContent.push('⏰ 주문 마감:')
-                                finalContent.push(selectedProduct.deadlineInfo)
-                              }
-
-                              return finalContent.join('\n')
-                            })()}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 미리보기 정보 */}
-                      <div className="text-sm text-green-600 bg-green-50 p-3 rounded">
-                        💡 이 내용이 스룩페이와 소매밴드에 실제로 게시됩니다.
-                      </div>
                     </div>
                   </div>
                 </div>

@@ -1,9 +1,42 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check } from 'lucide-react'
+import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check, AlertCircle, Info } from 'lucide-react'
 import { AppSection, getDefaultPathBySection } from '@/config/navigation'
+
+// 상대 시간 표시 컴포넌트 (독립적으로 업데이트되어 반짝임 방지)
+const RelativeTime = memo(function RelativeTime({ dateString }: { dateString: string }) {
+  const [timeText, setTimeText] = useState('')
+
+  useEffect(() => {
+    const formatTime = () => {
+      const date = new Date(dateString)
+      const now = new Date()
+      const diffMs = now.getTime() - date.getTime()
+      const diffMinutes = Math.floor(diffMs / (1000 * 60))
+      const diffHours = Math.floor(diffMinutes / 60)
+      const diffDays = Math.floor(diffHours / 24)
+
+      if (diffMinutes < 1) return '방금 전'
+      if (diffMinutes < 60) return `${diffMinutes}분 전`
+      if (diffHours < 24) return `${diffHours}시간 전`
+      if (diffDays < 7) return `${diffDays}일 전`
+      return `${date.getMonth() + 1}/${date.getDate()}`
+    }
+
+    setTimeText(formatTime())
+
+    // 1분마다 시간 텍스트만 업데이트 (API 호출 없이)
+    const interval = setInterval(() => {
+      setTimeText(formatTime())
+    }, 60000)
+
+    return () => clearInterval(interval)
+  }, [dateString])
+
+  return <span className="text-xs text-gray-400">{timeText}</span>
+})
 
 interface HeaderProps {
   onMenuClick?: () => void
@@ -11,10 +44,10 @@ interface HeaderProps {
   onSectionChange: (section: AppSection) => void
 }
 
-// 알림 타입
-type NotificationType = 'ORDER' | 'CANCEL' | 'REFUND' | 'INQUIRY' | 'SETTLEMENT'
+// 알림 타입 (Shop + Sourcing)
+type NotificationType = 'ORDER' | 'CANCEL' | 'REFUND' | 'INQUIRY' | 'SETTLEMENT' | 'COLLECT' | 'TRANSFORM' | 'PUBLISH' | 'ERROR' | 'INFO'
 
-interface ShopNotification {
+interface AppNotification {
   id: number
   type: NotificationType
   title: string
@@ -24,13 +57,20 @@ interface ShopNotification {
   createdAt: string
 }
 
-// 타입별 설정
+// 타입별 설정 (Shop + Sourcing)
 const notificationTypeConfig: Record<NotificationType, { icon: React.ReactNode; bg: string; text: string }> = {
+  // Shop 알림 타입
   ORDER: { icon: <ShoppingCart size={14} />, bg: 'bg-blue-100', text: 'text-blue-600' },
   CANCEL: { icon: <XCircle size={14} />, bg: 'bg-orange-100', text: 'text-orange-600' },
   REFUND: { icon: <RotateCcw size={14} />, bg: 'bg-red-100', text: 'text-red-600' },
   INQUIRY: { icon: <MessageSquare size={14} />, bg: 'bg-purple-100', text: 'text-purple-600' },
   SETTLEMENT: { icon: <Wallet size={14} />, bg: 'bg-green-100', text: 'text-green-600' },
+  // Sourcing 알림 타입
+  COLLECT: { icon: <Package size={14} />, bg: 'bg-green-100', text: 'text-green-600' },
+  TRANSFORM: { icon: <Zap size={14} />, bg: 'bg-yellow-100', text: 'text-yellow-600' },
+  PUBLISH: { icon: <Upload size={14} />, bg: 'bg-blue-100', text: 'text-blue-600' },
+  ERROR: { icon: <AlertCircle size={14} />, bg: 'bg-red-100', text: 'text-red-600' },
+  INFO: { icon: <Info size={14} />, bg: 'bg-gray-100', text: 'text-gray-600' },
 }
 
 export default function Header({ onMenuClick, currentSection, onSectionChange }: HeaderProps) {
@@ -41,8 +81,8 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
   const [showUserMenu, setShowUserMenu] = useState(false)
   const notificationRef = useRef<HTMLDivElement>(null)
 
-  // 쇼핑몰 알림
-  const [notifications, setNotifications] = useState<ShopNotification[]>([])
+  // 알림 (현재 섹션에 따라 shop 또는 sourcing)
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [notificationLoading, setNotificationLoading] = useState(false)
 
@@ -62,11 +102,11 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
     inquiries: 0,
   })
 
-  // 쇼핑몰 알림 데이터 로드
+  // 알림 데이터 로드 (현재 섹션에 따라)
   const loadNotifications = async () => {
     try {
       setNotificationLoading(true)
-      const response = await fetch('/api/admin/notifications?section=shop&limit=10')
+      const response = await fetch(`/api/admin/notifications?section=${currentSection}&limit=10`)
       const data = await response.json()
       if (data.success) {
         setNotifications(data.data.notifications || [])
@@ -94,7 +134,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
   }
 
   // 알림 클릭 시 이동
-  const handleNotificationClick = (notification: ShopNotification) => {
+  const handleNotificationClick = (notification: AppNotification) => {
     if (!notification.isRead) {
       handleMarkAsRead([notification.id])
     }
@@ -112,23 +152,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
     }
   }
 
-  // 상대 시간 포맷
-  const formatRelativeTime = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMinutes = Math.floor(diffMs / (1000 * 60))
-    const diffHours = Math.floor(diffMinutes / 60)
-    const diffDays = Math.floor(diffHours / 24)
-
-    if (diffMinutes < 1) return '방금 전'
-    if (diffMinutes < 60) return `${diffMinutes}분 전`
-    if (diffHours < 24) return `${diffHours}시간 전`
-    if (diffDays < 7) return `${diffDays}일 전`
-    return `${date.getMonth() + 1}/${date.getDate()}`
-  }
-
-  // 알림 로드 (로그인 시)
+  // 알림 로드 (로그인 시 및 섹션 변경 시)
   useEffect(() => {
     if (user) {
       loadNotifications()
@@ -136,7 +160,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
       const notificationInterval = setInterval(loadNotifications, 30000)
       return () => clearInterval(notificationInterval)
     }
-  }, [user])
+  }, [user, currentSection])
 
   // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
@@ -353,7 +377,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                  <span className="text-xs text-gray-400">{formatRelativeTime(notification.createdAt)}</span>
+                                  <RelativeTime dateString={notification.createdAt} />
                                   {!notification.isRead && (
                                     <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                                   )}
@@ -374,7 +398,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
                     <button
                       onClick={() => {
                         setShowNotifications(false)
-                        router.push('/shop/notification')
+                        router.push(`/${currentSection}/notification`)
                       }}
                       className="w-full py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     >

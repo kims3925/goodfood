@@ -43,7 +43,7 @@ enum WorkflowType {
   COLLECT
   TRANSFORM
   PUBLISH
-  FULL_PIPELINE1
+  FULL_PIPELINE
 }
 
 enum WorkflowStatus {
@@ -141,9 +141,16 @@ enum RefundMethod {
 }
 
 enum ShopNotificationType {
+  // Shop 알림 타입
   ORDER
   CANCEL
   REFUND
   INQUIRY
   SETTLEMENT
+  // Sourcing 알림 타입
+  COLLECT
+  TRANSFORM
+  PUBLISH
+  ERROR
+  INFO
 }

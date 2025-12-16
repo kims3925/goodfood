@@ -29,16 +29,6 @@ export default function AdminDashboard() {
     },
     {
       step: 3,
-      title: '쇼핑몰 업로드',
-      description: '쇼핑몰에 상품을 업로드하고 결제링크확보와 주문을 진행합니다',
-      icon: <Upload className="w-6 h-6" />,
-      status: 'ready',
-      count: 8,
-      href: '/strokepay/upload',
-      color: 'blue'
-    },
-    {
-      step: 4,
       title: '소매밴드 포스팅',
       description: '결제링크와 함께 소매밴드에 자동 발행합니다',
       icon: <Send className="w-6 h-6" />,
@@ -194,12 +184,6 @@ export default function AdminDashboard() {
             className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
           >
             AI 컨텐츠 생성
-          </button>
-          <button
-            onClick={() => router.push('/strokepay/upload')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            쇼핑몰 업로드
           </button>
           <button
             onClick={() => router.push('/retail/publish')}

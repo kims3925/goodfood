@@ -628,7 +628,7 @@ export default function AutomationDashboardPage() {
               runningWorkflow?.currentStage === 'collection' ||
               (runningWorkflow?.type === 'COLLECT' && !runningWorkflow?.currentStage)
             const isCollectCompleted =
-              runningWorkflow?.type === 'FULL_PIPELINE1' &&
+              runningWorkflow?.type === 'FULL_PIPELINE' &&
               runningWorkflow?.stageProgress?.collection?.completed
             return (
               <div className="flex-1">
@@ -696,7 +696,7 @@ export default function AutomationDashboardPage() {
               runningWorkflow?.currentStage === 'transform' ||
               (runningWorkflow?.type === 'TRANSFORM' && !runningWorkflow?.currentStage)
             const isTransformCompleted =
-              runningWorkflow?.type === 'FULL_PIPELINE1' &&
+              runningWorkflow?.type === 'FULL_PIPELINE' &&
               runningWorkflow?.stageProgress?.transform?.completed
             return (
               <div className="flex-1">
@@ -764,7 +764,7 @@ export default function AutomationDashboardPage() {
               runningWorkflow?.currentStage === 'productCreate' ||
               (runningWorkflow?.type === 'PRODUCT_CREATE' && !runningWorkflow?.currentStage)
             const isProductCreateCompleted =
-              runningWorkflow?.type === 'FULL_PIPELINE1' &&
+              runningWorkflow?.type === 'FULL_PIPELINE' &&
               runningWorkflow?.stageProgress?.productCreate?.completed
             return (
               <div className="flex-1">
@@ -836,7 +836,7 @@ export default function AutomationDashboardPage() {
               runningWorkflow?.currentStage === 'publish' ||
               (runningWorkflow?.type === 'PUBLISH' && !runningWorkflow?.currentStage)
             const isPublishCompleted =
-              runningWorkflow?.type === 'FULL_PIPELINE1' &&
+              runningWorkflow?.type === 'FULL_PIPELINE' &&
               runningWorkflow?.stageProgress?.publish?.completed
             const publishProgress = runningWorkflow?.stageProgress?.publish
             return (
@@ -1224,7 +1224,7 @@ export default function AutomationDashboardPage() {
           </div>
 
           {/* 단계별 진행 상태 (전체 파이프라인일 때만 표시) */}
-          {runningWorkflow.type === 'FULL_PIPELINE1' && (
+          {runningWorkflow.type === 'FULL_PIPELINE' && (
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-3">
                 {/* 1. 수집 */}

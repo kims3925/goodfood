@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, Save, RotateCcw, FileText, Info } from 'lucide-react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { Settings, Save, RotateCcw, FileText, Info, Sparkles, DollarSign } from 'lucide-react'
+import PolicyManager from '@/components/settings/PolicyManager'
 
 // 기본 프롬프트 템플릿 (product.transformer.ts와 동기화)
 const DEFAULT_PROMPT = `당신은 한국 도매 쇼핑몰 상품 정보 추출 전문가입니다.
@@ -298,8 +300,30 @@ interface PromptSettings {
   } | null
 }
 
-export default function PromptSettingsPage() {
+type TabType = 'prompt' | 'policy'
+
+export default function AISettingsPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const tabParam = searchParams.get('tab')
+  const [activeTab, setActiveTab] = useState<TabType>(tabParam === 'policy' ? 'policy' : 'prompt')
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT)
+
+  // URL 파라미터 변경 시 탭 동기화
+  useEffect(() => {
+    if (tabParam === 'policy') {
+      setActiveTab('policy')
+    } else {
+      setActiveTab('prompt')
+    }
+  }, [tabParam])
+
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab)
+    // URL 업데이트 (히스토리에 추가하지 않음)
+    const url = tab === 'policy' ? '/sourcing/settings/prompt?tab=policy' : '/sourcing/settings/prompt'
+    router.replace(url)
+  }
   const [name, setName] = useState('상품 변환 프롬프트')
   const [description, setDescription] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -401,6 +425,11 @@ export default function PromptSettingsPage() {
     }
   }
 
+  const handlePolicyToast = (type: 'success' | 'error', message: string) => {
+    setSaveMessage({ type, text: message })
+    setTimeout(() => setSaveMessage(null), 3000)
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -415,129 +444,163 @@ export default function PromptSettingsPage() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <FileText className="h-8 w-8 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">프롬프트 설정</h1>
+            <Sparkles className="h-8 w-8 text-blue-600" />
+            <h1 className="text-3xl font-bold text-gray-900">AI 변환 설정</h1>
           </div>
-          <p className="text-gray-600">AI가 게시물을 상품으로 변환할 때 사용하는 프롬프트를 설정합니다.</p>
+          <p className="text-gray-600">AI가 게시물을 상품으로 변환할 때 사용하는 프롬프트와 가격 정책을 관리합니다.</p>
         </div>
 
-        {/* Info Banner */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-blue-600 mt-0.5" />
-            <div className="text-sm text-blue-800">
-              <p className="font-medium mb-1">변수 사용법</p>
-              <ul className="list-disc list-inside space-y-1 text-blue-700">
-                <li><code className="bg-blue-100 px-1 rounded">{'{title}'}</code> - 게시물 제목</li>
-                <li><code className="bg-blue-100 px-1 rounded">{'{content}'}</code> - 게시물 내용</li>
-                <li><code className="bg-blue-100 px-1 rounded">{'{policySection}'}</code> - 가격 정책 섹션 (선택적)</li>
-                <li><code className="bg-blue-100 px-1 rounded">{'{pricingRule}'}</code> - 가격 추출 규칙</li>
-              </ul>
-            </div>
+        {/* Tabs */}
+        <div className="bg-white rounded-t-lg border border-b-0 border-gray-200">
+          <div className="flex">
+            <button
+              onClick={() => handleTabChange('prompt')}
+              className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'prompt'
+                  ? 'border-blue-500 text-blue-600 bg-blue-50/50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FileText size={18} />
+              프롬프트
+            </button>
+            <button
+              onClick={() => handleTabChange('policy')}
+              className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'policy'
+                  ? 'border-blue-500 text-blue-600 bg-blue-50/50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <DollarSign size={18} />
+              가격 정책
+            </button>
           </div>
         </div>
 
-        {/* Settings Form */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="p-6 space-y-6">
-            {/* Status Badge */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">현재 상태:</span>
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                hasCustomPrompt
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {hasCustomPrompt ? '커스텀 프롬프트 사용 중' : '기본 프롬프트 사용 중'}
-              </span>
+        {/* Tab Content */}
+        <div className="bg-white rounded-b-lg shadow-sm border border-gray-200">
+          {/* Save Message (공통) */}
+          {saveMessage && (
+            <div className={`mx-6 mt-6 p-4 rounded-md ${
+              saveMessage.type === 'success'
+                ? 'bg-green-50 border border-green-200 text-green-800'
+                : 'bg-red-50 border border-red-200 text-red-800'
+            }`}>
+              {saveMessage.text}
             </div>
+          )}
 
-            {/* Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                프롬프트 이름
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="프롬프트 이름을 입력하세요"
-              />
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                설명 (선택)
-              </label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="이 프롬프트에 대한 간단한 설명"
-              />
-            </div>
-
-            {/* Prompt Content */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                프롬프트 내용
-              </label>
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                rows={30}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-                placeholder="AI에게 전달할 프롬프트를 입력하세요"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                총 {prompt.length.toLocaleString()}자
-              </p>
-            </div>
-
-            {/* Save Message */}
-            {saveMessage && (
-              <div className={`p-4 rounded-md ${
-                saveMessage.type === 'success'
-                  ? 'bg-green-50 border border-green-200 text-green-800'
-                  : 'bg-red-50 border border-red-200 text-red-800'
-              }`}>
-                {saveMessage.text}
+          {activeTab === 'prompt' ? (
+            <div className="p-6 space-y-6">
+              {/* Info Banner */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">변수 사용법</p>
+                    <ul className="list-disc list-inside space-y-1 text-blue-700">
+                      <li><code className="bg-blue-100 px-1 rounded">{'{title}'}</code> - 게시물 제목</li>
+                      <li><code className="bg-blue-100 px-1 rounded">{'{content}'}</code> - 게시물 내용</li>
+                      <li><code className="bg-blue-100 px-1 rounded">{'{policySection}'}</code> - 가격 정책 섹션 (선택적)</li>
+                      <li><code className="bg-blue-100 px-1 rounded">{'{pricingRule}'}</code> - 가격 추출 규칙</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
-            )}
 
-            {/* Action Buttons */}
-            <div className="flex justify-between items-center border-t pt-6">
-              <button
-                onClick={resetToDefault}
-                disabled={!hasCustomPrompt}
-                className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <RotateCcw className="h-4 w-4" />
-                기본값으로 복구
-              </button>
+              {/* Status Badge */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">현재 상태:</span>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  hasCustomPrompt
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {hasCustomPrompt ? '커스텀 프롬프트 사용 중' : '기본 프롬프트 사용 중'}
+                </span>
+              </div>
 
-              <button
-                onClick={saveSettings}
-                disabled={isSaving || !prompt.trim()}
-                className="flex items-center gap-2 px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isSaving ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    저장 중...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4" />
-                    저장
-                  </>
-                )}
-              </button>
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  프롬프트 이름
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="프롬프트 이름을 입력하세요"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  설명 (선택)
+                </label>
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="이 프롬프트에 대한 간단한 설명"
+                />
+              </div>
+
+              {/* Prompt Content */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  프롬프트 내용
+                </label>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  rows={30}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                  placeholder="AI에게 전달할 프롬프트를 입력하세요"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  총 {prompt.length.toLocaleString()}자
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-between items-center border-t pt-6">
+                <button
+                  onClick={resetToDefault}
+                  disabled={!hasCustomPrompt}
+                  className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  기본값으로 복구
+                </button>
+
+                <button
+                  onClick={saveSettings}
+                  disabled={isSaving || !prompt.trim()}
+                  className="flex items-center gap-2 px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      저장 중...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      저장
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-6">
+              <PolicyManager onToast={handlePolicyToast} />
+            </div>
+          )}
         </div>
       </div>
     </div>
