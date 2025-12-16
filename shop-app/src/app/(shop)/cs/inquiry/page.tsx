@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { ChevronLeft, Send, MessageSquare, Clock, CheckCircle } from 'lucide-react'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import { useShop } from '@/contexts/ShopContext'
 
 interface Reply {
   id: number
@@ -37,6 +38,8 @@ const inquiryTypes = [
 export default function InquiryPage() {
   const { data: session, status } = useSession()
   const { getPath, getApiPath } = useShopUrl()
+  const { shop } = useShop()
+  const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
   const [activeTab, setActiveTab] = useState<'write' | 'list'>('write')
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -122,7 +125,7 @@ export default function InquiryPage() {
   if (status === 'loading') {
     return (
       <div className="kurly-container py-8 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF6B6B]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: primaryColor }}></div>
       </div>
     )
   }
@@ -143,9 +146,10 @@ export default function InquiryPage() {
           onClick={() => setActiveTab('write')}
           className={`flex-1 py-3 text-center font-medium transition-colors ${
             activeTab === 'write'
-              ? 'text-[#FF6B6B] border-b-2 border-[#FF6B6B]'
+              ? 'border-b-2'
               : 'text-gray-500 hover:text-gray-700'
           }`}
+          style={activeTab === 'write' ? { color: primaryColor, borderColor: primaryColor } : {}}
         >
           문의하기
         </button>
@@ -153,9 +157,10 @@ export default function InquiryPage() {
           onClick={() => setActiveTab('list')}
           className={`flex-1 py-3 text-center font-medium transition-colors ${
             activeTab === 'list'
-              ? 'text-[#FF6B6B] border-b-2 border-[#FF6B6B]'
+              ? 'border-b-2'
               : 'text-gray-500 hover:text-gray-700'
           }`}
+          style={activeTab === 'list' ? { color: primaryColor, borderColor: primaryColor } : {}}
         >
           내 문의내역
         </button>
@@ -180,7 +185,8 @@ export default function InquiryPage() {
             <select
               value={formData.inquiryType}
               onChange={(e) => setFormData({ ...formData, inquiryType: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#FF6B6B]"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1"
+              style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
             >
               {inquiryTypes.map((type) => (
                 <option key={type.value} value={type.value}>
@@ -199,7 +205,8 @@ export default function InquiryPage() {
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               placeholder="문의 제목을 입력해 주세요"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#FF6B6B]"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1"
+              style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
               maxLength={200}
             />
           </div>
@@ -213,14 +220,16 @@ export default function InquiryPage() {
               onChange={(e) => setFormData({ ...formData, content: e.target.value })}
               placeholder="문의 내용을 상세히 입력해 주세요"
               rows={8}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#FF6B6B] resize-none"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 resize-none"
+              style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
             />
           </div>
 
           <button
             type="submit"
             disabled={!session || isSubmitting}
-            className="w-full py-4 bg-[#FF6B6B] text-white font-medium rounded-lg hover:bg-[#FF5252] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-4 text-white font-medium rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:opacity-90"
+            style={{ backgroundColor: primaryColor }}
           >
             <Send className="w-5 h-5" />
             {isSubmitting ? '등록 중...' : '문의 등록'}
@@ -236,14 +245,15 @@ export default function InquiryPage() {
               <p className="text-gray-500 mb-4">로그인 후 문의내역을 확인할 수 있습니다</p>
               <Link
                 href={getPath('/auth/login')}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-[#FF6B6B] text-white font-medium rounded-lg hover:bg-[#FF5252] transition-colors"
+                className="inline-flex items-center gap-2 px-6 py-3 text-white font-medium rounded-lg hover:opacity-90 transition-colors"
+                style={{ backgroundColor: primaryColor }}
               >
                 로그인하기
               </Link>
             </div>
           ) : isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF6B6B]"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: primaryColor }}></div>
             </div>
           ) : inquiries.length === 0 ? (
             <div className="text-center py-12">
@@ -263,7 +273,10 @@ export default function InquiryPage() {
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium text-[#FF6B6B] bg-[#FFF5F5] px-2 py-1 rounded">
+                        <span
+                          className="text-xs font-medium px-2 py-1 rounded"
+                          style={{ color: primaryColor, backgroundColor: `${primaryColor}15` }}
+                        >
                           {getTypeLabel(inquiry.inquiryType)}
                         </span>
                         <span

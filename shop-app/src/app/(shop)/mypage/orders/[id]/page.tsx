@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import { useShop } from '@/contexts/ShopContext'
 
 // 취소 사유 목록
 const CANCEL_REASONS = [
@@ -150,6 +151,8 @@ export default function OrderDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { getPath, getApiPath } = useShopUrl()
+  const { shop } = useShop()
+  const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -313,7 +316,7 @@ export default function OrderDetailPage() {
     return (
       <div className="kurly-container py-12">
         <div className="text-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B6B] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: primaryColor }}></div>
           <p className="mt-4 text-gray-600">주문 정보를 불러오는 중...</p>
         </div>
       </div>
@@ -328,7 +331,8 @@ export default function OrderDetailPage() {
           <p className="text-gray-600 mb-4">{error || '주문을 찾을 수 없습니다'}</p>
           <Link
             href={getPath('/mypage/orders')}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252]"
+            className="inline-flex items-center gap-2 px-6 py-3 text-white rounded-md hover:opacity-90"
+            style={{ backgroundColor: primaryColor }}
           >
             <ArrowLeft className="w-4 h-4" />
             주문 목록으로
@@ -424,7 +428,7 @@ export default function OrderDetailPage() {
               </div>
               <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
                 <span className="text-gray-500 text-sm">입금 금액</span>
-                <span className="text-xl font-bold text-[#FF6B6B]">{formatPrice(order.totalAmount)}</span>
+                <span className="text-xl font-bold" style={{ color: primaryColor }}>{formatPrice(order.totalAmount)}</span>
               </div>
             </div>
           </div>
@@ -459,16 +463,17 @@ export default function OrderDetailPage() {
       {!isCancelled && (
         <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
           <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <Truck className="w-5 h-5 text-[#FF6B6B]" />
+            <Truck className="w-5 h-5" style={{ color: primaryColor }} />
             배송 현황
           </h2>
           <div className="relative">
             {/* Progress Line */}
             <div className="absolute top-6 left-6 right-6 h-0.5 bg-gray-200">
               <div
-                className="absolute top-0 left-0 h-full bg-[#FF6B6B] transition-all"
+                className="absolute top-0 left-0 h-full transition-all"
                 style={{
-                  width: `${(deliverySteps.filter(s => s.completed).length - 1) / (deliverySteps.length - 1) * 100}%`
+                  width: `${(deliverySteps.filter(s => s.completed).length - 1) / (deliverySteps.length - 1) * 100}%`,
+                  backgroundColor: primaryColor
                 }}
               ></div>
             </div>
@@ -479,9 +484,10 @@ export default function OrderDetailPage() {
                   <div
                     className={`w-12 h-12 rounded-full flex items-center justify-center z-10 ${
                       step.completed
-                        ? 'bg-[#FF6B6B] text-white'
+                        ? 'text-white'
                         : 'bg-gray-200 text-gray-400'
                     }`}
+                    style={step.completed ? { backgroundColor: primaryColor } : {}}
                   >
                     {step.completed ? (
                       <CheckCircle className="w-6 h-6" />
@@ -513,7 +519,7 @@ export default function OrderDetailPage() {
           {/* 주문 상품 목록 */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Package className="w-5 h-5 text-[#FF6B6B]" />
+              <Package className="w-5 h-5" style={{ color: primaryColor }} />
               주문 상품 ({order.items.length}개)
             </h2>
             <div className="space-y-4">
@@ -559,7 +565,7 @@ export default function OrderDetailPage() {
           {order.shippingAddress && (
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-[#FF6B6B]" />
+                <MapPin className="w-5 h-5" style={{ color: primaryColor }} />
                 배송지 정보
               </h2>
               <div className="space-y-3 text-sm">
@@ -606,7 +612,7 @@ export default function OrderDetailPage() {
           {/* 결제 금액 */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[#FF6B6B]" />
+              <FileText className="w-5 h-5" style={{ color: primaryColor }} />
               결제 금액
             </h2>
             <div className="space-y-3 text-sm">
@@ -628,7 +634,7 @@ export default function OrderDetailPage() {
               )}
               <div className="pt-3 border-t border-gray-200 flex justify-between">
                 <span className="font-bold text-gray-900">총 결제금액</span>
-                <span className="text-xl font-bold text-[#FF6B6B]">{formatPrice(order.totalAmount)}</span>
+                <span className="text-xl font-bold" style={{ color: primaryColor }}>{formatPrice(order.totalAmount)}</span>
               </div>
             </div>
           </div>
@@ -637,7 +643,7 @@ export default function OrderDetailPage() {
           {order.payment && (
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-[#FF6B6B]" />
+                <CreditCard className="w-5 h-5" style={{ color: primaryColor }} />
                 결제 정보
               </h2>
               <div className="space-y-3 text-sm">
@@ -698,7 +704,7 @@ export default function OrderDetailPage() {
           {/* 주문자 정보 */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <User className="w-5 h-5 text-[#FF6B6B]" />
+              <User className="w-5 h-5" style={{ color: primaryColor }} />
               주문자 정보
             </h2>
             <div className="space-y-3 text-sm">
@@ -726,7 +732,8 @@ export default function OrderDetailPage() {
             {order.hasWritableReview && (
               <Link
                 href={getPath('/mypage/reviews')}
-                className="block w-full px-4 py-3 bg-[#FF6B6B] text-white text-center rounded-lg font-medium hover:bg-[#FF5252] transition-colors"
+                className="block w-full px-4 py-3 text-white text-center rounded-lg font-medium hover:opacity-90 transition-colors"
+                style={{ backgroundColor: primaryColor }}
               >
                 후기 작성하기
               </Link>
@@ -783,7 +790,7 @@ export default function OrderDetailPage() {
                 <select
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">취소 사유를 선택해주세요</option>
                   {CANCEL_REASONS.map((reason) => (
@@ -804,7 +811,7 @@ export default function OrderDetailPage() {
                     onChange={(e) => setCustomReason(e.target.value)}
                     placeholder="취소 사유를 입력해주세요"
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent resize-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
                   />
                 </div>
               )}

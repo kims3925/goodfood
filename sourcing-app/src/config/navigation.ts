@@ -20,11 +20,15 @@ import {
   Ticket,
   Star,
   Bell,
+  Shield,
+  ScrollText,
+  Lock,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
 // 타입 정의
 export type AppSection = 'sourcing' | 'shop'
+export type UserRole = 'USER' | 'MANAGER' | 'ADMIN'
 
 export interface MenuItem {
   label: string
@@ -32,6 +36,7 @@ export interface MenuItem {
   icon: LucideIcon
   children?: MenuItem[]
   badge?: string
+  adminOnly?: boolean
 }
 
 // 소싱 탭 메뉴
@@ -73,6 +78,15 @@ export const sourcingMenuItems: MenuItem[] = [
       { label: '프롬프트 / 가격 정책', href: '/sourcing/settings/prompt', icon: FileText },
     ],
   },
+  {
+    label: '정책 관리',
+    icon: Shield,
+    adminOnly: true,
+    children: [
+      { label: '이용약관', href: '/shop/policy/terms', icon: ScrollText, adminOnly: true },
+      { label: '개인정보처리방침', href: '/shop/policy/privacy', icon: Lock, adminOnly: true },
+    ],
+  },
 ]
 
 // 쇼핑몰 탭 메뉴
@@ -101,6 +115,15 @@ export const shopMenuItems: MenuItem[] = [
   { label: '쿠폰', href: '/shop/coupon/list', icon: Ticket },
   { label: '알림 관리', href: '/shop/notification', icon: Bell },
   { label: '사용자 관리', href: '/shop/user/list', icon: Users },
+  {
+    label: '정책 관리',
+    icon: Shield,
+    adminOnly: true,
+    children: [
+      { label: '이용약관', href: '/shop/policy/terms', icon: ScrollText, adminOnly: true },
+      { label: '개인정보처리방침', href: '/shop/policy/privacy', icon: Lock, adminOnly: true },
+    ],
+  },
 ]
 
 // 헬퍼 함수들
@@ -133,8 +156,8 @@ export const sourcingPathToMenuMap: Record<string, string> = {
   '/sourcing/publish': '발행',
   '/sourcing/automation': '자동화',
   '/sourcing/notification': '알림 관리',
-  '/sourcing/policy': '설정',
   '/sourcing/settings': '설정',
+  '/shop/policy': '정책 관리',
 }
 
 export const shopPathToMenuMap: Record<string, string> = {
@@ -148,8 +171,24 @@ export const shopPathToMenuMap: Record<string, string> = {
   '/shop/reviews': '리뷰 관리',
   '/shop/coupon': '쿠폰',
   '/shop/notification': '알림 관리',
+  '/shop/policy': '정책 관리',
 }
 
 export function getPathToMenuMap(section: AppSection): Record<string, string> {
   return section === 'sourcing' ? sourcingPathToMenuMap : shopPathToMenuMap
+}
+
+// 사용자 역할에 따라 메뉴 필터링
+export function filterMenuByRole(items: MenuItem[], userRole: UserRole): MenuItem[] {
+  return items
+    .filter(item => !item.adminOnly || userRole === 'ADMIN')
+    .map(item => ({
+      ...item,
+      children: item.children ? filterMenuByRole(item.children, userRole) : undefined
+    }))
+}
+
+export function getMenuBySectionAndRole(section: AppSection, userRole: UserRole): MenuItem[] {
+  const items = section === 'sourcing' ? sourcingMenuItems : shopMenuItems
+  return filterMenuByRole(items, userRole)
 }

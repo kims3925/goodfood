@@ -11,14 +11,16 @@ import {
   Star,
   MessageSquare,
   MapPin,
-  FileText,
   ChevronRight
 } from 'lucide-react'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import { useShop } from '@/contexts/ShopContext'
 
 export default function MyPage() {
   const { data: session } = useSession()
   const { getPath } = useShopUrl()
+  const { shop } = useShop()
+  const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
 
   const menuItems = [
     {
@@ -42,18 +44,17 @@ export default function MyPage() {
       items: [
         { icon: User, label: '회원 정보 관리', href: getPath('/mypage/profile'), description: '개인정보 수정' },
         { icon: MapPin, label: '배송지 관리', href: getPath('/mypage/addresses'), description: '배송지 등록 및 관리' },
-        { icon: FileText, label: '개인정보처리방침', href: getPath('/mypage/privacy'), description: '개인정보 보호' },
       ],
     },
   ]
 
   return (
-    <div className="kurly-container py-12">
+    <>
       {/* 헤더 */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">마이페이지</h1>
+        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">마이페이지</h1>
         <p className="text-gray-600">
-          안녕하세요, <span className="font-semibold text-[#FF6B6B]">{session?.user?.name || '회원'}</span>님
+          안녕하세요, <span className="font-semibold" style={{ color: primaryColor }}>{session?.user?.name || '회원'}</span>님
         </p>
       </div>
 
@@ -61,18 +62,20 @@ export default function MyPage() {
       <div className="space-y-8">
         {menuItems.map((section, idx) => (
           <div key={idx}>
-            <h2 className="text-xl font-bold text-gray-900 mb-4">{section.title}</h2>
+            <h2 className="text-lg lg:text-xl font-bold text-gray-900 mb-4">{section.title}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {section.items.map((item, itemIdx) => (
                 <Link
                   key={itemIdx}
                   href={item.href}
-                  className="group bg-white border border-gray-200 rounded-lg p-6 hover:border-[#FF6B6B] hover:shadow-md transition-all"
+                  className="group bg-white border border-gray-200 rounded-lg p-5 lg:p-6 hover:shadow-md transition-all"
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = primaryColor}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                 >
                   <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="p-3 bg-gray-50 rounded-lg group-hover:bg-[#FFF5F5] transition-colors">
-                        <item.icon className="w-6 h-6 text-gray-600 group-hover:text-[#FF6B6B]" />
+                    <div className="flex items-start gap-3 lg:gap-4">
+                      <div className="p-2.5 lg:p-3 bg-gray-50 rounded-lg transition-colors group-hover:bg-gray-100">
+                        <item.icon className="w-5 h-5 lg:w-6 lg:h-6 text-gray-600" />
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900 mb-1">
@@ -83,7 +86,7 @@ export default function MyPage() {
                         </p>
                       </div>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#FF6B6B]" />
+                    <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" />
                   </div>
                 </Link>
               ))}
@@ -91,6 +94,6 @@ export default function MyPage() {
           </div>
         ))}
       </div>
-    </div>
+    </>
   )
 }

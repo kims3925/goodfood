@@ -34,11 +34,15 @@ import {
   Ticket,
   Calendar,
   CreditCard,
+  Shield,
+  Lock,
 } from 'lucide-react'
 import {
   AppSection,
   MenuItem,
+  UserRole,
   getMenuBySection,
+  getMenuBySectionAndRole,
   getPathToMenuMap,
   getSectionLabel,
 } from '@/config/navigation'
@@ -50,6 +54,7 @@ interface SidebarProps {
   onToggleCollapse?: () => void
   currentSection: AppSection
   onSectionChange: (section: AppSection) => void
+  userRole?: UserRole
 }
 
 // 아이콘 컴포넌트 매핑
@@ -79,6 +84,8 @@ const iconMap: Record<string, React.ReactNode> = {
   Ticket: <Ticket size={20} />,
   Calendar: <Calendar size={20} />,
   CreditCard: <CreditCard size={20} />,
+  Shield: <Shield size={20} />,
+  Lock: <Lock size={20} />,
 }
 
 const smallIconMap: Record<string, React.ReactNode> = {
@@ -107,6 +114,8 @@ const smallIconMap: Record<string, React.ReactNode> = {
   Ticket: <Ticket size={16} />,
   Calendar: <Calendar size={16} />,
   CreditCard: <CreditCard size={16} />,
+  Shield: <Shield size={16} />,
+  Lock: <Lock size={16} />,
 }
 
 function getIcon(iconComponent: unknown, small = false): React.ReactNode {
@@ -124,15 +133,16 @@ export default function Sidebar({
   collapsed = false,
   onToggleCollapse,
   currentSection,
-  onSectionChange
+  onSectionChange,
+  userRole = 'USER'
 }: SidebarProps) {
   const pathname = usePathname()
   const [expandedItems, setExpandedItems] = useState<string[]>([])
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [clickedItem, setClickedItem] = useState<string | null>(null)
 
-  // 현재 섹션의 메뉴 아이템
-  const menuItems = useMemo(() => getMenuBySection(currentSection), [currentSection])
+  // 현재 섹션의 메뉴 아이템 (사용자 역할에 따라 필터링)
+  const menuItems = useMemo(() => getMenuBySectionAndRole(currentSection, userRole), [currentSection, userRole])
   const pathToMenuMap = useMemo(() => getPathToMenuMap(currentSection), [currentSection])
 
   // 경로에 따라 해당 메뉴 그룹 자동 확장

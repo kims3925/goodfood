@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Heart, ShoppingCart, Trash2 } from 'lucide-react'
 import { ConfirmModal } from '@/modules/common/ui-kit/src/ui'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import { useShop } from '@/contexts/ShopContext'
 
 interface Wishlist {
   id: number
@@ -22,10 +24,22 @@ interface Wishlist {
 }
 
 export default function WishlistPage() {
-  const { data: session } = useSession()
+  const router = useRouter()
+  const pathname = usePathname()
+  const { data: session, status } = useSession()
   const { getPath, getApiPath } = useShopUrl()
+  const { shop } = useShop()
+  const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
   const [wishlists, setWishlists] = useState<Wishlist[]>([])
   const [loading, setLoading] = useState(true)
+
+  // 로그인 체크 - 미로그인 시 로그인 페이지로 리다이렉트
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      const callbackUrl = encodeURIComponent(pathname)
+      router.replace(getPath(`/auth/login?callbackUrl=${callbackUrl}`))
+    }
+  }, [status, router, pathname, getPath])
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [pendingRemoveId, setPendingRemoveId] = useState<number | null>(null)
 
@@ -81,38 +95,46 @@ export default function WishlistPage() {
     return new Intl.NumberFormat('ko-KR').format(price) + '원'
   }
 
+  // 세션 로딩 중이거나 인증되지 않은 경우 로딩 표시
+  if (status === 'loading' || status === 'unauthenticated') {
+    return (
+      <div className="text-center py-20">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: primaryColor }}></div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
-      <div className="kurly-container py-12">
-        <div className="text-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B6B] mx-auto"></div>
-        </div>
+      <div className="text-center py-20">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: primaryColor }}></div>
       </div>
     )
   }
 
   return (
-    <div className="kurly-container py-12">
+    <>
       {/* 헤더 */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">찜한 상품</h1>
+      <div className="mb-6">
+        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">찜한 상품</h1>
         <p className="text-gray-600">관심있는 상품을 모아보세요</p>
       </div>
 
       {/* 찜한 상품 목록 */}
       {wishlists.length === 0 ? (
-        <div className="text-center py-20 bg-gray-50 rounded-lg">
+        <div className="text-center py-20 bg-gray-50 rounded-lg w-full">
           <Heart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">찜한 상품이 없습니다</p>
           <Link
             href={getPath('/main')}
-            className="inline-block px-6 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252]"
+            className="inline-block px-6 py-3 text-white rounded-md hover:opacity-90"
+            style={{ backgroundColor: primaryColor }}
           >
             쇼핑 시작하기
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
           {wishlists.map((item) => (
             <div
               key={item.id}
@@ -130,27 +152,21 @@ export default function WishlistPage() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <ShoppingCart className="w-16 h-16 text-gray-300" />
+                      <ShoppingCart className="w-12 h-12 lg:w-16 lg:h-16 text-gray-300" />
                     </div>
                   )}
                 </div>
               </Link>
 
-              <div className="p-4">
+              <div className="p-3 lg:p-4">
                 <Link href={getPath(`/product/${item.product.id}`)}>
-                  <h3 className="font-medium text-gray-900 mb-2 line-clamp-2 hover:text-[#FF6B6B]">
+                  <h3 className="font-medium text-gray-900 mb-1 lg:mb-2 line-clamp-2 text-sm lg:text-base hover:opacity-70">
                     {item.product.name}
                   </h3>
                 </Link>
 
-                {item.product.description && (
-                  <p className="text-sm text-gray-500 mb-3 line-clamp-2">
-                    {item.product.description}
-                  </p>
-                )}
-
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-lg font-bold text-gray-900">
+                <div className="flex items-center justify-between mb-3 lg:mb-4">
+                  <span className="text-base lg:text-lg font-bold text-gray-900">
                     {formatPrice(item.product.price)}
                   </span>
                 </div>
@@ -158,13 +174,14 @@ export default function WishlistPage() {
                 <div className="flex gap-2">
                   <Link
                     href={getPath(`/product/${item.product.id}`)}
-                    className="flex-1 px-4 py-2 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] text-center text-sm"
+                    className="flex-1 px-3 lg:px-4 py-2 text-white rounded-md hover:opacity-90 text-center text-sm"
+                    style={{ backgroundColor: primaryColor }}
                   >
                     상품보기
                   </Link>
                   <button
                     onClick={() => handleRemove(item.id)}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                    className="px-3 lg:px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -188,6 +205,6 @@ export default function WishlistPage() {
         confirmText="삭제"
         variant="danger"
       />
-    </div>
+    </>
   )
 }

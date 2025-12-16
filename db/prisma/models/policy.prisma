@@ -1,0 +1,25 @@
+model TermsPolicy {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(255)
+  content   String   @db.Text
+  main      Int      @default(0)
+  sub       Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@index([main, sub])
+  @@map("terms_policy")
+}
+
+model PrivacyPolicy {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(255)
+  content   String   @db.Text
+  main      Int      @default(0)
+  sub       Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@index([main, sub])
+  @@map("privacy_policy")
+}
