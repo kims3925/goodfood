@@ -139,3 +139,11 @@ enum RefundMethod {
   BANK_TRANSFER
   POINTS
 }
+
+enum ShopNotificationType {
+  ORDER
+  CANCEL
+  REFUND
+  INQUIRY
+  SETTLEMENT
+}

@@ -173,6 +173,20 @@ export default function AutomationSettingsPage() {
   // 저장되지 않은 변경사항이 있는지 확인
   const hasUnsavedChanges = hasScheduleChanges || hasCollectionChanges || hasAiChanges || hasPublishChanges || hasShopChanges
 
+  // 필수 설정 누락 여부 (설정이 아예 안 된 경우)
+  const isScheduleMissing = config.selectedHours.length === 0
+  const isShopMissing = config.shopIds.length === 0
+  const isCollectionMissing = config.wholesaleChannelIds.length === 0
+  const isAiMissing = !config.aiProvider
+  const isPublishMissing = config.retailChannelIds.length === 0
+
+  // 섹션별 문제 여부 (설정 누락 또는 저장 안 됨)
+  const hasScheduleProblem = isScheduleMissing || hasScheduleChanges
+  const hasShopProblem = isShopMissing || hasShopChanges
+  const hasCollectionProblem = isCollectionMissing || hasCollectionChanges
+  const hasAiProblem = isAiMissing || hasAiChanges
+  const hasPublishProblem = isPublishMissing || hasPublishChanges
+
   // 자동화 활성화 상태 저장
   const saveAutomationState = async (enabled: boolean) => {
     try {
@@ -198,51 +212,48 @@ export default function AutomationSettingsPage() {
 
   // 자동화 시작 핸들러
   const handleStartAutomation = () => {
-    // 필수 설정 검증
-    const missingSettings: string[] = []
+    // 필수 설정 검증 - 설정이 안 된 섹션 확인
+    const missingSections: string[] = []
 
     // 실행 시간 선택 확인
     if (config.selectedHours.length === 0) {
-      missingSettings.push('실행 시간')
+      missingSections.push('schedule')
     }
 
     // 쇼핑몰 선택 확인
     if (config.shopIds.length === 0) {
-      missingSettings.push('쇼핑몰')
+      missingSections.push('shop')
     }
 
     // 수집할 도매채널 확인
     if (config.wholesaleChannelIds.length === 0) {
-      missingSettings.push('수집할 도매채널')
+      missingSections.push('collection')
     }
 
     // AI 제공자 확인
     if (!config.aiProvider) {
-      missingSettings.push('AI 제공자')
+      missingSections.push('ai')
     }
 
     // 발행할 소매채널 확인
     if (config.retailChannelIds.length === 0) {
-      missingSettings.push('발행할 소매채널')
+      missingSections.push('publish')
     }
 
-    // 필수 설정이 없으면 toast로 안내
-    if (missingSettings.length > 0) {
-      toast.error(`자동화를 시작하려면 다음 설정이 필요합니다: ${missingSettings.join(', ')}`)
-      return
-    }
-
+    // 저장되지 않은 변경사항 확인
     const unsavedSections: string[] = []
-
     if (hasShopChanges) unsavedSections.push('shop')
     if (hasScheduleChanges) unsavedSections.push('schedule')
     if (hasCollectionChanges) unsavedSections.push('collection')
     if (hasAiChanges) unsavedSections.push('ai')
     if (hasPublishChanges) unsavedSections.push('publish')
 
-    if (unsavedSections.length > 0) {
+    // 설정 누락 또는 저장되지 않은 섹션이 있으면 빨간색 강조
+    const problemSections = [...new Set([...missingSections, ...unsavedSections])]
+
+    if (problemSections.length > 0) {
       // 1단계: 빨간색 + 진동
-      setWarningSections(unsavedSections)
+      setWarningSections(problemSections)
       setWarningPhase('shake')
 
       // 2단계: 0.6초 후 진동 끝, 페이딩 시작
@@ -399,16 +410,43 @@ export default function AutomationSettingsPage() {
   const handleSaveSection = async (section: string) => {
     setSavingSection(section)
     try {
+      // 섹션별로 저장할 데이터 구성
+      let sectionData: Partial<AutomationConfig> = {}
+
+      switch (section) {
+        case 'schedule':
+          sectionData = { selectedHours: config.selectedHours }
+          break
+        case 'shop':
+          sectionData = { shopIds: config.shopIds }
+          break
+        case 'collection':
+          sectionData = { wholesaleChannelIds: config.wholesaleChannelIds }
+          break
+        case 'ai':
+          sectionData = { aiProvider: config.aiProvider, pricingPolicyId: config.pricingPolicyId }
+          break
+        case 'publish':
+          sectionData = { retailChannelIds: config.retailChannelIds }
+          break
+        default:
+          sectionData = config
+      }
+
+      // 기존 설정에 섹션 데이터만 병합하여 저장
+      const dataToSave = { ...initialConfig, ...sectionData }
+
       const response = await fetch('/api/automation/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify(dataToSave),
       })
 
       const data = await response.json()
 
       if (data.success) {
-        setInitialConfig(config)
+        // 해당 섹션의 initialConfig만 업데이트
+        setInitialConfig(prev => ({ ...prev, ...sectionData }))
         toast.success(`${sectionNames[section] || section} 설정이 저장되었습니다`)
       } else {
         toast.error(`${sectionNames[section] || section} 저장에 실패했습니다`)
@@ -578,7 +616,7 @@ export default function AutomationSettingsPage() {
       </div>
 
       {/* Schedule Settings - 독립 섹션 */}
-      <Card className={`overflow-hidden transition-all ${warningSections.includes('schedule') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
+      <Card className={`overflow-hidden transition-all ${warningSections.includes('schedule') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasScheduleProblem ? 'ring-2 ring-red-300' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -679,7 +717,7 @@ export default function AutomationSettingsPage() {
       {/* Row 1: Shop Selection + AI Settings - 2 Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Shop Selection Section */}
-        <Card className={`overflow-hidden transition-all ${warningSections.includes('shop') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
+        <Card className={`overflow-hidden transition-all ${warningSections.includes('shop') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasShopProblem ? 'ring-2 ring-red-300' : ''}`}>
           <div className="p-4 pb-5 flex flex-col">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -792,7 +830,7 @@ export default function AutomationSettingsPage() {
         </Card>
 
         {/* AI Settings */}
-        <Card className={`overflow-hidden transition-all ${warningSections.includes('ai') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
+        <Card className={`overflow-hidden transition-all ${warningSections.includes('ai') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasAiProblem ? 'ring-2 ring-red-300' : ''}`}>
           <div className="p-4 pb-5 flex flex-col">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -950,7 +988,7 @@ export default function AutomationSettingsPage() {
       {/* Row 2: Collection + Publish Settings - 2 Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Collection Settings - Wholesale Channel Cards */}
-      <Card className={`overflow-hidden transition-all ${warningSections.includes('collection') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
+      <Card className={`overflow-hidden transition-all ${warningSections.includes('collection') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasCollectionProblem ? 'ring-2 ring-red-300' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -1156,7 +1194,7 @@ export default function AutomationSettingsPage() {
       </Card>
 
         {/* Publish Settings - Retail Channel Cards */}
-      <Card className={`overflow-hidden transition-all ${warningSections.includes('publish') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
+      <Card className={`overflow-hidden transition-all ${warningSections.includes('publish') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasPublishProblem ? 'ring-2 ring-red-300' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">

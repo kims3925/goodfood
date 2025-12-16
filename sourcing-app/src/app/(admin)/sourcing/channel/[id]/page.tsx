@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Store, Save, Trash2, Edit, X, Calendar, Link2, Power, Globe, Image } from 'lucide-react'
+import { ArrowLeft, Store, Save, Trash2, Edit, X, Calendar, Link2, Power, Globe, Image, Key, CheckCircle, XCircle, Clock } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -88,6 +88,14 @@ export default function ChannelDetailPage({
   const [shops, setShops] = useState<Shop[]>([])
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null)
 
+  // 세션 상태
+  const [sessionStatus, setSessionStatus] = useState<{
+    hasSession: boolean
+    isValid: boolean
+    expiresAt: string | null
+  } | null>(null)
+  const [isLoadingSession, setIsLoadingSession] = useState(false)
+
   // 수정 가능한 필드
   const [name, setName] = useState('')
   const [isActive, setIsActive] = useState(true)
@@ -128,6 +136,22 @@ export default function ChannelDetailPage({
       console.error('Shop 목록 로드 실패:', error)
     }
   }, [])
+
+  // 세션 상태 로드
+  const loadSessionStatus = useCallback(async () => {
+    setIsLoadingSession(true)
+    try {
+      const response = await fetch(`/api/channel/${id}/band-session`)
+      const data = await response.json()
+      if (data.success) {
+        setSessionStatus(data.data)
+      }
+    } catch (error) {
+      console.error('세션 상태 로드 실패:', error)
+    } finally {
+      setIsLoadingSession(false)
+    }
+  }, [id])
 
   const loadChannel = useCallback(async () => {
     try {
@@ -190,7 +214,8 @@ export default function ChannelDetailPage({
   useEffect(() => {
     loadChannel()
     loadShops()
-  }, [loadChannel, loadShops])
+    loadSessionStatus()
+  }, [loadChannel, loadShops, loadSessionStatus])
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -532,6 +557,62 @@ export default function ChannelDetailPage({
                         </div>
                       </div>
                     </div>
+
+                    {/* 세션 정보 (소매 밴드만) */}
+                    {channel.kind === 'RETAIL' && channel.platform === 'BAND' && (
+                      <div className="bg-slate-50 rounded-xl p-4 mt-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Key size={14} className="text-slate-400" />
+                          <span className="text-slate-400 text-xs font-medium">밴드 세션</span>
+                        </div>
+                        {isLoadingSession ? (
+                          <div className="flex items-center gap-2 text-slate-500 text-xs">
+                            <div className="w-3 h-3 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"></div>
+                            로드 중...
+                          </div>
+                        ) : sessionStatus ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              {sessionStatus.hasSession ? (
+                                sessionStatus.isValid ? (
+                                  <div className="flex items-center gap-1.5 text-emerald-600">
+                                    <CheckCircle size={14} />
+                                    <span className="text-xs font-medium">저장됨</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 text-amber-600">
+                                    <Clock size={14} />
+                                    <span className="text-xs font-medium">만료됨</span>
+                                  </div>
+                                )
+                              ) : (
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-1.5 text-slate-400">
+                                    <XCircle size={14} />
+                                    <span className="text-xs font-medium">없음</span>
+                                  </div>
+                                  <a
+                                    href="/sourcing/guide/band-session"
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-violet-500 hover:bg-violet-600 text-white text-xs font-medium rounded-lg transition-colors w-fit"
+                                  >
+                                    <Key size={12} />
+                                    세션 저장하는 법
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                            {sessionStatus.expiresAt && (
+                              <p className="text-slate-500 text-xs">
+                                {sessionStatus.isValid ? '만료: ' : '만료일: '}
+                                {formatDateTimeKST(sessionStatus.expiresAt)}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-slate-400 text-xs">정보 없음</div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* 오른쪽: 상세 설정 */}

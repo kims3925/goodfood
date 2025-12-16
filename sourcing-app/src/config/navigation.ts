@@ -20,6 +20,7 @@ import {
   ShoppingBag,
   Ticket,
   Star,
+  Bell,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
@@ -63,6 +64,7 @@ export const sourcingMenuItems: MenuItem[] = [
       { label: '실행 로그', href: '/sourcing/automation/logs', icon: History },
     ],
   },
+  { label: '알림 관리', href: '/sourcing/notification', icon: Bell },
   {
     label: '설정',
     icon: Settings,
@@ -99,6 +101,7 @@ export const shopMenuItems: MenuItem[] = [
   { label: '고객 문의', href: '/shop/cs/inquiry', icon: MessageSquare },
   { label: '리뷰 관리', href: '/shop/reviews', icon: Star },
   { label: '쿠폰', href: '/shop/coupon/list', icon: Ticket },
+  { label: '알림 관리', href: '/shop/notification', icon: Bell },
   { label: '사용자 관리', href: '/shop/user/list', icon: Users },
 ]
 
@@ -124,12 +127,14 @@ export function getDefaultPathBySection(section: AppSection): string {
 export const sourcingPathToMenuMap: Record<string, string> = {
   '/sourcing/dashboard': '대시보드',
   '/sourcing/channel': '채널 관리',
+  '/sourcing/guide': '채널 관리',
   '/sourcing/post': '수집',
   '/sourcing/collected-product': '수집',
   '/sourcing/product': '상품',
   '/sourcing/published-product': '상품',
   '/sourcing/publish': '발행',
   '/sourcing/automation': '자동화',
+  '/sourcing/notification': '알림 관리',
   '/sourcing/policy': '설정',
   '/sourcing/settings': '설정',
 }
@@ -144,6 +149,7 @@ export const shopPathToMenuMap: Record<string, string> = {
   '/shop/cs': '고객 문의',
   '/shop/reviews': '리뷰 관리',
   '/shop/coupon': '쿠폰',
+  '/shop/notification': '알림 관리',
 }
 
 export function getPathToMenuMap(section: AppSection): Record<string, string> {

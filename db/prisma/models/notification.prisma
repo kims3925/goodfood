@@ -1,0 +1,29 @@
+model ShopNotification {
+  id              Int                   @id @default(autoincrement())
+  shopId          Int?                  @map("shop_id")
+  section         String                @default("shop") @db.VarChar(20) // 'shop' | 'sourcing'
+  type            ShopNotificationType
+  title           String                @db.VarChar(255)
+  message         String                @db.Text
+  isRead          Boolean               @default(false) @map("is_read")
+  link            String?               @db.VarChar(500)
+
+  // 연관 데이터 ID (선택적)
+  orderId         Int?                  @map("order_id")
+  inquiryId       Int?                  @map("inquiry_id")
+  settlementId    Int?                  @map("settlement_id")
+  returnRequestId Int?                  @map("return_request_id")
+
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamp(0)
+  readAt          DateTime?             @map("read_at") @db.Timestamp(0)
+
+  // Relations
+  shop            Shop?                 @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId])
+  @@index([section])
+  @@index([isRead])
+  @@index([type])
+  @@index([createdAt])
+  @@map("shop_notification")
+}

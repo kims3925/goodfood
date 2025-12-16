@@ -18,6 +18,10 @@ import {
   NotFoundError,
   BusinessLogicError,
 } from '@/modules/common/utils/src/errors/handlers'
+import {
+  createOrderNotification,
+  createCancelNotification,
+} from '@/services/notification.service'
 
 // ============================================
 // Types
@@ -209,6 +213,16 @@ export class OrderService {
 
     const order = await this.orderRepository.create(orderInput)
 
+    // 알림 생성 (shopId가 있는 경우에만)
+    if (shopId) {
+      createOrderNotification(shopId, {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        totalAmount,
+        customerName: shippingAddress.recipientName,
+      })
+    }
+
     // TossPayments 결제 요청 정보 생성 (주문자 정보는 user에서)
     // 경로 기반 URL: /{shopSlug}/payment/success
     const baseUrl = process.env.NEXT_PUBLIC_SHOP_DOMAIN || 'localhost:3000'
@@ -337,6 +351,16 @@ export class OrderService {
 
     const order = await this.orderRepository.create(orderInput)
 
+    // 알림 생성 (shopId가 있는 경우에만)
+    if (shopId) {
+      createOrderNotification(shopId, {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        totalAmount,
+        customerName: shippingAddress.recipientName,
+      })
+    }
+
     // TossPayments 결제 요청 정보 생성 (주문자 정보는 user에서)
     // 경로 기반 URL: /{shopSlug}/payment/success
     const baseUrl = process.env.NEXT_PUBLIC_SHOP_DOMAIN || 'localhost:3000'
@@ -459,6 +483,15 @@ export class OrderService {
     }
 
     const cancelledOrder = await this.orderRepository.cancel(orderId, reason, cancelledBy)
+
+    // 취소 알림 생성 (shopId가 있는 경우에만)
+    if (order.shopId) {
+      createCancelNotification(order.shopId, {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        customerName: order.shippingAddress?.recipientName,
+      })
+    }
 
     return this.formatOrderResponse(cancelledOrder)
   }

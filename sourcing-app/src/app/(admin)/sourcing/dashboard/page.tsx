@@ -605,6 +605,13 @@ export default function AutomationDashboardPage() {
         </div>
       </Card>
 
+      {/* 비활성화 시 음영 처리 컨테이너 (수동 실행 제외) */}
+      <div className={`relative space-y-6 ${!config?.isEnabled ? 'pointer-events-none' : ''}`}>
+        {/* 비활성화 오버레이 */}
+        {!config?.isEnabled && (
+          <div className="absolute inset-0 -m-3 p-3 bg-gray-400/30 rounded-2xl z-10" />
+        )}
+
       {/* Pipeline Flow Visualization */}
       <Card className="p-6 bg-gradient-to-r from-slate-50 to-white">
         <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
@@ -1620,6 +1627,7 @@ export default function AutomationDashboardPage() {
           </div>
         )}
       </Card>
+      </div>
     </div>
   )
 }

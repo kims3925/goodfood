@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator } from 'lucide-react'
+import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check } from 'lucide-react'
 import { AppSection, getDefaultPathBySection } from '@/config/navigation'
 
 interface HeaderProps {
@@ -11,12 +11,40 @@ interface HeaderProps {
   onSectionChange: (section: AppSection) => void
 }
 
+// 알림 타입
+type NotificationType = 'ORDER' | 'CANCEL' | 'REFUND' | 'INQUIRY' | 'SETTLEMENT'
+
+interface ShopNotification {
+  id: number
+  type: NotificationType
+  title: string
+  message: string
+  isRead: boolean
+  link?: string
+  createdAt: string
+}
+
+// 타입별 설정
+const notificationTypeConfig: Record<NotificationType, { icon: React.ReactNode; bg: string; text: string }> = {
+  ORDER: { icon: <ShoppingCart size={14} />, bg: 'bg-blue-100', text: 'text-blue-600' },
+  CANCEL: { icon: <XCircle size={14} />, bg: 'bg-orange-100', text: 'text-orange-600' },
+  REFUND: { icon: <RotateCcw size={14} />, bg: 'bg-red-100', text: 'text-red-600' },
+  INQUIRY: { icon: <MessageSquare size={14} />, bg: 'bg-purple-100', text: 'text-purple-600' },
+  SETTLEMENT: { icon: <Wallet size={14} />, bg: 'bg-green-100', text: 'text-green-600' },
+}
+
 export default function Header({ onMenuClick, currentSection, onSectionChange }: HeaderProps) {
   const router = useRouter()
   const [user, setUser] = useState<{ email: string; name?: string | null } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const notificationRef = useRef<HTMLDivElement>(null)
+
+  // 쇼핑몰 알림
+  const [notifications, setNotifications] = useState<ShopNotification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [notificationLoading, setNotificationLoading] = useState(false)
 
   // 소싱 통계
   const [sourcingStats, setSourcingStats] = useState({
@@ -33,6 +61,93 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
     pendingSettlement: 0,
     inquiries: 0,
   })
+
+  // 쇼핑몰 알림 데이터 로드
+  const loadNotifications = async () => {
+    try {
+      setNotificationLoading(true)
+      const response = await fetch('/api/admin/notifications?section=shop&limit=10')
+      const data = await response.json()
+      if (data.success) {
+        setNotifications(data.data.notifications || [])
+        setUnreadCount(data.data.stats?.unread || 0)
+      }
+    } catch (error) {
+      console.error('알림 로드 실패:', error)
+    } finally {
+      setNotificationLoading(false)
+    }
+  }
+
+  // 알림 읽음 처리
+  const handleMarkAsRead = async (ids: number[]) => {
+    try {
+      await fetch('/api/admin/notifications/read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
+      loadNotifications()
+    } catch (error) {
+      console.error('읽음 처리 실패:', error)
+    }
+  }
+
+  // 알림 클릭 시 이동
+  const handleNotificationClick = (notification: ShopNotification) => {
+    if (!notification.isRead) {
+      handleMarkAsRead([notification.id])
+    }
+    if (notification.link) {
+      setShowNotifications(false)
+      router.push(notification.link)
+    }
+  }
+
+  // 모든 알림 읽음 처리
+  const handleMarkAllAsRead = async () => {
+    const unreadIds = notifications.filter(n => !n.isRead).map(n => n.id)
+    if (unreadIds.length > 0) {
+      await handleMarkAsRead(unreadIds)
+    }
+  }
+
+  // 상대 시간 포맷
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMinutes = Math.floor(diffMs / (1000 * 60))
+    const diffHours = Math.floor(diffMinutes / 60)
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffMinutes < 1) return '방금 전'
+    if (diffMinutes < 60) return `${diffMinutes}분 전`
+    if (diffHours < 24) return `${diffHours}시간 전`
+    if (diffDays < 7) return `${diffDays}일 전`
+    return `${date.getMonth() + 1}/${date.getDate()}`
+  }
+
+  // 알림 로드 (로그인 시)
+  useEffect(() => {
+    if (user) {
+      loadNotifications()
+      // 30초마다 갱신
+      const notificationInterval = setInterval(loadNotifications, 30000)
+      return () => clearInterval(notificationInterval)
+    }
+  }, [user])
+
+  // 외부 클릭 시 드롭다운 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotifications(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   // 통계 데이터 로드
   useEffect(() => {
@@ -155,7 +270,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
   }
 
   return (
-    <header className="bg-white border-b border-border sticky top-0 z-30">
+    <header className="bg-white border-b border-border sticky top-0 z-50">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Left side */}
@@ -182,44 +297,89 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
           {/* Right side */}
           <div className="flex items-center gap-2">
             {/* Notifications */}
-            <div className="relative">
+            <div className="relative" ref={notificationRef}>
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface relative"
               >
                 <Bell size={20} />
-                {sourcingStats.pendingAI > 0 && (
-                  <span className="absolute top-1 right-1 h-2 w-2 bg-error rounded-full animate-pulse"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center animate-pulse">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
                 )}
               </button>
 
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-border">
-                  <div className="p-4 border-b border-divider">
-                    <h3 className="font-semibold text-text-primary">작업 알림</h3>
-                  </div>
-                  <div className="max-h-96 overflow-y-auto">
-                    <div className="p-4 space-y-3">
-                      {sourcingStats.pendingAI > 0 && (
-                        <div className="p-3 bg-yellow-50 rounded-lg">
-                          <p className="text-sm text-yellow-800">
-                            <span className="font-semibold">{sourcingStats.pendingAI}개</span>의 상품이 AI 처리 대기 중입니다.
-                          </p>
-                        </div>
+                <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-border z-[9999]">
+                  <div className="p-3 border-b border-divider flex items-center justify-between">
+                    <h3 className="font-semibold text-text-primary">알림</h3>
+                    <div className="flex items-center gap-2">
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllAsRead}
+                          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                        >
+                          <Check size={12} />
+                          모두 읽음
+                        </button>
                       )}
-                      {sourcingStats.readyToUpload > 0 && (
-                        <div className="p-3 bg-blue-50 rounded-lg">
-                          <p className="text-sm text-blue-800">
-                            <span className="font-semibold">{sourcingStats.readyToUpload}개</span>의 상품이 스룩페이 업로드 준비되었습니다.
-                          </p>
-                        </div>
-                      )}
-                      <div className="p-3 bg-green-50 rounded-lg">
-                        <p className="text-sm text-green-800">
-                          오늘 <span className="font-semibold">{sourcingStats.published}개</span>의 상품이 발행되었습니다.
-                        </p>
-                      </div>
                     </div>
+                  </div>
+                  <div className="max-h-[400px] overflow-y-auto">
+                    {notificationLoading ? (
+                      <div className="p-8 text-center text-gray-400">
+                        <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full mx-auto"></div>
+                      </div>
+                    ) : notifications.length > 0 ? (
+                      <div className="divide-y divide-gray-100">
+                        {notifications.map((notification) => {
+                          const config = notificationTypeConfig[notification.type] || notificationTypeConfig.ORDER
+                          return (
+                            <div
+                              key={notification.id}
+                              onClick={() => handleNotificationClick(notification)}
+                              className={`px-3 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors ${
+                                !notification.isRead ? 'bg-blue-50/50' : ''
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`p-1.5 rounded-lg ${config.bg} ${config.text} flex-shrink-0`}>
+                                  {config.icon}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm truncate ${!notification.isRead ? 'font-medium text-gray-900' : 'text-gray-600'}`}>
+                                    {notification.title}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className="text-xs text-gray-400">{formatRelativeTime(notification.createdAt)}</span>
+                                  {!notification.isRead && (
+                                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center text-gray-400">
+                        <Bell size={32} className="mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">새로운 알림이 없습니다</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2 border-t border-divider">
+                    <button
+                      onClick={() => {
+                        setShowNotifications(false)
+                        router.push('/shop/notification')
+                      }}
+                      className="w-full py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    >
+                      모든 알림 보기
+                    </button>
                   </div>
                 </div>
               )}

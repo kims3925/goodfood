@@ -23,6 +23,7 @@ model Shop {
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   theme              ShopTheme?
   customers          User[]             @relation("ShopCustomers")
+  notifications      ShopNotification[]
 
   @@index([userId])
   @@index([subdomain])
