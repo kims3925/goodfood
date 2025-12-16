@@ -190,6 +190,49 @@ export class NaverBandClient {
   }
 
   /**
+   * 게시물 삭제
+   */
+  async removePost(bandKey: string, postKey: string): Promise<void> {
+    // v2 API 사용, 파라미터는 query string으로 전송
+    const url = new URL(`${BAND_API_BASE_URL}/v2/band/post/remove`)
+    url.searchParams.append('access_token', this.accessToken)
+    url.searchParams.append('band_key', bandKey)
+    url.searchParams.append('post_key', postKey)
+
+    // 타임아웃 설정
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+      const data: BandApiResponse = await response.json()
+
+      if (data.result_code !== 1) {
+        const errorData = data.result_data as any
+        const errorMessage = this.getErrorMessage(
+          data.result_code,
+          errorData?.message || data.message
+        )
+        throw new Error(errorMessage)
+      }
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+      if (error.name === 'AbortError') {
+        throw new Error('Band API 요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.')
+      }
+      throw error
+    }
+  }
+
+  /**
    * 밴드 목록 조회
    */
   async getBands(): Promise<Array<{ band_key: string; name: string; cover: string }>> {

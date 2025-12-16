@@ -22,6 +22,32 @@ import {
 } from 'lucide-react'
 import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import toast from 'react-hot-toast'
+
+// 은행 목록
+const BANK_LIST = [
+  { code: 'KB', name: 'KB국민은행' },
+  { code: 'SHINHAN', name: '신한은행' },
+  { code: 'WOORI', name: '우리은행' },
+  { code: 'HANA', name: '하나은행' },
+  { code: 'NH', name: 'NH농협은행' },
+  { code: 'IBK', name: 'IBK기업은행' },
+  { code: 'SC', name: 'SC제일은행' },
+  { code: 'CITI', name: '한국씨티은행' },
+  { code: 'KAKAO', name: '카카오뱅크' },
+  { code: 'TOSS', name: '토스뱅크' },
+  { code: 'KBANK', name: '케이뱅크' },
+  { code: 'POST', name: '우체국' },
+  { code: 'SUHYUP', name: '수협은행' },
+  { code: 'BUSAN', name: '부산은행' },
+  { code: 'DAEGU', name: '대구은행' },
+  { code: 'KWANGJU', name: '광주은행' },
+  { code: 'JEONBUK', name: '전북은행' },
+  { code: 'JEJU', name: '제주은행' },
+  { code: 'KYONGNAM', name: '경남은행' },
+  { code: 'SAEMAUL', name: '새마을금고' },
+  { code: 'SHINHYUP', name: '신협' },
+]
 
 // 주문 상태 매핑
 const orderStatusMap: Record<string, { label: string; color: string; icon: any }> = {
@@ -101,6 +127,11 @@ function GuestOrderDetailContent() {
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
 
+  // 환불 계좌 정보 (무통장입금/가상계좌용)
+  const [refundBankName, setRefundBankName] = useState('')
+  const [refundAccountNumber, setRefundAccountNumber] = useState('')
+  const [refundAccountHolder, setRefundAccountHolder] = useState('')
+
   useEffect(() => {
     if (orderId && token) {
       fetchOrderDetail()
@@ -159,14 +190,47 @@ function GuestOrderDetailContent() {
     }
   }
 
+  // 무통장입금/가상계좌 결제인지 확인 (환불 계좌 필요 여부)
+  const needsRefundAccount = order?.payment?.method === 'VIRTUAL_ACCOUNT' ||
+                              order?.payment?.method === 'BANK_TRANSFER'
+
   const handleCancelOrder = async () => {
     if (!cancelReason.trim()) {
-      alert('취소 사유를 입력해주세요')
+      toast.error('취소 사유를 입력해주세요')
       return
+    }
+
+    // 무통장입금/가상계좌 결제이고 결제 완료 상태인 경우 환불 계좌 필수
+    if (needsRefundAccount && order?.status === 'PAID') {
+      if (!refundBankName || !refundAccountNumber.trim() || !refundAccountHolder.trim()) {
+        toast.error('환불받으실 계좌 정보를 모두 입력해주세요')
+        return
+      }
     }
 
     try {
       setIsCancelling(true)
+
+      // 요청 데이터 구성
+      const requestData: {
+        reason: string
+        refundAccount?: {
+          bankName: string
+          accountNumber: string
+          accountHolder: string
+        }
+      } = {
+        reason: cancelReason,
+      }
+
+      // 무통장입금/가상계좌 환불 계좌 정보 추가
+      if (needsRefundAccount && order?.status === 'PAID') {
+        requestData.refundAccount = {
+          bankName: refundBankName,
+          accountNumber: refundAccountNumber.trim(),
+          accountHolder: refundAccountHolder.trim(),
+        }
+      }
 
       const response = await fetch(getApiPath(`/api/guest-orders/${orderId}/cancel`), {
         method: 'POST',
@@ -174,21 +238,21 @@ function GuestOrderDetailContent() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ reason: cancelReason }),
+        body: JSON.stringify(requestData),
       })
 
       const data = await response.json()
 
       if (data.success) {
-        alert('주문이 취소되었습니다')
+        toast.success('주문이 취소되었습니다')
         setShowCancelModal(false)
         fetchOrderDetail() // 새로고침
       } else {
-        alert(data.error || '주문 취소에 실패했습니다')
+        toast.error(data.error || '주문 취소에 실패했습니다')
       }
     } catch (err) {
       console.error('Cancel error:', err)
-      alert('주문 취소 중 오류가 발생했습니다')
+      toast.error('주문 취소 중 오류가 발생했습니다')
     } finally {
       setIsCancelling(false)
     }
@@ -494,7 +558,7 @@ function GuestOrderDetailContent() {
       {/* 주문 취소 모달 */}
       {showCancelModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">주문 취소</h3>
             <p className="text-sm text-gray-600 mb-4">
               주문을 취소하시겠습니까? 취소 후에는 복구할 수 없습니다.
@@ -511,6 +575,59 @@ function GuestOrderDetailContent() {
                 rows={3}
               />
             </div>
+
+            {/* 무통장입금/가상계좌 환불 계좌 입력 */}
+            {needsRefundAccount && order?.status === 'PAID' && (
+              <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm font-medium text-blue-800 mb-3">
+                  환불 계좌 정보 <span className="text-red-500">*</span>
+                </p>
+                <p className="text-xs text-blue-600 mb-3">
+                  무통장입금 결제 건의 환불을 위해 계좌 정보를 입력해주세요.
+                </p>
+                <div className="space-y-3">
+                  {/* 은행 선택 */}
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">은행 선택</label>
+                    <select
+                      value={refundBankName}
+                      onChange={(e) => setRefundBankName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    >
+                      <option value="">은행을 선택하세요</option>
+                      {BANK_LIST.map((bank) => (
+                        <option key={bank.code} value={bank.name}>
+                          {bank.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* 계좌번호 */}
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">계좌번호</label>
+                    <input
+                      type="text"
+                      value={refundAccountNumber}
+                      onChange={(e) => setRefundAccountNumber(e.target.value.replace(/[^0-9-]/g, ''))}
+                      placeholder="숫자만 입력 (- 포함 가능)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                  {/* 예금주 */}
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">예금주</label>
+                    <input
+                      type="text"
+                      value={refundAccountHolder}
+                      onChange={(e) => setRefundAccountHolder(e.target.value)}
+                      placeholder="예금주명을 입력하세요"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
                 onClick={() => setShowCancelModal(false)}

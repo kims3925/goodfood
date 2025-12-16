@@ -18,6 +18,7 @@ import {
   Trash2,
   Loader2,
   AlertOctagon,
+  X,
 } from 'lucide-react'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -116,11 +117,17 @@ export default function PublishPage() {
   const [unpublishTarget, setUnpublishTarget] = useState<{
     productId: number
     productName: string
-    shopId: number
-    shopName: string
+    targetType: 'shop' | 'channel'
+    targetId: number
+    targetName: string
     publishId: number
   } | null>(null)
   const [isUnpublishing, setIsUnpublishing] = useState(false)
+  const [unpublishResult, setUnpublishResult] = useState<{
+    status: 'idle' | 'success' | 'warning' | 'error'
+    message: string
+    details?: string
+  }>({ status: 'idle', message: '' })
 
   // 발행 진행 모달 상태
   interface PublishProgressItem {
@@ -319,6 +326,13 @@ export default function PublishPage() {
     return publishedShop?.publishId
   }
 
+  // 채널 발행의 publishId 조회
+  const getChannelPublishId = (productId: number, channelId: number) => {
+    const product = products.find((p) => p.id === productId)
+    const publishedChannel = product?.publishedChannels?.find((pc) => pc.channelId === channelId)
+    return publishedChannel?.publishId
+  }
+
   // 셀 키 생성 (type-productId-targetId)
   const cellKey = (productId: number, targetType: 'shop' | 'channel', targetId: number) =>
     `${targetType}-${productId}-${targetId}`
@@ -330,11 +344,11 @@ export default function PublishPage() {
   }
 
   const handleCellClick = (productId: number, targetType: 'shop' | 'channel', targetId: number) => {
-    // 발행된 Shop 셀 클릭 시 취소 확인 모달 표시
+    // 발행된 셀 클릭 시 취소 확인 모달 표시
     if (isPublished(productId, targetType, targetId)) {
-      // Shop 발행만 취소 가능
+      const product = getProduct(productId)
+
       if (targetType === 'shop') {
-        const product = getProduct(productId)
         const shop = shops.find((s) => s.id === targetId)
         const publishId = getShopPublishId(productId, targetId)
 
@@ -342,8 +356,25 @@ export default function PublishPage() {
           setUnpublishTarget({
             productId,
             productName: product.name,
-            shopId: targetId,
-            shopName: shop.name,
+            targetType: 'shop',
+            targetId,
+            targetName: shop.name,
+            publishId,
+          })
+          setShowUnpublishConfirm(true)
+        }
+      } else {
+        // 채널(소매밴드) 발행 취소
+        const channel = channels.find((c) => c.id === targetId)
+        const publishId = getChannelPublishId(productId, targetId)
+
+        if (product && channel && publishId) {
+          setUnpublishTarget({
+            productId,
+            productName: product.name,
+            targetType: 'channel',
+            targetId,
+            targetName: channel.name,
             publishId,
           })
           setShowUnpublishConfirm(true)
@@ -783,6 +814,8 @@ export default function PublishPage() {
     if (isUnpublishing) return
 
     setIsUnpublishing(true)
+    setUnpublishResult({ status: 'idle', message: '' })
+
     try {
       const response = await fetch(`/api/shop/publish?ids=${unpublishTarget.publishId}`, {
         method: 'DELETE',
@@ -791,25 +824,54 @@ export default function PublishPage() {
       const data = await response.json()
 
       if (data.success) {
-        toast.success('발행이 취소되었습니다.')
-        setShowUnpublishConfirm(false)
-        setUnpublishTarget(null)
+        // Band 삭제 에러가 있는 경우 (DB는 삭제됨)
+        if (data.bandDeleteErrors && data.bandDeleteErrors.length > 0) {
+          setUnpublishResult({
+            status: 'warning',
+            message: '발행 취소 완료 (밴드 게시물 삭제 실패)',
+            details: data.bandDeleteErrors[0],
+          })
+        } else {
+          setUnpublishResult({
+            status: 'success',
+            message: '발행이 취소되었습니다.',
+          })
+        }
         loadProducts()
       } else {
-        // 주문/문의가 있어서 삭제 불가한 경우
+        // 완전 실패
         if (data.cannotDelete && data.cannotDelete.length > 0) {
           const item = data.cannotDelete[0]
-          toast.error(`발행 취소 불가: ${item.reason}이 있습니다.`)
+          setUnpublishResult({
+            status: 'error',
+            message: '발행 취소 불가',
+            details: `${item.reason}이 있어 취소할 수 없습니다.`,
+          })
         } else {
-          toast.error(data.error || '발행 취소에 실패했습니다.')
+          setUnpublishResult({
+            status: 'error',
+            message: '발행 취소 실패',
+            details: data.error || '알 수 없는 오류가 발생했습니다.',
+          })
         }
       }
     } catch (error) {
       console.error('발행 취소 실패:', error)
-      toast.error('발행 취소 중 오류가 발생했습니다.')
+      setUnpublishResult({
+        status: 'error',
+        message: '발행 취소 실패',
+        details: '네트워크 오류가 발생했습니다.',
+      })
     } finally {
       setIsUnpublishing(false)
     }
+  }
+
+  // 발행 취소 모달 닫기
+  const closeUnpublishModal = () => {
+    setShowUnpublishConfirm(false)
+    setUnpublishTarget(null)
+    setUnpublishResult({ status: 'idle', message: '' })
   }
 
   const formatPrice = (price: number | null) => (!price ? '-' : `₩${price.toLocaleString()}`)
@@ -1077,7 +1139,6 @@ export default function PublishPage() {
                           const published = isPublished(product.id, group.type, item.id)
                           const selected = selectedCells.has(cellKey(product.id, group.type, item.id))
                           const priceSet = hasPrice(product.id)
-                          const isShopPublished = published && group.type === 'shop'
 
                           return (
                             <td
@@ -1089,16 +1150,14 @@ export default function PublishPage() {
                                 className={`w-8 h-8 rounded transition-all ${
                                   selected
                                     ? 'bg-purple-500 hover:bg-purple-600 cursor-pointer'
-                                    : isShopPublished
-                                    ? 'bg-green-500 hover:bg-green-600 cursor-pointer'
                                     : published
-                                    ? 'bg-green-500 cursor-not-allowed'
+                                    ? 'bg-green-500 hover:bg-green-600 cursor-pointer'
                                     : !priceSet
                                     ? 'bg-amber-100 hover:bg-amber-200 cursor-pointer border-2 border-dashed border-amber-300'
                                     : 'bg-gray-200 hover:bg-gray-300 cursor-pointer'
                                 }`}
                                 title={`${product.name} → ${item.name}: ${
-                                  isShopPublished ? '발행됨 (클릭하여 취소)' : published ? '발행됨' : !priceSet ? '가격 미설정 (설정 필요)' : '미발행'
+                                  published ? '발행됨 (클릭하여 취소)' : !priceSet ? '가격 미설정 (설정 필요)' : '미발행'
                                 }`}
                               >
                                 {published && <Check size={16} className="text-white mx-auto" />}
@@ -1262,68 +1321,134 @@ export default function PublishPage() {
             className="absolute inset-0 bg-black/50"
             onClick={() => {
               if (!isUnpublishing) {
-                setShowUnpublishConfirm(false)
-                setUnpublishTarget(null)
+                closeUnpublishModal()
               }
             }}
           />
           <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
-            {/* 헤더 */}
-            <div className="bg-red-50 p-6 border-b border-red-100">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-red-100 rounded-full">
-                  <Trash2 size={24} className="text-red-600" />
+            {/* 결과 표시 (성공/경고/에러) */}
+            {unpublishResult.status !== 'idle' ? (
+              <>
+                {/* 결과 헤더 */}
+                <div className={`p-6 border-b ${
+                  unpublishResult.status === 'success' ? 'bg-green-50 border-green-100' :
+                  unpublishResult.status === 'warning' ? 'bg-yellow-50 border-yellow-100' :
+                  'bg-red-50 border-red-100'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`p-3 rounded-full ${
+                      unpublishResult.status === 'success' ? 'bg-green-100' :
+                      unpublishResult.status === 'warning' ? 'bg-yellow-100' :
+                      'bg-red-100'
+                    }`}>
+                      {unpublishResult.status === 'success' ? (
+                        <Check size={24} className="text-green-600" />
+                      ) : unpublishResult.status === 'warning' ? (
+                        <AlertTriangle size={24} className="text-yellow-600" />
+                      ) : (
+                        <X size={24} className="text-red-600" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">{unpublishResult.message}</h3>
+                      <p className="text-sm text-gray-600">
+                        {unpublishTarget.productName} → {unpublishTarget.targetName}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">발행 취소</h3>
-                  <p className="text-sm text-gray-600">쇼핑몰에서 상품을 제거합니다</p>
-                </div>
-              </div>
-            </div>
 
-            {/* 콘텐츠 */}
-            <div className="p-6">
-              <div className="p-4 bg-gray-50 rounded-xl mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-500">상품</span>
-                  <span className="font-medium text-gray-900 truncate max-w-[200px]">{unpublishTarget.productName}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">쇼핑몰</span>
-                  <span className="font-medium text-gray-900">{unpublishTarget.shopName}</span>
-                </div>
-              </div>
+                {/* 결과 콘텐츠 */}
+                <div className="p-6">
+                  {unpublishResult.details && (
+                    <div className={`p-4 rounded-xl mb-4 ${
+                      unpublishResult.status === 'success' ? 'bg-green-50 text-green-700' :
+                      unpublishResult.status === 'warning' ? 'bg-yellow-50 text-yellow-700' :
+                      'bg-red-50 text-red-700'
+                    }`}>
+                      <p className="text-sm">{unpublishResult.details}</p>
+                    </div>
+                  )}
 
-              <p className="text-sm text-gray-600 mb-6">
-                이 상품의 발행을 취소하시겠습니까?
-                <br />
-                <span className="text-red-500">
-                  주문 또는 문의가 있는 상품은 취소할 수 없습니다.
-                </span>
-              </p>
+                  <Button
+                    className="w-full"
+                    onClick={closeUnpublishModal}
+                  >
+                    닫기
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* 확인 헤더 */}
+                <div className="bg-red-50 p-6 border-b border-red-100">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-red-100 rounded-full">
+                      <Trash2 size={24} className="text-red-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">발행 취소</h3>
+                      <p className="text-sm text-gray-600">
+                        {unpublishTarget.targetType === 'channel'
+                          ? '소매밴드에서 게시물을 삭제합니다'
+                          : '쇼핑몰에서 상품을 제거합니다'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-              <div className="flex gap-3">
-                <Button
-                  variant="secondary"
-                  className="flex-1"
-                  onClick={() => {
-                    setShowUnpublishConfirm(false)
-                    setUnpublishTarget(null)
-                  }}
-                  disabled={isUnpublishing}
-                >
-                  닫기
-                </Button>
-                <Button
-                  className="flex-1 bg-red-600 hover:bg-red-700"
-                  onClick={handleUnpublish}
-                  loading={isUnpublishing}
-                >
-                  <Trash2 size={16} className="mr-2" />
-                  발행 취소
-                </Button>
-              </div>
-            </div>
+                {/* 확인 콘텐츠 */}
+                <div className="p-6">
+                  <div className="p-4 bg-gray-50 rounded-xl mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-500">상품</span>
+                      <span className="font-medium text-gray-900 truncate max-w-[200px]">{unpublishTarget.productName}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500">
+                        {unpublishTarget.targetType === 'channel' ? '소매밴드' : '쇼핑몰'}
+                      </span>
+                      <span className="font-medium text-gray-900">{unpublishTarget.targetName}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-gray-600 mb-6">
+                    이 상품의 발행을 취소하시겠습니까?
+                    <br />
+                    {unpublishTarget.targetType === 'channel' ? (
+                      <span className="text-red-500">
+                        소매밴드에서 해당 게시물이 삭제됩니다.
+                        <br />
+                        주문 또는 문의가 있는 상품은 취소할 수 없습니다.
+                      </span>
+                    ) : (
+                      <span className="text-red-500">
+                        주문 또는 문의가 있는 상품은 취소할 수 없습니다.
+                      </span>
+                    )}
+                  </p>
+
+                  <div className="flex gap-3">
+                    <Button
+                      variant="secondary"
+                      className="flex-1"
+                      onClick={closeUnpublishModal}
+                      disabled={isUnpublishing}
+                    >
+                      닫기
+                    </Button>
+                    <Button
+                      className="flex-1 bg-red-600 hover:bg-red-700"
+                      onClick={handleUnpublish}
+                      loading={isUnpublishing}
+                    >
+                      <Trash2 size={16} className="mr-2" />
+                      발행 취소
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

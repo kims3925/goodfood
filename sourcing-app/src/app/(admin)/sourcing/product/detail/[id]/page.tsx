@@ -59,7 +59,7 @@ interface Product {
   }>
 }
 
-interface PublishHistory {
+interface PublishedProduct {
   id: number
   status: 'PENDING' | 'SUCCESS' | 'FAILED'
   publishType: 'RETAIL_BAND' | 'SHOPPING_MALL'
@@ -105,7 +105,7 @@ export default function ProductDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false)
 
   // 발행현황 상태
-  const [publishHistory, setPublishHistory] = useState<PublishHistory[]>([])
+  const [publishedProducts, setPublishedProducts] = useState<PublishedProduct[]>([])
   const [isLoadingPublish, setIsLoadingPublish] = useState(false)
 
   // 옵션 편집 상태
@@ -130,7 +130,7 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (activeTab === 'publish' && productId) {
-      loadPublishHistory()
+      loadPublishedProducts()
     }
   }, [activeTab, productId])
 
@@ -168,14 +168,14 @@ export default function ProductDetailPage() {
     }
   }
 
-  const loadPublishHistory = async () => {
+  const loadPublishedProducts = async () => {
     try {
       setIsLoadingPublish(true)
       const response = await fetch(`/api/product/publish?productId=${productId}`)
       const data = await response.json()
 
       if (data.success) {
-        setPublishHistory(data.data || [])
+        setPublishedProducts(data.data || [])
       }
     } catch (err) {
       console.error('발행현황 로드 실패:', err)
@@ -636,11 +636,11 @@ export default function ProductDetailPage() {
               }`}
             >
               발행현황
-              {publishHistory.length > 0 && (
+              {publishedProducts.length > 0 && (
                 <span className={`px-1.5 py-0.5 rounded-full text-xs ${
                   activeTab === 'publish' ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-600'
                 }`}>
-                  {publishHistory.length}
+                  {publishedProducts.length}
                 </span>
               )}
             </button>
@@ -1338,9 +1338,9 @@ export default function ProductDetailPage() {
                 <div className="flex justify-center py-12">
                   <Loading />
                 </div>
-              ) : publishHistory.length > 0 ? (
+              ) : publishedProducts.length > 0 ? (
                 <div className="space-y-3">
-                  {publishHistory.map((publish) => (
+                  {publishedProducts.map((publish) => (
                     <div
                       key={publish.id}
                       className="group relative bg-gradient-to-r from-slate-50 to-white p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors"

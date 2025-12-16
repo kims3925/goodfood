@@ -107,6 +107,7 @@ export async function GET(
               name: true,
             },
           },
+          refundAccount: true, // 환불 계좌 정보
         },
       })
 
@@ -175,6 +176,14 @@ export async function GET(
           } : null,
           shopId: order.shopId,
           shopName: order.shop?.name || null,
+          // 환불 계좌 정보 (무통장입금 취소 시)
+          refundAccount: order.refundAccount ? {
+            bankName: order.refundAccount.bankName,
+            accountNumber: order.refundAccount.accountNumber,
+            accountHolder: order.refundAccount.accountHolder,
+          } : null,
+          cancelReason: order.cancelReason || null,
+          cancelledBy: order.cancelledBy || null,
         }
 
         return NextResponse.json({
@@ -213,6 +222,7 @@ export async function GET(
               name: true,
             },
           },
+          refundAccount: true, // 환불 계좌 정보
         },
       })
 
@@ -281,6 +291,14 @@ export async function GET(
         user: null, // 비회원은 user 정보 없음
         shopId: guestOrder.shopId,
         shopName: guestOrder.shop?.name || null,
+        // 환불 계좌 정보 (무통장입금 취소 시)
+        refundAccount: guestOrder.refundAccount ? {
+          bankName: guestOrder.refundAccount.bankName,
+          accountNumber: guestOrder.refundAccount.accountNumber,
+          accountHolder: guestOrder.refundAccount.accountHolder,
+        } : null,
+        cancelReason: guestOrder.cancelReason || null,
+        cancelledBy: guestOrder.cancelledBy || null,
       }
 
       return NextResponse.json({
@@ -400,8 +418,11 @@ export async function PATCH(
           updateData.cancelledAt = now
           updateData.cancelledBy = 'ADMIN'
 
-          // 결제가 완료된 상태인 경우 토스페이먼츠 결제 취소 API 호출
-          if (order.payment && order.payment.paymentKey && ['DONE', 'PARTIAL_CANCELED'].includes(order.payment.status)) {
+          // 카드 결제인 경우만 토스페이먼츠 결제 취소 API 호출
+          // 무통장입금/가상계좌는 토스 API 호출하지 않음 (환불 계좌로 수동 환불)
+          const isCardPayment = order.payment?.method === 'CARD'
+
+          if (order.payment && order.payment.paymentKey && ['DONE', 'PARTIAL_CANCELED'].includes(order.payment.status) && isCardPayment) {
             const paymentAmount = Number(order.payment.amount)
             const alreadyCancelledAmount = Number(order.payment.cancelledAmount || 0)
             const remainingAmount = paymentAmount - alreadyCancelledAmount
@@ -431,6 +452,19 @@ export async function PATCH(
                 }
               })
             }
+          }
+
+          // 무통장입금/가상계좌의 경우 Payment 상태만 업데이트
+          const isVirtualAccountPayment = order.payment?.method === 'VIRTUAL_ACCOUNT' || order.payment?.method === 'BANK_TRANSFER'
+          if (order.payment && isVirtualAccountPayment) {
+            await prisma.payment.update({
+              where: { id: order.payment.id },
+              data: {
+                status: 'CANCELED',
+                cancelReason: body.cancelReason || '관리자에 의한 주문 취소',
+                cancelledAt: now,
+              }
+            })
           }
           break
       }
@@ -512,8 +546,11 @@ export async function PATCH(
           updateData.cancelledAt = now
           updateData.cancelledBy = 'ADMIN'
 
-          // 결제가 완료된 상태인 경우 토스페이먼츠 결제 취소 API 호출
-          if (guestOrder.payment && guestOrder.payment.paymentKey && ['DONE', 'PARTIAL_CANCELED'].includes(guestOrder.payment.status)) {
+          // 카드 결제인 경우만 토스페이먼츠 결제 취소 API 호출
+          // 무통장입금/가상계좌는 토스 API 호출하지 않음 (환불 계좌로 수동 환불)
+          const isGuestCardPayment = guestOrder.payment?.method === 'CARD'
+
+          if (guestOrder.payment && guestOrder.payment.paymentKey && ['DONE', 'PARTIAL_CANCELED'].includes(guestOrder.payment.status) && isGuestCardPayment) {
             const paymentAmount = Number(guestOrder.payment.amount)
             const alreadyCancelledAmount = Number(guestOrder.payment.cancelledAmount || 0)
             const remainingAmount = paymentAmount - alreadyCancelledAmount
@@ -543,6 +580,19 @@ export async function PATCH(
                 }
               })
             }
+          }
+
+          // 무통장입금/가상계좌의 경우 Payment 상태만 업데이트
+          const isGuestVirtualAccountPayment = guestOrder.payment?.method === 'VIRTUAL_ACCOUNT' || guestOrder.payment?.method === 'BANK_TRANSFER'
+          if (guestOrder.payment && isGuestVirtualAccountPayment) {
+            await prisma.guestPayment.update({
+              where: { id: guestOrder.payment.id },
+              data: {
+                status: 'CANCELED',
+                cancelReason: body.cancelReason || '관리자에 의한 주문 취소',
+                cancelledAt: now,
+              }
+            })
           }
           break
       }

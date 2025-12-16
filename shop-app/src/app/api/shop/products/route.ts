@@ -24,9 +24,11 @@ export async function GET(req: NextRequest) {
     const currentShopId = shopIdHeader ? parseInt(shopIdHeader) : null
 
     // 기본 조건: 발행된 상품만 (published_product 테이블을 통해)
+    // isActive가 true인 상품만 노출 (비활성 상품은 품절 처리)
     const where: any = {
       publishedProducts: {
         some: {
+          isActive: true, // 활성 상태인 상품만 목록에 노출
           // shopId 기반 필터링 (우선)
           ...(currentShopId ? { shopId: currentShopId } : {}),
           // channelId 하위 호환

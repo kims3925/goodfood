@@ -20,6 +20,7 @@ import {
   ImageOff,
   FileSpreadsheet,
   Building2,
+  Banknote,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
@@ -62,6 +63,12 @@ interface OrderUser {
   email: string
 }
 
+interface RefundAccountInfo {
+  bankName: string
+  accountNumber: string
+  accountHolder: string
+}
+
 interface UnifiedOrderDetail {
   id: number
   source: OrderSource
@@ -87,6 +94,10 @@ interface UnifiedOrderDetail {
   user: OrderUser | null
   shopId: number | null
   shopName: string | null
+  // 환불 계좌 정보 (무통장입금 취소 시)
+  refundAccount: RefundAccountInfo | null
+  cancelReason: string | null
+  cancelledBy: string | null
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -463,7 +474,14 @@ export default function UnifiedOrderDetailPage() {
                 </p>
                 <p className="text-sm text-gray-600">
                   {formatDate(order.cancelledAt)}
+                  {order.cancelledBy && ` (${order.cancelledBy === 'ADMIN' ? '관리자' : order.cancelledBy === 'USER' ? '회원' : '비회원'})`}
                 </p>
+                {/* 취소 사유 */}
+                {order.cancelReason && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    <span className="font-medium">취소 사유:</span> {order.cancelReason}
+                  </p>
+                )}
               </div>
               {order.status === 'CANCELLED' && (
                 <Button
@@ -476,6 +494,32 @@ export default function UnifiedOrderDetailPage() {
                 </Button>
               )}
             </div>
+
+            {/* 무통장입금 환불 계좌 정보 */}
+            {order.refundAccount && (
+              <div className="mt-4 pt-4 border-t border-red-200">
+                <div className="flex items-start gap-3">
+                  <Banknote size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-gray-900 mb-2">환불 계좌 정보</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-500">은행: </span>
+                        <span className="font-medium text-gray-900">{order.refundAccount.bankName}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">계좌번호: </span>
+                        <span className="font-mono font-medium text-gray-900">{order.refundAccount.accountNumber}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">예금주: </span>
+                        <span className="font-medium text-gray-900">{order.refundAccount.accountHolder}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

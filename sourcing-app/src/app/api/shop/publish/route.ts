@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma, { ChannelKind } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { publishService } from '@/modules/publish'
+import { bandPlaywrightService } from '@/modules/band-playwright/band-playwright.service'
+import { NaverBandClient } from '@/modules/sourcing/domain/src/channel'
 
 /**
  * GET /api/shop/publish
@@ -388,6 +390,7 @@ export async function POST(request: NextRequest) {
  *
  * Unpublish products from channels or shops
  * 주문이나 문의가 있는 발행 상품은 삭제 불가 (리뷰는 제외)
+ * 채널(소매밴드) 발행의 경우 Band에서도 게시물 삭제
  */
 export async function DELETE(request: NextRequest) {
   try {
@@ -410,7 +413,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // 발행 상품 조회 (주문, 문의 카운트 포함)
+    // 발행 상품 조회 (주문, 문의 카운트 + 채널 정보 포함)
     const publishedProducts = await prisma.publishedProduct.findMany({
       where: {
         id: { in: publishIds },
@@ -419,6 +422,13 @@ export async function DELETE(request: NextRequest) {
       include: {
         product: {
           select: { name: true },
+        },
+        channel: {
+          select: {
+            id: true,
+            channelKey: true,
+            name: true,
+          },
         },
         _count: {
           select: {
@@ -431,7 +441,7 @@ export async function DELETE(request: NextRequest) {
 
     // 삭제 불가한 발행 상품 확인
     const cannotDelete: { id: number; name: string; reason: string }[] = []
-    const canDelete: number[] = []
+    const canDelete: typeof publishedProducts = []
 
     for (const pp of publishedProducts) {
       const hasOrders = pp._count.orderItems > 0
@@ -447,7 +457,7 @@ export async function DELETE(request: NextRequest) {
           reason: reasons.join(', '),
         })
       } else {
-        canDelete.push(pp.id)
+        canDelete.push(pp)
       }
     }
 
@@ -461,23 +471,75 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // 삭제 가능한 상품만 삭제
+    // 삭제 가능한 상품 처리
     let deletedCount = 0
+    const bandDeleteErrors: string[] = []
+
     if (canDelete.length > 0) {
-      const deleteResult = await prisma.publishedProduct.deleteMany({
-        where: {
-          id: { in: canDelete },
-          userId,
-        },
-      })
-      deletedCount = deleteResult.count
+      // 채널 발행인 경우 Band에서 게시물 삭제 시도 (Playwright 사용)
+      const successfulDeletes: number[] = [] // Band 삭제 성공한 ID 목록
+
+      for (const pp of canDelete) {
+        console.log(`[Unpublish] 발행 취소 처리: productId=${pp.productId}, channelId=${pp.channelId}, postKey=${pp.postKey}`)
+
+        if (pp.channelId && pp.channel && pp.postKey) {
+          // Playwright로 게시물 삭제 시도
+          try {
+            console.log(`[Unpublish] Playwright 삭제 시도: channelId=${pp.channelId}, bandKey=${pp.channel.channelKey}, postKey=${pp.postKey}`)
+            const deleteResult = await bandPlaywrightService.deletePost({
+              channelId: pp.channelId,
+              bandKey: pp.channel.channelKey,
+              bandName: pp.channel.name,
+              postKey: pp.postKey,
+            })
+
+            if (deleteResult.success) {
+              console.log(`[Unpublish] Band 게시물 삭제 성공: ${pp.channel.name} / postKey: ${pp.postKey}`)
+              successfulDeletes.push(pp.id) // Band 삭제 성공한 경우만 DB 삭제 대상에 추가
+            } else {
+              console.error(`[Unpublish] Band 게시물 삭제 실패: ${deleteResult.error}`)
+              bandDeleteErrors.push(`${pp.product.name}: ${deleteResult.error}`)
+            }
+          } catch (bandError: any) {
+            console.error(`[Unpublish] Band 게시물 삭제 실패: ${bandError.message}`)
+            bandDeleteErrors.push(`${pp.product.name}: ${bandError.message}`)
+          }
+        } else if (pp.shopId) {
+          // Shop 발행인 경우 - DB만 삭제
+          successfulDeletes.push(pp.id)
+        } else {
+          // postKey 없는 채널 발행 - DB만 삭제 (이전 데이터)
+          console.warn(`[Unpublish] postKey 없음 - DB만 삭제: ${pp.product.name} (채널: ${pp.channel?.name || 'N/A'})`)
+          successfulDeletes.push(pp.id)
+        }
+      }
+
+      // Band 삭제 성공한 것만 DB에서 레코드 삭제
+      if (successfulDeletes.length > 0) {
+        const deleteResult = await prisma.publishedProduct.deleteMany({
+          where: {
+            id: { in: successfulDeletes },
+            userId,
+          },
+        })
+        deletedCount = deleteResult.count
+      }
     }
 
+    // Band 삭제 실패가 있으면 실패로 처리
+    const hasErrors = bandDeleteErrors.length > 0
+    const allFailed = deletedCount === 0 && hasErrors
+
     return NextResponse.json({
-      success: true,
+      success: !allFailed, // 모두 실패하면 false
       deletedCount,
       cannotDelete: cannotDelete.length > 0 ? cannotDelete : undefined,
-      message: cannotDelete.length > 0
+      bandDeleteErrors: bandDeleteErrors.length > 0 ? bandDeleteErrors : undefined,
+      message: allFailed
+        ? '발행 취소 실패: 밴드 게시물을 삭제할 수 없습니다.'
+        : hasErrors
+        ? `${deletedCount}개 발행 취소 완료, ${bandDeleteErrors.length}개 밴드 삭제 실패`
+        : cannotDelete.length > 0
         ? `${deletedCount}개 발행 취소 완료, ${cannotDelete.length}개는 주문/문의가 있어 취소 불가`
         : `${deletedCount}개 발행 취소 완료`,
     })
