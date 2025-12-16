@@ -357,7 +357,7 @@ export class CartService {
       throw new ValidationError('publishedProductId는 필수입니다')
     }
 
-    // publishedProduct 확인 (존재 여부만 확인)
+    // publishedProduct 확인 (존재 여부 및 활성 상태 확인)
     const publishedProduct = await prisma.publishedProduct.findFirst({
       where: {
         id: publishedProductId,
@@ -373,6 +373,11 @@ export class CartService {
 
     if (!publishedProduct) {
       throw new NotFoundError('상품', String(publishedProductId))
+    }
+
+    // 비활성(품절) 상품은 장바구니에 추가할 수 없음
+    if (!publishedProduct.isActive) {
+      throw new BusinessLogicError('품절된 상품은 장바구니에 담을 수 없습니다')
     }
 
     const cart = await this.getOrCreateCart(sessionId, userId, shopId)

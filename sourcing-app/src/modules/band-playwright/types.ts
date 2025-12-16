@@ -101,3 +101,15 @@ export class BandPlaywrightError extends Error {
     this.name = 'BandPlaywrightError'
   }
 }
+
+export interface BandDeleteParams {
+  channelId: number
+  bandKey: string
+  bandName: string
+  postKey: string  // post_no (숫자 형태)
+}
+
+export interface BandDeleteResult {
+  success: boolean
+  error?: string
+}

@@ -198,6 +198,16 @@ export async function POST(req: NextRequest) {
         )
       }
 
+      // 품절(비활성) 상품 체크
+      const soldOutItems = cart.items.filter((item) => !item.publishedProduct.isActive)
+      if (soldOutItems.length > 0) {
+        const soldOutNames = soldOutItems.map((item) => item.publishedProduct.product.name).join(', ')
+        return NextResponse.json(
+          { success: false, error: `품절된 상품이 포함되어 있습니다: ${soldOutNames}` },
+          { status: 400 }
+        )
+      }
+
       orderItems = cart.items.map((item) => {
         const publishedProduct = item.publishedProduct
         const product = publishedProduct.product
@@ -240,6 +250,14 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(
             { success: false, error: `상품을 찾을 수 없거나 판매 중인 상품이 아닙니다` },
             { status: 404 }
+          )
+        }
+
+        // 품절(비활성) 상품 체크
+        if (!publishedProduct.isActive) {
+          return NextResponse.json(
+            { success: false, error: `품절된 상품입니다: ${publishedProduct.product.name}` },
+            { status: 400 }
           )
         }
 

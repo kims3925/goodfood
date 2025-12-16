@@ -59,12 +59,6 @@ enum TriggerType {
   SCHEDULED
 }
 
-enum PublishStatus {
-  SUCCESS
-  FAILED
-  PENDING
-}
-
 enum CustomerOrderStatus {
   PENDING
   PAID

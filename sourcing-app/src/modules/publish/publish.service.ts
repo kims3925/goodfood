@@ -306,12 +306,13 @@ export class PublishService {
         console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
       }
 
-      // 7. PublishedProduct 레코드 생성
+      // 7. PublishedProduct 레코드 생성 (postKey 포함)
       const publishedProduct = await prisma.publishedProduct.create({
         data: {
           userId,
           productId,
           channelId,
+          postKey, // Band 게시물 키 저장 (발행 취소 시 필요)
           publishedAt: new Date(),
         },
       })
@@ -950,12 +951,13 @@ export class PublishService {
         console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
       }
 
-      // 7. PublishedProduct 레코드 생성
+      // 7. PublishedProduct 레코드 생성 (postKey 포함)
       const publishedProduct = await prisma.publishedProduct.create({
         data: {
           userId,
           productId,
           channelId,
+          postKey, // Band 게시물 키 저장 (발행 취소 시 필요)
           publishedAt: new Date(),
         },
       })
@@ -1015,6 +1017,7 @@ export class PublishService {
   /**
    * 배치 발행 (SSE 스트리밍용)
    * Generator 함수로 각 상품 발행 시 SSE 이벤트를 yield
+   * 이벤트 큐를 사용하여 콜백에서 발생한 진행률 이벤트도 전달
    */
   async *publishBatchWithStream(params: {
     userId: number
@@ -1022,6 +1025,9 @@ export class PublishService {
     channelId: number
   }): AsyncGenerator<PublishSSEEvent, void, unknown> {
     const { userId, productIds, channelId } = params
+
+    // 이벤트 큐 (콜백에서 발생한 이벤트 저장)
+    const eventQueue: PublishSSEEvent[] = []
 
     // 채널 정보 조회
     const channel = await prisma.channel.findFirst({
@@ -1044,6 +1050,13 @@ export class PublishService {
       return
     }
 
+    // 상품 정보 미리 조회 (이름 표시용)
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds }, userId },
+      select: { id: true, name: true },
+    })
+    const productNameMap = new Map(products.map(p => [p.id, p.name]))
+
     // 배치 시작 이벤트
     yield {
       type: 'batch_start',
@@ -1062,6 +1075,7 @@ export class PublishService {
 
     for (let i = 0; i < productIds.length; i++) {
       const productId = productIds[i]
+      const productName = productNameMap.get(productId) || `상품 ${productId}`
 
       // 상품 발행 시작 이벤트
       yield {
@@ -1074,7 +1088,7 @@ export class PublishService {
           currentIndex: i,
           progress: {
             productId,
-            productName: `상품 ${productId}`,
+            productName,
             stage: 'preparing',
             stageLabel: '준비 중',
           },
@@ -1087,16 +1101,70 @@ export class PublishService {
         await delay(cooldownMs)
       }
 
-      // 발행 진행 - 진행 콜백으로 각 단계 전달
-      const result = await this.publishToChannelWithProgress({
+      // 이벤트 큐 초기화
+      eventQueue.length = 0
+
+      // 발행 진행 - 진행 콜백에서 이벤트 큐에 추가
+      const publishPromise = this.publishToChannelWithProgress({
         userId,
         productId,
         channelId,
         onStageProgress: async (progress) => {
-          // 단계 변경 이벤트를 yield할 수 없으므로 개별 발행 함수에서 처리
-          // 여기서는 빈 처리 (이벤트는 product_complete에서 종합)
+          // 콜백에서 이벤트 큐에 추가
+          eventQueue.push({
+            type: 'stage_update',
+            timestamp: Date.now(),
+            data: {
+              channelId,
+              channelName: channel.name,
+              totalProducts: productIds.length,
+              currentIndex: i,
+              progress: {
+                productId,
+                productName,
+                stage: progress.stage,
+                stageLabel: progress.stageLabel,
+                imageProgress: progress.imageProgress,
+                publishMethod: progress.publishMethod,
+                error: progress.error,
+              },
+            },
+          })
         },
       })
+
+      // 발행 진행 중 이벤트 큐 폴링 (100ms 간격)
+      let result: PublishToChannelResult | null = null
+      let publishDone = false
+
+      publishPromise.then(r => {
+        result = r
+        publishDone = true
+      }).catch(err => {
+        result = { success: false, productId, channelId, error: err.message }
+        publishDone = true
+      })
+
+      // 발행 완료까지 이벤트 큐 체크
+      while (!publishDone) {
+        await delay(100)
+
+        // 큐에 있는 이벤트 모두 yield
+        while (eventQueue.length > 0) {
+          const event = eventQueue.shift()!
+          yield event
+        }
+      }
+
+      // 남은 이벤트 처리
+      while (eventQueue.length > 0) {
+        const event = eventQueue.shift()!
+        yield event
+      }
+
+      if (!result) {
+        result = { success: false, productId, channelId, error: '알 수 없는 오류' }
+      }
 
       if (result.publishMethod) {
         lastPublishMethod = result.publishMethod
@@ -1127,7 +1195,7 @@ export class PublishService {
           skippedCount,
           progress: {
             productId,
-            productName: `상품 ${productId}`,
+            productName,
             stage: result.success ? (result.skipped ? 'skipped' : 'completed') : 'failed',
             stageLabel: result.success ? (result.skipped ? '건너뜀' : '완료') : '실패',
             imageProgress: result.imageCount

@@ -22,6 +22,7 @@ model Order {
   items           OrderItem[]
   payment         Payment?
   shippingAddress ShippingAddress?
+  refundAccount   RefundAccount?
 
   @@index([userId])
   @@index([shopId])

@@ -23,6 +23,7 @@ model GuestOrder {
   items           GuestOrderItem[]
   payment         GuestPayment?
   shippingAddress ShippingAddress?
+  refundAccount   RefundAccount?
 
   @@index([shopId])
   @@index([orderNumber])

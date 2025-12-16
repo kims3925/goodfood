@@ -27,6 +27,12 @@ const CANCEL_REASONS = [
 interface CancelRequest {
   reason: string
   customReason?: string
+  // 무통장입금/가상계좌 환불 계좌 정보
+  refundAccount?: {
+    bankName: string
+    accountNumber: string
+    accountHolder: string
+  }
 }
 
 /**
@@ -63,7 +69,7 @@ export async function POST(
 
     // 요청 본문 파싱
     const body: CancelRequest = await req.json()
-    const { reason, customReason } = body
+    const { reason, customReason, refundAccount } = body
 
     if (!reason) {
       return NextResponse.json(
@@ -116,14 +122,28 @@ export async function POST(
       )
     }
 
+    // 무통장입금/가상계좌 결제의 경우 환불 계좌 정보 필수 확인
+    const isVirtualAccountPayment = order.payment?.method === 'VIRTUAL_ACCOUNT' || order.payment?.method === 'BANK_TRANSFER'
+    if (isVirtualAccountPayment && order.status === 'PAID') {
+      if (!refundAccount || !refundAccount.bankName || !refundAccount.accountNumber || !refundAccount.accountHolder) {
+        return NextResponse.json(
+          { success: false, error: '무통장입금 환불을 위해 환불 계좌 정보를 입력해주세요' },
+          { status: 400 }
+        )
+      }
+    }
+
     // 취소 사유 텍스트
     const reasonLabel = CANCEL_REASONS.find(r => r.value === reason)?.label || reason
     const cancelReasonText = reason === 'OTHER' && customReason
       ? `${reasonLabel}: ${customReason}`
       : reasonLabel
 
-    // 결제가 완료된 주문인 경우 토스페이먼츠 결제 취소
-    if (order.payment && order.payment.paymentKey && order.status === 'PAID') {
+    // 결제가 완료된 주문인 경우 토스페이먼츠 결제 취소 (카드결제만)
+    // 무통장입금/가상계좌는 토스 API 호출하지 않음 (환불 계좌로 수동 환불)
+    const isCardPayment = order.payment?.method === 'CARD'
+
+    if (order.payment && order.payment.paymentKey && order.status === 'PAID' && isCardPayment) {
       try {
         const authHeader = Buffer.from(`${TOSS_SECRET_KEY}:`).toString('base64')
 
@@ -175,6 +195,18 @@ export async function POST(
       }
     }
 
+    // 무통장입금/가상계좌의 경우 Payment 상태만 업데이트
+    if (order.payment && isVirtualAccountPayment && order.status === 'PAID') {
+      await prisma.payment.update({
+        where: { id: order.payment.id },
+        data: {
+          status: 'CANCELED',
+          cancelReason: cancelReasonText,
+        },
+      })
+      console.log(`무통장입금 결제 취소 처리: ${order.orderNumber}`)
+    }
+
     // 주문 상태 업데이트
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
@@ -189,6 +221,19 @@ export async function POST(
         payment: true,
       },
     })
+
+    // 무통장입금/가상계좌 환불 계좌 정보 저장
+    if (isVirtualAccountPayment && refundAccount) {
+      await prisma.refundAccount.create({
+        data: {
+          orderId: updatedOrder.id,
+          bankName: refundAccount.bankName,
+          accountNumber: refundAccount.accountNumber,
+          accountHolder: refundAccount.accountHolder,
+        },
+      })
+      console.log(`환불 계좌 정보 저장: ${refundAccount.bankName} ${refundAccount.accountNumber}`)
+    }
 
     console.log(`주문 취소 완료: ${order.orderNumber}`)
 

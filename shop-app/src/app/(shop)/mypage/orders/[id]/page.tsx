@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import toast from 'react-hot-toast'
 
 // 취소 사유 목록
 const CANCEL_REASONS = [
@@ -36,6 +37,31 @@ const CANCEL_REASONS = [
   { value: 'DELIVERY_DELAY', label: '배송 지연' },
   { value: 'OUT_OF_STOCK', label: '상품 품절' },
   { value: 'OTHER', label: '기타' },
+]
+
+// 은행 목록
+const BANK_LIST = [
+  { code: 'KB', name: 'KB국민은행' },
+  { code: 'SHINHAN', name: '신한은행' },
+  { code: 'WOORI', name: '우리은행' },
+  { code: 'HANA', name: '하나은행' },
+  { code: 'NH', name: 'NH농협은행' },
+  { code: 'IBK', name: 'IBK기업은행' },
+  { code: 'SC', name: 'SC제일은행' },
+  { code: 'CITI', name: '한국씨티은행' },
+  { code: 'KAKAO', name: '카카오뱅크' },
+  { code: 'TOSS', name: '토스뱅크' },
+  { code: 'KBANK', name: '케이뱅크' },
+  { code: 'POST', name: '우체국' },
+  { code: 'SUHYUP', name: '수협은행' },
+  { code: 'BUSAN', name: '부산은행' },
+  { code: 'DAEGU', name: '대구은행' },
+  { code: 'KWANGJU', name: '광주은행' },
+  { code: 'JEONBUK', name: '전북은행' },
+  { code: 'JEJU', name: '제주은행' },
+  { code: 'KYONGNAM', name: '경남은행' },
+  { code: 'SAEMAUL', name: '새마을금고' },
+  { code: 'SHINHYUP', name: '신협' },
 ]
 
 // 취소 가능한 상태
@@ -162,6 +188,11 @@ export default function OrderDetailPage() {
   const [customReason, setCustomReason] = useState('')
   const [cancelLoading, setCancelLoading] = useState(false)
 
+  // 환불 계좌 상태 (무통장입금용)
+  const [refundBankName, setRefundBankName] = useState('')
+  const [refundAccountNumber, setRefundAccountNumber] = useState('')
+  const [refundAccountHolder, setRefundAccountHolder] = useState('')
+
   const orderId = params.id as string
 
   useEffect(() => {
@@ -261,7 +292,14 @@ export default function OrderDetailPage() {
     setCancelModalOpen(false)
     setCancelReason('')
     setCustomReason('')
+    setRefundBankName('')
+    setRefundAccountNumber('')
+    setRefundAccountHolder('')
   }
+
+  // 무통장입금/가상계좌 결제 여부 확인
+  const isVirtualAccountPayment = order?.payment?.method === 'VIRTUAL_ACCOUNT' || order?.payment?.method === 'BANK_TRANSFER'
+  const needsRefundAccount = isVirtualAccountPayment && order?.status === 'PAID'
 
   // 주문 취소 처리
   const handleCancelOrder = async () => {
@@ -273,16 +311,35 @@ export default function OrderDetailPage() {
       return
     }
 
+    // 무통장입금 환불 계좌 검증
+    if (needsRefundAccount) {
+      if (!refundBankName || !refundAccountNumber.trim() || !refundAccountHolder.trim()) {
+        toast.error('환불 계좌 정보를 모두 입력해주세요.')
+        return
+      }
+    }
+
     try {
       setCancelLoading(true)
+
+      const requestBody: any = {
+        reason: cancelReason,
+        customReason: cancelReason === 'OTHER' ? customReason : undefined,
+      }
+
+      // 무통장입금 환불 계좌 정보 추가
+      if (needsRefundAccount) {
+        requestBody.refundAccount = {
+          bankName: refundBankName,
+          accountNumber: refundAccountNumber.trim(),
+          accountHolder: refundAccountHolder.trim(),
+        }
+      }
 
       const response = await fetch(getApiPath(`/api/orders/${order.id}/cancel`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reason: cancelReason,
-          customReason: cancelReason === 'OTHER' ? customReason : undefined,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       const data = await response.json()
@@ -290,9 +347,12 @@ export default function OrderDetailPage() {
       if (data.success) {
         closeCancelModal()
         fetchOrder() // 주문 정보 새로고침
+      } else {
+        toast.error(data.error || '주문 취소에 실패했습니다.')
       }
     } catch (error) {
       console.error('주문 취소 오류:', error)
+      toast.error('주문 취소 중 오류가 발생했습니다.')
     } finally {
       setCancelLoading(false)
     }
@@ -808,6 +868,63 @@ export default function OrderDetailPage() {
                   />
                 </div>
               )}
+
+              {/* 무통장입금 환불 계좌 입력 */}
+              {needsRefundAccount && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-blue-800 mb-2">
+                    <Building2 className="w-4 h-4" />
+                    <p className="text-sm font-medium">환불 계좌 정보</p>
+                  </div>
+                  <p className="text-xs text-blue-600 mb-3">
+                    무통장입금 환불을 위해 계좌 정보를 입력해주세요.
+                  </p>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      은행 선택 <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={refundBankName}
+                      onChange={(e) => setRefundBankName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    >
+                      <option value="">은행을 선택해주세요</option>
+                      {BANK_LIST.map((bank) => (
+                        <option key={bank.code} value={bank.name}>
+                          {bank.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      계좌번호 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={refundAccountNumber}
+                      onChange={(e) => setRefundAccountNumber(e.target.value.replace(/[^0-9-]/g, ''))}
+                      placeholder="'-' 없이 숫자만 입력"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      예금주 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={refundAccountHolder}
+                      onChange={(e) => setRefundAccountHolder(e.target.value)}
+                      placeholder="예금주명 입력"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 모달 푸터 */}
@@ -821,7 +938,7 @@ export default function OrderDetailPage() {
               </button>
               <button
                 onClick={handleCancelOrder}
-                disabled={cancelLoading || !cancelReason}
+                disabled={cancelLoading || !cancelReason || (needsRefundAccount && (!refundBankName || !refundAccountNumber || !refundAccountHolder))}
                 className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {cancelLoading ? (

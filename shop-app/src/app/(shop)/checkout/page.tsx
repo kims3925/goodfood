@@ -9,6 +9,7 @@ import { ArrowLeft, Package, User, MapPin, CreditCard, Truck, Plus, Check, Build
 import TossPaymentWidget from '@/modules/payments/components/TossPaymentWidget'
 import { useShop } from '@/contexts/ShopContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import toast from 'react-hot-toast'
 
 declare global {
   interface Window {
@@ -640,7 +641,7 @@ function CheckoutContent() {
 
           router.push(getPath(`/order/bank-transfer/complete?${params.toString()}`))
         } else {
-          alert(data.error || '주문 생성에 실패했습니다.')
+          toast.error(data.error || '주문 생성에 실패했습니다.')
         }
       } else {
         // 토스 결제 플로우 (회원/비회원 모두 지원)
@@ -665,7 +666,7 @@ function CheckoutContent() {
             window.scrollTo({ top: 0, behavior: 'smooth' })
           }
         } else {
-          alert(data.error || '주문 준비에 실패했습니다.')
+          toast.error(data.error || '주문 준비에 실패했습니다.')
         }
       }
     } catch (error) {

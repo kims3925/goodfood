@@ -1,0 +1,17 @@
+model RefundAccount {
+  id            Int      @id @default(autoincrement())
+  orderId       Int?     @unique @map("order_id")
+  guestOrderId  Int?     @unique @map("guest_order_id")
+  bankName      String   @map("bank_name") @db.VarChar(50)
+  accountNumber String   @map("account_number") @db.VarChar(50)
+  accountHolder String   @map("account_holder") @db.VarChar(50)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  order      Order?      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  guestOrder GuestOrder? @relation(fields: [guestOrderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([guestOrderId])
+  @@map("refund_account")
+}

@@ -103,6 +103,7 @@ export async function GET(
     const channelName = channel?.name || null
     const publishChannelId = channel?.id || null
     const publishedProductId = publishedProduct?.id || null
+    const isActive = publishedProduct?.isActive ?? true // 발행 상품의 활성 상태 (비활성이면 품절)
 
     // 판매자 정보 가져오기 (collectedProduct -> post -> channel)
     const sellerName = product.collectedProduct?.post?.channel?.name || null
@@ -148,6 +149,9 @@ export async function GET(
       // variants 정보 (가격은 variant에서 가져옴)
       variants: formattedVariants,
       optionGroups: Object.keys(optionGroups).length > 0 ? optionGroups : undefined,
+      // 품절 상태 (isActive가 false면 품절)
+      isActive,
+      isSoldOut: !isActive,
     }
 
     return NextResponse.json({

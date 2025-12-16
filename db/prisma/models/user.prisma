@@ -24,7 +24,6 @@ model User {
   orders             Order[]
   pricingPolicies    PricingPolicy[]
   products           Product[]
-  publishHistories   PublishHistory[]
   publishedProducts  PublishedProduct[]
   returnRequests     ReturnRequest[]
   reviews            Review[]

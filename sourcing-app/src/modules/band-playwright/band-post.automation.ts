@@ -2312,6 +2312,191 @@ export class BandPostAutomation {
       BandPlaywrightErrorCode.POST_FAILED
     )
   }
+
+  /**
+   * 게시물 삭제 (Playwright 사용)
+   * postKey는 post_no (숫자 형태)
+   */
+  async deletePost(page: Page, bandKey: string, bandName: string, postKey: string): Promise<{ success: boolean; error?: string }> {
+    console.log(`[밴드자동화] 게시물 삭제 시작: bandName="${bandName}", postKey=${postKey}`)
+
+    try {
+      // 1. 먼저 밴드 페이지로 이동 (navigateToBand 사용)
+      await this.navigateToBand(page, bandKey, bandName)
+
+      // 현재 URL에서 band_no 추출
+      const currentUrl = page.url()
+      const bandNoMatch = currentUrl.match(/\/band\/(\d+)/)
+      if (!bandNoMatch) {
+        await this.saveDebugScreenshot(page, 'delete-no-band-no')
+        return { success: false, error: '밴드 번호를 찾을 수 없습니다.' }
+      }
+      const bandNo = bandNoMatch[1]
+      console.log(`[밴드자동화] 밴드 번호: ${bandNo}`)
+
+      // 2. 해당 게시물 페이지로 이동
+      const postUrl = `https://band.us/band/${bandNo}/post/${postKey}`
+      console.log(`[밴드자동화] 게시물 페이지 이동: ${postUrl}`)
+
+      await page.goto(postUrl, { waitUntil: 'networkidle', timeout: 30000 })
+      await page.waitForTimeout(2000)
+
+      // 로그인 리다이렉트 확인
+      const afterNavUrl = page.url()
+      if (afterNavUrl.includes('signin') || afterNavUrl.includes('login')) {
+        return { success: false, error: '로그인이 필요합니다. 세션이 만료되었을 수 있습니다.' }
+      }
+
+      // 게시물이 존재하지 않는 경우 (이미 삭제됨)
+      const notFoundText = await page.$('text=삭제된 글입니다')
+      const notFoundText2 = await page.$('text=존재하지 않는 글입니다')
+      const notFoundText3 = await page.$('text=없는 게시글')
+      if (notFoundText || notFoundText2 || notFoundText3) {
+        console.log('[밴드자동화] 게시물이 이미 삭제되었거나 존재하지 않음')
+        return { success: true } // 이미 삭제된 것으로 처리
+      }
+
+      await this.saveDebugScreenshot(page, 'delete-post-page')
+
+      // 3. 더보기 메뉴 버튼 클릭
+      const moreButtonSelectors = [
+        'button._btnPostMore',
+        '.postMore button',
+        'button[class*="more"]',
+        '.cPost ._btnMore',
+        '.cPostBody button._btnMore',
+        '[data-viewname="DPostView"] button._btnMore',
+        '.cPostHeader button',
+        'button.uButton.-more',
+      ]
+
+      let moreButtonClicked = false
+      for (const selector of moreButtonSelectors) {
+        const moreButton = await page.$(selector)
+        if (moreButton && await moreButton.isVisible()) {
+          console.log(`[밴드자동화] 더보기 버튼 클릭: ${selector}`)
+          await moreButton.click()
+          await page.waitForTimeout(1000)
+          moreButtonClicked = true
+          break
+        }
+      }
+
+      if (!moreButtonClicked) {
+        await this.saveDebugScreenshot(page, 'delete-no-more-button')
+        return { success: false, error: '게시물 더보기 버튼을 찾을 수 없습니다.' }
+      }
+
+      await this.saveDebugScreenshot(page, 'delete-more-menu-opened')
+
+      // 4. 삭제 메뉴 클릭
+      // Band 더보기 메뉴 내에서 "삭제" 텍스트가 포함된 요소 찾기
+      let deleteMenuClicked = false
+
+      // 방법 1: 텍스트로 직접 찾기
+      const deleteByText = await page.locator('text=삭제').first()
+      if (await deleteByText.isVisible().catch(() => false)) {
+        console.log('[밴드자동화] 삭제 메뉴 클릭: text=삭제')
+        await deleteByText.click()
+        await page.waitForTimeout(1000)
+        deleteMenuClicked = true
+      }
+
+      // 방법 2: 셀렉터로 찾기
+      if (!deleteMenuClicked) {
+        const deleteMenuSelectors = [
+          'button._btnDelete',
+          'a._btnDelete',
+          '.uLayerList li:has-text("삭제")',
+          '.uLayerList button:has-text("삭제")',
+          '.layerMenu li:has-text("삭제")',
+          '.uLayer li:has-text("삭제")',
+          '[class*="layer"] li:has-text("삭제")',
+          '[class*="menu"] li:has-text("삭제")',
+          'li button:has-text("삭제")',
+          '[data-action="delete"]',
+        ]
+
+        for (const selector of deleteMenuSelectors) {
+          try {
+            const deleteMenu = await page.$(selector)
+            if (deleteMenu && await deleteMenu.isVisible()) {
+              console.log(`[밴드자동화] 삭제 메뉴 클릭: ${selector}`)
+              await deleteMenu.click()
+              await page.waitForTimeout(1000)
+              deleteMenuClicked = true
+              break
+            }
+          } catch {
+            // 계속 시도
+          }
+        }
+      }
+
+      if (!deleteMenuClicked) {
+        await this.saveDebugScreenshot(page, 'delete-no-delete-menu')
+        return { success: false, error: '삭제 메뉴를 찾을 수 없습니다. 삭제 권한이 없을 수 있습니다.' }
+      }
+
+      // 5. 삭제 확인 다이얼로그에서 확인 버튼 클릭
+      await page.waitForTimeout(500)
+      await this.saveDebugScreenshot(page, 'delete-confirm-dialog')
+
+      const confirmButtonSelectors = [
+        'button._btnConfirm',
+        '.uModalBtnArea button.confirm',
+        '.uModal button:has-text("삭제")',
+        '.layerContainer button.confirm',
+        'button:has-text("확인")',
+      ]
+
+      let confirmClicked = false
+      for (const selector of confirmButtonSelectors) {
+        const confirmButton = await page.$(selector)
+        if (confirmButton && await confirmButton.isVisible()) {
+          const buttonText = await confirmButton.textContent()
+          // "취소" 버튼이 아닌지 확인
+          if (buttonText && !buttonText.includes('취소')) {
+            console.log(`[밴드자동화] 삭제 확인 버튼 클릭: ${selector} (텍스트: ${buttonText})`)
+            await confirmButton.click()
+            await page.waitForTimeout(2000)
+            confirmClicked = true
+            break
+          }
+        }
+      }
+
+      if (!confirmClicked) {
+        await this.saveDebugScreenshot(page, 'delete-no-confirm-button')
+        return { success: false, error: '삭제 확인 버튼을 찾을 수 없습니다.' }
+      }
+
+      // 6. 삭제 성공 확인 (페이지가 리다이렉트되거나 토스트 메시지 확인)
+      await page.waitForTimeout(2000)
+      const afterUrl = page.url()
+
+      // 게시물 페이지에서 벗어났으면 성공
+      if (!afterUrl.includes(`/post/${postKey}`)) {
+        console.log(`[밴드자동화] 게시물 삭제 성공: postKey=${postKey}`)
+        return { success: true }
+      }
+
+      // 토스트 메시지 확인
+      const successToast = await page.$('text=삭제되었습니다')
+      if (successToast) {
+        console.log(`[밴드자동화] 게시물 삭제 성공 (토스트 확인): postKey=${postKey}`)
+        return { success: true }
+      }
+
+      console.log(`[밴드자동화] 게시물 삭제 완료 (추정): postKey=${postKey}`)
+      return { success: true }
+
+    } catch (error: any) {
+      console.error('[밴드자동화] 게시물 삭제 실패:', error)
+      await this.saveDebugScreenshot(page, 'delete-error')
+      return { success: false, error: error.message || '게시물 삭제 중 오류가 발생했습니다.' }
+    }
+  }
 }
 
 export const postAutomation = new BandPostAutomation()

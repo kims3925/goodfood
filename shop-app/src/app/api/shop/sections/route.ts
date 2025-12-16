@@ -45,10 +45,11 @@ export async function GET(req: NextRequest) {
     // 2. 각 소매채널별로 발행된 상품 조회
     const sections = await Promise.all(
       retailChannels.map(async (channel) => {
-        // 해당 채널에 발행된 상품 조회 (published_product 테이블 사용)
+        // 해당 채널에 발행된 활성 상품만 조회 (published_product 테이블 사용)
         const publishedProducts = await prisma.publishedProduct.findMany({
           where: {
             channelId: channel.id,
+            isActive: true, // 활성 상태인 상품만 노출
           },
           include: {
             product: {
@@ -126,9 +127,10 @@ export async function GET(req: NextRequest) {
 
     const wholesaleSections = await Promise.all(
       wholesaleChannels.map(async (channel) => {
-        // 해당 도매채널의 상품 중 발행된 것만 조회
+        // 해당 도매채널의 상품 중 활성 상태로 발행된 것만 조회
         const publishedProducts = await prisma.publishedProduct.findMany({
           where: {
+            isActive: true, // 활성 상태인 상품만 노출
             product: {
               collectedProduct: {
                 post: {
@@ -245,10 +247,11 @@ async function getShopProducts(shopId: number, limit: number) {
     })
   }
 
-  // 해당 Shop에 발행된 상품 조회
+  // 해당 Shop에 발행된 활성 상품만 조회 (비활성 상품은 품절 처리)
   const publishedProducts = await prisma.publishedProduct.findMany({
     where: {
       shopId: shopId,
+      isActive: true, // 활성 상태인 상품만 노출
     },
     include: {
       product: {
@@ -334,10 +337,11 @@ async function getChannelProducts(channelId: number, limit: number) {
     })
   }
 
-  // 해당 채널에 발행된 상품 조회
+  // 해당 채널에 발행된 활성 상품만 조회 (비활성 상품은 품절 처리)
   const publishedProducts = await prisma.publishedProduct.findMany({
     where: {
       channelId: channelId,
+      isActive: true, // 활성 상태인 상품만 노출
     },
     include: {
       product: {

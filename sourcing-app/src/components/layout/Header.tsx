@@ -355,9 +355,9 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
                       <div className="p-8 text-center text-gray-400">
                         <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full mx-auto"></div>
                       </div>
-                    ) : notifications.length > 0 ? (
+                    ) : notifications.filter(n => !n.isRead).length > 0 ? (
                       <div className="divide-y divide-gray-100">
-                        {notifications.map((notification) => {
+                        {notifications.filter(n => !n.isRead).map((notification) => {
                           const config = notificationTypeConfig[notification.type] || notificationTypeConfig.ORDER
                           return (
                             <div

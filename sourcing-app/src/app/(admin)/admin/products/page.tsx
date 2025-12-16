@@ -5,6 +5,7 @@ import { Package, Search, Edit3, Trash2, DollarSign, Calendar, Tag, Download, Ch
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toast'
 
 interface Product {
   id: number
@@ -71,6 +72,7 @@ interface CollectedProduct {
 }
 
 export default function ProductsPage() {
+  const toast = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -181,7 +183,7 @@ export default function ProductsPage() {
       }
     } catch (error) {
       console.error('수집상품 목록 조회 실패:', error)
-      alert('수집상품 목록을 불러오는데 실패했습니다.')
+      toast.error('수집상품 목록을 불러오는데 실패했습니다.')
     } finally {
       setIsLoadingCollected(false)
     }
@@ -189,13 +191,13 @@ export default function ProductsPage() {
 
   const handleConvertToProduct = async () => {
     if (!selectedCollectedId) {
-      alert('수집상품을 선택해주세요.')
+      toast.warning('수집상품을 선택해주세요.')
       return
     }
 
     const selectedCP = collectedProducts.find(cp => cp.id === selectedCollectedId)
     if (!selectedCP) {
-      alert('선택한 수집상품을 찾을 수 없습니다.')
+      toast.error('선택한 수집상품을 찾을 수 없습니다.')
       return
     }
 
@@ -216,14 +218,14 @@ export default function ProductsPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('상품이 등록되었습니다.')
+        toast.success('상품이 등록되었습니다.')
         setShowRegisterModal(false)
         loadProducts()
       } else {
-        alert(data.error || '상품 등록에 실패했습니다.')
+        toast.error(data.error || '상품 등록에 실패했습니다.')
       }
     } catch {
-      alert('상품 등록 중 오류가 발생했습니다.')
+      toast.error('상품 등록 중 오류가 발생했습니다.')
     } finally {
       setIsConverting(false)
     }

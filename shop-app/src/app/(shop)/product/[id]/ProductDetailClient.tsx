@@ -230,7 +230,7 @@ export default function ProductDetailClient() {
   }
 
   const handleAddToCart = async () => {
-    if (!product?.publishedProductId || !selectedVariant) {
+    if (!product?.publishedProductId || !selectedVariant || product.isSoldOut) {
       return
     }
 
@@ -278,7 +278,7 @@ export default function ProductDetailClient() {
 
   const handleBuyNow = () => {
     // publishedProductId와 variantId를 체크아웃 페이지로 전달
-    if (!product?.publishedProductId || !selectedVariant) {
+    if (!product?.publishedProductId || !selectedVariant || product.isSoldOut) {
       return
     }
     // 비회원도 바로구매 가능 (checkout 페이지에서 비회원 주문 처리)
@@ -471,28 +471,41 @@ export default function ProductDetailClient() {
                   className={`h-6 w-6 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
                 />
               </button>
-              <button
-                onClick={handleAddToCart}
-                disabled={!selectedVariant}
-                className={`flex-1 h-14 rounded-xl font-semibold text-base transition-all ${
-                  selectedVariant
-                    ? 'bg-white border-2 border-[#FF6B6B] text-[#FF6B6B] hover:bg-[#FFF5F5]'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                장바구니
-              </button>
-              <button
-                onClick={handleBuyNow}
-                disabled={!selectedVariant}
-                className={`flex-1 h-14 rounded-xl font-semibold text-base transition-all ${
-                  selectedVariant
-                    ? 'bg-[#FF6B6B] text-white hover:bg-[#FF5252] shadow-lg shadow-[#FF6B6B]/25'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                구매하기
-              </button>
+              {product.isSoldOut ? (
+                // 품절 상태
+                <button
+                  disabled
+                  className="flex-[2] h-14 rounded-xl font-semibold text-base bg-gray-200 text-gray-500 cursor-not-allowed"
+                >
+                  품절된 상품입니다
+                </button>
+              ) : (
+                // 정상 판매 상태
+                <>
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={!selectedVariant}
+                    className={`flex-1 h-14 rounded-xl font-semibold text-base transition-all ${
+                      selectedVariant
+                        ? 'bg-white border-2 border-[#FF6B6B] text-[#FF6B6B] hover:bg-[#FFF5F5]'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    장바구니
+                  </button>
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={!selectedVariant}
+                    className={`flex-1 h-14 rounded-xl font-semibold text-base transition-all ${
+                      selectedVariant
+                        ? 'bg-[#FF6B6B] text-white hover:bg-[#FF5252] shadow-lg shadow-[#FF6B6B]/25'
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    구매하기
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -734,28 +747,41 @@ export default function ProductDetailClient() {
               className={`h-5 w-5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
             />
           </button>
-          <button
-            onClick={handleAddToCart}
-            disabled={!selectedVariant}
-            className={`flex-1 h-12 rounded-xl font-semibold transition-all ${
-              selectedVariant
-                ? 'bg-white border-2 border-[#FF6B6B] text-[#FF6B6B]'
-                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            장바구니
-          </button>
-          <button
-            onClick={handleBuyNow}
-            disabled={!selectedVariant}
-            className={`flex-1 h-12 rounded-xl font-semibold transition-all ${
-              selectedVariant
-                ? 'bg-[#FF6B6B] text-white shadow-lg shadow-[#FF6B6B]/25'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            구매하기
-          </button>
+          {product.isSoldOut ? (
+            // 품절 상태
+            <button
+              disabled
+              className="flex-[2] h-12 rounded-xl font-semibold bg-gray-200 text-gray-500 cursor-not-allowed"
+            >
+              품절된 상품입니다
+            </button>
+          ) : (
+            // 정상 판매 상태
+            <>
+              <button
+                onClick={handleAddToCart}
+                disabled={!selectedVariant}
+                className={`flex-1 h-12 rounded-xl font-semibold transition-all ${
+                  selectedVariant
+                    ? 'bg-white border-2 border-[#FF6B6B] text-[#FF6B6B]'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                장바구니
+              </button>
+              <button
+                onClick={handleBuyNow}
+                disabled={!selectedVariant}
+                className={`flex-1 h-12 rounded-xl font-semibold transition-all ${
+                  selectedVariant
+                    ? 'bg-[#FF6B6B] text-white shadow-lg shadow-[#FF6B6B]/25'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                구매하기
+              </button>
+            </>
+          )}
         </div>
       </div>
 
