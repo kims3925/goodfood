@@ -18,17 +18,9 @@ async function getProduct(id: string) {
           orderBy: { id: 'asc' },
           take: 1,
         },
-        collectedProduct: {
-          include: {
-            post: {
-              include: {
-                images: {
-                  where: { sortOrder: 0 },
-                  take: 1,
-                },
-              },
-            },
-          },
+        images: {
+          orderBy: { sortOrder: 'asc' },
+          take: 1,
         },
       },
     })
@@ -53,9 +45,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = product.description || `${product.name} - 최저가로 만나보세요`
   const price = product.variants[0]?.price
 
-  // sort_order가 0인 이미지 (대표 이미지)
+  // 대표 이미지
   const mainImage =
-    product.collectedProduct?.post?.images?.[0]?.url ||
+    product.images?.[0]?.url ||
     product.thumbnailUrl ||
     '/images/placeholder.png'
 

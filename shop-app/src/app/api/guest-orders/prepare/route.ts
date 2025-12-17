@@ -81,20 +81,6 @@ export async function POST(req: NextRequest) {
     // Shop ID 가져오기 (헤더에서)
     const shopId = await getShopIdFromHeaders()
 
-    // Shop의 배송비 설정 조회 (필수)
-    let shopFreeShippingAmount: number | null = null
-    let shopDefaultShippingFee: number | null = null
-    if (shopId) {
-      const shop = await prisma.shop.findUnique({
-        where: { id: shopId },
-        select: { freeShippingAmount: true, defaultShippingFee: true },
-      })
-      if (shop) {
-        shopFreeShippingAmount = shop.freeShippingAmount
-        shopDefaultShippingFee = shop.defaultShippingFee
-      }
-    }
-
     // 주문 아이템 검증 및 금액 계산
     let orderItems: any[] = []
 
@@ -138,15 +124,15 @@ export async function POST(req: NextRequest) {
         const publishedProduct = item.publishedProduct
         const product = publishedProduct.product
         const variant = item.variant
-        const mainVariant = product.variants[0]
+        const mainVariant = product?.variants[0]
         const unitPrice = variant?.price || mainVariant?.price || 0
 
         return {
           publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
-          productName: product.name,
+          productName: product?.name || '',
           optionSummary: variant?.optionSummary || null,
-          thumbnailUrl: product.thumbnailUrl,
+          thumbnailUrl: product?.thumbnailUrl || null,
           quantity: item.quantity,
           unitPrice: Number(unitPrice),
         }
@@ -187,30 +173,28 @@ export async function POST(req: NextRequest) {
         }
 
         const product = publishedProduct.product
-        const mainVariant = product.variants[0]
+        const mainVariant = product?.variants[0]
         const unitPrice = variant?.price || mainVariant?.price || 0
 
         orderItems.push({
           publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
-          productName: product.name,
+          productName: product?.name || '',
           optionSummary: variant?.optionSummary || null,
-          thumbnailUrl: product.thumbnailUrl,
+          thumbnailUrl: product?.thumbnailUrl || null,
           quantity: item.quantity || 1,
           unitPrice: Number(unitPrice),
         })
       }
     }
 
-    // 금액 계산 (Shop의 배송비 설정 사용 - 필수)
+    // 금액 계산
     const subtotal = orderItems.reduce(
       (sum, item) => sum + item.unitPrice * item.quantity,
       0
     )
-    // 배송비 설정이 없으면 0원 처리
-    const shippingFee = (shopFreeShippingAmount != null && shopDefaultShippingFee != null)
-      ? (subtotal >= shopFreeShippingAmount ? 0 : shopDefaultShippingFee)
-      : 0
+    // 배송비는 상품별 설정 또는 0원 처리
+    const shippingFee = 0
     const totalAmount = subtotal + shippingFee
 
     // 비회원 주문번호 생성

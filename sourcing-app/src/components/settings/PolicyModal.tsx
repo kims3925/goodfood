@@ -3,12 +3,20 @@
 import { useState, useEffect } from 'react'
 import { X, Save, FileText } from 'lucide-react'
 
+interface Channel {
+  id: number
+  name: string
+  kind: string
+}
+
 interface PricingPolicy {
   id?: number
+  channelId: number
   name: string
   description: string | null
   content: string
   isActive: boolean
+  channel?: Channel
 }
 
 interface PolicyModalProps {
@@ -26,20 +34,47 @@ export default function PolicyModal({
   policy,
   mode
 }: PolicyModalProps) {
+  const [channels, setChannels] = useState<Channel[]>([])
+  const [channelId, setChannelId] = useState<number | ''>('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [content, setContent] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isLoadingChannels, setIsLoadingChannels] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 도매채널 목록 로드
+  useEffect(() => {
+    if (isOpen) {
+      loadWholesaleChannels()
+    }
+  }, [isOpen])
+
+  const loadWholesaleChannels = async () => {
+    setIsLoadingChannels(true)
+    try {
+      const response = await fetch('/api/channel?kind=WHOLESALE&limit=100')
+      const data = await response.json()
+      if (data.success) {
+        setChannels(data.data || [])
+      }
+    } catch (error) {
+      console.error('채널 목록 로드 실패:', error)
+    } finally {
+      setIsLoadingChannels(false)
+    }
+  }
 
   useEffect(() => {
     if (policy && mode === 'edit') {
+      setChannelId(policy.channelId)
       setName(policy.name)
       setDescription(policy.description || '')
       setContent(policy.content)
       setIsActive(policy.isActive)
     } else {
+      setChannelId('')
       setName('')
       setDescription('')
       setContent('')
@@ -52,6 +87,10 @@ export default function PolicyModal({
     e.preventDefault()
     setError(null)
 
+    if (!channelId) {
+      setError('도매채널을 선택해주세요.')
+      return
+    }
     if (!name.trim()) {
       setError('정책 이름을 입력해주세요.')
       return
@@ -65,6 +104,7 @@ export default function PolicyModal({
     try {
       await onSave({
         id: policy?.id,
+        channelId: channelId as number,
         name: name.trim(),
         description: description.trim() || null,
         content: content.trim(),
@@ -110,6 +150,33 @@ export default function PolicyModal({
 
         {/* Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto max-h-[calc(90vh-140px)]">
+          {/* 도매채널 선택 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              도매채널 <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={channelId}
+              onChange={(e) => setChannelId(e.target.value ? parseInt(e.target.value) : '')}
+              disabled={isLoadingChannels}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            >
+              <option value="">
+                {isLoadingChannels ? '채널 로딩 중...' : '도매채널을 선택하세요'}
+              </option>
+              {channels.map((channel) => (
+                <option key={channel.id} value={channel.id}>
+                  {channel.name}
+                </option>
+              ))}
+            </select>
+            {channels.length === 0 && !isLoadingChannels && (
+              <p className="text-xs text-amber-600 mt-1">
+                등록된 도매채널이 없습니다. 먼저 도매채널을 등록해주세요.
+              </p>
+            )}
+          </div>
+
           {/* 정책 이름 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">

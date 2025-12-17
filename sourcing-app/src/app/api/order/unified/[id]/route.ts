@@ -150,6 +150,7 @@ export async function GET(
           paymentMethod: order.payment?.method || null,
           createdAt: order.orderedAt?.toISOString() || order.createdAt?.toISOString(),
           paidAt: order.paidAt?.toISOString() || null,
+          preparingAt: order.preparingAt?.toISOString() || null,
           shippedAt: order.shippedAt?.toISOString() || null,
           deliveredAt: order.deliveredAt?.toISOString() || null,
           cancelledAt: order.cancelledAt?.toISOString() || null,
@@ -269,6 +270,7 @@ export async function GET(
         paymentMethod: guestOrder.payment?.method || null,
         createdAt: guestOrder.orderedAt?.toISOString() || guestOrder.createdAt?.toISOString(),
         paidAt: guestOrder.paidAt?.toISOString() || null,
+        preparingAt: guestOrder.preparingAt?.toISOString() || null,
         shippedAt: guestOrder.shippedAt?.toISOString() || null,
         deliveredAt: guestOrder.deliveredAt?.toISOString() || null,
         cancelledAt: guestOrder.cancelledAt?.toISOString() || null,
@@ -370,7 +372,7 @@ export async function PATCH(
       if (order) {
 
       // 유효한 상태인지 확인
-      const validStatuses = ['PENDING', 'PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED']
+      const validStatuses = ['PENDING', 'PAID', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED']
       if (!validStatuses.includes(status)) {
         return NextResponse.json(
           { success: false, error: '유효하지 않은 상태입니다.' },
@@ -390,10 +392,24 @@ export async function PATCH(
             updateData.paidAt = now
           }
           break
+        case 'PREPARING':
+          // paidAt이 없으면 설정 (중간 단계 채움)
+          if (!order.paidAt) {
+            updateData.paidAt = now
+          }
+          // preparingAt 설정
+          if (!order.preparingAt) {
+            updateData.preparingAt = now
+          }
+          break
         case 'SHIPPED':
           // paidAt이 없으면 설정 (중간 단계 채움)
           if (!order.paidAt) {
             updateData.paidAt = now
+          }
+          // preparingAt이 없으면 설정 (중간 단계 채움)
+          if (!order.preparingAt) {
+            updateData.preparingAt = now
           }
           // shippedAt 설정
           if (!order.shippedAt) {
@@ -404,6 +420,10 @@ export async function PATCH(
           // paidAt이 없으면 설정 (중간 단계 채움)
           if (!order.paidAt) {
             updateData.paidAt = now
+          }
+          // preparingAt이 없으면 설정 (중간 단계 채움)
+          if (!order.preparingAt) {
+            updateData.preparingAt = now
           }
           // shippedAt이 없으면 설정 (중간 단계 채움)
           if (!order.shippedAt) {
@@ -505,7 +525,7 @@ export async function PATCH(
       }
 
       // 유효한 상태인지 확인
-      const validStatuses = ['PENDING', 'PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED']
+      const validStatuses = ['PENDING', 'PAID', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED']
       if (!validStatuses.includes(status)) {
         return NextResponse.json(
           { success: false, error: '유효하지 않은 상태입니다.' },
@@ -523,9 +543,20 @@ export async function PATCH(
             updateData.paidAt = now
           }
           break
+        case 'PREPARING':
+          if (!guestOrder.paidAt) {
+            updateData.paidAt = now
+          }
+          if (!guestOrder.preparingAt) {
+            updateData.preparingAt = now
+          }
+          break
         case 'SHIPPED':
           if (!guestOrder.paidAt) {
             updateData.paidAt = now
+          }
+          if (!guestOrder.preparingAt) {
+            updateData.preparingAt = now
           }
           if (!guestOrder.shippedAt) {
             updateData.shippedAt = now
@@ -534,6 +565,9 @@ export async function PATCH(
         case 'DELIVERED':
           if (!guestOrder.paidAt) {
             updateData.paidAt = now
+          }
+          if (!guestOrder.preparingAt) {
+            updateData.preparingAt = now
           }
           if (!guestOrder.shippedAt) {
             updateData.shippedAt = now

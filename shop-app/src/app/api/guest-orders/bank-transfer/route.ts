@@ -155,15 +155,15 @@ export async function POST(req: NextRequest) {
         const publishedProduct = item.publishedProduct
         const product = publishedProduct.product
         const variant = item.variant
-        const mainVariant = product.variants[0]
+        const mainVariant = product?.variants[0]
         const unitPrice = variant?.price || mainVariant?.price || 0
 
         return {
           publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
-          productName: product.name,
+          productName: product?.name || '',
           optionSummary: variant?.optionSummary || null,
-          thumbnailUrl: product.thumbnailUrl,
+          thumbnailUrl: product?.thumbnailUrl || null,
           quantity: item.quantity,
           unitPrice: Number(unitPrice),
           cartId: cart.id,
@@ -205,27 +205,27 @@ export async function POST(req: NextRequest) {
         }
 
         const product = publishedProduct.product
-        const mainVariant = product.variants[0]
+        const mainVariant = product?.variants[0]
         const unitPrice = variant?.price || mainVariant?.price || 0
 
         orderItems.push({
           publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
-          productName: product.name,
+          productName: product?.name || '',
           optionSummary: variant?.optionSummary || null,
-          thumbnailUrl: product.thumbnailUrl,
+          thumbnailUrl: product?.thumbnailUrl || null,
           quantity: item.quantity || 1,
           unitPrice: Number(unitPrice),
         })
       }
     }
 
-    // 금액 계산
+    // 금액 계산 (배송비는 판매가에 포함)
     const subtotal = orderItems.reduce(
       (sum, item) => sum + item.unitPrice * item.quantity,
       0
     )
-    const shippingFee = subtotal >= 30000 ? 0 : 3000
+    const shippingFee = 0
     const totalAmount = subtotal + shippingFee
     const depositDeadline = getDepositDeadline()
 

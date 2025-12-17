@@ -9,8 +9,8 @@ import { useShop } from '@/contexts/ShopContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface Product {
-  id: string
-  publishedProductId?: string
+  id: number
+  publishedProductId?: number
   title: string
   description?: string
   originalPrice: number

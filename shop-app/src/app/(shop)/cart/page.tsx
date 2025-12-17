@@ -21,7 +21,6 @@ interface CartItem {
   quantity: number
   stock: number
   shippingFee: number | null
-  freeShippingAmount: number | null
 }
 
 interface Cart {
@@ -145,26 +144,8 @@ export default function CartPage() {
     return price?.toLocaleString('ko-KR') || '0'
   }
 
-  // Shop 배송비 설정 (필수 - 없으면 null)
-  const shopFreeShippingAmount = shop?.freeShippingAmount
-  const shopDefaultShippingFee = shop?.defaultShippingFee
-
-  // 배송비 계산 헬퍼 함수 (Shop 설정 기반 - 필수)
+  // 배송비 계산 헬퍼 함수 (상품별 배송비 중 최고값 사용)
   const calculateShippingFee = (items: CartItem[]) => {
-    // Shop 배송비 설정이 없으면 0원 처리
-    if (shopFreeShippingAmount == null || shopDefaultShippingFee == null) {
-      return 0
-    }
-
-    // 전체 주문 금액 계산
-    const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-
-    // Shop 기준으로 무료배송 체크
-    if (totalAmount >= shopFreeShippingAmount) {
-      return 0
-    }
-
-    // 상품별 배송비가 있는 경우 최고값 사용, 없으면 Shop 기본 배송비 사용
     let maxShippingFee = 0
     for (const item of items) {
       const itemShippingFee = item.shippingFee ?? 0
@@ -172,9 +153,7 @@ export default function CartPage() {
         maxShippingFee = itemShippingFee
       }
     }
-
-    // 상품별 배송비가 없으면 Shop 기본 배송비 사용
-    return maxShippingFee > 0 ? maxShippingFee : shopDefaultShippingFee
+    return maxShippingFee
   }
 
   // Optimistic Update: UI 즉시 업데이트, 백그라운드에서 API 호출
@@ -331,9 +310,6 @@ export default function CartPage() {
   const shippingFee = selectedCartItems.length > 0 ? calculateShippingFee(selectedCartItems) : 0
   const totalAmount = subtotal + shippingFee
   const discountAmount = 0 // 할인 금액 (추후 구현 시 사용)
-
-  // 무료배송까지 남은 금액 계산 (Shop 설정 기준 사용 - 설정 없으면 null)
-  const remainingForFreeShipping = shopFreeShippingAmount != null ? shopFreeShippingAmount - subtotal : null
 
   // 커스텀 체크박스 컴포넌트
   const CustomCheckbox = ({ checked, onChange, className = '' }: { checked: boolean; onChange: () => void; className?: string }) => (
@@ -496,24 +472,6 @@ export default function CartPage() {
               </div>
             </div>
 
-            {/* 무료배송 안내 */}
-            {subtotal > 0 && remainingForFreeShipping != null && remainingForFreeShipping > 0 && shopFreeShippingAmount && (
-              <div className="mt-4 bg-[#fef5f5] rounded-md p-4">
-                <div className="flex items-center gap-2">
-                  <Truck className="w-5 h-5 text-[#FF6B6B]" />
-                  <span className="text-sm text-gray-700">
-                    <span className="font-bold text-[#FF6B6B]">{formatPrice(remainingForFreeShipping)}원</span> 더 담으면
-                    <span className="font-bold text-[#FF6B6B]"> 무료배송</span>
-                  </span>
-                </div>
-                <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
-                  <div
-                    className="bg-[#FF6B6B] h-1.5 rounded-full transition-all"
-                    style={{ width: `${Math.min((subtotal / shopFreeShippingAmount) * 100, 100)}%` }}
-                  ></div>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* 우측: 결제 정보 (스티키) */}

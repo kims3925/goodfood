@@ -9,6 +9,7 @@ model Order {
   totalAmount     Decimal             @map("total_amount") @db.Decimal(12, 2)
   orderedAt       DateTime            @default(now()) @map("ordered_at") @db.Timestamp(0)
   paidAt          DateTime?           @map("paid_at") @db.Timestamp(0)
+  preparingAt     DateTime?           @map("preparing_at") @db.Timestamp(0)
   shippedAt       DateTime?           @map("shipped_at") @db.Timestamp(0)
   deliveredAt     DateTime?           @map("delivered_at") @db.Timestamp(0)
   cancelledAt     DateTime?           @map("cancelled_at") @db.Timestamp(0)

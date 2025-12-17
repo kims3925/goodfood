@@ -39,7 +39,6 @@ export interface CartItemResponse {
   stock: number
   // 배송 정보
   shippingFee: number | null
-  freeShippingAmount: number | null
 }
 
 export interface CartResponse {
@@ -67,17 +66,9 @@ const cartIncludeOptions = {
         include: {
           product: {
             include: {
-              collectedProduct: {
-                include: {
-                  post: {
-                    include: {
-                      images: {
-                        orderBy: { sortOrder: 'asc' as const },
-                        take: 1,
-                      },
-                    },
-                  },
-                },
+              images: {
+                orderBy: { sortOrder: 'asc' as const },
+                take: 1,
               },
               variants: {
                 take: 1,
@@ -92,16 +83,6 @@ const cartIncludeOptions = {
     },
     orderBy: { createdAt: 'desc' as const },
   },
-}
-
-// 배송 정보 파싱 헬퍼
-function parseShippingInfo(shippingInfoStr: string | null): { freeShippingAmount?: number } {
-  if (!shippingInfoStr) return {}
-  try {
-    return JSON.parse(shippingInfoStr)
-  } catch {
-    return {}
-  }
 }
 
 /**
@@ -278,9 +259,8 @@ export class CartService {
       const publishedProduct = item.publishedProduct
       const product = publishedProduct.product
       const variant = item.variant
-      const mainVariant = product.variants[0]
-      const image = product.collectedProduct?.post?.images?.[0]?.url || product.thumbnailUrl || '/placeholder.jpg'
-      const shippingInfo = parseShippingInfo(product.shippingInfo)
+      const mainVariant = product?.variants[0]
+      const image = product.images?.[0]?.url || product.thumbnailUrl || '/placeholder.jpg'
 
       return {
         id: item.id,
@@ -300,7 +280,6 @@ export class CartService {
         stock: variant?.stock || mainVariant?.stock || 100,
         // 배송 정보
         shippingFee: product.shippingFee,
-        freeShippingAmount: shippingInfo.freeShippingAmount ?? null,
       }
     })
 
@@ -309,19 +288,9 @@ export class CartService {
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
     // 배송비 계산: 상품별 배송비 중 가장 높은 값 사용
-    // 각 상품의 무료배송 기준을 만족하면 해당 상품 배송비는 0
     let shippingFee = 0
     for (const item of items) {
-      const itemTotal = item.price * item.quantity
       const itemShippingFee = item.shippingFee ?? 0
-      const freeShippingAmount = item.freeShippingAmount
-
-      // 무료배송 조건 충족 여부 확인
-      if (freeShippingAmount != null && itemTotal >= freeShippingAmount) {
-        // 무료배송 조건 충족 - 배송비 0
-        continue
-      }
-
       // 배송비가 있는 경우, 가장 높은 배송비 적용
       if (itemShippingFee > shippingFee) {
         shippingFee = itemShippingFee
@@ -381,7 +350,7 @@ export class CartService {
     }
 
     const cart = await this.getOrCreateCart(sessionId, userId, shopId)
-    const price = publishedProduct.product.variants[0]?.price || 0
+    const price = publishedProduct.product?.variants[0]?.price || 0
 
     const newSessionId = (cart as any).__newSessionId
 

@@ -7,8 +7,6 @@ model Shop {
   bankName           String?            @map("bank_name") @db.VarChar(50)
   bankAccount        String?            @map("bank_account") @db.VarChar(50)
   accountHolder      String?            @map("account_holder") @db.VarChar(100)
-  freeShippingAmount Int?               @map("free_shipping_amount")
-  defaultShippingFee Int?               @map("default_shipping_fee")
   contactPhone       String?            @map("contact_phone") @db.VarChar(20)
   contactEmail       String?            @map("contact_email") @db.VarChar(255)
   isActive           Boolean            @default(true) @map("is_active")
@@ -23,7 +21,7 @@ model Shop {
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   theme              ShopTheme?
   customers          User[]             @relation("ShopCustomers")
-  notifications      ShopNotification[]
+  notifications      Notification[]
 
   @@index([userId])
   @@index([subdomain])

@@ -38,13 +38,9 @@ export async function GET(request: NextRequest) {
       where.name = { contains: search }
     }
 
-    // 도매밴드 필터 (수집된 상품의 채널 기준)
+    // 도매밴드 필터 (상품의 채널 기준)
     if (channelId) {
-      where.collectedProduct = {
-        post: {
-          channelId: parseInt(channelId),
-        },
-      }
+      where.channelId = parseInt(channelId)
     }
 
     // Get total count
@@ -107,22 +103,14 @@ export async function GET(request: NextRequest) {
     const products = await prisma.product.findMany({
       where,
       include: {
-        collectedProduct: {
-          include: {
-            post: {
-              include: {
-                images: {
-                  orderBy: { sortOrder: 'asc' },
-                  take: 1,
-                },
-                channel: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+        images: {
+          orderBy: { sortOrder: 'asc' },
+          take: 1,
+        },
+        channel: {
+          select: {
+            id: true,
+            name: true,
           },
         },
         variants: {
@@ -190,7 +178,7 @@ export async function GET(request: NextRequest) {
         thumbnailUrl: mainImage,
         price: mainVariant?.price || 0,
         wholesalePrice: mainVariant?.wholesalePrice || null,
-        channel: product.collectedProduct?.post?.channel,
+        channel: product.channel,
         // 발행 상태 (유형별)
         publishStatus: {
           retailBand: hasChannelPublish, // 하위 호환성
@@ -453,7 +441,7 @@ export async function DELETE(request: NextRequest) {
         if (hasInquiries) reasons.push(`문의 ${pp._count.inquiries}건`)
         cannotDelete.push({
           id: pp.id,
-          name: pp.product.name,
+          name: pp.product?.name || 'Unknown',
           reason: reasons.join(', '),
         })
       } else {
@@ -498,18 +486,18 @@ export async function DELETE(request: NextRequest) {
               successfulDeletes.push(pp.id) // Band 삭제 성공한 경우만 DB 삭제 대상에 추가
             } else {
               console.error(`[Unpublish] Band 게시물 삭제 실패: ${deleteResult.error}`)
-              bandDeleteErrors.push(`${pp.product.name}: ${deleteResult.error}`)
+              bandDeleteErrors.push(`${pp.product?.name || 'Unknown'}: ${deleteResult.error}`)
             }
           } catch (bandError: any) {
             console.error(`[Unpublish] Band 게시물 삭제 실패: ${bandError.message}`)
-            bandDeleteErrors.push(`${pp.product.name}: ${bandError.message}`)
+            bandDeleteErrors.push(`${pp.product?.name || 'Unknown'}: ${bandError.message}`)
           }
         } else if (pp.shopId) {
           // Shop 발행인 경우 - DB만 삭제
           successfulDeletes.push(pp.id)
         } else {
           // postKey 없는 채널 발행 - DB만 삭제 (이전 데이터)
-          console.warn(`[Unpublish] postKey 없음 - DB만 삭제: ${pp.product.name} (채널: ${pp.channel?.name || 'N/A'})`)
+          console.warn(`[Unpublish] postKey 없음 - DB만 삭제: ${pp.product?.name || 'Unknown'} (채널: ${pp.channel?.name || 'N/A'})`)
           successfulDeletes.push(pp.id)
         }
       }

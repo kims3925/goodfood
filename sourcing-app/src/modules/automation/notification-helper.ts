@@ -135,7 +135,7 @@ export async function createPipelineNotification(
     }
 
     // 알림 생성
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         section: 'sourcing',
         type,
@@ -167,7 +167,7 @@ export async function createSinglePipelineErrorNotification(
   }
 
   try {
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         section: 'sourcing',
         type: 'ERROR',

@@ -445,63 +445,7 @@ export default function CollectedProductDetailClient({ id }: { id: string }) {
               </div>
             </div>
 
-            {/* 변환된 상품 목록 */}
-            {product.products.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-emerald-100 rounded-lg">
-                      <ShoppingBag size={18} className="text-emerald-600" />
-                    </div>
-                    <span className="font-semibold text-slate-900">변환된 상품</span>
-                    <span className="px-2 py-0.5 bg-slate-200 rounded-full text-xs font-medium text-slate-600">
-                      {product.products.length}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-4">
-                  <div className="space-y-3">
-                    {product.products.map((p) => (
-                      <div
-                        key={p.id}
-                        className="group relative bg-gradient-to-r from-slate-50 to-white p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/product/detail/${p.id}`)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-slate-900 truncate">{p.name}</p>
-                            {p.variants.length > 0 && (
-                              <div className="flex items-center gap-3 mt-1 text-sm">
-                                <span className="text-emerald-600 font-medium">{formatPrice(p.variants[0]?.wholesalePrice)}</span>
-                                <span className="text-slate-300">→</span>
-                                <span className="text-slate-700 font-medium">{formatPrice(p.variants[0]?.price)}</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                              p.status === 'COLLECTED'
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${
-                                p.status === 'COLLECTED' ? 'bg-emerald-500' : 'bg-slate-400'
-                              }`}></span>
-                              {p.status === 'COLLECTED' ? '활성' : '보관'}
-                            </span>
-                            <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
-                              발행 {p.publishedProducts.length}건
-                            </span>
-                            <ExternalLink size={16} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* 변환된 상품 목록 - products 관계 제거됨 */}
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Store, Trash2, ImageIcon, Package, Calendar, Globe, History, DollarSign, Clock, AlertCircle, CheckCircle, Info, ExternalLink, ToggleLeft, ToggleRight, Power } from 'lucide-react'
+import { ArrowLeft, Store, Trash2, ImageIcon, Package, Calendar, Globe, DollarSign, Clock, Info, ExternalLink, ToggleLeft, ToggleRight, Power } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -13,7 +13,7 @@ import Link from 'next/link'
 interface PublishedProductDetail {
   id: number
   userId: number
-  productId: number
+  productId: number | null
   channelId: number | null
   shopId: number | null
   isActive: boolean
@@ -36,24 +36,11 @@ interface PublishedProductDetail {
       groupName: string
       value: string
     }>
-    collectedProduct: {
+    images: Array<{
       id: number
-      name: string | null
-      post: {
-        id: number
-        title: string
-        channel: {
-          id: number
-          name: string
-          platform: string
-        }
-        images: Array<{
-          id: number
-          url: string
-          sortOrder: number
-        }>
-      }
-    } | null
+      url: string
+      sortOrder: number
+    }>
     // 같은 상품의 모든 발행 정보
     publishedProducts: Array<{
       id: number
@@ -76,7 +63,7 @@ interface PublishedProductDetail {
         isActive: boolean
       } | null
     }>
-  }
+  } | null
   channel: {
     id: number
     name: string
@@ -90,12 +77,6 @@ interface PublishedProductDetail {
     subdomain: string
     isActive: boolean
   } | null
-  publishHistories: Array<{
-    id: number
-    status: string
-    errorMessage: string | null
-    publishedAt: string
-  }>
 }
 
 export default function PublishedProductDetailPage({
@@ -205,20 +186,8 @@ export default function PublishedProductDetailPage({
     return product?.product?.variants?.[0]?.price ?? null
   }
 
-  const getHistoryStatusBadge = (status: string) => {
-    const statusMap: { [key: string]: { label: string; bgColor: string; textColor: string; dotColor: string; icon: typeof CheckCircle } } = {
-      SUCCESS: { label: '발행 성공', bgColor: 'bg-emerald-50', textColor: 'text-emerald-700', dotColor: 'bg-emerald-500', icon: CheckCircle },
-      FAILED: { label: '발행 실패', bgColor: 'bg-red-50', textColor: 'text-red-700', dotColor: 'bg-red-500', icon: AlertCircle },
-      PENDING: { label: '발행 대기', bgColor: 'bg-amber-50', textColor: 'text-amber-700', dotColor: 'bg-amber-500', icon: Clock },
-    }
-    const statusInfo = statusMap[status] || { label: status, bgColor: 'bg-slate-100', textColor: 'text-slate-700', dotColor: 'bg-slate-500', icon: Clock }
-    return (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${statusInfo.bgColor} ${statusInfo.textColor}`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dotColor}`}></span>
-        {statusInfo.label}
-      </span>
-    )
-  }
+  // product가 null인 경우 (원본 상품이 삭제된 경우) 체크
+  const isProductDeleted = !product?.product
 
   if (isLoading) {
     return (
@@ -232,7 +201,7 @@ export default function PublishedProductDetailPage({
     return null
   }
 
-  const galleryImages = product.product.collectedProduct?.post?.images ?? []
+  const galleryImages = product.product?.images ?? []
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -253,7 +222,7 @@ export default function PublishedProductDetailPage({
                 <span className="text-slate-400 text-sm">발행상품</span>
                 <span className="text-slate-300">/</span>
                 <span className="text-slate-700 text-sm font-medium truncate max-w-[200px]">
-                  {product.product.name}
+                  {product.product?.name || '삭제된 상품'}
                 </span>
               </div>
             </div>
@@ -273,28 +242,46 @@ export default function PublishedProductDetailPage({
 
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* 안내 문구 */}
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-              <Info size={18} className="text-blue-600" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-blue-900">
-                발행상품의 정보를 수정하려면 원본 상품을 수정해주세요.
-              </p>
-              <p className="text-sm text-blue-700 mt-1">
-                상품 관리에서 원본 상품을 수정하면 이 발행상품에도 자동으로 반영됩니다.
-              </p>
-              <Link
-                href={`/product/detail/${product.productId}`}
-                className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <ExternalLink size={14} />
-                원본 상품 수정하기
-              </Link>
+        {isProductDeleted ? (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-amber-100 rounded-lg flex-shrink-0">
+                <Info size={18} className="text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-900">
+                  원본 상품이 삭제되었습니다.
+                </p>
+                <p className="text-sm text-amber-700 mt-1">
+                  이 발행상품과 연결된 원본 상품이 삭제되어 상품 정보를 확인할 수 없습니다.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                <Info size={18} className="text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-blue-900">
+                  발행상품의 정보를 수정하려면 원본 상품을 수정해주세요.
+                </p>
+                <p className="text-sm text-blue-700 mt-1">
+                  상품 관리에서 원본 상품을 수정하면 이 발행상품에도 자동으로 반영됩니다.
+                </p>
+                <Link
+                  href={`/product/detail/${product.productId}`}
+                  className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <ExternalLink size={14} />
+                  원본 상품 수정하기
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 2컬럼 레이아웃 */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
@@ -318,7 +305,7 @@ export default function PublishedProductDetailPage({
                   {galleryImages.length > 0 ? (
                     <ProductImageViewer
                       images={galleryImages}
-                      productName={product.product.name}
+                      productName={product.product?.name || '삭제된 상품'}
                       enableLightbox={true}
                       showThumbnails={true}
                       thumbnailSize="md"
@@ -326,7 +313,7 @@ export default function PublishedProductDetailPage({
                   ) : (
                     <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                       <ImageIcon size={48} className="mb-2" />
-                      <p className="text-sm">이미지가 없습니다</p>
+                      <p className="text-sm">{isProductDeleted ? '원본 상품이 삭제되어 이미지를 확인할 수 없습니다' : '이미지가 없습니다'}</p>
                     </div>
                   )}
                 </div>
@@ -344,86 +331,126 @@ export default function PublishedProductDetailPage({
                     <Globe size={18} className="text-emerald-600" />
                   </div>
                   <span className="font-semibold text-slate-900">발행 정보</span>
-                  {product.product.publishedProducts.length > 0 && (
+                  {(product.product?.publishedProducts?.length ?? 0) > 0 && (
                     <span className="px-2 py-0.5 bg-slate-200 rounded-full text-xs font-medium text-slate-600">
-                      {product.product.publishedProducts.length}개 발행처
+                      {product.product?.publishedProducts?.length}개 발행처
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="p-6">
-                {/* 발행처 목록 */}
-                <div className="space-y-3">
-                  {product.product.publishedProducts.map((pub) => {
-                    const isShopPublish = pub.shopId !== null
-                    const name = isShopPublish ? pub.shop?.name : pub.channel?.name
-                    const typeLabel = isShopPublish ? '쇼핑몰' : pub.channel?.platform || '채널'
-
-                    return (
-                      <div
-                        key={pub.id}
-                        className="flex items-center justify-between p-3 rounded-xl border bg-slate-50 border-slate-100 hover:border-slate-200 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          {/* 아이콘 */}
-                          {isShopPublish ? (
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center flex-shrink-0">
-                              <Store size={18} className="text-blue-600" />
-                            </div>
-                          ) : pub.channel?.coverUrl ? (
-                            <img
-                              src={pub.channel.coverUrl}
-                              alt={pub.channel.name}
-                              className="w-10 h-10 rounded-lg object-cover ring-1 ring-slate-200 flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center flex-shrink-0">
-                              <Store size={18} className="text-purple-600" />
-                            </div>
-                          )}
-                          {/* 발행처 정보 */}
-                          <div>
-                            <p className="font-medium text-slate-900">{name || '알 수 없음'}</p>
-                            <p className="text-xs text-slate-500">
-                              {formatDateTime(pub.publishedAt || pub.createdAt)}
-                            </p>
-                          </div>
+              <div className="p-6 space-y-6">
+                {/* 밴드 섹션 */}
+                {(() => {
+                  const bandPublishes = (product.product?.publishedProducts ?? []).filter(pub => pub.channelId !== null && pub.shopId === null)
+                  if (bandPublishes.length === 0) return null
+                  return (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-1.5 bg-purple-100 rounded-lg">
+                          <Store size={14} className="text-purple-600" />
                         </div>
-                        <div className="flex items-center gap-2">
-                          {/* 활성화 토글 */}
-                          <button
-                            onClick={() => handleToggleActive(pub.id, pub.isActive)}
-                            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
-                              pub.isActive
-                                ? 'text-green-700 bg-green-50 hover:bg-green-100'
-                                : 'text-gray-500 bg-gray-100 hover:bg-gray-200'
-                            }`}
-                            title={pub.isActive ? '활성화됨 (클릭하여 비활성화)' : '비활성화됨 (클릭하여 활성화)'}
-                          >
-                            {pub.isActive ? (
-                              <ToggleRight size={14} />
-                            ) : (
-                              <ToggleLeft size={14} />
-                            )}
-                            {pub.isActive ? '활성' : '비활성'}
-                          </button>
-                          {/* 발행 유형 뱃지 */}
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                            isShopPublish
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-purple-100 text-purple-700'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${
-                              isShopPublish ? 'bg-blue-500' : 'bg-purple-500'
-                            }`}></span>
-                            {typeLabel}
-                          </span>
-                        </div>
+                        <span className="font-semibold text-slate-700 text-sm">밴드</span>
+                        <span className="px-2 py-0.5 bg-purple-100 rounded-full text-xs font-medium text-purple-600">
+                          {bandPublishes.length}
+                        </span>
                       </div>
-                    )
-                  })}
-                </div>
+                      <div className="space-y-2">
+                        {bandPublishes.map((pub) => (
+                          <div
+                            key={pub.id}
+                            className="flex items-center justify-between p-3 rounded-xl border bg-purple-50/50 border-purple-100 hover:border-purple-200 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              {pub.channel?.coverUrl ? (
+                                <img
+                                  src={pub.channel.coverUrl}
+                                  alt={pub.channel.name}
+                                  className="w-10 h-10 rounded-lg object-cover ring-1 ring-purple-200 flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center flex-shrink-0">
+                                  <Store size={18} className="text-purple-600" />
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-medium text-slate-900">{pub.channel?.name || '알 수 없음'}</p>
+                                <p className="text-xs text-slate-500">
+                                  {formatDateTime(pub.publishedAt || pub.createdAt)}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                              {pub.channel?.platform || '밴드'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* 쇼핑몰 섹션 */}
+                {(() => {
+                  const shopPublishes = (product.product?.publishedProducts ?? []).filter(pub => pub.shopId !== null)
+                  if (shopPublishes.length === 0) return null
+                  return (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-1.5 bg-blue-100 rounded-lg">
+                          <Store size={14} className="text-blue-600" />
+                        </div>
+                        <span className="font-semibold text-slate-700 text-sm">쇼핑몰</span>
+                        <span className="px-2 py-0.5 bg-blue-100 rounded-full text-xs font-medium text-blue-600">
+                          {shopPublishes.length}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {shopPublishes.map((pub) => (
+                          <div
+                            key={pub.id}
+                            className="flex items-center justify-between p-3 rounded-xl border bg-blue-50/50 border-blue-100 hover:border-blue-200 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center flex-shrink-0">
+                                <Store size={18} className="text-blue-600" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-900">{pub.shop?.name || '알 수 없음'}</p>
+                                <p className="text-xs text-slate-500">
+                                  {formatDateTime(pub.publishedAt || pub.createdAt)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleToggleActive(pub.id, pub.isActive)}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
+                                  pub.isActive
+                                    ? 'text-green-700 bg-green-50 hover:bg-green-100'
+                                    : 'text-gray-500 bg-gray-100 hover:bg-gray-200'
+                                }`}
+                                title={pub.isActive ? '활성화됨 (클릭하여 비활성화)' : '비활성화됨 (클릭하여 활성화)'}
+                              >
+                                {pub.isActive ? (
+                                  <ToggleRight size={14} />
+                                ) : (
+                                  <ToggleLeft size={14} />
+                                )}
+                                {pub.isActive ? '활성' : '비활성'}
+                              </button>
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                쇼핑몰
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* 현재 발행 정보 요약 */}
                 <div className="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-slate-100">
@@ -465,92 +492,45 @@ export default function PublishedProductDetailPage({
               </div>
 
               <div className="p-6">
-                <div className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">상품명</label>
-                    <h1 className="text-xl font-bold text-slate-900">{product.product.name}</h1>
+                {isProductDeleted ? (
+                  <div className="text-center py-8">
+                    <Package size={48} className="mx-auto text-slate-300 mb-3" />
+                    <p className="text-slate-500">원본 상품이 삭제되어 상품 정보를 확인할 수 없습니다.</p>
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-xl">
-                      <DollarSign size={18} className="text-emerald-600" />
-                    </div>
+                ) : (
+                  <div className="space-y-5">
                     <div>
-                      <p className="text-slate-500 text-xs">판매가</p>
-                      <p className="text-xl font-bold text-slate-900">{formatPrice(getMainPrice())}</p>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">상품명</label>
+                      <h1 className="text-xl font-bold text-slate-900">{product.product?.name}</h1>
                     </div>
-                  </div>
 
-                  {product.product.description && (
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">설명</label>
-                      <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                        <p className="text-slate-700 whitespace-pre-wrap text-sm leading-relaxed">
-                          {product.product.description.length > 300
-                            ? `${product.product.description.substring(0, 300)}...`
-                            : product.product.description}
-                        </p>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-xl">
+                        <DollarSign size={18} className="text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-xs">판매가</p>
+                        <p className="text-xl font-bold text-slate-900">{formatPrice(getMainPrice())}</p>
                       </div>
                     </div>
-                  )}
-                </div>
+
+                    {product.product?.description && (
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">설명</label>
+                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                          <p className="text-slate-700 whitespace-pre-wrap text-sm leading-relaxed">
+                            {product.product.description.length > 300
+                              ? `${product.product.description.substring(0, 300)}...`
+                              : product.product.description}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* 발행 이력 카드 */}
-            {product.publishHistories.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-violet-100 rounded-lg">
-                      <History size={18} className="text-violet-600" />
-                    </div>
-                    <span className="font-semibold text-slate-900">발행 이력</span>
-                    <span className="px-2 py-0.5 bg-slate-200 rounded-full text-xs font-medium text-slate-600">
-                      {product.publishHistories.length}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-4">
-                  <div className="space-y-3">
-                    {product.publishHistories.map((history) => (
-                      <div
-                        key={history.id}
-                        className="group relative bg-gradient-to-r from-slate-50 to-white p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                              history.status === 'SUCCESS' ? 'bg-emerald-100' :
-                              history.status === 'FAILED' ? 'bg-red-100' : 'bg-amber-100'
-                            }`}>
-                              {history.status === 'SUCCESS' && <CheckCircle size={20} className="text-emerald-600" />}
-                              {history.status === 'FAILED' && <AlertCircle size={20} className="text-red-600" />}
-                              {history.status === 'PENDING' && <Clock size={20} className="text-amber-600" />}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                {getHistoryStatusBadge(history.status)}
-                              </div>
-                              <div className="flex items-center gap-2 text-sm text-slate-500">
-                                <Calendar size={14} />
-                                {formatDateTime(history.publishedAt)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        {history.errorMessage && (
-                          <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-100">
-                            <p className="text-sm text-red-700">{history.errorMessage}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

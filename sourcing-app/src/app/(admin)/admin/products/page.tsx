@@ -171,15 +171,12 @@ export default function ProductsPage() {
   const loadCollectedProducts = async () => {
     setIsLoadingCollected(true)
     try {
-      const response = await fetch('/api/collected-product?limit=1000')
+      // 미변환 수집상품만 조회
+      const response = await fetch('/api/collected-product?limit=1000&unconvertedOnly=true')
       const data = await response.json()
 
       if (data.success) {
-        // Product로 변환되지 않은 CollectedProduct만 필터링
-        const unconverted = data.data.filter(
-          (cp: CollectedProduct) => !cp.products || cp.products.length === 0
-        )
-        setCollectedProducts(unconverted)
+        setCollectedProducts(data.data)
       }
     } catch (error) {
       console.error('수집상품 목록 조회 실패:', error)
@@ -208,9 +205,11 @@ export default function ProductsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          collectedProductId: selectedCollectedId,
+          channelId: selectedCP.post?.channel?.id || null,
           name: selectedCP.name || selectedCP.post.title || '상품명 미지정',
           description: selectedCP.description || '',
+          wholesalePrice: selectedCP.wholesalePrice || null,
+          price: selectedCP.price || null,
           currency: selectedCP.currency || 'KRW',
         }),
       })

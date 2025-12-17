@@ -31,26 +31,20 @@ interface ProductImage {
 
 interface Product {
   id: number
-  collectedProductId: number | null
+  channelId: number | null
   name: string
   description: string | null
   thumbnailUrl: string | null
+  wholesalePrice: number | null
   price: number | null
   currency: string
   createdAt: string
   images?: ProductImage[]
-  collectedProduct?: {
-    post?: {
-      title: string
-      channel: {
-        id: number
-        name: string
-        coverUrl: string | null
-      }
-      images: Array<{
-        url: string
-      }>
-    }
+  channel?: {
+    id: number
+    name: string
+    coverUrl: string | null
+    platform?: string
   } | null
   publishedChannelIds?: number[]
   publishedProducts?: Array<{
@@ -66,11 +60,6 @@ interface Product {
     id: number
     price: number
   }>
-  // 발행 상태
-  publishStatus?: {
-    channel: boolean
-    shoppingMall: boolean
-  }
   publishSummary?: string
 }
 
@@ -81,10 +70,11 @@ interface CollectedProduct {
   name: string | null
   description: string | null
   currency: string
-  price: number | null
-  wholesalePrice: number | null
+  isConverted: boolean
   createdAt: string
   rawMetadata: {
+    wholesalePrice?: number | null
+    price?: number | null
     options?: Array<{
       groupName: string
       values: string[]
@@ -167,6 +157,23 @@ export default function ProductListPage() {
   const [isConverting, setIsConverting] = useState(false)
   const [convertingProgress, setConvertingProgress] = useState({ current: 0, total: 0 })
 
+  // 모달 탭 상태 ('collected' | 'manual')
+  const [modalTab, setModalTab] = useState<'collected' | 'manual'>('collected')
+
+  // 정책 자동 적용 관련 상태
+  const [channelPolicyMap, setChannelPolicyMap] = useState<Map<number, { policyId: number; content: string } | null>>(new Map())
+
+  // 직접 등록 폼 상태
+  const [manualForm, setManualForm] = useState({
+    name: '',
+    description: '',
+    wholesalePrice: '',
+    price: '',
+    shippingFee: '',
+    shippingInfo: '',
+  })
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false)
+
   useEffect(() => {
     loadChannels()
   }, [])
@@ -188,21 +195,27 @@ export default function ProductListPage() {
   const handleOpenCollectedProductModal = async () => {
     setShowCollectedProductModal(true)
     setSelectedCollectedIds([])
+    setModalTab('collected')
+    setManualForm({
+      name: '',
+      description: '',
+      wholesalePrice: '',
+      price: '',
+      shippingFee: '',
+      shippingInfo: '',
+    })
     await loadCollectedProducts()
   }
 
   const loadCollectedProducts = async () => {
     setIsLoadingCollected(true)
     try {
-      const response = await fetch('/api/collected-product?limit=1000')
+      // 가공상품으로 변환된 적 없는 수집상품만 조회
+      const response = await fetch('/api/collected-product?limit=1000&excludeConverted=true')
       const data = await response.json()
 
       if (data.success) {
-        // Product로 변환되지 않은 CollectedProduct만 필터링
-        const unconverted = data.data.filter(
-          (cp: CollectedProduct) => !cp.products || cp.products.length === 0
-        )
-        setCollectedProducts(unconverted)
+        setCollectedProducts(data.data)
       }
     } catch (error) {
       console.error('수집상품 목록 조회 실패:', error)
@@ -237,8 +250,39 @@ export default function ProductListPage() {
         }
 
         try {
-          // rawMetadata에서 options, variants, shipping 추출
-          const rawMetadata = selectedCP.rawMetadata as any
+          // rawMetadata에서 options, variants, shipping, 가격 추출
+          // rawMetadata가 문자열이면 JSON 파싱
+          let rawMetadata = selectedCP.rawMetadata as any
+          if (typeof rawMetadata === 'string') {
+            try {
+              rawMetadata = JSON.parse(rawMetadata)
+            } catch {
+              rawMetadata = null
+            }
+          }
+
+          // 가격 추출: rawMetadata 직접 → pricing 객체 → variants 첫 번째 항목 순서로 fallback
+          const wholesalePrice = rawMetadata?.wholesalePrice
+            ?? rawMetadata?.pricing?.wholesalePrice
+            ?? rawMetadata?.variants?.[0]?.wholesalePrice
+            ?? null
+          const price = rawMetadata?.price
+            ?? rawMetadata?.pricing?.price
+            ?? rawMetadata?.variants?.[0]?.price
+            ?? null
+
+          // 가격 정보 validation
+          if (wholesalePrice === null || wholesalePrice === undefined) {
+            toast.error(`"${selectedCP.name || selectedCP.post.title}" 상품의 도매가 정보가 없습니다.`)
+            failCount++
+            continue
+          }
+          if (price === null || price === undefined) {
+            toast.error(`"${selectedCP.name || selectedCP.post.title}" 상품의 판매가 정보가 없습니다.`)
+            failCount++
+            continue
+          }
+
           const options = rawMetadata?.options?.flatMap((opt: { groupName: string; values: string[] }) =>
             opt.values.map((value: string) => ({
               groupName: opt.groupName,
@@ -247,8 +291,8 @@ export default function ProductListPage() {
           ) || []
           const variants = rawMetadata?.variants?.map((v: { optionSummary?: string; wholesalePrice?: number; price?: number }) => ({
             optionSummary: v.optionSummary || null,
-            price: v.price || selectedCP.price || 0,
-            wholesalePrice: v.wholesalePrice || selectedCP.wholesalePrice || null,
+            price: v.price ?? price ?? 0,
+            wholesalePrice: v.wholesalePrice ?? wholesalePrice ?? null,
           })) || []
           // shipping 객체 또는 직접 shippingFee/shippingInfo 필드 둘 다 지원
           const shipping = rawMetadata?.shipping || {
@@ -260,10 +304,12 @@ export default function ProductListPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              collectedProductId: cpId,
+              postId: selectedCP.postId,
+              channelId: selectedCP.post?.channel?.id || null,
               name: selectedCP.name || selectedCP.post.title || '상품명 미지정',
               description: selectedCP.description || '',
-              price: selectedCP.price || null,
+              wholesalePrice,
+              price,
               currency: selectedCP.currency || 'KRW',
               shippingFee: typeof shipping.shippingFee === 'number' ? shipping.shippingFee : undefined,
               shippingInfo: typeof shipping.shippingInfo === 'string' ? shipping.shippingInfo : undefined,
@@ -277,9 +323,11 @@ export default function ProductListPage() {
           if (data.success) {
             successCount++
           } else {
+            toast.error(`"${selectedCP.name || selectedCP.post.title}" 등록 실패: ${data.error || '알 수 없는 오류'}`)
             failCount++
           }
-        } catch {
+        } catch (error) {
+          toast.error(`"${selectedCP.name || selectedCP.post.title}" 등록 중 오류 발생`)
           failCount++
         }
       }
@@ -304,6 +352,55 @@ export default function ProductListPage() {
   const handleCloseCollectedProductModal = () => {
     setShowCollectedProductModal(false)
     setSelectedCollectedIds([])
+    setModalTab('collected')
+    setManualForm({
+      name: '',
+      description: '',
+      wholesalePrice: '',
+      price: '',
+      shippingFee: '',
+      shippingInfo: '',
+    })
+  }
+
+  // 직접 등록 핸들러
+  const handleManualSubmit = async () => {
+    if (!manualForm.name.trim()) {
+      toast.error('상품명을 입력해주세요.')
+      return
+    }
+
+    setIsSubmittingManual(true)
+    try {
+      const response = await fetch('/api/product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: manualForm.name.trim(),
+          description: manualForm.description.trim() || null,
+          wholesalePrice: manualForm.wholesalePrice ? parseInt(manualForm.wholesalePrice) : null,
+          price: manualForm.price ? parseInt(manualForm.price) : null,
+          shippingFee: manualForm.shippingFee ? parseInt(manualForm.shippingFee) : null,
+          shippingInfo: manualForm.shippingInfo.trim() || null,
+          currency: 'KRW',
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success('상품이 등록되었습니다.')
+        handleCloseCollectedProductModal()
+        loadProducts()
+      } else {
+        toast.error(data.error || '상품 등록에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('상품 등록 실패:', error)
+      toast.error('상품 등록 중 오류가 발생했습니다.')
+    } finally {
+      setIsSubmittingManual(false)
+    }
   }
 
   // 수집상품 개별 선택/해제
@@ -368,15 +465,199 @@ export default function ProductListPage() {
     fetchProducts(page)
   }
 
+  // 채널별 활성 정책 조회 헬퍼 함수
+  const fetchPolicyByChannelId = async (channelId: number): Promise<{ policyId: number; content: string } | null> => {
+    try {
+      const response = await fetch(`/api/policy?channelId=${channelId}&limit=100`)
+      const data = await response.json()
+      if (data.success && data.data?.length > 0) {
+        // 활성화된 정책 중 첫 번째 반환
+        const activePolicy = data.data.find((p: any) => p.isActive)
+        if (activePolicy) {
+          return { policyId: activePolicy.id, content: activePolicy.content }
+        }
+      }
+      return null
+    } catch (error) {
+      console.error(`채널 ${channelId} 정책 조회 실패:`, error)
+      return null
+    }
+  }
+
+  // 게시물 목록에서 채널 ID 추출 헬퍼 함수
+  const fetchPostsChannelInfo = async (postIds: number[]): Promise<Map<number, number>> => {
+    const postChannelMap = new Map<number, number>() // postId -> channelId
+    try {
+      for (const postId of postIds) {
+        const response = await fetch(`/api/post/${postId}`)
+        const data = await response.json()
+        if (data.success && data.data?.channel?.id) {
+          postChannelMap.set(postId, data.data.channel.id)
+        }
+      }
+    } catch (error) {
+      console.error('게시물 채널 정보 조회 실패:', error)
+    }
+    return postChannelMap
+  }
+
   // 단일 게시물 선택 (하위 호환성)
   const handlePostSelected = async (postId: number) => {
     await handleMultiplePostsSelected([postId])
   }
 
-  // 다중 게시물 선택 처리 - 정책 선택 모달로 이동
+  // 다중 게시물 선택 처리 - 정책 자동 적용
   const handleMultiplePostsSelected = async (postIds: number[]) => {
-    setPendingPostIds(postIds)
     setShowPostSelectionModal(false)
+
+    // 로딩 표시
+    setIsGenerating(true)
+    setGeneratingProgress({ current: 0, total: postIds.length })
+
+    try {
+      // 1. 게시물별 채널 정보 조회
+      const postChannelMap = await fetchPostsChannelInfo(postIds)
+
+      // 2. 고유 채널 ID 추출
+      const uniqueChannelIds = [...new Set(postChannelMap.values())]
+
+      // 3. 각 채널별 활성 정책 조회
+      const newChannelPolicyMap = new Map<number, { policyId: number; content: string } | null>()
+      for (const channelId of uniqueChannelIds) {
+        const policy = await fetchPolicyByChannelId(channelId)
+        newChannelPolicyMap.set(channelId, policy)
+      }
+      setChannelPolicyMap(newChannelPolicyMap)
+
+      // 4. 정책 없는 채널 확인
+      const channelsWithoutPolicy = uniqueChannelIds.filter(id => !newChannelPolicyMap.get(id))
+
+      if (channelsWithoutPolicy.length > 0) {
+        // 정책이 없는 채널이 있으면 정책 선택 모달 표시
+        setIsGenerating(false)
+        setPendingPostIds(postIds)
+        setShowPolicyModal(true)
+        return
+      }
+
+      // 5. 모든 채널에 정책이 있으면 바로 AI 생성 시작
+      await startAIGenerationWithAutoPolicy(postIds, postChannelMap, newChannelPolicyMap)
+    } catch (error) {
+      console.error('정책 자동 적용 실패:', error)
+      setIsGenerating(false)
+      // 실패 시 수동 정책 선택으로 폴백
+      setPendingPostIds(postIds)
+      setShowPolicyModal(true)
+    }
+  }
+
+  // 자동 정책으로 AI 생성 시작
+  const startAIGenerationWithAutoPolicy = async (
+    postIds: number[],
+    postChannelMap: Map<number, number>,
+    policyMap: Map<number, { policyId: number; content: string } | null>
+  ) => {
+    setSelectedPostIds(postIds)
+    setGeneratingProgress({ current: 0, total: postIds.length })
+
+    try {
+      const drafts: any[] = []
+
+      // 각 게시물에 대해 AI 상품 생성 (해당 채널의 정책 사용)
+      for (let i = 0; i < postIds.length; i++) {
+        const postId = postIds[i]
+        const channelId = postChannelMap.get(postId)
+        const policy = channelId ? policyMap.get(channelId) : null
+        const policyContent = policy?.content || null
+
+        // 마지막 사용 정책 저장 (추가 상품 선택 시 재사용)
+        if (policyContent && i === 0) {
+          setLastUsedPolicyContent(policyContent)
+        }
+
+        setGeneratingProgress({ current: i + 1, total: postIds.length })
+
+        try {
+          const response = await fetch('/api/product/ai-generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ postId, policyContent }),
+          })
+
+          const data = await response.json()
+
+          if (data.success) {
+            drafts.push({
+              postId,
+              draft: data.draft,
+              channelId,
+              policyApplied: !!policyContent,
+            })
+          } else {
+            console.error(`게시물 ${postId} AI 생성 실패:`, data.error)
+            drafts.push({
+              postId,
+              draft: {
+                name: `게시물 ${postId} (AI 생성 실패)`,
+                description: '',
+                categoryId: '',
+                price: '',
+                options: [],
+                variants: [],
+              },
+              error: data.error,
+              channelId,
+            })
+          }
+        } catch (error) {
+          console.error(`게시물 ${postId} AI 생성 오류:`, error)
+          drafts.push({
+            postId,
+            draft: {
+              name: `게시물 ${postId} (AI 생성 오류)`,
+              description: '',
+              categoryId: '',
+              price: '',
+              wholesalePrice: '',
+              options: [],
+              variants: [],
+            },
+            error: '네트워크 오류',
+            channelId,
+          })
+        }
+      }
+
+      if (drafts.length > 0) {
+        if (isAddingMore) {
+          // 추가 모드: 기존 drafts에 새 drafts 추가
+          setProductDrafts(prev => [...prev, ...drafts])
+          setIsAddingMore(false)
+        } else {
+          // 일반 모드: drafts 새로 설정
+          setProductDrafts(drafts)
+        }
+        setShowProductFormModal(true)
+      }
+    } catch (error) {
+      console.error('AI 상품 생성 실패:', error)
+    } finally {
+      setIsGenerating(false)
+      setGeneratingProgress({ current: 0, total: 0 })
+    }
+  }
+
+  // 정책 선택 모달에서 선택 시 - 수동 정책 선택 (오버라이드)
+  const handleChangePolicyRequest = () => {
+    // 현재 선택된 게시물들을 대기열에 저장
+    setPendingPostIds(selectedPostIds)
+    // 기존 drafts 초기화 (새 정책으로 다시 생성되므로)
+    setProductDrafts([])
+    // 추가 모드 해제
+    setIsAddingMore(false)
+    // ProductFormModal 닫기
+    setShowProductFormModal(false)
+    // 정책 선택 모달 열기
     setShowPolicyModal(true)
   }
 
@@ -699,40 +980,6 @@ export default function ProductListPage() {
     )
   }
 
-  // 발행현황 배지
-  const getPublishStatusBadge = (product: Product) => {
-    if (!product.publishStatus) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-          미발행
-        </span>
-      )
-    }
-
-    const { channel, shoppingMall } = product.publishStatus
-
-    if (channel && shoppingMall) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          발행완료
-        </span>
-      )
-    }
-
-    if (channel || shoppingMall) {
-      return (
-        <div className="flex flex-col gap-1">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-            부분발행
-          </span>
-          <div className="flex gap-1">
-            <span className={`inline-block w-2 h-2 rounded-full ${channel ? 'bg-green-500' : 'bg-gray-300'}`} title="채널" />
-            <span className={`inline-block w-2 h-2 rounded-full ${shoppingMall ? 'bg-green-500' : 'bg-gray-300'}`} title="쇼핑몰" />
-          </div>
-        </div>
-      )
-    }
-  }
 
   const formatPrice = (price: number | null) => {
     if (!price) return '-'
@@ -770,7 +1017,7 @@ export default function ProductListPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-500">발행완료</p>
-                <p className="text-2xl font-bold text-green-600">{products.filter(p => p.publishStatus?.channel || p.publishStatus?.shoppingMall).length}</p>
+                <p className="text-2xl font-bold text-green-600">{products.filter(p => p.publishedProducts && p.publishedProducts.length > 0).length}</p>
               </div>
             </div>
           </div>
@@ -781,7 +1028,7 @@ export default function ProductListPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-500">미발행</p>
-                <p className="text-2xl font-bold text-yellow-600">{products.filter(p => !p.publishStatus?.channel && !p.publishStatus?.shoppingMall).length}</p>
+                <p className="text-2xl font-bold text-yellow-600">{products.filter(p => !p.publishedProducts || p.publishedProducts.length === 0).length}</p>
               </div>
             </div>
           </div>
@@ -906,10 +1153,9 @@ export default function ProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[40%]">상품명</TableHead>
-                  <TableHead className="w-[20%]">출처 채널</TableHead>
-                  <TableHead className="w-[20%]">발행현황</TableHead>
-                  <TableHead className="w-[16%]">생성일</TableHead>
+                  <TableHead className="w-[50%]">상품명</TableHead>
+                  <TableHead className="w-[25%]">출처 채널</TableHead>
+                  <TableHead className="w-[21%]">생성일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -959,10 +1205,9 @@ export default function ProductListPage() {
                     </TableCell>
                     <TableCell>
                       <div className="text-gray-600 truncate">
-                        {product.collectedProduct?.post?.channel?.name || '-'}
+                        {product.channel?.name || '-'}
                       </div>
                     </TableCell>
-                    <TableCell>{getPublishStatusBadge(product)}</TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-600 whitespace-nowrap">
                         {new Date(product.createdAt).toLocaleDateString('ko-KR', {
@@ -999,7 +1244,7 @@ export default function ProductListPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   AI가 상품 정보를 생성하고 있습니다...
                 </h3>
-                {generatingProgress.total > 1 && (
+                {generatingProgress.total > 0 && (
                   <div className="mb-3">
                     <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
@@ -1013,7 +1258,7 @@ export default function ProductListPage() {
                   </div>
                 )}
                 <p className="text-sm text-gray-600">
-                  게시물을 분석하여 상품명, 옵션, 가격 등을 추출 중입니다.
+                  도매처 가격 정책을 자동 적용하여 상품 정보를 추출 중입니다.
                 </p>
               </div>
             </div>
@@ -1083,6 +1328,7 @@ export default function ProductListPage() {
           onSaved={handleProductSaved}
           onAddMorePosts={handleAddMorePosts}
           onRetry={handleRetryAI}
+          onChangePolicyRequest={handleChangePolicyRequest}
         />
       )}
 
@@ -1090,119 +1336,248 @@ export default function ProductListPage() {
       <Modal
         isOpen={showCollectedProductModal}
         onClose={handleCloseCollectedProductModal}
-        title="상품 등록 - 수집상품 선택"
+        title="상품 등록"
         size="2xl"
       >
         <div className="flex flex-col h-[calc(70vh-8rem)]">
-          {isLoadingCollected ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : isConverting ? (
-            <div className="flex-1 flex flex-col items-center justify-center">
-              <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-gray-900 font-medium">상품 등록 중...</p>
-              {convertingProgress.total > 1 && (
-                <div className="mt-4 w-64">
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-purple-500 transition-all duration-300"
-                      style={{ width: `${(convertingProgress.current / convertingProgress.total) * 100}%` }}
-                    />
-                  </div>
-                  <p className="text-sm text-gray-600 mt-2 text-center">
-                    {convertingProgress.current} / {convertingProgress.total}
-                  </p>
-                </div>
-              )}
-            </div>
-          ) : collectedProducts.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
-              <Package size={48} className="mb-4 text-gray-300" />
-              <p>변환 가능한 수집상품이 없습니다.</p>
-              <p className="text-sm mt-2">수집상품 관리에서 먼저 수집상품을 추가해주세요.</p>
-            </div>
-          ) : (
-            <>
-              {/* 전체 선택 헤더 */}
-              <div className="flex items-center justify-between py-3 px-2 border-b border-gray-200 mb-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedCollectedIds.length === collectedProducts.length && collectedProducts.length > 0}
-                    onChange={handleToggleCollectedSelectAll}
-                    className="w-4 h-4 cursor-pointer rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">전체 선택</span>
-                </label>
-                {selectedCollectedIds.length > 0 && (
-                  <span className="text-sm text-purple-600 font-medium">
-                    {selectedCollectedIds.length}개 선택됨
-                  </span>
-                )}
-              </div>
+          {/* 탭 버튼 */}
+          <div className="flex border-b border-gray-200 mb-4">
+            <button
+              onClick={() => setModalTab('collected')}
+              className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+                modalTab === 'collected'
+                  ? 'border-purple-500 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              수집상품 선택
+            </button>
+            <button
+              onClick={() => setModalTab('manual')}
+              className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+                modalTab === 'manual'
+                  ? 'border-purple-500 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              직접 등록
+            </button>
+          </div>
 
-              <div className="flex-1 overflow-y-auto space-y-2">
-                {collectedProducts.map((cp) => (
-                  <div
-                    key={cp.id}
-                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                      selectedCollectedIds.includes(cp.id)
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => handleToggleCollectedSelection(cp.id)}
-                  >
-                    <div className="flex items-start gap-3">
-                      {cp.post?.images?.[0]?.url ? (
-                        <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                          <Image
-                            src={cp.post.images[0].url}
-                            alt={cp.name || cp.post.title}
-                            fill
-                            sizes="80px"
-                            className="object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-20 h-20 rounded bg-gray-200 flex items-center justify-center flex-shrink-0">
-                          <Package size={24} className="text-gray-400" />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-gray-900 truncate">
-                          {cp.name || '(상품명 미추출)'}
-                        </h4>
-                        <p className="text-sm text-gray-500 truncate">
-                          {cp.post?.title}
-                        </p>
-                        <div className="flex items-center gap-3 mt-2">
-                          <span className="text-sm text-gray-600">
-                            {cp.post?.channel?.name}
-                          </span>
-                          {cp.price && (
-                            <span className="text-sm font-medium text-gray-900">
-                              ₩{cp.price.toLocaleString()}
-                            </span>
+          {/* 탭 콘텐츠 */}
+          {modalTab === 'collected' ? (
+            // 수집상품 선택 탭
+            <>
+              {isLoadingCollected ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : isConverting ? (
+                <div className="flex-1 flex flex-col items-center justify-center">
+                  <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4" />
+                  <p className="text-gray-900 font-medium">상품 등록 중...</p>
+                  {convertingProgress.total > 1 && (
+                    <div className="mt-4 w-64">
+                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-purple-500 transition-all duration-300"
+                          style={{ width: `${(convertingProgress.current / convertingProgress.total) * 100}%` }}
+                        />
+                      </div>
+                      <p className="text-sm text-gray-600 mt-2 text-center">
+                        {convertingProgress.current} / {convertingProgress.total}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : collectedProducts.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
+                  <Package size={48} className="mb-4 text-gray-300" />
+                  <p>변환 가능한 수집상품이 없습니다.</p>
+                  <p className="text-sm mt-2">수집상품 관리에서 먼저 수집상품을 추가해주세요.</p>
+                </div>
+              ) : (
+                <>
+                  {/* 전체 선택 헤더 */}
+                  <div className="flex items-center justify-between py-3 px-2 border-b border-gray-200 mb-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedCollectedIds.length === collectedProducts.length && collectedProducts.length > 0}
+                        onChange={handleToggleCollectedSelectAll}
+                        className="w-4 h-4 cursor-pointer rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">전체 선택</span>
+                    </label>
+                    {selectedCollectedIds.length > 0 && (
+                      <span className="text-sm text-purple-600 font-medium">
+                        {selectedCollectedIds.length}개 선택됨
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-2">
+                    {collectedProducts.map((cp) => (
+                      <div
+                        key={cp.id}
+                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                          selectedCollectedIds.includes(cp.id)
+                            ? 'border-purple-500 bg-purple-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        onClick={() => handleToggleCollectedSelection(cp.id)}
+                      >
+                        <div className="flex items-start gap-3">
+                          {cp.post?.images?.[0]?.url ? (
+                            <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                              <Image
+                                src={cp.post.images[0].url}
+                                alt={cp.name || cp.post.title}
+                                fill
+                                sizes="80px"
+                                className="object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-20 h-20 rounded bg-gray-200 flex items-center justify-center flex-shrink-0">
+                              <Package size={24} className="text-gray-400" />
+                            </div>
                           )}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-gray-900 truncate">
+                              {cp.name || '(상품명 미추출)'}
+                            </h4>
+                            <p className="text-sm text-gray-500 truncate">
+                              {cp.post?.title}
+                            </p>
+                            <div className="flex items-center gap-3 mt-2">
+                              <span className="text-sm text-gray-600">
+                                {cp.post?.channel?.name}
+                              </span>
+                              {cp.rawMetadata?.price && (
+                                <span className="text-sm font-medium text-gray-900">
+                                  ₩{cp.rawMetadata.price.toLocaleString()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                  <ModalFooter>
+                    <Button variant="secondary" onClick={handleCloseCollectedProductModal}>
+                      취소
+                    </Button>
+                    <Button
+                      variant="primary"
+                      onClick={handleConvertToProduct}
+                      disabled={selectedCollectedIds.length === 0 || isConverting}
+                    >
+                      {selectedCollectedIds.length > 0
+                        ? `${selectedCollectedIds.length}개 상품 등록`
+                        : '상품 등록'}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </>
+          ) : (
+            // 직접 등록 탭
+            <>
+              <div className="flex-1 overflow-y-auto space-y-4 px-1">
+                {/* 상품명 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    상품명 <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={manualForm.name}
+                    onChange={(e) => setManualForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="상품명을 입력하세요"
+                  />
+                </div>
+
+                {/* 설명 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    상품 설명
+                  </label>
+                  <textarea
+                    value={manualForm.description}
+                    onChange={(e) => setManualForm(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="상품 설명을 입력하세요"
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                  />
+                </div>
+
+                {/* 가격 정보 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      도매가 (원)
+                    </label>
+                    <Input
+                      type="number"
+                      value={manualForm.wholesalePrice}
+                      onChange={(e) => setManualForm(prev => ({ ...prev, wholesalePrice: e.target.value }))}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      판매가 (원)
+                    </label>
+                    <Input
+                      type="number"
+                      value={manualForm.price}
+                      onChange={(e) => setManualForm(prev => ({ ...prev, price: e.target.value }))}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+
+                {/* 배송 정보 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      배송비 (원)
+                    </label>
+                    <Input
+                      type="number"
+                      value={manualForm.shippingFee}
+                      onChange={(e) => setManualForm(prev => ({ ...prev, shippingFee: e.target.value }))}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      배송 정보
+                    </label>
+                    <Input
+                      value={manualForm.shippingInfo}
+                      onChange={(e) => setManualForm(prev => ({ ...prev, shippingInfo: e.target.value }))}
+                      placeholder="예: 무료배송, 3일 이내 출고"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-500 mt-2">
+                  * 옵션, 변형(사이즈/색상 등), 이미지는 상품 등록 후 상세 페이지에서 추가할 수 있습니다.
+                </p>
               </div>
+
               <ModalFooter>
                 <Button variant="secondary" onClick={handleCloseCollectedProductModal}>
                   취소
                 </Button>
                 <Button
                   variant="primary"
-                  onClick={handleConvertToProduct}
-                  disabled={selectedCollectedIds.length === 0 || isConverting}
+                  onClick={handleManualSubmit}
+                  disabled={isSubmittingManual || !manualForm.name.trim()}
                 >
-                  {selectedCollectedIds.length > 0
-                    ? `${selectedCollectedIds.length}개 상품 등록`
-                    : '상품 등록'}
+                  {isSubmittingManual ? '등록 중...' : '상품 등록'}
                 </Button>
               </ModalFooter>
             </>

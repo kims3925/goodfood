@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Trash2, Store, Package, CheckCircle, ChevronDown, ChevronRight, ExternalLink, Power, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Search, Trash2, Store, Package, CheckCircle } from 'lucide-react'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
@@ -69,11 +69,12 @@ export default function PublishedProductListPage() {
 
   // Filter states
   const [channels, setChannels] = useState<Channel[]>([])
+  const [channelCount, setChannelCount] = useState(0)
   const [shopCount, setShopCount] = useState(0)
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
 
   // 발행처 수 = 채널 수 + Shop 수
-  const publishDestinationCount = channels.length + shopCount
+  const publishDestinationCount = channelCount + shopCount
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
@@ -90,12 +91,22 @@ export default function PublishedProductListPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Accordion expanded states
-  const [expandedProducts, setExpandedProducts] = useState<Set<number>>(new Set())
-
   useEffect(() => {
     loadChannels()
     loadShopCount()
+
+    // 페이지가 다시 보일 때마다 채널/Shop 수 업데이트
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadChannels()
+        loadShopCount()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   const loadChannels = async () => {
@@ -104,6 +115,7 @@ export default function PublishedProductListPage() {
       const data = await response.json()
       if (data.success) {
         setChannels(data.data)
+        setChannelCount(data.pagination?.total || data.data.length)
       }
     } catch (error) {
       console.error('채널 목록 조회 실패:', error)
@@ -115,7 +127,7 @@ export default function PublishedProductListPage() {
       const response = await fetch('/api/shop?limit=1')
       const data = await response.json()
       if (data.success) {
-        setShopCount(data.total || 0)
+        setShopCount(data.pagination?.total || 0)
       }
     } catch (error) {
       console.error('Shop 수 조회 실패:', error)
@@ -191,6 +203,8 @@ export default function PublishedProductListPage() {
   // 새로고침용 함수
   const loadProducts = () => {
     fetchProducts(currentPage)
+    loadChannels()
+    loadShopCount()
   }
 
   const handlePageChange = (page: number) => {
@@ -237,19 +251,6 @@ export default function PublishedProductListPage() {
   const isProductSelected = (productGroup: PublishedProductGroup) => {
     const productPublishIds = productGroup.publishedChannels.map((ch) => ch.publishId)
     return productPublishIds.every((id) => selectedIds.includes(id))
-  }
-
-  // 아코디언 토글
-  const toggleExpanded = (productId: number) => {
-    setExpandedProducts(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(productId)) {
-        newSet.delete(productId)
-      } else {
-        newSet.add(productId)
-      }
-      return newSet
-    })
   }
 
   // 발행처 수 계산 (중복 제거)
@@ -398,29 +399,6 @@ export default function PublishedProductListPage() {
     return `${year}-${month}-${day} ${hour}:${minute}`
   }
 
-  // 발행상품 활성화/비활성화 토글
-  const handleToggleActive = async (publishId: number, currentIsActive: boolean) => {
-    try {
-      const response = await fetch(`/api/published-product/${publishId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !currentIsActive }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(currentIsActive ? '발행상품이 비활성화되었습니다.' : '발행상품이 활성화되었습니다.')
-        loadProducts()
-      } else {
-        toast.error('상태 변경에 실패했습니다.')
-      }
-    } catch (error) {
-      console.error('상태 변경 실패:', error)
-      toast.error('상태 변경에 실패했습니다.')
-    }
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -552,8 +530,7 @@ export default function PublishedProductListPage() {
                       disabled={products.length === 0}
                     />
                   </TableHead>
-                  <TableHead className="w-[4%]"></TableHead>
-                  <TableHead className="w-[36%]">상품명</TableHead>
+                  <TableHead className="w-[40%]">상품명</TableHead>
                   <TableHead className="w-[14%]">발행 현황</TableHead>
                   <TableHead className="w-[14%]">생성일시</TableHead>
                   <TableHead className="w-[14%]">최근 수정</TableHead>
@@ -563,210 +540,68 @@ export default function PublishedProductListPage() {
               <TableBody>
                 {/* 데이터 행 */}
                 {products.map((productGroup) => {
-                  const isExpanded = expandedProducts.has(productGroup.productId)
                   const uniqueCount = getUniquePublishCount(productGroup)
 
-                  // Shop 발행과 채널 발행 분리 및 중복 제거
-                  const shopPublishes = productGroup.publishedChannels.filter(p => p.shopId !== null && p.channelId === null)
-                  const channelPublishes = productGroup.publishedChannels.filter(p => p.channelId !== null)
-
-                  const uniqueShops = new Map<number, PublishedChannel>()
-                  shopPublishes.forEach(p => {
-                    if (p.shopId && !uniqueShops.has(p.shopId)) {
-                      uniqueShops.set(p.shopId, p)
-                    }
-                  })
-
-                  const uniqueChannels = new Map<number, PublishedChannel>()
-                  channelPublishes.forEach(p => {
-                    if (p.channelId && !uniqueChannels.has(p.channelId)) {
-                      uniqueChannels.set(p.channelId, p)
-                    }
-                  })
-
-                  const allUniquePublishes = [
-                    ...Array.from(uniqueShops.values()),
-                    ...Array.from(uniqueChannels.values())
-                  ]
-
                   return (
-                    <React.Fragment key={productGroup.productId}>
-                      {/* 메인 행 */}
-                      <TableRow
-                        className={`hover:bg-gray-50 cursor-pointer h-[72px] ${isExpanded ? 'bg-blue-50/50' : ''}`}
-                        onClick={() => toggleExpanded(productGroup.productId)}
-                      >
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={isProductSelected(productGroup)}
-                            onChange={() => handleToggleSelection(productGroup)}
-                            className="w-4 h-4 cursor-pointer"
+                    <TableRow
+                      key={productGroup.productId}
+                      className="hover:bg-gray-50 cursor-pointer h-[72px]"
+                      onClick={() => router.push(`/sourcing/published-product/${productGroup.publishedChannels[0]?.publishId}`)}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isProductSelected(productGroup)}
+                          onChange={() => handleToggleSelection(productGroup)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <ThumbnailImage
+                            src={getPublishedProductThumbnailUrl(productGroup)}
+                            alt={productGroup.product?.name || '상품'}
+                            size="md"
+                            rounded="lg"
+                            fallbackIcon="package"
                           />
-                        </TableCell>
-                        <TableCell className="px-2">
-                          <button
-                            className="p-1 hover:bg-gray-200 rounded transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleExpanded(productGroup.productId)
-                            }}
-                          >
-                            {isExpanded ? (
-                              <ChevronDown size={18} className="text-gray-500" />
-                            ) : (
-                              <ChevronRight size={18} className="text-gray-500" />
-                            )}
-                          </button>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <ThumbnailImage
-                              src={getPublishedProductThumbnailUrl(productGroup)}
-                              alt={productGroup.product?.name || '상품'}
-                              size="md"
-                              rounded="lg"
-                              fallbackIcon="package"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="font-semibold text-gray-900 text-base truncate">
-                                {productGroup.product?.name || '상품 정보 없음'}
-                              </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-gray-900 text-base truncate">
+                              {productGroup.product?.name || '상품 정보 없음'}
                             </div>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-semibold ${
-                              uniqueCount === publishDestinationCount
-                                ? 'bg-green-100 text-green-700'
-                                : uniqueCount > 0
-                                  ? 'bg-blue-100 text-blue-700'
-                                  : 'bg-gray-100 text-gray-500'
-                            }`}>
-                              <Store size={14} />
-                              {uniqueCount}/{publishDestinationCount}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-gray-600 whitespace-nowrap">
-                            {formatDateTime(productGroup.createdAt)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-semibold ${
+                            uniqueCount === publishDestinationCount
+                              ? 'bg-green-100 text-green-700'
+                              : uniqueCount > 0
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            <Store size={14} />
+                            {uniqueCount}/{publishDestinationCount}
                           </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-gray-600 whitespace-nowrap">
-                            {formatDateTime(productGroup.publishedChannels[0]?.updatedAt || null)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-gray-600 whitespace-nowrap">
-                            {formatDateTime(productGroup.latestPublishedAt)}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-
-                      {/* 아코디언 펼쳐진 내용 - 발행처 목록 */}
-                      {isExpanded && (
-                        <TableRow className="bg-gray-50/80">
-                          <TableCell colSpan={7} className="p-0">
-                            <div className="border-l-4 border-blue-400 ml-4 my-2">
-                              <div className="pl-4 pr-4 py-2">
-                                <div className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">
-                                  발행처 상세 ({allUniquePublishes.length}개)
-                                </div>
-                                <div className="space-y-2">
-                                  {allUniquePublishes.map((publish, idx) => {
-                                    const isShop = publish.shopId !== null && publish.channelId === null
-                                    return (
-                                      <div
-                                        key={`publish-${idx}`}
-                                        className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          <div className={`p-2 rounded-lg ${isShop ? 'bg-blue-100' : 'bg-purple-100'}`}>
-                                            <Store size={16} className={isShop ? 'text-blue-600' : 'text-purple-600'} />
-                                          </div>
-                                          <div>
-                                            <div className="flex items-center gap-2">
-                                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                                                isShop ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'
-                                              }`}>
-                                                {isShop ? '쇼핑몰' : '채널'}
-                                              </span>
-                                              <button
-                                                onClick={(e) => {
-                                                  e.stopPropagation()
-                                                  router.push(`/sourcing/published-product/${publish.publishId}`)
-                                                }}
-                                                className="font-medium text-gray-900 hover:text-blue-600 hover:underline transition-colors"
-                                              >
-                                                {isShop ? publish.shopName : publish.channelName}
-                                              </button>
-                                            </div>
-                                            {publish.platform && (
-                                              <div className="text-xs text-gray-500 mt-0.5">
-                                                플랫폼: {publish.platform}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                          <div className="text-right">
-                                            <div className="text-xs text-gray-500">발행일시</div>
-                                            <div className="text-sm text-gray-700">
-                                              {formatDateTime(publish.publishedAt || publish.createdAt)}
-                                            </div>
-                                          </div>
-                                          {/* 활성화 토글 */}
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              handleToggleActive(publish.publishId, publish.isActive)
-                                            }}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                                              publish.isActive
-                                                ? 'text-green-700 bg-green-50 hover:bg-green-100'
-                                                : 'text-gray-500 bg-gray-100 hover:bg-gray-200'
-                                            }`}
-                                            title={publish.isActive ? '활성화됨 (클릭하여 비활성화)' : '비활성화됨 (클릭하여 활성화)'}
-                                          >
-                                            {publish.isActive ? (
-                                              <ToggleRight size={16} />
-                                            ) : (
-                                              <ToggleLeft size={16} />
-                                            )}
-                                            {publish.isActive ? '활성' : '비활성'}
-                                          </button>
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              router.push(`/sourcing/published-product/${publish.publishId}`)
-                                            }}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                                            title="상세보기"
-                                          >
-                                            <ExternalLink size={14} />
-                                            상세
-                                          </button>
-                                        </div>
-                                      </div>
-                                    )
-                                  })}
-
-                                  {/* 미발행 채널 표시 */}
-                                  {uniqueCount < publishDestinationCount && (
-                                    <div className="text-xs text-gray-400 text-center py-2 border-t border-dashed border-gray-200 mt-2">
-                                      아직 발행되지 않은 발행처가 {publishDestinationCount - uniqueCount}개 있습니다
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </React.Fragment>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-gray-600 whitespace-nowrap">
+                          {formatDateTime(productGroup.createdAt)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-gray-600 whitespace-nowrap">
+                          {formatDateTime(productGroup.publishedChannels[0]?.updatedAt || null)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-gray-600 whitespace-nowrap">
+                          {formatDateTime(productGroup.latestPublishedAt)}
+                        </span>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
               </TableBody>

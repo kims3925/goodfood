@@ -28,8 +28,6 @@ export interface ShopInfo {
   subdomain: string
   name: string
   coverUrl?: string
-  freeShippingAmount?: number
-  defaultShippingFee?: number
   contactPhone?: string
   contactEmail?: string
   bankInfo?: ShopBankInfo

@@ -76,19 +76,11 @@ export async function GET(request: NextRequest) {
       prisma.product.findMany({
         where,
         include: {
-          collectedProduct: {
+          channel: {
             select: {
-              post: {
-                select: {
-                  channel: {
-                    select: {
-                      id: true,
-                      name: true,
-                      platform: true,
-                    },
-                  },
-                },
-              },
+              id: true,
+              name: true,
+              platform: true,
             },
           },
           publishedProducts: {
@@ -126,7 +118,7 @@ export async function GET(request: NextRequest) {
         id: product.id,
         name: product.name,
         thumbnailUrl: product.thumbnailUrl,
-        collectedProduct: product.collectedProduct,
+        channel: product.channel,
       },
       publishedChannels: product.publishedProducts.map((pp: any) => {
         // Shop 발행과 채널 발행을 구분하여 반환
@@ -238,7 +230,7 @@ export async function DELETE(request: NextRequest) {
         error: '발행상품을 삭제할 수 없습니다.',
         reason: `${reasons.join(', ')}이 존재하는 상품은 삭제할 수 없습니다.`,
         details: {
-          productName: publishedProduct.product.name,
+          productName: publishedProduct.product?.name || 'Unknown',
           orderCount: publishedProduct._count.orderItems,
           inquiryCount: publishedProduct._count.inquiries,
         },

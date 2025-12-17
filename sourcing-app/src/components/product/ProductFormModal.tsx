@@ -13,6 +13,8 @@ interface DraftWithPostId {
   postId: number
   draft: ProductDraft
   error?: string
+  channelId?: number
+  policyApplied?: boolean
 }
 
 interface ProductFormModalProps {
@@ -25,6 +27,7 @@ interface ProductFormModalProps {
   onSaved: () => void
   onAddMorePosts?: () => void // 추가 게시물 선택 콜백
   onRetry?: (postId: number) => void // AI 재시도 콜백
+  onChangePolicyRequest?: () => void // 정책 변경 요청 콜백
 }
 
 type TabType = 'basic' | 'images' | 'options' | 'variants'
@@ -41,6 +44,8 @@ interface ProductFormData {
   variants: GeneratedVariant[]
   images: SortableImage[] // 이미지 목록
   error?: string // AI 생성 실패 여부
+  channelId?: number // 출처 채널 ID
+  policyApplied?: boolean // 정책 자동 적용 여부
 }
 
 // 기본 상품 데이터 생성 함수
@@ -66,6 +71,7 @@ export default function ProductFormModal({
   onSaved,
   onAddMorePosts,
   onRetry,
+  onChangePolicyRequest,
 }: ProductFormModalProps) {
   const isEditMode = !!productId
   const [activeTab, setActiveTab] = useState<TabType>('basic')
@@ -126,6 +132,8 @@ export default function ProductFormModal({
               variants: item.draft?.variants || [],
               images,
               error: item.error,
+              channelId: item.channelId,
+              policyApplied: item.policyApplied,
             }
           })
         )
@@ -446,22 +454,50 @@ export default function ProductFormModal({
               <p className="font-medium mb-1">AI 상품 생성에 실패했습니다.</p>
               <p className="mb-2 text-red-700">사유: {currentProduct.error}</p>
               <p className="mb-2 text-red-600">게시물 내용을 확인하고 직접 상품 정보를 입력해주세요.</p>
-              <Link
-                href={`/post/detail/${currentProduct.postId}`}
-                target="_blank"
-                className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 underline"
-              >
-                <ExternalLink size={14} />
-                게시물 상세 보기
-              </Link>
+              <div className="flex items-center gap-3">
+                <Link
+                  href={`/post/detail/${currentProduct.postId}`}
+                  target="_blank"
+                  className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 underline"
+                >
+                  <ExternalLink size={14} />
+                  게시물 상세 보기
+                </Link>
+                {onRetry && (
+                  <button
+                    onClick={() => onRetry(currentProduct.postId!)}
+                    className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 underline"
+                  >
+                    <RefreshCw size={14} />
+                    AI 재시도
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ) : (
-          <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-start gap-2">
-            <AlertCircle size={20} className="text-purple-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-purple-800">
-              AI가 생성한 정보입니다. 내용을 확인하고 수정한 후 저장해주세요.
-            </p>
+          <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle size={20} className="text-purple-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-purple-800">
+                <p>
+                  AI가 생성한 정보입니다. 내용을 확인하고 수정한 후 저장해주세요.
+                </p>
+                {currentProduct.policyApplied && (
+                  <p className="text-xs text-purple-600 mt-1">
+                    도매처 가격 정책이 자동 적용되었습니다.
+                  </p>
+                )}
+              </div>
+            </div>
+            {onChangePolicyRequest && !isEditMode && (
+              <button
+                onClick={onChangePolicyRequest}
+                className="text-xs text-purple-600 hover:text-purple-800 underline whitespace-nowrap"
+              >
+                정책 변경
+              </button>
+            )}
           </div>
         )}
 

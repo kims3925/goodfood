@@ -19,31 +19,22 @@ interface ProductImage {
 
 interface Product {
   id: number
-  collectedProductId: number | null
+  channelId: number | null
   name: string
   description: string | null
   thumbnailUrl: string | null
   categoryId: string | null
+  wholesalePrice: number | null
+  price: number | null
   currency: string
   createdAt: string
   updatedAt: string
   images: ProductImage[]
-  collectedProduct?: {
+  channel?: {
     id: number
-    post?: {
-      id: number
-      title: string
-      content: string | null
-      channel: {
-        id: number
-        name: string
-        coverUrl: string | null
-      }
-      images: Array<{
-        id: number
-        imageUrl: string
-      }>
-    }
+    name: string
+    coverUrl: string | null
+    platform?: string
   } | null
   options: Array<{
     id: number
@@ -1272,24 +1263,24 @@ export default function ProductDetailPage() {
                 </div>
               </div>
 
-              {/* 원본 게시물 정보 */}
-              {product.collectedProduct?.post && (
+              {/* 출처 채널 정보 */}
+              {product.channel && (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                   <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                     <div className="flex items-center gap-2">
                       <div className="p-2 bg-amber-100 rounded-lg">
                         <FileText size={18} className="text-amber-600" />
                       </div>
-                      <span className="font-semibold text-slate-900">원본 게시물 정보</span>
+                      <span className="font-semibold text-slate-900">출처 채널 정보</span>
                     </div>
                   </div>
 
                   <div className="p-6 space-y-4">
                     <div className="flex items-center gap-3">
-                      {product.collectedProduct.post.channel.coverUrl ? (
+                      {product.channel.coverUrl ? (
                         <img
-                          src={product.collectedProduct.post.channel.coverUrl}
-                          alt={product.collectedProduct.post.channel.name}
+                          src={product.channel.coverUrl}
+                          alt={product.channel.name}
                           className="w-10 h-10 rounded-xl object-cover"
                         />
                       ) : (
@@ -1299,22 +1290,9 @@ export default function ProductDetailPage() {
                       )}
                       <div>
                         <p className="text-slate-500 text-xs">출처 채널</p>
-                        <p className="font-medium text-slate-900">{product.collectedProduct.post.channel.name}</p>
+                        <p className="font-medium text-slate-900">{product.channel.name}</p>
                       </div>
                     </div>
-
-                    <div>
-                      <p className="text-slate-500 text-xs mb-1">게시물 제목</p>
-                      <p className="text-slate-900 font-medium">{product.collectedProduct.post.title}</p>
-                    </div>
-
-                    <Link
-                      href={`/collected-product/${product.collectedProductId}`}
-                      className="inline-flex items-center gap-2 text-amber-600 hover:text-amber-700 text-sm font-medium transition-colors"
-                    >
-                      <ExternalLink size={16} />
-                      수집 상품 상세 보기
-                    </Link>
                   </div>
                 </div>
               )}

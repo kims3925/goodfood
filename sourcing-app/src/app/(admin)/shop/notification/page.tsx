@@ -108,6 +108,8 @@ export default function ShopNotificationPage() {
 
   // 선택된 알림
   const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteTargetIds, setDeleteTargetIds] = useState<number[]>([])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -201,9 +203,16 @@ export default function ShopNotificationPage() {
     }
   }
 
-  // 알림 삭제
-  const handleDelete = async (ids: number[]) => {
-    if (!confirm(`${ids.length}개의 알림을 삭제하시겠습니까?`)) return
+  // 알림 삭제 (모달 열기)
+  const handleDelete = (ids: number[]) => {
+    setDeleteTargetIds(ids)
+    setShowDeleteModal(true)
+  }
+
+  // 실제 삭제 수행
+  const handleDeleteConfirm = async () => {
+    setShowDeleteModal(false)
+    const ids = deleteTargetIds
 
     try {
       const res = await fetch('/api/admin/notifications', {
@@ -554,6 +563,34 @@ export default function ShopNotificationPage() {
           </div>
         )}
       </div>
+
+      {/* 삭제 확인 모달 */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full shadow-xl">
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">알림 삭제</h3>
+              <p className="text-gray-600">
+                {deleteTargetIds.length}개의 알림을 삭제하시겠습니까?
+              </p>
+            </div>
+            <div className="flex gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

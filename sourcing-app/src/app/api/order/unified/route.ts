@@ -33,6 +33,7 @@ export interface UnifiedOrder {
 const statusLabels: Record<string, string> = {
   PENDING: '결제대기',
   PAID: '결제완료',
+  PREPARING: '상품준비',
   SHIPPED: '배송중',
   DELIVERED: '배송완료',
   CANCELLED: '주문취소',
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
       total: 0,
       PENDING: 0,
       PAID: 0,
+      PREPARING: 0,
       SHIPPED: 0,
       DELIVERED: 0,
       CANCELLED: 0, // CANCELLED + REFUNDED
@@ -105,9 +107,10 @@ export async function GET(request: NextRequest) {
           }
 
           try {
-            const [pendingCount, paidCount, shippedCount, deliveredCount, cancelledCount, refundedCount] = await Promise.all([
+            const [pendingCount, paidCount, preparingCount, shippedCount, deliveredCount, cancelledCount, refundedCount] = await Promise.all([
               prisma.order.count({ where: { ...countBaseWhere, status: 'PENDING' } }),
               prisma.order.count({ where: { ...countBaseWhere, status: 'PAID' } }),
+              prisma.order.count({ where: { ...countBaseWhere, status: 'PREPARING' } }),
               prisma.order.count({ where: { ...countBaseWhere, status: 'SHIPPED' } }),
               prisma.order.count({ where: { ...countBaseWhere, status: 'DELIVERED' } }),
               prisma.order.count({ where: { ...countBaseWhere, status: 'CANCELLED' } }),
@@ -116,6 +119,7 @@ export async function GET(request: NextRequest) {
 
             statusCounts.PENDING = pendingCount
             statusCounts.PAID = paidCount
+            statusCounts.PREPARING = preparingCount
             statusCounts.SHIPPED = shippedCount
             statusCounts.DELIVERED = deliveredCount
             statusCounts.CANCELLED = cancelledCount + refundedCount
@@ -218,9 +222,10 @@ export async function GET(request: NextRequest) {
           }
 
           try {
-            const [guestPendingCount, guestPaidCount, guestShippedCount, guestDeliveredCount, guestCancelledCount, guestRefundedCount] = await Promise.all([
+            const [guestPendingCount, guestPaidCount, guestPreparingCount, guestShippedCount, guestDeliveredCount, guestCancelledCount, guestRefundedCount] = await Promise.all([
               prisma.guestOrder.count({ where: { ...guestCountBaseWhere, status: 'PENDING' } }),
               prisma.guestOrder.count({ where: { ...guestCountBaseWhere, status: 'PAID' } }),
+              prisma.guestOrder.count({ where: { ...guestCountBaseWhere, status: 'PREPARING' } }),
               prisma.guestOrder.count({ where: { ...guestCountBaseWhere, status: 'SHIPPED' } }),
               prisma.guestOrder.count({ where: { ...guestCountBaseWhere, status: 'DELIVERED' } }),
               prisma.guestOrder.count({ where: { ...guestCountBaseWhere, status: 'CANCELLED' } }),
@@ -229,6 +234,7 @@ export async function GET(request: NextRequest) {
 
             statusCounts.PENDING += guestPendingCount
             statusCounts.PAID += guestPaidCount
+            statusCounts.PREPARING += guestPreparingCount
             statusCounts.SHIPPED += guestShippedCount
             statusCounts.DELIVERED += guestDeliveredCount
             statusCounts.CANCELLED += guestCancelledCount + guestRefundedCount
@@ -321,7 +327,7 @@ export async function GET(request: NextRequest) {
     )
 
     // 전체 카운트 계산
-    statusCounts.total = statusCounts.PENDING + statusCounts.PAID +
+    statusCounts.total = statusCounts.PENDING + statusCounts.PAID + statusCounts.PREPARING +
                          statusCounts.SHIPPED + statusCounts.DELIVERED + statusCounts.CANCELLED
 
     // 페이지네이션

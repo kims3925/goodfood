@@ -53,8 +53,8 @@ export async function runProductCreatePipeline(
     },
   }
 
-  if (config.collectedProductIds?.length) {
-    whereClause.id = { in: config.collectedProductIds }
+  if (config.channelIds?.length) {
+    whereClause.id = { in: config.channelIds }
   }
 
   const collectedProducts = await prisma.collectedProduct.findMany({
@@ -140,7 +140,7 @@ export async function runProductCreatePipeline(
     }
 
     const result: CreatedProductResult = {
-      collectedProductId: collectedProduct.id,
+      channelId: collectedProduct.id,
       status: 'pending' as any,
     }
 
@@ -158,6 +158,8 @@ export async function runProductCreatePipeline(
       }
       const options = metadata.options || []
       const variants = metadata.variants || []
+      const wholesalePrice = metadata.wholesalePrice ?? null
+      const price = metadata.price ?? null
       const shipping = metadata.shipping || {
         shippingFee: metadata.shippingFee ?? null,
         shippingInfo: metadata.shippingInfo ?? null,
@@ -170,11 +172,13 @@ export async function runProductCreatePipeline(
       const product = await prisma.product.create({
         data: {
           userId,
-          collectedProductId: collectedProduct.id,
+          channelId: collectedProduct.id,
           name: collectedProduct.name || '상품명 없음',
           description: collectedProduct.description || null,
           categoryId: metadata.category || null,
           currency: collectedProduct.currency || 'KRW',
+          wholesalePrice: typeof wholesalePrice === 'number' ? wholesalePrice : null,
+          price: typeof price === 'number' ? price : null,
           shippingFee: typeof shipping.shippingFee === 'number' ? shipping.shippingFee : null,
           shippingInfo: typeof shipping.shippingInfo === 'string' ? shipping.shippingInfo : null,
           thumbnailUrl: collectedProduct.post.images[0]?.url || null,

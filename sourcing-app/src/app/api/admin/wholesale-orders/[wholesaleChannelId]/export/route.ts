@@ -5,17 +5,17 @@ import ExcelJS from 'exceljs'
 
 // 엑셀 행 데이터 타입
 interface ExcelRowData {
-  productName: string
-  optionSummary: string
-  quantity: number
-  wholesalePrice: number
-  supplyAmount: number
-  customerName: string
-  customerPhone: string
-  fullAddress: string
-  orderedAt: string
-  orderNumber: string
-  isMember: boolean
+  timestamp: string          // 타임스탬프(날짜,시간)
+  productName: string        // 상품및 제품명
+  quantity: number           // 수량
+  totalAmount: number        // 총금액
+  recipientName: string      // 배송받는분 이름
+  recipientPhone: string     // 받는분 연락처
+  fullAddress: string        // 배송지 주소
+  senderName: string         // 보내는 사람(받는분과 다른경우)
+  cashReceipt: string        // 현금영수증 신청
+  email: string              // 이메일주소
+  dateKey: string            // YYYY-MM-DD 형식의 날짜 키 (그룹화용)
 }
 
 /**
@@ -38,21 +38,7 @@ export async function GET(
     const { wholesaleChannelId } = await params
     const channelId = parseInt(wholesaleChannelId)
 
-    const { searchParams } = new URL(request.url)
-    const from = searchParams.get('from')
-    const to = searchParams.get('to')
-
-    if (!from || !to) {
-      return NextResponse.json(
-        { success: false, error: '기간(from, to)은 필수입니다.' },
-        { status: 400 }
-      )
-    }
-
-    const fromDate = new Date(from)
-    fromDate.setHours(0, 0, 0, 0)
-    const toDate = new Date(to)
-    toDate.setHours(23, 59, 59, 999)
+    // 전체 이력 조회 (날짜 필터 제거)
 
     // 도매처 정보 조회
     const channel = await prisma.channel.findUnique({
@@ -67,30 +53,23 @@ export async function GET(
       )
     }
 
-    // 결제완료(PAID)만 조회 (배송중/배송완료/취소 제외)
+    // 배송 시작 전 주문만 조회 (발주 대상)
+    // PAID, PREPARING 상태만 포함 (SHIPPED 이후는 발주 완료)
 
-    // 공통 쿼리 조건
+    // 공통 쿼리 조건 (Product의 channelId 참조 - 소싱 출처인 도매처)
     const productCondition = {
       userId: user.userId,
       product: {
-        collectedProduct: {
-          post: {
-            channelId: channelId,
-          },
-        },
+        channelId: channelId,
       },
     }
 
-    // 1. 회원 주문 조회
+    // 1. 회원 주문 조회 (배송 시작 전)
     const memberItems = await prisma.orderItem.findMany({
       where: {
         order: {
-          status: 'PAID',
-          paidAt: {
-            not: null,
-            gte: fromDate,
-            lte: toDate,
-          },
+          status: { in: ['PAID', 'PREPARING'] },
+          paidAt: { not: null },
         },
         publishedProduct: productCondition,
       },
@@ -99,6 +78,12 @@ export async function GET(
           select: {
             orderNumber: true,
             orderedAt: true,
+            user: {
+              select: {
+                name: true,
+                email: true,
+              },
+            },
             shippingAddress: {
               select: {
                 recipientName: true,
@@ -138,16 +123,12 @@ export async function GET(
       },
     })
 
-    // 2. 비회원 주문 조회
+    // 2. 비회원 주문 조회 (배송 시작 전)
     const guestItems = await prisma.guestOrderItem.findMany({
       where: {
         guestOrder: {
-          status: 'PAID',
-          paidAt: {
-            not: null,
-            gte: fromDate,
-            lte: toDate,
-          },
+          status: { in: ['PAID', 'PREPARING'] },
+          paidAt: { not: null },
         },
         publishedProduct: productCondition,
       },
@@ -158,6 +139,7 @@ export async function GET(
             orderedAt: true,
             guestName: true,
             guestPhone: true,
+            guestEmail: true,
             shippingAddress: {
               select: {
                 recipientName: true,
@@ -203,7 +185,7 @@ export async function GET(
     // 회원 주문 변환
     for (const item of memberItems) {
       const wholesalePrice = getWholesalePrice(item)
-      const supplyAmount = Number(wholesalePrice) * item.quantity
+      const totalAmount = Number(wholesalePrice) * item.quantity
 
       const addr = item.order.shippingAddress
       const fullAddress = addr?.addressDetail
@@ -211,32 +193,32 @@ export async function GET(
         : `(${addr?.postalCode || ''}) ${addr?.address || ''}`
 
       const orderDate = new Date(item.order.orderedAt)
-      const orderedAt = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}-${String(orderDate.getDate()).padStart(2, '0')} ${String(orderDate.getHours()).padStart(2, '0')}:${String(orderDate.getMinutes()).padStart(2, '0')}`
+      const dateKey = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}-${String(orderDate.getDate()).padStart(2, '0')}`
+      const timestamp = `${dateKey} ${String(orderDate.getHours()).padStart(2, '0')}:${String(orderDate.getMinutes()).padStart(2, '0')}`
 
-      let optionSummary = item.optionSummary || item.variant?.optionSummary || null
-      if (!optionSummary && item.publishedProduct?.product?.variants?.length) {
-        optionSummary = item.publishedProduct.product.variants[0].optionSummary || null
-      }
+      const recipientName = addr?.recipientName || ''
+      const orderUserName = (item.order as any).user?.name || ''
+      const senderName = recipientName !== orderUserName && orderUserName ? orderUserName : ''
 
       excelRows.push({
+        timestamp,
         productName: item.productName,
-        optionSummary: optionSummary || '-',
         quantity: item.quantity,
-        wholesalePrice: Number(wholesalePrice),
-        supplyAmount,
-        customerName: addr?.recipientName || '',
-        customerPhone: addr?.recipientPhone || '',
+        totalAmount,
+        recipientName,
+        recipientPhone: addr?.recipientPhone || '',
         fullAddress,
-        orderedAt,
-        orderNumber: item.order.orderNumber,
-        isMember: true,
+        senderName,
+        cashReceipt: '',
+        email: (item.order as any).user?.email || '',
+        dateKey,
       })
     }
 
     // 비회원 주문 변환
     for (const item of guestItems) {
       const wholesalePrice = getWholesalePrice(item)
-      const supplyAmount = Number(wholesalePrice) * item.quantity
+      const totalAmount = Number(wholesalePrice) * item.quantity
 
       const addr = item.guestOrder.shippingAddress
       const fullAddress = addr?.addressDetail
@@ -244,41 +226,49 @@ export async function GET(
         : `(${addr?.postalCode || ''}) ${addr?.address || ''}`
 
       const orderDate = new Date(item.guestOrder.orderedAt)
-      const orderedAt = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}-${String(orderDate.getDate()).padStart(2, '0')} ${String(orderDate.getHours()).padStart(2, '0')}:${String(orderDate.getMinutes()).padStart(2, '0')}`
+      const dateKey = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}-${String(orderDate.getDate()).padStart(2, '0')}`
+      const timestamp = `${dateKey} ${String(orderDate.getHours()).padStart(2, '0')}:${String(orderDate.getMinutes()).padStart(2, '0')}`
 
-      let optionSummary = item.optionSummary || item.variant?.optionSummary || null
-      if (!optionSummary && item.publishedProduct?.product?.variants?.length) {
-        optionSummary = item.publishedProduct.product.variants[0].optionSummary || null
-      }
-
-      const customerName = addr?.recipientName || item.guestOrder.guestName
-      const customerPhone = addr?.recipientPhone || item.guestOrder.guestPhone
+      const recipientName = addr?.recipientName || item.guestOrder.guestName
+      const guestName = item.guestOrder.guestName
+      const senderName = recipientName !== guestName ? guestName : ''
 
       excelRows.push({
+        timestamp,
         productName: item.productName,
-        optionSummary: optionSummary || '-',
         quantity: item.quantity,
-        wholesalePrice: Number(wholesalePrice),
-        supplyAmount,
-        customerName,
-        customerPhone,
+        totalAmount,
+        recipientName,
+        recipientPhone: addr?.recipientPhone || item.guestOrder.guestPhone,
         fullAddress,
-        orderedAt,
-        orderNumber: item.guestOrder.orderNumber,
-        isMember: false,
+        senderName,
+        cashReceipt: '',
+        email: item.guestOrder.guestEmail || '',
+        dateKey,
       })
     }
 
-    // 날짜순 정렬
-    excelRows.sort((a, b) => new Date(b.orderedAt).getTime() - new Date(a.orderedAt).getTime())
+    // 날짜순 정렬 (내림차순)
+    excelRows.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+    // 날짜별로 그룹화
+    const groupedByDate = new Map<string, ExcelRowData[]>()
+    for (const row of excelRows) {
+      const existing = groupedByDate.get(row.dateKey) || []
+      existing.push(row)
+      groupedByDate.set(row.dateKey, existing)
+    }
+
+    // 날짜 키를 내림차순 정렬
+    const sortedDateKeys = Array.from(groupedByDate.keys()).sort((a, b) => b.localeCompare(a))
 
     // 엑셀 생성
     const workbook = new ExcelJS.Workbook()
-    const sheet = workbook.addWorksheet('발주서')
+    const sheet = workbook.addWorksheet('발주견적서')
 
-    // 헤더 스타일
+    // 스타일 정의
     const headerStyle: Partial<ExcelJS.Style> = {
-      font: { bold: true, size: 12 },
+      font: { bold: true, size: 11 },
       alignment: { horizontal: 'center', vertical: 'middle' },
       fill: {
         type: 'pattern',
@@ -293,107 +283,169 @@ export async function GET(
       },
     }
 
+    const dateSeparatorStyle: Partial<ExcelJS.Style> = {
+      font: { bold: true, size: 12, color: { argb: 'FFFFFFFF' } },
+      alignment: { horizontal: 'left', vertical: 'middle' },
+      fill: {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF4472C4' },
+      },
+    }
+
+    const subtotalStyle: Partial<ExcelJS.Style> = {
+      font: { bold: true },
+      fill: {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD9E1F2' },
+      },
+      border: {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      },
+    }
+
+    const totalStyle: Partial<ExcelJS.Style> = {
+      font: { bold: true, size: 12 },
+      fill: {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFF0C0' },
+      },
+      border: {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      },
+    }
+
+    // 열 너비 설정
+    sheet.getColumn(1).width = 18 // 타임스탬프
+    sheet.getColumn(2).width = 40 // 상품및 제품명
+    sheet.getColumn(3).width = 8  // 수량
+    sheet.getColumn(4).width = 14 // 총금액
+    sheet.getColumn(5).width = 12 // 배송받는분 이름
+    sheet.getColumn(6).width = 15 // 받는분 연락처
+    sheet.getColumn(7).width = 50 // 배송지 주소
+    sheet.getColumn(8).width = 12 // 보내는 사람
+    sheet.getColumn(9).width = 20 // 현금영수증 신청
+    sheet.getColumn(10).width = 25 // 이메일주소
+
     // 타이틀
     sheet.mergeCells('A1:J1')
     const titleCell = sheet.getCell('A1')
-    titleCell.value = '도매 발주서'
+    titleCell.value = '도매 발주견적서'
     titleCell.font = { bold: true, size: 16 }
     titleCell.alignment = { horizontal: 'center' }
 
     // 정보
     sheet.getCell('A2').value = `도매처: ${channel.name}`
-    sheet.getCell('A3').value = `발주일: ${from}`
-    sheet.getCell('A4').value = `생성일시: ${new Date().toLocaleString('ko-KR')}`
-    sheet.getCell('A5').value = `총 주문: 회원 ${memberItems.length}건 + 비회원 ${guestItems.length}건 = ${excelRows.length}건`
+    sheet.getCell('A3').value = `생성일시: ${new Date().toLocaleString('ko-KR')}`
+    sheet.getCell('A4').value = `총 주문: 회원 ${memberItems.length}건 + 비회원 ${guestItems.length}건 = ${excelRows.length}건`
+    sheet.getCell('A5').value = `총 발주일수: ${sortedDateKeys.length}일`
 
-    // 빈 줄
-    sheet.getRow(6).values = []
+    let rowIndex = 7
+    let grandTotalQty = 0
+    let grandTotalAmount = 0
 
-    // 테이블 헤더
-    const headerRow = sheet.getRow(7)
-    headerRow.values = ['주문번호', '상품명', '옵션', '수량', '단가', '공급가액', '고객명', '연락처', '주소', '주문일시']
-    headerRow.eachCell((cell) => {
-      Object.assign(cell, { style: headerStyle })
-    })
+    // 날짜별 그룹 출력
+    for (const dateKey of sortedDateKeys) {
+      const dateRows = groupedByDate.get(dateKey) || []
 
-    // 열 너비 설정
-    sheet.getColumn(1).width = 20 // 주문번호
-    sheet.getColumn(2).width = 40 // 상품명
-    sheet.getColumn(3).width = 20 // 옵션
-    sheet.getColumn(4).width = 8  // 수량
-    sheet.getColumn(5).width = 12 // 단가
-    sheet.getColumn(6).width = 14 // 공급가액
-    sheet.getColumn(7).width = 12 // 고객명
-    sheet.getColumn(8).width = 15 // 연락처
-    sheet.getColumn(9).width = 50 // 주소
-    sheet.getColumn(10).width = 18 // 주문일시
+      // 요일 계산
+      const date = new Date(dateKey)
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+      const dayName = dayNames[date.getDay()]
 
-    // 데이터
-    let totalQty = 0
-    let totalAmount = 0
-    let rowIndex = 8
+      // 날짜 구분선
+      sheet.mergeCells(`A${rowIndex}:J${rowIndex}`)
+      const dateCell = sheet.getCell(`A${rowIndex}`)
+      dateCell.value = `▼ ${dateKey} (${dayName}) - ${dateRows.length}건`
+      Object.assign(dateCell, { style: dateSeparatorStyle })
+      rowIndex++
 
-    for (const rowData of excelRows) {
-      totalQty += rowData.quantity
-      totalAmount += rowData.supplyAmount
-
-      const row = sheet.getRow(rowIndex)
-      row.values = [
-        rowData.orderNumber,
-        rowData.productName,
-        rowData.optionSummary,
-        rowData.quantity,
-        rowData.wholesalePrice,
-        rowData.supplyAmount,
-        rowData.customerName,
-        rowData.customerPhone,
-        rowData.fullAddress,
-        rowData.orderedAt,
-      ]
-
-      // 숫자 포맷
-      row.getCell(4).numFmt = '#,##0'
-      row.getCell(5).numFmt = '#,##0'
-      row.getCell(6).numFmt = '#,##0'
-
-      // 테두리
-      row.eachCell((cell) => {
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' },
-        }
+      // 테이블 헤더
+      const headerRow = sheet.getRow(rowIndex)
+      headerRow.values = ['타임스탬프', '상품및 제품명', '수량', '총금액', '배송받는분 이름', '받는분 연락처', '배송지 주소', '보내는 사람', '현금영수증 신청', '이메일주소']
+      headerRow.eachCell((cell) => {
+        Object.assign(cell, { style: headerStyle })
       })
+      rowIndex++
 
+      // 해당 날짜의 데이터
+      let dateTotalQty = 0
+      let dateTotalAmount = 0
+
+      for (const rowData of dateRows) {
+        dateTotalQty += rowData.quantity
+        dateTotalAmount += rowData.totalAmount
+        grandTotalQty += rowData.quantity
+        grandTotalAmount += rowData.totalAmount
+
+        const row = sheet.getRow(rowIndex)
+        row.values = [
+          rowData.timestamp,
+          rowData.productName,
+          rowData.quantity,
+          rowData.totalAmount,
+          rowData.recipientName,
+          rowData.recipientPhone,
+          rowData.fullAddress,
+          rowData.senderName,
+          rowData.cashReceipt,
+          rowData.email,
+        ]
+
+        // 숫자 포맷
+        row.getCell(3).numFmt = '#,##0'
+        row.getCell(4).numFmt = '#,##0'
+
+        // 테두리
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' },
+          }
+        })
+
+        rowIndex++
+      }
+
+      // 일별 소계
+      const subtotalRow = sheet.getRow(rowIndex)
+      subtotalRow.values = [`소계 (${dateKey})`, '', dateTotalQty, dateTotalAmount, '', '', '', '', '', '']
+      subtotalRow.eachCell((cell) => {
+        Object.assign(cell, { style: subtotalStyle })
+      })
+      subtotalRow.getCell(3).numFmt = '#,##0'
+      subtotalRow.getCell(4).numFmt = '#,##0'
+      rowIndex++
+
+      // 빈 줄 추가 (날짜 그룹 사이)
       rowIndex++
     }
 
-    // 합계
-    const summaryRow = sheet.getRow(rowIndex)
-    summaryRow.values = ['합계', '', '', totalQty, '', totalAmount, '', '', '', '']
-    summaryRow.font = { bold: true }
-    summaryRow.getCell(4).numFmt = '#,##0'
-    summaryRow.getCell(6).numFmt = '#,##0'
-    summaryRow.eachCell((cell) => {
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' },
-      }
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFFFF0C0' },
-      }
+    // 총합계
+    const totalRow = sheet.getRow(rowIndex)
+    totalRow.values = ['총합계', '', grandTotalQty, grandTotalAmount, '', '', '', '', '', '']
+    totalRow.eachCell((cell) => {
+      Object.assign(cell, { style: totalStyle })
     })
+    totalRow.getCell(3).numFmt = '#,##0'
+    totalRow.getCell(4).numFmt = '#,##0'
 
     // 엑셀 파일 생성
     const buffer = await workbook.xlsx.writeBuffer()
 
     // 파일명 생성
-    const fileName = encodeURIComponent(`발주서_${channel.name}_${from}_${to}.xlsx`)
+    const today = new Date().toISOString().split('T')[0]
+    const fileName = encodeURIComponent(`발주견적서_${channel.name}_${today}.xlsx`)
 
     return new NextResponse(buffer, {
       headers: {

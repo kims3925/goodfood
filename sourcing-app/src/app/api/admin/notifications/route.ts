@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     // 데이터 조회
     const [notifications, total, unreadCount, todayCount, shops] = await Promise.all([
-      prisma.shopNotification.findMany({
+      prisma.notification.findMany({
         where,
         include: {
           shop: {
@@ -93,11 +93,11 @@ export async function GET(request: NextRequest) {
         skip: offset,
         take: limit,
       }),
-      prisma.shopNotification.count({ where }),
-      prisma.shopNotification.count({
+      prisma.notification.count({ where }),
+      prisma.notification.count({
         where: { ...where, isRead: false },
       }),
-      prisma.shopNotification.count({
+      prisma.notification.count({
         where: {
           ...where,
           createdAt: {

@@ -95,7 +95,7 @@ export interface TransformResult extends PipelineResult {
 
 export interface TransformedPost {
   postId: number
-  collectedProductId?: number
+  channelId?: number
   status: 'success' | 'failed' | 'skipped'
   error?: string
   errorType?: 'TRANSIENT' | 'PERMANENT'  // 에러 타입 (일시적/영구적)
@@ -107,7 +107,7 @@ export interface TransformedPost {
 // =============================================
 
 export interface ProductCreateConfig {
-  collectedProductIds?: number[]  // 특정 수집상품만 처리
+  channelIds?: number[]  // 특정 수집상품만 처리
   createPendingOnly?: boolean     // Product가 없는 수집상품만 처리
 }
 
@@ -120,7 +120,7 @@ export interface ProductCreateResult extends PipelineResult {
 }
 
 export interface CreatedProductResult {
-  collectedProductId: number
+  channelId: number
   productId?: number
   productName?: string
   status: 'success' | 'failed' | 'skipped'

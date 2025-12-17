@@ -182,7 +182,7 @@ export async function executeProductCreatePipeline(
 
   try {
     const productCreateConfig = {
-      collectedProductIds: config?.collectedProductIds,
+      channelIds: config?.channelIds,
       createPendingOnly: config?.createPendingOnly ?? true,
     }
 

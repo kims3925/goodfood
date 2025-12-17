@@ -41,7 +41,7 @@ export async function createOrderNotification(
   order: OrderInfo
 ): Promise<void> {
   try {
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         shopId,
         section: 'shop',
@@ -65,7 +65,7 @@ export async function createCancelNotification(
   order: OrderInfo
 ): Promise<void> {
   try {
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         shopId,
         section: 'shop',
@@ -92,7 +92,7 @@ export async function createRefundNotification(
     const typeLabel = returnRequest.type === 'RETURN' ? '반품' :
                       returnRequest.type === 'EXCHANGE' ? '교환' : '취소'
 
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         shopId,
         section: 'shop',
@@ -127,7 +127,7 @@ export async function createInquiryNotification(
     }
     const typeLabel = inquiry.type ? typeLabels[inquiry.type] || '일반' : '일반'
 
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         shopId,
         section: 'shop',
@@ -159,7 +159,7 @@ export async function createSettlementNotification(
       ? `${formatDate(settlement.periodStart)} ~ ${formatDate(settlement.periodEnd)}`
       : ''
 
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         shopId,
         section: 'shop',
@@ -211,7 +211,7 @@ export async function createCollectNotification(
   info: CollectInfo
 ): Promise<void> {
   try {
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         section: 'sourcing',
         type: 'COLLECT',
@@ -235,7 +235,7 @@ export async function createTransformNotification(
     const successText = info.successCount !== undefined ? `성공 ${info.successCount}개` : ''
     const failText = info.failCount && info.failCount > 0 ? `, 실패 ${info.failCount}개` : ''
 
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         section: 'sourcing',
         type: 'TRANSFORM',
@@ -259,7 +259,7 @@ export async function createPublishNotification(
     const successText = info.successCount !== undefined ? `성공 ${info.successCount}개` : ''
     const failText = info.failCount && info.failCount > 0 ? `, 실패 ${info.failCount}개` : ''
 
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         section: 'sourcing',
         type: 'PUBLISH',
@@ -280,7 +280,7 @@ export async function createErrorNotification(
   info: ErrorInfo
 ): Promise<void> {
   try {
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         section: 'sourcing',
         type: 'ERROR',
@@ -303,7 +303,7 @@ export async function createInfoNotification(
   link?: string
 ): Promise<void> {
   try {
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         section: 'sourcing',
         type: 'INFO',
@@ -322,7 +322,7 @@ export async function createInfoNotification(
  */
 export async function markNotificationsAsRead(ids: number[]): Promise<number> {
   try {
-    const result = await prisma.shopNotification.updateMany({
+    const result = await prisma.notification.updateMany({
       where: { id: { in: ids } },
       data: {
         isRead: true,
@@ -341,7 +341,7 @@ export async function markNotificationsAsRead(ids: number[]): Promise<number> {
  */
 export async function deleteNotifications(ids: number[]): Promise<number> {
   try {
-    const result = await prisma.shopNotification.deleteMany({
+    const result = await prisma.notification.deleteMany({
       where: { id: { in: ids } },
     })
     return result.count

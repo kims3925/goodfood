@@ -86,6 +86,7 @@ interface UnifiedOrderDetail {
   paymentMethod: string | null
   createdAt: string
   paidAt: string | null
+  preparingAt: string | null
   shippedAt: string | null
   deliveredAt: string | null
   cancelledAt: string | null
@@ -103,6 +104,7 @@ interface UnifiedOrderDetail {
 const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   PENDING: { label: '결제대기', color: 'bg-yellow-100 text-yellow-700', icon: <Clock size={16} /> },
   PAID: { label: '결제완료', color: 'bg-blue-100 text-blue-700', icon: <CreditCard size={16} /> },
+  PREPARING: { label: '상품준비중', color: 'bg-orange-100 text-orange-700', icon: <Package size={16} /> },
   SHIPPED: { label: '배송중', color: 'bg-indigo-100 text-indigo-700', icon: <Truck size={16} /> },
   DELIVERED: { label: '배송완료', color: 'bg-green-100 text-green-700', icon: <CheckCircle size={16} /> },
   CANCELLED: { label: '취소됨', color: 'bg-red-100 text-red-700', icon: <XCircle size={16} /> },
@@ -113,7 +115,8 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.R
 // 주문 상태 흐름 정의
 const ORDER_STATUS_FLOW: Record<string, { next: string | null; nextLabel: string }> = {
   PENDING: { next: 'PAID', nextLabel: '결제 확인' },
-  PAID: { next: 'SHIPPED', nextLabel: '배송 시작' },
+  PAID: { next: 'PREPARING', nextLabel: '상품 준비' },
+  PREPARING: { next: 'SHIPPED', nextLabel: '배송 시작' },
   SHIPPED: { next: 'DELIVERED', nextLabel: '배송 완료' },
   DELIVERED: { next: null, nextLabel: '' },
   CANCELLED: { next: null, nextLabel: '' },
@@ -124,6 +127,7 @@ const ORDER_STATUS_FLOW: Record<string, { next: string | null; nextLabel: string
 const ORDER_STEPS = [
   { key: 'PENDING', label: '주문접수', icon: Clock, dateField: 'createdAt' },
   { key: 'PAID', label: '결제완료', icon: CreditCard, dateField: 'paidAt' },
+  { key: 'PREPARING', label: '상품준비', icon: Package, dateField: 'preparingAt' },
   { key: 'SHIPPED', label: '배송중', icon: Truck, dateField: 'shippedAt' },
   { key: 'DELIVERED', label: '배송완료', icon: CheckCircle, dateField: 'deliveredAt' },
 ] as const
@@ -133,8 +137,9 @@ const getStepIndex = (status: string): number => {
   switch (status) {
     case 'PENDING': return 0
     case 'PAID': return 1
-    case 'SHIPPED': return 2
-    case 'DELIVERED': return 3
+    case 'PREPARING': return 2
+    case 'SHIPPED': return 3
+    case 'DELIVERED': return 4
     case 'CANCELLED':
     case 'REFUNDED':
       return -1 // 취소/환불은 별도 처리
@@ -431,12 +436,13 @@ export default function UnifiedOrderDetailPage() {
                       size="lg"
                     >
                       {order.status === 'PENDING' && <CreditCard size={18} />}
-                      {order.status === 'PAID' && <Truck size={18} />}
+                      {order.status === 'PAID' && <Package size={18} />}
+                      {order.status === 'PREPARING' && <Truck size={18} />}
                       {order.status === 'SHIPPED' && <CheckCircle size={18} />}
                       {ORDER_STATUS_FLOW[order.status].nextLabel}
                     </Button>
                   )}
-                  {['PENDING', 'PAID'].includes(order.status) && (
+                  {['PENDING', 'PAID', 'PREPARING'].includes(order.status) && (
                     <Button
                       variant="danger"
                       onClick={() => handleStatusChange('CANCELLED')}

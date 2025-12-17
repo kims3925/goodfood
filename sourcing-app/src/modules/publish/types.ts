@@ -64,6 +64,7 @@ export interface ProductForPublish {
   description: string | null
   variants: Array<{
     id: number
+    optionSummary: string | null
     price: number
     wholesalePrice: number | null
   }>

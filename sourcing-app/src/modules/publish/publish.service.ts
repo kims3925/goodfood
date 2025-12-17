@@ -59,7 +59,7 @@ function isQuotaError(error: any): boolean {
 /**
  * 게시글 내용 생성
  * Band API로 텍스트만 발행 (이미지 없음)
- * 본문 구조: 쇼핑몰URL → 상품명 → 상품설명 → 쇼핑몰URL
+ * 본문 구조: 쇼핑몰URL → 상품명 → 판매가 → 상품설명 → 쇼핑몰URL
  */
 function buildPostContent(
   product: ProductForPublish,
@@ -77,11 +77,22 @@ function buildPostContent(
   lines.push(product.name)
   lines.push('')
 
+  // 판매가 (variants에서 옵션별로 추출)
+  if (product.variants && product.variants.length > 0) {
+    lines.push('💰 판매가:')
+
+    for (const variant of product.variants) {
+      const optionName = variant.optionSummary || '기본'
+      const price = variant.price.toLocaleString()
+      lines.push(`  • ${optionName}: ${price}원`)
+    }
+
+    lines.push('')
+  }
+
   // 상품 설명
   if (product.description) {
     lines.push(product.description)
-  } else if (product.collectedProduct?.post?.content) {
-    lines.push(product.collectedProduct.post.content)
   }
 
   // 하단 쇼핑몰 링크
@@ -168,16 +179,21 @@ export class PublishService {
         },
       })
 
-      // 2. 상품 정보 조회
+      // 2. 상품 정보 조회 (스냅샷용 필드 포함)
       const product = await prisma.product.findFirst({
         where: {
           id: productId,
           userId,
         },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          thumbnailUrl: true,
           variants: {
             select: {
               id: true,
+              optionSummary: true,
               price: true,
               wholesalePrice: true,
             },
@@ -185,15 +201,6 @@ export class PublishService {
           images: {
             orderBy: { sortOrder: 'asc' },
             select: { url: true },
-          },
-          collectedProduct: {
-            include: {
-              post: {
-                select: {
-                  content: true,
-                },
-              },
-            },
           },
         },
       })
@@ -306,7 +313,7 @@ export class PublishService {
         console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
       }
 
-      // 7. PublishedProduct 레코드 생성 (postKey 포함)
+      // 7. PublishedProduct 레코드 생성 (postKey 및 스냅샷 데이터 포함)
       const publishedProduct = await prisma.publishedProduct.create({
         data: {
           userId,
@@ -314,6 +321,10 @@ export class PublishService {
           channelId,
           postKey, // Band 게시물 키 저장 (발행 취소 시 필요)
           publishedAt: new Date(),
+          // 스냅샷 데이터 (Product 삭제 후에도 유지)
+          productName: product.name,
+          thumbnailUrl: product.thumbnailUrl,
+          imageUrls: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         },
       })
 
@@ -518,11 +529,20 @@ export class PublishService {
         }
       }
 
-      // 2. 상품 정보 조회
+      // 2. 상품 정보 조회 (스냅샷용 필드 포함)
       const product = await prisma.product.findFirst({
         where: {
           id: productId,
           userId,
+        },
+        select: {
+          id: true,
+          name: true,
+          thumbnailUrl: true,
+          images: {
+            orderBy: { sortOrder: 'asc' },
+            select: { url: true },
+          },
         },
       })
 
@@ -534,6 +554,9 @@ export class PublishService {
           error: '상품을 찾을 수 없습니다.',
         }
       }
+
+      // 스냅샷용 이미지 URL 배열
+      const imageUrls = product.images?.map(img => img.url) || []
 
       // 3. 이미 발행 여부 확인
       const existingPublish = await prisma.publishedProduct.findFirst({
@@ -554,13 +577,17 @@ export class PublishService {
         }
       }
 
-      // 4. PublishedProduct 레코드 생성
+      // 4. PublishedProduct 레코드 생성 (스냅샷 데이터 포함)
       const publishedProduct = await prisma.publishedProduct.create({
         data: {
           userId,
           productId,
           shopId,
           publishedAt: new Date(),
+          // 스냅샷 데이터 (Product 삭제 후에도 유지)
+          productName: product.name,
+          thumbnailUrl: product.thumbnailUrl,
+          imageUrls: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         },
       })
 
@@ -753,16 +780,21 @@ export class PublishService {
         },
       })
 
-      // 2. 상품 정보 조회
+      // 2. 상품 정보 조회 (스냅샷용 필드 포함)
       const product = await prisma.product.findFirst({
         where: {
           id: productId,
           userId,
         },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          thumbnailUrl: true,
           variants: {
             select: {
               id: true,
+              optionSummary: true,
               price: true,
               wholesalePrice: true,
             },
@@ -770,15 +802,6 @@ export class PublishService {
           images: {
             orderBy: { sortOrder: 'asc' },
             select: { url: true },
-          },
-          collectedProduct: {
-            include: {
-              post: {
-                select: {
-                  content: true,
-                },
-              },
-            },
           },
         },
       })
@@ -951,7 +974,7 @@ export class PublishService {
         console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
       }
 
-      // 7. PublishedProduct 레코드 생성 (postKey 포함)
+      // 7. PublishedProduct 레코드 생성 (postKey 및 스냅샷 데이터 포함)
       const publishedProduct = await prisma.publishedProduct.create({
         data: {
           userId,
@@ -959,6 +982,10 @@ export class PublishService {
           channelId,
           postKey, // Band 게시물 키 저장 (발행 취소 시 필요)
           publishedAt: new Date(),
+          // 스냅샷 데이터 (Product 삭제 후에도 유지)
+          productName: product.name,
+          thumbnailUrl: product.thumbnailUrl,
+          imageUrls: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         },
       })
 

@@ -1,8 +1,8 @@
-model ShopNotification {
+model Notification {
   id              Int                   @id @default(autoincrement())
   shopId          Int?                  @map("shop_id")
   section         String                @default("shop") @db.VarChar(20) // 'shop' | 'sourcing'
-  type            ShopNotificationType
+  type            NotificationType
   title           String                @db.VarChar(255)
   message         String                @db.Text
   isRead          Boolean               @default(false) @map("is_read")
@@ -25,5 +25,5 @@ model ShopNotification {
   @@index([isRead])
   @@index([type])
   @@index([createdAt])
-  @@map("shop_notification")
+  @@map("notification")
 }

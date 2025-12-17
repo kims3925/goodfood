@@ -5,6 +5,7 @@ import {
   Package,
   FileText,
   Send,
+  Upload,
   Database,
   ClipboardList,
   Truck,
@@ -56,10 +57,10 @@ export const sourcingMenuItems: MenuItem[] = [
     icon: Package,
     children: [
       { label: '가공 상품', href: '/sourcing/product/list', icon: Package },
+      { label: '가공상품 발행', href: '/sourcing/publish', icon: Upload },
       { label: '발행 상품', href: '/sourcing/published-product/list', icon: Send },
     ],
   },
-  { label: '발행', href: '/sourcing/publish', icon: Send },
   {
     label: '자동화',
     icon: Zap,
@@ -153,7 +154,7 @@ export const sourcingPathToMenuMap: Record<string, string> = {
   '/sourcing/collected-product': '수집',
   '/sourcing/product': '상품',
   '/sourcing/published-product': '상품',
-  '/sourcing/publish': '발행',
+  '/sourcing/publish': '상품',
   '/sourcing/automation': '자동화',
   '/sourcing/notification': '알림 관리',
   '/sourcing/settings': '설정',

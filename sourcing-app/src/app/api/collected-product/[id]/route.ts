@@ -50,23 +50,6 @@ export async function GET(
             },
           },
         },
-        products: {
-          include: {
-            variants: true,
-            options: true,
-            publishedProducts: {
-              include: {
-                channel: {
-                  select: {
-                    id: true,
-                    name: true,
-                    platform: true,
-                  },
-                },
-              },
-            },
-          },
-        },
       },
     })
 

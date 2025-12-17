@@ -134,20 +134,6 @@ export async function POST(req: NextRequest) {
     // Shop ID 가져오기
     const shopId = getShopId(req)
 
-    // Shop의 배송비 설정 조회 (필수)
-    let shopFreeShippingAmount: number | null = null
-    let shopDefaultShippingFee: number | null = null
-    if (shopId) {
-      const shop = await prisma.shop.findUnique({
-        where: { id: shopId },
-        select: { freeShippingAmount: true, defaultShippingFee: true },
-      })
-      if (shop) {
-        shopFreeShippingAmount = shop.freeShippingAmount
-        shopDefaultShippingFee = shop.defaultShippingFee
-      }
-    }
-
     if (fromCart) {
       // 장바구니에서 주문
       const sessionId = getSessionId(req)
@@ -201,7 +187,7 @@ export async function POST(req: NextRequest) {
       // 품절(비활성) 상품 체크
       const soldOutItems = cart.items.filter((item) => !item.publishedProduct.isActive)
       if (soldOutItems.length > 0) {
-        const soldOutNames = soldOutItems.map((item) => item.publishedProduct.product.name).join(', ')
+        const soldOutNames = soldOutItems.map((item) => item.publishedProduct.product?.name || item.publishedProduct.productName || '알 수 없는 상품').join(', ')
         return NextResponse.json(
           { success: false, error: `품절된 상품이 포함되어 있습니다: ${soldOutNames}` },
           { status: 400 }
@@ -212,15 +198,15 @@ export async function POST(req: NextRequest) {
         const publishedProduct = item.publishedProduct
         const product = publishedProduct.product
         const variant = item.variant
-        const mainVariant = product.variants[0]
+        const mainVariant = product?.variants[0]
         const unitPrice = variant?.price || mainVariant?.price || 0
 
         return {
           publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
-          productName: product.name,
+          productName: product?.name || "",
           optionSummary: variant?.optionSummary || null,
-          thumbnailUrl: product.thumbnailUrl,
+          thumbnailUrl: product?.thumbnailUrl || null,
           quantity: item.quantity,
           unitPrice: Number(unitPrice),
         }
@@ -256,7 +242,7 @@ export async function POST(req: NextRequest) {
         // 품절(비활성) 상품 체크
         if (!publishedProduct.isActive) {
           return NextResponse.json(
-            { success: false, error: `품절된 상품입니다: ${publishedProduct.product.name}` },
+            { success: false, error: `품절된 상품입니다: ${publishedProduct.product?.name || publishedProduct.productName || '알 수 없는 상품'}` },
             { status: 400 }
           )
         }
@@ -269,30 +255,28 @@ export async function POST(req: NextRequest) {
         }
 
         const product = publishedProduct.product
-        const mainVariant = product.variants[0]
+        const mainVariant = product?.variants[0]
         const unitPrice = variant?.price || mainVariant?.price || 0
 
         orderItems.push({
           publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
-          productName: product.name,
+          productName: product?.name || "",
           optionSummary: variant?.optionSummary || null,
-          thumbnailUrl: product.thumbnailUrl,
+          thumbnailUrl: product?.thumbnailUrl || null,
           quantity: item.quantity || 1,
           unitPrice: Number(unitPrice),
         })
       }
     }
 
-    // 금액 계산 (Shop의 배송비 설정 사용 - 필수)
+    // 금액 계산
     const subtotal = orderItems.reduce(
       (sum, item) => sum + item.unitPrice * item.quantity,
       0
     )
-    // 배송비 설정이 없으면 0원 처리
-    let shippingFee = (shopFreeShippingAmount != null && shopDefaultShippingFee != null)
-      ? (subtotal >= shopFreeShippingAmount ? 0 : shopDefaultShippingFee)
-      : 0
+    // 배송비는 상품별 설정 또는 0원 처리
+    let shippingFee = 0
     let discountAmount = 0
 
     // 쿠폰 처리

@@ -134,7 +134,7 @@ enum RefundMethod {
   POINTS
 }
 
-enum ShopNotificationType {
+enum NotificationType {
   // Shop 알림 타입
   ORDER
   CANCEL

@@ -1,6 +1,7 @@
 model PricingPolicy {
   id                Int                @id @default(autoincrement())
   userId            Int                @map("user_id")
+  channelId         Int                @map("channel_id")
   name              String             @db.VarChar(100)
   description       String?            @db.Text
   content           String             @db.Text
@@ -8,9 +9,11 @@ model PricingPolicy {
   createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamp(0)
   automationConfigs AutomationConfig[]
+  channel           Channel            @relation(fields: [channelId], references: [id], onDelete: Cascade)
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId], map: "pricing_policy_user_id_fkey")
+  @@index([channelId])
   @@map("pricing_policy")
 }
 
@@ -28,6 +31,7 @@ model AutomationConfig {
   channelIds       String?        @map("channel_ids") @db.LongText
   retailChannelIds String?        @map("retail_channel_ids") @db.LongText
   shopIds          String?        @map("shop_ids") @db.LongText
+  pipelineSteps    String?        @map("pipeline_steps") @db.LongText
   pricingPolicy    PricingPolicy? @relation(fields: [pricingPolicyId], references: [id])
   user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 

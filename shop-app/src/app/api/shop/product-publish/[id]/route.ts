@@ -27,17 +27,8 @@ export async function GET(
       include: {
         product: {
           include: {
-            collectedProduct: {
-              include: {
-                post: {
-                  include: {
-                    images: {
-                      orderBy: { sortOrder: 'asc' },
-                    },
-                    channel: true,
-                  },
-                },
-              },
+            images: {
+              orderBy: { sortOrder: 'asc' },
             },
             variants: {
               orderBy: { id: 'asc' },

@@ -1,26 +1,28 @@
 model Product {
-  id                 Int                @id @default(autoincrement())
-  userId             Int                @map("user_id")
-  collectedProductId Int?               @map("collected_product_id")
-  name               String             @db.VarChar(500)
-  description        String?            @db.Text
-  thumbnailUrl       String?            @map("thumbnail_url") @db.VarChar(1000)
-  categoryId         String?            @map("category_id") @db.VarChar(100)
-  currency           String             @default("KRW") @db.VarChar(10)
-  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamp(0)
-  shippingFee        Int?               @map("shipping_fee")
-  shippingInfo       String?            @map("shipping_info") @db.Text
-  collectedProduct   CollectedProduct?  @relation(fields: [collectedProductId], references: [id])
-  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  images             ProductImage[]
-  options            ProductOption[]
-  variants           ProductVariant[]
-  publishedProducts  PublishedProduct[]
-  wishlists          Wishlist[]
+  id                Int                @id @default(autoincrement())
+  userId            Int                @map("user_id")
+  channelId         Int?               @map("channel_id")
+  name              String             @db.VarChar(500)
+  description       String?            @db.Text
+  thumbnailUrl      String?            @map("thumbnail_url") @db.VarChar(1000)
+  categoryId        String?            @map("category_id") @db.VarChar(100)
+  currency          String             @default("KRW") @db.VarChar(10)
+  wholesalePrice    Int?               @map("wholesale_price")
+  price             Int?
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamp(0)
+  shippingFee       Int?               @map("shipping_fee")
+  shippingInfo      String?            @map("shipping_info") @db.Text
+  channel           Channel?           @relation(fields: [channelId], references: [id])
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images            ProductImage[]
+  options           ProductOption[]
+  variants          ProductVariant[]
+  publishedProducts PublishedProduct[]
+  wishlists         Wishlist[]
 
   @@index([userId])
-  @@index([collectedProductId])
+  @@index([channelId])
   @@index([categoryId])
   @@index([createdAt])
   @@map("product")

@@ -330,6 +330,7 @@ export default function AISettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [hasCustomPrompt, setHasCustomPrompt] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [showResetModal, setShowResetModal] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -397,10 +398,8 @@ export default function AISettingsPage() {
     }
   }
 
-  const resetToDefault = async () => {
-    if (!confirm('기본 프롬프트로 복구하시겠습니까? 커스텀 설정이 삭제됩니다.')) {
-      return
-    }
+  const handleResetConfirm = async () => {
+    setShowResetModal(false)
 
     try {
       const response = await fetch('/api/settings/prompt?promptType=product_extraction', {
@@ -569,7 +568,7 @@ export default function AISettingsPage() {
               {/* Action Buttons */}
               <div className="flex justify-between items-center border-t pt-6">
                 <button
-                  onClick={resetToDefault}
+                  onClick={() => setShowResetModal(true)}
                   disabled={!hasCustomPrompt}
                   className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
@@ -603,6 +602,34 @@ export default function AISettingsPage() {
           )}
         </div>
       </div>
+
+      {/* 복구 확인 모달 */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full shadow-xl">
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">기본 프롬프트로 복구</h3>
+              <p className="text-gray-600">
+                기본 프롬프트로 복구하시겠습니까? 커스텀 설정이 삭제됩니다.
+              </p>
+            </div>
+            <div className="flex gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowResetModal(false)}
+                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleResetConfirm}
+                className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+              >
+                복구
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -58,16 +58,8 @@ export async function GET(req: NextRequest) {
                   orderBy: { id: 'asc' },
                   take: 1,
                 },
-                collectedProduct: {
-                  include: {
-                    post: {
-                      include: {
-                        images: {
-                          orderBy: { sortOrder: 'asc' },
-                        },
-                      },
-                    },
-                  },
+                images: {
+                  orderBy: { sortOrder: 'asc' },
                 },
               },
             },
@@ -80,17 +72,17 @@ export async function GET(req: NextRequest) {
         const products = publishedProducts
           .filter((pp) => pp.product)
           .map((pp) => {
-            const product = pp.product
-            const mainVariant = product.variants[0]
-            const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
+            const product = pp.product!
+            const mainVariant = product?.variants[0]
+            const images = product.images?.map((img) => img.url) || []
 
             const salePrice = mainVariant?.price || 0
             const originalPrice = salePrice
             const discount = 0
 
             return {
-              id: product.id.toString(),
-              publishedProductId: pp.id.toString(), // 추가: 장바구니/주문에 필요
+              id: product.id,
+              publishedProductId: pp.id,
               title: product.name,
               description: product.description,
               originalPrice,
@@ -115,99 +107,10 @@ export async function GET(req: NextRequest) {
     // 상품이 있는 섹션만 필터링
     const filteredSections = sections.filter((section) => section.products.length > 0)
 
-    // 3. 도매채널별 섹션 (발행된 상품만 포함)
-    // 쇼핑몰에서는 product_publish를 통해서만 상품을 판매할 수 있음
-    const wholesaleChannels = await prisma.channel.findMany({
-      where: {
-        isActive: true,
-        kind: ChannelKind.WHOLESALE,
-      },
-      orderBy: { name: 'asc' },
-    })
-
-    const wholesaleSections = await Promise.all(
-      wholesaleChannels.map(async (channel) => {
-        // 해당 도매채널의 상품 중 활성 상태로 발행된 것만 조회
-        const publishedProducts = await prisma.publishedProduct.findMany({
-          where: {
-            isActive: true, // 활성 상태인 상품만 노출
-            product: {
-              collectedProduct: {
-                post: {
-                  channelId: channel.id,
-                },
-              },
-            },
-          },
-          include: {
-            product: {
-              include: {
-                variants: {
-                  orderBy: { id: 'asc' },
-                  take: 1,
-                },
-                collectedProduct: {
-                  include: {
-                    post: {
-                      include: {
-                        images: {
-                          orderBy: { sortOrder: 'asc' },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: limit,
-        })
-
-        const formattedProducts = publishedProducts
-          .filter((pp) => pp.product)
-          .map((pp) => {
-            const product = pp.product
-            const mainVariant = product.variants[0]
-            const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
-
-            const salePrice = mainVariant?.price || 0
-            const originalPrice = salePrice
-            const discount = 0
-
-            return {
-              id: product.id.toString(),
-              publishedProductId: pp.id.toString(), // 추가: 장바구니/주문에 필요
-              title: product.name,
-              description: product.description,
-              originalPrice,
-              salePrice,
-              discount,
-              images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
-              category: product.categoryId || '',
-              rating: 4.5,
-              reviews: 100,
-            }
-          })
-
-        return {
-          id: `wholesale_${channel.id}`,
-          name: channel.name,
-          coverUrl: channel.coverUrl,
-          type: 'wholesale',
-          products: formattedProducts,
-        }
-      })
-    )
-
-    const filteredWholesaleSections = wholesaleSections.filter(
-      (section) => section.products.length > 0
-    )
-
     return NextResponse.json({
       success: true,
       retailSections: filteredSections,
-      wholesaleSections: filteredWholesaleSections,
+      wholesaleSections: [],
     })
   } catch (error: any) {
     console.error('Shop sections GET error:', error)
@@ -260,16 +163,8 @@ async function getShopProducts(shopId: number, limit: number) {
             orderBy: { id: 'asc' },
             take: 1,
           },
-          collectedProduct: {
-            include: {
-              post: {
-                include: {
-                  images: {
-                    orderBy: { sortOrder: 'asc' },
-                  },
-                },
-              },
-            },
+          images: {
+            orderBy: { sortOrder: 'asc' },
           },
         },
       },
@@ -282,17 +177,17 @@ async function getShopProducts(shopId: number, limit: number) {
   const products = publishedProducts
     .filter((pp) => pp.product)
     .map((pp) => {
-      const product = pp.product
-      const mainVariant = product.variants[0]
-      const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
+      const product = pp.product!
+      const mainVariant = product?.variants[0]
+      const images = product.images?.map((img) => img.url) || []
 
       const salePrice = mainVariant?.price || 0
       const originalPrice = salePrice
       const discount = 0
 
       return {
-        id: product.id.toString(),
-        publishedProductId: pp.id.toString(),
+        id: product.id,
+        publishedProductId: pp.id,
         title: product.name,
         description: product.description,
         originalPrice,
@@ -350,16 +245,8 @@ async function getChannelProducts(channelId: number, limit: number) {
             orderBy: { id: 'asc' },
             take: 1,
           },
-          collectedProduct: {
-            include: {
-              post: {
-                include: {
-                  images: {
-                    orderBy: { sortOrder: 'asc' },
-                  },
-                },
-              },
-            },
+          images: {
+            orderBy: { sortOrder: 'asc' },
           },
         },
       },
@@ -372,17 +259,17 @@ async function getChannelProducts(channelId: number, limit: number) {
   const products = publishedProducts
     .filter((pp) => pp.product)
     .map((pp) => {
-      const product = pp.product
-      const mainVariant = product.variants[0]
-      const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
+      const product = pp.product!
+      const mainVariant = product?.variants[0]
+      const images = product.images?.map((img) => img.url) || []
 
       const salePrice = mainVariant?.price || 0
       const originalPrice = salePrice
       const discount = 0
 
       return {
-        id: product.id.toString(),
-        publishedProductId: pp.id.toString(),
+        id: product.id,
+        publishedProductId: pp.id,
         title: product.name,
         description: product.description,
         originalPrice,

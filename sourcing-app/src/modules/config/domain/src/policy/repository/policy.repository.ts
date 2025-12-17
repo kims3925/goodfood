@@ -3,10 +3,11 @@ import type { PolicyListParams, PolicyCreateInput, PolicyUpdateInput } from '../
 
 export class PolicyRepository {
   async findMany(params: PolicyListParams) {
-    const { userId, search = '', page = 1, limit = 10 } = params
+    const { userId, channelId, search = '', page = 1, limit = 10 } = params
 
     const where = {
       userId,
+      ...(channelId && { channelId }),
       ...(search && {
         OR: [
           { name: { contains: search } },
@@ -19,6 +20,15 @@ export class PolicyRepository {
 
     const policies = await prisma.pricingPolicy.findMany({
       where,
+      include: {
+        channel: {
+          select: {
+            id: true,
+            name: true,
+            kind: true,
+          },
+        },
+      },
       orderBy: {
         createdAt: 'desc',
       },
@@ -47,10 +57,20 @@ export class PolicyRepository {
     return prisma.pricingPolicy.create({
       data: {
         userId: data.userId,
+        channelId: data.channelId,
         name: data.name,
         description: data.description,
         content: data.content,
         isActive: data.isActive ?? true,
+      },
+      include: {
+        channel: {
+          select: {
+            id: true,
+            name: true,
+            kind: true,
+          },
+        },
       },
     })
   }
@@ -59,10 +79,20 @@ export class PolicyRepository {
     return prisma.pricingPolicy.update({
       where: { id },
       data: {
+        ...(data.channelId && { channelId: data.channelId }),
         ...(data.name && { name: data.name }),
         ...(data.description !== undefined && { description: data.description }),
         ...(data.content && { content: data.content }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
+      },
+      include: {
+        channel: {
+          select: {
+            id: true,
+            name: true,
+            kind: true,
+          },
+        },
       },
     })
   }

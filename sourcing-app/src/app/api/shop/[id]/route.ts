@@ -151,8 +151,6 @@ export async function PUT(
       bankName,
       bankAccount,
       accountHolder,
-      freeShippingAmount,
-      defaultShippingFee,
       contactPhone,
       contactEmail,
       isActive,
@@ -195,8 +193,6 @@ export async function PUT(
     if (bankName !== undefined) updateData.bankName = bankName || null
     if (bankAccount !== undefined) updateData.bankAccount = bankAccount || null
     if (accountHolder !== undefined) updateData.accountHolder = accountHolder || null
-    if (freeShippingAmount !== undefined) updateData.freeShippingAmount = freeShippingAmount || null
-    if (defaultShippingFee !== undefined) updateData.defaultShippingFee = defaultShippingFee || null
     if (contactPhone !== undefined) updateData.contactPhone = contactPhone || null
     if (contactEmail !== undefined) updateData.contactEmail = contactEmail || null
     if (isActive !== undefined) updateData.isActive = isActive

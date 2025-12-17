@@ -223,6 +223,8 @@ export async function runTransformPipeline(
                   category: result.draft.categoryId,
                   options: result.draft.options,
                   variants: result.draft.variants,
+                  wholesalePrice: result.draft.wholesalePrice ?? null,
+                  price: result.draft.price ?? null,
                   shipping: {
                     shippingFee: result.draft.shippingFee ?? null,
                     shippingInfo: result.draft.shippingInfo ?? null,
@@ -234,7 +236,7 @@ export async function runTransformPipeline(
             transformedPost = {
               postId: result.postId,
               status: 'success',
-              collectedProductId: collectedProduct.id,
+              channelId: collectedProduct.id,
             }
             createdProducts++
 

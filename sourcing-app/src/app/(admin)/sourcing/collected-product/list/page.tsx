@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Package, Trash2, Plus, ChevronDown, ChevronRight, ChevronUp, Boxes, CheckCircle, Clock } from 'lucide-react'
+import { Search, Package, Trash2, Plus, ChevronDown, ChevronRight, ChevronUp, Boxes, CheckCircle } from 'lucide-react'
 import Image from 'next/image'
 import Button from '@/components/ui/Button'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
@@ -86,6 +86,7 @@ interface CollectedProduct {
   price: number | null
   wholesalePrice: number | null
   rawMetadata: any
+  isConverted: boolean
   createdAt: string
   updatedAt: string
   post: {
@@ -102,11 +103,6 @@ interface CollectedProduct {
       sortOrder: number
     }>
   }
-  products: Array<{
-    id: number
-    name: string
-    status: string
-  }>
 }
 
 export default function CollectedProductListPage() {
@@ -301,7 +297,6 @@ export default function CollectedProductListPage() {
 
   const handleOpenRegisterModal = async () => {
     setShowRegisterModal(true)
-    setModalStep('pricing')
     setSelectedPolicyId(null)
     setSelectedPlatform('')
     setAvailablePlatforms([])
@@ -310,7 +305,42 @@ export default function CollectedProductListPage() {
     setCurrentProcessingIndex(0)
     setExpandedPostIds([])
     setExpandedPolicyIds([])
-    await loadPricingPolicies()
+
+    // 가격 정책 자동 선택 및 게시물 선택 단계로 바로 이동
+    await loadPricingPoliciesAndProceed()
+  }
+
+  // 가격 정책 자동 선택 및 게시물 선택 단계로 이동
+  const loadPricingPoliciesAndProceed = async () => {
+    setModalStep('select')
+    setIsLoadingPosts(true)
+    try {
+      // 1. 가격 정책 로드
+      const response = await fetch('/api/policy?limit=100')
+      const data = await response.json()
+      if (data.success) {
+        const activePolicies = data.data.filter((p: PricingPolicyItem) => p.isActive)
+        setPricingPolicies(activePolicies)
+
+        // 첫 번째 활성 정책 자동 선택
+        if (activePolicies.length > 0) {
+          setSelectedPolicyId(activePolicies[0].id)
+        } else {
+          toast.error('활성화된 가격 정책이 없습니다. 자동화 설정에서 정책을 등록해주세요.')
+          setShowRegisterModal(false)
+          return
+        }
+      }
+
+      // 2. 게시물 목록 로드
+      await loadAvailablePosts()
+    } catch (error) {
+      console.error('정책 또는 게시물 로드 실패:', error)
+      toast.error('데이터를 불러오는데 실패했습니다.')
+      setShowRegisterModal(false)
+    } finally {
+      setIsLoadingPosts(false)
+    }
   }
 
   // 가격 정책 목록 로드 (활성화된 정책만)
@@ -560,10 +590,10 @@ export default function CollectedProductListPage() {
 
   const handleCloseRegisterModal = () => {
     setShowRegisterModal(false)
-    setModalStep('pricing')
+    setModalStep('select')
     setSelectedPolicyId(null)
     setPricingPolicies([])
-    setSelectedPlatform('BAND')
+    setSelectedPlatform('')
     setSelectedPostIds([])
     setSelectedPosts([])
     setCurrentProcessingIndex(0)
@@ -575,22 +605,6 @@ export default function CollectedProductListPage() {
   const formatPrice = (price: number | null) => {
     if (!price) return '-'
     return `₩${price.toLocaleString()}`
-  }
-
-  const getProductStatusSummary = (collectedProduct: CollectedProduct) => {
-    const productCount = collectedProduct.products?.length || 0
-    if (productCount === 0) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-          미변환
-        </span>
-      )
-    }
-    return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-        변환완료
-      </span>
-    )
   }
 
   return (
@@ -605,7 +619,7 @@ export default function CollectedProductListPage() {
         </div>
 
         {/* 통계 및 액션 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-gray-100 rounded-lg">
@@ -614,28 +628,6 @@ export default function CollectedProductListPage() {
               <div>
                 <p className="text-sm text-gray-500">수집상품</p>
                 <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <CheckCircle size={24} className="text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">변환완료</p>
-                <p className="text-2xl font-bold text-green-600">{products.filter(p => (p.products?.length || 0) > 0).length}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <Clock size={24} className="text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">미변환</p>
-                <p className="text-2xl font-bold text-yellow-600">{products.filter(p => (p.products?.length || 0) === 0).length}</p>
               </div>
             </div>
           </div>
@@ -763,10 +755,10 @@ export default function CollectedProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[40%]">상품명 / 게시물</TableHead>
+                  <TableHead className="w-[42%]">상품명 / 게시물</TableHead>
                   <TableHead className="w-[20%]">출처 채널</TableHead>
-                  <TableHead className="w-[20%]">변환상태</TableHead>
-                  <TableHead className="w-[16%]">수집일시</TableHead>
+                  <TableHead className="w-[10%] text-center">변환상태</TableHead>
+                  <TableHead className="w-[16%] text-center">수집일시</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -832,8 +824,18 @@ export default function CollectedProductListPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{getProductStatusSummary(product)}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
+                      {product.isConverted ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                          변환
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                          미변환
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
                       <span className="text-sm text-gray-600 whitespace-nowrap">
                         {new Date(product.createdAt).toLocaleDateString('ko-KR', {
                           year: 'numeric',
@@ -889,9 +891,7 @@ export default function CollectedProductListPage() {
         isOpen={showRegisterModal}
         onClose={handleCloseRegisterModal}
         title={
-          modalStep === 'pricing'
-            ? '수집 상품 등록 - 가격 정책 설정'
-            : modalStep === 'select'
+          modalStep === 'select'
             ? '수집 상품 등록 - 게시물 선택'
             : '수집 상품 등록 - AI 분석 중'
         }
@@ -1255,14 +1255,8 @@ export default function CollectedProductListPage() {
                   : `전체 ${availablePosts.length}개 게시물`}
               </p>
               <div className="flex gap-2">
-                <Button variant="secondary" onClick={() => {
-                  // 이전 단계로 돌아갈 때 선택 상태 초기화
-                  setSelectedPostIds([])
-                  setSelectedPosts([])
-                  setExpandedPostIds([])
-                  setModalStep('pricing')
-                }}>
-                  이전
+                <Button variant="secondary" onClick={handleCloseRegisterModal}>
+                  취소
                 </Button>
                 <Button
                   variant="primary"

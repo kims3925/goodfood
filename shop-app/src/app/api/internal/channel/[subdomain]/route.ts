@@ -26,8 +26,6 @@ export async function GET(
         name: true,
         coverUrl: true,
         isActive: true,
-        freeShippingAmount: true,
-        defaultShippingFee: true,
         contactPhone: true,
         contactEmail: true,
         bankName: true,

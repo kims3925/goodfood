@@ -6,10 +6,8 @@ export class ProductRepository {
   async findMany(params: ProductListParams) {
     const {
       userId,
-      collectedProductId,
-      postId,
-      search,
       channelId,
+      search,
       sourcePlatform,
       startDate,
       endDate,
@@ -19,15 +17,8 @@ export class ProductRepository {
 
     const where: any = { userId }
 
-    if (collectedProductId) {
-      where.collectedProductId = collectedProductId
-    }
-
-    const collectedProductWhere: any = {}
-    const postWhere: any = {}
-
-    if (postId) {
-      collectedProductWhere.postId = postId
+    if (channelId) {
+      where.channelId = channelId
     }
 
     if (search) {
@@ -37,26 +28,12 @@ export class ProductRepository {
       ]
     }
 
-    if (channelId) {
-      postWhere.channelId = channelId
-    }
-
-    // sourcePlatform 필터: 수집 출처 플랫폼
+    // sourcePlatform 필터: 채널의 플랫폼
     if (sourcePlatform) {
-      postWhere.channel = {
+      where.channel = {
         platform: sourcePlatform,
       }
     }
-
-    // post 필터가 있으면 적용
-    if (Object.keys(postWhere).length > 0) {
-      collectedProductWhere.post = postWhere
-    }
-
-    if (Object.keys(collectedProductWhere).length > 0) {
-      where.collectedProduct = collectedProductWhere
-    }
-
 
     if (startDate || endDate) {
       where.createdAt = {}
@@ -75,27 +52,19 @@ export class ProductRepository {
     const products = await prisma.product.findMany({
       where,
       include: {
-        collectedProduct: {
-          include: {
-            post: {
-              include: {
-                channel: {
-                  select: {
-                    id: true,
-                    name: true,
-                    coverUrl: true,
-                  },
-                },
-                images: {
-                  orderBy: { sortOrder: 'asc' },
-                  take: 1,
-                },
-              },
-            },
+        channel: {
+          select: {
+            id: true,
+            name: true,
+            coverUrl: true,
+            platform: true,
           },
         },
         images: {
           orderBy: { sortOrder: 'asc' },
+        },
+        variants: {
+          orderBy: { id: 'asc' },
         },
         publishedProducts: {
           where: {
@@ -142,7 +111,7 @@ export class ProductRepository {
         publishStatus: {
           retailBand: hasChannelPublish,
         },
-        publishedChannelIds, // 발행된 채널 ID 목록
+        publishedChannelIds,
         publishSummary,
       }
     })
@@ -178,9 +147,9 @@ export class ProductRepository {
     })
   }
 
-  async findByCollectedProductId(collectedProductId: number) {
-    return prisma.product.findFirst({
-      where: { collectedProductId },
+  async findByChannelId(channelId: number) {
+    return prisma.product.findMany({
+      where: { channelId },
     })
   }
 
@@ -188,7 +157,6 @@ export class ProductRepository {
     return prisma.collectedProduct.findFirst({
       where: { postId },
       include: {
-        products: true,
         post: {
           include: {
             images: {
@@ -215,44 +183,24 @@ export class ProductRepository {
     })
   }
 
-  async createCollectedProductFromPost(params: {
-    userId: number
-    postId: number
-    name?: string
-    description?: string
-    currency?: string
-  }) {
-    return prisma.collectedProduct.create({
-      data: {
-        userId: params.userId,
-        postId: params.postId,
-        name: params.name || null,
-        description: params.description || null,
-        currency: params.currency || 'KRW',
-      },
-    })
-  }
-
   async create(data: ProductCreateInput & { thumbnailUrl?: string | null; imageUrls?: string[] }) {
     // 상품 생성 (options와 variants 포함)
     const product = await prisma.product.create({
       data: {
         userId: data.userId,
-        collectedProductId: data.collectedProductId || null,
+        channelId: data.channelId || null,
         name: data.name,
         description: data.description || null,
         categoryId: data.categoryId || null,
         currency: data.currency || 'KRW',
+        wholesalePrice: data.wholesalePrice || null,
+        price: data.price || null,
         shippingFee: data.shippingFee || null,
         shippingInfo: data.shippingInfo || null,
         thumbnailUrl: data.thumbnailUrl || null,
-        // ProductOption 생성: 두 가지 형태 지원
-        // 1. 그룹 형태: [{ groupName: '사이즈', values: ['S', 'M'] }]
-        // 2. 개별 형태: [{ groupName: '사이즈', value: 'S' }, { groupName: '사이즈', value: 'M' }]
         options: data.options?.length
           ? {
               create: data.options.flatMap((opt: any, groupIndex: number) => {
-                // 개별 형태 (value 필드가 있는 경우)
                 if ('value' in opt && typeof opt.value === 'string') {
                   return [{
                     groupName: opt.groupName,
@@ -260,7 +208,6 @@ export class ProductRepository {
                     sortOrder: groupIndex,
                   }]
                 }
-                // 그룹 형태 (values 배열이 있는 경우)
                 if (Array.isArray(opt.values)) {
                   return opt.values.map((value: string, valueIndex: number) => ({
                     groupName: opt.groupName,
@@ -272,12 +219,11 @@ export class ProductRepository {
               }),
             }
           : undefined,
-        // ProductVariant 생성
         variants: data.variants?.length
           ? {
               create: data.variants.map((v) => ({
                 optionSummary: v.optionSummary ?? null,
-                wholesalePrice: v.wholesalePrice ?? null,  // ?? 사용하여 0도 유지
+                wholesalePrice: v.wholesalePrice ?? null,
                 price: v.price ?? 0,
               })),
             }
@@ -302,7 +248,6 @@ export class ProductRepository {
             })),
           })
 
-          // 첫 번째 이미지를 썸네일로 설정 (thumbnailUrl이 없는 경우)
           if (!product.thumbnailUrl) {
             await prisma.product.update({
               where: { id: product.id },
@@ -323,10 +268,11 @@ export class ProductRepository {
     if (data.name !== undefined) updateData.name = data.name
     if (data.description !== undefined) updateData.description = data.description
     if (data.categoryId !== undefined) updateData.categoryId = data.categoryId
+    if (data.wholesalePrice !== undefined) updateData.wholesalePrice = data.wholesalePrice
+    if (data.price !== undefined) updateData.price = data.price
     if (data.shippingFee !== undefined) updateData.shippingFee = data.shippingFee
     if (data.shippingInfo !== undefined) updateData.shippingInfo = data.shippingInfo
 
-    // 옵션 업데이트: 기존 삭제 후 새로 생성
     if (data.options !== undefined) {
       await prisma.productOption.deleteMany({ where: { productId: id } })
       if (data.options.length > 0) {
@@ -341,7 +287,6 @@ export class ProductRepository {
       }
     }
 
-    // 변형상품 업데이트: 기존 삭제 후 새로 생성
     if (data.variants !== undefined) {
       await prisma.productVariant.deleteMany({ where: { productId: id } })
       if (data.variants.length > 0) {
@@ -349,7 +294,7 @@ export class ProductRepository {
           data: data.variants.map((v: any) => ({
             productId: id,
             optionSummary: v.optionSummary ?? null,
-            wholesalePrice: v.wholesalePrice ?? null,  // ?? 사용하여 0도 유지
+            wholesalePrice: v.wholesalePrice ?? null,
             price: v.price ?? 0,
           })),
         })
@@ -372,9 +317,13 @@ export class ProductRepository {
     return prisma.collectedPost.findFirst({
       where: { id: postId, userId },
       include: {
+        channel: {
+          select: {
+            id: true,
+          },
+        },
         images: {
           orderBy: { sortOrder: 'asc' },
-          take: 1,
         },
       },
     })

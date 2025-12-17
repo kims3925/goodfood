@@ -5,14 +5,22 @@ import { Plus, Edit2, Trash2, CheckCircle, XCircle, FileText, AlertCircle } from
 import PolicyModal from './PolicyModal'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 
+interface Channel {
+  id: number
+  name: string
+  kind: string
+}
+
 interface PricingPolicy {
   id: number
+  channelId: number
   name: string
   description: string | null
   content: string
   isActive: boolean
   createdAt: string
   updatedAt: string
+  channel?: Channel
 }
 
 interface PolicyManagerProps {
@@ -67,6 +75,7 @@ export default function PolicyManager({ onToast }: PolicyManagerProps) {
 
   const handleSave = async (policyData: {
     id?: number
+    channelId: number
     name: string
     description: string | null
     content: string
@@ -194,6 +203,9 @@ export default function PolicyManager({ onToast }: PolicyManagerProps) {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">{policy.name}</h3>
+                    {policy.channel && (
+                      <p className="text-xs text-blue-600 font-medium">{policy.channel.name}</p>
+                    )}
                     {policy.description && (
                       <p className="text-xs text-gray-500">{policy.description}</p>
                     )}

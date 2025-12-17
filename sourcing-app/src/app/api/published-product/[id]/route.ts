@@ -51,17 +51,8 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
           include: {
             variants: true,
             options: true,
-            collectedProduct: {
-              include: {
-                post: {
-                  include: {
-                    channel: true,
-                    images: {
-                      orderBy: { sortOrder: 'asc' },
-                    },
-                  },
-                },
-              },
+            images: {
+              orderBy: { sortOrder: 'asc' },
             },
             // 같은 상품의 모든 발행 정보 포함
             publishedProducts: {
@@ -104,10 +95,6 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
             subdomain: true,
             isActive: true,
           },
-        },
-        publishHistories: {
-          orderBy: { publishedAt: 'desc' },
-          take: 10,
         },
       },
     })

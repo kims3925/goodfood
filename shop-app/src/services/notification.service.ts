@@ -34,7 +34,7 @@ export async function createOrderNotification(
   order: OrderInfo
 ): Promise<void> {
   try {
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         shopId,
         type: 'ORDER',
@@ -57,7 +57,7 @@ export async function createCancelNotification(
   order: OrderInfo
 ): Promise<void> {
   try {
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         shopId,
         type: 'CANCEL',
@@ -83,7 +83,7 @@ export async function createRefundNotification(
     const typeLabel = returnRequest.type === 'RETURN' ? '반품' :
                       returnRequest.type === 'EXCHANGE' ? '교환' : '취소'
 
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         shopId,
         type: 'REFUND',
@@ -117,7 +117,7 @@ export async function createInquiryNotification(
     }
     const typeLabel = inquiry.type ? typeLabels[inquiry.type] || '일반' : '일반'
 
-    await prisma.shopNotification.create({
+    await prisma.notification.create({
       data: {
         shopId,
         type: 'INQUIRY',

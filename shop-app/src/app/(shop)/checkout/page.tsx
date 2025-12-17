@@ -402,11 +402,8 @@ function CheckoutContent() {
     if (coupon?.coupon.discountType === 'FREE_SHIPPING') {
       return 0
     }
-    // Shop 설정에서 무료배송 기준액과 기본 배송비 사용 (필수 설정)
-    const freeShippingAmount = shop?.freeShippingAmount
-    const shippingFee = shop?.defaultShippingFee
-    if (freeShippingAmount == null || shippingFee == null) return 0
-    return subtotal >= freeShippingAmount ? 0 : shippingFee
+    // 배송비는 상품별로 관리되므로 여기서는 0 반환
+    return 0
   }
 
   // 쿠폰 할인 금액 계산
@@ -1403,11 +1400,6 @@ function CheckoutContent() {
                             {shippingFee > 0 ? `+${formatPrice(shippingFee)}원` : '무료'}
                           </span>
                         </div>
-                        {shippingFee > 0 && shop?.freeShippingAmount && shop.freeShippingAmount > subtotal && (
-                          <p className="text-xs text-[#FF6B6B]">
-                            {formatPrice(shop.freeShippingAmount - subtotal)}원 추가 시 무료배송
-                          </p>
-                        )}
                         {couponDiscount > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">쿠폰 할인</span>

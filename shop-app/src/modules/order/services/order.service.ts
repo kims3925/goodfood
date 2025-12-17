@@ -164,7 +164,7 @@ export class OrderService {
       const publishedProduct = item.publishedProduct
       const product = publishedProduct.product
       const variant = item.variant
-      const mainVariant = product.variants[0]
+      const mainVariant = product?.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || 0
 
       // variant가 있으면 해당 옵션 사용, 없으면 첫 번째 variant의 옵션 사용
@@ -173,9 +173,9 @@ export class OrderService {
       return {
         publishedProductId: publishedProduct.id,
         variantId: variant?.id || null,
-        productName: product.name,
+        productName: product?.name || "",
         optionSummary,
-        thumbnailUrl: product.thumbnailUrl,
+        thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity,
         unitPrice: Number(unitPrice),
       }
@@ -186,7 +186,7 @@ export class OrderService {
       (sum, item) => sum + item.unitPrice * item.quantity,
       0
     )
-    const shippingFee = subtotal >= 30000 ? 0 : 3000
+    const shippingFee = 0 // 배송비는 판매가에 포함
     const discountAmount = 0
     const totalAmount = subtotal + shippingFee - discountAmount
 
@@ -302,7 +302,7 @@ export class OrderService {
       }
 
       const product = publishedProduct.product
-      const mainVariant = product.variants[0]
+      const mainVariant = product?.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || 0
 
       // variant가 있으면 해당 옵션 사용, 없으면 첫 번째 variant의 옵션 사용
@@ -311,9 +311,9 @@ export class OrderService {
       orderItems.push({
         publishedProductId: publishedProduct.id,
         variantId: variant?.id || null,
-        productName: product.name,
+        productName: product?.name || "",
         optionSummary,
-        thumbnailUrl: product.thumbnailUrl,
+        thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity || 1,
         unitPrice: Number(unitPrice),
       })
@@ -324,7 +324,7 @@ export class OrderService {
       (sum, item) => sum + item.unitPrice * item.quantity,
       0
     )
-    const shippingFee = subtotal >= 30000 ? 0 : 3000
+    const shippingFee = 0 // 배송비는 판매가에 포함
     const discountAmount = 0
     const totalAmount = subtotal + shippingFee - discountAmount
 

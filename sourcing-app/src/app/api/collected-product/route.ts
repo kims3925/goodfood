@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const sourcePlatform = searchParams.get('sourcePlatform')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const excludeConverted = searchParams.get('excludeConverted') === 'true'
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const skip = (page - 1) * limit
@@ -26,6 +27,11 @@ export async function GET(request: NextRequest) {
     // 조건 생성
     const where: any = {
       userId: currentUser.userId,
+    }
+
+    // 가공상품으로 변환된 상품 제외 (excludeConverted=true인 경우)
+    if (excludeConverted) {
+      where.isConverted = false
     }
 
     if (search) {
@@ -77,6 +83,7 @@ export async function GET(request: NextRequest) {
           description: true,
           currency: true,
           rawMetadata: true,
+          isConverted: true,
           createdAt: true,
           updatedAt: true,
           post: {
@@ -92,12 +99,6 @@ export async function GET(request: NextRequest) {
                 take: 1,
                 orderBy: { sortOrder: 'asc' },
               },
-            },
-          },
-          products: {
-            select: {
-              id: true,
-              name: true,
             },
           },
         },

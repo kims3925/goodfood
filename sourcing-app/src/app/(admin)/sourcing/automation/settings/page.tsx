@@ -1,16 +1,24 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLeft, ChevronRight, Clock, Download, Upload, Zap, Settings2, ShoppingBag } from 'lucide-react'
+import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLeft, ChevronRight, Clock, Download, Upload, Zap, Settings2, ShoppingBag, AlertTriangle, ExternalLink } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
+
+interface ChannelShop {
+  id: number
+  name: string
+  subdomain: string
+  isActive: boolean
+}
 
 interface Channel {
   id: number
   name: string
   coverUrl: string | null
   kind: 'WHOLESALE' | 'RETAIL'
+  shop?: ChannelShop | null
 }
 
 interface PricingPolicy {
@@ -32,6 +40,13 @@ interface Shop {
   coverUrl: string | null
 }
 
+interface PipelineSteps {
+  collection: boolean
+  transform: boolean
+  productCreate: boolean
+  publish: boolean
+}
+
 interface AutomationConfig {
   isEnabled: boolean
   cronInterval: string
@@ -42,6 +57,7 @@ interface AutomationConfig {
   pricingPolicyId: number | null
   retailChannelIds: number[]
   shopIds: number[]
+  pipelineSteps: PipelineSteps
 }
 
 // 00:00 ~ 23:00 시간 버튼 생성
@@ -131,6 +147,12 @@ const defaultConfig: AutomationConfig = {
   pricingPolicyId: null,
   retailChannelIds: [],
   shopIds: [],
+  pipelineSteps: {
+    collection: true,
+    transform: true,
+    productCreate: true,
+    publish: true,
+  },
 }
 
 export default function AutomationSettingsPage() {
@@ -152,6 +174,10 @@ export default function AutomationSettingsPage() {
   const [warningPhase, setWarningPhase] = useState<'idle' | 'shake' | 'fading'>('idle')
   const [nextExecution, setNextExecution] = useState<{ text: string; remainingText: string }>({ text: '', remainingText: '' })
 
+  // 쇼핑몰 미연결 경고 모달
+  const [showShopConnectionWarning, setShowShopConnectionWarning] = useState(false)
+  const [unconnectedChannels, setUnconnectedChannels] = useState<Channel[]>([])
+
   const CHANNELS_PER_PAGE = 4
 
   // 섹션별 변경 여부 확인 (isEnabled는 버튼으로 변경하므로 제외)
@@ -170,8 +196,10 @@ export default function AutomationSettingsPage() {
   const hasShopChanges = JSON.stringify((config.shopIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.shopIds || []).slice().sort())
 
+  const hasPipelineChanges = JSON.stringify(config.pipelineSteps) !== JSON.stringify(initialConfig.pipelineSteps)
+
   // 저장되지 않은 변경사항이 있는지 확인
-  const hasUnsavedChanges = hasScheduleChanges || hasCollectionChanges || hasAiChanges || hasPublishChanges || hasShopChanges
+  const hasUnsavedChanges = hasScheduleChanges || hasCollectionChanges || hasAiChanges || hasPublishChanges || hasShopChanges || hasPipelineChanges
 
   // 필수 설정 누락 여부 (설정이 아예 안 된 경우)
   const isScheduleMissing = config.selectedHours.length === 0
@@ -179,6 +207,7 @@ export default function AutomationSettingsPage() {
   const isCollectionMissing = config.wholesaleChannelIds.length === 0
   const isAiMissing = !config.aiProvider
   const isPublishMissing = config.retailChannelIds.length === 0
+  const isPipelineMissing = !config.pipelineSteps.collection && !config.pipelineSteps.transform && !config.pipelineSteps.productCreate && !config.pipelineSteps.publish
 
   // 섹션별 문제 여부 (설정 누락 또는 저장 안 됨)
   const hasScheduleProblem = isScheduleMissing || hasScheduleChanges
@@ -186,6 +215,7 @@ export default function AutomationSettingsPage() {
   const hasCollectionProblem = isCollectionMissing || hasCollectionChanges
   const hasAiProblem = isAiMissing || hasAiChanges
   const hasPublishProblem = isPublishMissing || hasPublishChanges
+  const hasPipelineProblem = isPipelineMissing || hasPipelineChanges
 
   // 자동화 활성화 상태 저장
   const saveAutomationState = async (enabled: boolean) => {
@@ -240,6 +270,11 @@ export default function AutomationSettingsPage() {
       missingSections.push('publish')
     }
 
+    // 파이프라인 단계 확인
+    if (!config.pipelineSteps.collection && !config.pipelineSteps.transform && !config.pipelineSteps.productCreate && !config.pipelineSteps.publish) {
+      missingSections.push('pipeline')
+    }
+
     // 저장되지 않은 변경사항 확인
     const unsavedSections: string[] = []
     if (hasShopChanges) unsavedSections.push('shop')
@@ -247,6 +282,7 @@ export default function AutomationSettingsPage() {
     if (hasCollectionChanges) unsavedSections.push('collection')
     if (hasAiChanges) unsavedSections.push('ai')
     if (hasPublishChanges) unsavedSections.push('publish')
+    if (hasPipelineChanges) unsavedSections.push('pipeline')
 
     // 설정 누락 또는 저장되지 않은 섹션이 있으면 빨간색 강조
     const problemSections = [...new Set([...missingSections, ...unsavedSections])]
@@ -267,6 +303,17 @@ export default function AutomationSettingsPage() {
         setWarningPhase('idle')
       }, 3000)
 
+      return
+    }
+
+    // 소매채널 중 쇼핑몰 미연결 채널 확인
+    const channelsWithoutShop = retailChannels.filter(
+      (ch) => config.retailChannelIds.includes(ch.id) && !ch.shop
+    )
+
+    if (channelsWithoutShop.length > 0) {
+      setUnconnectedChannels(channelsWithoutShop)
+      setShowShopConnectionWarning(true)
       return
     }
 
@@ -320,6 +367,7 @@ export default function AutomationSettingsPage() {
             wholesaleChannelIds: configData.data?.wholesaleChannelIds || [],
             retailChannelIds: configData.data?.retailChannelIds || [],
             shopIds: configData.data?.shopIds || [],
+            pipelineSteps: configData.data?.pipelineSteps || defaultConfig.pipelineSteps,
           }
           setConfig(loadedConfig)
           setInitialConfig(loadedConfig)
@@ -405,6 +453,7 @@ export default function AutomationSettingsPage() {
     collection: '수집 설정',
     ai: 'AI 변환 설정',
     publish: '발행 설정',
+    pipeline: '파이프라인 범위',
   }
 
   const handleSaveSection = async (section: string) => {
@@ -428,6 +477,9 @@ export default function AutomationSettingsPage() {
           break
         case 'publish':
           sectionData = { retailChannelIds: config.retailChannelIds }
+          break
+        case 'pipeline':
+          sectionData = { pipelineSteps: config.pipelineSteps }
           break
         default:
           sectionData = config
@@ -708,6 +760,200 @@ export default function AutomationSettingsPage() {
               </div>
               <span className="text-violet-600 text-xs">
                 {getSelectedHoursSummary(config.selectedHours)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Pipeline Range Settings */}
+      <Card className={`overflow-hidden transition-all ${warningSections.includes('pipeline') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasPipelineProblem ? 'ring-2 ring-red-300' : ''}`}>
+        <div className="p-4 pb-5 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                <Zap className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-gray-900">파이프라인 범위</h2>
+                  {hasPipelineChanges && (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
+                  )}
+                  <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-indigo-100 text-indigo-700">
+                    {[config.pipelineSteps.collection, config.pipelineSteps.transform, config.pipelineSteps.productCreate, config.pipelineSteps.publish].filter(Boolean).length}/4 단계
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500">자동화가 실행될 파이프라인 단계를 선택하세요</p>
+              </div>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => handleSaveSection('pipeline')}
+              disabled={savingSection === 'pipeline' || !hasPipelineChanges}
+              className="flex items-center gap-2 text-sm px-4 shadow-md"
+            >
+              {savingSection === 'pipeline' ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+              저장
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-4 gap-4">
+            {/* 수집 단계 */}
+            <button
+              onClick={() => setConfig(prev => ({
+                ...prev,
+                pipelineSteps: { ...prev.pipelineSteps, collection: !prev.pipelineSteps.collection }
+              }))}
+              className={`
+                relative group p-4 rounded-xl border-2 transition-all duration-300
+                ${config.pipelineSteps.collection
+                  ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-cyan-50 shadow-md shadow-blue-100'
+                  : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                }
+              `}
+            >
+              <div className="flex flex-col items-center gap-3">
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                  config.pipelineSteps.collection
+                    ? 'bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-200'
+                    : 'bg-gray-100 group-hover:bg-blue-100'
+                }`}>
+                  <Download className={`w-7 h-7 ${config.pipelineSteps.collection ? 'text-white' : 'text-gray-400 group-hover:text-blue-500'}`} />
+                </div>
+                <div className="text-center">
+                  <h3 className={`font-bold text-sm ${config.pipelineSteps.collection ? 'text-blue-700' : 'text-gray-600'}`}>수집</h3>
+                  <p className="text-xs text-gray-500 mt-1">게시물 수집</p>
+                </div>
+                {config.pipelineSteps.collection && (
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center shadow-md">
+                    <Check size={14} className="text-white" />
+                  </div>
+                )}
+              </div>
+            </button>
+
+            {/* 변환 단계 */}
+            <button
+              onClick={() => setConfig(prev => ({
+                ...prev,
+                pipelineSteps: { ...prev.pipelineSteps, transform: !prev.pipelineSteps.transform }
+              }))}
+              className={`
+                relative group p-4 rounded-xl border-2 transition-all duration-300
+                ${config.pipelineSteps.transform
+                  ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50 shadow-md shadow-amber-100'
+                  : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
+                }
+              `}
+            >
+              <div className="flex flex-col items-center gap-3">
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                  config.pipelineSteps.transform
+                    ? 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-200'
+                    : 'bg-gray-100 group-hover:bg-amber-100'
+                }`}>
+                  <Sparkles className={`w-7 h-7 ${config.pipelineSteps.transform ? 'text-white' : 'text-gray-400 group-hover:text-amber-500'}`} />
+                </div>
+                <div className="text-center">
+                  <h3 className={`font-bold text-sm ${config.pipelineSteps.transform ? 'text-amber-700' : 'text-gray-600'}`}>변환</h3>
+                  <p className="text-xs text-gray-500 mt-1">AI 상품 변환</p>
+                </div>
+                {config.pipelineSteps.transform && (
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center shadow-md">
+                    <Check size={14} className="text-white" />
+                  </div>
+                )}
+              </div>
+            </button>
+
+            {/* 상품생성 단계 */}
+            <button
+              onClick={() => setConfig(prev => ({
+                ...prev,
+                pipelineSteps: { ...prev.pipelineSteps, productCreate: !prev.pipelineSteps.productCreate }
+              }))}
+              className={`
+                relative group p-4 rounded-xl border-2 transition-all duration-300
+                ${config.pipelineSteps.productCreate
+                  ? 'border-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-md shadow-emerald-100'
+                  : 'border-gray-200 hover:border-emerald-300 hover:bg-emerald-50/50'
+                }
+              `}
+            >
+              <div className="flex flex-col items-center gap-3">
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                  config.pipelineSteps.productCreate
+                    ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-200'
+                    : 'bg-gray-100 group-hover:bg-emerald-100'
+                }`}>
+                  <ShoppingBag className={`w-7 h-7 ${config.pipelineSteps.productCreate ? 'text-white' : 'text-gray-400 group-hover:text-emerald-500'}`} />
+                </div>
+                <div className="text-center">
+                  <h3 className={`font-bold text-sm ${config.pipelineSteps.productCreate ? 'text-emerald-700' : 'text-gray-600'}`}>상품생성</h3>
+                  <p className="text-xs text-gray-500 mt-1">Product 생성</p>
+                </div>
+                {config.pipelineSteps.productCreate && (
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center shadow-md">
+                    <Check size={14} className="text-white" />
+                  </div>
+                )}
+              </div>
+            </button>
+
+            {/* 발행 단계 */}
+            <button
+              onClick={() => setConfig(prev => ({
+                ...prev,
+                pipelineSteps: { ...prev.pipelineSteps, publish: !prev.pipelineSteps.publish }
+              }))}
+              className={`
+                relative group p-4 rounded-xl border-2 transition-all duration-300
+                ${config.pipelineSteps.publish
+                  ? 'border-green-500 bg-gradient-to-br from-green-50 to-emerald-50 shadow-md shadow-green-100'
+                  : 'border-gray-200 hover:border-green-300 hover:bg-green-50/50'
+                }
+              `}
+            >
+              <div className="flex flex-col items-center gap-3">
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                  config.pipelineSteps.publish
+                    ? 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-200'
+                    : 'bg-gray-100 group-hover:bg-green-100'
+                }`}>
+                  <Upload className={`w-7 h-7 ${config.pipelineSteps.publish ? 'text-white' : 'text-gray-400 group-hover:text-green-500'}`} />
+                </div>
+                <div className="text-center">
+                  <h3 className={`font-bold text-sm ${config.pipelineSteps.publish ? 'text-green-700' : 'text-gray-600'}`}>발행</h3>
+                  <p className="text-xs text-gray-500 mt-1">채널 발행</p>
+                </div>
+                {config.pipelineSteps.publish && (
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-md">
+                    <Check size={14} className="text-white" />
+                  </div>
+                )}
+              </div>
+            </button>
+          </div>
+
+          {/* 파이프라인 흐름 표시 */}
+          <div className="mt-4 p-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl border border-indigo-100">
+            <div className="flex items-center justify-center gap-2 text-sm">
+              <span className={`px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.collection ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
+                수집
+              </span>
+              <span className="text-indigo-400">→</span>
+              <span className={`px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.transform ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
+                변환
+              </span>
+              <span className="text-indigo-400">→</span>
+              <span className={`px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.productCreate ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
+                상품생성
+              </span>
+              <span className="text-indigo-400">→</span>
+              <span className={`px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.publish ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
+                발행
               </span>
             </div>
           </div>
@@ -1399,6 +1645,88 @@ export default function AutomationSettingsPage() {
         </div>
       </Card>
     </div>
+
+      {/* 쇼핑몰 미연결 경고 모달 */}
+      {showShopConnectionWarning && unconnectedChannels.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => {
+              setShowShopConnectionWarning(false)
+              setUnconnectedChannels([])
+            }}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            {/* 헤더 */}
+            <div className="bg-orange-50 p-6 border-b border-orange-100">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-orange-100 rounded-full">
+                  <AlertTriangle size={24} className="text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">쇼핑몰 연결 필요</h3>
+                  <p className="text-sm text-gray-600">소매밴드에 쇼핑몰이 연결되어 있지 않습니다</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 콘텐츠 */}
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                다음 소매밴드에 연결된 쇼핑몰이 없습니다:
+              </p>
+              <div className="space-y-2 mb-4 max-h-40 overflow-y-auto">
+                {unconnectedChannels.map((channel) => (
+                  <div
+                    key={channel.id}
+                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                  >
+                    {channel.coverUrl ? (
+                      <img
+                        src={channel.coverUrl}
+                        alt={channel.name}
+                        className="w-10 h-10 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center">
+                        <Send size={20} className="text-gray-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{channel.name}</p>
+                      <p className="text-xs text-orange-500">쇼핑몰 미연결</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-sm text-gray-600 mb-6">
+                자동화를 시작하려면 먼저 소매밴드에 쇼핑몰을 연결해주세요.
+              </p>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowShopConnectionWarning(false)
+                    setUnconnectedChannels([])
+                  }}
+                >
+                  닫기
+                </Button>
+                <a
+                  href="/sourcing/channel"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-color hover:bg-primary-color/90 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <ExternalLink size={16} />
+                  채널 관리
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -66,26 +66,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Note: 수집상품 등록 여부는 여기서 체크하지 않음
-    // 수집상품 페이지에서 AI 변환 후 CollectedProduct를 직접 생성하기 때문
-    // Product 생성 여부만 체크 (중복 상품 방지)
-    const existingProduct = await prisma.product.findFirst({
-      where: {
-        collectedProduct: {
-          postId: post.id,
-        },
-      },
-    })
-
-    if (existingProduct) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: '이미 이 게시물로 생성된 상품이 있습니다.',
-        },
-        { status: 400 }
-      )
-    }
+    // Note: 가공상품이 생성되면 CollectedPost가 삭제되므로
+    // 위의 findUnique에서 자연스럽게 404가 반환됨 (중복 생성 방지)
 
     // Get AI config
     const aiConfigProvider = aiProvider || 'GEMINI'

@@ -72,6 +72,7 @@ export default function UnifiedOrderListPage() {
     total: 0,
     PENDING: 0,
     PAID: 0,
+    PREPARING: 0,
     SHIPPED: 0,
     DELIVERED: 0,
     CANCELLED: 0,
@@ -181,6 +182,7 @@ export default function UnifiedOrderListPage() {
     const colorMap: Record<string, string> = {
       PENDING: 'bg-yellow-100 text-yellow-700',
       PAID: 'bg-blue-100 text-blue-700',
+      PREPARING: 'bg-orange-100 text-orange-700',
       SHIPPED: 'bg-indigo-100 text-indigo-700',
       DELIVERED: 'bg-green-100 text-green-700',
       CANCELLED: 'bg-red-100 text-red-700',
@@ -206,7 +208,7 @@ export default function UnifiedOrderListPage() {
         </div>
 
         {/* 상태 필터 버튼 */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
           <button
             onClick={() => setStatusFilter(null)}
             className={`rounded-xl p-4 transition-all ${
@@ -258,6 +260,24 @@ export default function UnifiedOrderListPage() {
               <div className="text-left">
                 <p className={`text-xs ${statusFilter === 'PAID' ? 'text-blue-100' : 'text-gray-500'}`}>결제완료</p>
                 <p className={`text-xl font-bold ${statusFilter === 'PAID' ? '' : 'text-blue-600'}`}>{statusCounts.PAID}</p>
+              </div>
+            </div>
+          </button>
+          <button
+            onClick={() => setStatusFilter(statusFilter === 'PREPARING' ? null : 'PREPARING')}
+            className={`rounded-xl p-4 transition-all ${
+              statusFilter === 'PREPARING'
+                ? 'bg-orange-500 text-white shadow-lg scale-[1.02]'
+                : 'bg-white hover:bg-orange-50 border border-gray-200 shadow-sm hover:shadow-md hover:border-orange-200'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-lg ${statusFilter === 'PREPARING' ? 'bg-orange-400' : 'bg-orange-100'}`}>
+                <Package size={20} className={statusFilter === 'PREPARING' ? 'text-white' : 'text-orange-600'} />
+              </div>
+              <div className="text-left">
+                <p className={`text-xs ${statusFilter === 'PREPARING' ? 'text-orange-100' : 'text-gray-500'}`}>상품준비</p>
+                <p className={`text-xl font-bold ${statusFilter === 'PREPARING' ? '' : 'text-orange-600'}`}>{statusCounts.PREPARING}</p>
               </div>
             </div>
           </button>

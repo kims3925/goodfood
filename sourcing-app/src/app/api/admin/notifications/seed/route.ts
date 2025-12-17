@@ -20,13 +20,13 @@ export async function POST(request: NextRequest) {
 
     // 기존 sourcing 알림 개수 확인
     const existingCountResult = await prisma.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt FROM shop_notification WHERE section = 'sourcing'
+      SELECT COUNT(*) as cnt FROM notification WHERE section = 'sourcing'
     `
     const existingCount = Number(existingCountResult[0]?.cnt || 0)
 
     // Raw SQL로 더미 데이터 삽입 (enum 타입 우회)
     await prisma.$executeRaw`
-      INSERT INTO shop_notification (section, type, title, message, link, is_read, created_at)
+      INSERT INTO notification (section, type, title, message, link, is_read, created_at)
       VALUES
         ('sourcing', 'COLLECT', '상품 수집이 완료되었습니다', '[도매밴드] 15개 상품 수집 완료', '/sourcing/automation/logs', 0, NOW()),
         ('sourcing', 'TRANSFORM', 'AI 변환이 완료되었습니다', '10개 상품 변환 완료 (성공 9개, 실패 1개)', '/sourcing/automation/logs', 0, NOW()),
