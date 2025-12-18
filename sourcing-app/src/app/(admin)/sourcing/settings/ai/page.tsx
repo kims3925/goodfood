@@ -74,17 +74,14 @@ export default function AISettingsPage() {
       const data = await response.json()
 
       if (data.success) {
-        setTestResult({ success: true, message: '연결 테스트 성공! 설정이 저장되었습니다.' })
-        setIsTestSuccess(true)
+        setTestResult({ success: true, message: '설정이 저장되었습니다.' })
         await loadSettings()
       } else {
         setTestResult({ success: false, message: data.error || '설정 저장에 실패했습니다.' })
-        setIsTestSuccess(false)
       }
     } catch (error) {
       console.error('설정 저장 실패:', error)
       setTestResult({ success: false, message: '설정 저장 중 오류가 발생했습니다.' })
-      setIsTestSuccess(false)
     } finally {
       setIsSaving(false)
     }
@@ -396,20 +393,44 @@ export default function AISettingsPage() {
               )}
 
               {/* Helper Text */}
-              {!currentApiKey && (
+              {!currentApiKey ? (
                 <p className="text-xs text-gray-500 text-right mb-2">
                   * API Key를 입력해주세요
+                </p>
+              ) : !isTestSuccess && (
+                <p className="text-xs text-gray-500 text-right mb-2">
+                  * 연결 테스트 후 저장할 수 있습니다
                 </p>
               )}
 
               <div className="flex justify-end gap-3">
-                {/* Save Settings Button (연결 테스트 포함) */}
+                {/* 연결 테스트 버튼 */}
+                <button
+                  onClick={testConnection}
+                  disabled={isTesting || !currentApiKey}
+                  className="flex items-center gap-2 px-6 py-2 border border-gray-300 text-gray-700 bg-white rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isTesting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                      테스트 중...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4" />
+                      연결 테스트
+                    </>
+                  )}
+                </button>
+
+                {/* 저장 버튼 - 연결 테스트 성공 후 활성화 */}
                 <button
                   onClick={saveSettings}
-                  disabled={isSaving || !currentApiKey}
+                  disabled={isSaving || !currentApiKey || !isTestSuccess}
                   className={`flex items-center gap-2 px-6 py-2 text-white rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
                     settings.provider === 'gemini' ? 'bg-purple-500' : 'bg-green-500'
                   }`}
+                  title={!isTestSuccess ? '연결 테스트를 먼저 진행해주세요' : ''}
                 >
                   {isSaving ? (
                     <>
@@ -419,7 +440,7 @@ export default function AISettingsPage() {
                   ) : (
                     <>
                       <Save className="h-4 w-4" />
-                      연결 테스트 및 저장
+                      저장
                     </>
                   )}
                 </button>
