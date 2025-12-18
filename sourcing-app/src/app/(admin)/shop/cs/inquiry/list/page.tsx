@@ -123,7 +123,7 @@ export default function InquiryManagementPage() {
   }
 
   const handleRowClick = (inquiryId: number) => {
-    router.push(`/cs/inquiry/${inquiryId}`)
+    router.push(`/shop/cs/inquiry/detail/${inquiryId}`)
   }
 
   const formatDate = (dateString: string) => {

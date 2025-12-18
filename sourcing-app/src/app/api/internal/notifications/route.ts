@@ -30,18 +30,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { type, shopId, data } = body
+    const { type, userId, shopId, data } = body
 
-    if (!type || !shopId || !data) {
+    if (!type || !userId || !shopId || !data) {
       return NextResponse.json(
-        { success: false, error: 'type, shopId, data are required' },
+        { success: false, error: 'type, userId, shopId, data are required' },
         { status: 400 }
       )
     }
 
     switch (type) {
       case 'ORDER':
-        await createOrderNotification(shopId, {
+        await createOrderNotification(userId, shopId, {
           id: data.id,
           orderNumber: data.orderNumber,
           totalAmount: data.totalAmount,
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
         break
 
       case 'CANCEL':
-        await createCancelNotification(shopId, {
+        await createCancelNotification(userId, shopId, {
           id: data.id,
           orderNumber: data.orderNumber,
           customerName: data.customerName,
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
         break
 
       case 'REFUND':
-        await createRefundNotification(shopId, {
+        await createRefundNotification(userId, shopId, {
           id: data.id,
           orderNumber: data.orderNumber,
           type: data.returnType,
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         break
 
       case 'INQUIRY':
-        await createInquiryNotification(shopId, {
+        await createInquiryNotification(userId, shopId, {
           id: data.id,
           title: data.title,
           type: data.inquiryType,
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
         break
 
       case 'SETTLEMENT':
-        await createSettlementNotification(shopId, {
+        await createSettlementNotification(userId, shopId, {
           id: data.id,
           periodStart: data.periodStart ? new Date(data.periodStart) : undefined,
           periodEnd: data.periodEnd ? new Date(data.periodEnd) : undefined,

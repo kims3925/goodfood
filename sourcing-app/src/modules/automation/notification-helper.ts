@@ -8,6 +8,7 @@ import { WorkflowStatus } from '@bandauto/db'
 import { FullPipelineResult } from './types'
 
 interface PipelineNotificationParams {
+  userId: number
   result: FullPipelineResult
   workflowLogId?: number
   errorMessage?: string
@@ -20,7 +21,7 @@ interface PipelineNotificationParams {
 export async function createPipelineNotification(
   params: PipelineNotificationParams
 ): Promise<void> {
-  const { result, workflowLogId, errorMessage } = params
+  const { userId, result, workflowLogId, errorMessage } = params
 
   try {
     const isSuccess = result.overallStatus === WorkflowStatus.COMPLETED
@@ -137,6 +138,7 @@ export async function createPipelineNotification(
     // 알림 생성
     await prisma.notification.create({
       data: {
+        userId,
         section: 'sourcing',
         type,
         title,
@@ -156,6 +158,7 @@ export async function createPipelineNotification(
  * 단일 파이프라인 (수집/변환/발행) 실패 알림 생성
  */
 export async function createSinglePipelineErrorNotification(
+  userId: number,
   pipelineType: 'COLLECT' | 'TRANSFORM' | 'PUBLISH',
   errorMessage: string,
   workflowLogId?: number
@@ -169,6 +172,7 @@ export async function createSinglePipelineErrorNotification(
   try {
     await prisma.notification.create({
       data: {
+        userId,
         section: 'sourcing',
         type: 'ERROR',
         title: `${typeLabels[pipelineType]} 작업 실패`,

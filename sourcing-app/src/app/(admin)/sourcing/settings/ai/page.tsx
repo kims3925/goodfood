@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, Save, Check, AlertCircle, Sparkles, Zap, DollarSign, TestTube } from 'lucide-react'
+import { Settings, Save, Check, AlertCircle, Sparkles, Zap, DollarSign } from 'lucide-react'
 
 interface AISettings {
   provider: 'gemini' | 'openai'
@@ -54,6 +54,7 @@ export default function AISettingsPage() {
   const saveSettings = async () => {
     try {
       setIsSaving(true)
+      setTestResult(null)
 
       const response = await fetch('/api/settings/ai', {
         method: 'POST',
@@ -61,7 +62,7 @@ export default function AISettingsPage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          provider: settings.provider,
+          provider: settings.provider.toUpperCase(),
           settings: {
             apiKey: settings.provider === 'gemini' ? settings.geminiApiKey : settings.openaiApiKey,
             model: settings.provider === 'gemini' ? settings.geminiModel : settings.openaiModel,
@@ -73,13 +74,17 @@ export default function AISettingsPage() {
       const data = await response.json()
 
       if (data.success) {
-        setTestResult(null)
-        setIsTestSuccess(false)
+        setTestResult({ success: true, message: '연결 테스트 성공! 설정이 저장되었습니다.' })
+        setIsTestSuccess(true)
         await loadSettings()
       } else {
+        setTestResult({ success: false, message: data.error || '설정 저장에 실패했습니다.' })
+        setIsTestSuccess(false)
       }
     } catch (error) {
       console.error('설정 저장 실패:', error)
+      setTestResult({ success: false, message: '설정 저장 중 오류가 발생했습니다.' })
+      setIsTestSuccess(false)
     } finally {
       setIsSaving(false)
     }
@@ -391,39 +396,20 @@ export default function AISettingsPage() {
               )}
 
               {/* Helper Text */}
-              {!isTestSuccess && (
+              {!currentApiKey && (
                 <p className="text-xs text-gray-500 text-right mb-2">
-                  * 연결 테스트를 먼저 완료해주세요
+                  * API Key를 입력해주세요
                 </p>
               )}
 
               <div className="flex justify-end gap-3">
-                {/* Connection Test Button */}
+                {/* Save Settings Button (연결 테스트 포함) */}
                 <button
-                  onClick={testConnection}
-                  disabled={isTesting || !currentApiKey}
+                  onClick={saveSettings}
+                  disabled={isSaving || !currentApiKey}
                   className={`flex items-center gap-2 px-6 py-2 text-white rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
                     settings.provider === 'gemini' ? 'bg-purple-500' : 'bg-green-500'
                   }`}
-                >
-                  {isTesting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      테스트 중...
-                    </>
-                  ) : (
-                    <>
-                      <TestTube className="h-4 w-4" />
-                      연결 테스트
-                    </>
-                  )}
-                </button>
-
-                {/* Save Settings Button */}
-                <button
-                  onClick={saveSettings}
-                  disabled={isSaving || !isTestSuccess}
-                  className="flex items-center gap-2 px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSaving ? (
                     <>
@@ -433,7 +419,7 @@ export default function AISettingsPage() {
                   ) : (
                     <>
                       <Save className="h-4 w-4" />
-                      설정 저장
+                      연결 테스트 및 저장
                     </>
                   )}
                 </button>

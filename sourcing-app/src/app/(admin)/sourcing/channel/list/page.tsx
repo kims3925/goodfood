@@ -435,7 +435,7 @@ function ChannelListContent() {
                     <TableRow
                       key={channel.id}
                       className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/channel/${channel.id}`)}
+                      onClick={() => router.push(`/channel/detail/${channel.id}`)}
                     >
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <input

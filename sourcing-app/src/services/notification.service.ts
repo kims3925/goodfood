@@ -37,12 +37,14 @@ interface SettlementInfo {
  * 신규 주문 알림 생성
  */
 export async function createOrderNotification(
+  userId: number,
   shopId: number,
   order: OrderInfo
 ): Promise<void> {
   try {
     await prisma.notification.create({
       data: {
+        userId,
         shopId,
         section: 'shop',
         type: 'ORDER',
@@ -61,12 +63,14 @@ export async function createOrderNotification(
  * 주문 취소 요청 알림 생성
  */
 export async function createCancelNotification(
+  userId: number,
   shopId: number,
   order: OrderInfo
 ): Promise<void> {
   try {
     await prisma.notification.create({
       data: {
+        userId,
         shopId,
         section: 'shop',
         type: 'CANCEL',
@@ -85,6 +89,7 @@ export async function createCancelNotification(
  * 환불/반품 요청 알림 생성
  */
 export async function createRefundNotification(
+  userId: number,
   shopId: number,
   returnRequest: ReturnInfo
 ): Promise<void> {
@@ -94,6 +99,7 @@ export async function createRefundNotification(
 
     await prisma.notification.create({
       data: {
+        userId,
         shopId,
         section: 'shop',
         type: 'REFUND',
@@ -112,6 +118,7 @@ export async function createRefundNotification(
  * 신규 문의 알림 생성
  */
 export async function createInquiryNotification(
+  userId: number,
   shopId: number,
   inquiry: InquiryInfo
 ): Promise<void> {
@@ -129,6 +136,7 @@ export async function createInquiryNotification(
 
     await prisma.notification.create({
       data: {
+        userId,
         shopId,
         section: 'shop',
         type: 'INQUIRY',
@@ -147,6 +155,7 @@ export async function createInquiryNotification(
  * 정산 완료 알림 생성
  */
 export async function createSettlementNotification(
+  userId: number,
   shopId: number,
   settlement: SettlementInfo
 ): Promise<void> {
@@ -161,6 +170,7 @@ export async function createSettlementNotification(
 
     await prisma.notification.create({
       data: {
+        userId,
         shopId,
         section: 'shop',
         type: 'SETTLEMENT',
@@ -208,11 +218,13 @@ interface ErrorInfo {
  * 수집 완료 알림 생성
  */
 export async function createCollectNotification(
+  userId: number,
   info: CollectInfo
 ): Promise<void> {
   try {
     await prisma.notification.create({
       data: {
+        userId,
         section: 'sourcing',
         type: 'COLLECT',
         title: '상품 수집이 완료되었습니다',
@@ -229,6 +241,7 @@ export async function createCollectNotification(
  * AI 변환 완료 알림 생성
  */
 export async function createTransformNotification(
+  userId: number,
   info: TransformInfo
 ): Promise<void> {
   try {
@@ -237,6 +250,7 @@ export async function createTransformNotification(
 
     await prisma.notification.create({
       data: {
+        userId,
         section: 'sourcing',
         type: 'TRANSFORM',
         title: 'AI 변환이 완료되었습니다',
@@ -253,6 +267,7 @@ export async function createTransformNotification(
  * 발행 완료 알림 생성
  */
 export async function createPublishNotification(
+  userId: number,
   info: PublishInfo
 ): Promise<void> {
   try {
@@ -261,6 +276,7 @@ export async function createPublishNotification(
 
     await prisma.notification.create({
       data: {
+        userId,
         section: 'sourcing',
         type: 'PUBLISH',
         title: '상품 발행이 완료되었습니다',
@@ -277,11 +293,13 @@ export async function createPublishNotification(
  * 오류 알림 생성
  */
 export async function createErrorNotification(
+  userId: number,
   info: ErrorInfo
 ): Promise<void> {
   try {
     await prisma.notification.create({
       data: {
+        userId,
         section: 'sourcing',
         type: 'ERROR',
         title: `오류가 발생했습니다${info.errorType ? ` (${info.errorType})` : ''}`,
@@ -298,6 +316,7 @@ export async function createErrorNotification(
  * 일반 정보 알림 생성
  */
 export async function createInfoNotification(
+  userId: number,
   title: string,
   message: string,
   link?: string
@@ -305,6 +324,7 @@ export async function createInfoNotification(
   try {
     await prisma.notification.create({
       data: {
+        userId,
         section: 'sourcing',
         type: 'INFO',
         title,

@@ -1,5 +1,6 @@
 model Notification {
   id              Int                   @id @default(autoincrement())
+  userId          Int                   @map("user_id")
   shopId          Int?                  @map("shop_id")
   section         String                @default("shop") @db.VarChar(20) // 'shop' | 'sourcing'
   type            NotificationType
@@ -18,8 +19,10 @@ model Notification {
   readAt          DateTime?             @map("read_at") @db.Timestamp(0)
 
   // Relations
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   shop            Shop?                 @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@index([shopId])
   @@index([section])
   @@index([isRead])

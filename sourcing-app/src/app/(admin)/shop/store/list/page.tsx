@@ -417,7 +417,7 @@ function ShopListContent() {
                     <TableRow
                       key={shop.id}
                       className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/shop/store/${shop.id}`)}
+                      onClick={() => router.push(`/shop/store/detail/${shop.id}`)}
                     >
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <input

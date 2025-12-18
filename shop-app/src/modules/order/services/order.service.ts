@@ -213,14 +213,20 @@ export class OrderService {
 
     const order = await this.orderRepository.create(orderInput)
 
-    // 알림 생성 (shopId가 있는 경우에만)
+    // 알림 생성 (shopId가 있는 경우에만 - 샵 소유자에게 알림)
     if (shopId) {
-      createOrderNotification(shopId, {
-        id: order.id,
-        orderNumber: order.orderNumber,
-        totalAmount,
-        customerName: shippingAddress.recipientName,
+      const shop = await prisma.shop.findUnique({
+        where: { id: shopId },
+        select: { userId: true },
       })
+      if (shop?.userId) {
+        createOrderNotification(shop.userId, shopId, {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          totalAmount,
+          customerName: shippingAddress.recipientName,
+        })
+      }
     }
 
     // TossPayments 결제 요청 정보 생성 (주문자 정보는 user에서)
@@ -351,14 +357,20 @@ export class OrderService {
 
     const order = await this.orderRepository.create(orderInput)
 
-    // 알림 생성 (shopId가 있는 경우에만)
+    // 알림 생성 (shopId가 있는 경우에만 - 샵 소유자에게 알림)
     if (shopId) {
-      createOrderNotification(shopId, {
-        id: order.id,
-        orderNumber: order.orderNumber,
-        totalAmount,
-        customerName: shippingAddress.recipientName,
+      const shop = await prisma.shop.findUnique({
+        where: { id: shopId },
+        select: { userId: true },
       })
+      if (shop?.userId) {
+        createOrderNotification(shop.userId, shopId, {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          totalAmount,
+          customerName: shippingAddress.recipientName,
+        })
+      }
     }
 
     // TossPayments 결제 요청 정보 생성 (주문자 정보는 user에서)
@@ -484,13 +496,19 @@ export class OrderService {
 
     const cancelledOrder = await this.orderRepository.cancel(orderId, reason, cancelledBy)
 
-    // 취소 알림 생성 (shopId가 있는 경우에만)
+    // 취소 알림 생성 (shopId가 있는 경우에만 - 샵 소유자에게 알림)
     if (order.shopId) {
-      createCancelNotification(order.shopId, {
-        id: order.id,
-        orderNumber: order.orderNumber,
-        customerName: order.shippingAddress?.recipientName,
+      const shop = await prisma.shop.findUnique({
+        where: { id: order.shopId },
+        select: { userId: true },
       })
+      if (shop?.userId) {
+        createCancelNotification(shop.userId, order.shopId, {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          customerName: order.shippingAddress?.recipientName,
+        })
+      }
     }
 
     return this.formatOrderResponse(cancelledOrder)

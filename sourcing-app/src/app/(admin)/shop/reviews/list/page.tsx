@@ -346,7 +346,7 @@ export default function ReviewListPage() {
                     <tr
                       key={review.id}
                       className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => window.location.href = `/shop/reviews/${review.id}`}
+                      onClick={() => window.location.href = `/shop/reviews/detail/${review.id}`}
                     >
                       <td className="px-4 py-3 text-sm text-center text-gray-500">
                         {(data.pagination.page - 1) * data.pagination.limit + index + 1}

@@ -275,7 +275,7 @@ export default function InquiryDetailPage({ params }: { params: { id: string } }
               </div>
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <Link
-                  href={`/user/${inquiry.user.id}`}
+                  href={`/shop/user/detail/${inquiry.user.id}`}
                   className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
                 >
                   <ExternalLink size={14} />

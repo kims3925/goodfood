@@ -90,6 +90,7 @@ export interface TransformResult extends PipelineResult {
     skippedCount: number         // 스킵된 항목 수 (일시적 에러)
     retryablePostIds: number[]   // 재처리 가능한 postId 목록
     cancelled?: boolean          // 사용자 취소 여부
+    rpdLimitReached?: boolean    // RPD 한도 도달 여부
   }
 }
 

@@ -16,7 +16,6 @@ import {
   PowerOff,
   Palette,
   Phone,
-  Truck,
   ExternalLink,
   Package,
   ShoppingCart,
@@ -26,10 +25,12 @@ import {
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import Select from '@/components/ui/Select'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
 import ImageUpload from '@/components/ui/ImageUpload'
+import { BANKS, getBankByName, formatAccountNumber, getAccountNumberDigits } from '@/constants/banks'
 
 interface ShopTheme {
   id: number
@@ -50,8 +51,6 @@ interface Shop {
   bankName: string | null
   bankAccount: string | null
   accountHolder: string | null
-  freeShippingAmount: number | null
-  defaultShippingFee: number | null
   contactPhone: string | null
   contactEmail: string | null
   isActive: boolean
@@ -89,11 +88,16 @@ export default function ShopDetailPage({
   // 정산 정보 필드
   const [bankName, setBankName] = useState('')
   const [bankAccount, setBankAccount] = useState('')
+  const [bankAccountDisplay, setBankAccountDisplay] = useState('')
   const [accountHolder, setAccountHolder] = useState('')
 
-  // 배송 설정 필드
-  const [freeShippingAmount, setFreeShippingAmount] = useState<number | null>(null)
-  const [defaultShippingFee, setDefaultShippingFee] = useState<number | null>(null)
+  // 은행 옵션
+  const bankOptions = BANKS.map(bank => ({
+    value: bank.name,
+    label: bank.name,
+  }))
+
+  const selectedBank = getBankByName(bankName)
 
   // 연락처 필드
   const [contactPhone, setContactPhone] = useState('')
@@ -216,9 +220,17 @@ export default function ShopDetailPage({
         setBankName(s.bankName || '')
         setBankAccount(s.bankAccount || '')
         setAccountHolder(s.accountHolder || '')
-        // 배송 설정
-        setFreeShippingAmount(s.freeShippingAmount)
-        setDefaultShippingFee(s.defaultShippingFee)
+        // 계좌번호 포맷팅 표시
+        if (s.bankName && s.bankAccount) {
+          const bank = getBankByName(s.bankName)
+          if (bank) {
+            setBankAccountDisplay(formatAccountNumber(s.bankAccount, bank.code))
+          } else {
+            setBankAccountDisplay(s.bankAccount || '')
+          }
+        } else {
+          setBankAccountDisplay(s.bankAccount || '')
+        }
         // 연락처
         setContactPhone(s.contactPhone || '')
         setContactEmail(s.contactEmail || '')
@@ -291,8 +303,6 @@ export default function ShopDetailPage({
         bankName: bankName || null,
         bankAccount: bankAccount || null,
         accountHolder: accountHolder || null,
-        freeShippingAmount: freeShippingAmount || null,
-        defaultShippingFee: defaultShippingFee || null,
         contactPhone: contactPhone || null,
         contactEmail: contactEmail || null,
         theme: {
@@ -360,8 +370,17 @@ export default function ShopDetailPage({
       setBankName(shop.bankName || '')
       setBankAccount(shop.bankAccount || '')
       setAccountHolder(shop.accountHolder || '')
-      setFreeShippingAmount(shop.freeShippingAmount)
-      setDefaultShippingFee(shop.defaultShippingFee)
+      // 계좌번호 포맷팅 복원
+      if (shop.bankName && shop.bankAccount) {
+        const bank = getBankByName(shop.bankName)
+        if (bank) {
+          setBankAccountDisplay(formatAccountNumber(shop.bankAccount, bank.code))
+        } else {
+          setBankAccountDisplay(shop.bankAccount || '')
+        }
+      } else {
+        setBankAccountDisplay(shop.bankAccount || '')
+      }
       setContactPhone(shop.contactPhone || '')
       setContactEmail(shop.contactEmail || '')
       if (shop.theme) {
@@ -373,6 +392,40 @@ export default function ShopDetailPage({
       }
     }
     setIsEditMode(false)
+  }
+
+  // 은행 선택 핸들러
+  const handleBankChange = (value: string) => {
+    setBankName(value)
+    // 은행 변경 시 계좌번호 재포맷팅
+    if (bankAccount) {
+      const bank = getBankByName(value)
+      if (bank) {
+        const formatted = formatAccountNumber(bankAccount, bank.code)
+        setBankAccountDisplay(formatted)
+      }
+    }
+  }
+
+  // 계좌번호 입력 핸들러
+  const handleAccountNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value
+    const digits = getAccountNumberDigits(inputValue)
+
+    // 최대 자릿수 제한
+    const maxLength = selectedBank?.length || 14
+    const limitedDigits = digits.slice(0, maxLength)
+
+    // 숫자만 저장
+    setBankAccount(limitedDigits)
+
+    // 포맷팅된 값 표시
+    if (selectedBank) {
+      const formatted = formatAccountNumber(limitedDigits, selectedBank.code)
+      setBankAccountDisplay(formatted)
+    } else {
+      setBankAccountDisplay(limitedDigits)
+    }
   }
 
   const formatDateTimeKST = (dateString: string) => {
@@ -388,6 +441,7 @@ export default function ShopDetailPage({
     return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
   }
 
+  // 전화번호 포맷팅 (표시용)
   const formatPhoneNumber = (phone: string | null) => {
     if (!phone) return '-'
     const cleaned = phone.replace(/\D/g, '')
@@ -402,6 +456,41 @@ export default function ShopDetailPage({
       return `${cleaned.slice(0, 2)}-${cleaned.slice(2, 5)}-${cleaned.slice(5)}`
     }
     return phone
+  }
+
+  // 전화번호 입력 핸들러 (자동 포맷팅)
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value
+    const digits = inputValue.replace(/\D/g, '')
+
+    // 최대 11자리 제한
+    const limitedDigits = digits.slice(0, 11)
+
+    // 자동 포맷팅
+    let formatted = ''
+    if (limitedDigits.startsWith('02')) {
+      // 서울 지역번호
+      if (limitedDigits.length <= 2) {
+        formatted = limitedDigits
+      } else if (limitedDigits.length <= 5) {
+        formatted = `${limitedDigits.slice(0, 2)}-${limitedDigits.slice(2)}`
+      } else if (limitedDigits.length <= 9) {
+        formatted = `${limitedDigits.slice(0, 2)}-${limitedDigits.slice(2, 5)}-${limitedDigits.slice(5)}`
+      } else {
+        formatted = `${limitedDigits.slice(0, 2)}-${limitedDigits.slice(2, 6)}-${limitedDigits.slice(6)}`
+      }
+    } else {
+      // 일반 전화번호 (010, 031 등)
+      if (limitedDigits.length <= 3) {
+        formatted = limitedDigits
+      } else if (limitedDigits.length <= 7) {
+        formatted = `${limitedDigits.slice(0, 3)}-${limitedDigits.slice(3)}`
+      } else {
+        formatted = `${limitedDigits.slice(0, 3)}-${limitedDigits.slice(3, 7)}-${limitedDigits.slice(7)}`
+      }
+    }
+
+    setContactPhone(formatted)
   }
 
   if (isLoading) {
@@ -496,7 +585,47 @@ export default function ShopDetailPage({
         </div>
 
         {/* 통계 카드 */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-5 gap-4 mb-8">
+          {/* 활성화 상태 카드 */}
+          <div className={`bg-white rounded-xl shadow-sm border p-4 ${isEditMode ? 'border-blue-300' : 'border-gray-200'}`}>
+            <div className="flex items-center gap-3">
+              <div className={`p-3 rounded-lg ${shop.isActive ? 'bg-green-100' : 'bg-gray-100'}`}>
+                {shop.isActive ? (
+                  <Power size={20} className="text-green-600" />
+                ) : (
+                  <PowerOff size={20} className="text-gray-500" />
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-gray-500">활성화 상태</p>
+                {isEditMode ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsActive(!isActive)}
+                    className={`mt-1 relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      isActive ? 'bg-green-500' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        isActive ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                ) : (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      shop.isActive
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {shop.isActive ? '활성화' : '비활성화'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-blue-100 rounded-lg">
@@ -543,7 +672,7 @@ export default function ShopDetailPage({
           </div>
         </div>
 
-        {/* 첫 번째 줄: 기본 정보 | 활성화 + 연락처 */}
+        {/* 첫 번째 줄: 기본 정보 | 연락처 + 정산 정보 */}
         <div className="grid grid-cols-2 gap-6 mb-6">
           {/* 기본 정보 카드 */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -658,63 +787,8 @@ export default function ShopDetailPage({
             </div>
           </div>
 
-          {/* 오른쪽: 활성화 + 연락처 */}
+          {/* 오른쪽: 연락처 + 정산 정보 */}
           <div className="space-y-6">
-            {/* 활성화 상태 카드 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-center gap-2">
-                  <div className={`p-2 rounded-lg ${isActive ? 'bg-green-100' : 'bg-gray-100'}`}>
-                    {isActive ? (
-                      <Power size={18} className="text-green-600" />
-                    ) : (
-                      <PowerOff size={18} className="text-gray-500" />
-                    )}
-                  </div>
-                  <span className="font-semibold text-slate-900">활성화 상태</span>
-                </div>
-              </div>
-              <div className="p-6">
-                {isEditMode ? (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">쇼핑몰 활성화 여부를 설정합니다.</p>
-                      <p className="text-xs text-gray-400">비활성화된 쇼핑몰은 고객에게 표시되지 않습니다.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsActive(!isActive)}
-                      className={`relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                        isActive ? 'bg-green-500 focus:ring-green-500' : 'bg-gray-300 focus:ring-gray-500'
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          isActive ? 'translate-x-6' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">현재 상태</p>
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
-                          shop.isActive
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        {shop.isActive ? <Power size={14} /> : <PowerOff size={14} />}
-                        {shop.isActive ? '활성화됨' : '비활성화됨'}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* 연락처 카드 */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-4 border-b border-slate-100 bg-slate-50/50">
@@ -732,7 +806,7 @@ export default function ShopDetailPage({
                     {isEditMode ? (
                       <Input
                         value={contactPhone}
-                        onChange={(e) => setContactPhone(e.target.value)}
+                        onChange={handlePhoneChange}
                         placeholder="02-1234-5678"
                       />
                     ) : (
@@ -754,113 +828,80 @@ export default function ShopDetailPage({
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* 두 번째 줄: 정산 정보 | 배송 설정 */}
-        <div className="grid grid-cols-2 gap-6 mb-6">
-          {/* 정산 정보 카드 */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CreditCard size={18} className="text-green-600" />
-                </div>
-                <span className="font-semibold text-slate-900">정산 정보</span>
-              </div>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">은행명</label>
-                  {isEditMode ? (
-                    <Input
-                      value={bankName}
-                      onChange={(e) => setBankName(e.target.value)}
-                      placeholder="국민은행"
-                    />
-                  ) : (
-                    <p className="text-gray-900">{shop.bankName || '-'}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">계좌번호</label>
-                  {isEditMode ? (
-                    <Input
-                      value={bankAccount}
-                      onChange={(e) => setBankAccount(e.target.value)}
-                      placeholder="123-456-789012"
-                    />
-                  ) : (
-                    <p className="text-gray-900 font-mono">{shop.bankAccount || '-'}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">예금주</label>
-                  {isEditMode ? (
-                    <Input
-                      value={accountHolder}
-                      onChange={(e) => setAccountHolder(e.target.value)}
-                      placeholder="홍길동"
-                    />
-                  ) : (
-                    <p className="text-gray-900">{shop.accountHolder || '-'}</p>
-                  )}
+            {/* 정산 정보 카드 */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <CreditCard size={18} className="text-green-600" />
+                  </div>
+                  <span className="font-semibold text-slate-900">정산 정보</span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* 배송 설정 카드 */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Truck size={18} className="text-orange-600" />
-                </div>
-                <span className="font-semibold text-slate-900">배송 설정</span>
-              </div>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">무료배송 기준금액</label>
-                  {isEditMode ? (
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        value={freeShippingAmount || ''}
-                        onChange={(e) => setFreeShippingAmount(e.target.value ? parseInt(e.target.value) : null)}
-                        placeholder="50000"
+              <div className="p-6">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">은행</label>
+                    {isEditMode ? (
+                      <Select
+                        value={bankName}
+                        onChange={handleBankChange}
+                        options={bankOptions}
+                        placeholder="은행 선택"
                       />
-                    </div>
-                  ) : (
-                    <p className="text-gray-900">
-                      {shop.freeShippingAmount ? `${shop.freeShippingAmount.toLocaleString()}원` : '-'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">기본 배송비</label>
-                  {isEditMode ? (
-                    <Input
-                      type="number"
-                      value={defaultShippingFee || ''}
-                      onChange={(e) => setDefaultShippingFee(e.target.value ? parseInt(e.target.value) : null)}
-                      placeholder="3000"
-                    />
-                  ) : (
-                    <p className="text-gray-900">
-                      {shop.defaultShippingFee ? `${shop.defaultShippingFee.toLocaleString()}원` : '-'}
-                    </p>
-                  )}
+                    ) : (
+                      <p className="text-gray-900">{shop.bankName || '-'}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">계좌번호</label>
+                    {isEditMode ? (
+                      <>
+                        <Input
+                          value={bankAccountDisplay}
+                          onChange={handleAccountNumberChange}
+                          placeholder={selectedBank?.placeholder || '계좌번호 입력'}
+                          disabled={!bankName}
+                        />
+                        {selectedBank && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            형식: {selectedBank.format} ({selectedBank.length}자리)
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-gray-900 font-mono">
+                        {shop.bankName && shop.bankAccount
+                          ? (() => {
+                              const bank = getBankByName(shop.bankName)
+                              return bank
+                                ? formatAccountNumber(shop.bankAccount, bank.code)
+                                : shop.bankAccount
+                            })()
+                          : shop.bankAccount || '-'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">예금주</label>
+                    {isEditMode ? (
+                      <Input
+                        value={accountHolder}
+                        onChange={(e) => setAccountHolder(e.target.value)}
+                        placeholder="홍길동"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{shop.accountHolder || '-'}</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 세 번째 줄: 테마 설정 (전체 너비) */}
+        {/* 두 번째 줄: 테마 설정 (전체 너비) */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-4 border-b border-slate-100 bg-slate-50/50">
             <div className="flex items-center gap-2">

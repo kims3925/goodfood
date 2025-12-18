@@ -150,7 +150,7 @@ export default function TermsPolicyListPage() {
 
   // 행 클릭 시 상세 페이지로 이동
   const handleRowClick = (id: number) => {
-    router.push(`/shop/policy/terms/${id}`)
+    router.push(`/shop/policy/terms/detail/${id}`)
   }
 
   const formatDate = (dateString: string) => {

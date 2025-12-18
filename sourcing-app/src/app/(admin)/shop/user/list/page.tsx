@@ -301,7 +301,7 @@ export default function UserListPage() {
                     <TableRow
                       key={user.id}
                       className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/shop/user/${user.id}`)}
+                      onClick={() => router.push(`/shop/user/detail/${user.id}`)}
                     >
                       <TableCell>
                         <span className="text-gray-500 text-sm">
