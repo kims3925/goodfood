@@ -410,7 +410,10 @@ export default function PublishPage() {
           setShowUnpublishConfirm(true)
         }
       } else {
-        // 채널(소매밴드) 발행 취소
+        // 채널(소매밴드) 발행 취소 - 비활성화 (로직은 유지)
+        // 소매밴드는 발행 취소 기능을 막아둠
+        return
+        /* 취소 로직 (비활성화됨)
         const channel = channels.find((c) => c.id === targetId)
         const publishId = getChannelPublishId(productId, targetId)
 
@@ -425,6 +428,7 @@ export default function PublishPage() {
           })
           setShowUnpublishConfirm(true)
         }
+        */
       }
       return
     }
@@ -1248,13 +1252,17 @@ export default function PublishPage() {
                                   selected
                                     ? 'bg-purple-500 hover:bg-purple-600 cursor-pointer ring-2 ring-purple-300'
                                     : published
-                                    ? 'bg-green-500 hover:bg-green-600 cursor-pointer'
+                                    ? (group.type === 'shop'
+                                        ? 'bg-green-500 hover:bg-green-600 cursor-pointer'
+                                        : 'bg-green-500 cursor-default')
                                     : !priceSet
                                     ? 'bg-amber-100 hover:bg-amber-200 cursor-pointer border-2 border-dashed border-amber-300'
                                     : 'bg-gray-200 hover:bg-gray-300 cursor-pointer'
                                 }`}
                                 title={`${product.name} → ${item.name}: ${
-                                  published ? '발행됨 (클릭하여 취소)' : !priceSet ? '가격 미설정 (설정 필요)' : '미발행'
+                                  published
+                                    ? (group.type === 'shop' ? '발행됨 (클릭하여 취소)' : '발행됨')
+                                    : !priceSet ? '가격 미설정 (설정 필요)' : '미발행'
                                 }`}
                               >
                                 {published && <Check size={16} className="text-white mx-auto" />}
