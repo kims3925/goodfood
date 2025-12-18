@@ -34,6 +34,7 @@ export interface ProductCreateInput {
   price?: number
   shippingFee?: number
   shippingInfo?: string
+  bundleMaxQty?: number  // 합배송 최대 수량
   thumbnailUrl?: string | null
   imageUrls?: string[]
   options?: OptionGroupInput[]
@@ -54,6 +55,7 @@ export interface ProductUpdateInput {
   price?: number
   shippingFee?: number
   shippingInfo?: string
+  bundleMaxQty?: number  // 합배송 최대 수량
   options?: OptionInput[]
   variants?: VariantInput[]
 }

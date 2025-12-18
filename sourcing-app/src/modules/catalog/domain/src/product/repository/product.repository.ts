@@ -197,6 +197,7 @@ export class ProductRepository {
         price: data.price || null,
         shippingFee: data.shippingFee || null,
         shippingInfo: data.shippingInfo || null,
+        bundleMaxQty: data.bundleMaxQty || 1,
         thumbnailUrl: data.thumbnailUrl || null,
         options: data.options?.length
           ? {
@@ -272,6 +273,7 @@ export class ProductRepository {
     if (data.price !== undefined) updateData.price = data.price
     if (data.shippingFee !== undefined) updateData.shippingFee = data.shippingFee
     if (data.shippingInfo !== undefined) updateData.shippingInfo = data.shippingInfo
+    if (data.bundleMaxQty !== undefined) updateData.bundleMaxQty = data.bundleMaxQty
 
     if (data.options !== undefined) {
       await prisma.productOption.deleteMany({ where: { productId: id } })

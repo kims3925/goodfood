@@ -242,17 +242,23 @@ ${pricingRule}
 
 ---
 
-## 5. 배송비 추출
+## 5. 배송비 및 합배송 추출
 
-### 인식 패턴
+### 배송비 인식 패턴
 포함: "택배비 포함", "배송비 포함", "무료배송"
 별도: "배송비 별도 3,000원", "택배비 4,000원"
 조건: "2박스 이상 무료", "5만원 이상 무배"
 
+### 합배송 인식 패턴
+"3세트까지 합배송", "합배송 3개", "묶음배송 2개까지"
+"2세트 이상 배송비 할인", "3박스 동봉 가능"
+
 ### 추출 규칙
-- 금액이 명시되면 숫자로 추출
+- 배송비 금액이 명시되면 숫자로 추출
 - "포함/무료"면 shippingFee: 0
 - 정보 없으면 null
+- 합배송 최대 수량 추출 (숫자로 명시된 경우)
+- 합배송 언급 없으면 bundleMaxQty: 1 (합배송 불가)
 
 ---
 
@@ -299,7 +305,8 @@ ${pricingRule}
   ],
   "shipping": {
     "shippingFee": number 또는 null,
-    "shippingInfo": "string 또는 null"
+    "shippingInfo": "string 또는 null",
+    "bundleMaxQty": number (기본값 1, 합배송 가능하면 2 이상)
   },
   "validImages": ["사용 가능한 이미지 URL 목록"],
   "excludedImages": [
@@ -342,7 +349,7 @@ ${pricingRule}
     { "optionSummary": "얼치기 5미", "options": { "규격": "얼치기 5미" }, "wholesalePrice": 32500, "price": 32500 },
     { "optionSummary": "소낙지 10미", "options": { "규격": "소낙지 10미" }, "wholesalePrice": 70000, "price": 70000 }
   ],
-  "shipping": { "shippingFee": 5000, "shippingInfo": "택배비 별도 5,000원" },
+  "shipping": { "shippingFee": 5000, "shippingInfo": "택배비 별도 5,000원", "bundleMaxQty": 1 },
   "validImages": [],
   "excludedImages": []
 }
@@ -374,7 +381,7 @@ ${pricingRule}
   "variants": [
     { "optionSummary": "10kg", "options": { "규격": "10kg" }, "wholesalePrice": 39000, "price": 39000 }
   ],
-  "shipping": { "shippingFee": null, "shippingInfo": null },
+  "shipping": { "shippingFee": null, "shippingInfo": null, "bundleMaxQty": 1 },
   "validImages": [],
   "excludedImages": []
 }
@@ -858,6 +865,9 @@ function parseAiResponse(aiResponse: AiResponse): AiProductAnalysis {
     const shippingInfo = typeof parsed.shipping?.shippingInfo === 'string'
       ? parsed.shipping.shippingInfo
       : null
+    const bundleMaxQty = typeof parsed.shipping?.bundleMaxQty === 'number'
+      ? parsed.shipping.bundleMaxQty
+      : 1 // 기본값: 합배송 불가
 
     // Build analysis result
     const analysis: AiProductAnalysis = {
@@ -877,6 +887,7 @@ function parseAiResponse(aiResponse: AiResponse): AiProductAnalysis {
       shipping: {
         shippingFee,
         shippingInfo,
+        bundleMaxQty,
       },
       rawResponse: aiResponse.content,
     }
@@ -1053,6 +1064,7 @@ function buildProductDraft(
     price: sellingPrice, // 판매가 (정책 적용된 가격)
     shippingFee: analysis.shipping?.shippingFee ?? undefined,
     shippingInfo: analysis.shipping?.shippingInfo ?? undefined,
+    bundleMaxQty: analysis.shipping?.bundleMaxQty ?? 1,
     options: analysis.options,
     variants,
   }
@@ -1310,17 +1322,23 @@ ${pricingRule}
 
 ---
 
-## 5. 배송비 추출
+## 5. 배송비 및 합배송 추출
 
-### 인식 패턴
+### 배송비 인식 패턴
 포함: "택배비 포함", "배송비 포함", "무료배송"
 별도: "배송비 별도 3,000원", "택배비 4,000원"
 조건: "2박스 이상 무료", "5만원 이상 무배"
 
+### 합배송 인식 패턴
+"3세트까지 합배송", "합배송 3개", "묶음배송 2개까지"
+"2세트 이상 배송비 할인", "3박스 동봉 가능"
+
 ### 추출 규칙
-- 금액이 명시되면 숫자로 추출
+- 배송비 금액이 명시되면 숫자로 추출
 - "포함/무료"면 shippingFee: 0
 - 정보 없으면 null
+- 합배송 최대 수량 추출 (숫자로 명시된 경우)
+- 합배송 언급 없으면 bundleMaxQty: 1 (합배송 불가)
 
 ---
 
@@ -1469,6 +1487,9 @@ function parseIndividualResult(item: any): AiProductAnalysis {
   const shippingInfo = typeof item.shipping?.shippingInfo === 'string'
     ? item.shipping.shippingInfo
     : null
+  const bundleMaxQty = typeof item.shipping?.bundleMaxQty === 'number'
+    ? item.shipping.bundleMaxQty
+    : 1
 
   return {
     productName: item.productName,
@@ -1487,6 +1508,7 @@ function parseIndividualResult(item: any): AiProductAnalysis {
     shipping: {
       shippingFee,
       shippingInfo,
+      bundleMaxQty,
     },
     rawResponse: JSON.stringify(item),
   }

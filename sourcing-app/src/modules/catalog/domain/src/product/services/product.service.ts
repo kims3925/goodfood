@@ -22,6 +22,7 @@ export class ProductService {
     let variants: VariantInput[] = data.variants || []
     let shippingFee: number | undefined = data.shippingFee ?? undefined
     let shippingInfo: string | undefined = data.shippingInfo ?? undefined
+    let bundleMaxQty: number | undefined = data.bundleMaxQty ?? undefined
     let categoryId: string | undefined = data.categoryId ?? undefined
     let wholesalePrice: number | undefined = data.wholesalePrice ?? undefined
     let price: number | undefined = data.price ?? undefined
@@ -82,6 +83,15 @@ export class ProductService {
             }
           }
 
+          // bundleMaxQty: 요청에 없으면 rawMetadata에서 추출
+          if (bundleMaxQty === undefined) {
+            if (metadata.shipping?.bundleMaxQty !== undefined) {
+              bundleMaxQty = metadata.shipping.bundleMaxQty
+            } else if (metadata.bundleMaxQty !== undefined) {
+              bundleMaxQty = metadata.bundleMaxQty
+            }
+          }
+
           // categoryId: 요청에 없으면 rawMetadata에서 추출
           if (!categoryId && metadata.category) {
             categoryId = metadata.category
@@ -111,6 +121,7 @@ export class ProductService {
       variants,
       shippingFee,
       shippingInfo,
+      bundleMaxQty,
       categoryId,
       wholesalePrice,
       price,

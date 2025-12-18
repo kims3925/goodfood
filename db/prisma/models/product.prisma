@@ -13,6 +13,7 @@ model Product {
   updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamp(0)
   shippingFee       Int?               @map("shipping_fee")
   shippingInfo      String?            @map("shipping_info") @db.Text
+  bundleMaxQty      Int?               @default(1) @map("bundle_max_qty") // 합배송 최대 수량
   channel           Channel?           @relation(fields: [channelId], references: [id])
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   images            ProductImage[]

@@ -355,16 +355,38 @@ function CheckoutContent() {
         const mainVariant = product.variants?.[0]
         const images = product.post?.images?.map((img: any) => img.url) || []
 
+        // 합배송 옵션 계산 (shop product API와 동일한 로직)
+        const shippingFee = product.shippingFee ?? 0
+        const bundleMaxQty = product.bundleMaxQty ?? 1
+        const variantPrice = mainVariant?.price || 0
+        const priceWithShipping = variantPrice + shippingFee
+
+        let bundleOptions: any[] = []
+        if (bundleMaxQty > 1 && shippingFee > 0) {
+          for (let qty = 1; qty <= bundleMaxQty; qty++) {
+            const totalPrice = (variantPrice * qty) + shippingFee
+            const fullPrice = priceWithShipping * qty
+            const discount = fullPrice - totalPrice
+            bundleOptions.push({
+              qty,
+              totalPrice,
+              discount,
+              unitPrice: Math.round(totalPrice / qty),
+            })
+          }
+        }
+
         setProduct({
           id: product.id,
           publishedProductId: pp.id,
           title: product.name,
           description: product.description || '',
           images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
-          originalPrice: mainVariant?.price || 0,
-          salePrice: mainVariant?.price || 0,
+          originalPrice: priceWithShipping,
+          salePrice: priceWithShipping,
           category: product.categoryId || '',
-          stock: mainVariant?.stock || 100
+          stock: mainVariant?.stock || 100,
+          bundleOptions,
         })
       } else {
         setProduct({
@@ -675,17 +697,35 @@ function CheckoutContent() {
 
   // 계산
   let subtotal = 0
+  let originalSubtotal = 0 // 할인 전 원가 (표시용)
   let orderItemCount = 0
   let orderName = ''
+  let bundleDiscount = 0
 
   if (fromCart && cartItems.length > 0) {
     subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    originalSubtotal = subtotal
     orderItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
     orderName = cartItems.length > 1
       ? `${cartItems[0].name} 외 ${cartItems.length - 1}건`
       : cartItems[0].name
   } else if (product) {
-    subtotal = product.salePrice * quantity
+    // 합배송 옵션이 있으면 해당 가격 사용
+    if (product.bundleOptions && product.bundleOptions.length > 0) {
+      const bundleOption = product.bundleOptions.find((opt: any) => opt.qty === quantity)
+      if (bundleOption) {
+        originalSubtotal = product.salePrice * quantity // 할인 전 가격
+        subtotal = bundleOption.totalPrice // 할인 후 가격
+        bundleDiscount = bundleOption.discount
+      } else {
+        // 수량에 맞는 옵션이 없으면 기본 계산
+        subtotal = product.salePrice * quantity
+        originalSubtotal = subtotal
+      }
+    } else {
+      subtotal = product.salePrice * quantity
+      originalSubtotal = subtotal
+    }
     orderItemCount = quantity
     orderName = product.title
   }
@@ -1392,12 +1432,18 @@ function CheckoutContent() {
                       <div className="space-y-3">
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">상품금액</span>
-                          <span className="text-gray-900">{formatPrice(subtotal)}원</span>
+                          <span className="text-gray-900">{formatPrice(originalSubtotal)}원</span>
                         </div>
+                        {bundleDiscount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">합배송 할인</span>
+                            <span className="text-[#FF6B6B]">-{formatPrice(bundleDiscount)}원</span>
+                          </div>
+                        )}
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">배송비</span>
                           <span className={shippingFee === 0 ? 'text-[#FF6B6B]' : 'text-gray-900'}>
-                            {shippingFee > 0 ? `+${formatPrice(shippingFee)}원` : '무료'}
+                            {shippingFee > 0 ? `+${formatPrice(shippingFee)}원` : '포함'}
                           </span>
                         </div>
                         {couponDiscount > 0 && (

@@ -20,6 +20,7 @@ export default function ProductDetailClient() {
   const [quantity, setQuantity] = useState(1)
   const [selectedImage, setSelectedImage] = useState(0)
   const [selectedVariant, setSelectedVariant] = useState<any>(null)
+  const [selectedBundleQty, setSelectedBundleQty] = useState(1) // 합배송 선택 수량
   const [activeTab, setActiveTab] = useState('detail')
   const [isLoading, setIsLoading] = useState(true)
   const [isWishlisted, setIsWishlisted] = useState(false)
@@ -423,41 +424,105 @@ export default function ProductDetailClient() {
                 </div>
               )}
 
-              {/* Quantity */}
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                <label className="text-sm font-medium text-gray-700">수량</label>
-                <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
-                  <button
-                    onClick={() => handleQuantityChange('decrease')}
-                    className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
-                  >
-                    <Minus className="h-4 w-4 text-gray-600" />
-                  </button>
-                  <span className="w-14 text-center font-semibold text-gray-900">{quantity}</span>
-                  <button
-                    onClick={() => handleQuantityChange('increase')}
-                    className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
-                  >
-                    <Plus className="h-4 w-4 text-gray-600" />
-                  </button>
+              {/* 합배송 옵션 or 일반 수량 선택 */}
+              {product.bundleOptions && product.bundleOptions.length > 0 ? (
+                // 합배송 가능 상품: 드롭다운 선택
+                <div className="pt-3 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">수량 선택 (합배송)</label>
+                    {(() => {
+                      const opt = product.bundleOptions.find((o: any) => o.qty === selectedBundleQty)
+                      return opt?.discount > 0 && (
+                        <span className="text-sm text-[#FF6B6B] font-medium">-{formatPrice(opt.discount)}원 할인</span>
+                      )
+                    })()}
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={selectedBundleQty}
+                      onChange={(e) => {
+                        const qty = parseInt(e.target.value)
+                        setSelectedBundleQty(qty)
+                        setQuantity(qty)
+                      }}
+                      className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-3.5 pr-10 text-gray-900 bg-gray-50 hover:border-gray-300 focus:border-[#FF6B6B] focus:ring-2 focus:ring-[#FF6B6B]/20 outline-none transition-all cursor-pointer"
+                    >
+                      {product.bundleOptions.map((option: any) => (
+                        <option key={option.qty} value={option.qty}>
+                          {option.label} - {formatPrice(option.totalPrice)}원
+                          {option.discount > 0 ? ` (배송비 -${formatPrice(option.discount)}원)` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                // 일반 상품: 수량 선택
+                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                  <label className="text-sm font-medium text-gray-700">수량</label>
+                  <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
+                    <button
+                      onClick={() => handleQuantityChange('decrease')}
+                      className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                    >
+                      <Minus className="h-4 w-4 text-gray-600" />
+                    </button>
+                    <span className="w-14 text-center font-semibold text-gray-900">{quantity}</span>
+                    <button
+                      onClick={() => handleQuantityChange('increase')}
+                      className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                    >
+                      <Plus className="h-4 w-4 text-gray-600" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Price Summary */}
             <div className="bg-gradient-to-r from-[#FFF5F5] to-[#FFF0F0] rounded-xl p-5">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-xs text-gray-500">
-                    {formatPrice(currentPrice)}원 × {quantity}개
-                  </p>
-                  <p className="text-sm font-medium text-gray-600">총 상품금액</p>
+              {product.bundleOptions && product.bundleOptions.length > 0 ? (
+                // 합배송 가격 표시
+                (() => {
+                  const bundleOption = product.bundleOptions.find((opt: any) => opt.qty === selectedBundleQty)
+                  return (
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-xs text-gray-500">
+                          {bundleOption?.label || `${selectedBundleQty}개`}
+                        </p>
+                        <p className="text-sm font-medium text-gray-600">총 상품금액</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-3xl font-bold text-[#FF6B6B]">
+                          {formatPrice(bundleOption?.totalPrice || currentPrice * quantity)}
+                        </span>
+                        <span className="text-lg text-[#FF6B6B] ml-1">원</span>
+                        {bundleOption?.discount > 0 && (
+                          <p className="text-sm text-[#FF6B6B] font-medium mt-1">
+                            배송비 할인 -{formatPrice(bundleOption.discount)}원
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()
+              ) : (
+                // 일반 가격 표시
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500">
+                      {formatPrice(currentPrice)}원 × {quantity}개
+                    </p>
+                    <p className="text-sm font-medium text-gray-600">총 상품금액</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-3xl font-bold text-[#FF6B6B]">{formatPrice(currentPrice * quantity)}</span>
+                    <span className="text-lg text-[#FF6B6B] ml-1">원</span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-3xl font-bold text-[#FF6B6B]">{formatPrice(currentPrice * quantity)}</span>
-                  <span className="text-lg text-[#FF6B6B] ml-1">원</span>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Action Buttons */}

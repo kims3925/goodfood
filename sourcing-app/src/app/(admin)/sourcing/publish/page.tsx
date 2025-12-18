@@ -282,10 +282,10 @@ export default function PublishPage() {
         label: '쇼핑몰',
         icon: <ShoppingCart size={16} />,
         items: [],
-        headerBgColor: 'bg-purple-100',
-        headerTextColor: 'text-purple-800',
-        cellBgColor: 'bg-purple-50/30',
-        badgeColor: 'bg-purple-500',
+        headerBgColor: 'bg-blue-100',
+        headerTextColor: 'text-blue-800',
+        cellBgColor: 'bg-blue-50/30',
+        badgeColor: 'bg-blue-500',
       },
       {
         type: 'channel',
@@ -293,10 +293,10 @@ export default function PublishPage() {
         label: '소매밴드',
         icon: <BandIcon size={16} />,
         items: [],
-        headerBgColor: 'bg-blue-100',
-        headerTextColor: 'text-blue-800',
-        cellBgColor: 'bg-blue-50/30',
-        badgeColor: 'bg-blue-500',
+        headerBgColor: 'bg-green-100',
+        headerTextColor: 'text-green-800',
+        cellBgColor: 'bg-green-50/30',
+        badgeColor: 'bg-green-500',
       },
       {
         type: 'channel',
@@ -1001,26 +1001,26 @@ export default function PublishPage() {
             </div>
           </div>
           {/* 쇼핑몰 카드 */}
-          <div className="bg-white rounded-lg shadow-sm border-2 border-purple-200 p-4">
+          <div className="bg-white rounded-lg shadow-sm border-2 border-blue-200 p-4">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <ShoppingCart size={24} className="text-purple-600" />
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <ShoppingCart size={24} className="text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-purple-600 font-medium">쇼핑몰</p>
-                <p className="text-2xl font-bold text-purple-700">{stats.totalShops}</p>
+                <p className="text-sm text-blue-600 font-medium">쇼핑몰</p>
+                <p className="text-2xl font-bold text-blue-700">{stats.totalShops}</p>
               </div>
             </div>
           </div>
           {/* 소매채널 카드 */}
-          <div className="bg-white rounded-lg shadow-sm border-2 border-blue-200 p-4">
+          <div className="bg-white rounded-lg shadow-sm border-2 border-green-200 p-4">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <BandIcon size={24} className="text-blue-600" />
+              <div className="p-3 bg-green-100 rounded-lg">
+                <BandIcon size={24} className="text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-blue-600 font-medium">소매채널</p>
-                <p className="text-2xl font-bold text-blue-700">{stats.totalChannels}</p>
+                <p className="text-sm text-green-600 font-medium">소매채널</p>
+                <p className="text-2xl font-bold text-green-700">{stats.totalChannels}</p>
               </div>
             </div>
           </div>
@@ -1042,17 +1042,17 @@ export default function PublishPage() {
             disabled={selectedUnpublishedCount === 0 || isPublishing}
             className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
               selectedUnpublishedCount > 0 && !isPublishing
-                ? 'hover:border-purple-300 hover:bg-purple-50 cursor-pointer'
+                ? 'hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
                 : 'opacity-50 cursor-not-allowed'
             }`}
           >
             <div className="flex items-center gap-3">
-              <div className={`p-3 rounded-lg ${selectedUnpublishedCount > 0 ? 'bg-purple-100' : 'bg-gray-100'}`}>
-                <Send size={24} className={selectedUnpublishedCount > 0 ? 'text-purple-600' : 'text-gray-400'} />
+              <div className={`p-3 rounded-lg ${selectedUnpublishedCount > 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                <Send size={24} className={selectedUnpublishedCount > 0 ? 'text-blue-600' : 'text-gray-400'} />
               </div>
               <div>
                 <p className="text-sm text-gray-500">선택 발행</p>
-                <p className={`text-lg font-bold ${selectedUnpublishedCount > 0 ? 'text-purple-600' : 'text-gray-400'}`}>
+                <p className={`text-lg font-bold ${selectedUnpublishedCount > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
                   {selectedUnpublishedCount}개 선택됨
                 </p>
               </div>
@@ -1745,7 +1745,7 @@ export default function PublishPage() {
                         <p className="text-xs text-gray-500 flex items-center gap-1">
                           <span>→</span>
                           <span className={`px-1.5 py-0.5 rounded text-xs ${
-                            item.targetType === 'shop' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                            item.targetType === 'shop' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
                           }`}>
                             {item.targetType === 'shop' ? 'Shop' : '밴드'}
                           </span>
