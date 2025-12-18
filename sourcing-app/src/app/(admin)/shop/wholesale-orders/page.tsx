@@ -666,12 +666,16 @@ export default function WholesaleOrdersPage() {
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-200">
                           <th className="text-center py-4 px-3 w-12">
-                            <input
-                              type="checkbox"
-                              checked={!!isAllSelected}
-                              onChange={toggleSelectAll}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                            />
+                            <div className="flex flex-col items-center gap-1">
+                              <input
+                                type="checkbox"
+                                checked={!!isAllSelected}
+                                onChange={toggleSelectAll}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                title="전체 주문 선택"
+                              />
+                              <span className="text-[10px] text-gray-500">주문</span>
+                            </div>
                           </th>
                           <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">상품명</th>
                           <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">옵션</th>
@@ -697,10 +701,18 @@ export default function WholesaleOrdersPage() {
 
                           return (
                             <>
-                              {/* 주문 헤더 행 (그룹의 첫 번째 아이템일 때만 표시) */}
+                              {/* 주문 헤더 행 (그룹의 첫 번째 아이템일 때만 표시) - 체크박스 포함 */}
                               {isFirstInGroup && (
-                                <tr key={`header-${item.orderId}-${item.isMember}`} className="bg-gray-100/50 border-b border-gray-200">
-                                  <td colSpan={10} className={`py-2 px-5 border-l-4 ${colors.border}`}>
+                                <tr key={`header-${item.orderId}-${item.isMember}`} className={`bg-gray-100/50 border-b border-gray-200 ${isSelected ? 'bg-blue-100/50' : ''}`}>
+                                  <td className={`py-2 px-3 border-l-4 ${colors.border}`}>
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => toggleOrderSelection(item)}
+                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                    />
+                                  </td>
+                                  <td colSpan={9} className="py-2 px-2">
                                     <div className="flex items-center gap-4 text-xs">
                                       <span className="font-semibold text-gray-700">
                                         주문번호: {metadata?.orderNumber}
@@ -716,24 +728,17 @@ export default function WholesaleOrdersPage() {
                                 </tr>
                               )}
 
-                              {/* 실제 상품 행 */}
+                              {/* 실제 상품 행 - 체크박스 없음 */}
                               <tr
                                 key={item.orderItemId}
                                 className={`
                                   border-b border-gray-100
                                   ${idx % 2 === 1 ? 'bg-gray-50/50' : ''}
                                   ${isSelected ? 'bg-blue-50' : colors.bg}
-                                  ${isFirstInGroup ? `border-l-4 ${colors.border}` : 'border-l-4 border-transparent'}
+                                  ${`border-l-4 ${colors.border}`}
                                 `}
                               >
-                                <td className="text-center py-4 px-3">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedOrders.has(`${item.orderId}-${item.isMember}`)}
-                                    onChange={() => toggleOrderSelection(item)}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                                  />
-                                </td>
+                                <td className="py-4 px-3"></td>
                                 <td className="py-4 px-5 text-sm text-gray-900 max-w-[200px] truncate" title={item.productName}>
                                   {item.productName}
                                 </td>
