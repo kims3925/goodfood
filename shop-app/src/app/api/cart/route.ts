@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { publishedProductId, variantId, quantity = 1, sessionId: bodySessionId } = body
+    const { publishedProductId, variantId, quantity = 1, sessionId: bodySessionId, isBundleItem = false } = body
 
     if (!publishedProductId) {
       return NextResponse.json(
@@ -127,6 +127,7 @@ export async function POST(req: NextRequest) {
         publishedProductId: parseInt(publishedProductId),
         variantId: variantId ? parseInt(variantId) : undefined,
         quantity: parseInt(quantity),
+        isBundleItem, // 묶음 상품 플래그 전달
       },
       userId,
       shopId

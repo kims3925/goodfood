@@ -4,24 +4,20 @@ import Link from 'next/link'
 
 interface OrderSummaryProps {
   subtotal: number
-  shippingFee: number
   discount?: number
-  freeShippingAmount?: number | null // Shop의 무료배송 기준액 (필수 설정)
   onCheckout?: () => void
 }
 
 export default function OrderSummary({
   subtotal,
-  shippingFee,
   discount = 0,
-  freeShippingAmount,
   onCheckout,
 }: OrderSummaryProps) {
   const formatPrice = (value: number) => {
     return value.toLocaleString('ko-KR')
   }
 
-  const total = subtotal + shippingFee - discount
+  const total = subtotal - discount
 
   return (
     <div className="order-summary">
@@ -35,13 +31,7 @@ export default function OrderSummary({
 
       <div className="order-summary-row">
         <span className="text-gray-600">배송비</span>
-        <span className="font-medium text-gray-900">
-          {shippingFee === 0 ? (
-            <span className="text-primary-600">무료</span>
-          ) : (
-            `${formatPrice(shippingFee)}원`
-          )}
-        </span>
+        <span className="font-medium text-primary-600">포함</span>
       </div>
 
       {discount > 0 && (
@@ -56,18 +46,6 @@ export default function OrderSummary({
         <span>결제예정금액</span>
         <span className="text-primary-600">{formatPrice(total)}원</span>
       </div>
-
-      {/* Free Shipping Notice */}
-      {shippingFee > 0 && freeShippingAmount != null && subtotal < freeShippingAmount && (
-        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-          <p className="text-xs text-gray-600">
-            <span className="font-medium text-primary-600">
-              {formatPrice(freeShippingAmount - subtotal)}원
-            </span>{' '}
-            더 구매하시면 무료배송!
-          </p>
-        </div>
-      )}
 
       {/* Checkout Button */}
       <div className="mt-6 space-y-3">

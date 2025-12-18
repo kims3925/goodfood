@@ -243,34 +243,88 @@ export default function ProductDetailClient() {
         localStorage.setItem('sessionId', sessionId)
       }
 
-      const cartData = {
-        sessionId,
-        publishedProductId: product.publishedProductId,
-        variantId: selectedVariant.id,
-        quantity
-      }
+      // 합배송 상품인 경우 묶음 단위로 분리
+      const bundleMaxQty = product.bundleMaxQty || (product.bundleOptions?.length || 0)
+      const hasBundleOptions = product.bundleOptions && product.bundleOptions.length > 0 && bundleMaxQty > 1
 
-      const response = await fetch(getApiPath('/api/cart'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(cartData)
-      })
+      if (hasBundleOptions && quantity > 0) {
+        // 묶음 단위로 분리해서 장바구니에 추가
+        const fullBundles = Math.floor(quantity / bundleMaxQty)
+        const remainder = quantity % bundleMaxQty
+        const cartItems: { quantity: number }[] = []
 
-      const data = await response.json()
+        // 풀번들 추가
+        for (let i = 0; i < fullBundles; i++) {
+          cartItems.push({ quantity: bundleMaxQty })
+        }
 
-      if (data.success) {
-        // 장바구니 수량 업데이트
-        await refreshCartCount()
+        // 나머지 수량 추가
+        if (remainder > 0) {
+          cartItems.push({ quantity: remainder })
+        }
 
-        // 알림 버블 표시
-        showNotification({
-          title: product.title,
-          image: product.images?.[0] || '/images/placeholder.png',
-          quantity: quantity,
-          isExisting: data.isExisting // API에서 이미 담긴 상품인지 여부 반환
+        // 각 묶음을 개별 장바구니 아이템으로 추가
+        let totalAdded = 0
+        for (const item of cartItems) {
+          const cartData = {
+            sessionId,
+            publishedProductId: product.publishedProductId,
+            variantId: selectedVariant.id,
+            quantity: item.quantity,
+            isBundleItem: true // 묶음 상품 표시
+          }
+
+          const response = await fetch(getApiPath('/api/cart'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(cartData)
+          })
+
+          const data = await response.json()
+          if (data.success) {
+            totalAdded += item.quantity
+          }
+        }
+
+        if (totalAdded > 0) {
+          await refreshCartCount()
+          showNotification({
+            title: product.title,
+            image: product.images?.[0] || '/images/placeholder.png',
+            quantity: totalAdded,
+            isExisting: false
+          })
+        }
+      } else {
+        // 일반 상품: 기존 로직
+        const cartData = {
+          sessionId,
+          publishedProductId: product.publishedProductId,
+          variantId: selectedVariant.id,
+          quantity
+        }
+
+        const response = await fetch(getApiPath('/api/cart'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(cartData)
         })
+
+        const data = await response.json()
+
+        if (data.success) {
+          await refreshCartCount()
+          showNotification({
+            title: product.title,
+            image: product.images?.[0] || '/images/placeholder.png',
+            quantity: quantity,
+            isExisting: data.isExisting
+          })
+        }
       }
     } catch (error) {
       console.error('장바구니 추가 오류:', error)
@@ -426,35 +480,75 @@ export default function ProductDetailClient() {
 
               {/* 합배송 옵션 or 일반 수량 선택 */}
               {product.bundleOptions && product.bundleOptions.length > 0 ? (
-                // 합배송 가능 상품: 드롭다운 선택
+                // 합배송 가능 상품: +/- 버튼으로 수량 선택
                 <div className="pt-3 border-t border-gray-100">
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">수량 선택 (합배송)</label>
+                    <label className="text-sm font-medium text-gray-700">수량</label>
                     {(() => {
-                      const opt = product.bundleOptions.find((o: any) => o.qty === selectedBundleQty)
-                      return opt?.discount > 0 && (
-                        <span className="text-sm text-[#FF6B6B] font-medium">-{formatPrice(opt.discount)}원 할인</span>
+                      // 절약 금액 계산 (묶음 단위로)
+                      const bundleMaxQty = product.bundleMaxQty || product.bundleOptions.length
+                      const fullBundles = Math.floor(quantity / bundleMaxQty)
+                      const remainder = quantity % bundleMaxQty
+                      let totalSavings = 0
+
+                      // 각 풀번들의 절약금액
+                      if (fullBundles > 0) {
+                        const maxBundleOption = product.bundleOptions.find((o: any) => o.qty === bundleMaxQty)
+                        if (maxBundleOption) {
+                          totalSavings += fullBundles * maxBundleOption.discount
+                        }
+                      }
+                      // 나머지 수량의 절약금액
+                      if (remainder > 1) {
+                        const remainderOption = product.bundleOptions.find((o: any) => o.qty === remainder)
+                        if (remainderOption) {
+                          totalSavings += remainderOption.discount
+                        }
+                      }
+
+                      return totalSavings > 0 && (
+                        <span className="text-sm text-[#FF6B6B] font-medium">{formatPrice(totalSavings)}원 절약!</span>
                       )
                     })()}
                   </div>
-                  <div className="relative">
-                    <select
-                      value={selectedBundleQty}
-                      onChange={(e) => {
-                        const qty = parseInt(e.target.value)
-                        setSelectedBundleQty(qty)
-                        setQuantity(qty)
-                      }}
-                      className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-3.5 pr-10 text-gray-900 bg-gray-50 hover:border-gray-300 focus:border-[#FF6B6B] focus:ring-2 focus:ring-[#FF6B6B]/20 outline-none transition-all cursor-pointer"
-                    >
-                      {product.bundleOptions.map((option: any) => (
-                        <option key={option.qty} value={option.qty}>
-                          {option.label} - {formatPrice(option.totalPrice)}원
-                          {option.discount > 0 ? ` (배송비 -${formatPrice(option.discount)}원)` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
+                      <button
+                        onClick={() => quantity > 1 && setQuantity(quantity - 1)}
+                        className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                      >
+                        <Minus className="h-4 w-4 text-gray-600" />
+                      </button>
+                      <span className="w-14 text-center font-semibold text-gray-900">{quantity}</span>
+                      <button
+                        onClick={() => setQuantity(quantity + 1)}
+                        className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                      >
+                        <Plus className="h-4 w-4 text-gray-600" />
+                      </button>
+                    </div>
+                    {/* 묶음 단위 표시 */}
+                    {(() => {
+                      const bundleMaxQty = product.bundleMaxQty || product.bundleOptions.length
+                      const fullBundles = Math.floor(quantity / bundleMaxQty)
+                      const remainder = quantity % bundleMaxQty
+
+                      if (quantity > bundleMaxQty || (fullBundles >= 1 && remainder > 0)) {
+                        const parts = []
+                        if (fullBundles > 0) {
+                          parts.push(`${bundleMaxQty}개 × ${fullBundles}`)
+                        }
+                        if (remainder > 0) {
+                          parts.push(`${remainder}개`)
+                        }
+                        return (
+                          <span className="text-xs text-gray-500">
+                            ({parts.join(' + ')})
+                          </span>
+                        )
+                      }
+                      return null
+                    })()}
                   </div>
                 </div>
               ) : (
@@ -483,25 +577,69 @@ export default function ProductDetailClient() {
             {/* Price Summary */}
             <div className="bg-gradient-to-r from-[#FFF5F5] to-[#FFF0F0] rounded-xl p-5">
               {product.bundleOptions && product.bundleOptions.length > 0 ? (
-                // 합배송 가격 표시
+                // 합배송 가격 표시 (묶음 단위로 계산)
                 (() => {
-                  const bundleOption = product.bundleOptions.find((opt: any) => opt.qty === selectedBundleQty)
+                  const bundleMaxQty = product.bundleMaxQty || product.bundleOptions.length
+                  const fullBundles = Math.floor(quantity / bundleMaxQty)
+                  const remainder = quantity % bundleMaxQty
+
+                  // 총 가격 계산
+                  let totalPrice = 0
+                  let totalSavings = 0
+                  const priceBreakdown: string[] = []
+
+                  // 풀번들 가격
+                  if (fullBundles > 0) {
+                    const maxBundleOption = product.bundleOptions.find((o: any) => o.qty === bundleMaxQty)
+                    if (maxBundleOption) {
+                      totalPrice += fullBundles * maxBundleOption.totalPrice
+                      totalSavings += fullBundles * maxBundleOption.discount
+                      if (fullBundles === 1) {
+                        priceBreakdown.push(`${bundleMaxQty}개 ${formatPrice(maxBundleOption.totalPrice)}원`)
+                      } else {
+                        priceBreakdown.push(`${bundleMaxQty}개 × ${fullBundles} = ${formatPrice(fullBundles * maxBundleOption.totalPrice)}원`)
+                      }
+                    }
+                  }
+
+                  // 나머지 가격
+                  if (remainder > 0) {
+                    const remainderOption = product.bundleOptions.find((o: any) => o.qty === remainder)
+                    if (remainderOption) {
+                      totalPrice += remainderOption.totalPrice
+                      if (remainder > 1) {
+                        totalSavings += remainderOption.discount
+                      }
+                      priceBreakdown.push(`${remainder}개 ${formatPrice(remainderOption.totalPrice)}원`)
+                    }
+                  }
+
+                  // 단일 수량인 경우
+                  if (quantity === 1) {
+                    const singleOption = product.bundleOptions.find((o: any) => o.qty === 1)
+                    if (singleOption && totalPrice === 0) {
+                      totalPrice = singleOption.totalPrice
+                    }
+                  }
+
                   return (
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <p className="text-xs text-gray-500">
-                          {bundleOption?.label || `${selectedBundleQty}개`}
+                          {priceBreakdown.length > 1
+                            ? priceBreakdown.join(' + ')
+                            : `${quantity}개`}
                         </p>
                         <p className="text-sm font-medium text-gray-600">총 상품금액</p>
                       </div>
                       <div className="text-right">
                         <span className="text-3xl font-bold text-[#FF6B6B]">
-                          {formatPrice(bundleOption?.totalPrice || currentPrice * quantity)}
+                          {formatPrice(totalPrice)}
                         </span>
                         <span className="text-lg text-[#FF6B6B] ml-1">원</span>
-                        {bundleOption?.discount > 0 && (
-                          <p className="text-sm text-[#FF6B6B] font-medium mt-1">
-                            배송비 할인 -{formatPrice(bundleOption.discount)}원
+                        {totalSavings > 0 && (
+                          <p className="text-sm text-green-600 font-medium mt-1">
+                            {formatPrice(totalSavings)}원 절약!
                           </p>
                         )}
                       </div>

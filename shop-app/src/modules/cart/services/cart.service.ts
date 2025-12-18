@@ -56,6 +56,7 @@ export interface AddToCartDTO {
   publishedProductId: number
   variantId?: number
   quantity?: number
+  isBundleItem?: boolean // 묶음 상품 여부 (true면 기존 아이템과 합치지 않고 새로 추가)
 }
 
 // 장바구니 조회에 필요한 include 옵션
@@ -253,6 +254,7 @@ export class CartService {
 
   /**
    * 장바구니 데이터 포맷팅
+   * 배송비가 상품 가격에 포함되어 계산됨
    */
   formatCart(cart: any): CartResponse {
     const items: CartItemResponse[] = cart.items.map((item: any) => {
@@ -261,6 +263,24 @@ export class CartService {
       const variant = item.variant
       const mainVariant = product?.variants[0]
       const image = product.images?.[0]?.url || product.thumbnailUrl || '/placeholder.jpg'
+
+      const basePrice = variant?.price || mainVariant?.price || 0
+      const shippingFee = product.shippingFee || 0
+      const bundleMaxQty = product.bundleMaxQty || 1
+      const quantity = item.quantity
+
+      // 가격 계산: 배송비가 상품 가격에 포함
+      // 합배송 상품인 경우 (bundleMaxQty > 1 && shippingFee > 0): (소매가 * 수량 + 배송비) / 수량
+      // 일반 상품인 경우: 소매가 + 배송비
+      let unitPrice = basePrice
+      if (bundleMaxQty > 1 && shippingFee > 0) {
+        // 합배송 상품: 수량에 따른 단가 계산
+        const totalPrice = (basePrice * quantity) + shippingFee
+        unitPrice = Math.round(totalPrice / quantity)
+      } else if (shippingFee > 0) {
+        // 일반 상품: 배송비 포함
+        unitPrice = basePrice + shippingFee
+      }
 
       return {
         id: item.id,
@@ -275,11 +295,11 @@ export class CartService {
         name: product.name,
         optionSummary: variant?.optionSummary || null,
         image,
-        price: variant?.price || mainVariant?.price || 0,
+        price: unitPrice,
         quantity: item.quantity,
         stock: variant?.stock || mainVariant?.stock || 100,
-        // 배송 정보
-        shippingFee: product.shippingFee,
+        // 배송 정보 (참조용으로 유지)
+        shippingFee: shippingFee,
       }
     })
 
@@ -287,17 +307,9 @@ export class CartService {
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
-    // 배송비 계산: 상품별 배송비 중 가장 높은 값 사용
-    let shippingFee = 0
-    for (const item of items) {
-      const itemShippingFee = item.shippingFee ?? 0
-      // 배송비가 있는 경우, 가장 높은 배송비 적용
-      if (itemShippingFee > shippingFee) {
-        shippingFee = itemShippingFee
-      }
-    }
-
-    const total = subtotal + shippingFee
+    // 배송비는 이미 상품 가격에 포함되어 있으므로 0으로 설정
+    const shippingFee = 0
+    const total = subtotal
 
     return {
       id: cart.id,
@@ -320,7 +332,7 @@ export class CartService {
     userId: number | null = null,
     shopId: number | null = null
   ): Promise<{ cart: CartResponse; isExisting: boolean; newSessionId?: string }> {
-    const { publishedProductId, variantId, quantity = 1 } = data
+    const { publishedProductId, variantId, quantity = 1, isBundleItem = false } = data
 
     if (!publishedProductId) {
       throw new ValidationError('publishedProductId는 필수입니다')
@@ -354,7 +366,27 @@ export class CartService {
 
     const newSessionId = (cart as any).__newSessionId
 
-    // 기존 아이템 확인
+    // 묶음 상품이면 항상 새로운 아이템으로 추가 (합치지 않음)
+    if (isBundleItem) {
+      await prisma.cartItem.create({
+        data: {
+          cartId: cart.id,
+          publishedProductId,
+          variantId: variantId || null,
+          quantity,
+          priceAt: price,
+        },
+      })
+
+      const updatedCart = await this.getOrCreateCart(newSessionId || sessionId, userId, shopId)
+      return {
+        cart: this.formatCart(updatedCart),
+        isExisting: false,
+        newSessionId,
+      }
+    }
+
+    // 일반 상품: 기존 아이템 확인 후 합치기
     const existingItem = await prisma.cartItem.findFirst({
       where: {
         cartId: cart.id,

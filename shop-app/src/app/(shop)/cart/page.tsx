@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Minus, Plus, X, ShoppingBag, Check, Truck } from 'lucide-react'
+import { Minus, Plus, X, ShoppingBag, Check } from 'lucide-react'
 import { ConfirmModal } from '@/modules/common/ui-kit/src/ui'
 import { useShop } from '@/contexts/ShopContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
@@ -144,18 +144,6 @@ export default function CartPage() {
     return price?.toLocaleString('ko-KR') || '0'
   }
 
-  // 배송비 계산 헬퍼 함수 (상품별 배송비 중 최고값 사용)
-  const calculateShippingFee = (items: CartItem[]) => {
-    let maxShippingFee = 0
-    for (const item of items) {
-      const itemShippingFee = item.shippingFee ?? 0
-      if (itemShippingFee > maxShippingFee) {
-        maxShippingFee = itemShippingFee
-      }
-    }
-    return maxShippingFee
-  }
-
   // Optimistic Update: UI 즉시 업데이트, 백그라운드에서 API 호출
   const handleQuantityChange = async (itemId: number, newQuantity: number) => {
     if (newQuantity < 1 || !cart) return
@@ -170,14 +158,13 @@ export default function CartPage() {
         item.id === itemId ? { ...item, quantity: newQuantity } : item
       )
       const newSubtotal = newItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-      const newShippingFee = calculateShippingFee(newItems)
       return {
         ...prev,
         items: newItems,
         totalItems: newItems.reduce((sum, item) => sum + item.quantity, 0),
         subtotal: newSubtotal,
-        shippingFee: newShippingFee,
-        total: newSubtotal + newShippingFee,
+        shippingFee: 0, // 배송비는 상품 가격에 포함
+        total: newSubtotal,
       }
     })
 
@@ -219,15 +206,14 @@ export default function CartPage() {
     // UI 즉시 업데이트
     const newItems = cart.items.filter(item => item.id !== itemId)
     const newSubtotal = newItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-    const newShippingFee = newItems.length > 0 ? calculateShippingFee(newItems) : 0
 
     setCart({
       ...cart,
       items: newItems,
       totalItems: newItems.reduce((sum, item) => sum + item.quantity, 0),
       subtotal: newSubtotal,
-      shippingFee: newShippingFee,
-      total: newSubtotal + newShippingFee,
+      shippingFee: 0, // 배송비는 상품 가격에 포함
+      total: newSubtotal,
     })
     setSelectedItems(prev => prev.filter(id => id !== itemId))
 
@@ -304,11 +290,10 @@ export default function CartPage() {
     }
   }
 
-  // 선택된 항목만 계산
+  // 선택된 항목만 계산 (배송비는 상품 가격에 포함됨)
   const selectedCartItems = cart?.items?.filter(item => selectedItems.includes(item.id)) || []
   const subtotal = selectedCartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-  const shippingFee = selectedCartItems.length > 0 ? calculateShippingFee(selectedCartItems) : 0
-  const totalAmount = subtotal + shippingFee
+  const totalAmount = subtotal // 배송비가 상품 가격에 포함되어 있음
   const discountAmount = 0 // 할인 금액 (추후 구현 시 사용)
 
   // 커스텀 체크박스 컴포넌트
@@ -485,15 +470,15 @@ export default function CartPage() {
                       <span className="text-gray-600">상품금액</span>
                       <span className="text-gray-900">{formatPrice(subtotal)}원</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">상품할인금액</span>
-                      <span className="text-gray-900">{discountAmount > 0 ? `-${formatPrice(discountAmount)}` : '0'}원</span>
-                    </div>
+                    {discountAmount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">상품할인금액</span>
+                        <span className="text-[#FF6B6B]">-{formatPrice(discountAmount)}원</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">배송비</span>
-                      <span className={shippingFee === 0 && subtotal > 0 ? 'text-[#FF6B6B]' : 'text-gray-900'}>
-                        {shippingFee === 0 && subtotal > 0 ? '무료' : `+${formatPrice(shippingFee)}원`}
-                      </span>
+                      <span className="text-[#FF6B6B]">포함</span>
                     </div>
                   </div>
                 </div>
