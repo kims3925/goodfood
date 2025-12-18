@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * 소싱 알림 더미 데이터 시드 API
  * POST /api/admin/notifications/seed

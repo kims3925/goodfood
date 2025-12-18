@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Inquiry API
  * 고객 문의 등록 및 조회

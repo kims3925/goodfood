@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Guest Payment Confirm API
  * 비회원 TossPayments 결제 승인

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Shop Product Detail API
  * 쇼핑몰 상품 상세 조회

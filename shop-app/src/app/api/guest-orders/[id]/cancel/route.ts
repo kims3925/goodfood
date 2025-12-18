@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * 비회원 주문 취소 API
  * 토큰 검증 후 취소 처리

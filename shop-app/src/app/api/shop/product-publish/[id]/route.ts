@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Published Product Detail API
  * publishedProductId로 상품 정보 조회

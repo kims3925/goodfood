@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Guest Orders Prepare API
  * 비회원 토스 결제 전 주문 정보를 쿠키에 임시 저장

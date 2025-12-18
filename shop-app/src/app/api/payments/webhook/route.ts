@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Toss Payments Webhook API
  * 토스페이먼츠 웹훅 수신 엔드포인트

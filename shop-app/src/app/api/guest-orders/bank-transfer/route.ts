@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * 비회원 무통장입금 주문 생성 API
  */

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Check Email API
  * 이메일 중복 확인 API

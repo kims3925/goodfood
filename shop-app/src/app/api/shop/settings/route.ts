@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Shop Settings API Routes
  * 쇼핑몰 설정 조회 API

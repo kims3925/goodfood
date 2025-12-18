@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Band 세션 일괄 저장 API
  * Chrome Extension에서 모든 소매 채널에 세션을 저장합니다.

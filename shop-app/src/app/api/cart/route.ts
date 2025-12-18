@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Cart API
  * 세션 + 사용자 + Shop 기반 장바구니 CRUD

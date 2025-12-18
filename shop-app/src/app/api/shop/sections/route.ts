@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Shop Sections API
  * Shop별 상품 섹션 조회

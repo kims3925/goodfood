@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus, Upload, Info } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus, Upload, Info, Truck } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -27,6 +27,8 @@ interface Product {
   wholesalePrice: number | null
   price: number | null
   currency: string
+  shippingFee: number | null
+  shippingInfo: string | null
   createdAt: string
   updatedAt: string
   images: ProductImage[]
@@ -938,6 +940,7 @@ export default function ProductDetailPage() {
                           </div>
                         </div>
                       )}
+
                     </div>
                   )}
                 </div>
@@ -1259,6 +1262,43 @@ export default function ProductDetailPage() {
                     </div>
                   ) : (
                     <p className="text-sm text-slate-400 px-2">변형상품 없음</p>
+                  )}
+                </div>
+              </div>
+
+              {/* 배송비 정보 */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-sky-100 rounded-lg">
+                      <Truck size={18} className="text-sky-600" />
+                    </div>
+                    <span className="font-semibold text-slate-900">배송 정보</span>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
+                      <Truck size={18} className="text-slate-500" />
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-xs">배송비</p>
+                      <p className="font-medium text-slate-900">
+                        {product.shippingFee === 0 ? '무료배송' : product.shippingFee ? `₩${product.shippingFee.toLocaleString()}` : '정보 없음'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {product.shippingInfo && (
+                    <div className="pt-4 border-t border-slate-100">
+                      <p className="text-slate-500 text-xs mb-2">배송 안내</p>
+                      <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                        <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                          {product.shippingInfo}
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

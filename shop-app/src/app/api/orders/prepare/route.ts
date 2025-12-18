@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Orders Prepare API
  * 결제 전 주문 정보를 쿠키에 임시 저장

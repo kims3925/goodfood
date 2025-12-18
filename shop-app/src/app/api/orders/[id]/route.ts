@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Order Detail API
  * 특정 주문 상세 조회, 수정, 삭제 API

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Automation Execute API
  * 자동화 파이프라인 수동 실행

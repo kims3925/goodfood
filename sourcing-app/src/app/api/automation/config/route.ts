@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Automation Config API
  * 자동화 설정 CRUD

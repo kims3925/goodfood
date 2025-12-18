@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Package, Store, ExternalLink, Trash2, ImageIcon, Calendar, User, FileText, ShoppingBag, Layers, Grid3X3, Truck } from 'lucide-react'
+import { ArrowLeft, Package, Store, ExternalLink, Trash2, ImageIcon, Calendar, User, FileText, ShoppingBag, Layers, Grid3X3, Truck, RefreshCw } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -19,6 +19,7 @@ interface CollectedProductDetail {
   rawMetadata: any
   createdAt: string
   updatedAt: string
+  isConverted: boolean
   post: {
     id: number
     title: string
@@ -78,6 +79,7 @@ export default function CollectedProductDetailClient({ id }: { id: string }) {
   const [isLoading, setIsLoading] = useState(true)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isUpdatingConversion, setIsUpdatingConversion] = useState(false)
 
   useEffect(() => {
     loadProduct()
@@ -101,6 +103,32 @@ export default function CollectedProductDetailClient({ id }: { id: string }) {
       router.push('/collected-product/list')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleConversionStatusChange = async (newStatus: boolean) => {
+    if (!product) return
+
+    setIsUpdatingConversion(true)
+    try {
+      const response = await fetch(`/api/collected-product/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isConverted: newStatus }),
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        setProduct({ ...product, isConverted: newStatus })
+        toast.success(newStatus ? '변환 완료로 변경되었습니다.' : '미변환으로 변경되었습니다.')
+      } else {
+        toast.error('변환 상태 변경에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('변환 상태 변경 실패:', error)
+      toast.error('변환 상태 변경에 실패했습니다.')
+    } finally {
+      setIsUpdatingConversion(false)
     }
   }
 
@@ -250,13 +278,38 @@ export default function CollectedProductDetailClient({ id }: { id: string }) {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-100">
-
                 <div className="flex items-center gap-2 text-sm col-span-2">
                   <Calendar size={16} className="text-slate-400" />
                   <span className="text-slate-500">수집일:</span>
                   <span className="font-medium text-slate-700">
                     {new Date(product.createdAt).toLocaleString('ko-KR')}
                   </span>
+                </div>
+                <div className="flex items-center gap-3 text-sm col-span-2">
+                  <RefreshCw size={16} className="text-slate-400" />
+                  <span className="text-slate-500">변환 상태:</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleConversionStatusChange(!product.isConverted)}
+                      disabled={isUpdatingConversion}
+                      className={`
+                        relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out
+                        focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2
+                        ${product.isConverted ? 'bg-emerald-500' : 'bg-slate-300'}
+                        ${isUpdatingConversion ? 'opacity-50 cursor-wait' : 'cursor-pointer'}
+                      `}
+                    >
+                      <span
+                        className={`
+                          inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out
+                          ${product.isConverted ? 'translate-x-6' : 'translate-x-1'}
+                        `}
+                      />
+                    </button>
+                    <span className={`text-xs font-medium ${product.isConverted ? 'text-emerald-600' : 'text-slate-500'}`}>
+                      {isUpdatingConversion ? '변경 중...' : (product.isConverted ? '변환 완료' : '미변환')}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

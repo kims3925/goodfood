@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * 무통장입금 주문 생성 API
  * 토스 결제 없이 바로 주문 생성

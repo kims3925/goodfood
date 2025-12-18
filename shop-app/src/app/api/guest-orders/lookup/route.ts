@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * 비회원 주문 조회 API
  * 주문번호 + 휴대폰번호로 조회

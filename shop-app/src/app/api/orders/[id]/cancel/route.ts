@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Order Cancel API
  * 주문 취소 및 토스페이먼츠 결제 취소

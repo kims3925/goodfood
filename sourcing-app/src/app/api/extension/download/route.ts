@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Band Session Extension 다운로드 API
  * 확장 프로그램을 zip 파일로 다운로드

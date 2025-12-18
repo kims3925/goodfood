@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Cart Item API
  * 장바구니 아이템 개별 조작

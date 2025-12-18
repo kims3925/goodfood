@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * 비회원 주문 상세 API
  * 토큰 검증 후 주문 상세 반환

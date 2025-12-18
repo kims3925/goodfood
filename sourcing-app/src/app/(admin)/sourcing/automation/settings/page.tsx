@@ -801,140 +801,212 @@ export default function AutomationSettingsPage() {
 
           <div className="grid grid-cols-4 gap-4">
             {/* 수집 단계 */}
-            <button
-              onClick={() => setConfig(prev => ({
-                ...prev,
-                pipelineSteps: { ...prev.pipelineSteps, collection: !prev.pipelineSteps.collection }
-              }))}
-              className={`
-                relative group p-4 rounded-xl border-2 transition-all duration-300
-                ${config.pipelineSteps.collection
-                  ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-cyan-50 shadow-md shadow-blue-100'
-                  : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
-                }
-              `}
-            >
-              <div className="flex flex-col items-center gap-3">
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
-                  config.pipelineSteps.collection
-                    ? 'bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-200'
-                    : 'bg-gray-100 group-hover:bg-blue-100'
-                }`}>
-                  <Download className={`w-7 h-7 ${config.pipelineSteps.collection ? 'text-white' : 'text-gray-400 group-hover:text-blue-500'}`} />
-                </div>
-                <div className="text-center">
-                  <h3 className={`font-bold text-sm ${config.pipelineSteps.collection ? 'text-blue-700' : 'text-gray-600'}`}>수집</h3>
-                  <p className="text-xs text-gray-500 mt-1">게시물 수집</p>
-                </div>
-                {config.pipelineSteps.collection && (
-                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center shadow-md">
-                    <Check size={14} className="text-white" />
+            {(() => {
+              // 수집을 해제하려면 변환이 해제되어 있어야 함
+              const canToggleOff = !config.pipelineSteps.transform
+              const isDisabled = config.pipelineSteps.collection && !canToggleOff
+              return (
+                <button
+                  onClick={() => {
+                    if (isDisabled) {
+                      toast.error('다음 단계(변환)를 먼저 해제해주세요')
+                      return
+                    }
+                    setConfig(prev => ({
+                      ...prev,
+                      pipelineSteps: { ...prev.pipelineSteps, collection: !prev.pipelineSteps.collection }
+                    }))
+                  }}
+                  className={`
+                    relative group p-4 rounded-xl border-2 transition-all duration-300
+                    ${config.pipelineSteps.collection
+                      ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-cyan-50 shadow-md shadow-blue-100'
+                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                    }
+                    ${isDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}
+                  `}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                      config.pipelineSteps.collection
+                        ? 'bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-200'
+                        : 'bg-gray-100 group-hover:bg-blue-100'
+                    }`}>
+                      <Download className={`w-7 h-7 ${config.pipelineSteps.collection ? 'text-white' : 'text-gray-400 group-hover:text-blue-500'}`} />
+                    </div>
+                    <div className="text-center">
+                      <h3 className={`font-bold text-sm ${config.pipelineSteps.collection ? 'text-blue-700' : 'text-gray-600'}`}>수집</h3>
+                      <p className="text-xs text-gray-500 mt-1">게시물 수집</p>
+                    </div>
+                    {config.pipelineSteps.collection && (
+                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center shadow-md">
+                        <Check size={14} className="text-white" />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </button>
+                </button>
+              )
+            })()}
 
             {/* 변환 단계 */}
-            <button
-              onClick={() => setConfig(prev => ({
-                ...prev,
-                pipelineSteps: { ...prev.pipelineSteps, transform: !prev.pipelineSteps.transform }
-              }))}
-              className={`
-                relative group p-4 rounded-xl border-2 transition-all duration-300
-                ${config.pipelineSteps.transform
-                  ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50 shadow-md shadow-amber-100'
-                  : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
-                }
-              `}
-            >
-              <div className="flex flex-col items-center gap-3">
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
-                  config.pipelineSteps.transform
-                    ? 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-200'
-                    : 'bg-gray-100 group-hover:bg-amber-100'
-                }`}>
-                  <Sparkles className={`w-7 h-7 ${config.pipelineSteps.transform ? 'text-white' : 'text-gray-400 group-hover:text-amber-500'}`} />
-                </div>
-                <div className="text-center">
-                  <h3 className={`font-bold text-sm ${config.pipelineSteps.transform ? 'text-amber-700' : 'text-gray-600'}`}>변환</h3>
-                  <p className="text-xs text-gray-500 mt-1">AI 상품 변환</p>
-                </div>
-                {config.pipelineSteps.transform && (
-                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center shadow-md">
-                    <Check size={14} className="text-white" />
+            {(() => {
+              // 변환을 선택하려면 수집이 선택되어 있어야 함
+              // 변환을 해제하려면 상품생성이 해제되어 있어야 함
+              const canToggleOn = config.pipelineSteps.collection
+              const canToggleOff = !config.pipelineSteps.productCreate
+              const isDisabledOn = !config.pipelineSteps.transform && !canToggleOn
+              const isDisabledOff = config.pipelineSteps.transform && !canToggleOff
+              const isDisabled = isDisabledOn || isDisabledOff
+              return (
+                <button
+                  onClick={() => {
+                    if (!config.pipelineSteps.transform && !canToggleOn) {
+                      toast.error('이전 단계(수집)를 먼저 선택해주세요')
+                      return
+                    }
+                    if (config.pipelineSteps.transform && !canToggleOff) {
+                      toast.error('다음 단계(상품생성)를 먼저 해제해주세요')
+                      return
+                    }
+                    setConfig(prev => ({
+                      ...prev,
+                      pipelineSteps: { ...prev.pipelineSteps, transform: !prev.pipelineSteps.transform }
+                    }))
+                  }}
+                  className={`
+                    relative group p-4 rounded-xl border-2 transition-all duration-300
+                    ${config.pipelineSteps.transform
+                      ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50 shadow-md shadow-amber-100'
+                      : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
+                    }
+                    ${isDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}
+                  `}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                      config.pipelineSteps.transform
+                        ? 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-200'
+                        : 'bg-gray-100 group-hover:bg-amber-100'
+                    }`}>
+                      <Sparkles className={`w-7 h-7 ${config.pipelineSteps.transform ? 'text-white' : 'text-gray-400 group-hover:text-amber-500'}`} />
+                    </div>
+                    <div className="text-center">
+                      <h3 className={`font-bold text-sm ${config.pipelineSteps.transform ? 'text-amber-700' : 'text-gray-600'}`}>변환</h3>
+                      <p className="text-xs text-gray-500 mt-1">AI 상품 변환</p>
+                    </div>
+                    {config.pipelineSteps.transform && (
+                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center shadow-md">
+                        <Check size={14} className="text-white" />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </button>
+                </button>
+              )
+            })()}
 
             {/* 상품생성 단계 */}
-            <button
-              onClick={() => setConfig(prev => ({
-                ...prev,
-                pipelineSteps: { ...prev.pipelineSteps, productCreate: !prev.pipelineSteps.productCreate }
-              }))}
-              className={`
-                relative group p-4 rounded-xl border-2 transition-all duration-300
-                ${config.pipelineSteps.productCreate
-                  ? 'border-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-md shadow-emerald-100'
-                  : 'border-gray-200 hover:border-emerald-300 hover:bg-emerald-50/50'
-                }
-              `}
-            >
-              <div className="flex flex-col items-center gap-3">
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
-                  config.pipelineSteps.productCreate
-                    ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-200'
-                    : 'bg-gray-100 group-hover:bg-emerald-100'
-                }`}>
-                  <ShoppingBag className={`w-7 h-7 ${config.pipelineSteps.productCreate ? 'text-white' : 'text-gray-400 group-hover:text-emerald-500'}`} />
-                </div>
-                <div className="text-center">
-                  <h3 className={`font-bold text-sm ${config.pipelineSteps.productCreate ? 'text-emerald-700' : 'text-gray-600'}`}>상품생성</h3>
-                  <p className="text-xs text-gray-500 mt-1">Product 생성</p>
-                </div>
-                {config.pipelineSteps.productCreate && (
-                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center shadow-md">
-                    <Check size={14} className="text-white" />
+            {(() => {
+              // 상품생성을 선택하려면 변환이 선택되어 있어야 함
+              // 상품생성을 해제하려면 발행이 해제되어 있어야 함
+              const canToggleOn = config.pipelineSteps.transform
+              const canToggleOff = !config.pipelineSteps.publish
+              const isDisabledOn = !config.pipelineSteps.productCreate && !canToggleOn
+              const isDisabledOff = config.pipelineSteps.productCreate && !canToggleOff
+              const isDisabled = isDisabledOn || isDisabledOff
+              return (
+                <button
+                  onClick={() => {
+                    if (!config.pipelineSteps.productCreate && !canToggleOn) {
+                      toast.error('이전 단계(변환)를 먼저 선택해주세요')
+                      return
+                    }
+                    if (config.pipelineSteps.productCreate && !canToggleOff) {
+                      toast.error('다음 단계(발행)를 먼저 해제해주세요')
+                      return
+                    }
+                    setConfig(prev => ({
+                      ...prev,
+                      pipelineSteps: { ...prev.pipelineSteps, productCreate: !prev.pipelineSteps.productCreate }
+                    }))
+                  }}
+                  className={`
+                    relative group p-4 rounded-xl border-2 transition-all duration-300
+                    ${config.pipelineSteps.productCreate
+                      ? 'border-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-md shadow-emerald-100'
+                      : 'border-gray-200 hover:border-emerald-300 hover:bg-emerald-50/50'
+                    }
+                    ${isDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}
+                  `}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                      config.pipelineSteps.productCreate
+                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-200'
+                        : 'bg-gray-100 group-hover:bg-emerald-100'
+                    }`}>
+                      <ShoppingBag className={`w-7 h-7 ${config.pipelineSteps.productCreate ? 'text-white' : 'text-gray-400 group-hover:text-emerald-500'}`} />
+                    </div>
+                    <div className="text-center">
+                      <h3 className={`font-bold text-sm ${config.pipelineSteps.productCreate ? 'text-emerald-700' : 'text-gray-600'}`}>상품생성</h3>
+                      <p className="text-xs text-gray-500 mt-1">Product 생성</p>
+                    </div>
+                    {config.pipelineSteps.productCreate && (
+                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center shadow-md">
+                        <Check size={14} className="text-white" />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </button>
+                </button>
+              )
+            })()}
 
             {/* 발행 단계 */}
-            <button
-              onClick={() => setConfig(prev => ({
-                ...prev,
-                pipelineSteps: { ...prev.pipelineSteps, publish: !prev.pipelineSteps.publish }
-              }))}
-              className={`
-                relative group p-4 rounded-xl border-2 transition-all duration-300
-                ${config.pipelineSteps.publish
-                  ? 'border-green-500 bg-gradient-to-br from-green-50 to-emerald-50 shadow-md shadow-green-100'
-                  : 'border-gray-200 hover:border-green-300 hover:bg-green-50/50'
-                }
-              `}
-            >
-              <div className="flex flex-col items-center gap-3">
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
-                  config.pipelineSteps.publish
-                    ? 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-200'
-                    : 'bg-gray-100 group-hover:bg-green-100'
-                }`}>
-                  <Upload className={`w-7 h-7 ${config.pipelineSteps.publish ? 'text-white' : 'text-gray-400 group-hover:text-green-500'}`} />
-                </div>
-                <div className="text-center">
-                  <h3 className={`font-bold text-sm ${config.pipelineSteps.publish ? 'text-green-700' : 'text-gray-600'}`}>발행</h3>
-                  <p className="text-xs text-gray-500 mt-1">채널 발행</p>
-                </div>
-                {config.pipelineSteps.publish && (
-                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-md">
-                    <Check size={14} className="text-white" />
+            {(() => {
+              // 발행을 선택하려면 상품생성이 선택되어 있어야 함
+              const canToggleOn = config.pipelineSteps.productCreate
+              const isDisabled = !config.pipelineSteps.publish && !canToggleOn
+              return (
+                <button
+                  onClick={() => {
+                    if (isDisabled) {
+                      toast.error('이전 단계(상품생성)를 먼저 선택해주세요')
+                      return
+                    }
+                    setConfig(prev => ({
+                      ...prev,
+                      pipelineSteps: { ...prev.pipelineSteps, publish: !prev.pipelineSteps.publish }
+                    }))
+                  }}
+                  className={`
+                    relative group p-4 rounded-xl border-2 transition-all duration-300
+                    ${config.pipelineSteps.publish
+                      ? 'border-green-500 bg-gradient-to-br from-green-50 to-emerald-50 shadow-md shadow-green-100'
+                      : 'border-gray-200 hover:border-green-300 hover:bg-green-50/50'
+                    }
+                    ${isDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}
+                  `}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                      config.pipelineSteps.publish
+                        ? 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-200'
+                        : 'bg-gray-100 group-hover:bg-green-100'
+                    }`}>
+                      <Upload className={`w-7 h-7 ${config.pipelineSteps.publish ? 'text-white' : 'text-gray-400 group-hover:text-green-500'}`} />
+                    </div>
+                    <div className="text-center">
+                      <h3 className={`font-bold text-sm ${config.pipelineSteps.publish ? 'text-green-700' : 'text-gray-600'}`}>발행</h3>
+                      <p className="text-xs text-gray-500 mt-1">채널 발행</p>
+                    </div>
+                    {config.pipelineSteps.publish && (
+                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-md">
+                        <Check size={14} className="text-white" />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </button>
+                </button>
+              )
+            })()}
           </div>
 
           {/* 파이프라인 흐름 표시 */}

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Toss Payments Cancel API
  * 토스페이먼츠 결제 취소 엔드포인트

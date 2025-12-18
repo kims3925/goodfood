@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
@@ -110,7 +112,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, description, price, wholesalePrice } = body
+    const { name, description, isConverted } = body
 
     // 수집상품 확인
     const existingProduct = await prisma.collectedProduct.findFirst({
@@ -130,8 +132,9 @@ export async function PUT(
     const updatedProduct = await prisma.collectedProduct.update({
       where: { id: collectedProductId },
       data: {
-        name,
-        description,
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description }),
+        ...(isConverted !== undefined && { isConverted }),
       },
     })
 
