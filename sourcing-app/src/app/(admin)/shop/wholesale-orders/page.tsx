@@ -15,6 +15,7 @@ import {
   Banknote,
   Store,
   CheckCircle,
+  AlertTriangle,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
@@ -70,11 +71,18 @@ interface OrderItemsResponse {
   }
 }
 
+interface MissedOrdersInfo {
+  count: number
+  oldestDate: string
+  newestDate: string
+}
+
 export default function WholesaleOrdersPage() {
   const toast = useToast()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [summaries, setSummaries] = useState<WholesaleSummary[]>([])
+  const [missedOrders, setMissedOrders] = useState<MissedOrdersInfo | null>(null)
 
   // 날짜 필터 (하루만) - URL 쿼리 파라미터에서 초기값 설정
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -168,6 +176,7 @@ export default function WholesaleOrdersPage() {
 
       if (data.success) {
         setSummaries(data.data)
+        setMissedOrders(data.missedOrders || null)
         // 디버그 정보 출력
         if (data.debug) {
           console.log('=== 도매 발주 디버그 ===', data.debug)
@@ -483,6 +492,33 @@ export default function WholesaleOrdersPage() {
             </div>
           </div>
         </div>
+
+        {/* 발주 누락 경고 배너 */}
+        {missedOrders && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-amber-100 rounded-lg flex-shrink-0">
+                <AlertTriangle size={20} className="text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-800">발주 누락 주문이 있습니다</h3>
+                <p className="text-sm text-amber-700 mt-1">
+                  {missedOrders.oldestDate === missedOrders.newestDate ? (
+                    <>{missedOrders.oldestDate}에 결제되었지만 아직 발주되지 않은 주문이 <span className="font-bold">{missedOrders.count}건</span> 있습니다.</>
+                  ) : (
+                    <>{missedOrders.oldestDate} ~ {missedOrders.newestDate} 기간에 결제되었지만 아직 발주되지 않은 주문이 <span className="font-bold">{missedOrders.count}건</span> 있습니다.</>
+                  )}
+                </p>
+                <button
+                  onClick={() => setSelectedDate(missedOrders.oldestDate)}
+                  className="mt-2 text-sm font-medium text-amber-800 hover:text-amber-900 underline"
+                >
+                  {missedOrders.oldestDate} 주문 보기 →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 도매처별 카드 */}
         {!loading && summaries.length === 0 ? (

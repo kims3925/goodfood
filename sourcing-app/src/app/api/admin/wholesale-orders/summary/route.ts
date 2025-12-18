@@ -228,9 +228,78 @@ export async function GET(request: NextRequest) {
       totalAmount: s.totalAmount,
     })).sort((a, b) => b.totalAmount - a.totalAmount)
 
+    // 발주 누락 주문 조회 (선택된 날짜 이전의 PAID/PREPARING 상태 주문)
+    const [missedMemberOrders, missedGuestOrders] = await Promise.all([
+      prisma.order.findMany({
+        where: {
+          status: { in: ['PAID', 'PREPARING'] },
+          paidAt: {
+            not: null,
+            lt: fromDate, // 선택된 날짜 이전
+          },
+          items: {
+            some: {
+              publishedProduct: {
+                userId: user.userId,
+                product: {
+                  channel: {
+                    kind: 'WHOLESALE',
+                  },
+                },
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          orderNumber: true,
+          paidAt: true,
+        },
+      }),
+      prisma.guestOrder.findMany({
+        where: {
+          status: { in: ['PAID', 'PREPARING'] },
+          paidAt: {
+            not: null,
+            lt: fromDate, // 선택된 날짜 이전
+          },
+          items: {
+            some: {
+              publishedProduct: {
+                userId: user.userId,
+                product: {
+                  channel: {
+                    kind: 'WHOLESALE',
+                  },
+                },
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          orderNumber: true,
+          paidAt: true,
+        },
+      }),
+    ])
+
+    // 누락 주문 정보 (가장 오래된 날짜 기준)
+    const allMissedOrders = [
+      ...missedMemberOrders.map(o => ({ ...o, isMember: true })),
+      ...missedGuestOrders.map(o => ({ ...o, isMember: false })),
+    ].sort((a, b) => new Date(a.paidAt!).getTime() - new Date(b.paidAt!).getTime())
+
+    const missedOrdersInfo = allMissedOrders.length > 0 ? {
+      count: allMissedOrders.length,
+      oldestDate: allMissedOrders[0].paidAt?.toISOString().split('T')[0],
+      newestDate: allMissedOrders[allMissedOrders.length - 1].paidAt?.toISOString().split('T')[0],
+    } : null
+
     return NextResponse.json({
       success: true,
       data: summaries,
+      missedOrders: missedOrdersInfo,
     })
   } catch (error) {
     console.error('도매처 발주 집계 조회 실패:', error)
