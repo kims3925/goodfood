@@ -36,6 +36,7 @@ model User {
   loginLogs          UserLoginLog[]
   wishlists          Wishlist[]
   workflowLogs       WorkflowLog[]
+  notifications      Notification[]
 
   @@index([shopId])
   @@index([email])
@@ -94,10 +95,11 @@ model AiApiConfig {
   config          String?    @db.LongText
   isActive        Boolean    @default(true) @map("is_active")
   usageCount      Int        @default(0) @map("usage_count")
+  dailyUsageCount Int        @default(0) @map("daily_usage_count")
+  dailyResetDate  DateTime?  @map("daily_reset_date") @db.Date
   lastUsedAt      DateTime?  @map("last_used_at") @db.Timestamp(0)
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  totalTokensUsed BigInt     @default(0) @map("total_tokens_used")
   user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, provider])

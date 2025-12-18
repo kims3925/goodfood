@@ -148,7 +148,8 @@ function createStageResult(result: PipelineResult | undefined, stageName: string
 /**
  * 파이프라인 결과에 따른 알림 생성
  */
-async function createPipelineNotification(
+async function createPipelineNotificationInternal(
+  userId: number,
   type: 'collect' | 'transform' | 'register' | 'publish' | 'full',
   result: PipelineResult | FullPipelineResult,
   workflowId?: number
@@ -167,7 +168,7 @@ async function createPipelineNotification(
             .filter(Boolean)
             .join(', ') || ''
 
-          await createCollectNotification({
+          await createCollectNotification(userId, {
             channelName: channelNames,
             collectCount: collectResult.successCount,
             workflowRunId: workflowId,
@@ -176,7 +177,7 @@ async function createPipelineNotification(
 
         // 에러가 있으면 오류 알림도 생성
         if (hasErrors) {
-          await createErrorNotification({
+          await createErrorNotification(userId, {
             errorType: '수집',
             errorMessage: `${collectResult.failedCount}개 채널에서 수집 실패`,
             workflowRunId: workflowId,
@@ -187,7 +188,7 @@ async function createPipelineNotification(
       case 'transform':
         const transformResult = result as TransformResult
         if (transformResult.totalItems > 0) {
-          await createTransformNotification({
+          await createTransformNotification(userId, {
             productCount: transformResult.totalItems,
             successCount: transformResult.successCount,
             failCount: transformResult.failedCount,
@@ -197,7 +198,7 @@ async function createPipelineNotification(
 
         if (hasErrors && transformResult.failedCount > 3) {
           // 3개 이상 실패 시 오류 알림
-          await createErrorNotification({
+          await createErrorNotification(userId, {
             errorType: 'AI변환',
             errorMessage: `${transformResult.failedCount}개 상품 변환 실패`,
             workflowRunId: workflowId,
@@ -209,6 +210,7 @@ async function createPipelineNotification(
         const registerResult = result as ProductCreateResult
         if (registerResult.successCount > 0) {
           await createInfoNotification(
+            userId,
             '상품 등록이 완료되었습니다',
             `${registerResult.successCount}개 상품 등록 완료${registerResult.failedCount > 0 ? ` (${registerResult.failedCount}개 실패)` : ''}`,
             '/sourcing/automation/logs'
@@ -216,7 +218,7 @@ async function createPipelineNotification(
         }
 
         if (hasErrors && registerResult.failedCount > 3) {
-          await createErrorNotification({
+          await createErrorNotification(userId, {
             errorType: '상품등록',
             errorMessage: `${registerResult.failedCount}개 상품 등록 실패`,
             workflowRunId: workflowId,
@@ -233,7 +235,7 @@ async function createPipelineNotification(
             .filter(Boolean)
             .join(', ') || ''
 
-          await createPublishNotification({
+          await createPublishNotification(userId, {
             shopName: publishChannelNames,
             productCount: publishResult.totalItems,
             successCount: publishResult.successCount,
@@ -243,7 +245,7 @@ async function createPipelineNotification(
         }
 
         if (hasErrors && publishResult.failedCount > 0) {
-          await createErrorNotification({
+          await createErrorNotification(userId, {
             errorType: '발행',
             errorMessage: `${publishResult.failedCount}개 상품 발행 실패`,
             workflowRunId: workflowId,
@@ -255,16 +257,16 @@ async function createPipelineNotification(
         const fullResult = result as FullPipelineResult
         // 전체 파이프라인은 각 단계별로 알림 생성
         if (fullResult.collection) {
-          await createPipelineNotification('collect', fullResult.collection, workflowId)
+          await createPipelineNotificationInternal(userId, 'collect', fullResult.collection, workflowId)
         }
         if (fullResult.transform) {
-          await createPipelineNotification('transform', fullResult.transform, workflowId)
+          await createPipelineNotificationInternal(userId, 'transform', fullResult.transform, workflowId)
         }
         if (fullResult.productCreate) {
-          await createPipelineNotification('register', fullResult.productCreate, workflowId)
+          await createPipelineNotificationInternal(userId, 'register', fullResult.productCreate, workflowId)
         }
         if (fullResult.publish) {
-          await createPipelineNotification('publish', fullResult.publish, workflowId)
+          await createPipelineNotificationInternal(userId, 'publish', fullResult.publish, workflowId)
         }
 
         // 전체 완료 정보 알림
@@ -279,6 +281,7 @@ async function createPipelineNotification(
 
         if (totalSuccess > 0 || totalFailed > 0) {
           await createInfoNotification(
+            userId,
             '전체 파이프라인 실행 완료',
             `수집→변환→등록→발행 완료 (성공: ${totalSuccess}, 실패: ${totalFailed})`,
             '/sourcing/automation/logs'
@@ -514,7 +517,7 @@ export async function POST(request: NextRequest) {
         result = await executeCollectionPipeline(currentUser.userId, config)
         responseData = buildSinglePipelineResponse(result as PipelineResult, 'collect')
         // 수집 완료 알림 생성
-        await createPipelineNotification('collect', result as PipelineResult, responseData.workflowId)
+        await createPipelineNotificationInternal(currentUser.userId, 'collect', result as PipelineResult, responseData.workflowId)
         break
 
       case 'transform':
@@ -522,7 +525,7 @@ export async function POST(request: NextRequest) {
         result = await executeTransformPipeline(currentUser.userId, config)
         responseData = buildSinglePipelineResponse(result as PipelineResult, 'transform')
         // AI 변환 완료 알림 생성
-        await createPipelineNotification('transform', result as PipelineResult, responseData.workflowId)
+        await createPipelineNotificationInternal(currentUser.userId, 'transform', result as PipelineResult, responseData.workflowId)
         break
 
       case 'register':
@@ -531,7 +534,7 @@ export async function POST(request: NextRequest) {
         result = await executeProductCreatePipeline(currentUser.userId, config)
         responseData = buildSinglePipelineResponse(result as PipelineResult, 'register')
         // 상품 등록 완료 알림 생성
-        await createPipelineNotification('register', result as PipelineResult, responseData.workflowId)
+        await createPipelineNotificationInternal(currentUser.userId, 'register', result as PipelineResult, responseData.workflowId)
         break
 
       case 'publish':
@@ -539,7 +542,7 @@ export async function POST(request: NextRequest) {
         result = await executePublishPipeline(currentUser.userId, config)
         responseData = buildSinglePipelineResponse(result as PipelineResult, 'publish')
         // 발행 완료 알림 생성
-        await createPipelineNotification('publish', result as PipelineResult, responseData.workflowId)
+        await createPipelineNotificationInternal(currentUser.userId, 'publish', result as PipelineResult, responseData.workflowId)
         break
 
       case 'full':
@@ -559,7 +562,7 @@ export async function POST(request: NextRequest) {
 
         responseData = buildFullPipelineResponse(result as FullPipelineResult)
         // 전체 파이프라인 완료 알림 생성
-        await createPipelineNotification('full', result as FullPipelineResult, responseData.workflowId)
+        await createPipelineNotificationInternal(currentUser.userId, 'full', result as FullPipelineResult, responseData.workflowId)
         break
 
       default:
@@ -583,11 +586,14 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('파이프라인 실행 실패:', error)
 
-    // 예외 발생 시 오류 알림 생성
-    await createErrorNotification({
-      errorType: '파이프라인',
-      errorMessage: error.message || '파이프라인 실행 중 오류가 발생했습니다.',
-    })
+    // 예외 발생 시 오류 알림 생성 (currentUser가 있을 경우에만)
+    const currentUser = await getCurrentUser()
+    if (currentUser) {
+      await createErrorNotification(currentUser.userId, {
+        errorType: '파이프라인',
+        errorMessage: error.message || '파이프라인 실행 중 오류가 발생했습니다.',
+      })
+    }
 
     return NextResponse.json(
       { success: false, error: error.message || '파이프라인 실행에 실패했습니다.' },

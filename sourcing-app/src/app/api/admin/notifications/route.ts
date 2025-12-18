@@ -28,23 +28,15 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = (page - 1) * limit
 
-    // where 조건 구성
+    // where 조건 구성 - 사용자별 알림만 조회
     const where: any = {
+      userId: user.userId, // 사용자별 필터 (필수)
       section, // section 필터 추가
     }
 
-    // shop 섹션일 때만 shopId 필터 적용
-    if (section === 'shop') {
-      if (shopId) {
-        where.shopId = parseInt(shopId)
-      } else {
-        // shopId가 없으면 사용자의 모든 쇼핑몰 알림 조회
-        const userShops = await prisma.shop.findMany({
-          where: { userId: user.userId },
-          select: { id: true },
-        })
-        where.shopId = { in: userShops.map((s) => s.id) }
-      }
+    // shop 섹션일 때 추가로 shopId 필터 적용 가능
+    if (section === 'shop' && shopId) {
+      where.shopId = parseInt(shopId)
     }
 
     // 타입 필터

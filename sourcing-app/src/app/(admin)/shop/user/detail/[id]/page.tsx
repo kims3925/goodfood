@@ -528,7 +528,7 @@ export default function UserDetailPage() {
                         </div>
                       </div>
                       <div className="mt-3 flex justify-end">
-                        <Link href={`/shop/cs/inquiry/${inquiry.id}`}>
+                        <Link href={`/shop/cs/inquiry/detail/${inquiry.id}`}>
                           <Button variant="ghost" size="sm">
                             상세보기 <ChevronRight className="w-4 h-4" />
                           </Button>

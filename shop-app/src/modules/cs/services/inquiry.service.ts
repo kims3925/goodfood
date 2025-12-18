@@ -81,14 +81,19 @@ export class InquiryService {
       },
     })
 
-    // 알림 생성 (publishedProductId가 있으면 shopId 조회)
+    // 알림 생성 (publishedProductId가 있으면 shopId 조회 - 샵 소유자에게 알림)
     if (publishedProductId) {
       const publishedProduct = await prisma.publishedProduct.findUnique({
         where: { id: publishedProductId },
-        select: { shopId: true },
+        select: {
+          shopId: true,
+          shop: {
+            select: { userId: true },
+          },
+        },
       })
-      if (publishedProduct?.shopId) {
-        createInquiryNotification(publishedProduct.shopId, {
+      if (publishedProduct?.shopId && publishedProduct?.shop?.userId) {
+        createInquiryNotification(publishedProduct.shop.userId, publishedProduct.shopId, {
           id: inquiry.id,
           title: inquiry.title,
           type: inquiry.inquiryType,

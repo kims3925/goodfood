@@ -43,7 +43,7 @@ export interface MenuItem {
 // 소싱 탭 메뉴
 export const sourcingMenuItems: MenuItem[] = [
   { label: '대시보드', href: '/sourcing/dashboard', icon: LayoutDashboard },
-  { label: '채널 관리', href: '/sourcing/channel', icon: Store },
+  { label: '채널 관리', href: '/sourcing/channel/list', icon: Store },
   {
     label: '수집',
     icon: Database,
@@ -111,8 +111,8 @@ export const shopMenuItems: MenuItem[] = [
       { label: '정산 이력', href: '/shop/settlement/history', icon: History },
     ],
   },
-  { label: '고객 문의', href: '/shop/cs/inquiry', icon: MessageSquare },
-  { label: '리뷰 관리', href: '/shop/reviews', icon: Star },
+  { label: '고객 문의', href: '/shop/cs/inquiry/list', icon: MessageSquare },
+  { label: '리뷰 관리', href: '/shop/reviews/list', icon: Star },
   { label: '쿠폰', href: '/shop/coupon/list', icon: Ticket },
   { label: '알림 관리', href: '/shop/notification', icon: Bell },
   { label: '사용자 관리', href: '/shop/user/list', icon: Users },

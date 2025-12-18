@@ -457,6 +457,7 @@ export async function executeFullPipeline(
     }
 
     await createPipelineNotification({
+      userId,
       result: pipelineResult,
       workflowLogId: logId,
     })
@@ -480,6 +481,7 @@ export async function executeFullPipeline(
       }
 
       await createPipelineNotification({
+        userId,
         result: cancelledResult,
         workflowLogId: logId,
         errorMessage: '사용자에 의해 작업이 취소되었습니다.',
@@ -508,6 +510,7 @@ export async function executeFullPipeline(
       }
 
       await createPipelineNotification({
+        userId,
         result: errorResult,
         workflowLogId: logId,
         errorMessage: error.message,
@@ -772,6 +775,7 @@ export async function executeFullPipelineWithLock(
     }
 
     await createPipelineNotification({
+      userId,
       result: pipelineResult,
       workflowLogId: logId,
     })
@@ -808,6 +812,7 @@ export async function executeFullPipelineWithLock(
       }
 
       await createPipelineNotification({
+        userId,
         result: cancelledResult,
         workflowLogId: logId,
         errorMessage: '사용자에 의해 작업이 취소되었습니다.',
@@ -837,6 +842,7 @@ export async function executeFullPipelineWithLock(
     }
 
     await createPipelineNotification({
+      userId,
       result: errorResult,
       workflowLogId: logId,
       errorMessage: error.message,

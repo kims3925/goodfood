@@ -150,7 +150,7 @@ export default function PrivacyPolicyListPage() {
 
   // 행 클릭 시 상세 페이지로 이동
   const handleRowClick = (id: number) => {
-    router.push(`/shop/policy/privacy/${id}`)
+    router.push(`/shop/policy/privacy/detail/${id}`)
   }
 
   const formatDate = (dateString: string) => {

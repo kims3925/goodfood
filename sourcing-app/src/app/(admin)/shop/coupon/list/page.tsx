@@ -198,7 +198,7 @@ export default function CouponListPage() {
 
   // 행 클릭 시 상세 페이지로 이동
   const handleRowClick = (id: number) => {
-    router.push(`/shop/coupon/${id}`)
+    router.push(`/shop/coupon/detail/${id}`)
   }
 
   const formatDate = (dateString: string) => {

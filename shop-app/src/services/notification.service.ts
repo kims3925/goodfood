@@ -30,13 +30,16 @@ interface ReturnInfo {
  * 신규 주문 알림 생성
  */
 export async function createOrderNotification(
+  userId: number,
   shopId: number,
   order: OrderInfo
 ): Promise<void> {
   try {
     await prisma.notification.create({
       data: {
+        userId,
         shopId,
+        section: 'shop',
         type: 'ORDER',
         title: '새로운 주문이 접수되었습니다',
         message: `주문번호 ${order.orderNumber}${order.customerName ? ` (${order.customerName})` : ''}${order.totalAmount ? ` - ${order.totalAmount.toLocaleString()}원` : ''}`,
@@ -53,13 +56,16 @@ export async function createOrderNotification(
  * 주문 취소 요청 알림 생성
  */
 export async function createCancelNotification(
+  userId: number,
   shopId: number,
   order: OrderInfo
 ): Promise<void> {
   try {
     await prisma.notification.create({
       data: {
+        userId,
         shopId,
+        section: 'shop',
         type: 'CANCEL',
         title: '주문 취소 요청이 접수되었습니다',
         message: `주문번호 ${order.orderNumber}${order.customerName ? ` (${order.customerName})` : ''} 취소 요청`,
@@ -76,6 +82,7 @@ export async function createCancelNotification(
  * 환불/반품 요청 알림 생성
  */
 export async function createRefundNotification(
+  userId: number,
   shopId: number,
   returnRequest: ReturnInfo
 ): Promise<void> {
@@ -85,7 +92,9 @@ export async function createRefundNotification(
 
     await prisma.notification.create({
       data: {
+        userId,
         shopId,
+        section: 'shop',
         type: 'REFUND',
         title: `${typeLabel} 요청이 접수되었습니다`,
         message: `${returnRequest.orderNumber ? `주문번호 ${returnRequest.orderNumber}` : ''}${returnRequest.customerName ? ` (${returnRequest.customerName})` : ''} ${typeLabel} 요청`,
@@ -102,6 +111,7 @@ export async function createRefundNotification(
  * 신규 문의 알림 생성
  */
 export async function createInquiryNotification(
+  userId: number,
   shopId: number,
   inquiry: InquiryInfo
 ): Promise<void> {
@@ -119,7 +129,9 @@ export async function createInquiryNotification(
 
     await prisma.notification.create({
       data: {
+        userId,
         shopId,
+        section: 'shop',
         type: 'INQUIRY',
         title: '새로운 문의가 등록되었습니다',
         message: `[${typeLabel}] ${inquiry.title || '문의'}${inquiry.customerName ? ` - ${inquiry.customerName}` : ''}`,

@@ -213,7 +213,7 @@ export default function PolicyModal({
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="AI가 참조할 가격 정책 내용을 입력하세요.&#10;&#10;예시:&#10;- 5만원 이하: 50% 마진&#10;- 5만원~10만원: 40% 마진&#10;- 10만원 이상: 30% 마진"
+              placeholder="AI가 참조할 가격 정책 내용을 입력하세요.&#10;&#10;예시:&#10;# 마진율&#10;- 5만원 이하: 50% 마진&#10;- 5만원~10만원: 40% 마진&#10;- 10만원 이상: 30% 마진&#10;&#10;# 배송비 처리&#10;- 배송비는 소매 판매가에 포함됩니다&#10;- 배송비가 별도로 표시된 경우, 해당 금액을 도매가에 합산한 후 마진을 적용합니다&#10;- 예: 도매가 10,000원 + 배송비 3,000원 = 13,000원 → 마진 적용"
               rows={8}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-none"
             />
