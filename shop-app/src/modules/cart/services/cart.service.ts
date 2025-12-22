@@ -35,10 +35,13 @@ export interface CartItemResponse {
   optionSummary: string | null
   image: string
   price: number
+  originalPrice: number // 배송비 미포함 원가
   quantity: number
   stock: number
   // 배송 정보
   shippingFee: number | null
+  // 합배송 정보
+  bundleMaxQty: number
 }
 
 export interface CartResponse {
@@ -195,10 +198,8 @@ export class CartService {
       }
 
       if (userCart) {
-        await prisma.cart.update({
-          where: { id: userCart.id },
-          data: { expiresAt },
-        })
+        // expiresAt 업데이트 - 동시성 충돌 방지를 위해 executeRaw 사용
+        await prisma.$executeRaw`UPDATE cart SET expires_at = ${expiresAt} WHERE id = ${userCart.id}`
       }
 
       return userCart!
@@ -216,10 +217,8 @@ export class CartService {
       })
 
       if (cart) {
-        await prisma.cart.update({
-          where: { id: cart.id },
-          data: { expiresAt },
-        })
+        // expiresAt 업데이트 - 동시성 충돌 방지를 위해 executeRaw 사용
+        await prisma.$executeRaw`UPDATE cart SET expires_at = ${expiresAt} WHERE id = ${cart.id}`
         return cart
       }
 
@@ -270,16 +269,34 @@ export class CartService {
       const quantity = item.quantity
 
       // 가격 계산: 배송비가 상품 가격에 포함
-      // 합배송 상품인 경우 (bundleMaxQty > 1 && shippingFee > 0): (소매가 * 수량 + 배송비) / 수량
+      // 합배송 상품인 경우 (bundleMaxQty > 1 && shippingFee > 0): 묶음 단위로 배송비 적용
       // 일반 상품인 경우: 소매가 + 배송비
       let unitPrice = basePrice
+      let itemTotal = 0
       if (bundleMaxQty > 1 && shippingFee > 0) {
-        // 합배송 상품: 수량에 따른 단가 계산
-        const totalPrice = (basePrice * quantity) + shippingFee
-        unitPrice = Math.round(totalPrice / quantity)
+        // 합배송 상품: bundleMaxQty 단위로 묶음을 분리해서 각 묶음마다 배송비 적용
+        // 상세 페이지와 동일한 로직
+        const fullBundles = Math.floor(quantity / bundleMaxQty)
+        const remainder = quantity % bundleMaxQty
+
+        // 풀번들 가격
+        if (fullBundles > 0) {
+          const bundlePrice = (basePrice * bundleMaxQty) + shippingFee
+          itemTotal += bundlePrice * fullBundles
+        }
+        // 나머지 가격
+        if (remainder > 0) {
+          itemTotal += (basePrice * remainder) + shippingFee
+        }
+
+        unitPrice = Math.round(itemTotal / quantity)
       } else if (shippingFee > 0) {
         // 일반 상품: 배송비 포함
         unitPrice = basePrice + shippingFee
+        itemTotal = unitPrice * quantity
+      } else {
+        // 배송비 없는 상품
+        itemTotal = basePrice * quantity
       }
 
       return {
@@ -296,16 +313,20 @@ export class CartService {
         optionSummary: variant?.optionSummary || null,
         image,
         price: unitPrice,
+        originalPrice: basePrice, // 배송비 미포함 원가
+        itemTotal, // 정확한 아이템 총액 (반올림 오차 없음)
         quantity: item.quantity,
         stock: variant?.stock || mainVariant?.stock || 100,
         // 배송 정보 (참조용으로 유지)
         shippingFee: shippingFee,
+        // 합배송 정보
+        bundleMaxQty: bundleMaxQty,
       }
     })
 
     const shopId = cart.shopId || null
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
-    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const subtotal = items.reduce((sum, item) => sum + item.itemTotal, 0)
 
     // 배송비는 이미 상품 가격에 포함되어 있으므로 0으로 설정
     const shippingFee = 0
@@ -368,15 +389,31 @@ export class CartService {
 
     // 묶음 상품이면 항상 새로운 아이템으로 추가 (합치지 않음)
     if (isBundleItem) {
-      await prisma.cartItem.create({
-        data: {
+      // 기존 아이템이 있는지 확인하고 있으면 수량 업데이트
+      const existingItem = await prisma.cartItem.findFirst({
+        where: {
           cartId: cart.id,
           publishedProductId,
           variantId: variantId || null,
-          quantity,
-          priceAt: price,
         },
       })
+
+      if (existingItem) {
+        await prisma.cartItem.update({
+          where: { id: existingItem.id },
+          data: { quantity: existingItem.quantity + quantity },
+        })
+      } else {
+        await prisma.cartItem.create({
+          data: {
+            cartId: cart.id,
+            publishedProductId,
+            variantId: variantId || null,
+            quantity,
+            priceAt: price,
+          },
+        })
+      }
 
       const updatedCart = await this.getOrCreateCart(newSessionId || sessionId, userId, shopId)
       return {

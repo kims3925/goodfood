@@ -36,7 +36,11 @@ interface CartItem {
   optionSummary: string | null
   image: string
   price: number
+  originalPrice: number // 배송비 미포함 원가
+  itemTotal: number // 정확한 아이템 총액
   quantity: number
+  shippingFee: number | null
+  bundleMaxQty: number
 }
 
 interface CheckoutFormData {
@@ -691,13 +695,27 @@ function CheckoutContent() {
   let subtotal = 0
   let orderItemCount = 0
   let orderName = ''
+  let bundleDiscount = 0 // 합배송 할인액
 
   if (fromCart && cartItems.length > 0) {
-    subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    subtotal = cartItems.reduce((sum, item) => sum + item.itemTotal, 0)
     orderItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
     orderName = cartItems.length > 1
       ? `${cartItems[0].name} 외 ${cartItems.length - 1}건`
       : cartItems[0].name
+
+    // 합배송 할인액 계산
+    bundleDiscount = cartItems.reduce((sum, item) => {
+      if (item.bundleMaxQty > 1 && item.shippingFee && item.shippingFee > 0 && item.quantity > 1) {
+        const fullBundles = Math.floor(item.quantity / item.bundleMaxQty)
+        const remainder = item.quantity % item.bundleMaxQty
+        // 할인액 = (풀번들 개수 * (bundleMaxQty - 1) + (나머지 > 1 ? 나머지 - 1 : 0)) * 배송비
+        const savings = (fullBundles * (item.bundleMaxQty - 1) * item.shippingFee) +
+          (remainder > 1 ? (remainder - 1) * item.shippingFee : 0)
+        return sum + savings
+      }
+      return sum
+    }, 0)
   } else if (product) {
     // 합배송 옵션이 있으면 묶음 단위로 가격 계산
     if (product.bundleOptions && product.bundleOptions.length > 0) {
@@ -710,6 +728,7 @@ function CheckoutContent() {
         const maxBundleOption = product.bundleOptions.find((o: any) => o.qty === bundleMaxQty)
         if (maxBundleOption) {
           subtotal += fullBundles * maxBundleOption.totalPrice
+          bundleDiscount += fullBundles * maxBundleOption.discount
         }
       }
 
@@ -718,6 +737,7 @@ function CheckoutContent() {
         const remainderOption = product.bundleOptions.find((o: any) => o.qty === remainder)
         if (remainderOption) {
           subtotal += remainderOption.totalPrice
+          bundleDiscount += remainderOption.discount
         }
       }
 
@@ -912,7 +932,7 @@ function CheckoutContent() {
                             <div className="flex justify-between items-center mt-1">
                               <span className="text-xs text-gray-500">수량: {item.quantity}개</span>
                               <span className="font-semibold text-[#FF6B6B] text-sm">
-                                {formatPrice(item.price * item.quantity)}원
+                                {formatPrice(item.itemTotal)}원
                               </span>
                             </div>
                           </div>
@@ -1463,6 +1483,22 @@ function CheckoutContent() {
                         <span className="text-sm font-medium text-gray-700">결제예정금액</span>
                         <span className="text-[22px] font-bold text-gray-900">{formatPrice(totalAmount)}원</span>
                       </div>
+                      {(bundleDiscount > 0 || couponDiscount > 0) && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          {bundleDiscount > 0 && (
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-[#FF6B6B]">합배송 할인</span>
+                              <span className="text-[#FF6B6B] font-medium">-{formatPrice(bundleDiscount)}원</span>
+                            </div>
+                          )}
+                          {couponDiscount > 0 && (
+                            <div className="flex justify-between items-center text-sm mt-1">
+                              <span className="text-[#FF6B6B]">쿠폰 할인</span>
+                              <span className="text-[#FF6B6B] font-medium">-{formatPrice(couponDiscount)}원</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* 결제하기 버튼 */}

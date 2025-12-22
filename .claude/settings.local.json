@@ -58,5 +58,6 @@
     "typescript",
     "shadcn"
   ],
-  "vim": false
+  "vim": false,
+  "outputStyle": "junior-developer-korean"
 }

@@ -9,6 +9,7 @@ import { Minus, Plus, X, ShoppingBag, Check } from 'lucide-react'
 import { ConfirmModal } from '@/modules/common/ui-kit/src/ui'
 import { useShop } from '@/contexts/ShopContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import { useCartNotification } from '@/contexts/CartNotificationContext'
 
 interface CartItem {
   id: number
@@ -18,9 +19,11 @@ interface CartItem {
   optionSummary: string | null
   image: string
   price: number
+  originalPrice: number // 배송비 미포함 원가
   quantity: number
   stock: number
   shippingFee: number | null
+  bundleMaxQty: number // 합배송 최대 수량
 }
 
 interface Cart {
@@ -37,6 +40,7 @@ export default function CartPage() {
   const { data: session } = useSession()
   const { shop } = useShop()
   const { getPath, getApiPath } = useShopUrl()
+  const { refreshCartCount } = useCartNotification()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [cart, setCart] = useState<Cart | null>(null)
@@ -144,6 +148,62 @@ export default function CartPage() {
     return price?.toLocaleString('ko-KR') || '0'
   }
 
+  // 합배송 가격 계산 함수 (상세 페이지와 동일한 로직)
+  // bundleMaxQty 단위로 묶음을 분리해서 각 묶음마다 배송비 적용
+  const calculateItemPrice = (item: CartItem, newQuantity: number) => {
+    const { originalPrice, shippingFee, bundleMaxQty } = item
+    const fee = shippingFee || 0
+
+    // 합배송 상품인 경우 (bundleMaxQty > 1 && shippingFee > 0)
+    if (bundleMaxQty > 1 && fee > 0) {
+      // calculateItemTotal과 동일한 로직으로 총액 계산 후 단가 산출
+      const fullBundles = Math.floor(newQuantity / bundleMaxQty)
+      const remainder = newQuantity % bundleMaxQty
+
+      let totalPrice = 0
+      if (fullBundles > 0) {
+        const bundlePrice = (originalPrice * bundleMaxQty) + fee
+        totalPrice += bundlePrice * fullBundles
+      }
+      if (remainder > 0) {
+        totalPrice += (originalPrice * remainder) + fee
+      }
+      return Math.round(totalPrice / newQuantity)
+    }
+    // 일반 상품
+    if (fee > 0) {
+      return originalPrice + fee
+    }
+    return originalPrice
+  }
+
+  // 아이템 총액 계산 (상세 페이지와 동일한 로직)
+  // bundleMaxQty 단위로 묶음을 분리해서 각 묶음마다 배송비 적용
+  const calculateItemTotal = (item: CartItem, quantity: number) => {
+    const { originalPrice, shippingFee, bundleMaxQty } = item
+    const fee = shippingFee || 0
+
+    // 합배송 상품인 경우
+    if (bundleMaxQty > 1 && fee > 0) {
+      const fullBundles = Math.floor(quantity / bundleMaxQty)
+      const remainder = quantity % bundleMaxQty
+
+      let totalPrice = 0
+      // 풀번들 가격
+      if (fullBundles > 0) {
+        const bundlePrice = (originalPrice * bundleMaxQty) + fee
+        totalPrice += bundlePrice * fullBundles
+      }
+      // 나머지 가격
+      if (remainder > 0) {
+        totalPrice += (originalPrice * remainder) + fee
+      }
+      return totalPrice
+    }
+    // 일반 상품
+    return (originalPrice + fee) * quantity
+  }
+
   // Optimistic Update: UI 즉시 업데이트, 백그라운드에서 API 호출
   const handleQuantityChange = async (itemId: number, newQuantity: number) => {
     if (newQuantity < 1 || !cart) return
@@ -151,13 +211,18 @@ export default function CartPage() {
     // 이전 상태 저장 (롤백용)
     const prevCart = cart
 
-    // UI 즉시 업데이트 (로딩 없이)
+    // UI 즉시 업데이트 (합배송 가격 계산 적용)
     setCart(prev => {
       if (!prev) return prev
-      const newItems = prev.items.map(item =>
-        item.id === itemId ? { ...item, quantity: newQuantity } : item
-      )
-      const newSubtotal = newItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+      const newItems = prev.items.map(item => {
+        if (item.id === itemId) {
+          const newPrice = calculateItemPrice(item, newQuantity)
+          return { ...item, quantity: newQuantity, price: newPrice }
+        }
+        return item
+      })
+      // 합배송 할인이 적용된 총액 계산
+      const newSubtotal = newItems.reduce((sum, item) => sum + calculateItemTotal(item, item.quantity), 0)
       return {
         ...prev,
         items: newItems,
@@ -180,6 +245,17 @@ export default function CartPage() {
       if (!response.ok) {
         // 실패 시 롤백
         setCart(prevCart)
+      } else {
+        // 성공 시 서버 응답으로 cart 업데이트 (정확한 가격 보장)
+        const data = await response.json()
+        if (data.success && data.cart) {
+          setCart(data.cart)
+          // 선택 상태 유지: 기존 선택된 아이템 중 여전히 존재하는 것만 유지
+          const newItemIds = data.cart.items?.map((item: CartItem) => item.id) || []
+          setSelectedItems(prev => prev.filter(id => newItemIds.includes(id)))
+          // 뱃지 업데이트
+          await refreshCartCount()
+        }
       }
     } catch (error) {
       // 에러 시 롤백
@@ -203,9 +279,9 @@ export default function CartPage() {
     const prevCart = cart
     const prevSelectedItems = selectedItems
 
-    // UI 즉시 업데이트
+    // UI 즉시 업데이트 (합배송 할인 적용)
     const newItems = cart.items.filter(item => item.id !== itemId)
-    const newSubtotal = newItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const newSubtotal = newItems.reduce((sum, item) => sum + calculateItemTotal(item, item.quantity), 0)
 
     setCart({
       ...cart,
@@ -227,6 +303,9 @@ export default function CartPage() {
       if (!response.ok) {
         setCart(prevCart)
         setSelectedItems(prevSelectedItems)
+      } else {
+        // 뱃지 업데이트
+        await refreshCartCount()
       }
     } catch (error) {
       setCart(prevCart)
@@ -248,6 +327,8 @@ export default function CartPage() {
       await fetch(getApiPath('/api/cart'), { method: 'DELETE', credentials: 'include' })
       setCart(null)
       setSelectedItems([])
+      // 뱃지 업데이트
+      await refreshCartCount()
     } catch (error) {
       console.error('장바구니 비우기 실패:', error)
     }
@@ -285,16 +366,39 @@ export default function CartPage() {
         await fetch(getApiPath(`/api/cart/items/${itemId}`), { method: 'DELETE', credentials: 'include' })
       }
       await loadCart()
+      // 뱃지 업데이트
+      await refreshCartCount()
     } catch (error) {
       console.error('선택 상품 삭제 실패:', error)
     }
   }
 
-  // 선택된 항목만 계산 (배송비는 상품 가격에 포함됨)
+  // 선택된 항목만 계산
   const selectedCartItems = cart?.items?.filter(item => selectedItems.includes(item.id)) || []
-  const subtotal = selectedCartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-  const totalAmount = subtotal // 배송비가 상품 가격에 포함되어 있음
-  const discountAmount = 0 // 할인 금액 (추후 구현 시 사용)
+
+  // 원래 금액 (할인 전): 각 상품의 (원가 + 배송비) * 수량
+  const originalTotal = selectedCartItems.reduce((sum, item) => {
+    const fee = item.shippingFee || 0
+    return sum + (item.originalPrice + fee) * item.quantity
+  }, 0)
+
+  // 합배송 할인액 계산
+  const bundleDiscount = selectedCartItems.reduce((sum, item) => {
+    if (item.bundleMaxQty > 1 && item.shippingFee && item.shippingFee > 0 && item.quantity > 1) {
+      const fullBundles = Math.floor(item.quantity / item.bundleMaxQty)
+      const remainder = item.quantity % item.bundleMaxQty
+      const savings = (fullBundles * (item.bundleMaxQty - 1) * item.shippingFee) +
+        (remainder > 1 ? (remainder - 1) * item.shippingFee : 0)
+      return sum + savings
+    }
+    return sum
+  }, 0)
+
+  // 쿠폰 할인 (장바구니에서는 미적용, 주문서에서 적용)
+  const couponDiscount = 0
+
+  // 결제 예정 금액
+  const totalAmount = originalTotal - bundleDiscount - couponDiscount
 
   // 커스텀 체크박스 컴포넌트
   const CustomCheckbox = ({ checked, onChange, className = '' }: { checked: boolean; onChange: () => void; className?: string }) => (
@@ -416,11 +520,25 @@ export default function CartPage() {
                           <p className="text-[13px] text-gray-500 mt-1">{item.optionSummary}</p>
                         )}
 
-                        {/* 가격 */}
+                        {/* 가격 (합배송 할인 적용) */}
                         <div className="mt-2">
                           <span className="text-[16px] font-bold text-gray-900">
-                            {formatPrice(item.price * item.quantity)}원
+                            {formatPrice(calculateItemTotal(item, item.quantity))}원
                           </span>
+                          {/* 합배송 할인 표시: 묶음 단위로 절약 금액 계산 */}
+                          {item.bundleMaxQty > 1 && item.shippingFee && item.shippingFee > 0 && item.quantity > 1 && (() => {
+                            const fullBundles = Math.floor(item.quantity / item.bundleMaxQty)
+                            const remainder = item.quantity % item.bundleMaxQty
+                            // 각 풀번들에서 (bundleMaxQty - 1)개분 배송비 절약
+                            // 나머지에서 (remainder - 1)개분 배송비 절약 (remainder > 1인 경우만)
+                            const savings = (fullBundles * (item.bundleMaxQty - 1) * item.shippingFee) +
+                              (remainder > 1 ? (remainder - 1) * item.shippingFee : 0)
+                            return savings > 0 ? (
+                              <span className="ml-2 text-xs text-[#FF6B6B]">
+                                ({formatPrice(savings)}원 할인)
+                              </span>
+                            ) : null
+                          })()}
                         </div>
 
                         {/* 수량 조절 */}
@@ -468,18 +586,20 @@ export default function CartPage() {
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">상품금액</span>
-                      <span className="text-gray-900">{formatPrice(subtotal)}원</span>
+                      <span className="text-gray-900">{formatPrice(originalTotal)}원</span>
                     </div>
-                    {discountAmount > 0 && (
+                    {bundleDiscount > 0 && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">상품할인금액</span>
-                        <span className="text-[#FF6B6B]">-{formatPrice(discountAmount)}원</span>
+                        <span className="text-[#FF6B6B]">합배송 할인</span>
+                        <span className="text-[#FF6B6B]">-{formatPrice(bundleDiscount)}원</span>
                       </div>
                     )}
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">배송비</span>
-                      <span className="text-[#FF6B6B]">포함</span>
-                    </div>
+                    {couponDiscount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[#FF6B6B]">쿠폰 할인</span>
+                        <span className="text-[#FF6B6B]">-{formatPrice(couponDiscount)}원</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
