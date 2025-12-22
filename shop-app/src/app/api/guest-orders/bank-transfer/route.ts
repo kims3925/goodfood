@@ -31,11 +31,10 @@ function getSessionId(req: NextRequest): string | null {
   return req.cookies.get('cart_session')?.value || null
 }
 
-// 입금 기한 계산 (3일 후)
+// 입금 기한 계산 (3시간 후)
 function getDepositDeadline(): Date {
   const deadline = new Date()
-  deadline.setDate(deadline.getDate() + 3)
-  deadline.setHours(23, 59, 59, 999)
+  deadline.setHours(deadline.getHours() + 3)
   return deadline
 }
 

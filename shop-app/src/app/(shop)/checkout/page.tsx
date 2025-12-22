@@ -758,6 +758,21 @@ function CheckoutContent() {
   const couponDiscount = calculateCouponDiscount(subtotal, selectedCoupon)
   const totalAmount = subtotal - couponDiscount // 배송비는 상품 가격에 포함
 
+  // 배송비 무료 여부 확인
+  const isFreeShipping = (() => {
+    if (fromCart && cartItems.length > 0) {
+      // 장바구니: 모든 상품의 배송비가 0이거나 null이면 무료배송
+      return cartItems.every(item => !item.shippingFee || item.shippingFee === 0)
+    } else if (product) {
+      // 바로구매: bundleOptions가 없고 배송비가 없으면 무료배송
+      // bundleOptions가 있으면 배송비가 포함된 것
+      return !product.bundleOptions || product.bundleOptions.length === 0
+        ? product.salePrice === product.originalPrice
+        : false
+    }
+    return false
+  })()
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -1460,7 +1475,9 @@ function CheckoutContent() {
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">배송비</span>
-                          <span className="text-[#FF6B6B]">포함</span>
+                          <span className={isFreeShipping ? "text-[#22C55E] font-medium" : "text-[#FF6B6B]"}>
+                            {isFreeShipping ? "무료" : "포함"}
+                          </span>
                         </div>
                         {couponDiscount > 0 && (
                           <div className="flex justify-between text-sm">

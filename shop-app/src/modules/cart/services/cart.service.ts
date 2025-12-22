@@ -36,6 +36,7 @@ export interface CartItemResponse {
   image: string
   price: number
   originalPrice: number // 배송비 미포함 원가
+  itemTotal: number // 정확한 아이템 총액 (반올림 오차 없음)
   quantity: number
   stock: number
   // 배송 정보

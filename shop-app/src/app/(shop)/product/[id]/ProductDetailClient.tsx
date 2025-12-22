@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, Heart, Share2, Minus, Plus, Star, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Heart, Share2, Minus, Plus, Star, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCartNotification } from '@/contexts/CartNotificationContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
 
@@ -19,6 +19,14 @@ export default function ProductDetailClient() {
   const [product, setProduct] = useState<any>(null)
   const [quantity, setQuantity] = useState(1)
   const [selectedImage, setSelectedImage] = useState(0)
+  const thumbnailContainerRef = useRef<HTMLDivElement>(null)
+
+  // 섹션별 ref (Sticky Tabs + Scroll Spy)
+  const tabsRef = useRef<HTMLDivElement>(null)
+  const detailSectionRef = useRef<HTMLDivElement>(null)
+  const reviewSectionRef = useRef<HTMLDivElement>(null)
+  const infoSectionRef = useRef<HTMLDivElement>(null)
+
   const [selectedVariant, setSelectedVariant] = useState<any>(null)
   const [selectedBundleQty, setSelectedBundleQty] = useState(1) // 합배송 선택 수량
   const [activeTab, setActiveTab] = useState('detail')
@@ -48,12 +56,92 @@ export default function ProductDetailClient() {
     }
   }, [session, product])
 
-  // 리뷰 탭 활성화 시 리뷰 로드
+  // 리뷰 섹션이 보이면 리뷰 로드
   useEffect(() => {
     if (activeTab === 'review' && product) {
       loadReviews()
     }
   }, [activeTab, product, reviewPage, reviewSortBy])
+
+  // Scroll Spy: 스크롤 위치에 따라 활성 탭 변경
+  useEffect(() => {
+    const handleScroll = () => {
+      // StoreLayout 헤더 높이 계산
+      const windowWidth = window.innerWidth
+      let storeHeaderHeight = 64
+      if (windowWidth >= 1024) {
+        storeHeaderHeight = 100
+      } else if (windowWidth >= 768) {
+        storeHeaderHeight = 80
+      }
+      const tabsHeight = 56
+      const scrollPosition = window.scrollY + storeHeaderHeight + tabsHeight + 50
+
+      // 각 섹션의 위치 확인해서 활성 탭 결정
+      const sections = [
+        { id: 'detail', ref: detailSectionRef },
+        { id: 'review', ref: reviewSectionRef },
+        { id: 'info', ref: infoSectionRef },
+      ]
+
+      for (let i = sections.length - 1; i >= 0; i--) {
+        const section = sections[i]
+        if (section.ref.current) {
+          const sectionTop = section.ref.current.offsetTop
+          if (scrollPosition >= sectionTop) {
+            setActiveTab(section.id)
+            break
+          }
+        }
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  // 탭 클릭 시 해당 섹션으로 스크롤 이동
+  const scrollToSection = (sectionId: string) => {
+    const sectionRefs: Record<string, React.RefObject<HTMLDivElement>> = {
+      detail: detailSectionRef,
+      review: reviewSectionRef,
+      info: infoSectionRef,
+    }
+
+    const targetRef = sectionRefs[sectionId]
+    if (targetRef?.current) {
+      // StoreLayout 헤더 높이: 모바일 64px, md 80px, lg 100px
+      const windowWidth = window.innerWidth
+      let storeHeaderHeight = 64 // 기본 모바일
+      if (windowWidth >= 1024) {
+        storeHeaderHeight = 100 // lg
+      } else if (windowWidth >= 768) {
+        storeHeaderHeight = 80 // md
+      }
+      const tabsHeight = 56 // 탭 높이
+      const headerOffset = storeHeaderHeight + tabsHeight + 16 // 여유 공간
+      const elementPosition = targetRef.current.offsetTop
+      const offsetPosition = elementPosition - headerOffset
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      })
+    }
+  }
+
+  // 이미지 전환 시 썸네일 스크롤
+  useEffect(() => {
+    if (thumbnailContainerRef.current && product?.images) {
+      const container = thumbnailContainerRef.current
+      const thumbnailWidth = 80 + 8 // 썸네일 너비 + gap
+      const scrollPosition = selectedImage * thumbnailWidth - (container.clientWidth / 2) + (thumbnailWidth / 2)
+      container.scrollTo({
+        left: Math.max(0, scrollPosition),
+        behavior: 'smooth'
+      })
+    }
+  }, [selectedImage, product?.images])
 
   const loadProduct = async () => {
     try {
@@ -435,27 +523,98 @@ export default function ProductDetailClient() {
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
           {/* Product Images - 고정 너비 */}
           <div className="w-full lg:w-[430px] flex-shrink-0 space-y-3">
-            <div className="relative w-full h-[430px] bg-white rounded-lg overflow-hidden border border-gray-200">
-              <Image
-                src={product.images[selectedImage]}
-                alt={product.title}
-                fill
-                sizes="430px"
-                className="object-cover"
-                priority
-              />
+            <div className="relative w-full h-[430px] bg-white rounded-lg overflow-hidden border border-gray-200 group">
+              {/* 이미지 컨테이너 (애니메이션) */}
+              <div className="relative w-full h-full">
+                {product.images.map((image: string, index: number) => (
+                  <div
+                    key={index}
+                    className={`absolute inset-0 transition-all duration-500 ease-in-out ${
+                      selectedImage === index
+                        ? 'opacity-100 scale-100'
+                        : 'opacity-0 scale-105'
+                    }`}
+                  >
+                    <Image
+                      src={image}
+                      alt={`${product.title} - ${index + 1}`}
+                      fill
+                      sizes="430px"
+                      className="object-cover"
+                      priority={index === 0}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* 이전/다음 버튼 */}
+              {product.images.length > 1 && (
+                <>
+                  {/* 이전 버튼 */}
+                  <button
+                    onClick={() => setSelectedImage(prev => prev === 0 ? product.images.length - 1 : prev - 1)}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 z-10"
+                    aria-label="이전 이미지"
+                  >
+                    <ChevronLeft className="w-6 h-6 text-gray-700" />
+                  </button>
+
+                  {/* 다음 버튼 */}
+                  <button
+                    onClick={() => setSelectedImage(prev => prev === product.images.length - 1 ? 0 : prev + 1)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 z-10"
+                    aria-label="다음 이미지"
+                  >
+                    <ChevronRight className="w-6 h-6 text-gray-700" />
+                  </button>
+
+                  {/* 이미지 인디케이터 (하단 점) */}
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                    {product.images.map((_: string, index: number) => (
+                      <button
+                        key={index}
+                        onClick={() => setSelectedImage(index)}
+                        className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                          selectedImage === index
+                            ? 'bg-[#FF6B6B] w-6'
+                            : 'bg-white/70 hover:bg-white'
+                        }`}
+                        aria-label={`이미지 ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* 이미지 카운터 */}
+              {product.images.length > 1 && (
+                <div className="absolute top-3 right-3 bg-black/50 text-white text-xs font-medium px-2.5 py-1 rounded-full z-10">
+                  {selectedImage + 1} / {product.images.length}
+                </div>
+              )}
             </div>
-            {/* 썸네일 이미지 - 4열 고정 그리드 */}
-            <div className="grid grid-cols-4 gap-2">
-              {product.images.slice(0, 4).map((image: string, index: number) => (
+
+            {/* 썸네일 이미지 - 가로 스크롤 */}
+            <div
+              ref={thumbnailContainerRef}
+              className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+              style={{ scrollbarWidth: 'thin' }}
+            >
+              {product.images.map((image: string, index: number) => (
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
-                  className={`relative aspect-square rounded-lg overflow-hidden border-2 ${
-                    selectedImage === index ? 'border-[#FF6B6B]' : 'border-gray-200'
+                  className={`relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all duration-200 ${
+                    selectedImage === index
+                      ? 'border-[#FF6B6B] ring-2 ring-[#FF6B6B]/30 scale-105'
+                      : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <Image src={image} alt="" fill sizes="100px" className="object-cover" />
+                  <Image src={image} alt="" fill sizes="80px" className="object-cover" />
+                  {/* 선택된 썸네일 오버레이 */}
+                  {selectedImage === index && (
+                    <div className="absolute inset-0 bg-[#FF6B6B]/10" />
+                  )}
                 </button>
               ))}
             </div>
@@ -761,48 +920,52 @@ export default function ProductDetailClient() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="mt-8 bg-white rounded-lg">
-          <div className="flex border-b">
+        {/* Sticky Tabs - StoreLayout 헤더 아래에 고정 */}
+        <div
+          ref={tabsRef}
+          className="mt-8 bg-white sticky top-16 md:top-20 lg:top-[100px] z-40 shadow-sm"
+        >
+          <div className="flex border-b max-w-[1050px] mx-auto">
             <button
-              onClick={() => setActiveTab('detail')}
-              className={`flex-1 py-4 text-sm font-medium ${
+              onClick={() => scrollToSection('detail')}
+              className={`flex-1 py-4 text-sm font-medium transition-colors ${
                 activeTab === 'detail'
                   ? 'text-[#FF6B6B] border-b-2 border-[#FF6B6B]'
-                  : 'text-gray-500'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               상품설명
             </button>
             <button
-              onClick={() => setActiveTab('review')}
-              className={`flex-1 py-4 text-sm font-medium ${
+              onClick={() => scrollToSection('review')}
+              className={`flex-1 py-4 text-sm font-medium transition-colors ${
                 activeTab === 'review'
                   ? 'text-[#FF6B6B] border-b-2 border-[#FF6B6B]'
-                  : 'text-gray-500'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               리뷰 {reviewStats && reviewStats.totalCount > 0 && `(${reviewStats.totalCount})`}
             </button>
             <button
-              onClick={() => setActiveTab('info')}
-              className={`flex-1 py-4 text-sm font-medium ${
+              onClick={() => scrollToSection('info')}
+              className={`flex-1 py-4 text-sm font-medium transition-colors ${
                 activeTab === 'info'
                   ? 'text-[#FF6B6B] border-b-2 border-[#FF6B6B]'
-                  : 'text-gray-500'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               문의
             </button>
           </div>
+        </div>
 
-          <div className="p-4">
-            {activeTab === 'detail' && (
-              <div className="space-y-6">
-                {/* 상품 설명 */}
-                {product.description && (
-                  <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm p-5">
-                    <div className="text-gray-700 text-[16px] leading-7">
+        {/* 상품설명 섹션 */}
+        <div ref={detailSectionRef} className="bg-white rounded-lg mt-4 p-4">
+          <div id="section-detail" className="space-y-6">
+            {/* 상품 설명 */}
+            {product.description && (
+              <div className="rounded-2xl overflow-hidden p-5">
+                    <div className="text-[#121212] text-[16px] leading-7">
                           {(() => {
                             const lines = product.description.split('\n')
                             let currentListType: 'number' | 'bullet' | null = null
@@ -819,18 +982,18 @@ export default function ProductDetailClient() {
                                           <span className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-sm">
                                             {item.num}
                                           </span>
-                                          <span className="flex-1 pt-0.5 font-medium text-gray-800">{item.content}</span>
+                                          <span className="flex-1 pt-0.5 font-medium text-[#121212]">{item.content}</span>
                                         </li>
                                       ))}
                                     </ol>
                                   )
                                 } else {
                                   elements.push(
-                                    <ul key={`list-${elements.length}`} className="my-3 space-y-2 bg-gray-50 rounded-xl p-4">
+                                    <ul key={`list-${elements.length}`} className="my-3 space-y-2 bg-[#f6f6f6] rounded-xl p-4">
                                       {listItems.map((item) => (
                                         <li key={item.key} className="flex items-start gap-2">
                                           <span className="flex-shrink-0 w-1.5 h-1.5 bg-green-500 rounded-full mt-2.5"></span>
-                                          <span className="flex-1 text-gray-700">{item.content}</span>
+                                          <span className="flex-1 text-[#121212]">{item.content}</span>
                                         </li>
                                       ))}
                                     </ul>
@@ -901,7 +1064,7 @@ export default function ProductDetailClient() {
                               // 이모지로 시작하는 줄 (강조)
                               if (/^[\u{1F300}-\u{1F9FF}]/u.test(trimmed)) {
                                 elements.push(
-                                  <p key={idx} className="my-2 font-medium text-gray-800 text-base">
+                                  <p key={idx} className="my-2 font-medium text-[#121212] text-base">
                                     {trimmed}
                                   </p>
                                 )
@@ -910,7 +1073,7 @@ export default function ProductDetailClient() {
 
                               // 일반 텍스트
                               elements.push(
-                                <p key={idx} className="mb-2 text-gray-700">
+                                <p key={idx} className="mb-2 text-[#121212]">
                                   {trimmed}
                                 </p>
                               )
@@ -925,28 +1088,29 @@ export default function ProductDetailClient() {
                   </div>
                 )}
 
-                {/* 상세 이미지 */}
-                {product.detailImages && product.detailImages.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="font-bold text-gray-800 flex items-center gap-2 text-base">
-                      <span className="text-lg">🖼️</span>
-                      <span>상세 이미지</span>
-                      <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full ml-2">
-                        {product.detailImages.length}장
-                      </span>
-                    </h3>
-                    {product.detailImages.map((image: string, index: number) => (
-                      <div key={index} className="relative w-full rounded-xl overflow-hidden shadow-sm">
-                        <Image src={image} alt="" width={800} height={800} sizes="100vw" className="w-full h-auto" />
-                      </div>
-                    ))}
+            {/* 상세 이미지 */}
+            {product.detailImages && product.detailImages.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="font-bold text-gray-800 flex items-center gap-2 text-base">
+                  <span className="text-lg">🖼️</span>
+                  <span>상세 이미지</span>
+                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full ml-2">
+                    {product.detailImages.length}장
+                  </span>
+                </h3>
+                {product.detailImages.map((image: string, index: number) => (
+                  <div key={index} className="relative w-[80%] mx-auto rounded-xl overflow-hidden shadow-sm">
+                    <Image src={image} alt="" width={640} height={640} sizes="80vw" className="w-full h-auto" />
                   </div>
-                )}
+                ))}
               </div>
             )}
+          </div>
+        </div>
 
-            {activeTab === 'review' && (
-              <div className="space-y-6">
+        {/* 리뷰 섹션 */}
+        <div ref={reviewSectionRef} className="bg-white rounded-lg mt-4 p-4">
+          <div id="section-review" className="space-y-6">
                 {/* 리뷰 통계 */}
                 {reviewStats && (
                   <div className="bg-gray-50 rounded-lg p-6">
@@ -1069,56 +1233,55 @@ export default function ProductDetailClient() {
                   </div>
                 )}
 
-                {/* 페이지네이션 */}
-                {reviewTotalPages > 1 && (
-                  <div className="flex justify-center gap-2 mt-6">
-                    <button
-                      onClick={() => setReviewPage((p) => Math.max(1, p - 1))}
-                      disabled={reviewPage === 1}
-                      className="px-3 py-1 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
-                      이전
-                    </button>
-                    <span className="px-3 py-1 text-sm text-gray-600">
-                      {reviewPage} / {reviewTotalPages}
-                    </span>
-                    <button
-                      onClick={() => setReviewPage((p) => Math.min(reviewTotalPages, p + 1))}
-                      disabled={reviewPage === reviewTotalPages}
-                      className="px-3 py-1 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
-                      다음
-                    </button>
-                  </div>
+            {/* 페이지네이션 */}
+            {reviewTotalPages > 1 && (
+              <div className="flex justify-center gap-2 mt-6">
+                <button
+                  onClick={() => setReviewPage((p) => Math.max(1, p - 1))}
+                  disabled={reviewPage === 1}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  이전
+                </button>
+                <span className="px-3 py-1 text-sm text-gray-600">
+                  {reviewPage} / {reviewTotalPages}
+                </span>
+                <button
+                  onClick={() => setReviewPage((p) => Math.min(reviewTotalPages, p + 1))}
+                  disabled={reviewPage === reviewTotalPages}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  다음
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 문의 섹션 */}
+        <div ref={infoSectionRef} className="bg-white rounded-lg mt-4 p-4 mb-8">
+          <div id="section-info" className="space-y-4 text-sm text-gray-700">
+            <div>
+              <h3 className="font-medium mb-2">배송 안내</h3>
+              <ul className="space-y-1 text-gray-600">
+                {product.shippingInfo?.defaultShippingFee > 0 && (
+                  <li>• 배송비: {formatPrice(product.shippingInfo.defaultShippingFee)}원
+                    {product.shippingInfo?.freeShippingAmount > 0 &&
+                      ` (${formatPrice(product.shippingInfo.freeShippingAmount)}원 이상 무료배송)`}
+                  </li>
                 )}
-              </div>
-            )}
+                <li>• 배송기간: 결제 후 2-3일 이내</li>
+              </ul>
+            </div>
 
-            {activeTab === 'info' && (
-              <div className="space-y-4 text-sm text-gray-700">
-                <div>
-                  <h3 className="font-medium mb-2">배송 안내</h3>
-                  <ul className="space-y-1 text-gray-600">
-                    {product.shippingInfo?.defaultShippingFee > 0 && (
-                      <li>• 배송비: {formatPrice(product.shippingInfo.defaultShippingFee)}원
-                        {product.shippingInfo?.freeShippingAmount > 0 &&
-                          ` (${formatPrice(product.shippingInfo.freeShippingAmount)}원 이상 무료배송)`}
-                      </li>
-                    )}
-                    <li>• 배송기간: 결제 후 2-3일 이내</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="font-medium mb-2">교환/환불 안내</h3>
-                  <ul className="space-y-1 text-gray-600">
-                    <li>• 상품 수령 후 7일 이내 교환/환불 가능</li>
-                    <li>• 단순 변심의 경우 왕복 배송비 구매자 부담</li>
-                    <li>• 상품 하자의 경우 무료 교환/환불</li>
-                  </ul>
-                </div>
-              </div>
-            )}
+            <div>
+              <h3 className="font-medium mb-2">교환/환불 안내</h3>
+              <ul className="space-y-1 text-gray-600">
+                <li>• 상품 수령 후 7일 이내 교환/환불 가능</li>
+                <li>• 단순 변심의 경우 왕복 배송비 구매자 부담</li>
+                <li>• 상품 하자의 경우 무료 교환/환불</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
@@ -1175,6 +1338,22 @@ export default function ProductDetailClient() {
 
       {/* 모바일에서 하단 고정바 영역 확보 */}
       <div className="h-20 lg:hidden"></div>
+
+      {/* TOP 버튼 */}
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        className="fixed bottom-24 lg:bottom-8 right-4 lg:right-8 w-12 h-12 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-all z-50 group"
+        aria-label="맨 위로 이동"
+      >
+        <svg
+          className="w-5 h-5 text-gray-600 group-hover:text-[#FF6B6B] transition-colors"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        </svg>
+      </button>
     </div>
   )
 }

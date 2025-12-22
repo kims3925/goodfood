@@ -363,10 +363,14 @@ export default function OrderDetailPage() {
 
   // 배송 진행 상태 계산
   const getDeliverySteps = () => {
+    // 상품준비중: PREPARING, SHIPPED, DELIVERED 상태이면 완료
+    const preparingCompleted = order?.status === 'PREPARING' || order?.status === 'SHIPPED' || order?.status === 'DELIVERED'
+
     const steps = [
       { key: 'ordered', label: '주문접수', date: order?.orderedAt, completed: true },
       { key: 'paid', label: '결제완료', date: order?.paidAt, completed: !!order?.paidAt },
-      { key: 'shipped', label: '배송시작', date: order?.shippedAt, completed: !!order?.shippedAt },
+      { key: 'preparing', label: '상품준비', date: null, completed: preparingCompleted },
+      { key: 'shipped', label: '배송중', date: order?.shippedAt, completed: !!order?.shippedAt },
       { key: 'delivered', label: '배송완료', date: order?.deliveredAt, completed: !!order?.deliveredAt },
     ]
     return steps
@@ -526,7 +530,7 @@ export default function OrderDetailPage() {
             <Truck className="w-5 h-5" style={{ color: primaryColor }} />
             배송 현황
           </h2>
-          <div className="relative">
+          <div className="relative max-w-2xl mx-auto">
             {/* Progress Line */}
             <div className="absolute top-6 left-6 right-6 h-0.5 bg-gray-200">
               <div

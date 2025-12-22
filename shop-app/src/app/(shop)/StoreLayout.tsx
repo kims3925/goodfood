@@ -23,6 +23,16 @@ function StoreLayoutContent({
   const [searchQuery, setSearchQuery] = useState('')
   const [isCustomerServiceOpen, setIsCustomerServiceOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
+
+  // 스크롤 감지 - 유틸리티 바 숨기기
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 100)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   // Shop 정보
   const shopName = shop?.name || 'ABC마켓'
@@ -55,8 +65,10 @@ function StoreLayoutContent({
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
       <header className="kurly-header border-b border-gray-200">
-        {/* Top Utility Bar */}
-        <div className="border-b border-gray-100 bg-white">
+        {/* Top Utility Bar - 스크롤 시 숨김 */}
+        <div className={`border-b border-gray-100 bg-white overflow-hidden transition-all duration-300 ${
+          isScrolled ? 'max-h-0 border-b-0' : 'max-h-12'
+        }`}>
           <div className="kurly-container">
             <div className="flex justify-end items-center h-8 text-xs text-gray-600 gap-1">
               {status === 'loading' ? (
