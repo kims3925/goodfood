@@ -41,6 +41,8 @@ interface CartItem {
   quantity: number
   shippingFee: number | null
   bundleMaxQty: number
+  bundleUnit?: number  // 옵션별 합배송 단위 수
+  bundleDiscount?: number  // 합배송 할인 금액 (배송비 0원일 때 사용)
 }
 
 interface CheckoutFormData {
@@ -704,15 +706,29 @@ function CheckoutContent() {
       ? `${cartItems[0].name} 외 ${cartItems.length - 1}건`
       : cartItems[0].name
 
-    // 합배송 할인액 계산
+    // 합배송 할인액 계산 (bundleUnit 고려)
+    // 1. 배송비가 있는 경우: 합배송으로 절약되는 배송비
+    // 2. bundleDiscount가 있는 경우: 합배송 묶음 완성 시 할인
     bundleDiscount = cartItems.reduce((sum, item) => {
+      const bundleUnit = item.bundleUnit || 1
+      const discount = item.bundleDiscount || 0
+
+      // 케이스 1: 배송비가 있는 합배송 상품
       if (item.bundleMaxQty > 1 && item.shippingFee && item.shippingFee > 0 && item.quantity > 1) {
-        const fullBundles = Math.floor(item.quantity / item.bundleMaxQty)
-        const remainder = item.quantity % item.bundleMaxQty
-        // 할인액 = (풀번들 개수 * (bundleMaxQty - 1) + (나머지 > 1 ? 나머지 - 1 : 0)) * 배송비
-        const savings = (fullBundles * (item.bundleMaxQty - 1) * item.shippingFee) +
-          (remainder > 1 ? (remainder - 1) * item.shippingFee : 0)
-        return sum + savings
+        const totalBundleUnits = item.quantity * bundleUnit
+        const shippingCount = Math.floor(totalBundleUnits / item.bundleMaxQty) +
+          (totalBundleUnits % item.bundleMaxQty > 0 ? 1 : 0)
+        // 할인액 = (수량 × 배송비) - (배송횟수 × 배송비)
+        const savings = (item.quantity * item.shippingFee) - (shippingCount * item.shippingFee)
+        return sum + Math.max(0, savings)
+      }
+      // 케이스 2: bundleDiscount가 있는 상품 (배송비 0원)
+      if (item.bundleMaxQty > 1 && discount > 0) {
+        const totalBundleUnits = item.quantity * bundleUnit
+        const fullBundles = Math.floor(totalBundleUnits / item.bundleMaxQty)
+        // 할인액 = 완성된 묶음 수 × bundleDiscount
+        const discountAmount = fullBundles * discount
+        return sum + discountAmount
       }
       return sum
     }, 0)

@@ -1091,13 +1091,6 @@ export default function ProductDetailClient() {
             {/* 상세 이미지 */}
             {product.detailImages && product.detailImages.length > 0 && (
               <div className="space-y-4">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2 text-base">
-                  <span className="text-lg">🖼️</span>
-                  <span>상세 이미지</span>
-                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full ml-2">
-                    {product.detailImages.length}장
-                  </span>
-                </h3>
                 {product.detailImages.map((image: string, index: number) => (
                   <div key={index} className="relative w-[80%] mx-auto rounded-xl overflow-hidden shadow-sm">
                     <Image src={image} alt="" width={640} height={640} sizes="80vw" className="w-full h-auto" />

@@ -20,6 +20,7 @@ export interface VariantInput {
   options?: Record<string, string>
   wholesalePrice?: number
   price?: number
+  bundleUnit?: number  // 합배송 단위 수 (예: 2박스 옵션이면 2)
 }
 
 export interface ProductCreateInput {
@@ -35,6 +36,7 @@ export interface ProductCreateInput {
   shippingFee?: number
   shippingInfo?: string
   bundleMaxQty?: number  // 합배송 최대 수량
+  bundleDiscount?: number  // 합배송 할인 금액
   thumbnailUrl?: string | null
   imageUrls?: string[]
   options?: OptionGroupInput[]
@@ -56,6 +58,8 @@ export interface ProductUpdateInput {
   shippingFee?: number
   shippingInfo?: string
   bundleMaxQty?: number  // 합배송 최대 수량
+  bundleUnit?: string  // 합배송 단위
+  bundleDiscount?: number  // 합배송 할인 금액
   options?: OptionInput[]
   variants?: VariantInput[]
 }

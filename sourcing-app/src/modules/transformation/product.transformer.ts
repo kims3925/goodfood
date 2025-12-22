@@ -292,6 +292,7 @@ ${pricingRule}
 ### 합배송 인식 패턴
 "3세트까지 합배송", "합배송 3개", "묶음배송 2개까지"
 "2세트 이상 배송비 할인", "3박스 동봉 가능"
+"2세트(4박스)까지 합배송" → bundleMaxQty: 4
 
 ### 추출 규칙
 - 배송비 금액이 명시되면 숫자로 추출
@@ -299,6 +300,13 @@ ${pricingRule}
 - 정보 없으면 null
 - 합배송 최대 수량 추출 (숫자로 명시된 경우)
 - 합배송 언급 없으면 bundleMaxQty: 1 (합배송 불가)
+
+### 옵션별 합배송 단위 (bundleUnit)
+- 합배송 한도의 단위를 파악 (박스, kg, 개, 세트 등)
+- 각 옵션명에서 해당 단위의 수량을 추출하여 variants에 bundleUnit 추가
+- 예: "4박스까지 합배송", 옵션 "2박스(2.8kg)" → bundleUnit: 2
+- 예: "5kg까지 합배송", 옵션 "2kg" → bundleUnit: 2
+- 단위가 명확하지 않으면 bundleUnit: 1 (기본값)
 
 ---
 
@@ -340,7 +348,8 @@ ${pricingRule}
       "optionSummary": "string",
       "options": { "groupName": "value" },
       "wholesalePrice": number,
-      "price": number
+      "price": number,
+      "bundleUnit": number (기본값 1, 합배송 단위 수)
     }
   ],
   "shipping": {
@@ -505,11 +514,18 @@ function parseAiVariants(rawVariants: any[]): GeneratedVariant[] {
         console.warn(`⚠️ variants[${index}].price 변환 실패:`, v.price)
       }
 
+      // bundleUnit: AI가 추출했으면 사용, 아니면 정규표현식으로 폴백
+      const optionSummary = String(v.optionSummary || '')
+      const bundleUnit = typeof v.bundleUnit === 'number'
+        ? v.bundleUnit
+        : extractBundleUnitFromSummary(optionSummary)
+
       return {
-        optionSummary: String(v.optionSummary || ''),
+        optionSummary,
         options: v.options && typeof v.options === 'object' ? v.options : {},
         wholesalePrice,
         price: price || wholesalePrice, // price 없으면 wholesalePrice 사용
+        bundleUnit,
       }
     })
     // 최종적으로 가격이 있는 항목만 유지
@@ -517,6 +533,70 @@ function parseAiVariants(rawVariants: any[]): GeneratedVariant[] {
 
   console.log(`📊 variants 파싱 결과: 입력 ${rawVariants.length}개 -> 유효 ${parsed.length}개`)
   return parsed
+}
+
+/**
+ * 옵션명에서 합배송 단위 수 추출 (폴백 로직)
+ * "2박스", "3kg", "2개" 등에서 숫자 추출
+ */
+function extractBundleUnitFromSummary(optionSummary: string): number {
+  if (!optionSummary) return 1
+
+  // 박스, kg, 개, 세트, 팩 순서로 매칭 (더 구체적인 패턴 우선)
+  const patterns = [
+    /(\d+)\s*(박스|box)/i,      // "2박스", "2 box"
+    /(\d+)\s*(kg|킬로)/i,       // "2kg", "2킬로"
+    /(\d+)\s*(세트|set)/i,      // "2세트", "2 set"
+    /(\d+)\s*(팩|pack)/i,       // "2팩", "2 pack"
+    /(\d+)\s*개입/i,            // "40개입" -> 단위가 아니므로 제외
+  ]
+
+  for (const pattern of patterns) {
+    const match = optionSummary.match(pattern)
+    if (match) {
+      const unit = parseInt(match[1])
+      // "40개입" 같은 경우는 합배송 단위가 아니므로 1 반환
+      if (match[2] && match[2].includes('개입')) continue
+      if (unit > 0 && unit <= 100) { // 합리적인 범위
+        return unit
+      }
+    }
+  }
+
+  return 1 // 기본값
+}
+
+/**
+ * shippingInfo에서 합배송 할인 금액 추출
+ * 예: "합배송시 3000원 차감", "합배송 시 배송비 3,000원 할인"
+ */
+function extractBundleDiscountFromShippingInfo(shippingInfo: string | null | undefined): number {
+  if (!shippingInfo) return 0
+
+  // 합배송 할인 패턴들
+  const patterns = [
+    // "합배송시 3000원 차감", "합배송 시 3,000원 할인"
+    /합배송\s*(?:시|시에?)?\s*(?:배송비\s*)?(\d{1,3}(?:,?\d{3})*)\s*원?\s*(?:차감|할인|감소|절약)/i,
+    // "3000원 할인 (합배송)", "3,000원 차감(합배송시)"
+    /(\d{1,3}(?:,?\d{3})*)\s*원?\s*(?:차감|할인|감소|절약)\s*\(?합배송/i,
+    // "합배송 할인 3000원", "합배송할인: 3,000원"
+    /합배송\s*할인\s*:?\s*(\d{1,3}(?:,?\d{3})*)\s*원?/i,
+    // "묶음배송 시 3000원 할인"
+    /묶음\s*배송\s*(?:시|시에?)?\s*(\d{1,3}(?:,?\d{3})*)\s*원?\s*(?:차감|할인|감소|절약)/i,
+  ]
+
+  for (const pattern of patterns) {
+    const match = shippingInfo.match(pattern)
+    if (match) {
+      // 콤마 제거 후 숫자로 변환
+      const discount = parseInt(match[1].replace(/,/g, ''))
+      if (discount > 0 && discount <= 50000) { // 합리적인 범위 (최대 5만원)
+        return discount
+      }
+    }
+  }
+
+  return 0 // 기본값
 }
 
 /**
@@ -1412,6 +1492,7 @@ ${pricingRule}
 ### 합배송 인식 패턴
 "3세트까지 합배송", "합배송 3개", "묶음배송 2개까지"
 "2세트 이상 배송비 할인", "3박스 동봉 가능"
+"2세트(4박스)까지 합배송" → bundleMaxQty: 4
 
 ### 추출 규칙
 - 배송비 금액이 명시되면 숫자로 추출
@@ -1419,6 +1500,13 @@ ${pricingRule}
 - 정보 없으면 null
 - 합배송 최대 수량 추출 (숫자로 명시된 경우)
 - 합배송 언급 없으면 bundleMaxQty: 1 (합배송 불가)
+
+### 옵션별 합배송 단위 (bundleUnit)
+- 합배송 한도의 단위를 파악 (박스, kg, 개, 세트 등)
+- 각 옵션명에서 해당 단위의 수량을 추출하여 variants에 bundleUnit 추가
+- 예: "4박스까지 합배송", 옵션 "2박스(2.8kg)" → bundleUnit: 2
+- 예: "5kg까지 합배송", 옵션 "2kg" → bundleUnit: 2
+- 단위가 명확하지 않으면 bundleUnit: 1 (기본값)
 
 ---
 

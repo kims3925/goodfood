@@ -198,6 +198,7 @@ export class ProductRepository {
         shippingFee: data.shippingFee || null,
         shippingInfo: data.shippingInfo || null,
         bundleMaxQty: data.bundleMaxQty || 1,
+        bundleDiscount: data.bundleDiscount || 0,
         thumbnailUrl: data.thumbnailUrl || null,
         options: data.options?.length
           ? {
@@ -226,6 +227,7 @@ export class ProductRepository {
                 optionSummary: v.optionSummary ?? null,
                 wholesalePrice: v.wholesalePrice ?? null,
                 price: v.price ?? 0,
+                bundleUnit: v.bundleUnit ?? 1,  // 합배송 단위 수 (기본값 1)
               })),
             }
           : undefined,
@@ -274,6 +276,8 @@ export class ProductRepository {
     if (data.shippingFee !== undefined) updateData.shippingFee = data.shippingFee
     if (data.shippingInfo !== undefined) updateData.shippingInfo = data.shippingInfo
     if (data.bundleMaxQty !== undefined) updateData.bundleMaxQty = data.bundleMaxQty
+    if (data.bundleUnit !== undefined) updateData.bundleUnit = data.bundleUnit
+    if (data.bundleDiscount !== undefined) updateData.bundleDiscount = data.bundleDiscount
 
     if (data.options !== undefined) {
       await prisma.productOption.deleteMany({ where: { productId: id } })
@@ -298,6 +302,7 @@ export class ProductRepository {
             optionSummary: v.optionSummary ?? null,
             wholesalePrice: v.wholesalePrice ?? null,
             price: v.price ?? 0,
+            bundleUnit: v.bundleUnit ?? 1,  // 합배송 단위 수 (기본값 1)
           })),
         })
       }

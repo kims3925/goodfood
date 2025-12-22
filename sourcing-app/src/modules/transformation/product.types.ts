@@ -85,6 +85,7 @@ export interface GeneratedVariant {
   options: Record<string, string>          // { "색상": "빨강", "사이즈": "L" }
   wholesalePrice?: number                  // 도매가
   price?: number                           // 판매가
+  bundleUnit?: number                      // 합배송 단위 수 (예: 2박스 옵션이면 2)
 }
 
 /**
