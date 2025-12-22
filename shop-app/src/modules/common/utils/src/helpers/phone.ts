@@ -37,6 +37,21 @@ export function formatPhoneNumber(phone: string | null | undefined): string {
     return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
   }
 
+  // 대표전화 8자리 (xxxx-xxxx)
+  if (digits.length === 8) {
+    return `${digits.slice(0, 4)}-${digits.slice(4)}`
+  }
+
+  // 12자리 이상: 4-4-4 형식으로 분할 (예: 1234-5678-9012)
+  if (digits.length >= 12) {
+    return `${digits.slice(0, 4)}-${digits.slice(4, 8)}-${digits.slice(8, 12)}`
+  }
+
+  // 9자리: xxx-xxx-xxx
+  if (digits.length === 9) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+  }
+
   // 포맷팅 불가능한 경우 원본 반환
   return phone
 }

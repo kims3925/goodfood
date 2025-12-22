@@ -477,28 +477,75 @@ export default function ProductDetailClient() {
               {/* Variant 선택 */}
               {product.variants && product.variants.length > 1 && (
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">옵션 선택</label>
-                    <span className="text-lg font-bold text-gray-900">{formatPrice(currentPrice)}원</span>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-semibold text-gray-800">옵션 선택</label>
+                    <div className="text-right">
+                      <span className="text-xl font-bold text-[#FF6B6B]">{formatPrice(currentPrice)}</span>
+                      <span className="text-sm text-gray-500 ml-0.5">원</span>
+                    </div>
                   </div>
-                  <div className="relative">
-                    <select
-                      value={selectedVariant?.id || ''}
-                      onChange={(e) => {
-                        const variant = product.variants.find((v: any) => v.id === parseInt(e.target.value))
-                        setSelectedVariant(variant)
-                        setQuantity(1)
-                      }}
-                      className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-3.5 pr-10 text-gray-900 bg-gray-50 hover:border-gray-300 focus:border-[#FF6B6B] focus:ring-2 focus:ring-[#FF6B6B]/20 outline-none transition-all cursor-pointer"
-                    >
+
+                  {/* 옵션 버튼 그리드 (5개 이하일 때) */}
+                  {product.variants.length <= 5 ? (
+                    <div className="grid grid-cols-1 gap-2">
                       {product.variants.map((variant: any) => (
-                        <option key={variant.id} value={variant.id}>
-                          {variant.optionSummary} - {formatPrice(variant.price)}원
-                        </option>
+                        <button
+                          key={variant.id}
+                          onClick={() => {
+                            setSelectedVariant(variant)
+                            setQuantity(1)
+                          }}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${
+                            selectedVariant?.id === variant.id
+                              ? 'border-[#FF6B6B] bg-[#FFF5F5]'
+                              : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                              selectedVariant?.id === variant.id
+                                ? 'border-[#FF6B6B]'
+                                : 'border-gray-300'
+                            }`}>
+                              {selectedVariant?.id === variant.id && (
+                                <div className="w-2.5 h-2.5 rounded-full bg-[#FF6B6B]" />
+                              )}
+                            </div>
+                            <span className={`font-medium ${
+                              selectedVariant?.id === variant.id ? 'text-gray-900' : 'text-gray-700'
+                            }`}>
+                              {variant.optionSummary}
+                            </span>
+                          </div>
+                          <span className={`font-bold ${
+                            selectedVariant?.id === variant.id ? 'text-[#FF6B6B]' : 'text-gray-900'
+                          }`}>
+                            {formatPrice(variant.price)}원
+                          </span>
+                        </button>
                       ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-                  </div>
+                    </div>
+                  ) : (
+                    /* 드롭다운 (6개 이상일 때) */
+                    <div className="relative">
+                      <select
+                        value={selectedVariant?.id || ''}
+                        onChange={(e) => {
+                          const variant = product.variants.find((v: any) => v.id === parseInt(e.target.value))
+                          setSelectedVariant(variant)
+                          setQuantity(1)
+                        }}
+                        className="w-full appearance-none border-2 border-gray-200 rounded-xl px-4 py-3.5 pr-10 text-gray-900 bg-white hover:border-gray-300 focus:border-[#FF6B6B] focus:ring-2 focus:ring-[#FF6B6B]/20 outline-none transition-all cursor-pointer font-medium"
+                      >
+                        {product.variants.map((variant: any) => (
+                          <option key={variant.id} value={variant.id}>
+                            {variant.optionSummary} - {formatPrice(variant.price)}원
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -751,13 +798,150 @@ export default function ProductDetailClient() {
 
           <div className="p-4">
             {activeTab === 'detail' && (
-              <div className="space-y-4">
-                <p className="text-gray-700">{product.description}</p>
-                {product.detailImages && product.detailImages.map((image: string, index: number) => (
-                  <div key={index} className="relative w-full">
-                    <Image src={image} alt="" width={800} height={800} sizes="100vw" className="w-full h-auto rounded-lg" />
+              <div className="space-y-6">
+                {/* 상품 설명 */}
+                {product.description && (
+                  <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm p-5">
+                    <div className="text-gray-700 text-[16px] leading-7">
+                          {(() => {
+                            const lines = product.description.split('\n')
+                            let currentListType: 'number' | 'bullet' | null = null
+                            let listItems: { key: number; content: string; num?: string }[] = []
+                            const elements: React.ReactNode[] = []
+
+                            const flushList = () => {
+                              if (listItems.length > 0) {
+                                if (currentListType === 'number') {
+                                  elements.push(
+                                    <ol key={`list-${elements.length}`} className="my-4 space-y-3">
+                                      {listItems.map((item) => (
+                                        <li key={item.key} className="flex items-start gap-3">
+                                          <span className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-sm">
+                                            {item.num}
+                                          </span>
+                                          <span className="flex-1 pt-0.5 font-medium text-gray-800">{item.content}</span>
+                                        </li>
+                                      ))}
+                                    </ol>
+                                  )
+                                } else {
+                                  elements.push(
+                                    <ul key={`list-${elements.length}`} className="my-3 space-y-2 bg-gray-50 rounded-xl p-4">
+                                      {listItems.map((item) => (
+                                        <li key={item.key} className="flex items-start gap-2">
+                                          <span className="flex-shrink-0 w-1.5 h-1.5 bg-green-500 rounded-full mt-2.5"></span>
+                                          <span className="flex-1 text-gray-700">{item.content}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )
+                                }
+                                listItems = []
+                                currentListType = null
+                              }
+                            }
+
+                            lines.forEach((line: string, idx: number) => {
+                              const trimmed = line.trim()
+
+                              // 숫자 목록 (1. 2. 3. 등)
+                              const numberMatch = trimmed.match(/^([0-9]+)\.\s*(.+)/)
+                              if (numberMatch) {
+                                if (currentListType !== 'number') {
+                                  flushList()
+                                  currentListType = 'number'
+                                }
+                                listItems.push({ key: idx, num: numberMatch[1], content: numberMatch[2] })
+                                return
+                              }
+
+                              // 글머리 기호 (•, -, *, ✓, ✔, >, ·)
+                              const bulletMatch = trimmed.match(/^[•\-\*✓✔\>·]\s*(.+)/)
+                              if (bulletMatch) {
+                                if (currentListType !== 'bullet') {
+                                  flushList()
+                                  currentListType = 'bullet'
+                                }
+                                listItems.push({ key: idx, content: bulletMatch[1] })
+                                return
+                              }
+
+                              // 목록이 아닌 경우 기존 목록 출력
+                              flushList()
+
+                              // 빈 줄
+                              if (!trimmed) {
+                                elements.push(<div key={idx} className="h-4" />)
+                                return
+                              }
+
+                              // 강조 표현 (【】, 「」, ※, ★, ☆, ■, □, ▶, ▷)
+                              if (/^[【「※★☆■□▶▷]/.test(trimmed)) {
+                                elements.push(
+                                  <div key={idx} className="my-3 p-3 bg-amber-50 border-l-4 border-amber-400 rounded-r-lg">
+                                    <p className="font-bold text-amber-800">{trimmed}</p>
+                                  </div>
+                                )
+                                return
+                              }
+
+                              // 대괄호로 감싸진 제목 [제목]
+                              const bracketMatch = trimmed.match(/^\[(.+)\]$/)
+                              if (bracketMatch) {
+                                elements.push(
+                                  <div key={idx} className="mt-5 mb-3">
+                                    <span className="inline-block bg-gray-800 text-white px-3 py-1.5 rounded-lg text-sm font-bold">
+                                      {bracketMatch[1]}
+                                    </span>
+                                  </div>
+                                )
+                                return
+                              }
+
+                              // 이모지로 시작하는 줄 (강조)
+                              if (/^[\u{1F300}-\u{1F9FF}]/u.test(trimmed)) {
+                                elements.push(
+                                  <p key={idx} className="my-2 font-medium text-gray-800 text-base">
+                                    {trimmed}
+                                  </p>
+                                )
+                                return
+                              }
+
+                              // 일반 텍스트
+                              elements.push(
+                                <p key={idx} className="mb-2 text-gray-700">
+                                  {trimmed}
+                                </p>
+                              )
+                            })
+
+                            // 마지막 목록 출력
+                            flushList()
+
+                            return elements
+                          })()}
+                    </div>
                   </div>
-                ))}
+                )}
+
+                {/* 상세 이미지 */}
+                {product.detailImages && product.detailImages.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="font-bold text-gray-800 flex items-center gap-2 text-base">
+                      <span className="text-lg">🖼️</span>
+                      <span>상세 이미지</span>
+                      <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full ml-2">
+                        {product.detailImages.length}장
+                      </span>
+                    </h3>
+                    {product.detailImages.map((image: string, index: number) => (
+                      <div key={index} className="relative w-full rounded-xl overflow-hidden shadow-sm">
+                        <Image src={image} alt="" width={800} height={800} sizes="100vw" className="w-full h-auto" />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
