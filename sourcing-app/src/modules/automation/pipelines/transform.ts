@@ -373,6 +373,41 @@ export async function runTransformPipeline(
         let transformedPost: TransformedPost
 
         if (result.success && result.draft) {
+          // 가격 정책 적용 검증 (정책이 설정된 경우에만)
+          if (pricingPolicyContent && result.draft.variants && result.draft.variants.length > 0) {
+            const unpricedVariants = result.draft.variants.filter(v =>
+              v.wholesalePrice !== undefined &&
+              v.wholesalePrice !== null &&
+              v.price !== undefined &&
+              v.wholesalePrice === v.price
+            )
+
+            if (unpricedVariants.length > 0) {
+              // 가격 정책 미적용 - 실패로 처리
+              const failedOptions = unpricedVariants.map(v => v.optionSummary || '기본').join(', ')
+              const errorMessage = `가격 정책 미적용: ${unpricedVariants.length}개 옵션의 도매가와 소매가가 동일합니다. (${failedOptions})`
+
+              console.log(`[Transform] Post ${post.id} failed price policy validation: ${errorMessage}`)
+
+              transformedPost = {
+                postId: result.postId,
+                status: 'failed',
+                error: errorMessage,
+                errorType: 'PERMANENT',
+                retryable: true,  // 정책 수정 후 재시도 가능
+              }
+
+              errors.push({
+                itemId: post.id,
+                message: errorMessage,
+                timestamp: new Date(),
+              })
+
+              transformedPosts.push(transformedPost)
+              continue  // 다음 결과로
+            }
+          }
+
           try {
             // CollectedProduct 생성
             const collectedProduct = await prisma.collectedProduct.create({
