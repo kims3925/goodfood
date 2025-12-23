@@ -45,12 +45,10 @@ export async function runProductCreatePipeline(
 
   console.log(`[ProductCreate] Starting for user ${userId}`)
 
-  // Product가 없는 CollectedProduct 조회
+  // Product가 없는 CollectedProduct 조회 (isConverted=false)
   const whereClause: any = {
     userId,
-    products: {
-      none: {}, // Product가 아직 없는 수집상품만
-    },
+    isConverted: false, // Product로 아직 변환되지 않은 수집상품만
   }
 
   if (config.channelIds?.length) {
@@ -231,6 +229,12 @@ export async function runProductCreatePipeline(
           // 이미지 실패해도 상품 생성은 성공으로 처리
         }
       }
+
+      // 수집상품의 isConverted를 true로 업데이트
+      await prisma.collectedProduct.update({
+        where: { id: collectedProduct.id },
+        data: { isConverted: true },
+      })
 
       result.status = 'success'
       result.productId = product.id

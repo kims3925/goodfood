@@ -358,26 +358,56 @@ function CheckoutContent() {
       if (data.success && data.publishedProduct) {
         const pp = data.publishedProduct
         const product = pp.product
-        const mainVariant = product.variants?.[0]
         const images = product.post?.images?.map((img: any) => img.url) || []
 
-        // 합배송 옵션 계산 (shop product API와 동일한 로직)
+        // URL의 variantId로 해당 variant 찾기 (없으면 첫 번째)
+        const selectedVariant = variantId
+          ? product.variants?.find((v: any) => v.id === parseInt(variantId))
+          : product.variants?.[0]
+
+        // 합배송 옵션 계산 (상품 상세 페이지와 동일한 로직)
         const shippingFee = product.shippingFee ?? 0
         const bundleMaxQty = product.bundleMaxQty ?? 1
-        const variantPrice = mainVariant?.price || 0
-        const priceWithShipping = variantPrice + shippingFee
+        const variantPrice = selectedVariant?.price || 0
+        const bundleUnit = selectedVariant?.bundleUnit || 1
+
+        // bundleShippingType에 따른 가격 계산
+        // INCLUDED: 할인형 - 가격에 배송비 포함, 합배송 시 할인
+        // SEPARATE: 배송비형 - 가격 + 배송비, 합배송 시 배송비 절약
+        const isBundleDiscount = product.bundleShippingType === 'INCLUDED'
 
         let bundleOptions: any[] = []
         if (bundleMaxQty > 1 && shippingFee > 0) {
-          for (let qty = 1; qty <= bundleMaxQty; qty++) {
-            const totalPrice = (variantPrice * qty) + shippingFee
-            const fullPrice = priceWithShipping * qty
-            const discount = fullPrice - totalPrice
+          // 합배송 표시용 최대 수량 (1묶음 완성까지)
+          const maxDisplayQty = Math.floor(bundleMaxQty / bundleUnit) || 1
+
+          for (let qty = 1; qty <= maxDisplayQty; qty++) {
+            const totalBundleUnits = qty * bundleUnit
+            const shippingCount = Math.ceil(totalBundleUnits / bundleMaxQty)
+
+            let totalPrice: number
+            let discount: number
+
+            if (isBundleDiscount) {
+              // 할인형: 첫 번째 수량은 배송비 포함, 2번째부터 할인
+              const discountCount = Math.max(0, qty - shippingCount)
+              totalPrice = (variantPrice * qty) - (shippingFee * discountCount)
+              discount = shippingFee * discountCount
+            } else {
+              // 배송비형: 원가 + (배송비 × 횟수)
+              const originalPrice = variantPrice - shippingFee
+              totalPrice = (originalPrice * qty) + (shippingFee * shippingCount)
+              const fullPrice = variantPrice * qty
+              discount = fullPrice - totalPrice
+            }
+
             bundleOptions.push({
               qty,
               totalPrice,
               discount,
               unitPrice: Math.round(totalPrice / qty),
+              isBundleDiscount,
+              bundleUnit,
             })
           }
         }
@@ -388,12 +418,15 @@ function CheckoutContent() {
           title: product.name,
           description: product.description || '',
           images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
-          originalPrice: priceWithShipping,
-          salePrice: priceWithShipping,
+          originalPrice: variantPrice,
+          salePrice: variantPrice,
           category: product.categoryId || '',
-          stock: mainVariant?.stock || 100,
+          stock: selectedVariant?.stock || 100,
           bundleOptions,
           bundleMaxQty: bundleMaxQty > 1 ? bundleMaxQty : undefined,
+          shippingFee,
+          isBundleDiscount,
+          bundleUnit,
         })
       } else {
         setProduct({
@@ -732,36 +765,30 @@ function CheckoutContent() {
       return sum
     }, 0)
   } else if (product) {
-    // 합배송 옵션이 있으면 묶음 단위로 가격 계산
+    // 합배송 옵션이 있으면 bundleUnit 고려하여 가격 계산
     if (product.bundleOptions && product.bundleOptions.length > 0) {
-      const bundleMaxQty = product.bundleMaxQty || product.bundleOptions.length
-      const fullBundles = Math.floor(quantity / bundleMaxQty)
-      const remainder = quantity % bundleMaxQty
+      const bundleMaxQty = product.bundleMaxQty || 1
+      const bundleUnit = product.bundleUnit || 1
+      const isBundleDiscount = product.isBundleDiscount || false
+      const shippingFee = product.shippingFee || 0
+      const basePrice = product.salePrice || 0
 
-      // 풀번들 가격
-      if (fullBundles > 0) {
-        const maxBundleOption = product.bundleOptions.find((o: any) => o.qty === bundleMaxQty)
-        if (maxBundleOption) {
-          subtotal += fullBundles * maxBundleOption.totalPrice
-          bundleDiscount += fullBundles * maxBundleOption.discount
-        }
-      }
+      // bundleUnit을 고려한 총 합배송 단위 계산
+      const totalBundleUnits = quantity * bundleUnit
+      const shippingCount = Math.floor(totalBundleUnits / bundleMaxQty) +
+        (totalBundleUnits % bundleMaxQty > 0 ? 1 : 0)
 
-      // 나머지 가격
-      if (remainder > 0) {
-        const remainderOption = product.bundleOptions.find((o: any) => o.qty === remainder)
-        if (remainderOption) {
-          subtotal += remainderOption.totalPrice
-          bundleDiscount += remainderOption.discount
-        }
-      }
-
-      // 단일 수량인 경우
-      if (quantity === 1 && subtotal === 0) {
-        const singleOption = product.bundleOptions.find((o: any) => o.qty === 1)
-        if (singleOption) {
-          subtotal = singleOption.totalPrice
-        }
+      if (isBundleDiscount) {
+        // 할인형: 첫 번째 수량은 배송비 포함, 2번째부터 할인
+        const discountCount = Math.max(0, quantity - shippingCount)
+        subtotal = (basePrice * quantity) - (shippingFee * discountCount)
+        bundleDiscount = shippingFee * discountCount
+      } else {
+        // 배송비형: (원가 × 수량) + (배송비 × 횟수)
+        const originalPrice = basePrice - shippingFee
+        subtotal = (originalPrice * quantity) + (shippingFee * shippingCount)
+        // 절약액 = (매번 배송비 낼 경우) - (실제 배송비)
+        bundleDiscount = (shippingFee * quantity) - (shippingFee * shippingCount)
       }
     } else {
       subtotal = product.salePrice * quantity

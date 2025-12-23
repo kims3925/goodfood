@@ -588,65 +588,220 @@ export default function AutomationDashboardPage() {
           수동 실행
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <button
-            onClick={() => handleExecute('collect')}
-            disabled={isExecuting || !!runningWorkflow}
-            className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-green-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="w-10 h-10 rounded-lg bg-green-100 group-hover:bg-green-500 flex items-center justify-center mb-3 transition-colors">
-              <Package size={20} className="text-green-600 group-hover:text-white transition-colors" />
-            </div>
-            <p className="font-medium text-gray-900 text-sm">게시물 수집</p>
-            <p className="text-xs text-gray-500 mt-1">도매채널 게시물 수집</p>
-          </button>
+          {/* 게시물 수집 버튼 */}
+          {(() => {
+            const isThisRunning = runningWorkflow?.type === 'COLLECT'
+            const isOtherRunning = runningWorkflow && !isThisRunning
+            return (
+              <button
+                onClick={() => isThisRunning ? handleCancel() : handleExecute('collect')}
+                disabled={isExecuting || isOtherRunning || isCancelling}
+                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                  isThisRunning
+                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    : 'border-gray-200 bg-white hover:border-green-400 hover:shadow-lg'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isThisRunning && (
+                  <div className="absolute -top-2 -right-2">
+                    <span className="flex h-4 w-4">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                    </span>
+                  </div>
+                )}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                  isThisRunning
+                    ? 'bg-red-500'
+                    : 'bg-green-100 group-hover:bg-green-500'
+                }`}>
+                  {isThisRunning ? (
+                    <XCircle size={20} className="text-white" />
+                  ) : (
+                    <Package size={20} className="text-green-600 group-hover:text-white transition-colors" />
+                  )}
+                </div>
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '취소하기' : '게시물 수집'}
+                </p>
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '클릭하여 중단' : '도매채널 게시물 수집'}
+                </p>
+              </button>
+            )
+          })()}
 
-          <button
-            onClick={() => handleExecute('transform')}
-            disabled={isExecuting || !!runningWorkflow}
-            className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-yellow-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="w-10 h-10 rounded-lg bg-yellow-100 group-hover:bg-yellow-500 flex items-center justify-center mb-3 transition-colors">
-              <Zap size={20} className="text-yellow-600 group-hover:text-white transition-colors" />
-            </div>
-            <p className="font-medium text-gray-900 text-sm">AI 변환</p>
-            <p className="text-xs text-gray-500 mt-1">상품 정보 생성</p>
-          </button>
+          {/* AI 변환 버튼 */}
+          {(() => {
+            const isThisRunning = runningWorkflow?.type === 'TRANSFORM'
+            const isOtherRunning = runningWorkflow && !isThisRunning
+            return (
+              <button
+                onClick={() => isThisRunning ? handleCancel() : handleExecute('transform')}
+                disabled={isExecuting || isOtherRunning || isCancelling}
+                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                  isThisRunning
+                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    : 'border-gray-200 bg-white hover:border-yellow-400 hover:shadow-lg'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isThisRunning && (
+                  <div className="absolute -top-2 -right-2">
+                    <span className="flex h-4 w-4">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                    </span>
+                  </div>
+                )}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                  isThisRunning
+                    ? 'bg-red-500'
+                    : 'bg-yellow-100 group-hover:bg-yellow-500'
+                }`}>
+                  {isThisRunning ? (
+                    <XCircle size={20} className="text-white" />
+                  ) : (
+                    <Zap size={20} className="text-yellow-600 group-hover:text-white transition-colors" />
+                  )}
+                </div>
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '취소하기' : 'AI 변환'}
+                </p>
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '클릭하여 중단' : '상품 정보 생성'}
+                </p>
+              </button>
+            )
+          })()}
 
-          <button
-            onClick={() => handleExecute('register')}
-            disabled={isExecuting || !!runningWorkflow}
-            className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-orange-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="w-10 h-10 rounded-lg bg-orange-100 group-hover:bg-orange-500 flex items-center justify-center mb-3 transition-colors">
-              <ShoppingBag size={20} className="text-orange-600 group-hover:text-white transition-colors" />
-            </div>
-            <p className="font-medium text-gray-900 text-sm">상품 등록</p>
-            <p className="text-xs text-gray-500 mt-1">Product 생성</p>
-          </button>
+          {/* 상품 등록 버튼 */}
+          {(() => {
+            const isThisRunning = runningWorkflow?.type === 'PRODUCT_CREATE'
+            const isOtherRunning = runningWorkflow && !isThisRunning
+            return (
+              <button
+                onClick={() => isThisRunning ? handleCancel() : handleExecute('register')}
+                disabled={isExecuting || isOtherRunning || isCancelling}
+                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                  isThisRunning
+                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    : 'border-gray-200 bg-white hover:border-orange-400 hover:shadow-lg'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isThisRunning && (
+                  <div className="absolute -top-2 -right-2">
+                    <span className="flex h-4 w-4">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                    </span>
+                  </div>
+                )}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                  isThisRunning
+                    ? 'bg-red-500'
+                    : 'bg-orange-100 group-hover:bg-orange-500'
+                }`}>
+                  {isThisRunning ? (
+                    <XCircle size={20} className="text-white" />
+                  ) : (
+                    <ShoppingBag size={20} className="text-orange-600 group-hover:text-white transition-colors" />
+                  )}
+                </div>
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '취소하기' : '상품 등록'}
+                </p>
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '클릭하여 중단' : 'Product 생성'}
+                </p>
+              </button>
+            )
+          })()}
 
-          <button
-            onClick={() => handleExecute('publish')}
-            disabled={isExecuting || !!runningWorkflow}
-            className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-blue-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="w-10 h-10 rounded-lg bg-blue-100 group-hover:bg-blue-500 flex items-center justify-center mb-3 transition-colors">
-              <Upload size={20} className="text-blue-600 group-hover:text-white transition-colors" />
-            </div>
-            <p className="font-medium text-gray-900 text-sm">발행</p>
-            <p className="text-xs text-gray-500 mt-1">소매밴드 발행</p>
-          </button>
+          {/* 발행 버튼 */}
+          {(() => {
+            const isThisRunning = runningWorkflow?.type === 'PUBLISH'
+            const isOtherRunning = runningWorkflow && !isThisRunning
+            return (
+              <button
+                onClick={() => isThisRunning ? handleCancel() : handleExecute('publish')}
+                disabled={isExecuting || isOtherRunning || isCancelling}
+                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                  isThisRunning
+                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    : 'border-gray-200 bg-white hover:border-blue-400 hover:shadow-lg'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isThisRunning && (
+                  <div className="absolute -top-2 -right-2">
+                    <span className="flex h-4 w-4">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                    </span>
+                  </div>
+                )}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                  isThisRunning
+                    ? 'bg-red-500'
+                    : 'bg-blue-100 group-hover:bg-blue-500'
+                }`}>
+                  {isThisRunning ? (
+                    <XCircle size={20} className="text-white" />
+                  ) : (
+                    <Upload size={20} className="text-blue-600 group-hover:text-white transition-colors" />
+                  )}
+                </div>
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '취소하기' : '발행'}
+                </p>
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '클릭하여 중단' : '소매밴드 발행'}
+                </p>
+              </button>
+            )
+          })()}
 
-          <button
-            onClick={() => handleExecute('full')}
-            disabled={isExecuting || !!runningWorkflow}
-            className="group relative p-4 rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white hover:border-purple-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="w-10 h-10 rounded-lg bg-purple-100 group-hover:bg-purple-500 flex items-center justify-center mb-3 transition-colors">
-              <Play size={20} className="text-purple-600 group-hover:text-white transition-colors" />
-            </div>
-            <p className="font-medium text-gray-900 text-sm">전체 실행</p>
-            <p className="text-xs text-gray-500 mt-1">전체 파이프라인</p>
-          </button>
+          {/* 전체 실행 버튼 */}
+          {(() => {
+            const isThisRunning = runningWorkflow?.type === 'FULL_PIPELINE'
+            const isOtherRunning = runningWorkflow && !isThisRunning
+            return (
+              <button
+                onClick={() => isThisRunning ? handleCancel() : handleExecute('full')}
+                disabled={isExecuting || isOtherRunning || isCancelling}
+                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                  isThisRunning
+                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    : 'border-purple-200 bg-gradient-to-br from-purple-50 to-white hover:border-purple-400 hover:shadow-lg'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isThisRunning && (
+                  <div className="absolute -top-2 -right-2">
+                    <span className="flex h-4 w-4">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                    </span>
+                  </div>
+                )}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                  isThisRunning
+                    ? 'bg-red-500'
+                    : 'bg-purple-100 group-hover:bg-purple-500'
+                }`}>
+                  {isThisRunning ? (
+                    <XCircle size={20} className="text-white" />
+                  ) : (
+                    <Play size={20} className="text-purple-600 group-hover:text-white transition-colors" />
+                  )}
+                </div>
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '취소하기' : '전체 실행'}
+                </p>
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '클릭하여 중단' : '전체 파이프라인'}
+                </p>
+              </button>
+            )
+          })()}
         </div>
       </Card>
 
