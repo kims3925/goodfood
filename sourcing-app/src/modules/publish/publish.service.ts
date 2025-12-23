@@ -57,19 +57,35 @@ function isQuotaError(error: any): boolean {
 }
 
 /**
+ * 가격 포맷팅 (1000 → "1,000")
+ */
+function formatPrice(price: number): string {
+  return price.toLocaleString('ko-KR')
+}
+
+/**
+ * 판매가 계산
+ * - 배송비 포함 상품 (INCLUDED): 판매가 = 소매가
+ * - 배송비 별도 상품: 판매가 = 소매가 + 배송비
+ */
+function calculateSellingPrice(
+  price: number,
+  shippingFee: number,
+  bundleShippingType: string | null
+): number {
+  if (bundleShippingType === 'INCLUDED') {
+    return price // 배송비 이미 포함
+  }
+  return price + shippingFee // 배송비 추가
+}
+
+/**
  * 게시글 내용 생성
- * Band API로 텍스트만 발행 (이미지 없음)
- * 본문 구조: 쇼핑몰URL → 상품명 → 판매가 → 상품설명 → 쇼핑몰URL
- *
- * 가격 표시 로직:
- * - bundleShippingType이 'INCLUDED'인 경우: 판매가 그대로 (도매가에 배송비 포함)
- * - 그 외 (SEPARATE, NONE): 판매가 + 배송비
+ * 소매밴드 발행용 - 옵션별 판매가 포함
+ * 본문 구조: 쇼핑몰URL → 상품명 → 옵션별 판매가 → 상품설명 → 쇼핑몰URL
  */
 function buildPostContent(
-  product: ProductForPublish & {
-    shippingFee?: number | null
-    bundleShippingType?: string | null
-  },
+  product: ProductForPublish,
   options?: { orderLink?: string }
 ): string {
   const lines: string[] = []
@@ -84,24 +100,21 @@ function buildPostContent(
   lines.push(product.name)
   lines.push('')
 
-  // 판매가 (variants에서 옵션별로 추출)
-  // bundleShippingType이 INCLUDED면 배송비가 이미 포함된 가격
-  // 그 외에는 배송비를 더해서 표시
+  // 옵션별 판매가 표시
   if (product.variants && product.variants.length > 0) {
-    lines.push('💰 판매가:')
-
-    const isShippingIncluded = product.bundleShippingType === 'INCLUDED'
     const shippingFee = product.shippingFee || 0
+    const bundleShippingType = product.bundleShippingType || null
 
+    lines.push('💰 판매가')
     for (const variant of product.variants) {
+      const sellingPrice = calculateSellingPrice(
+        variant.price,
+        shippingFee,
+        bundleShippingType
+      )
       const optionName = variant.optionSummary || '기본'
-      // 배송비 포함형이면 그대로, 별도형이면 배송비 추가
-      const displayPrice = isShippingIncluded
-        ? variant.price
-        : variant.price + shippingFee
-      lines.push(`  • ${optionName}: ${displayPrice.toLocaleString()}원`)
+      lines.push(`• ${optionName}: ${formatPrice(sellingPrice)}원`)
     }
-
     lines.push('')
   }
 
