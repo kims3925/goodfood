@@ -1481,10 +1481,10 @@ export default function ProductDetailPage() {
                             <p className="text-slate-500 text-xs">합배송 타입</p>
                             <p className="font-medium text-slate-900">
                               {product.bundleShippingType === 'INCLUDED' && (
-                                <span className="text-green-600">배송비 포함형 (할인)</span>
+                                <span className="text-green-600">배송비 포함형</span>
                               )}
                               {product.bundleShippingType === 'SEPARATE' && (
-                                <span className="text-blue-600">배송비 별도형 (절약)</span>
+                                <span className="text-blue-600">배송비 별도형</span>
                               )}
                               {product.bundleShippingType === 'NONE' && (
                                 <span className="text-slate-400">합배송 없음</span>

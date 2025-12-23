@@ -136,7 +136,7 @@ export class GuestOrderService {
     this.validateCustomerInfo(customerInfo)
     this.validateShippingAddress(shippingAddress)
 
-    // 세션 장바구니 조회
+    // 세션 장바구니 조회 (합배송 정보 포함)
     const cart = await prisma.cart.findFirst({
       where: {
         sessionId,
@@ -149,12 +149,18 @@ export class GuestOrderService {
             publishedProduct: {
               include: {
                 product: {
-                  include: { variants: { take: 1 } },
+                  include: {
+                    variants: true,
+                    images: { take: 1, orderBy: { sortOrder: 'asc' } },
+                  },
                 },
+                shop: true,
+                channel: true,
               },
             },
             variant: true,
           },
+          orderBy: { createdAt: 'desc' },
         },
       },
     })
@@ -163,13 +169,47 @@ export class GuestOrderService {
       throw new BusinessLogicError('장바구니가 비어있습니다')
     }
 
-    // 주문 아이템 데이터 준비
+    // 주문 아이템 데이터 준비 (할인 계산 포함)
     const orderItems: GuestOrderItemInput[] = cart.items.map((item: any) => {
       const publishedProduct = item.publishedProduct
-      const product = publishedProduct.product
+      const product = publishedProduct?.product
       const variant = item.variant
-      const mainVariant = product?.variants[0]
-      const unitPrice = variant?.price || mainVariant?.price || 0
+      const mainVariant = product?.variants?.[0]
+
+      // 원래 단가 (할인 전)
+      const originalUnitPrice = Number(variant?.price || mainVariant?.price || 0)
+      const shippingFeePerItem = Number(product?.shippingFee || 0)
+      const bundleMaxQty = product?.bundleMaxQty || 1
+      const variantBundleUnit = variant?.bundleUnit || 1
+      const quantity = item.quantity
+
+      // 합배송 타입: INCLUDED (할인형) vs SEPARATE (배송비형)
+      const isBundleDiscount = product?.bundleShippingType === 'INCLUDED'
+
+      // 할인 반영된 아이템 총액 계산
+      let itemTotalWithDiscount = originalUnitPrice * quantity
+
+      if (bundleMaxQty > 1 && shippingFeePerItem > 0) {
+        // 합배송 상품
+        const totalBundleUnits = quantity * variantBundleUnit
+        const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
+        const remainder = totalBundleUnits % bundleMaxQty
+        const shippingCount = fullBundles + (remainder > 0 ? 1 : 0)
+
+        if (isBundleDiscount) {
+          // 할인형: 첫 번째 수량은 배송비 포함, 2번째 수량부터 할인
+          const discountCount = Math.max(0, quantity - shippingCount)
+          itemTotalWithDiscount = (originalUnitPrice * quantity) - (shippingFeePerItem * discountCount)
+        } else {
+          // 배송비형: 묶음당 배송비 적용
+          itemTotalWithDiscount = (originalUnitPrice * quantity) + (shippingFeePerItem * shippingCount)
+        }
+      } else if (shippingFeePerItem > 0 && !isBundleDiscount) {
+        // 일반 상품 (배송비 별도)
+        itemTotalWithDiscount = (originalUnitPrice + shippingFeePerItem) * quantity
+      }
+
+      const unitPriceWithDiscount = Math.round(itemTotalWithDiscount / quantity)
 
       return {
         publishedProductId: publishedProduct.id,
@@ -178,18 +218,24 @@ export class GuestOrderService {
         optionSummary: variant?.optionSummary || null,
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity,
-        unitPrice: Number(unitPrice),
+        unitPrice: unitPriceWithDiscount, // 할인 반영된 단가
+        originalUnitPrice, // 할인 전 단가 (참조용)
+        itemTotal: itemTotalWithDiscount, // 할인 반영된 아이템 총액
       }
     })
 
     // 금액 계산
+    const subtotalBeforeDiscount = orderItems.reduce(
+      (sum, item: any) => sum + (item.originalUnitPrice || item.unitPrice) * item.quantity,
+      0
+    )
     const subtotal = orderItems.reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity,
+      (sum, item: any) => sum + (item.itemTotal || item.unitPrice * item.quantity),
       0
     )
     const shippingFee = 0 // 배송비는 판매가에 포함
-    const discountAmount = 0
-    const totalAmount = subtotal + shippingFee - discountAmount
+    const discountAmount = subtotalBeforeDiscount - subtotal // 할인 금액
+    const totalAmount = subtotal // 실제 결제 금액
 
     // 비회원 주문 생성
     const orderInput: CreateGuestOrderInput = {
@@ -206,10 +252,10 @@ export class GuestOrderService {
         addressDetail: shippingAddress.addressDetail,
         deliveryMemo: shippingAddress.deliveryMemo,
       },
-      subtotalAmount: subtotal,
+      subtotalAmount: subtotalBeforeDiscount, // 할인 전 상품 총액
       shippingFee,
-      discountAmount,
-      totalAmount,
+      discountAmount, // 합배송 할인 금액
+      totalAmount, // 실제 결제 금액 (할인 후)
       items: orderItems,
     }
 

@@ -1546,7 +1546,7 @@ function CheckoutContent() {
                         <div className="mt-2 pt-2 border-t border-gray-200">
                           {bundleDiscount > 0 && (
                             <div className="flex justify-between items-center text-sm">
-                              <span className="text-[#FF6B6B]">합배송 할인</span>
+                              <span className="text-[#FF6B6B]">묶음 할인</span>
                               <span className="text-[#FF6B6B] font-medium">-{formatPrice(bundleDiscount)}원</span>
                             </div>
                           )}

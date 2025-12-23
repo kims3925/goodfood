@@ -43,7 +43,9 @@
       "Bash(git -C \"C:/Users/hsw48/Desktop/bandauto\" diff HEAD~5..HEAD --stat)",
       "mcp__filesystem__directory_tree",
       "mcp__filesystem__list_directory",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "WebSearch",
+      "Bash(npx tsx:*)"
     ],
     "deny": [],
     "ask": []
@@ -58,6 +60,6 @@
     "typescript",
     "shadcn"
   ],
-  "vim": false,
-  "outputStyle": "junior-developer-korean"
+  "outputStyle": "junior-developer-korean",
+  "vim": false
 }

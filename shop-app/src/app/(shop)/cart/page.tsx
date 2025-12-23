@@ -638,7 +638,7 @@ export default function CartPage() {
                     </div>
                     {totalBundleDiscount > 0 && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-[#FF6B6B]">합배송 할인</span>
+                        <span className="text-[#FF6B6B]">묶음 할인</span>
                         <span className="text-[#FF6B6B]">-{formatPrice(totalBundleDiscount)}원</span>
                       </div>
                     )}

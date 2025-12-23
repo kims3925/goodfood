@@ -765,16 +765,28 @@ export default function ProductDetailClient() {
               )}
 
               {/* 합배송 할인 안내 */}
-              {hasBundleOptions && (
-                <div className="bg-[#FFF5F5] rounded-lg px-3 py-2.5">
-                  <p className="text-sm text-[#FF6B6B] font-medium">
-                    {product.bundleMaxQty || activeBundleOptions.length}개 합배송 시 {activeBundleOptions[0]?.isBundleDiscount ? '할인' : '배송비 할인'}!
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    최대 {formatPrice(activeBundleOptions[activeBundleOptions.length - 1]?.discount || 0)}원 {activeBundleOptions[0]?.isBundleDiscount ? '할인' : '절약'}
-                  </p>
-                </div>
-              )}
+              {hasBundleOptions && (() => {
+                const bundleMaxQty = product.bundleMaxQty || activeBundleOptions.length
+                const isUnlimited = bundleMaxQty >= 999
+                const shippingFee = product.shippingFee || 0
+                const isBundleDiscount = activeBundleOptions[0]?.isBundleDiscount
+
+                return (
+                  <div className="bg-[#FFF5F5] rounded-lg px-3 py-2.5">
+                    <p className="text-sm text-[#FF6B6B] font-medium">
+                      {isUnlimited
+                        ? `2개 이상 구매 시 개당 ${formatPrice(shippingFee)}원 할인!`
+                        : `${bundleMaxQty}개 묶음 구매 시 ${isBundleDiscount ? '할인' : '배송비 할인'}!`
+                      }
+                    </p>
+                    {!isUnlimited && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        최대 {formatPrice(activeBundleOptions[activeBundleOptions.length - 1]?.discount || 0)}원 할인
+                      </p>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* 수량 선택 - 통일된 레이아웃 */}
               <div className="pt-3 border-t border-gray-100">
@@ -901,7 +913,7 @@ export default function ProductDetailClient() {
                         <span className="text-lg text-[#FF6B6B] ml-1">원</span>
                         {totalSavings > 0 && (
                           <p className="text-sm text-green-600 font-medium mt-1">
-                            {formatPrice(totalSavings)}원 {isBundleDiscount ? '할인' : '절약'}!
+                            {formatPrice(totalSavings)}원 할인!
                           </p>
                         )}
                       </div>
