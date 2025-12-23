@@ -44,7 +44,7 @@ export interface CartItemResponse {
   // 합배송 정보
   bundleMaxQty: number
   bundleUnit: number  // 옵션별 합배송 단위 수
-  bundleDiscount: number  // 합배송 할인 금액 (배송비 0원일 때 사용)
+  isBundleDiscount: boolean  // 할인형 여부 (true: 할인 차감, false: 배송비 추가)
 }
 
 export interface CartResponse {
@@ -269,51 +269,48 @@ export class CartService {
       const basePrice = variant?.price || mainVariant?.price || 0
       const shippingFee = product.shippingFee || 0
       const bundleMaxQty = product.bundleMaxQty || 1
-      const bundleDiscount = product.bundleDiscount || 0  // 합배송 할인 금액 (배송비 0원일 때 사용)
       const variantBundleUnit = variant?.bundleUnit || 1  // 옵션별 합배송 단위 수
       const quantity = item.quantity
 
-      // 가격 계산: 배송비가 상품 가격에 포함
-      // 합배송 상품인 경우 (bundleMaxQty > 1 && shippingFee > 0): 묶음 단위로 배송비 적용
-      // 합배송 할인 상품인 경우 (bundleMaxQty > 1 && bundleDiscount > 0): 묶음 완성 시 할인 적용
+      // 합배송 타입으로 할인형 vs 배송비형 구분
+      // INCLUDED: 배송비 포함형 (할인) - 소매가에 배송비 포함, 합배송 시 할인
+      // SEPARATE: 배송비 별도형 (절약) - 소매가 + 배송비, 합배송 시 배송비 절약
+      const isBundleDiscount = product.bundleShippingType === 'INCLUDED'
+
+      // 가격 계산
+      // 합배송 상품인 경우 (bundleMaxQty > 1 && shippingFee > 0): 묶음 단위로 배송비/할인 적용
       // 일반 상품인 경우: 소매가 + 배송비
       let unitPrice = basePrice
       let itemTotal = 0
       if (bundleMaxQty > 1 && shippingFee > 0) {
-        // 합배송 상품: bundleMaxQty 단위로 묶음을 분리해서 각 묶음마다 배송비 적용
+        // 합배송 상품: bundleMaxQty 단위로 묶음을 분리
         // variantBundleUnit을 고려하여 총 합배송 단위 계산
-        // 예: 2박스 옵션(bundleUnit=2) 3개 구매 시, totalBundleUnits = 6
+        // 예: 2박스 옵션(bundleUnit=2) 2개 구매 시, totalBundleUnits = 4
         const totalBundleUnits = quantity * variantBundleUnit
         const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
         const remainder = totalBundleUnits % bundleMaxQty
 
-        // 배송비 횟수 계산
+        // 배송비/할인 횟수 계산 (ceil)
         const shippingCount = fullBundles + (remainder > 0 ? 1 : 0)
 
-        // 총 가격 = (상품가 × 수량) + (배송비 × 배송횟수)
-        itemTotal = (basePrice * quantity) + (shippingFee * shippingCount)
+        if (isBundleDiscount) {
+          // 할인형: 첫 번째 수량은 배송비 포함, 2번째 수량부터 할인
+          // 할인 개수 = 수량 - 배송 횟수 (첫 번째 수량 제외)
+          const discountCount = Math.max(0, quantity - shippingCount)
+          itemTotal = (basePrice * quantity) - (shippingFee * discountCount)
+        } else {
+          // 배송비형: 배송비 별도 상품, 묶음당 배송비 적용
+          // 총 가격 = (상품가 × 수량) + (배송비 × 횟수)
+          itemTotal = (basePrice * quantity) + (shippingFee * shippingCount)
+        }
 
         unitPrice = Math.round(itemTotal / quantity)
-      } else if (bundleMaxQty > 1 && bundleDiscount > 0) {
-        // 합배송 할인 상품: 배송비는 0원이지만 합배송 묶음 완성 시 할인 적용
-        // 예: 4박스까지 합배송, 합배송 시 3000원 할인
-        // 4박스 구매 시 3000원 할인, 8박스 구매 시 6000원 할인
-        const totalBundleUnits = quantity * variantBundleUnit
-        const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
-
-        // 할인 금액 = 완성된 묶음 수 × bundleDiscount
-        const discountAmount = fullBundles * bundleDiscount
-
-        // 총 가격 = (상품가 × 수량) - 할인금액
-        itemTotal = (basePrice * quantity) - discountAmount
-
-        unitPrice = Math.round(itemTotal / quantity)
-      } else if (shippingFee > 0) {
-        // 일반 상품: 배송비 포함
+      } else if (shippingFee > 0 && !isBundleDiscount) {
+        // 일반 상품 (배송비 별도): 배송비 포함
         unitPrice = basePrice + shippingFee
         itemTotal = unitPrice * quantity
       } else {
-        // 배송비 없는 상품
+        // 배송비 없는 상품 또는 배송비 포함 상품
         itemTotal = basePrice * quantity
       }
 
@@ -340,7 +337,7 @@ export class CartService {
         // 합배송 정보
         bundleMaxQty: bundleMaxQty,
         bundleUnit: variantBundleUnit,  // 옵션별 합배송 단위 수
-        bundleDiscount: bundleDiscount,  // 합배송 할인 금액 (배송비 0원일 때 사용)
+        isBundleDiscount: isBundleDiscount,  // 할인형 여부
       }
     })
 

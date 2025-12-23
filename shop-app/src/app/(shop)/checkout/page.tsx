@@ -42,7 +42,7 @@ interface CartItem {
   shippingFee: number | null
   bundleMaxQty: number
   bundleUnit?: number  // 옵션별 합배송 단위 수
-  bundleDiscount?: number  // 합배송 할인 금액 (배송비 0원일 때 사용)
+  isBundleDiscount?: boolean  // 할인형 여부 (true: 할인 차감, false: 배송비 추가)
 }
 
 interface CheckoutFormData {
@@ -707,28 +707,27 @@ function CheckoutContent() {
       : cartItems[0].name
 
     // 합배송 할인액 계산 (bundleUnit 고려)
-    // 1. 배송비가 있는 경우: 합배송으로 절약되는 배송비
-    // 2. bundleDiscount가 있는 경우: 합배송 묶음 완성 시 할인
+    // - 배송비형: 합배송으로 절약되는 배송비
+    // - 할인형: 첫 번째 제외, 2번째부터 할인
     bundleDiscount = cartItems.reduce((sum, item) => {
       const bundleUnit = item.bundleUnit || 1
-      const discount = item.bundleDiscount || 0
+      const isBundleDiscount = item.isBundleDiscount || false
 
-      // 케이스 1: 배송비가 있는 합배송 상품
-      if (item.bundleMaxQty > 1 && item.shippingFee && item.shippingFee > 0 && item.quantity > 1) {
+      // 합배송 상품
+      if (item.bundleMaxQty > 1 && item.shippingFee && item.shippingFee > 0) {
         const totalBundleUnits = item.quantity * bundleUnit
         const shippingCount = Math.floor(totalBundleUnits / item.bundleMaxQty) +
           (totalBundleUnits % item.bundleMaxQty > 0 ? 1 : 0)
-        // 할인액 = (수량 × 배송비) - (배송횟수 × 배송비)
-        const savings = (item.quantity * item.shippingFee) - (shippingCount * item.shippingFee)
-        return sum + Math.max(0, savings)
-      }
-      // 케이스 2: bundleDiscount가 있는 상품 (배송비 0원)
-      if (item.bundleMaxQty > 1 && discount > 0) {
-        const totalBundleUnits = item.quantity * bundleUnit
-        const fullBundles = Math.floor(totalBundleUnits / item.bundleMaxQty)
-        // 할인액 = 완성된 묶음 수 × bundleDiscount
-        const discountAmount = fullBundles * discount
-        return sum + discountAmount
+
+        if (isBundleDiscount) {
+          // 할인형: 첫 번째 수량 제외, 2번째 수량부터 할인
+          const discountCount = Math.max(0, item.quantity - shippingCount)
+          return sum + (item.shippingFee * discountCount)
+        } else if (item.quantity > 1) {
+          // 배송비형: 합배송으로 절약되는 배송비
+          const savings = (item.quantity * item.shippingFee) - (shippingCount * item.shippingFee)
+          return sum + Math.max(0, savings)
+        }
       }
       return sum
     }, 0)

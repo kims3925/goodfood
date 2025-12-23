@@ -55,7 +55,6 @@ export interface OptionPrice {
  */
 export interface ShippingInfo {
   shippingIncluded: boolean        // 배송비 포함 여부
-  bundleDiscount?: string | null   // 묶음 할인 정보 (예: "2세트이상 4000원 차감")
   maxBundle?: number | null        // 합배송 최대 수량
 }
 

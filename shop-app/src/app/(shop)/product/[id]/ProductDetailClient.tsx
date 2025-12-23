@@ -66,13 +66,13 @@ export default function ProductDetailClient() {
   // Scroll Spy: 스크롤 위치에 따라 활성 탭 변경
   useEffect(() => {
     const handleScroll = () => {
-      // StoreLayout 헤더 높이 계산
+      // StoreLayout 헤더 높이 계산 (유틸리티 바 32px 포함)
       const windowWidth = window.innerWidth
-      let storeHeaderHeight = 64
+      let storeHeaderHeight = 96 // 64 + 32 (유틸리티 바)
       if (windowWidth >= 1024) {
-        storeHeaderHeight = 100
+        storeHeaderHeight = 132 // 100 + 32
       } else if (windowWidth >= 768) {
-        storeHeaderHeight = 80
+        storeHeaderHeight = 112 // 80 + 32
       }
       const tabsHeight = 56
       const scrollPosition = window.scrollY + storeHeaderHeight + tabsHeight + 50
@@ -110,13 +110,13 @@ export default function ProductDetailClient() {
 
     const targetRef = sectionRefs[sectionId]
     if (targetRef?.current) {
-      // StoreLayout 헤더 높이: 모바일 64px, md 80px, lg 100px
+      // StoreLayout 헤더 높이 (유틸리티 바 32px 포함): 모바일 96px, md 112px, lg 132px
       const windowWidth = window.innerWidth
-      let storeHeaderHeight = 64 // 기본 모바일
+      let storeHeaderHeight = 96 // 64 + 32 (유틸리티 바)
       if (windowWidth >= 1024) {
-        storeHeaderHeight = 100 // lg
+        storeHeaderHeight = 132 // 100 + 32
       } else if (windowWidth >= 768) {
-        storeHeaderHeight = 80 // md
+        storeHeaderHeight = 112 // 80 + 32
       }
       const tabsHeight = 56 // 탭 높이
       const headerOffset = storeHeaderHeight + tabsHeight + 16 // 여유 공간
@@ -444,27 +444,72 @@ export default function ProductDetailClient() {
 
     const bundleMaxQty = product.bundleMaxQty || 1
     const shippingFee = product.shippingFee || 0
+    const bundleUnit = selectedVariant.bundleUnit || 1
 
     // 합배송 조건: bundleMaxQty > 1 && shippingFee > 0
     if (bundleMaxQty <= 1 || shippingFee <= 0) return null
 
-    // 선택된 variant의 원가 (배송비 미포함)
-    const originalPrice = selectedVariant.originalPrice || (selectedVariant.price - shippingFee) || 0
-    const basePrice = selectedVariant.price || 0 // 배송비 포함 가격
+    // 합배송 타입으로 할인형 vs 배송비형 구분
+    // INCLUDED: 배송비 포함형 (할인) - 소매가에 배송비 포함, 합배송 시 할인
+    // SEPARATE: 배송비 별도형 (절약) - 소매가 + 배송비, 합배송 시 배송비 절약
+    const isBundleDiscount = product.bundleShippingType === 'INCLUDED'
+
+    // 선택된 variant의 원가
+    const basePrice = selectedVariant.price || 0
+    // 배송비형: 원가 = 상품가 - 배송비 (배송비가 별도)
+    // 할인형: 원가 = 상품가 (배송비가 이미 포함)
+    const originalPrice = isBundleDiscount
+      ? basePrice
+      : (selectedVariant.originalPrice || (basePrice - shippingFee) || 0)
+
+    // 합배송 표시용 최대 수량 (1묶음 완성까지)
+    // 예: 2박스 옵션(bundleUnit=2), bundleMaxQty=4 → 최대 2개까지만 표시
+    const maxDisplayQty = Math.floor(bundleMaxQty / bundleUnit) || 1
 
     const options = []
-    for (let qty = 1; qty <= bundleMaxQty; qty++) {
-      // 합배송 시 배송비는 1회만: 총액 = (원가 * 수량) + 배송비
-      const totalPrice = (originalPrice * qty) + shippingFee
-      const fullPrice = basePrice * qty // 배송비를 매번 내는 경우의 가격
-      const discount = fullPrice - totalPrice // 할인 금액
+    for (let qty = 1; qty <= maxDisplayQty; qty++) {
+      const totalBundleUnits = qty * bundleUnit // 실제 박스 수
+      const shippingCount = Math.ceil(totalBundleUnits / bundleMaxQty) // 배송/할인 횟수
+
+      let totalPrice: number
+      let discount: number
+
+      if (isBundleDiscount) {
+        // 할인형: 첫 번째 수량은 배송비 포함, 2번째 수량부터 할인
+        // 할인 개수 = 수량 - 배송 횟수 (첫 번째 수량 제외)
+        const discountCount = Math.max(0, qty - shippingCount)
+        totalPrice = (originalPrice * qty) - (shippingFee * discountCount)
+        discount = shippingFee * discountCount // 할인 금액
+      } else {
+        // 배송비형: 합배송 시 배송비는 횟수만큼
+        // 총액 = (원가 * 수량) + (배송비 * 횟수)
+        totalPrice = (originalPrice * qty) + (shippingFee * shippingCount)
+        const fullPrice = basePrice * qty // 배송비를 매번 내는 경우의 가격
+        discount = fullPrice - totalPrice // 절약 금액
+      }
+
+      // 라벨: bundleUnit > 1이면 박스 수도 표시
+      const isComplete = totalBundleUnits === bundleMaxQty
+      let label: string
+      if (bundleUnit > 1) {
+        label = isComplete
+          ? `${qty}개 (${totalBundleUnits}박스) - 최대할인`
+          : `${qty}개 (${totalBundleUnits}박스)`
+      } else {
+        label = isComplete
+          ? `${qty}개 묶음 - 최대할인`
+          : (qty === 1 ? '1개' : `${qty}개 묶음`)
+      }
 
       options.push({
         qty,
         totalPrice,
         discount,
         unitPrice: Math.round(totalPrice / qty),
-        label: qty === 1 ? '1개' : `${qty}개 묶음`,
+        label,
+        isBundleDiscount,
+        bundleUnit,
+        totalBundleUnits,
       })
     }
     return options
@@ -723,10 +768,10 @@ export default function ProductDetailClient() {
               {hasBundleOptions && (
                 <div className="bg-[#FFF5F5] rounded-lg px-3 py-2.5">
                   <p className="text-sm text-[#FF6B6B] font-medium">
-                    {product.bundleMaxQty || activeBundleOptions.length}개 합배송 시 배송비 할인!
+                    {product.bundleMaxQty || activeBundleOptions.length}개 합배송 시 {activeBundleOptions[0]?.isBundleDiscount ? '할인' : '배송비 할인'}!
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    최대 {formatPrice(activeBundleOptions[activeBundleOptions.length - 1]?.discount || 0)}원 절약
+                    최대 {formatPrice(activeBundleOptions[activeBundleOptions.length - 1]?.discount || 0)}원 {activeBundleOptions[0]?.isBundleDiscount ? '할인' : '절약'}
                   </p>
                 </div>
               )}
@@ -736,12 +781,25 @@ export default function ProductDetailClient() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <label className="text-sm font-medium text-gray-700">수량</label>
-                    {/* 합배송 묶음 단위 표시 */}
+                    {/* 합배송 묶음 단위 표시 (bundleUnit 고려) */}
                     {hasBundleOptions && (() => {
                       const bundleMaxQty = product.bundleMaxQty || activeBundleOptions.length
-                      const fullBundles = Math.floor(quantity / bundleMaxQty)
-                      const remainder = quantity % bundleMaxQty
+                      const bundleUnit = selectedVariant?.bundleUnit || 1
+                      const totalBundleUnits = quantity * bundleUnit
+                      const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
+                      const remainder = totalBundleUnits % bundleMaxQty
 
+                      // bundleUnit > 1이면 박스 수 표시
+                      if (bundleUnit > 1) {
+                        return (
+                          <span className="text-xs text-[#FF6B6B] font-medium">
+                            = {totalBundleUnits}박스
+                            {fullBundles > 0 && ` (${fullBundles}묶음${remainder > 0 ? ` + ${remainder}박스` : ''})`}
+                          </span>
+                        )
+                      }
+
+                      // bundleUnit = 1인 경우 기존 로직
                       if (quantity > bundleMaxQty || (fullBundles >= 1 && remainder > 0)) {
                         const parts = []
                         if (fullBundles > 0) {
@@ -784,58 +842,55 @@ export default function ProductDetailClient() {
             {/* Price Summary */}
             <div className="bg-gradient-to-r from-[#FFF5F5] to-[#FFF0F0] rounded-xl p-5">
               {activeBundleOptions && activeBundleOptions.length > 0 ? (
-                // 합배송 가격 표시 (묶음 단위로 계산)
+                // 합배송 가격 표시 (bundleUnit 고려해서 계산)
                 (() => {
                   const bundleMaxQty = product.bundleMaxQty || activeBundleOptions.length
-                  const fullBundles = Math.floor(quantity / bundleMaxQty)
-                  const remainder = quantity % bundleMaxQty
+                  const bundleUnit = selectedVariant?.bundleUnit || 1
+                  const isBundleDiscount = activeBundleOptions[0]?.isBundleDiscount || false
+                  const shippingFee = product.shippingFee || 0
+                  const basePrice = selectedVariant?.price || 0
+
+                  // bundleUnit을 고려한 총 박스 수 계산
+                  const totalBundleUnits = quantity * bundleUnit
+                  const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
+                  const remainder = totalBundleUnits % bundleMaxQty
+
+                  // 배송비/할인 횟수 (ceil)
+                  const shippingCount = fullBundles + (remainder > 0 ? 1 : 0)
 
                   // 총 가격 계산
-                  let totalPrice = 0
-                  let totalSavings = 0
-                  const priceBreakdown: string[] = []
+                  let totalPrice: number
+                  let totalSavings: number
 
-                  // 풀번들 가격
-                  if (fullBundles > 0) {
-                    const maxBundleOption = activeBundleOptions.find((o: any) => o.qty === bundleMaxQty)
-                    if (maxBundleOption) {
-                      totalPrice += fullBundles * maxBundleOption.totalPrice
-                      totalSavings += fullBundles * maxBundleOption.discount
-                      if (fullBundles === 1) {
-                        priceBreakdown.push(`${bundleMaxQty}개 ${formatPrice(maxBundleOption.totalPrice)}원`)
-                      } else {
-                        priceBreakdown.push(`${bundleMaxQty}개 × ${fullBundles} = ${formatPrice(fullBundles * maxBundleOption.totalPrice)}원`)
-                      }
-                    }
+                  if (isBundleDiscount) {
+                    // 할인형: 첫 번째 수량은 배송비 포함, 2번째 수량부터 할인
+                    // 할인 개수 = 수량 - 배송 횟수 (첫 번째 수량 제외)
+                    const discountCount = Math.max(0, quantity - shippingCount)
+                    totalPrice = (basePrice * quantity) - (shippingFee * discountCount)
+                    totalSavings = shippingFee * discountCount
+                  } else {
+                    // 배송비형: (원가 × 수량) + (배송비 × 횟수)
+                    const originalPrice = basePrice - shippingFee
+                    totalPrice = (originalPrice * quantity) + (shippingFee * shippingCount)
+                    // 절약액 = (매번 배송비 낼 경우) - (실제 배송비)
+                    totalSavings = (shippingFee * quantity) - (shippingFee * shippingCount)
                   }
 
-                  // 나머지 가격
-                  if (remainder > 0) {
-                    const remainderOption = activeBundleOptions.find((o: any) => o.qty === remainder)
-                    if (remainderOption) {
-                      totalPrice += remainderOption.totalPrice
-                      if (remainder > 1) {
-                        totalSavings += remainderOption.discount
-                      }
-                      priceBreakdown.push(`${remainder}개 ${formatPrice(remainderOption.totalPrice)}원`)
-                    }
-                  }
-
-                  // 단일 수량인 경우
-                  if (quantity === 1) {
-                    const singleOption = activeBundleOptions.find((o: any) => o.qty === 1)
-                    if (singleOption && totalPrice === 0) {
-                      totalPrice = singleOption.totalPrice
-                    }
-                  }
+                  // 박스 수 표시 텍스트
+                  const bundleText = bundleUnit > 1
+                    ? `${quantity}개 (${totalBundleUnits}박스)`
+                    : `${quantity}개`
 
                   return (
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <p className="text-xs text-gray-500">
-                          {priceBreakdown.length > 1
-                            ? priceBreakdown.join(' + ')
-                            : `${quantity}개`}
+                          {bundleText}
+                          {totalBundleUnits >= bundleMaxQty && (
+                            <span className="text-[#FF6B6B] ml-1">
+                              ({Math.floor(totalBundleUnits / bundleMaxQty)}묶음 완성!)
+                            </span>
+                          )}
                         </p>
                         <p className="text-sm font-medium text-gray-600">총 상품금액</p>
                       </div>
@@ -846,7 +901,7 @@ export default function ProductDetailClient() {
                         <span className="text-lg text-[#FF6B6B] ml-1">원</span>
                         {totalSavings > 0 && (
                           <p className="text-sm text-green-600 font-medium mt-1">
-                            {formatPrice(totalSavings)}원 할인!
+                            {formatPrice(totalSavings)}원 {isBundleDiscount ? '할인' : '절약'}!
                           </p>
                         )}
                       </div>
@@ -923,7 +978,7 @@ export default function ProductDetailClient() {
         {/* Sticky Tabs - StoreLayout 헤더 아래에 고정 */}
         <div
           ref={tabsRef}
-          className="mt-8 bg-white sticky top-16 md:top-20 lg:top-[100px] z-40 shadow-sm"
+          className="mt-8 bg-white sticky top-24 md:top-28 lg:top-[132px] z-40 shadow-sm"
         >
           <div className="flex border-b max-w-[1050px] mx-auto">
             <button

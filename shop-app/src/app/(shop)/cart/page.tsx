@@ -25,7 +25,7 @@ interface CartItem {
   shippingFee: number | null
   bundleMaxQty: number // 합배송 최대 수량
   bundleUnit?: number  // 옵션별 합배송 단위 수 (기본값 1)
-  bundleDiscount?: number  // 합배송 할인 금액 (배송비 0원일 때 사용)
+  isBundleDiscount?: boolean  // 할인형 여부 (true: 할인 차감, false: 배송비 추가)
 }
 
 interface Cart {
@@ -151,9 +151,9 @@ export default function CartPage() {
   }
 
   // 합배송 가격 계산 함수 (bundleUnit 기반)
-  // bundleUnit을 고려하여 총 합배송 단위 계산 후 배송비 횟수 산출
+  // bundleUnit을 고려하여 총 합배송 단위 계산 후 배송비/할인 횟수 산출
   const calculateItemPrice = (item: CartItem, newQuantity: number) => {
-    const { originalPrice, shippingFee, bundleMaxQty, bundleUnit = 1, bundleDiscount = 0 } = item
+    const { originalPrice, shippingFee, bundleMaxQty, bundleUnit = 1, isBundleDiscount = false } = item
     const fee = shippingFee || 0
 
     // 합배송 상품인 경우 (bundleMaxQty > 1 && shippingFee > 0)
@@ -163,54 +163,51 @@ export default function CartPage() {
       const shippingCount = Math.floor(totalBundleUnits / bundleMaxQty) +
         (totalBundleUnits % bundleMaxQty > 0 ? 1 : 0)
 
-      // 총 가격 = (상품가 × 수량) + (배송비 × 배송횟수)
-      const totalPrice = (originalPrice * newQuantity) + (fee * shippingCount)
+      let totalPrice: number
+      if (isBundleDiscount) {
+        // 할인형: 첫 번째 수량은 배송비 포함, 2번째 수량부터 할인
+        const discountCount = Math.max(0, newQuantity - shippingCount)
+        totalPrice = (originalPrice * newQuantity) - (fee * discountCount)
+      } else {
+        // 배송비형: 배송비 별도 상품, 묶음당 배송비 적용
+        totalPrice = (originalPrice * newQuantity) + (fee * shippingCount)
+      }
       return Math.round(totalPrice / newQuantity)
     }
-    // 합배송 할인 상품인 경우 (bundleMaxQty > 1 && bundleDiscount > 0 && shippingFee == 0)
-    if (bundleMaxQty > 1 && bundleDiscount > 0) {
-      const totalBundleUnits = newQuantity * bundleUnit
-      const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
-      const discountAmount = fullBundles * bundleDiscount
-
-      // 총 가격 = (상품가 × 수량) - 할인금액
-      const totalPrice = (originalPrice * newQuantity) - discountAmount
-      return Math.round(totalPrice / newQuantity)
-    }
-    // 일반 상품
-    if (fee > 0) {
+    // 일반 상품 (배송비 별도)
+    if (fee > 0 && !isBundleDiscount) {
       return originalPrice + fee
     }
     return originalPrice
   }
 
   // 아이템 총액 계산 (bundleUnit 기반)
-  // bundleUnit을 고려하여 총 합배송 단위 계산 후 배송비 횟수 산출
+  // bundleUnit을 고려하여 총 합배송 단위 계산 후 배송비/할인 횟수 산출
   const calculateItemTotal = (item: CartItem, quantity: number) => {
-    const { originalPrice, shippingFee, bundleMaxQty, bundleUnit = 1, bundleDiscount = 0 } = item
+    const { originalPrice, shippingFee, bundleMaxQty, bundleUnit = 1, isBundleDiscount = false } = item
     const fee = shippingFee || 0
 
-    // 합배송 상품인 경우 (배송비 있음)
+    // 합배송 상품인 경우 (배송비/할인 있음)
     if (bundleMaxQty > 1 && fee > 0) {
       // bundleUnit을 고려하여 총 합배송 단위 계산
       const totalBundleUnits = quantity * bundleUnit
       const shippingCount = Math.floor(totalBundleUnits / bundleMaxQty) +
         (totalBundleUnits % bundleMaxQty > 0 ? 1 : 0)
 
-      // 총 가격 = (상품가 × 수량) + (배송비 × 배송횟수)
-      return (originalPrice * quantity) + (fee * shippingCount)
+      if (isBundleDiscount) {
+        // 할인형: 첫 번째 수량은 배송비 포함, 2번째 수량부터 할인
+        const discountCount = Math.max(0, quantity - shippingCount)
+        return (originalPrice * quantity) - (fee * discountCount)
+      } else {
+        // 배송비형: 배송비 별도 상품, 묶음당 배송비 적용
+        return (originalPrice * quantity) + (fee * shippingCount)
+      }
     }
-    // 합배송 할인 상품인 경우 (배송비 0원, 할인 있음)
-    if (bundleMaxQty > 1 && bundleDiscount > 0) {
-      const totalBundleUnits = quantity * bundleUnit
-      const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
-      const discountAmount = fullBundles * bundleDiscount
-
-      // 총 가격 = (상품가 × 수량) - 할인금액
-      return (originalPrice * quantity) - discountAmount
+    // 일반 상품 (배송비 별도)
+    if (fee > 0 && !isBundleDiscount) {
+      return (originalPrice + fee) * quantity
     }
-    // 일반 상품
-    return (originalPrice + fee) * quantity
+    return originalPrice * quantity
   }
 
   // Optimistic Update: UI 즉시 업데이트, 백그라운드에서 API 호출
@@ -385,35 +382,44 @@ export default function CartPage() {
   // 선택된 항목만 계산
   const selectedCartItems = cart?.items?.filter(item => selectedItems.includes(item.id)) || []
 
-  // 원래 금액 (할인 전): 각 상품의 (원가 + 배송비) * 수량
+  // 원래 금액 (할인 전)
+  // - 배송비형: (원가 + 배송비) × 수량
+  // - 할인형: 원가 × 수량 (배송비가 이미 포함된 가격)
   const originalTotal = selectedCartItems.reduce((sum, item) => {
     const fee = item.shippingFee || 0
-    return sum + (item.originalPrice + fee) * item.quantity
+    const isBundleDiscount = item.isBundleDiscount || false
+
+    if (isBundleDiscount) {
+      // 할인형: 원가에 이미 배송비 포함
+      return sum + item.originalPrice * item.quantity
+    } else {
+      // 배송비형: 원가 + 배송비
+      return sum + (item.originalPrice + fee) * item.quantity
+    }
   }, 0)
 
   // 합배송 할인액 계산 (bundleUnit 고려)
-  // 1. 배송비가 있는 경우: 합배송으로 절약되는 배송비
-  // 2. bundleDiscount가 있는 경우: 합배송 묶음 완성 시 할인
+  // - 배송비형: 합배송으로 절약되는 배송비
+  // - 할인형: 첫 번째 제외, 2번째부터 할인
   const totalBundleDiscount = selectedCartItems.reduce((sum, item) => {
     const bundleUnit = item.bundleUnit || 1
-    const discount = item.bundleDiscount || 0
+    const isBundleDiscount = item.isBundleDiscount || false
 
-    // 케이스 1: 배송비가 있는 합배송 상품
-    if (item.bundleMaxQty > 1 && item.shippingFee && item.shippingFee > 0 && item.quantity > 1) {
+    // 합배송 상품
+    if (item.bundleMaxQty > 1 && item.shippingFee && item.shippingFee > 0) {
       const totalBundleUnits = item.quantity * bundleUnit
       const shippingCount = Math.floor(totalBundleUnits / item.bundleMaxQty) +
         (totalBundleUnits % item.bundleMaxQty > 0 ? 1 : 0)
-      // 할인액 = (수량 × 배송비) - (배송횟수 × 배송비)
-      const savings = (item.quantity * item.shippingFee) - (shippingCount * item.shippingFee)
-      return sum + Math.max(0, savings)
-    }
-    // 케이스 2: bundleDiscount가 있는 상품 (배송비 0원)
-    if (item.bundleMaxQty > 1 && discount > 0) {
-      const totalBundleUnits = item.quantity * bundleUnit
-      const fullBundles = Math.floor(totalBundleUnits / item.bundleMaxQty)
-      // 할인액 = 완성된 묶음 수 × bundleDiscount
-      const discountAmount = fullBundles * discount
-      return sum + discountAmount
+
+      if (isBundleDiscount) {
+        // 할인형: 첫 번째 수량 제외, 2번째 수량부터 할인
+        const discountCount = Math.max(0, item.quantity - shippingCount)
+        return sum + (item.shippingFee * discountCount)
+      } else if (item.quantity > 1) {
+        // 배송비형: 합배송으로 절약되는 배송비
+        const savings = (item.quantity * item.shippingFee) - (shippingCount * item.shippingFee)
+        return sum + Math.max(0, savings)
+      }
     }
     return sum
   }, 0)
@@ -549,33 +555,35 @@ export default function CartPage() {
                           <span className="text-[16px] font-bold text-gray-900">
                             {formatPrice(calculateItemTotal(item, item.quantity))}원
                           </span>
-                          {/* 합배송 할인 표시: 묶음 단위로 절약 금액 계산 */}
+                          {/* 합배송 할인 표시 */}
                           {(() => {
                             const bundleUnit = item.bundleUnit || 1
-                            const discount = item.bundleDiscount || 0
+                            const isBundleDiscount = item.isBundleDiscount || false
 
-                            // 케이스 1: 배송비가 있는 합배송 상품
-                            if (item.bundleMaxQty > 1 && item.shippingFee && item.shippingFee > 0 && item.quantity > 1) {
+                            // 합배송 상품
+                            if (item.bundleMaxQty > 1 && item.shippingFee && item.shippingFee > 0) {
                               const totalBundleUnits = item.quantity * bundleUnit
                               const shippingCount = Math.floor(totalBundleUnits / item.bundleMaxQty) +
                                 (totalBundleUnits % item.bundleMaxQty > 0 ? 1 : 0)
-                              const savings = (item.quantity * item.shippingFee) - (shippingCount * item.shippingFee)
-                              return savings > 0 ? (
-                                <span className="ml-2 text-xs text-[#FF6B6B]">
-                                  ({formatPrice(savings)}원 할인)
-                                </span>
-                              ) : null
-                            }
-                            // 케이스 2: bundleDiscount가 있는 상품
-                            if (item.bundleMaxQty > 1 && discount > 0) {
-                              const totalBundleUnits = item.quantity * bundleUnit
-                              const fullBundles = Math.floor(totalBundleUnits / item.bundleMaxQty)
-                              const discountAmount = fullBundles * discount
-                              return discountAmount > 0 ? (
-                                <span className="ml-2 text-xs text-[#FF6B6B]">
-                                  ({formatPrice(discountAmount)}원 할인)
-                                </span>
-                              ) : null
+
+                              if (isBundleDiscount) {
+                                // 할인형: 첫 번째 수량 제외, 2번째 수량부터 할인
+                                const discountCount = Math.max(0, item.quantity - shippingCount)
+                                const discount = item.shippingFee * discountCount
+                                return discount > 0 ? (
+                                  <span className="ml-2 text-xs text-[#FF6B6B]">
+                                    ({formatPrice(discount)}원 할인)
+                                  </span>
+                                ) : null
+                              } else if (item.quantity > 1) {
+                                // 배송비형: 절약된 배송비 표시
+                                const savings = (item.quantity * item.shippingFee) - (shippingCount * item.shippingFee)
+                                return savings > 0 ? (
+                                  <span className="ml-2 text-xs text-[#FF6B6B]">
+                                    ({formatPrice(savings)}원 절약)
+                                  </span>
+                                ) : null
+                              }
                             }
                             return null
                           })()}

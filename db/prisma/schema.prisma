@@ -148,3 +148,10 @@ enum NotificationType {
   ERROR
   INFO
 }
+
+// 합배송 타입
+enum BundleShippingType {
+  NONE      // 합배송 없음
+  INCLUDED  // 배송비 포함형: 소매가에 배송비 포함, 합배송 시 할인
+  SEPARATE  // 배송비 별도형: 소매가 + 배송비, 합배송 시 배송비 절약
+}

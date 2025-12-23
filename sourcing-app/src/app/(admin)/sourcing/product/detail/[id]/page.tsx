@@ -31,7 +31,7 @@ interface Product {
   shippingInfo: string | null
   bundleMaxQty: number | null
   bundleUnit: string | null
-  bundleDiscount: number | null  // 합배송 할인 금액
+  bundleShippingType: 'NONE' | 'INCLUDED' | 'SEPARATE'
   createdAt: string
   updatedAt: string
   images: ProductImage[]
@@ -126,14 +126,14 @@ export default function ProductDetailPage() {
     shippingInfo: '',
     bundleMaxQty: 1,
     bundleUnit: '개',
-    bundleDiscount: 0,  // 합배송 할인 금액
+    bundleShippingType: 'NONE' as 'NONE' | 'INCLUDED' | 'SEPARATE',
   })
   const [originalShippingData, setOriginalShippingData] = useState({
     shippingFee: 0,
     shippingInfo: '',
     bundleMaxQty: 1,
     bundleUnit: '개',
-    bundleDiscount: 0,
+    bundleShippingType: 'NONE' as 'NONE' | 'INCLUDED' | 'SEPARATE',
   })
 
   useEffect(() => {
@@ -169,7 +169,7 @@ export default function ProductDetailPage() {
           shippingInfo: data.data.shippingInfo || '',
           bundleMaxQty: data.data.bundleMaxQty || 1,
           bundleUnit: data.data.bundleUnit || '개',
-          bundleDiscount: data.data.bundleDiscount || 0,
+          bundleShippingType: (data.data.bundleShippingType || 'NONE') as 'NONE' | 'INCLUDED' | 'SEPARATE',
         }
         setShippingFormData(shippingData)
         setOriginalShippingData(shippingData)
@@ -256,7 +256,6 @@ export default function ProductDetailPage() {
           shippingInfo: shippingFormData.shippingInfo.trim() || null,
           bundleMaxQty: shippingFormData.bundleMaxQty,
           bundleUnit: shippingFormData.bundleUnit.trim() || '개',
-          bundleDiscount: shippingFormData.bundleDiscount || 0,
         }),
       })
 
@@ -1435,21 +1434,6 @@ export default function ProductDetailPage() {
                         <p className="text-xs text-slate-400 mt-1">1 입력 시 합배송 불가로 표시됩니다</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">합배송 할인</label>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            value={shippingFormData.bundleDiscount || ''}
-                            onChange={(e) => setShippingFormData({ ...shippingFormData, bundleDiscount: parseInt(e.target.value) || 0 })}
-                            placeholder="0"
-                            min={0}
-                            className="!rounded-xl w-24"
-                          />
-                          <span className="text-slate-500 text-sm whitespace-nowrap">원</span>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-1">배송비 0원인 경우, 합배송 시 적용할 할인 금액</p>
-                      </div>
-                      <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">배송 안내</label>
                         <textarea
                           value={shippingFormData.shippingInfo}
@@ -1488,22 +1472,27 @@ export default function ProductDetailPage() {
                             </p>
                           </div>
                         </div>
-                      </div>
 
-                      {/* 합배송 할인 표시 (배송비 0원이고 할인이 있는 경우) */}
-                      {product.bundleDiscount && product.bundleDiscount > 0 && (
                         <div className="flex items-center gap-3">
-                          <div className="flex items-center justify-center w-10 h-10 bg-rose-50 rounded-xl">
-                            <Tag size={18} className="text-rose-500" />
+                          <div className="flex items-center justify-center w-10 h-10 bg-purple-50 rounded-xl">
+                            <Tag size={18} className="text-purple-500" />
                           </div>
                           <div>
-                            <p className="text-slate-500 text-xs">합배송 할인</p>
-                            <p className="font-medium text-rose-600">
-                              -{product.bundleDiscount.toLocaleString()}원
+                            <p className="text-slate-500 text-xs">합배송 타입</p>
+                            <p className="font-medium text-slate-900">
+                              {product.bundleShippingType === 'INCLUDED' && (
+                                <span className="text-green-600">배송비 포함형 (할인)</span>
+                              )}
+                              {product.bundleShippingType === 'SEPARATE' && (
+                                <span className="text-blue-600">배송비 별도형 (절약)</span>
+                              )}
+                              {product.bundleShippingType === 'NONE' && (
+                                <span className="text-slate-400">합배송 없음</span>
+                              )}
                             </p>
                           </div>
                         </div>
-                      )}
+                      </div>
 
                       {product.shippingInfo && (
                         <div className="pt-4 border-t border-slate-100">

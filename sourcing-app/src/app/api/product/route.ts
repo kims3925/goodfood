@@ -141,7 +141,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, name, description, categoryId, shippingFee, shippingInfo, bundleMaxQty, bundleUnit, bundleDiscount, options, variants } = body
+    const { id, name, description, categoryId, shippingFee, shippingInfo, bundleMaxQty, bundleUnit, options, variants } = body
 
     if (!id) {
       return NextResponse.json(
@@ -158,7 +158,6 @@ export async function PUT(request: NextRequest) {
       shippingInfo,
       bundleMaxQty,
       bundleUnit,
-      bundleDiscount,
       options,
       variants,
     })

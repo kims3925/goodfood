@@ -2,6 +2,23 @@ import prisma, { ChannelKind } from '@bandauto/db'
 import type { ProductListParams, ProductCreateInput, ProductUpdateInput } from '../types/product.types'
 import { downloadAndSaveProductImages } from '@/modules/utils/imageUtils'
 
+/**
+ * 옵션 이름에서 bundleUnit(합배송 단위 수)을 자동 추출
+ * 예: "2박스 (2.8kg)" → 2, "3세트" → 3, "1kg (2팩)" → 1
+ */
+function extractBundleUnit(optionSummary: string | null | undefined): number {
+  if (!optionSummary) return 1
+
+  // "2박스", "3세트", "2팩" 등의 패턴 매칭 (옵션 이름 시작 부분)
+  const match = optionSummary.match(/^(\d+)\s*(박스|세트|팩|개입|묶음)/i)
+  if (match) {
+    const num = parseInt(match[1], 10)
+    return num > 0 ? num : 1
+  }
+
+  return 1
+}
+
 export class ProductRepository {
   async findMany(params: ProductListParams) {
     const {
@@ -198,7 +215,6 @@ export class ProductRepository {
         shippingFee: data.shippingFee || null,
         shippingInfo: data.shippingInfo || null,
         bundleMaxQty: data.bundleMaxQty || 1,
-        bundleDiscount: data.bundleDiscount || 0,
         thumbnailUrl: data.thumbnailUrl || null,
         options: data.options?.length
           ? {
@@ -227,7 +243,8 @@ export class ProductRepository {
                 optionSummary: v.optionSummary ?? null,
                 wholesalePrice: v.wholesalePrice ?? null,
                 price: v.price ?? 0,
-                bundleUnit: v.bundleUnit ?? 1,  // 합배송 단위 수 (기본값 1)
+                // bundleUnit: 명시적으로 전달되면 사용, 아니면 옵션 이름에서 자동 추출
+                bundleUnit: v.bundleUnit ?? extractBundleUnit(v.optionSummary),
               })),
             }
           : undefined,
@@ -277,7 +294,6 @@ export class ProductRepository {
     if (data.shippingInfo !== undefined) updateData.shippingInfo = data.shippingInfo
     if (data.bundleMaxQty !== undefined) updateData.bundleMaxQty = data.bundleMaxQty
     if (data.bundleUnit !== undefined) updateData.bundleUnit = data.bundleUnit
-    if (data.bundleDiscount !== undefined) updateData.bundleDiscount = data.bundleDiscount
 
     if (data.options !== undefined) {
       await prisma.productOption.deleteMany({ where: { productId: id } })
@@ -302,7 +318,8 @@ export class ProductRepository {
             optionSummary: v.optionSummary ?? null,
             wholesalePrice: v.wholesalePrice ?? null,
             price: v.price ?? 0,
-            bundleUnit: v.bundleUnit ?? 1,  // 합배송 단위 수 (기본값 1)
+            // bundleUnit: 명시적으로 전달되면 사용, 아니면 옵션 이름에서 자동 추출
+            bundleUnit: v.bundleUnit ?? extractBundleUnit(v.optionSummary),
           })),
         })
       }
