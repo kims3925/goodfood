@@ -1032,6 +1032,7 @@ export default function ProductDetailClient() {
             {/* 상품 설명 */}
             {product.description && (
               <div className="rounded-2xl overflow-hidden p-5">
+                    <h2 className="text-[32px] font-bold text-[#121212] mb-4">{product.title}</h2>
                     <div className="text-[#121212] text-[16px] leading-7">
                           {(() => {
                             const lines = product.description.split('\n')

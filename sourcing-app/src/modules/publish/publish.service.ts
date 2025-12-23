@@ -60,9 +60,16 @@ function isQuotaError(error: any): boolean {
  * 게시글 내용 생성
  * Band API로 텍스트만 발행 (이미지 없음)
  * 본문 구조: 쇼핑몰URL → 상품명 → 판매가 → 상품설명 → 쇼핑몰URL
+ *
+ * 가격 표시 로직:
+ * - bundleShippingType이 'INCLUDED'인 경우: 판매가 그대로 (도매가에 배송비 포함)
+ * - 그 외 (SEPARATE, NONE): 판매가 + 배송비
  */
 function buildPostContent(
-  product: ProductForPublish,
+  product: ProductForPublish & {
+    shippingFee?: number | null
+    bundleShippingType?: string | null
+  },
   options?: { orderLink?: string }
 ): string {
   const lines: string[] = []
@@ -78,13 +85,21 @@ function buildPostContent(
   lines.push('')
 
   // 판매가 (variants에서 옵션별로 추출)
+  // bundleShippingType이 INCLUDED면 배송비가 이미 포함된 가격
+  // 그 외에는 배송비를 더해서 표시
   if (product.variants && product.variants.length > 0) {
     lines.push('💰 판매가:')
 
+    const isShippingIncluded = product.bundleShippingType === 'INCLUDED'
+    const shippingFee = product.shippingFee || 0
+
     for (const variant of product.variants) {
       const optionName = variant.optionSummary || '기본'
-      const price = variant.price.toLocaleString()
-      lines.push(`  • ${optionName}: ${price}원`)
+      // 배송비 포함형이면 그대로, 별도형이면 배송비 추가
+      const displayPrice = isShippingIncluded
+        ? variant.price
+        : variant.price + shippingFee
+      lines.push(`  • ${optionName}: ${displayPrice.toLocaleString()}원`)
     }
 
     lines.push('')
@@ -190,6 +205,8 @@ export class PublishService {
           name: true,
           description: true,
           thumbnailUrl: true,
+          shippingFee: true,
+          bundleShippingType: true,
           variants: {
             select: {
               id: true,
@@ -791,6 +808,8 @@ export class PublishService {
           name: true,
           description: true,
           thumbnailUrl: true,
+          shippingFee: true,
+          bundleShippingType: true,
           variants: {
             select: {
               id: true,
