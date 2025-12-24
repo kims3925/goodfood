@@ -888,7 +888,7 @@ export default function WholesaleOrdersPage() {
                         </div>
 
                         {/* 페이지네이션 */}
-                        {orderItems.pagination.totalPages > 1 && (
+                        {orderItems && orderItems.pagination.totalPages > 1 && (
                           <div className="mt-4 flex items-center justify-between">
                             <p className="text-sm text-gray-600">
                               총 {orderItems.pagination.total}건 중 {(detailPage - 1) * 10 + 1}-{Math.min(detailPage * 10, orderItems.pagination.total)}건

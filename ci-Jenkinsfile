@@ -9,9 +9,6 @@ pipeline {
   environment {
     CI = 'true'
     NEXT_TELEMETRY_DISABLED = '1'
-    NEXTAUTH_SECRET = credentials('nextauth-secret')
-    GUEST_TOKEN_SECRET = credentials('guest-secret')
-    JWT_SECRET = credentials('jwt-secret')
   }
 
   stages {
@@ -91,11 +88,17 @@ stage('Debug') {
 
     stage('Build') {
       steps {
-        sh '''
-          set -eux
-          npm run build:shop
-          npm run build:sourcing
-        '''
+        withCredentials([
+          string(credentialsId: 'nextauth-secret', variable: 'NEXTAUTH_SECRET'),
+          string(credentialsId: 'guest-secret', variable: 'GUEST_TOKEN_SECRET'),
+          string(credentialsId: 'jwt-secret', variable: 'JWT_SECRET')
+        ]) {
+          sh '''
+            set -eux
+            npm run build:shop
+            npm run build:sourcing
+          '''
+        }
       }
     }
   }

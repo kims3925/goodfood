@@ -24,6 +24,7 @@ const STAGE_LABELS: Record<PublishStage, string> = {
   uploading: '이미지 업로드 중',
   entering: '내용 입력 중',
   submitting: '게시물 등록 중',
+  retrying: '재시도 중',
   completed: '완료',
   failed: '실패',
   skipped: '건너뜀',

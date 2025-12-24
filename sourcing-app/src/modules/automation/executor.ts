@@ -437,13 +437,6 @@ export async function executeFullPipeline(
       })
 
       logStageComplete('AI변환(Transform)', transformResult, { ...logCtx, stage: 'TRANSFORM' })
-
-      if (transformResult.failedCount > 0 && transformResult.details?.errors) {
-        log('WARN', `변환 실패 항목:`, { ...logCtx, stage: 'TRANSFORM' })
-        for (const err of transformResult.details.errors.slice(0, 3)) {
-          log('WARN', `  - Post ${err.postId}: ${err.message}`, { ...logCtx, stage: 'TRANSFORM' })
-        }
-      }
     } else {
       log('INFO', 'AI변환 단계 건너뜀 (skipTransform=true)', logCtx)
     }
@@ -514,15 +507,6 @@ export async function executeFullPipeline(
 
         logStageComplete('발행(Publish)', publishResult, { ...logCtx, stage: 'PUBLISH' })
 
-        if (publishResult.failedCount > 0 && publishResult.details?.publishedProducts) {
-          const failedPublishes = publishResult.details.publishedProducts.filter((p: any) => p.status?.toUpperCase() === 'FAILED')
-          if (failedPublishes.length > 0) {
-            log('WARN', `발행 실패 항목:`, { ...logCtx, stage: 'PUBLISH' })
-            for (const p of failedPublishes.slice(0, 3)) {
-              log('WARN', `  - ${p.productName || 'Unknown'}: ${p.error || '알 수 없는 오류'}`, { ...logCtx, stage: 'PUBLISH' })
-            }
-          }
-        }
       }
     } else {
       log('INFO', '발행 단계 건너뜀 (skipPublish=true)', logCtx)

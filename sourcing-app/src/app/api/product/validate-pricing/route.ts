@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions } from '@modules/auth/auth.config'
 
 interface UnpricedProduct {
   productId: number
@@ -28,11 +28,10 @@ interface UnpricedProduct {
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const userId = (session?.user as any)?.id
+    if (!userId) {
       return NextResponse.json({ success: false, error: '인증이 필요합니다.' }, { status: 401 })
     }
-
-    const userId = session.user.id
     const { searchParams } = new URL(req.url)
     const limit = parseInt(searchParams.get('limit') || '100')
 
