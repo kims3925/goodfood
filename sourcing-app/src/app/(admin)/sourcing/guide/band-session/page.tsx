@@ -219,7 +219,7 @@ export default function BandSessionGuidePage() {
                   세션 저장
                 </h3>
                 <p className="text-slate-600 text-sm">
-                  "저장 준비 완료" 상태가 표시되면 <span className="font-semibold text-violet-600">세션 저장하기</span> 버튼을 클릭합니다.<br />
+                  &quot;저장 준비 완료&quot; 상태가 표시되면 <span className="font-semibold text-violet-600">세션 저장하기</span> 버튼을 클릭합니다.<br />
                   등록된 모든 소매 밴드 채널에 세션이 자동으로 저장됩니다.
                 </p>
               </div>
