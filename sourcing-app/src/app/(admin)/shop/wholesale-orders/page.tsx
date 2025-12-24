@@ -16,8 +16,11 @@ import {
   Store,
   CheckCircle,
   AlertTriangle,
+  Calendar,
+  History,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
-import Button from '@/components/ui/Button'
 import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
@@ -41,10 +44,10 @@ interface WholesaleSummary {
 
 interface WholesaleOrderItem {
   orderItemId: number
-  orderId: number  // 발주완료 처리용
+  orderId: number
   orderNumber: string
   orderedAt: string
-  isMember: boolean  // 회원/비회원 구분
+  isMember: boolean
   retailChannelName: string
   productName: string
   optionSummary: string
@@ -77,14 +80,29 @@ interface MissedOrdersInfo {
   newestDate: string
 }
 
+interface DailyHistory {
+  date: string
+  orderCount: number
+  itemCount: number
+  totalQuantity: number
+  totalAmount: number
+}
+
+interface HistorySummary {
+  totalOrders: number
+  totalItems: number
+  totalQuantity: number
+  totalAmount: number
+}
+
 export default function WholesaleOrdersPage() {
   const toast = useToast()
   const searchParams = useSearchParams()
+
+  // 발주 대기 상태
   const [loading, setLoading] = useState(false)
   const [summaries, setSummaries] = useState<WholesaleSummary[]>([])
   const [missedOrders, setMissedOrders] = useState<MissedOrdersInfo | null>(null)
-
-  // 날짜 필터 (하루만) - URL 쿼리 파라미터에서 초기값 설정
   const [selectedDate, setSelectedDate] = useState(() => {
     const dateParam = searchParams.get('date')
     if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
@@ -92,29 +110,54 @@ export default function WholesaleOrdersPage() {
     }
     return new Date().toISOString().split('T')[0]
   })
-
-  // 자동 발주 시간 설정
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [scheduleTime, setScheduleTime] = useState('18:00')
-
-  // 상세 보기
   const [selectedChannel, setSelectedChannel] = useState<WholesaleSummary | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [orderItems, setOrderItems] = useState<OrderItemsResponse | null>(null)
   const [detailPage, setDetailPage] = useState(1)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
-
-  // 체크박스 선택 상태 (key: orderId-isMember, value: { orderId, isMember })
   const [selectedOrders, setSelectedOrders] = useState<Map<string, { orderId: number; isMember: boolean }>>(new Map())
+
+  // 발주 이력 상태 (모달 내)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [history, setHistory] = useState<DailyHistory[]>([])
+  const [historySummary, setHistorySummary] = useState<HistorySummary | null>(null)
+  const [historyExpanded, setHistoryExpanded] = useState(true)
+  const [expandedHistoryDate, setExpandedHistoryDate] = useState<string | null>(null)
+  const [historyDetailItems, setHistoryDetailItems] = useState<WholesaleOrderItem[]>([])
+  const [historyDetailLoading, setHistoryDetailLoading] = useState(false)
+
+  // 쇼핑몰 필터
+  const [selectedShop, setSelectedShop] = useState<string>('all')
+
+  // 쇼핑몰 목록 추출
+  const shopList = useMemo(() => {
+    if (!orderItems) return []
+    const shops = new Set<string>()
+    orderItems.items.forEach(item => {
+      if (item.retailChannelName) {
+        shops.add(item.retailChannelName)
+      }
+    })
+    return Array.from(shops).sort()
+  }, [orderItems])
+
+  // 필터링된 아이템
+  const filteredItems = useMemo(() => {
+    if (!orderItems) return []
+    if (selectedShop === 'all') return orderItems.items
+    return orderItems.items.filter(item => item.retailChannelName === selectedShop)
+  }, [orderItems, selectedShop])
 
   // 각 주문(orderId)에 색상 인덱스 할당
   const orderColorMap = useMemo(() => {
-    if (!orderItems) return new Map<string, number>()
+    if (!filteredItems.length) return new Map<string, number>()
 
     const uniqueOrders = new Map<string, number>()
     let colorIndex = 0
 
-    orderItems.items.forEach(item => {
+    filteredItems.forEach(item => {
       const key = `${item.orderId}-${item.isMember}`
       if (!uniqueOrders.has(key)) {
         uniqueOrders.set(key, colorIndex % ORDER_COLORS.length)
@@ -123,11 +166,11 @@ export default function WholesaleOrdersPage() {
     })
 
     return uniqueOrders
-  }, [orderItems])
+  }, [filteredItems])
 
   // 각 아이템이 그룹의 첫 번째인지 여부 및 주문 정보
   const orderMetadata = useMemo(() => {
-    if (!orderItems) return new Map<string, {
+    if (!filteredItems.length) return new Map<string, {
       isFirst: boolean
       itemCount: number
       orderNumber: string
@@ -138,14 +181,12 @@ export default function WholesaleOrdersPage() {
     const orderItemCounts = new Map<string, number>()
     const seenOrders = new Set<string>()
 
-    // 주문당 아이템 개수 세기
-    orderItems.items.forEach(item => {
+    filteredItems.forEach(item => {
       const orderKey = `${item.orderId}-${item.isMember}`
       orderItemCounts.set(orderKey, (orderItemCounts.get(orderKey) || 0) + 1)
     })
 
-    // 첫 번째 아이템 식별
-    orderItems.items.forEach(item => {
+    filteredItems.forEach(item => {
       const orderKey = `${item.orderId}-${item.isMember}`
       const itemKey = `${item.orderItemId}`
 
@@ -160,9 +201,9 @@ export default function WholesaleOrdersPage() {
     })
 
     return metadata
-  }, [orderItems])
+  }, [filteredItems])
 
-  // 집계 조회
+  // 발주 대기 집계 조회
   const fetchSummary = useCallback(async () => {
     setLoading(true)
     try {
@@ -177,10 +218,6 @@ export default function WholesaleOrdersPage() {
       if (data.success) {
         setSummaries(data.data)
         setMissedOrders(data.missedOrders || null)
-        // 디버그 정보 출력
-        if (data.debug) {
-          console.log('=== 도매 발주 디버그 ===', data.debug)
-        }
       } else {
         toast.error(data.error || '집계 조회에 실패했습니다.')
       }
@@ -192,7 +229,7 @@ export default function WholesaleOrdersPage() {
     }
   }, [selectedDate])
 
-  // 상세 조회
+  // 발주 대기 상세 조회
   const fetchDetails = useCallback(async (channelId: number, page: number = 1) => {
     setDetailLoading(true)
     try {
@@ -220,12 +257,66 @@ export default function WholesaleOrdersPage() {
     }
   }, [selectedDate])
 
-  // 엑셀 다운로드
-  const downloadExcel = async (channelId: number, channelName: string) => {
+  // 발주 이력 조회 (최근 30일)
+  const fetchHistory = useCallback(async (channelId: number) => {
+    setHistoryLoading(true)
+    try {
+      const toDate = new Date().toISOString().split('T')[0]
+      const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+      const params = new URLSearchParams({
+        wholesaleChannelId: channelId.toString(),
+        from: fromDate,
+        to: toDate,
+      })
+
+      const res = await fetch(`/api/admin/wholesale-orders/history?${params}`)
+      const data = await res.json()
+
+      if (data.success) {
+        setHistory(data.history || [])
+        setHistorySummary(data.summary || null)
+      } else {
+        toast.error(data.error || '발주 이력 조회에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('발주 이력 조회 실패:', error)
+      toast.error('발주 이력 조회에 실패했습니다.')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [])
+
+  // 이력 날짜별 상세 조회
+  const fetchHistoryDetail = useCallback(async (channelId: number, date: string) => {
+    setHistoryDetailLoading(true)
     try {
       const params = new URLSearchParams({
-        from: selectedDate,
-        to: selectedDate,
+        from: date,
+        to: date,
+        page: '1',
+        limit: '100',
+      })
+
+      const res = await fetch(`/api/admin/wholesale-orders/${channelId}/items?${params}`)
+      const data = await res.json()
+
+      if (data.success) {
+        setHistoryDetailItems(data.data.items || [])
+      }
+    } catch (error) {
+      console.error('이력 상세 조회 실패:', error)
+    } finally {
+      setHistoryDetailLoading(false)
+    }
+  }, [])
+
+  const downloadExcel = async (channelId: number, channelName: string, date?: string) => {
+    try {
+      const targetDate = date || selectedDate
+      const params = new URLSearchParams({
+        from: targetDate,
+        to: targetDate,
       })
 
       const res = await fetch(`/api/admin/wholesale-orders/${channelId}/export?${params}`)
@@ -239,7 +330,7 @@ export default function WholesaleOrdersPage() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `발주서_${channelName}_${selectedDate}.xlsx`
+      a.download = `발주서_${channelName}_${targetDate}.xlsx`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
@@ -252,7 +343,6 @@ export default function WholesaleOrdersPage() {
     }
   }
 
-  // 발주 완료 (배송시작) 상태로 변경
   const markAsShipped = async (channelId: number, markAll: boolean = false) => {
     setIsUpdatingStatus(true)
     try {
@@ -261,13 +351,11 @@ export default function WholesaleOrdersPage() {
         to: selectedDate,
       })
 
-      // 선택 발주완료 시 선택된 주문 ID 분류
       let body: { markAll?: boolean; orderIds?: { memberIds?: number[]; guestIds?: number[] } } = {}
 
       if (markAll) {
         body = { markAll: true }
       } else {
-        // 선택된 주문을 회원/비회원으로 분류
         const memberIds: number[] = []
         const guestIds: number[] = []
 
@@ -302,13 +390,11 @@ export default function WholesaleOrdersPage() {
 
       if (data.success) {
         toast.success(`${data.updatedCount}건의 주문이 발주 완료(배송시작) 처리되었습니다.`)
-        // 선택 초기화
         setSelectedOrders(new Map())
-        // 목록 새로고침
         fetchSummary()
-        // 상세 목록 새로고침
         if (selectedChannel) {
           fetchDetails(selectedChannel.wholesaleChannelId, 1)
+          fetchHistory(selectedChannel.wholesaleChannelId)
         }
       } else {
         toast.error(data.error || '상태 변경에 실패했습니다.')
@@ -321,7 +407,6 @@ export default function WholesaleOrdersPage() {
     }
   }
 
-  // 체크박스 토글
   const toggleOrderSelection = (item: WholesaleOrderItem) => {
     const key = `${item.orderId}-${item.isMember}`
     setSelectedOrders((prev) => {
@@ -335,46 +420,51 @@ export default function WholesaleOrdersPage() {
     })
   }
 
-  // 전체 선택/해제
   const toggleSelectAll = () => {
-    if (!orderItems) return
+    if (!filteredItems.length) return
 
-    const allSelected = orderItems.items.every((item) => selectedOrders.has(`${item.orderId}-${item.isMember}`))
+    const allSelected = filteredItems.every((item) => selectedOrders.has(`${item.orderId}-${item.isMember}`))
 
     if (allSelected) {
-      // 전체 해제
-      setSelectedOrders(new Map())
-    } else {
-      // 전체 선택
-      const newSelection = new Map<string, { orderId: number; isMember: boolean }>()
-      orderItems.items.forEach((item) => {
-        const key = `${item.orderId}-${item.isMember}`
-        newSelection.set(key, { orderId: item.orderId, isMember: item.isMember })
+      // 필터링된 아이템만 해제
+      setSelectedOrders((prev) => {
+        const next = new Map(prev)
+        filteredItems.forEach((item) => {
+          next.delete(`${item.orderId}-${item.isMember}`)
+        })
+        return next
       })
-      setSelectedOrders(newSelection)
+    } else {
+      // 필터링된 아이템만 선택
+      setSelectedOrders((prev) => {
+        const next = new Map(prev)
+        filteredItems.forEach((item) => {
+          const key = `${item.orderId}-${item.isMember}`
+          next.set(key, { orderId: item.orderId, isMember: item.isMember })
+        })
+        return next
+      })
     }
   }
 
-  // 현재 페이지 전체 선택 여부
-  const isAllSelected = orderItems && orderItems.items.length > 0 && orderItems.items.every((item) => selectedOrders.has(`${item.orderId}-${item.isMember}`))
+  const isAllSelected = filteredItems.length > 0 && filteredItems.every((item) => selectedOrders.has(`${item.orderId}-${item.isMember}`))
 
-  // 날짜 변경 핸들러 (자동 조회)
-  const handleDateChange = (date: string) => {
-    setSelectedDate(date)
-  }
-
-  // 날짜 변경 시 자동 조회
+  // Effects
   useEffect(() => {
     fetchSummary()
   }, [selectedDate, fetchSummary])
 
-  // 도매처 선택 시 상세 조회
   useEffect(() => {
     if (selectedChannel) {
       fetchDetails(selectedChannel.wholesaleChannelId, 1)
+      fetchHistory(selectedChannel.wholesaleChannelId)
+      setExpandedHistoryDate(null)
+      setHistoryDetailItems([])
+      setSelectedShop('all') // 쇼핑몰 필터 초기화
     }
   }, [selectedChannel])
 
+  // 포맷 함수들
   const formatPrice = (price: number) => {
     return `₩${price.toLocaleString()}`
   }
@@ -387,6 +477,15 @@ export default function WholesaleOrdersPage() {
     const hours = String(date.getHours()).padStart(2, '0')
     const minutes = String(date.getMinutes()).padStart(2, '0')
     return `${year}-${month}-${day} ${hours}:${minutes}`
+  }
+
+  const formatDateKorean = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('ko-KR', {
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short',
+    })
   }
 
   // 총합계 계산
@@ -403,16 +502,15 @@ export default function WholesaleOrdersPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">발주 관리</h1>
           <p className="text-gray-600">
             결제 완료된 주문을 도매처별로 집계하고 발주서를 생성합니다.
           </p>
         </div>
 
-        {/* 통계 및 액션 카드 */}
+        {/* 통계 카드 */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          {/* 전체 주문 카드 */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-gray-100 rounded-lg">
@@ -424,7 +522,6 @@ export default function WholesaleOrdersPage() {
               </div>
             </div>
           </div>
-          {/* 총 수량 카드 */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-blue-100 rounded-lg">
@@ -436,7 +533,6 @@ export default function WholesaleOrdersPage() {
               </div>
             </div>
           </div>
-          {/* 총 금액 카드 */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-green-100 rounded-lg">
@@ -448,7 +544,6 @@ export default function WholesaleOrdersPage() {
               </div>
             </div>
           </div>
-          {/* 도매처 수 카드 */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-purple-100 rounded-lg">
@@ -460,7 +555,6 @@ export default function WholesaleOrdersPage() {
               </div>
             </div>
           </div>
-          {/* 자동 발주 설정 카드 */}
           <button
             onClick={() => setShowScheduleModal(true)}
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-gray-400 hover:bg-gray-50 transition-colors cursor-pointer text-left"
@@ -485,7 +579,7 @@ export default function WholesaleOrdersPage() {
               <input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => handleDateChange(e.target.value)}
+                onChange={(e) => setSelectedDate(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 text-gray-700"
               />
               {loading && <Loading />}
@@ -539,7 +633,6 @@ export default function WholesaleOrdersPage() {
                 }`}
                 onClick={() => setSelectedChannel(summary)}
               >
-                {/* 썸네일 영역 */}
                 <div className="relative h-36 bg-gray-100">
                   {summary.wholesaleChannelCoverUrl ? (
                     <img
@@ -552,12 +645,10 @@ export default function WholesaleOrdersPage() {
                       <Store size={48} className="text-gray-300" />
                     </div>
                   )}
-                  {/* 도매처명 오버레이 */}
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
                     <h3 className="font-semibold text-white truncate">{summary.wholesaleChannelName}</h3>
                   </div>
                 </div>
-                {/* 정보 영역 */}
                 <div className="p-4">
                   <div className="grid grid-cols-3 gap-2 text-center mb-3">
                     <div className="bg-gray-50 rounded-lg py-2">
@@ -591,10 +682,10 @@ export default function WholesaleOrdersPage() {
 
         {/* 상세 모달 */}
         {selectedChannel && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-10 md:p-16">
-            <div className="bg-white rounded-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 md:p-8">
+            <div className="bg-white rounded-2xl max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col shadow-2xl">
               {/* 모달 헤더 */}
-              <div className="px-8 py-5 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white flex-shrink-0">
                 <div className="flex items-center gap-4">
                   {selectedChannel.wholesaleChannelCoverUrl ? (
                     <img
@@ -609,246 +700,358 @@ export default function WholesaleOrdersPage() {
                   )}
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">{selectedChannel.wholesaleChannelName}</h2>
-                    <p className="text-sm text-gray-500">{selectedDate} 발주 상세</p>
+                    <p className="text-sm text-gray-500">{selectedDate} 발주 현황</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 rounded-lg transition-colors shadow-sm"
-                    onClick={() => downloadExcel(selectedChannel.wholesaleChannelId, selectedChannel.wholesaleChannelName)}
-                  >
-                    <Download size={16} />
-                    엑셀 다운로드
-                  </button>
-                  <button
-                    className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={() => markAsShipped(selectedChannel.wholesaleChannelId, false)}
-                    disabled={isUpdatingStatus || selectedOrders.size === 0}
-                  >
-                    <CheckCircle size={16} />
-                    {isUpdatingStatus ? '처리중...' : `선택 발주완료 (${selectedOrders.size})`}
-                  </button>
-                  <button
-                    className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={() => markAsShipped(selectedChannel.wholesaleChannelId, true)}
-                    disabled={isUpdatingStatus}
-                  >
-                    <Truck size={16} />
-                    {isUpdatingStatus ? '처리중...' : '전체 발주완료'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedChannel(null)
-                      setOrderItems(null)
-                      setSelectedOrders(new Map())
-                    }}
-                    className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <X size={22} className="text-gray-500" />
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    setSelectedChannel(null)
+                    setOrderItems(null)
+                    setSelectedOrders(new Map())
+                    setHistory([])
+                    setHistorySummary(null)
+                  }}
+                  className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X size={22} className="text-gray-500" />
+                </button>
               </div>
 
-              {/* 요약 */}
-              {orderItems && (
-                <div className="px-8 py-5 bg-gradient-to-br from-gray-50 to-gray-100/50 border-b border-gray-200">
-                  <div className="grid grid-cols-3 gap-5">
-                    <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100">
-                      <div className="flex items-center gap-3">
-                        <div className="w-[38px] h-[38px] rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-                          <Package size={19} className="text-blue-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-500">총 수량</p>
-                          <p className="text-2xl font-bold text-gray-900 truncate">{orderItems.summary.totalQuantity.toLocaleString()}개</p>
-                        </div>
+              {/* 모달 컨텐츠 - 스크롤 영역 */}
+              <div className="flex-1 overflow-y-auto">
+                {/* 발주 대기 섹션 */}
+                <div className="border-b border-gray-200">
+                  <div className="px-6 py-4 bg-orange-50 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <Package size={20} className="text-orange-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">발주 대기</h3>
+                        <p className="text-sm text-gray-500">{selectedDate} 결제 완료 주문</p>
                       </div>
                     </div>
-                    <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100">
-                      <div className="flex items-center gap-3">
-                        <div className="w-[38px] h-[38px] rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
-                          <Banknote size={19} className="text-green-600" />
+                    <div className="flex items-center gap-3">
+                      <button
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 rounded-lg transition-colors"
+                        onClick={() => downloadExcel(selectedChannel.wholesaleChannelId, selectedChannel.wholesaleChannelName)}
+                      >
+                        <Download size={16} />
+                        엑셀
+                      </button>
+                      <button
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => markAsShipped(selectedChannel.wholesaleChannelId, false)}
+                        disabled={isUpdatingStatus || selectedOrders.size === 0}
+                      >
+                        <CheckCircle size={16} />
+                        {isUpdatingStatus ? '처리중...' : `선택 완료 (${selectedOrders.size})`}
+                      </button>
+                      <button
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => markAsShipped(selectedChannel.wholesaleChannelId, true)}
+                        disabled={isUpdatingStatus || !orderItems?.items.length}
+                      >
+                        <Truck size={16} />
+                        {isUpdatingStatus ? '처리중...' : '전체 완료'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 발주 대기 요약 */}
+                  {orderItems && (
+                    <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-6">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-500">주문:</span>
+                            <span className="font-bold text-gray-900">{filteredItems.length}건</span>
+                            {selectedShop !== 'all' && (
+                              <span className="text-xs text-gray-400">(전체 {orderItems.pagination.total}건)</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-500">수량:</span>
+                            <span className="font-bold text-gray-900">
+                              {filteredItems.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}개
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-500">금액:</span>
+                            <span className="font-bold text-gray-900">
+                              {formatPrice(filteredItems.reduce((sum, item) => sum + item.totalAmount, 0))}
+                            </span>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-500">총 금액</p>
-                          <p className="text-2xl font-bold text-gray-900 truncate">{formatPrice(orderItems.summary.totalAmount)}</p>
-                        </div>
+                        {/* 쇼핑몰 필터 */}
+                        {shopList.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-500">쇼핑몰:</span>
+                            <select
+                              value={selectedShop}
+                              onChange={(e) => setSelectedShop(e.target.value)}
+                              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
+                            >
+                              <option value="all">전체 ({orderItems.items.length})</option>
+                              {shopList.map((shop) => (
+                                <option key={shop} value={shop}>
+                                  {shop} ({orderItems.items.filter(i => i.retailChannelName === shop).length})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100">
-                      <div className="flex items-center gap-3">
-                        <div className="w-[38px] h-[38px] rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
-                          <ShoppingCart size={19} className="text-purple-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-500">주문 건수</p>
-                          <p className="text-2xl font-bold text-gray-900 truncate">{orderItems.items.length}건</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 테이블 */}
-              <div className="p-6">
-                {detailLoading ? (
-                  <div className="flex justify-center py-16">
-                    <Loading />
-                  </div>
-                ) : (
-                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200">
-                          <th className="text-center py-4 px-3 w-12">
-                            <div className="flex flex-col items-center gap-1">
-                              <input
-                                type="checkbox"
-                                checked={!!isAllSelected}
-                                onChange={toggleSelectAll}
-                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                                title="전체 주문 선택"
-                              />
-                              <span className="text-[10px] text-gray-500">주문</span>
-                            </div>
-                          </th>
-                          <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">상품명</th>
-                          <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">옵션</th>
-                          <th className="text-right py-4 px-5 text-sm font-semibold text-gray-700">수량</th>
-                          <th className="text-right py-4 px-5 text-sm font-semibold text-gray-700">단가</th>
-                          <th className="text-right py-4 px-5 text-sm font-semibold text-gray-700">금액</th>
-                          <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">고객명</th>
-                          <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">연락처</th>
-                          <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">주소</th>
-                          <th className="text-left py-4 px-5 text-sm font-semibold text-gray-700">주문일시</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {/* 실제 데이터 행 */}
-                        {orderItems?.items.map((item, idx) => {
-                          const orderKey = `${item.orderId}-${item.isMember}`
-                          const itemKey = `${item.orderItemId}`
-                          const colorIndex = orderColorMap.get(orderKey) ?? 0
-                          const colors = ORDER_COLORS[colorIndex]
-                          const metadata = orderMetadata.get(itemKey)
-                          const isFirstInGroup = metadata?.isFirst || false
-                          const isSelected = selectedOrders.has(orderKey)
-
-                          return (
-                            <>
-                              {/* 주문 헤더 행 (그룹의 첫 번째 아이템일 때만 표시) - 체크박스 포함 */}
-                              {isFirstInGroup && (
-                                <tr key={`header-${item.orderId}-${item.isMember}`} className={`bg-gray-100/50 border-b border-gray-200 ${isSelected ? 'bg-blue-100/50' : ''}`}>
-                                  <td className={`py-2 px-3 border-l-4 ${colors.border}`}>
-                                    <input
-                                      type="checkbox"
-                                      checked={isSelected}
-                                      onChange={() => toggleOrderSelection(item)}
-                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                                    />
-                                  </td>
-                                  <td colSpan={9} className="py-2 px-2">
-                                    <div className="flex items-center gap-4 text-xs">
-                                      <span className="font-semibold text-gray-700">
-                                        주문번호: {metadata?.orderNumber}
-                                      </span>
-                                      <span className="text-gray-500">
-                                        주문일시: {formatDate(metadata?.orderedAt || '')}
-                                      </span>
-                                      <span className="text-gray-500">
-                                        {metadata?.itemCount}개 상품
-                                      </span>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
-
-                              {/* 실제 상품 행 - 체크박스 없음 */}
-                              <tr
-                                key={item.orderItemId}
-                                className={`
-                                  border-b border-gray-100
-                                  ${idx % 2 === 1 ? 'bg-gray-50/50' : ''}
-                                  ${isSelected ? 'bg-blue-50' : colors.bg}
-                                  ${`border-l-4 ${colors.border}`}
-                                `}
-                              >
-                                <td className="py-4 px-3"></td>
-                                <td className="py-4 px-5 text-sm text-gray-900 max-w-[200px] truncate" title={item.productName}>
-                                  {item.productName}
-                                </td>
-                                <td className="py-4 px-5">
-                                  <span className="inline-block px-2.5 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-md">
-                                    {item.optionSummary || '-'}
-                                  </span>
-                                </td>
-                                <td className="py-4 px-5 text-sm text-right font-medium text-gray-900">{item.quantity}</td>
-                                <td className="py-4 px-5 text-sm text-right text-gray-600">{formatPrice(item.wholesalePrice)}</td>
-                                <td className="py-4 px-5 text-sm text-right font-semibold text-gray-900">{formatPrice(item.totalAmount)}</td>
-                                <td className="py-4 px-5 text-sm text-gray-900">{item.customerName}</td>
-                                <td className="py-4 px-5 text-sm text-gray-600">{formatPhoneNumber(item.customerPhone)}</td>
-                                <td className="py-4 px-5 text-sm text-gray-600 max-w-[220px] truncate" title={item.customerAddress}>
-                                  {item.customerAddress}
-                                </td>
-                                <td className="py-4 px-5 text-sm text-gray-500 whitespace-nowrap">{formatDate(item.orderedAt)}</td>
-                              </tr>
-                            </>
-                          )
-                        })}
-                        {/* 빈 행 (최소 10행 유지) */}
-                        {Array.from({ length: Math.max(0, 10 - (orderItems?.items.length || 0)) }).map((_, idx) => (
-                          <tr key={`empty-${idx}`} className={`border-b border-gray-100 ${(orderItems?.items.length || 0) + idx % 2 === 1 ? 'bg-gray-50/50' : ''}`}>
-                            <td className="py-4 px-3"></td>
-                            <td className="py-4 px-5 text-sm text-gray-400">{!orderItems?.items.length && idx === 4 ? '데이터가 없습니다' : ''}</td>
-                            <td className="py-4 px-5"></td>
-                            <td className="py-4 px-5"></td>
-                            <td className="py-4 px-5"></td>
-                            <td className="py-4 px-5"></td>
-                            <td className="py-4 px-5"></td>
-                            <td className="py-4 px-5"></td>
-                            <td className="py-4 px-5"></td>
-                            <td className="py-4 px-5"></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* 페이지네이션 - 항상 표시 */}
-              <div className="px-8 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
-                <p className="text-sm text-gray-600">
-                  {orderItems ? (
-                    <>
-                      총 <span className="font-semibold text-gray-900">{orderItems.pagination.total}건</span>
-                      {orderItems.pagination.total > 0 && (
-                        <> 중 <span className="font-medium">{(detailPage - 1) * 10 + 1}-{Math.min(detailPage * 10, orderItems.pagination.total)}건</span></>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-gray-400">로딩 중...</span>
                   )}
-                </p>
-                <div className="flex items-center gap-2">
+
+                  {/* 발주 대기 테이블 */}
+                  <div className="px-6 py-4">
+                    {detailLoading ? (
+                      <div className="flex justify-center py-8">
+                        <Loading />
+                      </div>
+                    ) : filteredItems.length > 0 ? (
+                      <>
+                        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="bg-gray-50 border-b border-gray-200">
+                                <th className="text-center py-3 px-3 w-10">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!isAllSelected}
+                                    onChange={toggleSelectAll}
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                  />
+                                </th>
+                                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600">쇼핑몰</th>
+                                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600">상품명</th>
+                                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600">옵션</th>
+                                <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600">수량</th>
+                                <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600">금액</th>
+                                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600">고객</th>
+                                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600">연락처</th>
+                                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600">주소</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredItems.map((item, idx) => {
+                                const orderKey = `${item.orderId}-${item.isMember}`
+                                const itemKey = `${item.orderItemId}`
+                                const colorIndex = orderColorMap.get(orderKey) ?? 0
+                                const colors = ORDER_COLORS[colorIndex]
+                                const metadata = orderMetadata.get(itemKey)
+                                const isFirstInGroup = metadata?.isFirst || false
+                                const isSelected = selectedOrders.has(orderKey)
+
+                                return (
+                                  <tr
+                                    key={item.orderItemId}
+                                    className={`border-b border-gray-100 ${isSelected ? 'bg-blue-50' : colors.bg} border-l-4 ${colors.border}`}
+                                  >
+                                    <td className="py-3 px-3 text-center">
+                                      {isFirstInGroup && (
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={() => toggleOrderSelection(item)}
+                                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                        />
+                                      )}
+                                    </td>
+                                    <td className="py-3 px-4">
+                                      <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                                        {item.retailChannelName || '-'}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-sm text-gray-900 max-w-[160px] truncate" title={item.productName}>
+                                      {item.productName}
+                                    </td>
+                                    <td className="py-3 px-4">
+                                      <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded">
+                                        {item.optionSummary || '-'}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-sm text-right font-medium text-gray-900">{item.quantity}</td>
+                                    <td className="py-3 px-4 text-sm text-right font-semibold text-gray-900">{formatPrice(item.totalAmount)}</td>
+                                    <td className="py-3 px-4 text-sm text-gray-900">{item.customerName}</td>
+                                    <td className="py-3 px-4 text-sm text-gray-600">{formatPhoneNumber(item.customerPhone)}</td>
+                                    <td className="py-3 px-4 text-sm text-gray-600 max-w-[180px] truncate" title={item.customerAddress}>
+                                      {item.customerAddress}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* 페이지네이션 */}
+                        {orderItems.pagination.totalPages > 1 && (
+                          <div className="mt-4 flex items-center justify-between">
+                            <p className="text-sm text-gray-600">
+                              총 {orderItems.pagination.total}건 중 {(detailPage - 1) * 10 + 1}-{Math.min(detailPage * 10, orderItems.pagination.total)}건
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => fetchDetails(selectedChannel.wholesaleChannelId, detailPage - 1)}
+                                disabled={detailPage === 1}
+                                className="p-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <ChevronLeft size={16} />
+                              </button>
+                              <span className="px-3 py-1 text-sm text-gray-700">
+                                {detailPage} / {orderItems.pagination.totalPages}
+                              </span>
+                              <button
+                                onClick={() => fetchDetails(selectedChannel.wholesaleChannelId, detailPage + 1)}
+                                disabled={detailPage >= orderItems.pagination.totalPages}
+                                className="p-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <ChevronRight size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        발주 대기 주문이 없습니다.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 발주 완료 이력 섹션 */}
+                <div>
                   <button
-                    onClick={() => fetchDetails(selectedChannel.wholesaleChannelId, detailPage - 1)}
-                    disabled={!orderItems || detailPage === 1}
-                    className="p-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    onClick={() => setHistoryExpanded(!historyExpanded)}
+                    className="w-full px-6 py-4 bg-gray-100 flex items-center justify-between hover:bg-gray-150 transition-colors"
                   >
-                    <ChevronLeft size={18} />
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <History size={20} className="text-green-600" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="font-semibold text-gray-900">발주 완료 이력</h3>
+                        <p className="text-sm text-gray-500">최근 30일 발주 내역</p>
+                      </div>
+                      {historySummary && (
+                        <div className="flex items-center gap-4 ml-4 text-sm">
+                          <span className="text-gray-500">총 <span className="font-bold text-gray-900">{historySummary.totalOrders}건</span></span>
+                          <span className="text-gray-500"><span className="font-bold text-gray-900">{formatPrice(historySummary.totalAmount)}</span></span>
+                        </div>
+                      )}
+                    </div>
+                    {historyExpanded ? <ChevronUp size={20} className="text-gray-500" /> : <ChevronDown size={20} className="text-gray-500" />}
                   </button>
-                  <span className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg min-w-[80px] text-center">
-                    {orderItems ? `${detailPage} / ${Math.max(1, orderItems.pagination.totalPages)}` : '- / -'}
-                  </span>
-                  <button
-                    onClick={() => fetchDetails(selectedChannel.wholesaleChannelId, detailPage + 1)}
-                    disabled={!orderItems || detailPage >= orderItems.pagination.totalPages}
-                    className="p-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronRight size={18} />
-                  </button>
+
+                  {historyExpanded && (
+                    <div className="px-6 py-4 bg-gray-50">
+                      {historyLoading ? (
+                        <div className="flex justify-center py-8">
+                          <Loading />
+                        </div>
+                      ) : history.length > 0 ? (
+                        <div className="space-y-2">
+                          {history.map((day) => (
+                            <div key={day.date} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                              <button
+                                onClick={() => {
+                                  if (expandedHistoryDate === day.date) {
+                                    setExpandedHistoryDate(null)
+                                    setHistoryDetailItems([])
+                                  } else {
+                                    setExpandedHistoryDate(day.date)
+                                    fetchHistoryDetail(selectedChannel.wholesaleChannelId, day.date)
+                                  }
+                                }}
+                                className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className="flex items-center gap-2">
+                                    <Calendar size={16} className="text-gray-400" />
+                                    <span className="font-medium text-gray-900">{formatDateKorean(day.date)}</span>
+                                  </div>
+                                  <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">{day.orderCount}건</span>
+                                  <span className="text-sm text-gray-500">{day.totalQuantity}개</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="font-bold text-gray-900">{formatPrice(day.totalAmount)}</span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      downloadExcel(selectedChannel.wholesaleChannelId, selectedChannel.wholesaleChannelName, day.date)
+                                    }}
+                                    className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                                    title="엑셀 다운로드"
+                                  >
+                                    <Download size={14} className="text-gray-500" />
+                                  </button>
+                                  {expandedHistoryDate === day.date ? (
+                                    <ChevronUp size={16} className="text-gray-400" />
+                                  ) : (
+                                    <ChevronDown size={16} className="text-gray-400" />
+                                  )}
+                                </div>
+                              </button>
+
+                              {/* 상세 내역 */}
+                              {expandedHistoryDate === day.date && (
+                                <div className="border-t border-gray-200 bg-gray-50 p-4">
+                                  {historyDetailLoading ? (
+                                    <div className="flex justify-center py-4">
+                                      <Loading />
+                                    </div>
+                                  ) : historyDetailItems.length > 0 ? (
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full text-sm">
+                                        <thead>
+                                          <tr className="text-xs text-gray-500 border-b border-gray-200">
+                                            <th className="text-left py-2 px-3">쇼핑몰</th>
+                                            <th className="text-left py-2 px-3">상품명</th>
+                                            <th className="text-left py-2 px-3">옵션</th>
+                                            <th className="text-right py-2 px-3">수량</th>
+                                            <th className="text-right py-2 px-3">금액</th>
+                                            <th className="text-left py-2 px-3">고객</th>
+                                            <th className="text-left py-2 px-3">연락처</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {historyDetailItems.map((item) => (
+                                            <tr key={item.orderItemId} className="border-b border-gray-100">
+                                              <td className="py-2 px-3">
+                                                <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                                                  {item.retailChannelName || '-'}
+                                                </span>
+                                              </td>
+                                              <td className="py-2 px-3 text-gray-900 max-w-[150px] truncate">{item.productName}</td>
+                                              <td className="py-2 px-3 text-gray-600">{item.optionSummary || '-'}</td>
+                                              <td className="py-2 px-3 text-right font-medium">{item.quantity}</td>
+                                              <td className="py-2 px-3 text-right font-medium">{formatPrice(item.totalAmount)}</td>
+                                              <td className="py-2 px-3 text-gray-900">{item.customerName}</td>
+                                              <td className="py-2 px-3 text-gray-600">{formatPhoneNumber(item.customerPhone)}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ) : (
+                                    <p className="text-center text-gray-500 py-4">상세 내역이 없습니다.</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          최근 30일간 발주 완료 내역이 없습니다.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -62,6 +62,8 @@ export interface ProductForPublish {
   id: number
   name: string
   description: string | null
+  shippingFee: number | null
+  bundleShippingType: string | null
   variants: Array<{
     id: number
     optionSummary: string | null
@@ -136,6 +138,7 @@ export type PublishStage =
   | 'completed'      // 완료
   | 'failed'         // 실패
   | 'skipped'        // 건너뜀
+  | 'retrying'       // 재시도 중
 
 /**
  * 상세 진행 상태

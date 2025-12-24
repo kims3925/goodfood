@@ -363,10 +363,14 @@ export default function OrderDetailPage() {
 
   // 배송 진행 상태 계산
   const getDeliverySteps = () => {
+    // 상품준비중: PREPARING, SHIPPED, DELIVERED 상태이면 완료
+    const preparingCompleted = order?.status === 'PREPARING' || order?.status === 'SHIPPED' || order?.status === 'DELIVERED'
+
     const steps = [
       { key: 'ordered', label: '주문접수', date: order?.orderedAt, completed: true },
       { key: 'paid', label: '결제완료', date: order?.paidAt, completed: !!order?.paidAt },
-      { key: 'shipped', label: '배송시작', date: order?.shippedAt, completed: !!order?.shippedAt },
+      { key: 'preparing', label: '상품준비', date: null, completed: preparingCompleted },
+      { key: 'shipped', label: '배송중', date: order?.shippedAt, completed: !!order?.shippedAt },
       { key: 'delivered', label: '배송완료', date: order?.deliveredAt, completed: !!order?.deliveredAt },
     ]
     return steps
@@ -526,7 +530,7 @@ export default function OrderDetailPage() {
             <Truck className="w-5 h-5" style={{ color: primaryColor }} />
             배송 현황
           </h2>
-          <div className="relative">
+          <div className="relative max-w-2xl mx-auto">
             {/* Progress Line */}
             <div className="absolute top-6 left-6 right-6 h-0.5 bg-gray-200">
               <div
@@ -675,28 +679,39 @@ export default function OrderDetailPage() {
               <FileText className="w-5 h-5" style={{ color: primaryColor }} />
               결제 금액
             </h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">상품 금액</span>
-                <span className="text-gray-900">{formatPrice(order.subtotalAmount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">배송비</span>
-                <span className={order.shippingFee === 0 ? 'text-green-600' : 'text-gray-900'}>
-                  {order.shippingFee === 0 ? '무료' : formatPrice(order.shippingFee)}
-                </span>
-              </div>
-              {order.discountAmount > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">할인 금액</span>
-                  <span className="text-red-600">-{formatPrice(order.discountAmount)}</span>
+            {(() => {
+              // 상품 금액 합계 계산 (각 아이템의 totalPrice 합)
+              const itemsTotal = order.items.reduce((sum, item) => sum + item.totalPrice, 0)
+              // 실제 할인 금액 계산 (저장된 값이 없으면 계산)
+              const actualDiscount = order.discountAmount > 0
+                ? order.discountAmount
+                : Math.max(0, itemsTotal - order.totalAmount)
+
+              return (
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">상품 금액</span>
+                    <span className="text-gray-900">{formatPrice(itemsTotal)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">배송비</span>
+                    <span className={order.shippingFee === 0 ? 'text-green-600' : 'text-gray-900'}>
+                      {order.shippingFee === 0 ? '무료' : formatPrice(order.shippingFee)}
+                    </span>
+                  </div>
+                  {actualDiscount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">묶음 할인</span>
+                      <span className="text-green-600">-{formatPrice(actualDiscount)}</span>
+                    </div>
+                  )}
+                  <div className="pt-3 border-t border-gray-200 flex justify-between">
+                    <span className="font-bold text-gray-900">총 결제금액</span>
+                    <span className="text-xl font-bold" style={{ color: primaryColor }}>{formatPrice(order.totalAmount)}</span>
+                  </div>
                 </div>
-              )}
-              <div className="pt-3 border-t border-gray-200 flex justify-between">
-                <span className="font-bold text-gray-900">총 결제금액</span>
-                <span className="text-xl font-bold" style={{ color: primaryColor }}>{formatPrice(order.totalAmount)}</span>
-              </div>
-            </div>
+              )
+            })()}
           </div>
 
           {/* 결제 정보 */}

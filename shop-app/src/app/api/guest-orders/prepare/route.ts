@@ -9,6 +9,8 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import prisma from '@bandauto/db'
+import { getCartService } from '@/modules/cart/services/cart.service'
+import { calculateItemPrice } from '@/lib/price-calculator'
 
 // 비회원 주문번호 생성
 function generateGuestOrderNumber(): string {
@@ -85,9 +87,10 @@ export async function POST(req: NextRequest) {
 
     // 주문 아이템 검증 및 금액 계산
     let orderItems: any[] = []
+    let totalAmount = 0
 
     if (fromCart) {
-      // 세션 장바구니에서 주문
+      // 세션 장바구니에서 주문 - CartService 사용하여 정확한 가격 계산
       const sessionId = getSessionId(req)
 
       if (!sessionId) {
@@ -97,50 +100,38 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      const cart = await prisma.cart.findFirst({
-        where: { sessionId, userId: null, shopId },
-        include: {
-          items: {
-            include: {
-              publishedProduct: {
-                include: {
-                  product: {
-                    include: { variants: { take: 1 } },
-                  },
-                },
-              },
-              variant: true,
-            },
-          },
-        },
-      })
+      const cartService = getCartService()
 
-      if (!cart || cart.items.length === 0) {
+      // CartService를 통해 포맷팅된 장바구니 조회 (합배송 가격 적용됨)
+      const { cart: formattedCart } = await cartService.getCart(
+        sessionId,
+        null, // 비회원이므로 userId는 null
+        shopId
+      )
+
+      if (!formattedCart || formattedCart.items.length === 0) {
         return NextResponse.json(
           { success: false, error: '장바구니가 비어있습니다' },
           { status: 400 }
         )
       }
 
-      orderItems = cart.items.map((item) => {
-        const publishedProduct = item.publishedProduct
-        const product = publishedProduct.product
-        const variant = item.variant
-        const mainVariant = product?.variants[0]
-        const unitPrice = variant?.price || mainVariant?.price || 0
+      // CartService에서 계산된 itemTotal 사용
+      orderItems = formattedCart.items.map((item) => ({
+        publishedProductId: item.publishedProductId,
+        variantId: item.variantId || null,
+        productName: item.name,
+        optionSummary: item.optionSummary || null,
+        thumbnailUrl: item.image || null,
+        quantity: item.quantity,
+        unitPrice: item.originalPrice, // 원가 (배송비 미포함)
+        itemTotal: item.itemTotal, // 합배송 적용된 정확한 총액
+      }))
 
-        return {
-          publishedProductId: publishedProduct.id,
-          variantId: variant?.id || null,
-          productName: product?.name || '',
-          optionSummary: variant?.optionSummary || null,
-          thumbnailUrl: product?.thumbnailUrl || null,
-          quantity: item.quantity,
-          unitPrice: Number(unitPrice),
-        }
-      })
+      // 합배송 적용된 총액 사용
+      totalAmount = formattedCart.subtotal
     } else {
-      // 직접 상품 지정
+      // 직접 상품 지정 (바로구매) - 합배송 로직 적용
       if (!items || items.length === 0) {
         return NextResponse.json(
           { success: false, error: '주문 상품이 없습니다' },
@@ -155,7 +146,7 @@ export async function POST(req: NextRequest) {
           },
           include: {
             product: {
-              include: { variants: { take: 1 } },
+              include: { variants: true },
             },
           },
         })
@@ -176,7 +167,24 @@ export async function POST(req: NextRequest) {
 
         const product = publishedProduct.product
         const mainVariant = product?.variants[0]
-        const unitPrice = variant?.price || mainVariant?.price || 0
+        const basePrice = variant?.price || mainVariant?.price || 0
+        const quantity = item.quantity || 1
+
+        // 공통 가격 계산 함수 사용
+        const shippingFee = product?.shippingFee || 0
+        const bundleMaxQty = product?.bundleMaxQty || 1
+        const bundleUnit = variant?.bundleUnit || 1
+
+        const priceResult = calculateItemPrice({
+          basePrice,
+          shippingFee,
+          quantity,
+          bundleMaxQty,
+          bundleUnit,
+          bundleShippingType: product?.bundleShippingType || null,
+        })
+
+        const itemTotal = priceResult.itemTotal
 
         orderItems.push({
           publishedProductId: publishedProduct.id,
@@ -184,20 +192,20 @@ export async function POST(req: NextRequest) {
           productName: product?.name || '',
           optionSummary: variant?.optionSummary || null,
           thumbnailUrl: product?.thumbnailUrl || null,
-          quantity: item.quantity || 1,
-          unitPrice: Number(unitPrice),
+          quantity,
+          unitPrice: Number(basePrice),
+          itemTotal, // 합배송 적용된 총액
         })
       }
+
+      // 직접 상품 주문: 합배송 적용된 총액 사용
+      totalAmount = orderItems.reduce((sum, item) => sum + (item.itemTotal || item.unitPrice * item.quantity), 0)
     }
 
-    // 금액 계산
-    const subtotal = orderItems.reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity,
-      0
-    )
+    // 금액 계산 (subtotal은 totalAmount를 사용)
+    const subtotal = totalAmount
     // 배송비는 상품별 설정 또는 0원 처리
     const shippingFee = 0
-    const totalAmount = subtotal + shippingFee
 
     // 비회원 주문번호 생성
     const orderId = generateGuestOrderNumber()
@@ -239,7 +247,7 @@ export async function POST(req: NextRequest) {
           productName: item.productName,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          totalPrice: item.unitPrice * item.quantity,
+          totalPrice: item.itemTotal || (item.unitPrice * item.quantity),
         })),
       },
       message: '비회원 주문 준비가 완료되었습니다. 결제를 진행해주세요.',

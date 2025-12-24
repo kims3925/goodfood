@@ -100,7 +100,6 @@ export const shopMenuItems: MenuItem[] = [
     children: [
       { label: '주문 목록', href: '/shop/order/list', icon: ClipboardList },
       { label: '발주 관리', href: '/shop/wholesale-orders', icon: Truck },
-      { label: '발주 이력', href: '/shop/wholesale-orders/history', icon: History },
     ],
   },
   {

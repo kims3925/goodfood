@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLeft, ChevronRight, Clock, Download, Upload, Zap, Settings2, ShoppingBag, AlertTriangle, ExternalLink } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLeft, ChevronRight, Clock, Download, Upload, Zap, Settings2, ShoppingBag, AlertTriangle, ExternalLink, Settings, Info } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
+import { PipelineStatusPanel, DisableAutomationModal } from '@/components/automation'
 
 interface ChannelShop {
   id: number
@@ -45,6 +46,35 @@ interface PipelineSteps {
   transform: boolean
   productCreate: boolean
   publish: boolean
+}
+
+interface StageProgress {
+  completed: boolean
+  total?: number
+  success?: number
+  failed?: number
+  totalNewPosts?: number
+  channelResults?: Array<{ channelId: number; channelName: string; newPosts: number }>
+  batchProgress?: { current: number; total: number }
+  currentChannel?: string
+  currentProgress?: { current: number; total: number }
+}
+
+interface PipelineWorkflow {
+  id: number
+  type: string
+  status: string
+  startedAt: string
+  totalItems: number
+  successCount: number
+  failedCount: number
+  currentStage: 'collection' | 'transform' | 'productCreate' | 'publish' | null
+  stageProgress: {
+    collection?: StageProgress
+    transform?: StageProgress
+    productCreate?: StageProgress
+    publish?: StageProgress
+  }
 }
 
 interface AutomationConfig {
@@ -177,6 +207,12 @@ export default function AutomationSettingsPage() {
   // 쇼핑몰 미연결 경고 모달
   const [showShopConnectionWarning, setShowShopConnectionWarning] = useState(false)
   const [unconnectedChannels, setUnconnectedChannels] = useState<Channel[]>([])
+
+  // 파이프라인 상태 추적
+  const [pipelineStatus, setPipelineStatus] = useState<PipelineWorkflow | null>(null)
+  const [isPipelineRunning, setIsPipelineRunning] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [showDisableModal, setShowDisableModal] = useState(false)
 
   const CHANNELS_PER_PAGE = 4
 
@@ -323,8 +359,60 @@ export default function AutomationSettingsPage() {
 
   // 자동화 중지 핸들러
   const handleStopAutomation = () => {
+    // 실행 중인 파이프라인이 있으면 모달 표시
+    if (isPipelineRunning && pipelineStatus) {
+      setShowDisableModal(true)
+      return
+    }
+    // 없으면 바로 비활성화
     saveAutomationState(false)
   }
+
+  // 비활성화 모달 확인 핸들러
+  const handleDisableConfirm = async (cancelPipeline: boolean) => {
+    if (cancelPipeline && pipelineStatus) {
+      await handleCancelPipeline(pipelineStatus.id)
+    }
+    await saveAutomationState(false)
+    setShowDisableModal(false)
+  }
+
+  // 파이프라인 취소 핸들러
+  const handleCancelPipeline = async (workflowId: number) => {
+    setIsCancelling(true)
+    try {
+      const res = await fetch(`/api/automation/execute?workflowId=${workflowId}`, {
+        method: 'DELETE'
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('파이프라인이 취소되었습니다')
+        setPipelineStatus(null)
+        setIsPipelineRunning(false)
+      } else {
+        toast.error(data.error || '취소에 실패했습니다')
+      }
+    } catch (error) {
+      console.error('파이프라인 취소 실패:', error)
+      toast.error('취소 요청 중 오류가 발생했습니다')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
+  // 파이프라인 상태 조회
+  const fetchPipelineStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/automation/execute')
+      const data = await res.json()
+      if (data.success) {
+        setPipelineStatus(data.data?.workflow || null)
+        setIsPipelineRunning(data.data?.isRunning || false)
+      }
+    } catch (error) {
+      // 조용히 실패 처리 (네트워크 오류 등)
+    }
+  }, [])
 
   useEffect(() => {
     loadData()
@@ -344,6 +432,19 @@ export default function AutomationSettingsPage() {
 
     return () => clearInterval(interval)
   }, [config.selectedHours])
+
+  // 파이프라인 상태 폴링 (5초마다)
+  useEffect(() => {
+    // 초기 로드 (자동화 상태와 관계없이 항상 확인)
+    fetchPipelineStatus()
+
+    // 5초마다 폴링 (실행 중인 파이프라인이 있으면 계속 폴링)
+    const interval = setInterval(() => {
+      fetchPipelineStatus()
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [fetchPipelineStatus])
 
   const loadData = async () => {
     try {
@@ -666,6 +767,15 @@ export default function AutomationSettingsPage() {
           </button>
         </div>
       </div>
+
+      {/* 파이프라인 실행 상태 패널 */}
+      {isPipelineRunning && pipelineStatus && (
+        <PipelineStatusPanel
+          workflow={pipelineStatus}
+          onCancel={handleCancelPipeline}
+          isCancelling={isCancelling}
+        />
+      )}
 
       {/* Schedule Settings - 독립 섹션 */}
       <Card className={`overflow-hidden transition-all ${warningSections.includes('schedule') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasScheduleProblem ? 'ring-2 ring-red-300' : ''}`}>
@@ -1147,156 +1257,110 @@ export default function AutomationSettingsPage() {
           </div>
         </Card>
 
-        {/* AI Settings */}
+        {/* AI Settings - 간소화된 버전 */}
         <Card className={`overflow-hidden transition-all ${warningSections.includes('ai') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasAiProblem ? 'ring-2 ring-red-300' : ''}`}>
           <div className="p-4 pb-5 flex flex-col">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-200">
                   <Sparkles className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-gray-900">AI 변환 설정</h2>
-                    {hasAiChanges && (
-                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-500">상품 정보 변환에 사용할 AI를 선택하세요</p>
+                  <h2 className="text-lg font-bold text-gray-900">AI 변환 설정</h2>
+                  <p className="text-sm text-gray-500">AI와 가격 정책 설정 현황</p>
                 </div>
               </div>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => handleSaveSection('ai')}
-                disabled={savingSection === 'ai' || !hasAiChanges}
-                className="flex items-center gap-2 text-sm px-4 shadow-md"
-              >
-                {savingSection === 'ai' ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
-                저장
-              </Button>
             </div>
 
-            <div className="space-y-6 flex-1">
-              {/* AI Provider */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">AI 제공자</label>
-                {configuredAiProviders.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    {configuredAiProviders.map((ai) => {
-                      const isSelected = config.aiProvider === ai.provider
-                      return (
-                        <button
-                          key={ai.provider}
-                          onClick={() => setConfig(prev => ({ ...prev, aiProvider: ai.provider }))}
-                          className={`
-                            relative group flex items-center gap-4 px-5 py-4 rounded-xl border-2 transition-all duration-200
-                            ${isSelected
-                              ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50 shadow-md shadow-amber-100'
-                              : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
-                            }
-                          `}
-                        >
-                          {isSelected && (
-                            <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center shadow-md">
-                              <Check size={14} className="text-white" />
-                            </div>
+            <div className="space-y-4">
+              {/* AI 설정 상태 */}
+              <div className="p-4 bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {configuredAiProviders.length > 0 ? (
+                      <>
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          configuredAiProviders[0].provider === 'GEMINI'
+                            ? 'bg-gradient-to-br from-blue-500 to-purple-600'
+                            : 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                        }`}>
+                          {configuredAiProviders[0].provider === 'GEMINI' ? (
+                            <Sparkles size={20} className="text-white" />
+                          ) : (
+                            <Bot size={20} className="text-white" />
                           )}
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                            ai.provider === 'GEMINI'
-                              ? 'bg-gradient-to-br from-blue-500 to-purple-600'
-                              : 'bg-gradient-to-br from-emerald-500 to-teal-600'
-                          }`}>
-                            {ai.provider === 'GEMINI' ? (
-                              <Sparkles size={20} className="text-white" />
-                            ) : (
-                              <Bot size={20} className="text-white" />
-                            )}
-                          </div>
-                          <div className="text-left">
-                            <div className={`font-bold ${isSelected ? 'text-amber-700' : 'text-gray-800'}`}>{ai.name}</div>
-                            <div className="text-xs text-gray-500">
-                              {ai.provider === 'GEMINI' ? 'Google AI' : 'OpenAI'}
-                            </div>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                          <Sparkles size={16} className="text-amber-600" />
                         </div>
-                        <p className="text-sm text-amber-700">
-                          등록된 AI API가 없습니다. API 키를 등록해주세요.
-                        </p>
-                      </div>
-                      <a
-                        href="/sourcing/settings/ai"
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        <Sparkles size={14} />
-                        AI 설정
-                      </a>
-                    </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-800">{configuredAiProviders[0].name}</span>
+                            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">활성</span>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            {configuredAiProviders[0].provider === 'GEMINI' ? 'Google AI' : 'OpenAI'} •
+                            {configuredAiProviders.length > 1 && ` 외 ${configuredAiProviders.length - 1}개 설정됨`}
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                          <Sparkles size={20} className="text-amber-600" />
+                        </div>
+                        <div>
+                          <span className="font-semibold text-amber-700">AI 미설정</span>
+                          <p className="text-xs text-amber-600">API 키를 등록해주세요</p>
+                        </div>
+                      </>
+                    )}
                   </div>
-                )}
+                  <a
+                    href="/sourcing/settings/ai"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <Settings size={14} />
+                    AI 설정
+                  </a>
+                </div>
               </div>
 
-              {/* Pricing Policy */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">가격 정책</label>
-                {pricingPolicies.length > 0 ? (
-                  <div className="flex flex-wrap gap-3">
-                    {pricingPolicies.map((policy) => {
-                      const isSelected = config.pricingPolicyId === policy.id
-                      return (
-                        <button
-                          key={policy.id}
-                          onClick={() => setConfig(prev => ({ ...prev, pricingPolicyId: policy.id }))}
-                          className={`
-                            relative group flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all duration-200 text-sm
-                            ${isSelected
-                              ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50 shadow-sm'
-                              : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
-                            }
-                          `}
-                        >
-                          {isSelected && (
-                            <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center">
-                              <Check size={12} className="text-white" />
-                            </div>
-                          )}
-                          <FileText size={16} className={isSelected ? 'text-amber-600' : 'text-gray-400'} />
-                          <span className={`font-medium truncate max-w-[120px] ${isSelected ? 'text-amber-700' : 'text-gray-600'}`}>{policy.name}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                          <FileText size={16} className="text-amber-600" />
-                        </div>
-                        <p className="text-sm text-amber-700">
-                          등록된 가격 정책이 없습니다. 정책을 추가해주세요.
-                        </p>
-                      </div>
-                      <a
-                        href="/sourcing/policy/list"
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        <FileText size={14} />
-                        정책 설정
-                      </a>
+              {/* 가격 정책 안내 */}
+              <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                      <FileText size={20} className="text-amber-600" />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-amber-800">가격 정책</span>
+                      <p className="text-xs text-amber-600">도매밴드별로 개별 설정됩니다</p>
                     </div>
                   </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    <a
+                      href="/sourcing/policy/list"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 text-sm font-medium rounded-lg transition-colors"
+                    >
+                      <FileText size={14} />
+                      정책 관리
+                    </a>
+                    <a
+                      href="/sourcing/channel/list"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      <Settings size={14} />
+                      채널 설정
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* 도움말 */}
+              <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <Info size={16} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-blue-700">
+                  가격 정책은 <strong>채널 설정</strong>에서 도매밴드마다 개별 설정할 수 있습니다.
+                  AI 변환 시 해당 채널의 가격 정책이 자동으로 적용됩니다.
+                </p>
               </div>
             </div>
           </div>
@@ -1799,6 +1863,20 @@ export default function AutomationSettingsPage() {
           </div>
         </div>
       )}
+
+      {/* 비활성화 확인 모달 */}
+      <DisableAutomationModal
+        isOpen={showDisableModal}
+        onClose={() => setShowDisableModal(false)}
+        onConfirm={handleDisableConfirm}
+        workflow={{
+          id: pipelineStatus?.id || 0,
+          currentStage: pipelineStatus?.currentStage || null,
+          successCount: pipelineStatus?.successCount || 0,
+          totalItems: pipelineStatus?.totalItems || 0,
+        }}
+        isLoading={isCancelling}
+      />
     </div>
   )
 }

@@ -326,13 +326,19 @@ export class BandPostAutomation {
         console.warn('[밴드자동화] 글쓰기 레이어가 열리지 않았을 수 있음, 계속 진행...')
       }
 
-      // 3. 이미지 다운로드 및 업로드
+      // 3. 본문 입력 (먼저 입력해야 게시물 상단에 표시됨)
+      await reportStage('entering')
+      console.log('[밴드자동화] 3단계: 본문 입력')
+      await this.inputContent(page, content)
+      await this.saveDebugScreenshot(page, 'step3-content-entered')
+
+      // 4. 이미지 다운로드 및 업로드 (본문 아래에 표시됨)
       const imagesToUpload = imageUrls.slice(0, MAX_IMAGES)
       const totalImages = imagesToUpload.length
       if (totalImages > 0) {
         // 다운로드 단계
         await reportStage('downloading', { current: 0, total: totalImages })
-        console.log(`[밴드자동화] 3단계: ${totalImages}개 이미지 다운로드`)
+        console.log(`[밴드자동화] 4단계: ${totalImages}개 이미지 다운로드`)
 
         const downloadedImages = await this.downloadImagesWithProgress(
           imagesToUpload,
@@ -356,7 +362,7 @@ export class BandPostAutomation {
         if (downloadedImages.length > 0) {
           // 업로드 단계
           await reportStage('uploading', { current: 0, total: downloadedImages.length })
-          console.log('[밴드자동화] 4단계: 이미지 업로드')
+          console.log('[밴드자동화] 5단계: 이미지 업로드')
 
           await this.uploadImagesWithProgress(
             page,
@@ -365,15 +371,9 @@ export class BandPostAutomation {
               await reportStage('uploading', { current, total })
             }
           )
-          await this.saveDebugScreenshot(page, 'step4-images-uploaded')
+          await this.saveDebugScreenshot(page, 'step5-images-uploaded')
         }
       }
-
-      // 4. 본문 입력
-      await reportStage('entering')
-      console.log('[밴드자동화] 5단계: 본문 입력')
-      await this.inputContent(page, content)
-      await this.saveDebugScreenshot(page, 'step5-content-entered')
 
       // 5. 게시 버튼 클릭
       await reportStage('submitting')

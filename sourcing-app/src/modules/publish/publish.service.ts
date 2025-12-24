@@ -14,6 +14,7 @@
 import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { NaverBandClient } from '@/modules/sourcing/domain/src/channel'
 import { bandPlaywrightService } from '@/modules/band-playwright/band-playwright.service'
+import { calculateSellingPrice } from '@/lib/price-calculator'
 import type {
   PublishToChannelParams,
   PublishToChannelResult,
@@ -40,6 +41,10 @@ const PLAYWRIGHT_COOLDOWN_MS = 2000
 const MAX_QUOTA_RETRIES = 3
 const QUOTA_RETRY_BASE_DELAY_MS = 30000  // 30초 (30s, 60s, 120s 지연)
 
+// 이미지 업로드 재시도 설정
+const MAX_IMAGE_UPLOAD_RETRIES = 2  // 최대 2회 재시도 (총 3회 시도)
+const IMAGE_UPLOAD_RETRY_DELAY_MS = 5000  // 5초 대기 후 재시도
+
 // 지연 함수
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -57,9 +62,16 @@ function isQuotaError(error: any): boolean {
 }
 
 /**
+ * 가격 포맷팅 (1000 → "1,000")
+ */
+function formatPrice(price: number): string {
+  return price.toLocaleString('ko-KR')
+}
+
+/**
  * 게시글 내용 생성
- * Band API로 텍스트만 발행 (이미지 없음)
- * 본문 구조: 쇼핑몰URL → 상품명 → 판매가 → 상품설명 → 쇼핑몰URL
+ * 소매밴드 발행용 - 옵션별 판매가 포함
+ * 본문 구조: 쇼핑몰URL → 상품명 → 옵션별 판매가 → 상품설명 → 쇼핑몰URL
  */
 function buildPostContent(
   product: ProductForPublish,
@@ -77,16 +89,21 @@ function buildPostContent(
   lines.push(product.name)
   lines.push('')
 
-  // 판매가 (variants에서 옵션별로 추출)
+  // 옵션별 판매가 표시
   if (product.variants && product.variants.length > 0) {
-    lines.push('💰 판매가:')
+    const shippingFee = product.shippingFee || 0
+    const bundleShippingType = product.bundleShippingType || null
 
+    lines.push('💰 판매가')
     for (const variant of product.variants) {
+      const sellingPrice = calculateSellingPrice(
+        variant.price,
+        shippingFee,
+        bundleShippingType
+      )
       const optionName = variant.optionSummary || '기본'
-      const price = variant.price.toLocaleString()
-      lines.push(`  • ${optionName}: ${price}원`)
+      lines.push(`• ${optionName}: ${formatPrice(sellingPrice)}원`)
     }
-
     lines.push('')
   }
 
@@ -190,6 +207,8 @@ export class PublishService {
           name: true,
           description: true,
           thumbnailUrl: true,
+          shippingFee: true,
+          bundleShippingType: true,
           variants: {
             select: {
               id: true,
@@ -257,31 +276,57 @@ export class PublishService {
         new Date(channelSession.sessionExpiresAt) > new Date()
 
       // 6-1. Playwright 발행 시도 (세션이 유효하고 이미지가 있는 경우)
-      // 소매밴드 발행은 Playwright로만 진행 - 실패 시 API 폴백 없이 즉시 실패 처리
+      // 소매밴드 발행은 Playwright로만 진행 - 이미지 업로드 실패 시 재시도
       if (hasValidSession && imageUrls.length > 0) {
-        console.log(`[PublishService] Playwright 발행 시도 (${imageUrls.length}개 이미지)`)
+        let playwrightSuccess = false
+        let lastError: string | undefined
 
-        const playwrightResult = await bandPlaywrightService.publishWithImages({
-          channelId,
-          bandKey: channel.channelKey,
-          bandName: channel.name,
-          content: postContent,
-          imageUrls,
-        })
+        // 이미지 업로드 재시도 루프 (최대 MAX_IMAGE_UPLOAD_RETRIES + 1 회 시도)
+        for (let attempt = 0; attempt <= MAX_IMAGE_UPLOAD_RETRIES; attempt++) {
+          if (attempt > 0) {
+            console.log(`[PublishService] 이미지 업로드 재시도 ${attempt}/${MAX_IMAGE_UPLOAD_RETRIES} (${IMAGE_UPLOAD_RETRY_DELAY_MS / 1000}초 대기)`)
+            await delay(IMAGE_UPLOAD_RETRY_DELAY_MS)
+          }
 
-        if (playwrightResult.success && playwrightResult.postKey) {
-          postKey = playwrightResult.postKey
-          publishMethod = 'playwright'
-          imageCount = imageUrls.length
-          console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
-        } else {
-          // Playwright 발행 실패 시 즉시 실패 반환 (API 폴백 없음)
-          console.error(`[PublishService] Playwright 발행 실패: ${playwrightResult.error}`)
+          console.log(`[PublishService] Playwright 발행 시도 ${attempt + 1}/${MAX_IMAGE_UPLOAD_RETRIES + 1} (${imageUrls.length}개 이미지)`)
+
+          const playwrightResult = await bandPlaywrightService.publishWithImages({
+            channelId,
+            bandKey: channel.channelKey,
+            bandName: channel.name,
+            content: postContent,
+            imageUrls,
+          })
+
+          if (playwrightResult.success && playwrightResult.postKey) {
+            postKey = playwrightResult.postKey
+            publishMethod = 'playwright'
+            imageCount = imageUrls.length
+            playwrightSuccess = true
+            console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
+            break
+          } else {
+            lastError = playwrightResult.error
+            console.error(`[PublishService] Playwright 발행 실패 (시도 ${attempt + 1}): ${lastError}`)
+
+            // 재시도 불가능한 에러인 경우 즉시 중단
+            // - 세션 만료: 재시도해도 실패
+            // - 밴드를 찾을 수 없음: 설정 문제
+            if (lastError?.includes('세션') || lastError?.includes('로그인') || lastError?.includes('밴드를 찾을 수 없습니다')) {
+              console.log(`[PublishService] 재시도 불가능한 에러, 중단`)
+              break
+            }
+          }
+        }
+
+        if (!playwrightSuccess) {
+          // 모든 재시도 실패 - 글만 올라가는 것 방지
+          console.error(`[PublishService] Playwright 발행 최종 실패 (${MAX_IMAGE_UPLOAD_RETRIES + 1}회 시도): ${lastError}`)
           return {
             success: false,
             productId,
             channelId,
-            error: playwrightResult.error || '소매밴드 발행에 실패했습니다. (이미지 업로드 또는 게시글 등록 실패)',
+            error: lastError || '소매밴드 발행에 실패했습니다. (이미지 업로드 또는 게시글 등록 실패)',
           }
         }
       } else if (imageUrls.length > 0 && !hasValidSession) {
@@ -791,6 +836,8 @@ export class PublishService {
           name: true,
           description: true,
           thumbnailUrl: true,
+          shippingFee: true,
+          bundleShippingType: true,
           variants: {
             select: {
               id: true,
@@ -864,35 +911,70 @@ export class PublishService {
         new Date(channelSession.sessionExpiresAt) > new Date()
 
       // Playwright 발행 시도 (세션 유효하고 이미지 있을 때)
-      // 소매밴드 발행은 Playwright로만 진행 - 실패 시 API 폴백 없이 즉시 실패 처리
+      // 소매밴드 발행은 Playwright로만 진행 - 이미지 업로드 실패 시 재시도
       if (hasValidSession && imageUrls.length > 0) {
-        console.log(`[PublishService] Playwright 발행 시도 (${imageUrls.length}개 이미지) - 진행률 추적`)
+        let playwrightSuccess = false
+        let lastError: string | undefined
 
-        const playwrightResult = await bandPlaywrightService.publishWithImages({
-          channelId,
-          bandKey: channel.channelKey,
-          bandName: channel.name,
-          content: postContent,
-          imageUrls,
-          // 진행률 콜백 전달
-          onStageProgress: onStageProgress
-            ? (progress) => onStageProgress({
+        // 이미지 업로드 재시도 루프 (최대 MAX_IMAGE_UPLOAD_RETRIES + 1 회 시도)
+        for (let attempt = 0; attempt <= MAX_IMAGE_UPLOAD_RETRIES; attempt++) {
+          if (attempt > 0) {
+            console.log(`[PublishService] 이미지 업로드 재시도 ${attempt}/${MAX_IMAGE_UPLOAD_RETRIES} (${IMAGE_UPLOAD_RETRY_DELAY_MS / 1000}초 대기)`)
+
+            // 재시도 상태 콜백
+            if (onStageProgress) {
+              await onStageProgress({
                 productId,
                 productName: product.name,
-                ...progress,
+                stage: 'retrying',
+                stageLabel: `재시도 중 (${attempt}/${MAX_IMAGE_UPLOAD_RETRIES})`,
               })
-            : undefined,
-        })
+            }
 
-        if (playwrightResult.success && playwrightResult.postKey) {
-          postKey = playwrightResult.postKey
-          publishMethod = 'playwright'
-          imageCount = imageUrls.length
-          console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
-        } else {
-          // Playwright 발행 실패 시 즉시 실패 반환 (API 폴백 없음)
-          const errorMessage = playwrightResult.error || '소매밴드 발행에 실패했습니다. (이미지 업로드 또는 게시글 등록 실패)'
-          console.error(`[PublishService] Playwright 발행 실패: ${errorMessage}`)
+            await delay(IMAGE_UPLOAD_RETRY_DELAY_MS)
+          }
+
+          console.log(`[PublishService] Playwright 발행 시도 ${attempt + 1}/${MAX_IMAGE_UPLOAD_RETRIES + 1} (${imageUrls.length}개 이미지) - 진행률 추적`)
+
+          const playwrightResult = await bandPlaywrightService.publishWithImages({
+            channelId,
+            bandKey: channel.channelKey,
+            bandName: channel.name,
+            content: postContent,
+            imageUrls,
+            // 진행률 콜백 전달
+            onStageProgress: onStageProgress
+              ? (progress) => onStageProgress({
+                  productId,
+                  productName: product.name,
+                  ...progress,
+                })
+              : undefined,
+          })
+
+          if (playwrightResult.success && playwrightResult.postKey) {
+            postKey = playwrightResult.postKey
+            publishMethod = 'playwright'
+            imageCount = imageUrls.length
+            playwrightSuccess = true
+            console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
+            break
+          } else {
+            lastError = playwrightResult.error
+            console.error(`[PublishService] Playwright 발행 실패 (시도 ${attempt + 1}): ${lastError}`)
+
+            // 재시도 불가능한 에러인 경우 즉시 중단
+            if (lastError?.includes('세션') || lastError?.includes('로그인') || lastError?.includes('밴드를 찾을 수 없습니다')) {
+              console.log(`[PublishService] 재시도 불가능한 에러, 중단`)
+              break
+            }
+          }
+        }
+
+        if (!playwrightSuccess) {
+          // 모든 재시도 실패 - 글만 올라가는 것 방지
+          const errorMessage = lastError || '소매밴드 발행에 실패했습니다. (이미지 업로드 또는 게시글 등록 실패)'
+          console.error(`[PublishService] Playwright 발행 최종 실패 (${MAX_IMAGE_UPLOAD_RETRIES + 1}회 시도): ${errorMessage}`)
 
           // 실패 상태 콜백 호출
           if (onStageProgress) {

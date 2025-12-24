@@ -659,26 +659,37 @@ export default function UnifiedOrderDetailPage() {
                   결제 정보
                 </h2>
               </div>
-              <div className="p-4 space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">상품 금액</span>
-                  <span className="font-medium">{formatPrice(order.subtotalAmount)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">배송비</span>
-                  <span className="font-medium">{formatPrice(order.shippingFee)}</span>
-                </div>
-                {order.discountAmount > 0 && (
-                  <div className="flex justify-between text-red-600">
-                    <span>할인</span>
-                    <span>-{formatPrice(order.discountAmount)}</span>
+              {(() => {
+                // 상품 금액 합계 계산 (각 아이템의 totalPrice 합)
+                const itemsTotal = order.items.reduce((sum, item) => sum + item.totalPrice, 0)
+                // 실제 할인 금액 계산 (저장된 값이 없으면 계산)
+                const actualDiscount = order.discountAmount > 0
+                  ? order.discountAmount
+                  : Math.max(0, itemsTotal - order.totalAmount)
+
+                return (
+                  <div className="p-4 space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">상품 금액</span>
+                      <span className="font-medium">{formatPrice(itemsTotal)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">배송비</span>
+                      <span className="font-medium">{order.shippingFee === 0 ? '무료' : formatPrice(order.shippingFee)}</span>
+                    </div>
+                    {actualDiscount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>묶음 할인</span>
+                        <span>-{formatPrice(actualDiscount)}</span>
+                      </div>
+                    )}
+                    <div className="border-t border-gray-200 pt-3 flex justify-between">
+                      <span className="font-semibold text-gray-900">총 결제금액</span>
+                      <span className="text-xl font-bold text-blue-600">{formatPrice(order.totalAmount)}</span>
+                    </div>
                   </div>
-                )}
-                <div className="border-t border-gray-200 pt-3 flex justify-between">
-                  <span className="font-semibold text-gray-900">총 결제금액</span>
-                  <span className="text-xl font-bold text-blue-600">{formatPrice(order.totalAmount)}</span>
-                </div>
-              </div>
+                )
+              })()}
             </div>
 
           </div>

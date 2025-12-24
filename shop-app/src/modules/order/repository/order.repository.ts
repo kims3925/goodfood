@@ -20,6 +20,8 @@ export interface OrderItemInput {
   thumbnailUrl: string | null
   quantity: number
   unitPrice: number
+  originalUnitPrice?: number // 할인 전 단가 (참조용)
+  itemTotal?: number // 할인 반영된 아이템 총액
 }
 
 export interface ShippingAddressInput {

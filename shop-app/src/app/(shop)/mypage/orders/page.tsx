@@ -292,12 +292,38 @@ export default function OrdersPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-600">총 결제금액</span>
-                      <span className="text-xl font-bold" style={{ color: primaryColor }}>
-                        {formatPrice(order.totalAmount)}
-                      </span>
-                    </div>
+                    {(() => {
+                      // 상품 금액 합계 계산 (각 아이템의 totalPrice 합)
+                      const itemsTotal = order.items.reduce((sum, item) => sum + item.totalPrice, 0)
+                      // 실제 할인 금액 계산 (저장된 값이 없으면 계산)
+                      const actualDiscount = order.discountAmount > 0
+                        ? order.discountAmount
+                        : Math.max(0, itemsTotal - order.totalAmount)
+
+                      return (
+                        <div className="flex flex-col items-end gap-1">
+                          {/* 할인이 있는 경우 상품금액과 할인금액 표시 */}
+                          {actualDiscount > 0 && (
+                            <>
+                              <div className="flex items-center gap-2 text-sm text-gray-500">
+                                <span>상품금액</span>
+                                <span>{formatPrice(itemsTotal)}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-green-600">
+                                <span>묶음 할인</span>
+                                <span>-{formatPrice(actualDiscount)}</span>
+                              </div>
+                            </>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-600">총 결제금액</span>
+                            <span className="text-xl font-bold" style={{ color: primaryColor }}>
+                              {formatPrice(order.totalAmount)}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* 액션 버튼 */}

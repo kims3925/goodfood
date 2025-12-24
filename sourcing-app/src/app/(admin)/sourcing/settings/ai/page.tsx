@@ -294,9 +294,9 @@ export default function AISettingsPage() {
                     }}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
-                    <option value="o3-mini">o3-mini ($1.1/1M 입력, 추론 최적화)</option>
+                    <option value="gpt-4.1-nano">GPT-4.1-nano ($0.10/1M 입력, 빠르고 저렴, 추천!)</option>
                     <option value="gpt-4o-mini">GPT-4o-mini ($0.15/1M 입력, 가성비)</option>
-                    <option value="gpt-5-mini">GPT-5-mini (최신, 고성능)</option>
+                    <option value="o3-mini">o3-mini ($1.1/1M 입력, 추론 최적화)</option>
                     <option value="gpt-4o">GPT-4o ($2.5/1M 입력, 고성능)</option>
                   </select>
                 </div>
@@ -308,10 +308,10 @@ export default function AISettingsPage() {
                     <span className="text-sm font-medium text-green-800">가격 정보</span>
                   </div>
                   <div className="text-xs text-green-700 space-y-1">
-                    <div>• o3-mini: 입력 $1.1/1M, 출력 $4.4/1M (추론 최적화, 추천!)</div>
-                    <div>• GPT-4o-mini: 입력 $0.15/1M, 출력 $0.6/1M (가성비)</div>
+                    <div>• GPT-4.1-nano: 입력 $0.10/1M, 출력 $0.40/1M (빠르고 저렴, 추천!)</div>
+                    <div>• GPT-4o-mini: 입력 $0.15/1M, 출력 $0.60/1M (가성비)</div>
+                    <div>• o3-mini: 입력 $1.1/1M, 출력 $4.4/1M (추론 최적화)</div>
                     <div>• GPT-4o: 입력 $2.5/1M, 출력 $10/1M (고성능)</div>
-                    <div>• 신규 사용자: $5 무료 크레딧 (3개월 유효)</div>
                   </div>
                 </div>
 

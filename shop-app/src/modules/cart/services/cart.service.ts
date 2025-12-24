@@ -12,6 +12,7 @@ import {
   NotFoundError,
   BusinessLogicError
 } from '@/modules/common/utils/src/errors/handlers'
+import { calculateItemPrice } from '@/lib/price-calculator'
 
 // 세션 만료 시간 (7일)
 const SESSION_EXPIRY_DAYS = 7
@@ -35,10 +36,16 @@ export interface CartItemResponse {
   optionSummary: string | null
   image: string
   price: number
+  originalPrice: number // 배송비 미포함 원가
+  itemTotal: number // 정확한 아이템 총액 (반올림 오차 없음)
   quantity: number
   stock: number
   // 배송 정보
   shippingFee: number | null
+  // 합배송 정보
+  bundleMaxQty: number
+  bundleUnit: number  // 옵션별 합배송 단위 수
+  isBundleDiscount: boolean  // 할인형 여부 (true: 할인 차감, false: 배송비 추가)
 }
 
 export interface CartResponse {
@@ -195,10 +202,8 @@ export class CartService {
       }
 
       if (userCart) {
-        await prisma.cart.update({
-          where: { id: userCart.id },
-          data: { expiresAt },
-        })
+        // expiresAt 업데이트 - 동시성 충돌 방지를 위해 executeRaw 사용
+        await prisma.$executeRaw`UPDATE cart SET expires_at = ${expiresAt} WHERE id = ${userCart.id}`
       }
 
       return userCart!
@@ -216,10 +221,8 @@ export class CartService {
       })
 
       if (cart) {
-        await prisma.cart.update({
-          where: { id: cart.id },
-          data: { expiresAt },
-        })
+        // expiresAt 업데이트 - 동시성 충돌 방지를 위해 executeRaw 사용
+        await prisma.$executeRaw`UPDATE cart SET expires_at = ${expiresAt} WHERE id = ${cart.id}`
         return cart
       }
 
@@ -267,20 +270,20 @@ export class CartService {
       const basePrice = variant?.price || mainVariant?.price || 0
       const shippingFee = product.shippingFee || 0
       const bundleMaxQty = product.bundleMaxQty || 1
+      const variantBundleUnit = variant?.bundleUnit || 1  // 옵션별 합배송 단위 수
       const quantity = item.quantity
 
-      // 가격 계산: 배송비가 상품 가격에 포함
-      // 합배송 상품인 경우 (bundleMaxQty > 1 && shippingFee > 0): (소매가 * 수량 + 배송비) / 수량
-      // 일반 상품인 경우: 소매가 + 배송비
-      let unitPrice = basePrice
-      if (bundleMaxQty > 1 && shippingFee > 0) {
-        // 합배송 상품: 수량에 따른 단가 계산
-        const totalPrice = (basePrice * quantity) + shippingFee
-        unitPrice = Math.round(totalPrice / quantity)
-      } else if (shippingFee > 0) {
-        // 일반 상품: 배송비 포함
-        unitPrice = basePrice + shippingFee
-      }
+      // 공통 가격 계산 함수 사용
+      const priceResult = calculateItemPrice({
+        basePrice,
+        shippingFee,
+        quantity,
+        bundleMaxQty,
+        bundleUnit: variantBundleUnit,
+        bundleShippingType: product.bundleShippingType,
+      })
+
+      const { unitPrice, itemTotal, isBundleDiscount } = priceResult
 
       return {
         id: item.id,
@@ -296,16 +299,22 @@ export class CartService {
         optionSummary: variant?.optionSummary || null,
         image,
         price: unitPrice,
+        originalPrice: basePrice, // 배송비 미포함 원가
+        itemTotal, // 정확한 아이템 총액 (반올림 오차 없음)
         quantity: item.quantity,
         stock: variant?.stock || mainVariant?.stock || 100,
         // 배송 정보 (참조용으로 유지)
         shippingFee: shippingFee,
+        // 합배송 정보
+        bundleMaxQty: bundleMaxQty,
+        bundleUnit: variantBundleUnit,  // 옵션별 합배송 단위 수
+        isBundleDiscount: isBundleDiscount,  // 할인형 여부
       }
     })
 
     const shopId = cart.shopId || null
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
-    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const subtotal = items.reduce((sum, item) => sum + item.itemTotal, 0)
 
     // 배송비는 이미 상품 가격에 포함되어 있으므로 0으로 설정
     const shippingFee = 0
@@ -368,15 +377,31 @@ export class CartService {
 
     // 묶음 상품이면 항상 새로운 아이템으로 추가 (합치지 않음)
     if (isBundleItem) {
-      await prisma.cartItem.create({
-        data: {
+      // 기존 아이템이 있는지 확인하고 있으면 수량 업데이트
+      const existingItem = await prisma.cartItem.findFirst({
+        where: {
           cartId: cart.id,
           publishedProductId,
           variantId: variantId || null,
-          quantity,
-          priceAt: price,
         },
       })
+
+      if (existingItem) {
+        await prisma.cartItem.update({
+          where: { id: existingItem.id },
+          data: { quantity: existingItem.quantity + quantity },
+        })
+      } else {
+        await prisma.cartItem.create({
+          data: {
+            cartId: cart.id,
+            publishedProductId,
+            variantId: variantId || null,
+            quantity,
+            priceAt: price,
+          },
+        })
+      }
 
       const updatedCart = await this.getOrCreateCart(newSessionId || sessionId, userId, shopId)
       return {

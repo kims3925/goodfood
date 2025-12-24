@@ -11,6 +11,7 @@ import prisma from '@bandauto/db'
 import { CustomerOrderStatus, TossPaymentMethod, TossPaymentStatus } from '@bandauto/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
+import { calculateItemPrice } from '@/lib/price-calculator'
 
 // 주문번호 생성
 function generateOrderNumber(): string {
@@ -43,11 +44,10 @@ function getSessionId(req: NextRequest): string | null {
   return req.cookies.get('cart_session')?.value || null
 }
 
-// 입금 기한 계산 (3일 후)
+// 입금 기한 계산 (3시간 후)
 function getDepositDeadline(): Date {
   const deadline = new Date()
-  deadline.setDate(deadline.getDate() + 3)
-  deadline.setHours(23, 59, 59, 999)
+  deadline.setHours(deadline.getHours() + 3)
   return deadline
 }
 
@@ -152,6 +152,8 @@ export async function POST(req: NextRequest) {
     // 주문 아이템 검증 및 금액 계산
     let orderItems: any[] = []
 
+    let totalAmount = 0
+
     if (fromCart) {
       // 장바구니에서 주문
       const sessionId = getSessionId(req)
@@ -166,7 +168,7 @@ export async function POST(req: NextRequest) {
                 publishedProduct: {
                   include: {
                     product: {
-                      include: { variants: { take: 1 } },
+                      include: { variants: true },
                     },
                   },
                 },
@@ -184,7 +186,7 @@ export async function POST(req: NextRequest) {
                 publishedProduct: {
                   include: {
                     product: {
-                      include: { variants: { take: 1 } },
+                      include: { variants: true },
                     },
                   },
                 },
@@ -207,7 +209,22 @@ export async function POST(req: NextRequest) {
         const product = publishedProduct.product
         const variant = item.variant
         const mainVariant = product?.variants[0]
-        const unitPrice = variant?.price || mainVariant?.price || 0
+        const basePrice = variant?.price || mainVariant?.price || 0
+        const quantity = item.quantity
+
+        // 공통 가격 계산 함수 사용
+        const shippingFee = product?.shippingFee || 0
+        const bundleMaxQty = product?.bundleMaxQty || 1
+        const bundleUnit = variant?.bundleUnit || 1
+
+        const priceResult = calculateItemPrice({
+          basePrice: Number(basePrice),
+          shippingFee,
+          quantity,
+          bundleMaxQty,
+          bundleUnit,
+          bundleShippingType: product?.bundleShippingType || null,
+        })
 
         return {
           publishedProductId: publishedProduct.id,
@@ -215,12 +232,16 @@ export async function POST(req: NextRequest) {
           productName: product?.name || "",
           optionSummary: variant?.optionSummary || null,
           thumbnailUrl: product?.thumbnailUrl || null,
-          quantity: item.quantity,
-          unitPrice: Number(unitPrice),
+          quantity,
+          unitPrice: priceResult.originalPrice,
+          itemTotal: priceResult.itemTotal,
         }
       })
+
+      // 합배송 적용된 총액 사용
+      totalAmount = orderItems.reduce((sum, item) => sum + item.itemTotal, 0)
     } else {
-      // 직접 상품 지정
+      // 직접 상품 지정 (바로구매)
       if (!items || items.length === 0) {
         return NextResponse.json(
           { success: false, error: '주문 상품이 없습니다' },
@@ -235,7 +256,7 @@ export async function POST(req: NextRequest) {
           },
           include: {
             product: {
-              include: { variants: { take: 1 } },
+              include: { variants: true },
             },
           },
         })
@@ -256,7 +277,22 @@ export async function POST(req: NextRequest) {
 
         const product = publishedProduct.product
         const mainVariant = product?.variants[0]
-        const unitPrice = variant?.price || mainVariant?.price || 0
+        const basePrice = variant?.price || mainVariant?.price || 0
+        const quantity = item.quantity || 1
+
+        // 공통 가격 계산 함수 사용
+        const shippingFee = product?.shippingFee || 0
+        const bundleMaxQty = product?.bundleMaxQty || 1
+        const bundleUnit = variant?.bundleUnit || 1
+
+        const priceResult = calculateItemPrice({
+          basePrice: Number(basePrice),
+          shippingFee,
+          quantity,
+          bundleMaxQty,
+          bundleUnit,
+          bundleShippingType: product?.bundleShippingType || null,
+        })
 
         orderItems.push({
           publishedProductId: publishedProduct.id,
@@ -264,17 +300,18 @@ export async function POST(req: NextRequest) {
           productName: product?.name || "",
           optionSummary: variant?.optionSummary || null,
           thumbnailUrl: product?.thumbnailUrl || null,
-          quantity: item.quantity || 1,
-          unitPrice: Number(unitPrice),
+          quantity,
+          unitPrice: priceResult.originalPrice,
+          itemTotal: priceResult.itemTotal,
         })
       }
+
+      // 합배송 적용된 총액 사용
+      totalAmount = orderItems.reduce((sum, item) => sum + item.itemTotal, 0)
     }
 
-    // 금액 계산 (배송비는 판매가에 포함)
-    const subtotal = orderItems.reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity,
-      0
-    )
+    // 금액 계산 (합배송 적용된 총액 사용)
+    const subtotal = totalAmount
     let shippingFee = 0
     let discountAmount = 0
     const depositDeadline = getDepositDeadline()
@@ -334,7 +371,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const totalAmount = subtotal + shippingFee - discountAmount
+    const finalTotalAmount = subtotal + shippingFee - discountAmount
 
     // 트랜잭션으로 주문 생성 (주문자 정보는 user 테이블에서)
     const result = await prisma.$transaction(async (tx) => {
@@ -350,7 +387,7 @@ export async function POST(req: NextRequest) {
           subtotalAmount: subtotal,
           shippingFee,
           discountAmount,
-          totalAmount,
+          totalAmount: finalTotalAmount,
           items: {
             create: orderItems.map((item) => ({
               publishedProductId: item.publishedProductId,
@@ -360,7 +397,7 @@ export async function POST(req: NextRequest) {
               thumbnailUrl: item.thumbnailUrl,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
-              totalPrice: item.unitPrice * item.quantity,
+              totalPrice: item.itemTotal, // 합배송 적용된 총액
             })),
           },
           // 배송지 정보 (수령인 - ShippingAddress 테이블에 저장)
@@ -390,7 +427,7 @@ export async function POST(req: NextRequest) {
           tossOrderId: orderNumber,
           method: TossPaymentMethod.BANK_TRANSFER,
           status: TossPaymentStatus.WAITING_FOR_DEPOSIT,
-          amount: totalAmount,
+          amount: finalTotalAmount,
           virtualAccountBank: shop.bankName,
           virtualAccountNumber: shop.bankAccount,
           virtualAccountDueDate: depositDeadline,
@@ -437,7 +474,7 @@ export async function POST(req: NextRequest) {
           productName: item.productName,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          totalPrice: item.unitPrice * item.quantity,
+          totalPrice: item.itemTotal, // 합배송 적용된 총액
         })),
         coupon: validCoupon ? {
           discountAmount: validCoupon.discountAmount,

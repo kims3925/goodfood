@@ -84,37 +84,28 @@ export async function GET(
     // 배송비 (발행 시 판매가에 포함)
     const shippingFee = product.shippingFee ?? 0
     const bundleMaxQty = (product as any).bundleMaxQty ?? 1
+    const bundleShippingType = (product as any).bundleShippingType || 'NONE'
 
-    // variants 정보 (id 포함) - 배송비가 포함된 가격
+    // 배송비 포함형(INCLUDED)인지 여부
+    // INCLUDED: 소매가에 이미 배송비 포함, 합배송 시 할인
+    // SEPARATE/NONE: 소매가 + 배송비 별도, 합배송 시 배송비 절약
+    const isBundleIncluded = bundleShippingType === 'INCLUDED'
+
+    // variants 정보 (id 포함)
     const formattedVariants = product.variants.map((variant) => ({
       id: variant.id,
       optionSummary: variant.optionSummary || product.name,
-      price: variant.price + shippingFee, // 배송비 포함 판매가
-      originalPrice: variant.price, // 원래 가격 (배송비 미포함)
+      // INCLUDED: 이미 배송비 포함된 가격 그대로 사용
+      // SEPARATE/NONE: 배송비 추가
+      price: isBundleIncluded ? variant.price : variant.price + shippingFee,
+      originalPrice: variant.price, // DB에 저장된 원래 가격
       wholesalePrice: variant.wholesalePrice,
+      bundleUnit: variant.bundleUnit || 1,
     }))
 
     // 합배송 옵션 계산 (bundleMaxQty > 1인 경우)
-    const bundleOptions = []
-    if (bundleMaxQty > 1 && shippingFee > 0) {
-      const basePrice = formattedVariants[0]?.price || 0 // 첫 번째 variant의 배송비 포함 가격
-      const originalPrice = formattedVariants[0]?.originalPrice || 0
-
-      for (let qty = 1; qty <= bundleMaxQty; qty++) {
-        // 합배송 시 배송비는 1회만: 총액 = (원가 * 수량) + 배송비
-        const totalPrice = (originalPrice * qty) + shippingFee
-        const fullPrice = basePrice * qty // 배송비를 매번 내는 경우의 가격
-        const discount = fullPrice - totalPrice // 할인 금액 = (qty - 1) * shippingFee
-
-        bundleOptions.push({
-          qty,
-          totalPrice,
-          discount,
-          unitPrice: Math.round(totalPrice / qty),
-          label: qty === 1 ? '1개' : `${qty}개 묶음`,
-        })
-      }
-    }
+    // 참고: 실제 계산은 ProductDetailClient에서 bundleUnit을 고려하여 다시 계산됨
+    const bundleOptions: any[] = []
 
     // 채널 정보 가져오기 (published_product -> channel)
     const publishedProduct = product.publishedProducts[0]
@@ -168,6 +159,8 @@ export async function GET(
       // 합배송 옵션 (bundleMaxQty > 1인 경우에만)
       bundleOptions: bundleOptions.length > 0 ? bundleOptions : undefined,
       bundleMaxQty: bundleMaxQty > 1 ? bundleMaxQty : undefined,
+      // 합배송 타입: NONE(없음), INCLUDED(배송비 포함형), SEPARATE(배송비 별도형)
+      bundleShippingType: product.bundleShippingType || 'NONE',
       // 품절 상태 (isActive가 false면 품절)
       isActive,
       isSoldOut: !isActive,
