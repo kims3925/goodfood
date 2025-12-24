@@ -1,0 +1,86 @@
+pipeline {
+  agent any
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+  }
+
+  environment {
+    CI = 'true'
+    NEXT_TELEMETRY_DISABLED = '1'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Setup') {
+      steps {
+        sh '''
+          node -v
+          corepack enable
+          pnpm -v
+        '''
+      }
+    }
+
+    stage('Install') {
+      steps {
+        sh 'pnpm install --frozen-lockfile'
+      }
+    }
+
+    stage('Lint') {
+      steps {
+        sh '''
+          if pnpm -s run | grep -q "^lint"; then
+            pnpm lint
+          else
+            echo "No lint script. Skip."
+          fi
+        '''
+      }
+    }
+
+    stage('Typecheck') {
+      steps {
+        sh '''
+          if pnpm -s run | grep -q "^typecheck"; then
+            pnpm typecheck
+          else
+            echo "No typecheck script. Skip."
+          fi
+        '''
+      }
+    }
+
+    stage('Test') {
+      steps {
+        sh '''
+          if pnpm -s run | grep -q "^test"; then
+            pnpm test
+          else
+            echo "No test script. Skip."
+          fi
+        '''
+      }
+    }
+
+    stage('Build') {
+      steps {
+        sh 'pnpm build'
+      }
+    }
+  }
+
+  post {
+    always {
+      junit allowEmptyResults: true, testResults: '**/junit.xml'
+      archiveArtifacts artifacts: '.next/**', allowEmptyArchive: true
+    }
+  }
+}
