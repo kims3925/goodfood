@@ -9,6 +9,9 @@ pipeline {
   environment {
     CI = 'true'
     NEXT_TELEMETRY_DISABLED = '1'
+    NEXTAUTH_SECRET = credentials('nextauth-secret')
+    GUEST_TOKEN_SECRET = credentials('guest-secret')
+    JWT_SECRET = credentials('jwt-secret')
   }
 
   stages {
