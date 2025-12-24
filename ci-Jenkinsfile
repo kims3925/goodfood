@@ -91,7 +91,8 @@ stage('Debug') {
       steps {
         sh '''
           set -eux
-          npm run build
+          npm run build:shop
+          npm run build:sourcing
         '''
       }
     }

@@ -94,7 +94,7 @@ export default function CartPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [getApiPath])
 
   // 마운트 상태 관리 - hydration 이슈 해결
   useEffect(() => {
@@ -145,7 +145,7 @@ export default function CartPage() {
     }
 
     autoAddToCart()
-  }, [isMounted, searchParams, loadCart, router])
+  }, [isMounted, searchParams, loadCart, router, getApiPath, getPath])
 
   const formatPrice = (price: number) => {
     return price?.toLocaleString('ko-KR') || '0'
