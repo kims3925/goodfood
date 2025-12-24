@@ -12,6 +12,8 @@ export async function middleware(request: NextRequest) {
   const publicPaths = [
     '/login',
     '/forbidden',
+    '/create-admin',       // 관리자 계정 생성
+    '/api/create-admin',   // 관리자 계정 생성 API
     '/api/auth/login',
     '/api/auth/logout',
     '/api/order/webhook',  // Google Forms 웹훅
