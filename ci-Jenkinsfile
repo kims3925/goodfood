@@ -48,6 +48,17 @@ stage('Debug') {
       }
     }
 
+    stage('Generate Prisma Client') {
+      steps {
+        sh '''
+          set -eux
+          cd db
+          npx prisma generate --schema prisma
+          cd ..
+        '''
+      }
+    }
+
     stage('Lint') {
       steps {
         sh '''
