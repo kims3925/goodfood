@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Payment Confirm API
  * TossPayments 결제 승인

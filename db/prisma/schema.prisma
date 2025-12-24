@@ -43,7 +43,7 @@ enum WorkflowType {
   COLLECT
   TRANSFORM
   PUBLISH
-  FULL_PIPELINE1
+  FULL_PIPELINE
 }
 
 enum WorkflowStatus {
@@ -57,12 +57,6 @@ enum WorkflowStatus {
 enum TriggerType {
   MANUAL
   SCHEDULED
-}
-
-enum PublishStatus {
-  SUCCESS
-  FAILED
-  PENDING
 }
 
 enum CustomerOrderStatus {
@@ -138,4 +132,26 @@ enum RefundMethod {
   CREDIT_CARD
   BANK_TRANSFER
   POINTS
+}
+
+enum NotificationType {
+  // Shop 알림 타입
+  ORDER
+  CANCEL
+  REFUND
+  INQUIRY
+  SETTLEMENT
+  // Sourcing 알림 타입
+  COLLECT
+  TRANSFORM
+  PUBLISH
+  ERROR
+  INFO
+}
+
+// 합배송 타입
+enum BundleShippingType {
+  NONE      // 합배송 없음
+  INCLUDED  // 배송비 포함형: 소매가에 배송비 포함, 합배송 시 할인
+  SEPARATE  // 배송비 별도형: 소매가 + 배송비, 합배송 시 배송비 절약
 }

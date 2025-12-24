@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
@@ -21,25 +23,21 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get('from') // YYYY-MM-DD
     const to = searchParams.get('to') // YYYY-MM-DD
 
-    // 도매처 목록 조회 (주문이 있는 도매처만)
-    // 먼저 주문이 있는 도매 채널 ID 목록을 가져옴
+    // 도매처 목록 조회 (주문이 있는 도매처만) - Product.channelId 사용 (소싱 출처)
+    // 발주 완료된 주문만 조회 (SHIPPED, DELIVERED)
     const [channelsWithOrders, channelsWithGuestOrders] = await Promise.all([
       prisma.orderItem.findMany({
         where: {
           order: {
-            status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+            status: { in: ['SHIPPED', 'DELIVERED'] },
             paidAt: { not: null },
           },
           publishedProduct: {
             userId: user.userId,
             product: {
-              collectedProduct: {
-                post: {
-                  channel: {
-                    kind: 'WHOLESALE',
-                    userId: user.userId,
-                  },
-                },
+              channel: {
+                kind: 'WHOLESALE',
+                userId: user.userId,
               },
             },
           },
@@ -49,15 +47,7 @@ export async function GET(request: NextRequest) {
             select: {
               product: {
                 select: {
-                  collectedProduct: {
-                    select: {
-                      post: {
-                        select: {
-                          channelId: true,
-                        },
-                      },
-                    },
-                  },
+                  channelId: true,
                 },
               },
             },
@@ -68,19 +58,15 @@ export async function GET(request: NextRequest) {
       prisma.guestOrderItem.findMany({
         where: {
           guestOrder: {
-            status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+            status: { in: ['SHIPPED', 'DELIVERED'] },
             paidAt: { not: null },
           },
           publishedProduct: {
             userId: user.userId,
             product: {
-              collectedProduct: {
-                post: {
-                  channel: {
-                    kind: 'WHOLESALE',
-                    userId: user.userId,
-                  },
-                },
+              channel: {
+                kind: 'WHOLESALE',
+                userId: user.userId,
               },
             },
           },
@@ -90,15 +76,7 @@ export async function GET(request: NextRequest) {
             select: {
               product: {
                 select: {
-                  collectedProduct: {
-                    select: {
-                      post: {
-                        select: {
-                          channelId: true,
-                        },
-                      },
-                    },
-                  },
+                  channelId: true,
                 },
               },
             },
@@ -108,16 +86,16 @@ export async function GET(request: NextRequest) {
       }),
     ])
 
-    // 주문이 있는 채널 ID 추출 (회원 + 비회원)
+    // 주문이 있는 채널 ID 추출 (회원 + 비회원) - Product.channelId 사용
     const channelIdsWithOrders = new Set<number>()
     for (const item of channelsWithOrders) {
-      const channelId = item.publishedProduct?.product?.collectedProduct?.post?.channelId
+      const channelId = item.publishedProduct?.product?.channelId
       if (channelId) {
         channelIdsWithOrders.add(channelId)
       }
     }
     for (const item of channelsWithGuestOrders) {
-      const channelId = item.publishedProduct?.product?.collectedProduct?.post?.channelId
+      const channelId = item.publishedProduct?.product?.channelId
       if (channelId) {
         channelIdsWithOrders.add(channelId)
       }
@@ -155,12 +133,12 @@ export async function GET(request: NextRequest) {
     const toDate = to ? new Date(to) : new Date()
     toDate.setHours(23, 59, 59, 999)
 
-    // 해당 도매처의 발주 데이터 조회 (회원 + 비회원)
+    // 해당 도매처의 발주 완료 데이터 조회 (회원 + 비회원) - Product.channelId 사용 (소싱 출처)
     const [orderItems, guestOrderItems] = await Promise.all([
       prisma.orderItem.findMany({
         where: {
           order: {
-            status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+            status: { in: ['SHIPPED', 'DELIVERED'] },
             paidAt: {
               not: null,
               gte: fromDate,
@@ -170,13 +148,9 @@ export async function GET(request: NextRequest) {
           publishedProduct: {
             userId: user.userId,
             product: {
-              collectedProduct: {
-                post: {
-                  channel: {
-                    id: parseInt(wholesaleChannelId),
-                    kind: 'WHOLESALE',
-                  },
-                },
+              channelId: parseInt(wholesaleChannelId),
+              channel: {
+                kind: 'WHOLESALE',
               },
             },
           },
@@ -213,7 +187,7 @@ export async function GET(request: NextRequest) {
       prisma.guestOrderItem.findMany({
         where: {
           guestOrder: {
-            status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+            status: { in: ['SHIPPED', 'DELIVERED'] },
             paidAt: {
               not: null,
               gte: fromDate,
@@ -223,13 +197,9 @@ export async function GET(request: NextRequest) {
           publishedProduct: {
             userId: user.userId,
             product: {
-              collectedProduct: {
-                post: {
-                  channel: {
-                    id: parseInt(wholesaleChannelId),
-                    kind: 'WHOLESALE',
-                  },
-                },
+              channelId: parseInt(wholesaleChannelId),
+              channel: {
+                kind: 'WHOLESALE',
               },
             },
           },

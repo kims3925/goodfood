@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Sidebar from '@/components/layout/Sidebar'
 import { ToastProvider } from '@/components/ui/Toast'
-import { AppSection, getSectionFromPath, getDefaultPathBySection } from '@/config/navigation'
+import { AppSection, UserRole, getSectionFromPath, getDefaultPathBySection } from '@/config/navigation'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
 const CURRENT_SECTION_KEY = 'current-section'
@@ -21,6 +21,7 @@ export default function AdminLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [currentSection, setCurrentSection] = useState<AppSection>('sourcing')
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const [userRole, setUserRole] = useState<UserRole>('USER')
 
   // 인증 상태 확인
   useEffect(() => {
@@ -36,6 +37,7 @@ export default function AdminLayout({
         }
 
         setIsAuthenticated(true)
+        setUserRole(data.user.role || 'USER')
       } catch (error) {
         console.error('인증 확인 실패:', error)
         router.replace('/login')
@@ -107,6 +109,7 @@ export default function AdminLayout({
             onToggleCollapse={handleToggleCollapse}
             currentSection={currentSection}
             onSectionChange={handleSectionChange}
+            userRole={userRole}
           />
 
           <main className="flex-1 overflow-y-auto">

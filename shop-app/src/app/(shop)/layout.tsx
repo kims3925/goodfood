@@ -57,8 +57,6 @@ async function getShopFromHeaders(): Promise<ShopInfo | null> {
         subdomain: true,
         name: true,
         coverUrl: true,
-        freeShippingAmount: true,
-        defaultShippingFee: true,
         contactPhone: true,
         contactEmail: true,
         bankName: true,
@@ -83,8 +81,6 @@ async function getShopFromHeaders(): Promise<ShopInfo | null> {
       subdomain: shop.subdomain,
       name: shop.name,
       coverUrl: shop.coverUrl || undefined,
-      freeShippingAmount: shop.freeShippingAmount || undefined,
-      defaultShippingFee: shop.defaultShippingFee || undefined,
       contactPhone: shop.contactPhone || undefined,
       contactEmail: shop.contactEmail || undefined,
       bankInfo: shop.bankName

@@ -20,6 +20,7 @@ import {
   ImageOff,
   FileSpreadsheet,
   Building2,
+  Banknote,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
@@ -62,6 +63,12 @@ interface OrderUser {
   email: string
 }
 
+interface RefundAccountInfo {
+  bankName: string
+  accountNumber: string
+  accountHolder: string
+}
+
 interface UnifiedOrderDetail {
   id: number
   source: OrderSource
@@ -79,6 +86,7 @@ interface UnifiedOrderDetail {
   paymentMethod: string | null
   createdAt: string
   paidAt: string | null
+  preparingAt: string | null
   shippedAt: string | null
   deliveredAt: string | null
   cancelledAt: string | null
@@ -87,11 +95,16 @@ interface UnifiedOrderDetail {
   user: OrderUser | null
   shopId: number | null
   shopName: string | null
+  // 환불 계좌 정보 (무통장입금 취소 시)
+  refundAccount: RefundAccountInfo | null
+  cancelReason: string | null
+  cancelledBy: string | null
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   PENDING: { label: '결제대기', color: 'bg-yellow-100 text-yellow-700', icon: <Clock size={16} /> },
   PAID: { label: '결제완료', color: 'bg-blue-100 text-blue-700', icon: <CreditCard size={16} /> },
+  PREPARING: { label: '상품준비중', color: 'bg-orange-100 text-orange-700', icon: <Package size={16} /> },
   SHIPPED: { label: '배송중', color: 'bg-indigo-100 text-indigo-700', icon: <Truck size={16} /> },
   DELIVERED: { label: '배송완료', color: 'bg-green-100 text-green-700', icon: <CheckCircle size={16} /> },
   CANCELLED: { label: '취소됨', color: 'bg-red-100 text-red-700', icon: <XCircle size={16} /> },
@@ -102,7 +115,8 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.R
 // 주문 상태 흐름 정의
 const ORDER_STATUS_FLOW: Record<string, { next: string | null; nextLabel: string }> = {
   PENDING: { next: 'PAID', nextLabel: '결제 확인' },
-  PAID: { next: 'SHIPPED', nextLabel: '배송 시작' },
+  PAID: { next: 'PREPARING', nextLabel: '상품 준비' },
+  PREPARING: { next: 'SHIPPED', nextLabel: '배송 시작' },
   SHIPPED: { next: 'DELIVERED', nextLabel: '배송 완료' },
   DELIVERED: { next: null, nextLabel: '' },
   CANCELLED: { next: null, nextLabel: '' },
@@ -113,6 +127,7 @@ const ORDER_STATUS_FLOW: Record<string, { next: string | null; nextLabel: string
 const ORDER_STEPS = [
   { key: 'PENDING', label: '주문접수', icon: Clock, dateField: 'createdAt' },
   { key: 'PAID', label: '결제완료', icon: CreditCard, dateField: 'paidAt' },
+  { key: 'PREPARING', label: '상품준비', icon: Package, dateField: 'preparingAt' },
   { key: 'SHIPPED', label: '배송중', icon: Truck, dateField: 'shippedAt' },
   { key: 'DELIVERED', label: '배송완료', icon: CheckCircle, dateField: 'deliveredAt' },
 ] as const
@@ -122,8 +137,9 @@ const getStepIndex = (status: string): number => {
   switch (status) {
     case 'PENDING': return 0
     case 'PAID': return 1
-    case 'SHIPPED': return 2
-    case 'DELIVERED': return 3
+    case 'PREPARING': return 2
+    case 'SHIPPED': return 3
+    case 'DELIVERED': return 4
     case 'CANCELLED':
     case 'REFUNDED':
       return -1 // 취소/환불은 별도 처리
@@ -420,12 +436,13 @@ export default function UnifiedOrderDetailPage() {
                       size="lg"
                     >
                       {order.status === 'PENDING' && <CreditCard size={18} />}
-                      {order.status === 'PAID' && <Truck size={18} />}
+                      {order.status === 'PAID' && <Package size={18} />}
+                      {order.status === 'PREPARING' && <Truck size={18} />}
                       {order.status === 'SHIPPED' && <CheckCircle size={18} />}
                       {ORDER_STATUS_FLOW[order.status].nextLabel}
                     </Button>
                   )}
-                  {['PENDING', 'PAID'].includes(order.status) && (
+                  {['PENDING', 'PAID', 'PREPARING'].includes(order.status) && (
                     <Button
                       variant="danger"
                       onClick={() => handleStatusChange('CANCELLED')}
@@ -463,7 +480,14 @@ export default function UnifiedOrderDetailPage() {
                 </p>
                 <p className="text-sm text-gray-600">
                   {formatDate(order.cancelledAt)}
+                  {order.cancelledBy && ` (${order.cancelledBy === 'ADMIN' ? '관리자' : order.cancelledBy === 'USER' ? '회원' : '비회원'})`}
                 </p>
+                {/* 취소 사유 */}
+                {order.cancelReason && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    <span className="font-medium">취소 사유:</span> {order.cancelReason}
+                  </p>
+                )}
               </div>
               {order.status === 'CANCELLED' && (
                 <Button
@@ -476,6 +500,32 @@ export default function UnifiedOrderDetailPage() {
                 </Button>
               )}
             </div>
+
+            {/* 무통장입금 환불 계좌 정보 */}
+            {order.refundAccount && (
+              <div className="mt-4 pt-4 border-t border-red-200">
+                <div className="flex items-start gap-3">
+                  <Banknote size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-gray-900 mb-2">환불 계좌 정보</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-500">은행: </span>
+                        <span className="font-medium text-gray-900">{order.refundAccount.bankName}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">계좌번호: </span>
+                        <span className="font-mono font-medium text-gray-900">{order.refundAccount.accountNumber}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">예금주: </span>
+                        <span className="font-medium text-gray-900">{order.refundAccount.accountHolder}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -609,26 +659,37 @@ export default function UnifiedOrderDetailPage() {
                   결제 정보
                 </h2>
               </div>
-              <div className="p-4 space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">상품 금액</span>
-                  <span className="font-medium">{formatPrice(order.subtotalAmount)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">배송비</span>
-                  <span className="font-medium">{formatPrice(order.shippingFee)}</span>
-                </div>
-                {order.discountAmount > 0 && (
-                  <div className="flex justify-between text-red-600">
-                    <span>할인</span>
-                    <span>-{formatPrice(order.discountAmount)}</span>
+              {(() => {
+                // 상품 금액 합계 계산 (각 아이템의 totalPrice 합)
+                const itemsTotal = order.items.reduce((sum, item) => sum + item.totalPrice, 0)
+                // 실제 할인 금액 계산 (저장된 값이 없으면 계산)
+                const actualDiscount = order.discountAmount > 0
+                  ? order.discountAmount
+                  : Math.max(0, itemsTotal - order.totalAmount)
+
+                return (
+                  <div className="p-4 space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">상품 금액</span>
+                      <span className="font-medium">{formatPrice(itemsTotal)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">배송비</span>
+                      <span className="font-medium">{order.shippingFee === 0 ? '무료' : formatPrice(order.shippingFee)}</span>
+                    </div>
+                    {actualDiscount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>묶음 할인</span>
+                        <span>-{formatPrice(actualDiscount)}</span>
+                      </div>
+                    )}
+                    <div className="border-t border-gray-200 pt-3 flex justify-between">
+                      <span className="font-semibold text-gray-900">총 결제금액</span>
+                      <span className="text-xl font-bold text-blue-600">{formatPrice(order.totalAmount)}</span>
+                    </div>
                   </div>
-                )}
-                <div className="border-t border-gray-200 pt-3 flex justify-between">
-                  <span className="font-semibold text-gray-900">총 결제금액</span>
-                  <span className="text-xl font-bold text-blue-600">{formatPrice(order.totalAmount)}</span>
-                </div>
-              </div>
+                )
+              })()}
             </div>
 
           </div>

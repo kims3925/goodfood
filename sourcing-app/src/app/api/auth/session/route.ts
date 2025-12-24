@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import prisma from '@bandauto/db'
@@ -23,6 +25,7 @@ export async function GET() {
         id: true,
         email: true,
         name: true,
+        role: true,
         createdAt: true,
       },
     })

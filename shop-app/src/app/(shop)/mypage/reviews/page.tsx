@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Star, Package, X, Pencil, Trash2, MoreVertical } from 'lucide-react'
+import { Star, Package, X, Pencil, Trash2 } from 'lucide-react'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import { useShop } from '@/contexts/ShopContext'
 import Image from 'next/image'
 
 interface WritableItem {
@@ -59,6 +60,8 @@ export default function ReviewsPage() {
   const { data: session, status: sessionStatus } = useSession()
   const router = useRouter()
   const { getPath, getApiPath } = useShopUrl()
+  const { shop } = useShop()
+  const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
   const [activeTab, setActiveTab] = useState<'writable' | 'written'>('writable')
   const [writableItems, setWritableItems] = useState<WritableItem[]>([])
   const [writtenReviews, setWrittenReviews] = useState<WrittenReview[]>([])
@@ -334,20 +337,18 @@ export default function ReviewsPage() {
 
   if (sessionStatus === 'loading' || (loading && writableItems.length === 0 && writtenReviews.length === 0)) {
     return (
-      <div className="kurly-container py-12">
-        <div className="text-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B6B] mx-auto"></div>
-          <p className="mt-4 text-gray-600">후기 내역을 불러오는 중...</p>
-        </div>
+      <div className="text-center py-20">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: primaryColor }}></div>
+        <p className="mt-4 text-gray-600">후기 내역을 불러오는 중...</p>
       </div>
     )
   }
 
   return (
-    <div className="kurly-container py-12">
+    <>
       {/* 헤더 */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">상품 후기</h1>
+      <div className="mb-6">
+        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">상품 후기</h1>
         <p className="text-gray-600">구매하신 상품의 후기를 작성하고 관리하세요</p>
       </div>
 
@@ -360,20 +361,24 @@ export default function ReviewsPage() {
           }}
           className={`flex-1 py-4 text-center font-medium transition-colors relative ${
             activeTab === 'writable'
-              ? 'text-[#FF6B6B]'
+              ? ''
               : 'text-gray-500 hover:text-gray-700'
           }`}
+          style={activeTab === 'writable' ? { color: primaryColor } : {}}
         >
           작성 가능한 후기
-          <span className={`ml-2 px-2 py-0.5 rounded-full text-sm ${
-            activeTab === 'writable'
-              ? 'bg-[#FF6B6B] text-white'
-              : 'bg-gray-100 text-gray-600'
-          }`}>
+          <span
+            className={`ml-2 px-2 py-0.5 rounded-full text-sm ${
+              activeTab === 'writable'
+                ? 'text-white'
+                : 'bg-gray-100 text-gray-600'
+            }`}
+            style={activeTab === 'writable' ? { backgroundColor: primaryColor } : {}}
+          >
             {writableCount}
           </span>
           {activeTab === 'writable' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FF6B6B]" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5" style={{ backgroundColor: primaryColor }} />
           )}
         </button>
         <button
@@ -383,20 +388,24 @@ export default function ReviewsPage() {
           }}
           className={`flex-1 py-4 text-center font-medium transition-colors relative ${
             activeTab === 'written'
-              ? 'text-[#FF6B6B]'
+              ? ''
               : 'text-gray-500 hover:text-gray-700'
           }`}
+          style={activeTab === 'written' ? { color: primaryColor } : {}}
         >
           작성한 후기
-          <span className={`ml-2 px-2 py-0.5 rounded-full text-sm ${
-            activeTab === 'written'
-              ? 'bg-[#FF6B6B] text-white'
-              : 'bg-gray-100 text-gray-600'
-          }`}>
+          <span
+            className={`ml-2 px-2 py-0.5 rounded-full text-sm ${
+              activeTab === 'written'
+                ? 'text-white'
+                : 'bg-gray-100 text-gray-600'
+            }`}
+            style={activeTab === 'written' ? { backgroundColor: primaryColor } : {}}
+          >
             {writtenCount}
           </span>
           {activeTab === 'written' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FF6B6B]" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5" style={{ backgroundColor: primaryColor }} />
           )}
         </button>
       </div>
@@ -404,7 +413,7 @@ export default function ReviewsPage() {
       {/* 로딩 오버레이 */}
       {loading && (
         <div className="fixed inset-0 bg-white/50 z-40 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF6B6B]"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: primaryColor }}></div>
         </div>
       )}
 
@@ -412,7 +421,7 @@ export default function ReviewsPage() {
       {activeTab === 'writable' && (
         <>
           {writableItems.length === 0 ? (
-            <div className="text-center py-20 bg-gray-50 rounded-lg">
+            <div className="text-center py-20 bg-gray-50 rounded-lg w-full">
               <Pencil className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-600">작성 가능한 후기가 없습니다</p>
               <p className="text-sm text-gray-500 mt-2">배송 완료된 상품의 후기를 작성할 수 있습니다</p>
@@ -422,10 +431,10 @@ export default function ReviewsPage() {
               {writableItems.map((item) => (
                 <div
                   key={item.orderItemId}
-                  className="bg-white border border-gray-200 rounded-lg p-6"
+                  className="bg-white border border-gray-200 rounded-lg p-4 lg:p-6"
                 >
                   <div className="flex gap-4 items-center">
-                    <div className="relative w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                    <div className="relative w-16 h-16 lg:w-20 lg:h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                       {item.thumbnailUrl ? (
                         <Image
                           src={item.thumbnailUrl}
@@ -453,10 +462,11 @@ export default function ReviewsPage() {
                     </div>
                     <button
                       onClick={() => openWriteModal(item)}
-                      className="px-4 py-2 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] transition-colors flex items-center gap-1 flex-shrink-0"
+                      className="px-4 py-2 text-white rounded-md hover:opacity-90 transition-colors flex items-center gap-1 flex-shrink-0"
+                      style={{ backgroundColor: primaryColor }}
                     >
                       <Pencil className="w-4 h-4" />
-                      후기 작성
+                      <span className="hidden sm:inline">후기 작성</span>
                     </button>
                   </div>
                 </div>
@@ -470,20 +480,21 @@ export default function ReviewsPage() {
       {activeTab === 'written' && (
         <>
           {writtenReviews.length === 0 ? (
-            <div className="text-center py-20 bg-gray-50 rounded-lg">
+            <div className="text-center py-20 bg-gray-50 rounded-lg w-full">
               <Star className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-600">작성한 후기가 없습니다</p>
             </div>
           ) : (
-            <div className="space-y-6">
+            <>
+              <div className="space-y-4">
               {writtenReviews.map((review) => (
                 <div
                   key={review.id}
-                  className="bg-white border border-gray-200 rounded-lg p-6"
+                  className="bg-white border border-gray-200 rounded-lg p-4 lg:p-6"
                 >
                   {/* 상품 정보 */}
                   <div className="flex gap-4 mb-4 pb-4 border-b border-gray-100">
-                    <div className="relative w-16 h-16 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                    <div className="relative w-12 h-12 lg:w-16 lg:h-16 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                       {review.orderItem?.thumbnailUrl || review.product.thumbnailUrl ? (
                         <Image
                           src={review.orderItem?.thumbnailUrl || review.product.thumbnailUrl || ''}
@@ -516,14 +527,14 @@ export default function ReviewsPage() {
                         className="px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center gap-1"
                       >
                         <Pencil className="w-4 h-4" />
-                        수정
+                        <span className="hidden sm:inline">수정</span>
                       </button>
                       <button
                         onClick={() => openDeleteConfirm(review.id)}
                         className="px-3 py-1.5 text-sm text-red-600 border border-red-300 rounded-md hover:bg-red-50 transition-colors flex items-center gap-1"
                       >
                         <Trash2 className="w-4 h-4" />
-                        삭제
+                        <span className="hidden sm:inline">삭제</span>
                       </button>
                     </div>
                   </div>
@@ -543,7 +554,7 @@ export default function ReviewsPage() {
                   {review.images && review.images.length > 0 && (
                     <div className="flex gap-2 flex-wrap">
                       {review.images.map((reviewImg: string, idx: number) => (
-                        <div key={idx} className="relative w-24 h-24 bg-gray-100 rounded-md overflow-hidden">
+                        <div key={idx} className="relative w-20 h-20 lg:w-24 lg:h-24 bg-gray-100 rounded-md overflow-hidden">
                           <Image
                             src={reviewImg}
                             alt={`리뷰 이미지 ${idx + 1}`}
@@ -555,63 +566,65 @@ export default function ReviewsPage() {
                       ))}
                     </div>
                   )}
+                  </div>
+                ))}
+              </div>
+
+              {/* 페이지네이션 */}
+              {pagination && pagination.totalPages > 1 && (
+                <div className="mt-8 flex justify-center items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+                  >
+                    이전
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+                      .filter((page) => {
+                        return (
+                          Math.abs(page - currentPage) <= 2 ||
+                          page === 1 ||
+                          page === pagination.totalPages
+                        )
+                      })
+                      .map((page, idx, arr) => {
+                        if (idx > 0 && page - arr[idx - 1] > 1) {
+                          return (
+                            <span key={`ellipsis-${page}`} className="px-2 text-gray-400">
+                              ...
+                            </span>
+                          )
+                        }
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`w-10 h-10 rounded-md transition-colors ${
+                              currentPage === page
+                                ? 'text-white'
+                                : 'border border-gray-300 hover:bg-gray-50'
+                            }`}
+                            style={currentPage === page ? { backgroundColor: primaryColor } : {}}
+                          >
+                            {page}
+                          </button>
+                        )
+                      })}
+                  </div>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))}
+                    disabled={currentPage === pagination.totalPages}
+                    className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+                  >
+                    다음
+                  </button>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </>
-      )}
-
-      {/* 페이지네이션 */}
-      {pagination && pagination.totalPages > 1 && (
-        <div className="mt-8 flex justify-center items-center gap-2">
-          <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-          >
-            이전
-          </button>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
-              .filter((page) => {
-                return (
-                  Math.abs(page - currentPage) <= 2 ||
-                  page === 1 ||
-                  page === pagination.totalPages
-                )
-              })
-              .map((page, idx, arr) => {
-                if (idx > 0 && page - arr[idx - 1] > 1) {
-                  return (
-                    <span key={`ellipsis-${page}`} className="px-2 text-gray-400">
-                      ...
-                    </span>
-                  )
-                }
-                return (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`w-10 h-10 rounded-md transition-colors ${
-                      currentPage === page
-                        ? 'bg-[#FF6B6B] text-white'
-                        : 'border border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                )
-              })}
-          </div>
-          <button
-            onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))}
-            disabled={currentPage === pagination.totalPages}
-            className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-          >
-            다음
-          </button>
-        </div>
       )}
 
       {/* 후기 작성 모달 */}
@@ -619,8 +632,8 @@ export default function ReviewsPage() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
             {/* 모달 헤더 */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">후기 작성</h2>
+            <div className="flex items-center justify-between p-4 lg:p-6 border-b border-gray-200">
+              <h2 className="text-lg lg:text-xl font-bold text-gray-900">후기 작성</h2>
               <button
                 onClick={closeWriteModal}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -630,10 +643,10 @@ export default function ReviewsPage() {
             </div>
 
             {/* 모달 내용 */}
-            <div className="p-6">
+            <div className="p-4 lg:p-6">
               {/* 상품 정보 */}
               <div className="flex gap-4 mb-6 pb-6 border-b border-gray-100">
-                <div className="relative w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                <div className="relative w-16 h-16 lg:w-20 lg:h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                   {selectedItem.thumbnailUrl ? (
                     <Image
                       src={selectedItem.thumbnailUrl}
@@ -682,7 +695,7 @@ export default function ReviewsPage() {
                   onChange={(e) => setReviewTitle(e.target.value)}
                   placeholder="후기 제목을 입력해주세요"
                   maxLength={200}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                 />
               </div>
 
@@ -696,7 +709,7 @@ export default function ReviewsPage() {
                   onChange={(e) => setReviewContent(e.target.value)}
                   placeholder="상품에 대한 솔직한 후기를 남겨주세요"
                   rows={5}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none"
                 />
                 <p className="text-sm text-gray-500 mt-1 text-right">
                   {reviewContent.length}/1000
@@ -705,7 +718,7 @@ export default function ReviewsPage() {
             </div>
 
             {/* 모달 푸터 */}
-            <div className="flex gap-3 p-6 border-t border-gray-200">
+            <div className="flex gap-3 p-4 lg:p-6 border-t border-gray-200">
               <button
                 onClick={closeWriteModal}
                 className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
@@ -715,7 +728,8 @@ export default function ReviewsPage() {
               <button
                 onClick={handleSubmitReview}
                 disabled={submitting || !reviewContent.trim()}
-                className="flex-1 px-4 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-3 text-white rounded-md hover:opacity-90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: primaryColor }}
               >
                 {submitting ? '작성 중...' : '작성 완료'}
               </button>
@@ -729,8 +743,8 @@ export default function ReviewsPage() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
             {/* 모달 헤더 */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">후기 수정</h2>
+            <div className="flex items-center justify-between p-4 lg:p-6 border-b border-gray-200">
+              <h2 className="text-lg lg:text-xl font-bold text-gray-900">후기 수정</h2>
               <button
                 onClick={closeEditModal}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -740,10 +754,10 @@ export default function ReviewsPage() {
             </div>
 
             {/* 모달 내용 */}
-            <div className="p-6">
+            <div className="p-4 lg:p-6">
               {/* 상품 정보 */}
               <div className="flex gap-4 mb-6 pb-6 border-b border-gray-100">
-                <div className="relative w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                <div className="relative w-16 h-16 lg:w-20 lg:h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                   {editingReview.orderItem?.thumbnailUrl || editingReview.product.thumbnailUrl ? (
                     <Image
                       src={editingReview.orderItem?.thumbnailUrl || editingReview.product.thumbnailUrl || ''}
@@ -794,7 +808,7 @@ export default function ReviewsPage() {
                   onChange={(e) => setEditTitle(e.target.value)}
                   placeholder="후기 제목을 입력해주세요"
                   maxLength={200}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                 />
               </div>
 
@@ -808,7 +822,7 @@ export default function ReviewsPage() {
                   onChange={(e) => setEditContent(e.target.value)}
                   placeholder="상품에 대한 솔직한 후기를 남겨주세요"
                   rows={5}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent outline-none resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none"
                 />
                 <p className="text-sm text-gray-500 mt-1 text-right">
                   {editContent.length}/1000
@@ -817,7 +831,7 @@ export default function ReviewsPage() {
             </div>
 
             {/* 모달 푸터 */}
-            <div className="flex gap-3 p-6 border-t border-gray-200">
+            <div className="flex gap-3 p-4 lg:p-6 border-t border-gray-200">
               <button
                 onClick={closeEditModal}
                 className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
@@ -827,7 +841,8 @@ export default function ReviewsPage() {
               <button
                 onClick={handleEditReview}
                 disabled={submitting || !editContent.trim()}
-                className="flex-1 px-4 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-3 text-white rounded-md hover:opacity-90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: primaryColor }}
               >
                 {submitting ? '수정 중...' : '수정 완료'}
               </button>
@@ -869,6 +884,6 @@ export default function ReviewsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

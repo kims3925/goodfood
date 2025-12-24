@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Payment Status API
  * 결제 상태 조회 엔드포인트

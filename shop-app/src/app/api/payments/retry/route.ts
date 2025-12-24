@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Payment Retry API
  * 결제 재시도 엔드포인트

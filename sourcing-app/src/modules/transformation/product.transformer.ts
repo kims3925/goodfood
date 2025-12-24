@@ -38,11 +38,17 @@ ${policyContent}
   // 가격 추출 규칙
   const pricingRule = policyContent
     ? `5. **가격**: 도매가(wholesalePrice)와 판매가(price)를 추출합니다.
-   - 도매가: 게시물에서 추출한 원래 가격
-   - 판매가: 위 가격정책을 적용한 최종 가격`
+   ⚠️ 중요: 원본 게시글의 모든 가격은 도매가(공급가)입니다.
+   - "판매가", "공급가", "가격" 등 어떤 표현이든 모두 도매가로 인식
+   - 도매 밴드 게시글에는 소매가가 없습니다
+   - 도매가: 게시물에서 추출한 모든 가격
+   - 판매가: 위 가격정책을 적용한 최종 소매 판매가`
     : `5. **가격**: 상품의 가격을 추출합니다.
-   - 도매가(wholesalePrice): 공급가, 도매가
-   - 판매가(price): 소비자 판매 가격 (없으면 도매가와 동일)`
+   ⚠️ 중요: 원본 게시글의 모든 가격은 도매가(공급가)입니다.
+   - "판매가", "공급가", "가격" 등 어떤 표현이든 모두 도매가로 인식
+   - 도매 밴드 게시글에는 소매가가 없습니다
+   - 도매가(wholesalePrice): 게시물에서 추출한 모든 가격
+   - 판매가(price): 도매가와 동일 (가격정책 없음)`
 
   // 변수 치환
   return template
@@ -80,12 +86,24 @@ ${policyContent}
   const pricingRule = policyContent
     ? `## 가격 추출
 도매가(wholesalePrice)와 판매가(price)를 추출합니다.
-- 도매가: 게시물에서 추출한 원래 가격
-- 판매가: 위 가격정책을 적용한 최종 가격`
+
+⚠️ 중요: 원본 게시글의 모든 가격은 도매가(공급가)입니다.
+- "판매가", "공급가", "가격" 등 어떤 표현이든 모두 도매가로 인식
+- 도매 밴드 게시글에는 소매가가 없습니다
+
+추출 규칙:
+- 도매가(wholesalePrice): 게시물에서 추출한 모든 가격
+- 판매가(price): 위 가격정책을 적용한 최종 소매 판매가`
     : `## 가격 추출
 상품의 가격을 추출합니다.
-- 도매가(wholesalePrice): 공급가, 도매가
-- 판매가(price): 소비자 판매 가격 (없으면 도매가와 동일)`
+
+⚠️ 중요: 원본 게시글의 모든 가격은 도매가(공급가)입니다.
+- "판매가", "공급가", "가격" 등 어떤 표현이든 모두 도매가로 인식
+- 도매 밴드 게시글에는 소매가가 없습니다
+
+추출 규칙:
+- 도매가(wholesalePrice): 게시물에서 추출한 모든 가격
+- 판매가(price): 도매가와 동일 (가격정책 없음)`
 
   return `당신은 한국 도매 쇼핑몰 상품 정보 추출 전문가입니다.
 
@@ -160,27 +178,69 @@ ${policySection}
 
 ---
 
-## 2. 상품 설명 (200-500자, 마케팅 카피)
+## 2. 상품 설명 (300-600자, 번호+글머리 서식 필수!)
 
-### 구조
-[훅 문장 - 강렬한 첫인상]
-+ [신뢰 포인트 - 원산지/제조방식/인증]
-+ [감성 표현 - 맛/식감/향 묘사]
-+ [활용법 - 요리/섭취 방법]
-+ [마무리 - 추천/인기 강조]
+### 서식 규칙 (반드시 적용)
+- 번호 제목: 1. 제목명, 2. 제목명 형식
+- 글머리 기호: • 로 세부 내용 나열
+- 괄호 보충: (보충 설명) 형식
+- 이모지: 적절히 사용 (😊 👍 등)
 
-### 감성 표현 사전
-| 카테고리 | 표현 예시 |
-|---------|---------|
-| 식감 | 쫀득쫀득, 탱글탱글, 바삭바삭, 촉촉, 부드러운 |
-| 맛 | 달콤한, 고소한, 감칠맛 나는, 깊은 맛, 시원한 |
-| 신선도 | 싱싱한, 살아있는, 펄떡펄떡, 통통한 |
-| 품질 | 엄선된, 정성껏, 직접 고른, 프리미엄 |
+### 필수 섹션 (4개)
+1. 크기/용량/규격
+• 구체적 수치 (길이, 무게, 용량 등)
+• 비교 표현 (일반 제품 대비 차별점)
 
-### 금지 표현
-- ❌ 의학적 효능 단정 ("당뇨 치료", "암 예방")
-- ❌ 허위 과장 ("세계 최고", "100% 완치")
-- ❌ 경쟁사 비방
+2. 신선도/원산지/제조방식
+• 산지직송, 당일작업 등 신선도 강조
+• 원산지, 생산방식 설명
+
+3. 맛/식감/품질
+• 맛 표현 (고소한, 달콤한, 감칠맛 등)
+• 식감 표현 (바삭, 촉촉, 쫄깃 등)
+
+4. 섭취방법/보관방법/손질여부
+• 조리법, 활용법
+• 보관 안내
+
+### 선택 섹션 (원본에 정보 있을 때만 추가)
+5. 주문/배송 안내 (선택)
+• 주문 마감: 매일 오후 N시
+• 발송일: 주문 후 N일 이내
+• 출고 요일: 매주 월/수/금
+
+6. 이벤트/혜택 (선택)
+• 기간한정 할인
+• 사은품 증정
+• 리뷰 이벤트
+
+### 출력 예시 (이 형식 그대로 따라할 것!)
+1. 압도적인 크기와 중량
+• 시중 일반 제품과 비교 거부!
+• 길이: 약 30~35cm 내외 (성인 팔뚝만한 사이즈!)
+• 무게: 1마리당 약 500g 내외
+• 한 마리만 구워도 온 가족이 배불리 드실 수 있는 특대 사이즈입니다.
+
+2. 신선함 그 자체, 산지직송
+• 여러 유통 단계를 거치며 마르는 생선이 아닙니다.
+• 가장 맛있는 제철 생선을 산지에서 바로 작업하여,
+• 바다의 신선함을 그대로 식탁까지 배송합니다.
+
+3. 갈비속촉, 최고의 맛
+• 클수록 맛있는 거 아시죠?
+• 껍질은 바삭하고 속살은 육즙이 가득해 퍽퍽하지 않고 촉촉합니다.
+• 비린내 없이 고소함이 가득해서 아이들도 정말 잘 먹습니다. 😊
+
+4. 손질 여부
+• 머리, 꼬리, 내장 깔끔하게 제거 후 세척하여 보내드립니다.
+  (집에서 굽기만 하세요!)
+• 천일염으로 알맞게 간을 한 자반입니다.
+
+### 금지
+- ❌ 의학적 효능 ("당뇨 치료", "암 예방")
+- ❌ 서식 미적용 (번호, 글머리 없이 문장 나열 금지)
+- ❌ 가격 정보 포함 금지! (도매가, 공급가, 판매가, 원가 등 모든 가격 정보는 설명에 절대 포함하지 않음)
+- ❌ "공급가 00원", "판매가 00원", "00,000원" 등의 금액 표기 금지
 
 ---
 
@@ -224,17 +284,31 @@ ${pricingRule}
 
 ---
 
-## 5. 배송비 추출
+## 5. 배송비 및 합배송 추출
 
-### 인식 패턴
+### 배송비 인식 패턴
 포함: "택배비 포함", "배송비 포함", "무료배송"
 별도: "배송비 별도 3,000원", "택배비 4,000원"
 조건: "2박스 이상 무료", "5만원 이상 무배"
 
+### 합배송 인식 패턴
+"3세트까지 합배송", "합배송 3개", "묶음배송 2개까지"
+"2세트 이상 배송비 할인", "3박스 동봉 가능"
+"2세트(4박스)까지 합배송" → bundleMaxQty: 4
+
 ### 추출 규칙
-- 금액이 명시되면 숫자로 추출
+- 배송비 금액이 명시되면 숫자로 추출
 - "포함/무료"면 shippingFee: 0
 - 정보 없으면 null
+- 합배송 최대 수량 추출 (숫자로 명시된 경우)
+- 합배송 언급 없으면 bundleMaxQty: 1 (합배송 불가)
+
+### 옵션별 합배송 단위 (bundleUnit)
+- 합배송 한도의 단위를 파악 (박스, kg, 개, 세트 등)
+- 각 옵션명에서 해당 단위의 수량을 추출하여 variants에 bundleUnit 추가
+- 예: "4박스까지 합배송", 옵션 "2박스(2.8kg)" → bundleUnit: 2
+- 예: "5kg까지 합배송", 옵션 "2kg" → bundleUnit: 2
+- 단위가 명확하지 않으면 bundleUnit: 1 (기본값)
 
 ---
 
@@ -276,12 +350,14 @@ ${pricingRule}
       "optionSummary": "string",
       "options": { "groupName": "value" },
       "wholesalePrice": number,
-      "price": number
+      "price": number,
+      "bundleUnit": number (기본값 1, 합배송 단위 수)
     }
   ],
   "shipping": {
     "shippingFee": number 또는 null,
-    "shippingInfo": "string 또는 null"
+    "shippingInfo": "string 또는 null",
+    "bundleMaxQty": number (기본값 1, 합배송 가능하면 2 이상)
   },
   "validImages": ["사용 가능한 이미지 URL 목록"],
   "excludedImages": [
@@ -324,7 +400,7 @@ ${pricingRule}
     { "optionSummary": "얼치기 5미", "options": { "규격": "얼치기 5미" }, "wholesalePrice": 32500, "price": 32500 },
     { "optionSummary": "소낙지 10미", "options": { "규격": "소낙지 10미" }, "wholesalePrice": 70000, "price": 70000 }
   ],
-  "shipping": { "shippingFee": 5000, "shippingInfo": "택배비 별도 5,000원" },
+  "shipping": { "shippingFee": 5000, "shippingInfo": "택배비 별도 5,000원", "bundleMaxQty": 1 },
   "validImages": [],
   "excludedImages": []
 }
@@ -356,7 +432,7 @@ ${pricingRule}
   "variants": [
     { "optionSummary": "10kg", "options": { "규격": "10kg" }, "wholesalePrice": 39000, "price": 39000 }
   ],
-  "shipping": { "shippingFee": null, "shippingInfo": null },
+  "shipping": { "shippingFee": null, "shippingInfo": null, "bundleMaxQty": 1 },
   "validImages": [],
   "excludedImages": []
 }
@@ -440,11 +516,18 @@ function parseAiVariants(rawVariants: any[]): GeneratedVariant[] {
         console.warn(`⚠️ variants[${index}].price 변환 실패:`, v.price)
       }
 
+      // bundleUnit: AI가 추출했으면 사용, 아니면 정규표현식으로 폴백
+      const optionSummary = String(v.optionSummary || '')
+      const bundleUnit = typeof v.bundleUnit === 'number'
+        ? v.bundleUnit
+        : extractBundleUnitFromSummary(optionSummary)
+
       return {
-        optionSummary: String(v.optionSummary || ''),
+        optionSummary,
         options: v.options && typeof v.options === 'object' ? v.options : {},
         wholesalePrice,
         price: price || wholesalePrice, // price 없으면 wholesalePrice 사용
+        bundleUnit,
       }
     })
     // 최종적으로 가격이 있는 항목만 유지
@@ -452,6 +535,70 @@ function parseAiVariants(rawVariants: any[]): GeneratedVariant[] {
 
   console.log(`📊 variants 파싱 결과: 입력 ${rawVariants.length}개 -> 유효 ${parsed.length}개`)
   return parsed
+}
+
+/**
+ * 옵션명에서 합배송 단위 수 추출 (폴백 로직)
+ * "2박스", "3kg", "2개" 등에서 숫자 추출
+ */
+function extractBundleUnitFromSummary(optionSummary: string): number {
+  if (!optionSummary) return 1
+
+  // 박스, kg, 개, 세트, 팩 순서로 매칭 (더 구체적인 패턴 우선)
+  const patterns = [
+    /(\d+)\s*(박스|box)/i,      // "2박스", "2 box"
+    /(\d+)\s*(kg|킬로)/i,       // "2kg", "2킬로"
+    /(\d+)\s*(세트|set)/i,      // "2세트", "2 set"
+    /(\d+)\s*(팩|pack)/i,       // "2팩", "2 pack"
+    /(\d+)\s*개입/i,            // "40개입" -> 단위가 아니므로 제외
+  ]
+
+  for (const pattern of patterns) {
+    const match = optionSummary.match(pattern)
+    if (match) {
+      const unit = parseInt(match[1])
+      // "40개입" 같은 경우는 합배송 단위가 아니므로 1 반환
+      if (match[2] && match[2].includes('개입')) continue
+      if (unit > 0 && unit <= 100) { // 합리적인 범위
+        return unit
+      }
+    }
+  }
+
+  return 1 // 기본값
+}
+
+/**
+ * shippingInfo에서 합배송 할인 금액 추출
+ * 예: "합배송시 3000원 차감", "합배송 시 배송비 3,000원 할인"
+ */
+function extractBundleDiscountFromShippingInfo(shippingInfo: string | null | undefined): number {
+  if (!shippingInfo) return 0
+
+  // 합배송 할인 패턴들
+  const patterns = [
+    // "합배송시 3000원 차감", "합배송 시 3,000원 할인"
+    /합배송\s*(?:시|시에?)?\s*(?:배송비\s*)?(\d{1,3}(?:,?\d{3})*)\s*원?\s*(?:차감|할인|감소|절약)/i,
+    // "3000원 할인 (합배송)", "3,000원 차감(합배송시)"
+    /(\d{1,3}(?:,?\d{3})*)\s*원?\s*(?:차감|할인|감소|절약)\s*\(?합배송/i,
+    // "합배송 할인 3000원", "합배송할인: 3,000원"
+    /합배송\s*할인\s*:?\s*(\d{1,3}(?:,?\d{3})*)\s*원?/i,
+    // "묶음배송 시 3000원 할인"
+    /묶음\s*배송\s*(?:시|시에?)?\s*(\d{1,3}(?:,?\d{3})*)\s*원?\s*(?:차감|할인|감소|절약)/i,
+  ]
+
+  for (const pattern of patterns) {
+    const match = shippingInfo.match(pattern)
+    if (match) {
+      // 콤마 제거 후 숫자로 변환
+      const discount = parseInt(match[1].replace(/,/g, ''))
+      if (discount > 0 && discount <= 50000) { // 합리적인 범위 (최대 5만원)
+        return discount
+      }
+    }
+  }
+
+  return 0 // 기본값
 }
 
 /**
@@ -840,6 +987,9 @@ function parseAiResponse(aiResponse: AiResponse): AiProductAnalysis {
     const shippingInfo = typeof parsed.shipping?.shippingInfo === 'string'
       ? parsed.shipping.shippingInfo
       : null
+    const bundleMaxQty = typeof parsed.shipping?.bundleMaxQty === 'number'
+      ? parsed.shipping.bundleMaxQty
+      : 1 // 기본값: 합배송 불가
 
     // Build analysis result
     const analysis: AiProductAnalysis = {
@@ -859,6 +1009,7 @@ function parseAiResponse(aiResponse: AiResponse): AiProductAnalysis {
       shipping: {
         shippingFee,
         shippingInfo,
+        bundleMaxQty,
       },
       rawResponse: aiResponse.content,
     }
@@ -1035,6 +1186,7 @@ function buildProductDraft(
     price: sellingPrice, // 판매가 (정책 적용된 가격)
     shippingFee: analysis.shipping?.shippingFee ?? undefined,
     shippingInfo: analysis.shipping?.shippingInfo ?? undefined,
+    bundleMaxQty: analysis.shipping?.bundleMaxQty ?? 1,
     options: analysis.options,
     variants,
   }
@@ -1154,12 +1306,24 @@ ${policyContent}
   const pricingRule = policyContent
     ? `## 가격 추출
 도매가(wholesalePrice)와 판매가(price)를 추출합니다.
-- 도매가: 게시물에서 추출한 원래 가격
-- 판매가: 위 가격정책을 적용한 최종 가격`
+
+⚠️ 중요: 원본 게시글의 모든 가격은 도매가(공급가)입니다.
+- "판매가", "공급가", "가격" 등 어떤 표현이든 모두 도매가로 인식
+- 도매 밴드 게시글에는 소매가가 없습니다
+
+추출 규칙:
+- 도매가(wholesalePrice): 게시물에서 추출한 모든 가격
+- 판매가(price): 위 가격정책을 적용한 최종 소매 판매가`
     : `## 가격 추출
 상품의 가격을 추출합니다.
-- 도매가(wholesalePrice): 공급가, 도매가
-- 판매가(price): 소비자 판매 가격 (없으면 도매가와 동일)`
+
+⚠️ 중요: 원본 게시글의 모든 가격은 도매가(공급가)입니다.
+- "판매가", "공급가", "가격" 등 어떤 표현이든 모두 도매가로 인식
+- 도매 밴드 게시글에는 소매가가 없습니다
+
+추출 규칙:
+- 도매가(wholesalePrice): 게시물에서 추출한 모든 가격
+- 판매가(price): 도매가와 동일 (가격정책 없음)`
 
   return `당신은 한국 도매 쇼핑몰 상품 정보 추출 전문가입니다.
 
@@ -1216,27 +1380,69 @@ ${policySection}
 
 ---
 
-## 2. 상품 설명 (200-500자, 마케팅 카피)
+## 2. 상품 설명 (300-600자, 번호+글머리 서식 필수!)
 
-### 구조
-[훅 문장 - 강렬한 첫인상]
-+ [신뢰 포인트 - 원산지/제조방식/인증]
-+ [감성 표현 - 맛/식감/향 묘사]
-+ [활용법 - 요리/섭취 방법]
-+ [마무리 - 추천/인기 강조]
+### 서식 규칙 (반드시 적용)
+- 번호 제목: 1. 제목명, 2. 제목명 형식
+- 글머리 기호: • 로 세부 내용 나열
+- 괄호 보충: (보충 설명) 형식
+- 이모지: 적절히 사용 (😊 👍 등)
 
-### 감성 표현 사전
-| 카테고리 | 표현 예시 |
-|---------|---------|
-| 식감 | 쫀득쫀득, 탱글탱글, 바삭바삭, 촉촉, 부드러운 |
-| 맛 | 달콤한, 고소한, 감칠맛 나는, 깊은 맛, 시원한 |
-| 신선도 | 싱싱한, 살아있는, 펄떡펄떡, 통통한 |
-| 품질 | 엄선된, 정성껏, 직접 고른, 프리미엄 |
+### 필수 섹션 (4개)
+1. 크기/용량/규격
+• 구체적 수치 (길이, 무게, 용량 등)
+• 비교 표현 (일반 제품 대비 차별점)
 
-### 금지 표현
-- ❌ 의학적 효능 단정 ("당뇨 치료", "암 예방")
-- ❌ 허위 과장 ("세계 최고", "100% 완치")
-- ❌ 경쟁사 비방
+2. 신선도/원산지/제조방식
+• 산지직송, 당일작업 등 신선도 강조
+• 원산지, 생산방식 설명
+
+3. 맛/식감/품질
+• 맛 표현 (고소한, 달콤한, 감칠맛 등)
+• 식감 표현 (바삭, 촉촉, 쫄깃 등)
+
+4. 섭취방법/보관방법/손질여부
+• 조리법, 활용법
+• 보관 안내
+
+### 선택 섹션 (원본에 정보 있을 때만 추가)
+5. 주문/배송 안내 (선택)
+• 주문 마감: 매일 오후 N시
+• 발송일: 주문 후 N일 이내
+• 출고 요일: 매주 월/수/금
+
+6. 이벤트/혜택 (선택)
+• 기간한정 할인
+• 사은품 증정
+• 리뷰 이벤트
+
+### 출력 예시 (이 형식 그대로 따라할 것!)
+1. 압도적인 크기와 중량
+• 시중 일반 제품과 비교 거부!
+• 길이: 약 30~35cm 내외 (성인 팔뚝만한 사이즈!)
+• 무게: 1마리당 약 500g 내외
+• 한 마리만 구워도 온 가족이 배불리 드실 수 있는 특대 사이즈입니다.
+
+2. 신선함 그 자체, 산지직송
+• 여러 유통 단계를 거치며 마르는 생선이 아닙니다.
+• 가장 맛있는 제철 생선을 산지에서 바로 작업하여,
+• 바다의 신선함을 그대로 식탁까지 배송합니다.
+
+3. 갈비속촉, 최고의 맛
+• 클수록 맛있는 거 아시죠?
+• 껍질은 바삭하고 속살은 육즙이 가득해 퍽퍽하지 않고 촉촉합니다.
+• 비린내 없이 고소함이 가득해서 아이들도 정말 잘 먹습니다. 😊
+
+4. 손질 여부
+• 머리, 꼬리, 내장 깔끔하게 제거 후 세척하여 보내드립니다.
+  (집에서 굽기만 하세요!)
+• 천일염으로 알맞게 간을 한 자반입니다.
+
+### 금지
+- ❌ 의학적 효능 ("당뇨 치료", "암 예방")
+- ❌ 서식 미적용 (번호, 글머리 없이 문장 나열 금지)
+- ❌ 가격 정보 포함 금지! (도매가, 공급가, 판매가, 원가 등 모든 가격 정보는 설명에 절대 포함하지 않음)
+- ❌ "공급가 00원", "판매가 00원", "00,000원" 등의 금액 표기 금지
 
 ---
 
@@ -1280,17 +1486,31 @@ ${pricingRule}
 
 ---
 
-## 5. 배송비 추출
+## 5. 배송비 및 합배송 추출
 
-### 인식 패턴
+### 배송비 인식 패턴
 포함: "택배비 포함", "배송비 포함", "무료배송"
 별도: "배송비 별도 3,000원", "택배비 4,000원"
 조건: "2박스 이상 무료", "5만원 이상 무배"
 
+### 합배송 인식 패턴
+"3세트까지 합배송", "합배송 3개", "묶음배송 2개까지"
+"2세트 이상 배송비 할인", "3박스 동봉 가능"
+"2세트(4박스)까지 합배송" → bundleMaxQty: 4
+
 ### 추출 규칙
-- 금액이 명시되면 숫자로 추출
+- 배송비 금액이 명시되면 숫자로 추출
 - "포함/무료"면 shippingFee: 0
 - 정보 없으면 null
+- 합배송 최대 수량 추출 (숫자로 명시된 경우)
+- 합배송 언급 없으면 bundleMaxQty: 1 (합배송 불가)
+
+### 옵션별 합배송 단위 (bundleUnit)
+- 합배송 한도의 단위를 파악 (박스, kg, 개, 세트 등)
+- 각 옵션명에서 해당 단위의 수량을 추출하여 variants에 bundleUnit 추가
+- 예: "4박스까지 합배송", 옵션 "2박스(2.8kg)" → bundleUnit: 2
+- 예: "5kg까지 합배송", 옵션 "2kg" → bundleUnit: 2
+- 단위가 명확하지 않으면 bundleUnit: 1 (기본값)
 
 ---
 
@@ -1439,6 +1659,9 @@ function parseIndividualResult(item: any): AiProductAnalysis {
   const shippingInfo = typeof item.shipping?.shippingInfo === 'string'
     ? item.shipping.shippingInfo
     : null
+  const bundleMaxQty = typeof item.shipping?.bundleMaxQty === 'number'
+    ? item.shipping.bundleMaxQty
+    : 1
 
   return {
     productName: item.productName,
@@ -1457,6 +1680,7 @@ function parseIndividualResult(item: any): AiProductAnalysis {
     shipping: {
       shippingFee,
       shippingInfo,
+      bundleMaxQty,
     },
     rawResponse: JSON.stringify(item),
   }

@@ -90,12 +90,13 @@ export interface TransformResult extends PipelineResult {
     skippedCount: number         // 스킵된 항목 수 (일시적 에러)
     retryablePostIds: number[]   // 재처리 가능한 postId 목록
     cancelled?: boolean          // 사용자 취소 여부
+    rpdLimitReached?: boolean    // RPD 한도 도달 여부
   }
 }
 
 export interface TransformedPost {
   postId: number
-  collectedProductId?: number
+  channelId?: number
   status: 'success' | 'failed' | 'skipped'
   error?: string
   errorType?: 'TRANSIENT' | 'PERMANENT'  // 에러 타입 (일시적/영구적)
@@ -107,7 +108,7 @@ export interface TransformedPost {
 // =============================================
 
 export interface ProductCreateConfig {
-  collectedProductIds?: number[]  // 특정 수집상품만 처리
+  channelIds?: number[]  // 특정 수집상품만 처리
   createPendingOnly?: boolean     // Product가 없는 수집상품만 처리
 }
 
@@ -120,7 +121,7 @@ export interface ProductCreateResult extends PipelineResult {
 }
 
 export interface CreatedProductResult {
-  collectedProductId: number
+  channelId: number
   productId?: number
   productName?: string
   status: 'success' | 'failed' | 'skipped'

@@ -1,16 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLeft, ChevronRight, Clock, Download, Upload, Zap, Settings2, ShoppingBag } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLeft, ChevronRight, Clock, Download, Upload, Zap, Settings2, ShoppingBag, AlertTriangle, ExternalLink, Settings, Info } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
+import { PipelineStatusPanel, DisableAutomationModal } from '@/components/automation'
+
+interface ChannelShop {
+  id: number
+  name: string
+  subdomain: string
+  isActive: boolean
+}
 
 interface Channel {
   id: number
   name: string
   coverUrl: string | null
   kind: 'WHOLESALE' | 'RETAIL'
+  shop?: ChannelShop | null
 }
 
 interface PricingPolicy {
@@ -32,6 +41,42 @@ interface Shop {
   coverUrl: string | null
 }
 
+interface PipelineSteps {
+  collection: boolean
+  transform: boolean
+  productCreate: boolean
+  publish: boolean
+}
+
+interface StageProgress {
+  completed: boolean
+  total?: number
+  success?: number
+  failed?: number
+  totalNewPosts?: number
+  channelResults?: Array<{ channelId: number; channelName: string; newPosts: number }>
+  batchProgress?: { current: number; total: number }
+  currentChannel?: string
+  currentProgress?: { current: number; total: number }
+}
+
+interface PipelineWorkflow {
+  id: number
+  type: string
+  status: string
+  startedAt: string
+  totalItems: number
+  successCount: number
+  failedCount: number
+  currentStage: 'collection' | 'transform' | 'productCreate' | 'publish' | null
+  stageProgress: {
+    collection?: StageProgress
+    transform?: StageProgress
+    productCreate?: StageProgress
+    publish?: StageProgress
+  }
+}
+
 interface AutomationConfig {
   isEnabled: boolean
   cronInterval: string
@@ -42,6 +87,7 @@ interface AutomationConfig {
   pricingPolicyId: number | null
   retailChannelIds: number[]
   shopIds: number[]
+  pipelineSteps: PipelineSteps
 }
 
 // 00:00 ~ 23:00 시간 버튼 생성
@@ -131,6 +177,12 @@ const defaultConfig: AutomationConfig = {
   pricingPolicyId: null,
   retailChannelIds: [],
   shopIds: [],
+  pipelineSteps: {
+    collection: true,
+    transform: true,
+    productCreate: true,
+    publish: true,
+  },
 }
 
 export default function AutomationSettingsPage() {
@@ -152,6 +204,16 @@ export default function AutomationSettingsPage() {
   const [warningPhase, setWarningPhase] = useState<'idle' | 'shake' | 'fading'>('idle')
   const [nextExecution, setNextExecution] = useState<{ text: string; remainingText: string }>({ text: '', remainingText: '' })
 
+  // 쇼핑몰 미연결 경고 모달
+  const [showShopConnectionWarning, setShowShopConnectionWarning] = useState(false)
+  const [unconnectedChannels, setUnconnectedChannels] = useState<Channel[]>([])
+
+  // 파이프라인 상태 추적
+  const [pipelineStatus, setPipelineStatus] = useState<PipelineWorkflow | null>(null)
+  const [isPipelineRunning, setIsPipelineRunning] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [showDisableModal, setShowDisableModal] = useState(false)
+
   const CHANNELS_PER_PAGE = 4
 
   // 섹션별 변경 여부 확인 (isEnabled는 버튼으로 변경하므로 제외)
@@ -170,8 +232,26 @@ export default function AutomationSettingsPage() {
   const hasShopChanges = JSON.stringify((config.shopIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.shopIds || []).slice().sort())
 
+  const hasPipelineChanges = JSON.stringify(config.pipelineSteps) !== JSON.stringify(initialConfig.pipelineSteps)
+
   // 저장되지 않은 변경사항이 있는지 확인
-  const hasUnsavedChanges = hasScheduleChanges || hasCollectionChanges || hasAiChanges || hasPublishChanges || hasShopChanges
+  const hasUnsavedChanges = hasScheduleChanges || hasCollectionChanges || hasAiChanges || hasPublishChanges || hasShopChanges || hasPipelineChanges
+
+  // 필수 설정 누락 여부 (설정이 아예 안 된 경우)
+  const isScheduleMissing = config.selectedHours.length === 0
+  const isShopMissing = config.shopIds.length === 0
+  const isCollectionMissing = config.wholesaleChannelIds.length === 0
+  const isAiMissing = !config.aiProvider
+  const isPublishMissing = config.retailChannelIds.length === 0
+  const isPipelineMissing = !config.pipelineSteps.collection && !config.pipelineSteps.transform && !config.pipelineSteps.productCreate && !config.pipelineSteps.publish
+
+  // 섹션별 문제 여부 (설정 누락 또는 저장 안 됨)
+  const hasScheduleProblem = isScheduleMissing || hasScheduleChanges
+  const hasShopProblem = isShopMissing || hasShopChanges
+  const hasCollectionProblem = isCollectionMissing || hasCollectionChanges
+  const hasAiProblem = isAiMissing || hasAiChanges
+  const hasPublishProblem = isPublishMissing || hasPublishChanges
+  const hasPipelineProblem = isPipelineMissing || hasPipelineChanges
 
   // 자동화 활성화 상태 저장
   const saveAutomationState = async (enabled: boolean) => {
@@ -198,51 +278,54 @@ export default function AutomationSettingsPage() {
 
   // 자동화 시작 핸들러
   const handleStartAutomation = () => {
-    // 필수 설정 검증
-    const missingSettings: string[] = []
+    // 필수 설정 검증 - 설정이 안 된 섹션 확인
+    const missingSections: string[] = []
 
     // 실행 시간 선택 확인
     if (config.selectedHours.length === 0) {
-      missingSettings.push('실행 시간')
+      missingSections.push('schedule')
     }
 
     // 쇼핑몰 선택 확인
     if (config.shopIds.length === 0) {
-      missingSettings.push('쇼핑몰')
+      missingSections.push('shop')
     }
 
     // 수집할 도매채널 확인
     if (config.wholesaleChannelIds.length === 0) {
-      missingSettings.push('수집할 도매채널')
+      missingSections.push('collection')
     }
 
     // AI 제공자 확인
     if (!config.aiProvider) {
-      missingSettings.push('AI 제공자')
+      missingSections.push('ai')
     }
 
     // 발행할 소매채널 확인
     if (config.retailChannelIds.length === 0) {
-      missingSettings.push('발행할 소매채널')
+      missingSections.push('publish')
     }
 
-    // 필수 설정이 없으면 toast로 안내
-    if (missingSettings.length > 0) {
-      toast.error(`자동화를 시작하려면 다음 설정이 필요합니다: ${missingSettings.join(', ')}`)
-      return
+    // 파이프라인 단계 확인
+    if (!config.pipelineSteps.collection && !config.pipelineSteps.transform && !config.pipelineSteps.productCreate && !config.pipelineSteps.publish) {
+      missingSections.push('pipeline')
     }
 
+    // 저장되지 않은 변경사항 확인
     const unsavedSections: string[] = []
-
     if (hasShopChanges) unsavedSections.push('shop')
     if (hasScheduleChanges) unsavedSections.push('schedule')
     if (hasCollectionChanges) unsavedSections.push('collection')
     if (hasAiChanges) unsavedSections.push('ai')
     if (hasPublishChanges) unsavedSections.push('publish')
+    if (hasPipelineChanges) unsavedSections.push('pipeline')
 
-    if (unsavedSections.length > 0) {
+    // 설정 누락 또는 저장되지 않은 섹션이 있으면 빨간색 강조
+    const problemSections = [...new Set([...missingSections, ...unsavedSections])]
+
+    if (problemSections.length > 0) {
       // 1단계: 빨간색 + 진동
-      setWarningSections(unsavedSections)
+      setWarningSections(problemSections)
       setWarningPhase('shake')
 
       // 2단계: 0.6초 후 진동 끝, 페이딩 시작
@@ -259,14 +342,77 @@ export default function AutomationSettingsPage() {
       return
     }
 
+    // 소매채널 중 쇼핑몰 미연결 채널 확인
+    const channelsWithoutShop = retailChannels.filter(
+      (ch) => config.retailChannelIds.includes(ch.id) && !ch.shop
+    )
+
+    if (channelsWithoutShop.length > 0) {
+      setUnconnectedChannels(channelsWithoutShop)
+      setShowShopConnectionWarning(true)
+      return
+    }
+
     // 저장된 상태에서만 자동화 시작 (서버에도 저장)
     saveAutomationState(true)
   }
 
   // 자동화 중지 핸들러
   const handleStopAutomation = () => {
+    // 실행 중인 파이프라인이 있으면 모달 표시
+    if (isPipelineRunning && pipelineStatus) {
+      setShowDisableModal(true)
+      return
+    }
+    // 없으면 바로 비활성화
     saveAutomationState(false)
   }
+
+  // 비활성화 모달 확인 핸들러
+  const handleDisableConfirm = async (cancelPipeline: boolean) => {
+    if (cancelPipeline && pipelineStatus) {
+      await handleCancelPipeline(pipelineStatus.id)
+    }
+    await saveAutomationState(false)
+    setShowDisableModal(false)
+  }
+
+  // 파이프라인 취소 핸들러
+  const handleCancelPipeline = async (workflowId: number) => {
+    setIsCancelling(true)
+    try {
+      const res = await fetch(`/api/automation/execute?workflowId=${workflowId}`, {
+        method: 'DELETE'
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('파이프라인이 취소되었습니다')
+        setPipelineStatus(null)
+        setIsPipelineRunning(false)
+      } else {
+        toast.error(data.error || '취소에 실패했습니다')
+      }
+    } catch (error) {
+      console.error('파이프라인 취소 실패:', error)
+      toast.error('취소 요청 중 오류가 발생했습니다')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
+  // 파이프라인 상태 조회
+  const fetchPipelineStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/automation/execute')
+      const data = await res.json()
+      if (data.success) {
+        setPipelineStatus(data.data?.workflow || null)
+        setIsPipelineRunning(data.data?.isRunning || false)
+      }
+    } catch (error) {
+      // 조용히 실패 처리 (네트워크 오류 등)
+    }
+  }, [])
 
   useEffect(() => {
     loadData()
@@ -286,6 +432,19 @@ export default function AutomationSettingsPage() {
 
     return () => clearInterval(interval)
   }, [config.selectedHours])
+
+  // 파이프라인 상태 폴링 (5초마다)
+  useEffect(() => {
+    // 초기 로드 (자동화 상태와 관계없이 항상 확인)
+    fetchPipelineStatus()
+
+    // 5초마다 폴링 (실행 중인 파이프라인이 있으면 계속 폴링)
+    const interval = setInterval(() => {
+      fetchPipelineStatus()
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [fetchPipelineStatus])
 
   const loadData = async () => {
     try {
@@ -309,6 +468,7 @@ export default function AutomationSettingsPage() {
             wholesaleChannelIds: configData.data?.wholesaleChannelIds || [],
             retailChannelIds: configData.data?.retailChannelIds || [],
             shopIds: configData.data?.shopIds || [],
+            pipelineSteps: configData.data?.pipelineSteps || defaultConfig.pipelineSteps,
           }
           setConfig(loadedConfig)
           setInitialConfig(loadedConfig)
@@ -394,21 +554,52 @@ export default function AutomationSettingsPage() {
     collection: '수집 설정',
     ai: 'AI 변환 설정',
     publish: '발행 설정',
+    pipeline: '파이프라인 범위',
   }
 
   const handleSaveSection = async (section: string) => {
     setSavingSection(section)
     try {
+      // 섹션별로 저장할 데이터 구성
+      let sectionData: Partial<AutomationConfig> = {}
+
+      switch (section) {
+        case 'schedule':
+          sectionData = { selectedHours: config.selectedHours }
+          break
+        case 'shop':
+          sectionData = { shopIds: config.shopIds }
+          break
+        case 'collection':
+          sectionData = { wholesaleChannelIds: config.wholesaleChannelIds }
+          break
+        case 'ai':
+          sectionData = { aiProvider: config.aiProvider, pricingPolicyId: config.pricingPolicyId }
+          break
+        case 'publish':
+          sectionData = { retailChannelIds: config.retailChannelIds }
+          break
+        case 'pipeline':
+          sectionData = { pipelineSteps: config.pipelineSteps }
+          break
+        default:
+          sectionData = config
+      }
+
+      // 기존 설정에 섹션 데이터만 병합하여 저장
+      const dataToSave = { ...initialConfig, ...sectionData }
+
       const response = await fetch('/api/automation/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify(dataToSave),
       })
 
       const data = await response.json()
 
       if (data.success) {
-        setInitialConfig(config)
+        // 해당 섹션의 initialConfig만 업데이트
+        setInitialConfig(prev => ({ ...prev, ...sectionData }))
         toast.success(`${sectionNames[section] || section} 설정이 저장되었습니다`)
       } else {
         toast.error(`${sectionNames[section] || section} 저장에 실패했습니다`)
@@ -577,8 +768,17 @@ export default function AutomationSettingsPage() {
         </div>
       </div>
 
+      {/* 파이프라인 실행 상태 패널 */}
+      {isPipelineRunning && pipelineStatus && (
+        <PipelineStatusPanel
+          workflow={pipelineStatus}
+          onCancel={handleCancelPipeline}
+          isCancelling={isCancelling}
+        />
+      )}
+
       {/* Schedule Settings - 독립 섹션 */}
-      <Card className={`overflow-hidden transition-all ${warningSections.includes('schedule') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
+      <Card className={`overflow-hidden transition-all ${warningSections.includes('schedule') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasScheduleProblem ? 'ring-2 ring-red-300' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -676,10 +876,276 @@ export default function AutomationSettingsPage() {
         </div>
       </Card>
 
+      {/* Pipeline Range Settings */}
+      <Card className={`overflow-hidden transition-all ${warningSections.includes('pipeline') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasPipelineProblem ? 'ring-2 ring-red-300' : ''}`}>
+        <div className="p-4 pb-5 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                <Zap className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-gray-900">파이프라인 범위</h2>
+                  {hasPipelineChanges && (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
+                  )}
+                  <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-indigo-100 text-indigo-700">
+                    {[config.pipelineSteps.collection, config.pipelineSteps.transform, config.pipelineSteps.productCreate, config.pipelineSteps.publish].filter(Boolean).length}/4 단계
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500">자동화가 실행될 파이프라인 단계를 선택하세요</p>
+              </div>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => handleSaveSection('pipeline')}
+              disabled={savingSection === 'pipeline' || !hasPipelineChanges}
+              className="flex items-center gap-2 text-sm px-4 shadow-md"
+            >
+              {savingSection === 'pipeline' ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+              저장
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-4 gap-4">
+            {/* 수집 단계 */}
+            {(() => {
+              // 수집을 해제하려면 변환이 해제되어 있어야 함
+              const canToggleOff = !config.pipelineSteps.transform
+              const isDisabled = config.pipelineSteps.collection && !canToggleOff
+              return (
+                <button
+                  onClick={() => {
+                    if (isDisabled) {
+                      toast.error('다음 단계(변환)를 먼저 해제해주세요')
+                      return
+                    }
+                    setConfig(prev => ({
+                      ...prev,
+                      pipelineSteps: { ...prev.pipelineSteps, collection: !prev.pipelineSteps.collection }
+                    }))
+                  }}
+                  className={`
+                    relative group p-4 rounded-xl border-2 transition-all duration-300
+                    ${config.pipelineSteps.collection
+                      ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-cyan-50 shadow-md shadow-blue-100'
+                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                    }
+                    ${isDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}
+                  `}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                      config.pipelineSteps.collection
+                        ? 'bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-200'
+                        : 'bg-gray-100 group-hover:bg-blue-100'
+                    }`}>
+                      <Download className={`w-7 h-7 ${config.pipelineSteps.collection ? 'text-white' : 'text-gray-400 group-hover:text-blue-500'}`} />
+                    </div>
+                    <div className="text-center">
+                      <h3 className={`font-bold text-sm ${config.pipelineSteps.collection ? 'text-blue-700' : 'text-gray-600'}`}>수집</h3>
+                      <p className="text-xs text-gray-500 mt-1">게시물 수집</p>
+                    </div>
+                    {config.pipelineSteps.collection && (
+                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center shadow-md">
+                        <Check size={14} className="text-white" />
+                      </div>
+                    )}
+                  </div>
+                </button>
+              )
+            })()}
+
+            {/* 변환 단계 */}
+            {(() => {
+              // 변환을 선택하려면 수집이 선택되어 있어야 함
+              // 변환을 해제하려면 상품생성이 해제되어 있어야 함
+              const canToggleOn = config.pipelineSteps.collection
+              const canToggleOff = !config.pipelineSteps.productCreate
+              const isDisabledOn = !config.pipelineSteps.transform && !canToggleOn
+              const isDisabledOff = config.pipelineSteps.transform && !canToggleOff
+              const isDisabled = isDisabledOn || isDisabledOff
+              return (
+                <button
+                  onClick={() => {
+                    if (!config.pipelineSteps.transform && !canToggleOn) {
+                      toast.error('이전 단계(수집)를 먼저 선택해주세요')
+                      return
+                    }
+                    if (config.pipelineSteps.transform && !canToggleOff) {
+                      toast.error('다음 단계(상품생성)를 먼저 해제해주세요')
+                      return
+                    }
+                    setConfig(prev => ({
+                      ...prev,
+                      pipelineSteps: { ...prev.pipelineSteps, transform: !prev.pipelineSteps.transform }
+                    }))
+                  }}
+                  className={`
+                    relative group p-4 rounded-xl border-2 transition-all duration-300
+                    ${config.pipelineSteps.transform
+                      ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50 shadow-md shadow-amber-100'
+                      : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
+                    }
+                    ${isDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}
+                  `}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                      config.pipelineSteps.transform
+                        ? 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-200'
+                        : 'bg-gray-100 group-hover:bg-amber-100'
+                    }`}>
+                      <Sparkles className={`w-7 h-7 ${config.pipelineSteps.transform ? 'text-white' : 'text-gray-400 group-hover:text-amber-500'}`} />
+                    </div>
+                    <div className="text-center">
+                      <h3 className={`font-bold text-sm ${config.pipelineSteps.transform ? 'text-amber-700' : 'text-gray-600'}`}>변환</h3>
+                      <p className="text-xs text-gray-500 mt-1">AI 상품 변환</p>
+                    </div>
+                    {config.pipelineSteps.transform && (
+                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center shadow-md">
+                        <Check size={14} className="text-white" />
+                      </div>
+                    )}
+                  </div>
+                </button>
+              )
+            })()}
+
+            {/* 상품생성 단계 */}
+            {(() => {
+              // 상품생성을 선택하려면 변환이 선택되어 있어야 함
+              // 상품생성을 해제하려면 발행이 해제되어 있어야 함
+              const canToggleOn = config.pipelineSteps.transform
+              const canToggleOff = !config.pipelineSteps.publish
+              const isDisabledOn = !config.pipelineSteps.productCreate && !canToggleOn
+              const isDisabledOff = config.pipelineSteps.productCreate && !canToggleOff
+              const isDisabled = isDisabledOn || isDisabledOff
+              return (
+                <button
+                  onClick={() => {
+                    if (!config.pipelineSteps.productCreate && !canToggleOn) {
+                      toast.error('이전 단계(변환)를 먼저 선택해주세요')
+                      return
+                    }
+                    if (config.pipelineSteps.productCreate && !canToggleOff) {
+                      toast.error('다음 단계(발행)를 먼저 해제해주세요')
+                      return
+                    }
+                    setConfig(prev => ({
+                      ...prev,
+                      pipelineSteps: { ...prev.pipelineSteps, productCreate: !prev.pipelineSteps.productCreate }
+                    }))
+                  }}
+                  className={`
+                    relative group p-4 rounded-xl border-2 transition-all duration-300
+                    ${config.pipelineSteps.productCreate
+                      ? 'border-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-md shadow-emerald-100'
+                      : 'border-gray-200 hover:border-emerald-300 hover:bg-emerald-50/50'
+                    }
+                    ${isDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}
+                  `}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                      config.pipelineSteps.productCreate
+                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-200'
+                        : 'bg-gray-100 group-hover:bg-emerald-100'
+                    }`}>
+                      <ShoppingBag className={`w-7 h-7 ${config.pipelineSteps.productCreate ? 'text-white' : 'text-gray-400 group-hover:text-emerald-500'}`} />
+                    </div>
+                    <div className="text-center">
+                      <h3 className={`font-bold text-sm ${config.pipelineSteps.productCreate ? 'text-emerald-700' : 'text-gray-600'}`}>상품생성</h3>
+                      <p className="text-xs text-gray-500 mt-1">Product 생성</p>
+                    </div>
+                    {config.pipelineSteps.productCreate && (
+                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center shadow-md">
+                        <Check size={14} className="text-white" />
+                      </div>
+                    )}
+                  </div>
+                </button>
+              )
+            })()}
+
+            {/* 발행 단계 */}
+            {(() => {
+              // 발행을 선택하려면 상품생성이 선택되어 있어야 함
+              const canToggleOn = config.pipelineSteps.productCreate
+              const isDisabled = !config.pipelineSteps.publish && !canToggleOn
+              return (
+                <button
+                  onClick={() => {
+                    if (isDisabled) {
+                      toast.error('이전 단계(상품생성)를 먼저 선택해주세요')
+                      return
+                    }
+                    setConfig(prev => ({
+                      ...prev,
+                      pipelineSteps: { ...prev.pipelineSteps, publish: !prev.pipelineSteps.publish }
+                    }))
+                  }}
+                  className={`
+                    relative group p-4 rounded-xl border-2 transition-all duration-300
+                    ${config.pipelineSteps.publish
+                      ? 'border-green-500 bg-gradient-to-br from-green-50 to-emerald-50 shadow-md shadow-green-100'
+                      : 'border-gray-200 hover:border-green-300 hover:bg-green-50/50'
+                    }
+                    ${isDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}
+                  `}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
+                      config.pipelineSteps.publish
+                        ? 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-200'
+                        : 'bg-gray-100 group-hover:bg-green-100'
+                    }`}>
+                      <Upload className={`w-7 h-7 ${config.pipelineSteps.publish ? 'text-white' : 'text-gray-400 group-hover:text-green-500'}`} />
+                    </div>
+                    <div className="text-center">
+                      <h3 className={`font-bold text-sm ${config.pipelineSteps.publish ? 'text-green-700' : 'text-gray-600'}`}>발행</h3>
+                      <p className="text-xs text-gray-500 mt-1">채널 발행</p>
+                    </div>
+                    {config.pipelineSteps.publish && (
+                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-md">
+                        <Check size={14} className="text-white" />
+                      </div>
+                    )}
+                  </div>
+                </button>
+              )
+            })()}
+          </div>
+
+          {/* 파이프라인 흐름 표시 */}
+          <div className="mt-4 p-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl border border-indigo-100">
+            <div className="flex items-center justify-center gap-2 text-sm">
+              <span className={`px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.collection ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
+                수집
+              </span>
+              <span className="text-indigo-400">→</span>
+              <span className={`px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.transform ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
+                변환
+              </span>
+              <span className="text-indigo-400">→</span>
+              <span className={`px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.productCreate ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
+                상품생성
+              </span>
+              <span className="text-indigo-400">→</span>
+              <span className={`px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.publish ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
+                발행
+              </span>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       {/* Row 1: Shop Selection + AI Settings - 2 Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Shop Selection Section */}
-        <Card className={`overflow-hidden transition-all ${warningSections.includes('shop') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
+        <Card className={`overflow-hidden transition-all ${warningSections.includes('shop') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasShopProblem ? 'ring-2 ring-red-300' : ''}`}>
           <div className="p-4 pb-5 flex flex-col">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -791,156 +1257,110 @@ export default function AutomationSettingsPage() {
           </div>
         </Card>
 
-        {/* AI Settings */}
-        <Card className={`overflow-hidden transition-all ${warningSections.includes('ai') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
+        {/* AI Settings - 간소화된 버전 */}
+        <Card className={`overflow-hidden transition-all ${warningSections.includes('ai') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasAiProblem ? 'ring-2 ring-red-300' : ''}`}>
           <div className="p-4 pb-5 flex flex-col">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-200">
                   <Sparkles className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-gray-900">AI 변환 설정</h2>
-                    {hasAiChanges && (
-                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-500">상품 정보 변환에 사용할 AI를 선택하세요</p>
+                  <h2 className="text-lg font-bold text-gray-900">AI 변환 설정</h2>
+                  <p className="text-sm text-gray-500">AI와 가격 정책 설정 현황</p>
                 </div>
               </div>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => handleSaveSection('ai')}
-                disabled={savingSection === 'ai' || !hasAiChanges}
-                className="flex items-center gap-2 text-sm px-4 shadow-md"
-              >
-                {savingSection === 'ai' ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
-                저장
-              </Button>
             </div>
 
-            <div className="space-y-6 flex-1">
-              {/* AI Provider */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">AI 제공자</label>
-                {configuredAiProviders.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    {configuredAiProviders.map((ai) => {
-                      const isSelected = config.aiProvider === ai.provider
-                      return (
-                        <button
-                          key={ai.provider}
-                          onClick={() => setConfig(prev => ({ ...prev, aiProvider: ai.provider }))}
-                          className={`
-                            relative group flex items-center gap-4 px-5 py-4 rounded-xl border-2 transition-all duration-200
-                            ${isSelected
-                              ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50 shadow-md shadow-amber-100'
-                              : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
-                            }
-                          `}
-                        >
-                          {isSelected && (
-                            <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center shadow-md">
-                              <Check size={14} className="text-white" />
-                            </div>
+            <div className="space-y-4">
+              {/* AI 설정 상태 */}
+              <div className="p-4 bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {configuredAiProviders.length > 0 ? (
+                      <>
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          configuredAiProviders[0].provider === 'GEMINI'
+                            ? 'bg-gradient-to-br from-blue-500 to-purple-600'
+                            : 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                        }`}>
+                          {configuredAiProviders[0].provider === 'GEMINI' ? (
+                            <Sparkles size={20} className="text-white" />
+                          ) : (
+                            <Bot size={20} className="text-white" />
                           )}
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                            ai.provider === 'GEMINI'
-                              ? 'bg-gradient-to-br from-blue-500 to-purple-600'
-                              : 'bg-gradient-to-br from-emerald-500 to-teal-600'
-                          }`}>
-                            {ai.provider === 'GEMINI' ? (
-                              <Sparkles size={20} className="text-white" />
-                            ) : (
-                              <Bot size={20} className="text-white" />
-                            )}
-                          </div>
-                          <div className="text-left">
-                            <div className={`font-bold ${isSelected ? 'text-amber-700' : 'text-gray-800'}`}>{ai.name}</div>
-                            <div className="text-xs text-gray-500">
-                              {ai.provider === 'GEMINI' ? 'Google AI' : 'OpenAI'}
-                            </div>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                          <Sparkles size={16} className="text-amber-600" />
                         </div>
-                        <p className="text-sm text-amber-700">
-                          등록된 AI API가 없습니다. API 키를 등록해주세요.
-                        </p>
-                      </div>
-                      <a
-                        href="/sourcing/settings/ai"
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        <Sparkles size={14} />
-                        AI 설정
-                      </a>
-                    </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-800">{configuredAiProviders[0].name}</span>
+                            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">활성</span>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            {configuredAiProviders[0].provider === 'GEMINI' ? 'Google AI' : 'OpenAI'} •
+                            {configuredAiProviders.length > 1 && ` 외 ${configuredAiProviders.length - 1}개 설정됨`}
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                          <Sparkles size={20} className="text-amber-600" />
+                        </div>
+                        <div>
+                          <span className="font-semibold text-amber-700">AI 미설정</span>
+                          <p className="text-xs text-amber-600">API 키를 등록해주세요</p>
+                        </div>
+                      </>
+                    )}
                   </div>
-                )}
+                  <a
+                    href="/sourcing/settings/ai"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <Settings size={14} />
+                    AI 설정
+                  </a>
+                </div>
               </div>
 
-              {/* Pricing Policy */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">가격 정책</label>
-                {pricingPolicies.length > 0 ? (
-                  <div className="flex flex-wrap gap-3">
-                    {pricingPolicies.map((policy) => {
-                      const isSelected = config.pricingPolicyId === policy.id
-                      return (
-                        <button
-                          key={policy.id}
-                          onClick={() => setConfig(prev => ({ ...prev, pricingPolicyId: policy.id }))}
-                          className={`
-                            relative group flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all duration-200 text-sm
-                            ${isSelected
-                              ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50 shadow-sm'
-                              : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
-                            }
-                          `}
-                        >
-                          {isSelected && (
-                            <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center">
-                              <Check size={12} className="text-white" />
-                            </div>
-                          )}
-                          <FileText size={16} className={isSelected ? 'text-amber-600' : 'text-gray-400'} />
-                          <span className={`font-medium truncate max-w-[120px] ${isSelected ? 'text-amber-700' : 'text-gray-600'}`}>{policy.name}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                          <FileText size={16} className="text-amber-600" />
-                        </div>
-                        <p className="text-sm text-amber-700">
-                          등록된 가격 정책이 없습니다. 정책을 추가해주세요.
-                        </p>
-                      </div>
-                      <a
-                        href="/sourcing/policy/list"
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        <FileText size={14} />
-                        정책 설정
-                      </a>
+              {/* 가격 정책 안내 */}
+              <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                      <FileText size={20} className="text-amber-600" />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-amber-800">가격 정책</span>
+                      <p className="text-xs text-amber-600">도매밴드별로 개별 설정됩니다</p>
                     </div>
                   </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    <a
+                      href="/sourcing/policy/list"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 text-sm font-medium rounded-lg transition-colors"
+                    >
+                      <FileText size={14} />
+                      정책 관리
+                    </a>
+                    <a
+                      href="/sourcing/channel/list"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      <Settings size={14} />
+                      채널 설정
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* 도움말 */}
+              <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <Info size={16} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-blue-700">
+                  가격 정책은 <strong>채널 설정</strong>에서 도매밴드마다 개별 설정할 수 있습니다.
+                  AI 변환 시 해당 채널의 가격 정책이 자동으로 적용됩니다.
+                </p>
               </div>
             </div>
           </div>
@@ -950,7 +1370,7 @@ export default function AutomationSettingsPage() {
       {/* Row 2: Collection + Publish Settings - 2 Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Collection Settings - Wholesale Channel Cards */}
-      <Card className={`overflow-hidden transition-all ${warningSections.includes('collection') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
+      <Card className={`overflow-hidden transition-all ${warningSections.includes('collection') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasCollectionProblem ? 'ring-2 ring-red-300' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -1156,7 +1576,7 @@ export default function AutomationSettingsPage() {
       </Card>
 
         {/* Publish Settings - Retail Channel Cards */}
-      <Card className={`overflow-hidden transition-all ${warningSections.includes('publish') && warningPhase === 'shake' ? 'ring-2 ring-red-400' : ''}`}>
+      <Card className={`overflow-hidden transition-all ${warningSections.includes('publish') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasPublishProblem ? 'ring-2 ring-red-300' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -1361,6 +1781,102 @@ export default function AutomationSettingsPage() {
         </div>
       </Card>
     </div>
+
+      {/* 쇼핑몰 미연결 경고 모달 */}
+      {showShopConnectionWarning && unconnectedChannels.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => {
+              setShowShopConnectionWarning(false)
+              setUnconnectedChannels([])
+            }}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            {/* 헤더 */}
+            <div className="bg-orange-50 p-6 border-b border-orange-100">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-orange-100 rounded-full">
+                  <AlertTriangle size={24} className="text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">쇼핑몰 연결 필요</h3>
+                  <p className="text-sm text-gray-600">소매밴드에 쇼핑몰이 연결되어 있지 않습니다</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 콘텐츠 */}
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                다음 소매밴드에 연결된 쇼핑몰이 없습니다:
+              </p>
+              <div className="space-y-2 mb-4 max-h-40 overflow-y-auto">
+                {unconnectedChannels.map((channel) => (
+                  <div
+                    key={channel.id}
+                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                  >
+                    {channel.coverUrl ? (
+                      <img
+                        src={channel.coverUrl}
+                        alt={channel.name}
+                        className="w-10 h-10 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center">
+                        <Send size={20} className="text-gray-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{channel.name}</p>
+                      <p className="text-xs text-orange-500">쇼핑몰 미연결</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-sm text-gray-600 mb-6">
+                자동화를 시작하려면 먼저 소매밴드에 쇼핑몰을 연결해주세요.
+              </p>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowShopConnectionWarning(false)
+                    setUnconnectedChannels([])
+                  }}
+                >
+                  닫기
+                </Button>
+                <a
+                  href="/sourcing/channel"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-color hover:bg-primary-color/90 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <ExternalLink size={16} />
+                  채널 관리
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 비활성화 확인 모달 */}
+      <DisableAutomationModal
+        isOpen={showDisableModal}
+        onClose={() => setShowDisableModal(false)}
+        onConfirm={handleDisableConfirm}
+        workflow={{
+          id: pipelineStatus?.id || 0,
+          currentStage: pipelineStatus?.currentStage || null,
+          successCount: pipelineStatus?.successCount || 0,
+          totalItems: pipelineStatus?.totalItems || 0,
+        }}
+        isLoading={isCancelling}
+      />
     </div>
   )
 }

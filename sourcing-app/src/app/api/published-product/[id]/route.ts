@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
@@ -51,17 +53,8 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
           include: {
             variants: true,
             options: true,
-            collectedProduct: {
-              include: {
-                post: {
-                  include: {
-                    channel: true,
-                    images: {
-                      orderBy: { sortOrder: 'asc' },
-                    },
-                  },
-                },
-              },
+            images: {
+              orderBy: { sortOrder: 'asc' },
             },
             // 같은 상품의 모든 발행 정보 포함
             publishedProducts: {
@@ -104,10 +97,6 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
             subdomain: true,
             isActive: true,
           },
-        },
-        publishHistories: {
-          orderBy: { publishedAt: 'desc' },
-          take: 10,
         },
       },
     })
@@ -157,13 +146,14 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     }
 
     const body = await request.json()
-    const { status, externalId, externalUrl, errorMessage } = body
+    const { status, externalId, externalUrl, errorMessage, isActive } = body
 
     const updateData: any = {}
     if (status !== undefined) updateData.status = status
     if (externalId !== undefined) updateData.externalId = externalId
     if (externalUrl !== undefined) updateData.externalUrl = externalUrl
     if (errorMessage !== undefined) updateData.errorMessage = errorMessage
+    if (isActive !== undefined) updateData.isActive = isActive
     if (status === 'SUCCESS') updateData.publishedAt = new Date()
 
     const updatedProduct = await prisma.publishedProduct.update({

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { Tag, Plus } from 'lucide-react'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import { useShop } from '@/contexts/ShopContext'
 
 interface Coupon {
   id: number
@@ -26,6 +27,8 @@ interface Coupon {
 export default function CouponsPage() {
   const { data: session } = useSession()
   const { getApiPath } = useShopUrl()
+  const { shop } = useShop()
+  const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [loading, setLoading] = useState(true)
   const [couponCode, setCouponCode] = useState('')
@@ -108,25 +111,24 @@ export default function CouponsPage() {
 
   if (loading) {
     return (
-      <div className="kurly-container py-12">
-        <div className="text-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B6B] mx-auto"></div>
-        </div>
+      <div className="text-center py-20">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: primaryColor }}></div>
       </div>
     )
   }
 
   return (
-    <div className="kurly-container py-12">
+    <>
       {/* 헤더 */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">쿠폰</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">쿠폰</h1>
           <p className="text-gray-600">보유하신 쿠폰을 확인하고 사용하세요</p>
         </div>
         <button
           onClick={() => setShowCouponInput(!showCouponInput)}
-          className="px-6 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] flex items-center gap-2"
+          className="px-6 py-3 text-white rounded-md hover:opacity-90 flex items-center justify-center gap-2 w-full sm:w-auto"
+          style={{ backgroundColor: primaryColor }}
         >
           <Plus className="w-5 h-5" />
           쿠폰 등록
@@ -143,11 +145,13 @@ export default function CouponsPage() {
               value={couponCode}
               onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
               placeholder="쿠폰 코드를 입력하세요"
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-[#FF6B6B]"
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1"
+              style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
             />
             <button
               onClick={handleIssueCoupon}
-              className="px-6 py-2 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252]"
+              className="px-6 py-2 text-white rounded-md hover:opacity-90"
+              style={{ backgroundColor: primaryColor }}
             >
               등록
             </button>
@@ -161,9 +165,10 @@ export default function CouponsPage() {
           onClick={() => setFilter('available')}
           className={`px-4 py-2 rounded-full ${
             filter === 'available'
-              ? 'bg-[#FF6B6B] text-white'
+              ? 'text-white'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
+          style={filter === 'available' ? { backgroundColor: primaryColor } : {}}
         >
           사용가능
         </button>
@@ -171,9 +176,10 @@ export default function CouponsPage() {
           onClick={() => setFilter('used')}
           className={`px-4 py-2 rounded-full ${
             filter === 'used'
-              ? 'bg-[#FF6B6B] text-white'
+              ? 'text-white'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
+          style={filter === 'used' ? { backgroundColor: primaryColor } : {}}
         >
           사용완료
         </button>
@@ -181,9 +187,10 @@ export default function CouponsPage() {
           onClick={() => setFilter('all')}
           className={`px-4 py-2 rounded-full ${
             filter === 'all'
-              ? 'bg-[#FF6B6B] text-white'
+              ? 'text-white'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
+          style={filter === 'all' ? { backgroundColor: primaryColor } : {}}
         >
           전체
         </button>
@@ -191,80 +198,83 @@ export default function CouponsPage() {
 
       {/* 쿠폰 목록 */}
       {filteredCoupons.length === 0 ? (
-        <div className="text-center py-20 bg-gray-50 rounded-lg">
+        <div className="text-center py-20 bg-gray-50 rounded-lg w-full">
           <Tag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-600">보유하신 쿠폰이 없습니다</p>
+          <p className="text-gray-600">
+            {filter === 'available' ? '사용 가능한 쿠폰이 없습니다' :
+             filter === 'used' ? '사용한 쿠폰이 없습니다' : '보유하신 쿠폰이 없습니다'}
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-4">
           {filteredCoupons.map((item) => (
             <div
               key={item.id}
               className={`bg-white border rounded-lg overflow-hidden ${
                 item.isUsed || item.isExpired
                   ? 'border-gray-200 opacity-60'
-                  : 'border-[#FF6B6B]'
+                  : ''
               }`}
+              style={!item.isUsed && !item.isExpired ? { borderColor: primaryColor } : {}}
             >
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">
-                      {item.coupon.name}
-                    </h3>
-                    <p className="text-2xl font-bold text-[#FF6B6B]">
+              <div className="p-4 lg:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <h3 className="text-lg font-bold text-gray-900">
+                        {item.coupon.name}
+                      </h3>
+                      {item.isUsed && (
+                        <span className="px-3 py-1 bg-gray-100 text-gray-600 text-sm rounded-full">
+                          사용완료
+                        </span>
+                      )}
+                      {item.isExpired && !item.isUsed && (
+                        <span className="px-3 py-1 bg-red-100 text-red-600 text-sm rounded-full">
+                          기간만료
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-2xl font-bold mb-3" style={{ color: primaryColor }}>
                       {getDiscountText(item.coupon)}
                     </p>
+                    {item.coupon.description && (
+                      <p className="text-sm text-gray-600 mb-3">{item.coupon.description}</p>
+                    )}
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-500">
+                      {item.coupon.minPurchaseAmount && (
+                        <p>
+                          최소 주문금액:{' '}
+                          {new Intl.NumberFormat('ko-KR').format(
+                            Number(item.coupon.minPurchaseAmount)
+                          )}
+                          원
+                        </p>
+                      )}
+                      {item.coupon.maxDiscountAmount && (
+                        <p>
+                          최대 할인금액:{' '}
+                          {new Intl.NumberFormat('ko-KR').format(
+                            Number(item.coupon.maxDiscountAmount)
+                          )}
+                          원
+                        </p>
+                      )}
+                      <p>유효기간: {formatDate(item.expiredAt)}까지</p>
+                      {item.isUsed && item.usedAt && (
+                        <p className="text-gray-400">사용일: {formatDate(item.usedAt)}</p>
+                      )}
+                    </div>
                   </div>
-                  {item.isUsed && (
-                    <span className="px-3 py-1 bg-gray-100 text-gray-600 text-sm rounded-full">
-                      사용완료
-                    </span>
-                  )}
-                  {item.isExpired && !item.isUsed && (
-                    <span className="px-3 py-1 bg-red-100 text-red-600 text-sm rounded-full">
-                      기간만료
-                    </span>
-                  )}
-                </div>
-
-                {item.coupon.description && (
-                  <p className="text-sm text-gray-600 mb-4">{item.coupon.description}</p>
-                )}
-
-                <div className="space-y-2 text-sm text-gray-500">
-                  {item.coupon.minPurchaseAmount && (
-                    <p>
-                      최소 주문금액:{' '}
-                      {new Intl.NumberFormat('ko-KR').format(
-                        Number(item.coupon.minPurchaseAmount)
-                      )}
-                      원
-                    </p>
-                  )}
-                  {item.coupon.maxDiscountAmount && (
-                    <p>
-                      최대 할인금액:{' '}
-                      {new Intl.NumberFormat('ko-KR').format(
-                        Number(item.coupon.maxDiscountAmount)
-                      )}
-                      원
-                    </p>
-                  )}
-                  <p>유효기간: {formatDate(item.expiredAt)}까지</p>
-                  {item.isUsed && item.usedAt && (
-                    <p className="text-gray-400">사용일: {formatDate(item.usedAt)}</p>
-                  )}
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <p className="text-xs text-gray-400 font-mono">{item.coupon.code}</p>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400 font-mono">{item.coupon.code}</p>
+                  </div>
                 </div>
               </div>
             </div>
           ))}
         </div>
       )}
-    </div>
+    </>
   )
 }

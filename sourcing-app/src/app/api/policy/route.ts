@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { policyService } from '@/modules/config/domain/src/policy'
@@ -15,6 +17,7 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || ''
+    const channelId = searchParams.get('channelId')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
 
@@ -23,6 +26,7 @@ export async function GET(request: NextRequest) {
       search,
       page,
       limit,
+      ...(channelId && { channelId: parseInt(channelId) }),
     })
 
     return NextResponse.json({
@@ -51,17 +55,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, description, content, isActive = true } = body
+    const { channelId, name, description, content, isActive = true } = body
 
-    if (!name || !content) {
+    if (!channelId || !name || !content) {
       return NextResponse.json(
-        { success: false, error: '정책 이름과 내용은 필수입니다.' },
+        { success: false, error: '채널, 정책 이름, 내용은 필수입니다.' },
         { status: 400 }
       )
     }
 
     const policy = await policyService.create({
       userId: currentUser.userId,
+      channelId,
       name,
       description,
       content,
@@ -90,7 +95,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, name, description, content, isActive } = body
+    const { id, channelId, name, description, content, isActive } = body
 
     if (!id) {
       return NextResponse.json(
@@ -99,7 +104,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const policy = await policyService.update(id, { name, description, content, isActive })
+    const policy = await policyService.update(id, { channelId, name, description, content, isActive })
 
     return NextResponse.json({ success: true, data: policy })
   } catch (error: any) {

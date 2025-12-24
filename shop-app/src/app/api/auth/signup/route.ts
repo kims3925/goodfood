@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Signup API
  * 회원가입 처리

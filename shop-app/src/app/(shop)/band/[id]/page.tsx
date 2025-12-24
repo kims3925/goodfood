@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -16,8 +16,8 @@ import { useCartNotification } from '@/contexts/CartNotificationContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface Product {
-  id: string
-  publishedProductId?: string
+  id: number
+  publishedProductId?: number
   title: string
   description?: string
   originalPrice: number
@@ -133,11 +133,7 @@ export default function BandProductsPage() {
 
   const priceFilters = generatePriceFilters()
 
-  useEffect(() => {
-    loadProducts()
-  }, [bandId, sort, currentPage, selectedPriceFilter])
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     try {
       setIsLoading(true)
       const queryParams = new URLSearchParams()
@@ -162,7 +158,11 @@ export default function BandProductsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [bandId, sort, currentPage, selectedPriceFilter, priceFilters, getApiPath])
+
+  useEffect(() => {
+    loadProducts()
+  }, [loadProducts])
 
   const handlePriceFilterSelect = (filterValue: string) => {
     setSelectedPriceFilter(filterValue)

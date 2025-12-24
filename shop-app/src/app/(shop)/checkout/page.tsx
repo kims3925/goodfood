@@ -9,6 +9,8 @@ import { ArrowLeft, Package, User, MapPin, CreditCard, Truck, Plus, Check, Build
 import TossPaymentWidget from '@/modules/payments/components/TossPaymentWidget'
 import { useShop } from '@/contexts/ShopContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import toast from 'react-hot-toast'
+import { calculateItemPrice as calcPrice } from '@/lib/price-calculator'
 
 declare global {
   interface Window {
@@ -35,7 +37,13 @@ interface CartItem {
   optionSummary: string | null
   image: string
   price: number
+  originalPrice: number // 배송비 미포함 원가
+  itemTotal: number // 정확한 아이템 총액
   quantity: number
+  shippingFee: number | null
+  bundleMaxQty: number
+  bundleUnit?: number  // 옵션별 합배송 단위 수
+  isBundleDiscount?: boolean  // 할인형 여부 (true: 할인 차감, false: 배송비 추가)
 }
 
 interface CheckoutFormData {
@@ -351,8 +359,51 @@ function CheckoutContent() {
       if (data.success && data.publishedProduct) {
         const pp = data.publishedProduct
         const product = pp.product
-        const mainVariant = product.variants?.[0]
         const images = product.post?.images?.map((img: any) => img.url) || []
+
+        // URL의 variantId로 해당 variant 찾기 (없으면 첫 번째)
+        const selectedVariant = variantId
+          ? product.variants?.find((v: any) => v.id === parseInt(variantId))
+          : product.variants?.[0]
+
+        // 합배송 옵션 계산 (공통 모듈 사용)
+        const shippingFee = product.shippingFee ?? 0
+        const bundleMaxQty = product.bundleMaxQty ?? 1
+        const variantPrice = selectedVariant?.price || 0
+        const bundleUnit = selectedVariant?.bundleUnit || 1
+        const bundleShippingType = product.bundleShippingType || 'NONE'
+
+        // bundleShippingType에 따른 가격 계산
+        // INCLUDED: 할인형 - 가격에 배송비 포함, 합배송 시 할인
+        // SEPARATE: 배송비형 - 가격 + 배송비, 합배송 시 배송비 절약
+        const isBundleDiscount = bundleShippingType === 'INCLUDED'
+
+        let bundleOptions: any[] = []
+        if (bundleMaxQty > 1 && shippingFee > 0) {
+          // 합배송 표시용 최대 수량 (1묶음 완성까지)
+          const maxDisplayQty = Math.floor(bundleMaxQty / bundleUnit) || 1
+
+          for (let qty = 1; qty <= maxDisplayQty; qty++) {
+            // 공통 모듈 사용
+            const priceResult = calcPrice({
+              basePrice: variantPrice,
+              shippingFee,
+              quantity: qty,
+              bundleMaxQty,
+              bundleUnit,
+              bundleShippingType,
+            })
+
+            bundleOptions.push({
+              qty,
+              totalPrice: priceResult.itemTotal,
+              discount: priceResult.discountAmount,
+              unitPrice: priceResult.unitPrice,
+              isBundleDiscount,
+              bundleUnit,
+            })
+          }
+        }
 
         setProduct({
           id: product.id,
@@ -360,10 +411,15 @@ function CheckoutContent() {
           title: product.name,
           description: product.description || '',
           images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
-          originalPrice: mainVariant?.price || 0,
-          salePrice: mainVariant?.price || 0,
+          originalPrice: variantPrice,
+          salePrice: variantPrice,
           category: product.categoryId || '',
-          stock: mainVariant?.stock || 100
+          stock: selectedVariant?.stock || 100,
+          bundleOptions,
+          bundleMaxQty: bundleMaxQty > 1 ? bundleMaxQty : undefined,
+          shippingFee,
+          isBundleDiscount,
+          bundleUnit,
         })
       } else {
         setProduct({
@@ -394,18 +450,6 @@ function CheckoutContent() {
 
   const formatPrice = (price: number) => {
     return price?.toLocaleString('ko-KR') || '0'
-  }
-
-  const calculateShipping = (subtotal: number, coupon?: UserCoupon | null) => {
-    // 무료배송 쿠폰 적용 시
-    if (coupon?.coupon.discountType === 'FREE_SHIPPING') {
-      return 0
-    }
-    // Shop 설정에서 무료배송 기준액과 기본 배송비 사용 (필수 설정)
-    const freeShippingAmount = shop?.freeShippingAmount
-    const shippingFee = shop?.defaultShippingFee
-    if (freeShippingAmount == null || shippingFee == null) return 0
-    return subtotal >= freeShippingAmount ? 0 : shippingFee
   }
 
   // 쿠폰 할인 금액 계산
@@ -640,7 +684,7 @@ function CheckoutContent() {
 
           router.push(getPath(`/order/bank-transfer/complete?${params.toString()}`))
         } else {
-          alert(data.error || '주문 생성에 실패했습니다.')
+          toast.error(data.error || '주문 생성에 실패했습니다.')
         }
       } else {
         // 토스 결제 플로우 (회원/비회원 모두 지원)
@@ -665,7 +709,7 @@ function CheckoutContent() {
             window.scrollTo({ top: 0, behavior: 'smooth' })
           }
         } else {
-          alert(data.error || '주문 준비에 실패했습니다.')
+          toast.error(data.error || '주문 준비에 실패했습니다.')
         }
       }
     } catch (error) {
@@ -679,22 +723,66 @@ function CheckoutContent() {
   let subtotal = 0
   let orderItemCount = 0
   let orderName = ''
+  let bundleDiscount = 0 // 합배송 할인액
 
   if (fromCart && cartItems.length > 0) {
-    subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    subtotal = cartItems.reduce((sum, item) => sum + item.itemTotal, 0)
     orderItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
     orderName = cartItems.length > 1
       ? `${cartItems[0].name} 외 ${cartItems.length - 1}건`
       : cartItems[0].name
+
+    // 합배송 할인액 계산 (공통 모듈 사용)
+    bundleDiscount = cartItems.reduce((sum, item) => {
+      const bundleShippingType = item.isBundleDiscount ? 'INCLUDED' : (item.shippingFee ? 'SEPARATE' : 'NONE')
+      const priceResult = calcPrice({
+        basePrice: item.originalPrice,
+        shippingFee: item.shippingFee || 0,
+        quantity: item.quantity,
+        bundleMaxQty: item.bundleMaxQty || 1,
+        bundleUnit: item.bundleUnit || 1,
+        bundleShippingType,
+      })
+      return sum + priceResult.discountAmount
+    }, 0)
   } else if (product) {
-    subtotal = product.salePrice * quantity
+    // 합배송 옵션이 있으면 공통 모듈로 가격 계산
+    if (product.bundleOptions && product.bundleOptions.length > 0) {
+      const bundleShippingType = product.isBundleDiscount ? 'INCLUDED' : (product.shippingFee ? 'SEPARATE' : 'NONE')
+      const priceResult = calcPrice({
+        basePrice: product.salePrice || 0,
+        shippingFee: product.shippingFee || 0,
+        quantity,
+        bundleMaxQty: product.bundleMaxQty || 1,
+        bundleUnit: product.bundleUnit || 1,
+        bundleShippingType,
+      })
+      subtotal = priceResult.itemTotal
+      bundleDiscount = priceResult.discountAmount
+    } else {
+      subtotal = product.salePrice * quantity
+    }
     orderItemCount = quantity
     orderName = product.title
   }
 
   const couponDiscount = calculateCouponDiscount(subtotal, selectedCoupon)
-  const shippingFee = calculateShipping(subtotal, selectedCoupon)
-  const totalAmount = subtotal + shippingFee - couponDiscount
+  const totalAmount = subtotal - couponDiscount // 배송비는 상품 가격에 포함
+
+  // 배송비 무료 여부 확인
+  const isFreeShipping = (() => {
+    if (fromCart && cartItems.length > 0) {
+      // 장바구니: 모든 상품의 배송비가 0이거나 null이면 무료배송
+      return cartItems.every(item => !item.shippingFee || item.shippingFee === 0)
+    } else if (product) {
+      // 바로구매: bundleOptions가 없고 배송비가 없으면 무료배송
+      // bundleOptions가 있으면 배송비가 포함된 것
+      return !product.bundleOptions || product.bundleOptions.length === 0
+        ? product.salePrice === product.originalPrice
+        : false
+    }
+    return false
+  })()
 
   if (isLoading) {
     return (
@@ -870,7 +958,7 @@ function CheckoutContent() {
                             <div className="flex justify-between items-center mt-1">
                               <span className="text-xs text-gray-500">수량: {item.quantity}개</span>
                               <span className="font-semibold text-[#FF6B6B] text-sm">
-                                {formatPrice(item.price * item.quantity)}원
+                                {formatPrice(item.itemTotal)}원
                               </span>
                             </div>
                           </div>
@@ -1398,15 +1486,10 @@ function CheckoutContent() {
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">배송비</span>
-                          <span className={shippingFee === 0 ? 'text-[#FF6B6B]' : 'text-gray-900'}>
-                            {shippingFee > 0 ? `+${formatPrice(shippingFee)}원` : '무료'}
+                          <span className={isFreeShipping ? "text-[#22C55E] font-medium" : "text-[#FF6B6B]"}>
+                            {isFreeShipping ? "무료" : "포함"}
                           </span>
                         </div>
-                        {shippingFee > 0 && shop?.freeShippingAmount && shop.freeShippingAmount > subtotal && (
-                          <p className="text-xs text-[#FF6B6B]">
-                            {formatPrice(shop.freeShippingAmount - subtotal)}원 추가 시 무료배송
-                          </p>
-                        )}
                         {couponDiscount > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">쿠폰 할인</span>
@@ -1428,6 +1511,22 @@ function CheckoutContent() {
                         <span className="text-sm font-medium text-gray-700">결제예정금액</span>
                         <span className="text-[22px] font-bold text-gray-900">{formatPrice(totalAmount)}원</span>
                       </div>
+                      {(bundleDiscount > 0 || couponDiscount > 0) && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          {bundleDiscount > 0 && (
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-[#FF6B6B]">묶음 할인</span>
+                              <span className="text-[#FF6B6B] font-medium">-{formatPrice(bundleDiscount)}원</span>
+                            </div>
+                          )}
+                          {couponDiscount > 0 && (
+                            <div className="flex justify-between items-center text-sm mt-1">
+                              <span className="text-[#FF6B6B]">쿠폰 할인</span>
+                              <span className="text-[#FF6B6B] font-medium">-{formatPrice(couponDiscount)}원</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* 결제하기 버튼 */}
@@ -1439,9 +1538,7 @@ function CheckoutContent() {
                       >
                         {isSubmitting
                           ? '주문 생성 중...'
-                          : paymentMethod === 'BANK_TRANSFER'
-                            ? `${formatPrice(totalAmount)}원 주문하기`
-                            : `${formatPrice(totalAmount)}원 결제하기`
+                          : `${formatPrice(totalAmount)}원 주문하기`
                         }
                       </button>
                     </div>

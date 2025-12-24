@@ -34,11 +34,15 @@ import {
   Ticket,
   Calendar,
   CreditCard,
+  Shield,
+  Lock,
 } from 'lucide-react'
 import {
   AppSection,
   MenuItem,
+  UserRole,
   getMenuBySection,
+  getMenuBySectionAndRole,
   getPathToMenuMap,
   getSectionLabel,
 } from '@/config/navigation'
@@ -50,6 +54,7 @@ interface SidebarProps {
   onToggleCollapse?: () => void
   currentSection: AppSection
   onSectionChange: (section: AppSection) => void
+  userRole?: UserRole
 }
 
 // 아이콘 컴포넌트 매핑
@@ -79,6 +84,8 @@ const iconMap: Record<string, React.ReactNode> = {
   Ticket: <Ticket size={20} />,
   Calendar: <Calendar size={20} />,
   CreditCard: <CreditCard size={20} />,
+  Shield: <Shield size={20} />,
+  Lock: <Lock size={20} />,
 }
 
 const smallIconMap: Record<string, React.ReactNode> = {
@@ -107,6 +114,8 @@ const smallIconMap: Record<string, React.ReactNode> = {
   Ticket: <Ticket size={16} />,
   Calendar: <Calendar size={16} />,
   CreditCard: <CreditCard size={16} />,
+  Shield: <Shield size={16} />,
+  Lock: <Lock size={16} />,
 }
 
 function getIcon(iconComponent: unknown, small = false): React.ReactNode {
@@ -124,39 +133,23 @@ export default function Sidebar({
   collapsed = false,
   onToggleCollapse,
   currentSection,
-  onSectionChange
+  onSectionChange,
+  userRole = 'USER'
 }: SidebarProps) {
   const pathname = usePathname()
   const [expandedItems, setExpandedItems] = useState<string[]>([])
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [clickedItem, setClickedItem] = useState<string | null>(null)
 
-  // 현재 섹션의 메뉴 아이템
-  const menuItems = useMemo(() => getMenuBySection(currentSection), [currentSection])
+  // 현재 섹션의 메뉴 아이템 (사용자 역할에 따라 필터링)
+  const menuItems = useMemo(() => getMenuBySectionAndRole(currentSection, userRole), [currentSection, userRole])
   const pathToMenuMap = useMemo(() => getPathToMenuMap(currentSection), [currentSection])
 
   // 경로에 따라 해당 메뉴 그룹 자동 확장
   useEffect(() => {
-    const pathToMenuMap: Record<string, string> = {
-      '/dashboard/shop': '대시보드',
-      '/dashboard': '대시보드',
-      '/channel': '채널 관리',
-      '/shop': '쇼핑몰 관리',
-      '/collected-product': '상품 관리',
-      '/product': '상품 관리',
-      '/published-product': '상품 관리',
-      '/publish': '발행',
-      '/order': '주문서 관리',
-      '/automation': '자동화 관리',
-      '/settlement': '정산 관리',
-      '/cs': '고객 관리',
-      '/user': '고객 관리',
-      '/coupon': '고객 관리',
-      '/policy': '환경 설정',
-      '/admin/settings': '환경 설정',
-    }
-
     const matchedMenus: string[] = []
+
+    // navigation.ts에서 가져온 pathToMenuMap 사용
     for (const [path, menu] of Object.entries(pathToMenuMap)) {
       if (pathname.startsWith(path)) {
         matchedMenus.push(menu)
@@ -230,7 +223,32 @@ export default function Sidebar({
       )
       return !hasMoreSpecificMatch
     }
+
+    // /list 패턴 처리: /sourcing/collected-product/list → /sourcing/collected-product 기준으로 매칭
+    // 예: href='/sourcing/collected-product/list', pathname='/sourcing/collected-product/31'
+    if (href.endsWith('/list')) {
+      const baseHref = href.replace(/\/list$/, '')
+      if (pathname.startsWith(baseHref + '/') || pathname === baseHref) {
+        // 다른 메뉴가 더 구체적으로 매칭되는지 확인
+        const hasMoreSpecificMatch = allMenuHrefs.some(
+          menuHref => menuHref !== href &&
+                      menuHref.startsWith(baseHref) &&
+                      menuHref.length > href.length &&
+                      (pathname === menuHref || pathname.startsWith(menuHref + '/'))
+        )
+        return !hasMoreSpecificMatch
+      }
+    }
+
     return false
+  }
+
+  // 자식 메뉴 중 하나라도 활성화되어 있는지 확인
+  const hasActiveChild = (item: MenuItem): boolean => {
+    if (!item.children) return false
+    return item.children.some(child =>
+      isActive(child.href) || hasActiveChild(child)
+    )
   }
 
   const renderIcon = (item: MenuItem, small = false) => {
@@ -243,6 +261,7 @@ export default function Sidebar({
     const hasChildren = item.children && item.children.length > 0
     const isExpanded = expandedItems.includes(item.label)
     const active = isActive(item.href)
+    const childActive = hasActiveChild(item)
     const isHovered = hoveredItem === item.label
     const isClicked = clickedItem === item.label
     const isSubmenuOpen = isHovered || isClicked
@@ -277,9 +296,12 @@ export default function Sidebar({
               w-full flex items-center
               ${collapsed ? 'justify-center px-2' : 'justify-between px-4'}
               py-2.5
-              text-text-secondary hover:text-text-primary hover:bg-surface
               transition-colors
               ${depth > 0 ? (collapsed ? '' : 'pl-8') : ''}
+              ${childActive
+                ? 'text-primary-color bg-primary-light/50 font-semibold'
+                : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+              }
             `}
             title={collapsed ? item.label : undefined}
           >

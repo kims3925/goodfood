@@ -14,12 +14,12 @@ function buildApiPath(path: string, slug?: string): string {
  * 장바구니 아이템 인터페이스
  */
 export interface CartItem {
-  id: string
-  productId: string
+  id: number
+  productId: number
   quantity: number
   priceAt: number
   product: {
-    id: string
+    id: number
     title: string
     salePrice: number
     images: string
@@ -46,8 +46,8 @@ interface CartState {
   setSessionId: (sessionId: string) => void
   setItems: (items: CartItem[]) => void
   addItem: (item: CartItem) => void
-  updateItemQuantity: (itemId: string, quantity: number) => void
-  removeItem: (itemId: string) => void
+  updateItemQuantity: (itemId: number, quantity: number) => void
+  removeItem: (itemId: number) => void
   clearCart: () => void
   setLoading: (isLoading: boolean) => void
   setError: (error: string | null) => void

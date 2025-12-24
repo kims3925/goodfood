@@ -26,6 +26,14 @@ export class ChannelRepository {
             name: true,
           },
         },
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            subdomain: true,
+            isActive: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',

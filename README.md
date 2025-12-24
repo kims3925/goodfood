@@ -8,10 +8,8 @@ BandAuto는 도매 밴드 상품 자동화부터 AI 상세페이지 생성, 토�
 
 ```
 main                    # 프로덕션 브랜치 (안정 버전)
-├── release-1           # 릴리즈 준비 브랜치 (QA/테스트)
-│   ├── hong            # 개발자 브랜치 (홍)
-│   └── Lee             # 개발자 브랜치 (이)
-└── 1.1, 1.2, ...       # 버전 태그
+├── hong                # 개발자 브랜치 (홍)
+└── Lee                 # 개발자 브랜치 (이)
 ```
 
 ### 브랜치별 용도
@@ -19,87 +17,95 @@ main                    # 프로덕션 브랜치 (안정 버전)
 | 브랜치 | 용도 | 배포 환경 |
 |--------|------|-----------|
 | `main` | 프로덕션 코드, 안정 버전만 머지 | Production |
-| `release-1` | 릴리즈 준비, QA 테스트 | Staging |
-| `hong`, `Lee` | 개발자별 작업 브랜치 | Local |
-| `1.1`, `1.2`, ... | 버전 태그/릴리즈 히스토리 | - |
+| `hong`, `Lee` | 개발자별 작업 브랜치 | Local/Dev |
+
+### 버전 태그
+
+- `v1.0.0` - 초기 릴리즈
+- `v1.1` - 기능 업데이트
 
 ### 개발 워크플로우
 
 ```bash
 # 1. 개발자 브랜치에서 작업
 git checkout hong
-git pull origin release-1
+git pull origin main
 # ... 작업 ...
 git commit -m "feat: 새 기능 추가"
 git push origin hong
 
-# 2. release-1로 머지 (PR 또는 직접)
-git checkout release-1
-git merge hong
-git push origin release-1
-
-# 3. QA 완료 후 main으로 머지
-git checkout main
-git merge release-1
-git push origin main
-git tag v1.x.x
+# 2. main으로 PR 생성 후 머지
+# GitHub에서 PR 생성 및 코드 리뷰 후 머지
 ```
 
 ### 머지 규칙
 
-- **main ← release-1**: QA 완료 후에만 머지
-- **release-1 ← 개발자 브랜치**: 기능 완료 시 머지
-- **main 직접 커밋 금지**: 반드시 release-1 통해서
+- **main ← 개발자 브랜치**: PR 리뷰 완료 후 머지
+- **main 직접 커밋 금지**: 반드시 PR 통해서
 
 ## 🏗️ 프로젝트 구조
 
-이 프로젝트는 **2개의 독립적인 Next.js 앱**과 **공유 모듈**로 구성된 모노레포입니다:
+이 프로젝트는 **2개의 독립적인 Next.js 앱**과 **공유 DB 패키지**로 구성된 모노레포입니다:
 
 ```
 bandauto/
-├── shop-app/          # 고객용 쇼핑몰 앱 (포트 3000)
+├── shop-app/                # 고객용 쇼핑몰 앱 (포트 3000)
 │   ├── src/
 │   │   ├── app/             # Next.js App Router
+│   │   │   ├── (shop)/      # 쇼핑몰 페이지 그룹
+│   │   │   │   ├── product/ # 상품 목록/상세
+│   │   │   │   ├── cart/    # 장바구니
+│   │   │   │   ├── checkout/# 주문서 작성
+│   │   │   │   ├── payment/ # 결제 처리
+│   │   │   │   ├── order/   # 주문 완료/조회
+│   │   │   │   ├── mypage/  # 마이페이지
+│   │   │   │   └── cs/      # 고객센터
+│   │   │   └── api/         # REST API (50개 엔드포인트)
 │   │   ├── components/      # 쇼핑몰 UI 컴포넌트
-│   │   ├── stores/          # Zustand 상태 관리
-│   │   └── modules/         # E-commerce 전용 모듈
-│   │       ├── order/       # 주문 관리
-│   │       ├── payments/    # 결제 처리 (토스페이먼츠)
-│   │       ├── cart/        # 장바구니
-│   │       ├── product/     # 상품 관리
-│   │       └── user/        # 사용자/고객 관리
-│   └── .env.local           # E-commerce 환경변수
+│   │   ├── contexts/        # React Context
+│   │   ├── hooks/           # Custom Hooks
+│   │   ├── modules/         # 비즈니스 로직 모듈
+│   │   └── services/        # 서비스 레이어
+│   └── .env.local           # 환경변수
 │
 ├── sourcing-app/            # 관리자/워커 앱 (포트 3001)
 │   ├── src/
 │   │   ├── app/             # Next.js App Router
+│   │   │   ├── (admin)/     # 관리자 페이지 그룹
+│   │   │   │   ├── sourcing/# 소싱 관리
+│   │   │   │   │   ├── channel/         # 채널 관리
+│   │   │   │   │   ├── collected-product/# 수집 상품
+│   │   │   │   │   ├── product/         # 가공 상품
+│   │   │   │   │   ├── published-product/# 발행 상품
+│   │   │   │   │   └── automation/      # 자동화 설정
+│   │   │   │   └── shop/    # 쇼핑몰 관리
+│   │   │   │       ├── order/           # 주문 관리
+│   │   │   │       ├── user/            # 회원 관리
+│   │   │   │       ├── settlement/      # 정산 관리
+│   │   │   │       ├── cs/              # CS 관리
+│   │   │   │       └── coupon/          # 쿠폰 관리
+│   │   │   ├── (auth)/      # 인증 페이지
+│   │   │   └── api/         # REST API (79개 엔드포인트)
 │   │   ├── components/      # 관리자 UI 컴포넌트
-│   │   └── modules/         # Sourcing 전용 모듈
-│   │       ├── config/      # API/AI 설정
-│   │       ├── sourcing/    # 도매 상품 수집
-│   │       ├── transformation/  # AI 상품 가공 (게시글 → 상세페이지)
-│   │       ├── catalog/     # 상품 카탈로그
-│   │       ├── shop/        # 쇼핑몰 관리
-│   │       └── monitoring/  # 파이프라인 모니터링
-│   └── .env.local           # Sourcing 환경변수
+│   │   ├── modules/         # 비즈니스 로직 모듈
+│   │   └── services/        # 서비스 레이어
+│   └── .env                 # 환경변수
 │
-├── modules/                 # 공통 모듈
-│   └── common/
-│       ├── kernel/          # 공통 타입 정의
-│       ├── utils/           # 유틸리티 함수
-│       └── ui-kit/          # 공유 UI 컴포넌트
+├── db/                      # 공유 데이터베이스 패키지
+│   ├── prisma/
+│   │   ├── schema.prisma    # Prisma 설정
+│   │   ├── models/          # 모델 정의 (44개 모델)
+│   │   │   ├── user.prisma
+│   │   │   ├── product.prisma
+│   │   │   ├── order.prisma
+│   │   │   ├── payment.prisma
+│   │   │   └── ...
+│   │   └── migrations/      # 마이그레이션 히스토리
+│   └── src/generated/       # Prisma Client 생성 위치
 │
-├── prisma/                  # 공유 데이터베이스
-│   ├── schema.prisma        # 20개 모델 정의
-│   ├── dev.db               # SQLite 데이터베이스 (개발 환경)
-│   └── migrations/          # 데이터베이스 마이그레이션 히스토리
-│
-└── docs/                    # 프로젝트 문서
-    ├── api/                 # API 레퍼런스
-    ├── project/             # 프로젝트 문서
-    ├── migration/           # 마이그레이션 가이드
-    │   └── DB-MIGRATION-GUIDE.md  # SQLite → MySQL 전환 가이드
-    └── architecture/        # 아키텍처 문서
+├── scripts/                 # 유틸리티 스크립트
+├── docs/                    # 프로젝트 문서
+└── band-session-extension/  # Chrome 확장 프로그램
 ```
 
 ## 🎯 2-App 아키텍처
@@ -108,65 +114,84 @@ bandauto/
 - **포트**: 3000
 - **역할**: 고객이 상품을 보고 구매하는 프론트엔드
 - **핵심 기능**:
-  - 상품 목록/상세 페이지
-  - 장바구니 (Zustand)
-  - 토스페이먼츠 결제
-  - 주문 관리
-  - 고객 계정 관리
+  - 상품 목록/상세 페이지 (옵션/변형 지원)
+  - 장바구니 (회원/비회원 지원)
+  - 토스페이먼츠 결제 (카드, 가상계좌, 계좌이체)
+  - 주문 관리 및 주문 조회
+  - 마이페이지 (주문내역, 배송조회, 1:1문의)
+  - 회원 인증 (회원가입, 로그인, 소셜로그인)
+  - 고객센터 (1:1문의, FAQ, 공지사항)
+  - 비회원 주문 (주문번호+비밀번호로 조회)
 
 ### Sourcing App (관리자/워커)
 - **포트**: 3001
 - **역할**: 관리자가 상품을 수집하고 AI로 가공하는 백오피스
 - **핵심 기능**:
-  - 도매 밴드 크롤링 (Playwright)
-  - AI 상품 가공 (Gemini - 게시글 → 상세페이지)
-  - 상품 카탈로그 관리
-  - 쇼핑몰 설정
-  - 파이프라인 모니터링
+  - **소싱 관리**
+    - 채널 관리 (도매 밴드, 소매 밴드)
+    - 상품 수집 (Playwright 자동화)
+    - AI 상품 가공 (Gemini - 게시글 → 상세페이지)
+    - 상품 발행 (소매 밴드로 자동 업로드)
+    - 자동화 파이프라인 (수집 → 가공 → 발행)
+  - **쇼핑몰 관리**
+    - 주문 관리 (주문확인, 배송처리, 취소/반품)
+    - 회원 관리
+    - 정산 관리 (주문별/기간별 정산)
+    - CS 관리 (1:1문의, 리뷰 관리)
+    - 쿠폰 관리
+    - 스토어 설정
 
 ## 🚀 빠른 시작
 
-### 1. 의존성 설치
+### 1. 저장소 클론 및 의존성 설치
 ```bash
-# v1.1 브랜치 클론
-git clone -b 1.1 https://github.com/abcpharm00002-spec/bandauto.git
+git clone https://github.com/ABC-Group-Tech/bandauto.git
 cd bandauto
 
 # 의존성 설치
 npm install
+```
 
-### 2. 데이터베이스 초기화
+### 2. 데이터베이스 설정
+
 ```bash
-npx prisma generate
-npx prisma db push
+# db 패키지로 이동
+cd db
+
+# Prisma Client 생성
+npx prisma generate --schema prisma
+
+# 데이터베이스 스키마 동기화
+npx prisma db push --schema prisma
 ```
 
 ### 3. 환경변수 설정
 
+**db/.env**
+```env
+DATABASE_URL="mysql://user:password@localhost:3306/bandauto"
+```
+
 **shop-app/.env.local**
 ```env
-DATABASE_URL="file:../prisma/dev.db"
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="your-secret-key"
 TOSS_PAYMENTS_CLIENT_KEY=""
 TOSS_PAYMENTS_SECRET_KEY=""
 ```
 
-**sourcing-app/.env.local**
+**sourcing-app/.env**
 ```env
-DATABASE_URL="file:../prisma/dev.db"
 NEXTAUTH_URL="http://localhost:3001"
 NEXTAUTH_SECRET="your-secret-key"
 GEMINI_API_KEY=""
-BAND_CLIENT_ID=""
-BAND_CLIENT_SECRET=""
 ```
 
 ### 4. 개발 서버 실행
 
 **각 앱 개별 실행:**
 ```bash
-# E-commerce 앱 (포트 3000)
+# Shop 앱 (포트 3000)
 npm run dev:shop
 
 # Sourcing 앱 (포트 3001)

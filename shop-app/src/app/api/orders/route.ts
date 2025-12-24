@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Orders API
  * 주문 생성 및 조회

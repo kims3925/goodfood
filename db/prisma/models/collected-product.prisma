@@ -8,9 +8,9 @@ model CollectedProduct {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
   rawMetadata String?       @map("raw_metadata") @db.LongText
+  isConverted Boolean       @default(false) @map("is_converted")
   post        CollectedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  products    Product[]
 
   @@index([userId])
   @@index([postId])

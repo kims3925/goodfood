@@ -658,10 +658,9 @@ components/shop/CheckoutForm.tsx         # 주문서 폼
 4. **주문 관리 대시보드**
 
 #### Phase 4 (추가 기능 - 1주)
-1. **레거시 코드 정리** (스룩페이 관련)
-2. **SEO 최적화**
-3. **모바일 반응형 최적화**
-4. **성능 최적화**
+1. **SEO 최적화**
+2. **모바일 반응형 최적화**
+3. **성능 최적화**
 
 ---
 
@@ -722,14 +721,6 @@ components/shop/CheckoutForm.tsx         # 주문서 폼
 - [ ] 고객용 상품 상세 페이지
 - [ ] 장바구니 페이지
 - [ ] 주문서 작성 페이지
-
-### 레거시 코드 정리 계획
-
-**삭제 후보 (신중히 검토 후):**
-- `app/(admin)/strokepay/` - 스룩페이 관리 페이지들
-- `app/api/strokepay/` - 스룩페이 API 엔드포인트들
-- `app/api/automation/strokepay/` - 스룩페이 자동화
-- `lib/strokepay-automation.ts` - 스룩페이 서비스
 
 ---
 

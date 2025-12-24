@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma, ChannelKind } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
@@ -131,14 +133,9 @@ export async function GET(request: NextRequest) {
                       take: 1,
                       select: { wholesalePrice: true },
                     },
-                    collectedProduct: {
-                      include: {
-                        post: {
-                          include: {
-                            images: { take: 1, orderBy: { sortOrder: 'asc' } },
-                          },
-                        },
-                      },
+                    images: {
+                      take: 1,
+                      orderBy: { sortOrder: 'asc' },
                     },
                   },
                 },
@@ -237,7 +234,7 @@ export async function GET(request: NextRequest) {
         const margin = wholesalePrice ? Number(item.unitPrice) - wholesalePrice : null
 
         const thumbnailUrl = item.thumbnailUrl ||
-          item.publishedProduct?.product?.collectedProduct?.post?.images?.[0]?.url || null
+          item.publishedProduct?.product?.images?.[0]?.url || null
 
         shopData.items.push({
           id: item.id,

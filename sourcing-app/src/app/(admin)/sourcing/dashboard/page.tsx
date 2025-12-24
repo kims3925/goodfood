@@ -21,6 +21,9 @@ import {
   History,
   ShoppingBag,
   Calendar,
+  AlertTriangle,
+  ExternalLink,
+  Send,
 } from 'lucide-react'
 import {
   LineChart,
@@ -71,6 +74,20 @@ interface AutomationConfig {
   nextRunAt: string | null
   retailChannelIds: number[]
   shopIds: number[]
+}
+
+interface ChannelShop {
+  id: number
+  name: string
+  subdomain: string
+  isActive: boolean
+}
+
+interface Channel {
+  id: number
+  name: string
+  coverUrl: string | null
+  shop?: ChannelShop | null
 }
 
 interface StageProgress {
@@ -225,6 +242,11 @@ export default function AutomationDashboardPage() {
   const [period, setPeriod] = useState<PeriodFilter>('today')
   const [startDate, setStartDate] = useState<string>(formatDateForInput(getToday()))
   const [endDate, setEndDate] = useState<string>(formatDateForInput(getToday()))
+
+  // 소매채널 및 쇼핑몰 미연결 경고 모달
+  const [retailChannels, setRetailChannels] = useState<Channel[]>([])
+  const [showShopConnectionWarning, setShowShopConnectionWarning] = useState(false)
+  const [unconnectedChannels, setUnconnectedChannels] = useState<Channel[]>([])
   const [isCustomDate, setIsCustomDate] = useState(false)
 
   const loadData = useCallback(async () => {
@@ -237,11 +259,12 @@ export default function AutomationDashboardPage() {
         statsUrl += `?period=${period}`
       }
 
-      const [statsRes, configRes, executeRes, logsRes] = await Promise.all([
+      const [statsRes, configRes, executeRes, logsRes, retailChannelsRes] = await Promise.all([
         fetch(statsUrl),
         fetch('/api/automation/config'),
         fetch('/api/automation/execute'),
         fetch('/api/automation/logs?limit=5'),
+        fetch('/api/channel?kind=RETAIL'),
       ])
 
       // 각 응답을 개별적으로 처리 (404 등 에러 시에도 다른 데이터는 표시)
@@ -282,6 +305,15 @@ export default function AutomationDashboardPage() {
       } else {
         // logs API가 없으면 빈 배열로 설정 (404 에러 방지)
         setRecentLogs([])
+      }
+
+      if (retailChannelsRes.ok) {
+        try {
+          const channelsData = await retailChannelsRes.json()
+          if (channelsData.success) setRetailChannels(channelsData.data || [])
+        } catch (e) {
+          console.error('retail channels 파싱 실패:', e)
+        }
       }
     } catch (error) {
       console.error('데이터 로드 실패:', error)
@@ -330,6 +362,19 @@ export default function AutomationDashboardPage() {
 
   const handleExecute = async (type: 'collect' | 'transform' | 'register' | 'publish' | 'full') => {
     if (isExecuting || runningWorkflow) return
+
+    // 발행 또는 전체 실행 시 쇼핑몰 연결 체크
+    if ((type === 'publish' || type === 'full') && config?.retailChannelIds) {
+      const channelsWithoutShop = retailChannels.filter(
+        (ch) => config.retailChannelIds.includes(ch.id) && !ch.shop
+      )
+
+      if (channelsWithoutShop.length > 0) {
+        setUnconnectedChannels(channelsWithoutShop)
+        setShowShopConnectionWarning(true)
+        return
+      }
+    }
 
     setIsExecuting(true)
     try {
@@ -543,67 +588,229 @@ export default function AutomationDashboardPage() {
           수동 실행
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <button
-            onClick={() => handleExecute('collect')}
-            disabled={isExecuting || !!runningWorkflow}
-            className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-green-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="w-10 h-10 rounded-lg bg-green-100 group-hover:bg-green-500 flex items-center justify-center mb-3 transition-colors">
-              <Package size={20} className="text-green-600 group-hover:text-white transition-colors" />
-            </div>
-            <p className="font-medium text-gray-900 text-sm">게시물 수집</p>
-            <p className="text-xs text-gray-500 mt-1">도매채널 게시물 수집</p>
-          </button>
+          {/* 게시물 수집 버튼 */}
+          {(() => {
+            const isThisRunning = runningWorkflow?.type === 'COLLECT'
+            const isOtherRunning = runningWorkflow && !isThisRunning
+            return (
+              <button
+                onClick={() => isThisRunning ? handleCancel() : handleExecute('collect')}
+                disabled={isExecuting || isOtherRunning || isCancelling}
+                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                  isThisRunning
+                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    : 'border-gray-200 bg-white hover:border-green-400 hover:shadow-lg'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isThisRunning && (
+                  <div className="absolute -top-2 -right-2">
+                    <span className="flex h-4 w-4">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                    </span>
+                  </div>
+                )}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                  isThisRunning
+                    ? 'bg-red-500'
+                    : 'bg-green-100 group-hover:bg-green-500'
+                }`}>
+                  {isThisRunning ? (
+                    <XCircle size={20} className="text-white" />
+                  ) : (
+                    <Package size={20} className="text-green-600 group-hover:text-white transition-colors" />
+                  )}
+                </div>
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '취소하기' : '게시물 수집'}
+                </p>
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '클릭하여 중단' : '도매채널 게시물 수집'}
+                </p>
+              </button>
+            )
+          })()}
 
-          <button
-            onClick={() => handleExecute('transform')}
-            disabled={isExecuting || !!runningWorkflow}
-            className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-yellow-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="w-10 h-10 rounded-lg bg-yellow-100 group-hover:bg-yellow-500 flex items-center justify-center mb-3 transition-colors">
-              <Zap size={20} className="text-yellow-600 group-hover:text-white transition-colors" />
-            </div>
-            <p className="font-medium text-gray-900 text-sm">AI 변환</p>
-            <p className="text-xs text-gray-500 mt-1">상품 정보 생성</p>
-          </button>
+          {/* AI 변환 버튼 */}
+          {(() => {
+            const isThisRunning = runningWorkflow?.type === 'TRANSFORM'
+            const isOtherRunning = runningWorkflow && !isThisRunning
+            return (
+              <button
+                onClick={() => isThisRunning ? handleCancel() : handleExecute('transform')}
+                disabled={isExecuting || isOtherRunning || isCancelling}
+                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                  isThisRunning
+                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    : 'border-gray-200 bg-white hover:border-yellow-400 hover:shadow-lg'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isThisRunning && (
+                  <div className="absolute -top-2 -right-2">
+                    <span className="flex h-4 w-4">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                    </span>
+                  </div>
+                )}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                  isThisRunning
+                    ? 'bg-red-500'
+                    : 'bg-yellow-100 group-hover:bg-yellow-500'
+                }`}>
+                  {isThisRunning ? (
+                    <XCircle size={20} className="text-white" />
+                  ) : (
+                    <Zap size={20} className="text-yellow-600 group-hover:text-white transition-colors" />
+                  )}
+                </div>
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '취소하기' : 'AI 변환'}
+                </p>
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '클릭하여 중단' : '상품 정보 생성'}
+                </p>
+              </button>
+            )
+          })()}
 
-          <button
-            onClick={() => handleExecute('register')}
-            disabled={isExecuting || !!runningWorkflow}
-            className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-orange-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="w-10 h-10 rounded-lg bg-orange-100 group-hover:bg-orange-500 flex items-center justify-center mb-3 transition-colors">
-              <ShoppingBag size={20} className="text-orange-600 group-hover:text-white transition-colors" />
-            </div>
-            <p className="font-medium text-gray-900 text-sm">상품 등록</p>
-            <p className="text-xs text-gray-500 mt-1">Product 생성</p>
-          </button>
+          {/* 상품 등록 버튼 */}
+          {(() => {
+            const isThisRunning = runningWorkflow?.type === 'PRODUCT_CREATE'
+            const isOtherRunning = runningWorkflow && !isThisRunning
+            return (
+              <button
+                onClick={() => isThisRunning ? handleCancel() : handleExecute('register')}
+                disabled={isExecuting || isOtherRunning || isCancelling}
+                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                  isThisRunning
+                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    : 'border-gray-200 bg-white hover:border-orange-400 hover:shadow-lg'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isThisRunning && (
+                  <div className="absolute -top-2 -right-2">
+                    <span className="flex h-4 w-4">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                    </span>
+                  </div>
+                )}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                  isThisRunning
+                    ? 'bg-red-500'
+                    : 'bg-orange-100 group-hover:bg-orange-500'
+                }`}>
+                  {isThisRunning ? (
+                    <XCircle size={20} className="text-white" />
+                  ) : (
+                    <ShoppingBag size={20} className="text-orange-600 group-hover:text-white transition-colors" />
+                  )}
+                </div>
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '취소하기' : '상품 등록'}
+                </p>
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '클릭하여 중단' : 'Product 생성'}
+                </p>
+              </button>
+            )
+          })()}
 
-          <button
-            onClick={() => handleExecute('publish')}
-            disabled={isExecuting || !!runningWorkflow}
-            className="group relative p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-blue-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="w-10 h-10 rounded-lg bg-blue-100 group-hover:bg-blue-500 flex items-center justify-center mb-3 transition-colors">
-              <Upload size={20} className="text-blue-600 group-hover:text-white transition-colors" />
-            </div>
-            <p className="font-medium text-gray-900 text-sm">발행</p>
-            <p className="text-xs text-gray-500 mt-1">소매밴드 발행</p>
-          </button>
+          {/* 발행 버튼 */}
+          {(() => {
+            const isThisRunning = runningWorkflow?.type === 'PUBLISH'
+            const isOtherRunning = runningWorkflow && !isThisRunning
+            return (
+              <button
+                onClick={() => isThisRunning ? handleCancel() : handleExecute('publish')}
+                disabled={isExecuting || isOtherRunning || isCancelling}
+                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                  isThisRunning
+                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    : 'border-gray-200 bg-white hover:border-blue-400 hover:shadow-lg'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isThisRunning && (
+                  <div className="absolute -top-2 -right-2">
+                    <span className="flex h-4 w-4">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                    </span>
+                  </div>
+                )}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                  isThisRunning
+                    ? 'bg-red-500'
+                    : 'bg-blue-100 group-hover:bg-blue-500'
+                }`}>
+                  {isThisRunning ? (
+                    <XCircle size={20} className="text-white" />
+                  ) : (
+                    <Upload size={20} className="text-blue-600 group-hover:text-white transition-colors" />
+                  )}
+                </div>
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '취소하기' : '발행'}
+                </p>
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '클릭하여 중단' : '소매밴드 발행'}
+                </p>
+              </button>
+            )
+          })()}
 
-          <button
-            onClick={() => handleExecute('full')}
-            disabled={isExecuting || !!runningWorkflow}
-            className="group relative p-4 rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white hover:border-purple-400 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="w-10 h-10 rounded-lg bg-purple-100 group-hover:bg-purple-500 flex items-center justify-center mb-3 transition-colors">
-              <Play size={20} className="text-purple-600 group-hover:text-white transition-colors" />
-            </div>
-            <p className="font-medium text-gray-900 text-sm">전체 실행</p>
-            <p className="text-xs text-gray-500 mt-1">전체 파이프라인</p>
-          </button>
+          {/* 전체 실행 버튼 */}
+          {(() => {
+            const isThisRunning = runningWorkflow?.type === 'FULL_PIPELINE'
+            const isOtherRunning = runningWorkflow && !isThisRunning
+            return (
+              <button
+                onClick={() => isThisRunning ? handleCancel() : handleExecute('full')}
+                disabled={isExecuting || isOtherRunning || isCancelling}
+                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                  isThisRunning
+                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    : 'border-purple-200 bg-gradient-to-br from-purple-50 to-white hover:border-purple-400 hover:shadow-lg'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isThisRunning && (
+                  <div className="absolute -top-2 -right-2">
+                    <span className="flex h-4 w-4">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                    </span>
+                  </div>
+                )}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                  isThisRunning
+                    ? 'bg-red-500'
+                    : 'bg-purple-100 group-hover:bg-purple-500'
+                }`}>
+                  {isThisRunning ? (
+                    <XCircle size={20} className="text-white" />
+                  ) : (
+                    <Play size={20} className="text-purple-600 group-hover:text-white transition-colors" />
+                  )}
+                </div>
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '취소하기' : '전체 실행'}
+                </p>
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '클릭하여 중단' : '전체 파이프라인'}
+                </p>
+              </button>
+            )
+          })()}
         </div>
       </Card>
+
+      {/* 비활성화 시 음영 처리 컨테이너 (수동 실행 제외) */}
+      <div className={`relative space-y-6 ${!config?.isEnabled ? 'pointer-events-none' : ''}`}>
+        {/* 비활성화 오버레이 */}
+        {!config?.isEnabled && (
+          <div className="absolute inset-0 -m-3 p-3 bg-gray-400/30 rounded-2xl z-10" />
+        )}
 
       {/* Pipeline Flow Visualization */}
       <Card className="p-6 bg-gradient-to-r from-slate-50 to-white">
@@ -621,7 +828,7 @@ export default function AutomationDashboardPage() {
               runningWorkflow?.currentStage === 'collection' ||
               (runningWorkflow?.type === 'COLLECT' && !runningWorkflow?.currentStage)
             const isCollectCompleted =
-              runningWorkflow?.type === 'FULL_PIPELINE1' &&
+              runningWorkflow?.type === 'FULL_PIPELINE' &&
               runningWorkflow?.stageProgress?.collection?.completed
             return (
               <div className="flex-1">
@@ -689,7 +896,7 @@ export default function AutomationDashboardPage() {
               runningWorkflow?.currentStage === 'transform' ||
               (runningWorkflow?.type === 'TRANSFORM' && !runningWorkflow?.currentStage)
             const isTransformCompleted =
-              runningWorkflow?.type === 'FULL_PIPELINE1' &&
+              runningWorkflow?.type === 'FULL_PIPELINE' &&
               runningWorkflow?.stageProgress?.transform?.completed
             return (
               <div className="flex-1">
@@ -757,7 +964,7 @@ export default function AutomationDashboardPage() {
               runningWorkflow?.currentStage === 'productCreate' ||
               (runningWorkflow?.type === 'PRODUCT_CREATE' && !runningWorkflow?.currentStage)
             const isProductCreateCompleted =
-              runningWorkflow?.type === 'FULL_PIPELINE1' &&
+              runningWorkflow?.type === 'FULL_PIPELINE' &&
               runningWorkflow?.stageProgress?.productCreate?.completed
             return (
               <div className="flex-1">
@@ -829,7 +1036,7 @@ export default function AutomationDashboardPage() {
               runningWorkflow?.currentStage === 'publish' ||
               (runningWorkflow?.type === 'PUBLISH' && !runningWorkflow?.currentStage)
             const isPublishCompleted =
-              runningWorkflow?.type === 'FULL_PIPELINE1' &&
+              runningWorkflow?.type === 'FULL_PIPELINE' &&
               runningWorkflow?.stageProgress?.publish?.completed
             const publishProgress = runningWorkflow?.stageProgress?.publish
             return (
@@ -1217,7 +1424,7 @@ export default function AutomationDashboardPage() {
           </div>
 
           {/* 단계별 진행 상태 (전체 파이프라인일 때만 표시) */}
-          {runningWorkflow.type === 'FULL_PIPELINE1' && (
+          {runningWorkflow.type === 'FULL_PIPELINE' && (
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-3">
                 {/* 1. 수집 */}
@@ -1620,6 +1827,89 @@ export default function AutomationDashboardPage() {
           </div>
         )}
       </Card>
+      </div>
+
+      {/* 쇼핑몰 미연결 경고 모달 */}
+      {showShopConnectionWarning && unconnectedChannels.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => {
+              setShowShopConnectionWarning(false)
+              setUnconnectedChannels([])
+            }}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            {/* 헤더 */}
+            <div className="bg-orange-50 p-6 border-b border-orange-100">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-orange-100 rounded-full">
+                  <AlertTriangle size={24} className="text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">쇼핑몰 연결 필요</h3>
+                  <p className="text-sm text-gray-600">소매밴드에 쇼핑몰이 연결되어 있지 않습니다</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 콘텐츠 */}
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                다음 소매밴드에 연결된 쇼핑몰이 없습니다:
+              </p>
+              <div className="space-y-2 mb-4 max-h-40 overflow-y-auto">
+                {unconnectedChannels.map((channel) => (
+                  <div
+                    key={channel.id}
+                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                  >
+                    {channel.coverUrl ? (
+                      <img
+                        src={channel.coverUrl}
+                        alt={channel.name}
+                        className="w-10 h-10 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center">
+                        <Send size={20} className="text-gray-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{channel.name}</p>
+                      <p className="text-xs text-orange-500">쇼핑몰 미연결</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-sm text-gray-600 mb-6">
+                수동 실행을 하려면 먼저 소매밴드에 쇼핑몰을 연결해주세요.
+              </p>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowShopConnectionWarning(false)
+                    setUnconnectedChannels([])
+                  }}
+                >
+                  닫기
+                </Button>
+                <Link
+                  href="/sourcing/channel"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-color hover:bg-primary-color/90 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <ExternalLink size={16} />
+                  채널 관리
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

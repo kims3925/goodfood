@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
@@ -76,19 +78,11 @@ export async function GET(request: NextRequest) {
       prisma.product.findMany({
         where,
         include: {
-          collectedProduct: {
+          channel: {
             select: {
-              post: {
-                select: {
-                  channel: {
-                    select: {
-                      id: true,
-                      name: true,
-                      platform: true,
-                    },
-                  },
-                },
-              },
+              id: true,
+              name: true,
+              platform: true,
             },
           },
           publishedProducts: {
@@ -120,15 +114,15 @@ export async function GET(request: NextRequest) {
     ])
 
     // 응답 데이터 변환
-    const data = products.map((product) => ({
+    const data = products.map((product: any) => ({
       productId: product.id,
       product: {
         id: product.id,
         name: product.name,
         thumbnailUrl: product.thumbnailUrl,
-        collectedProduct: product.collectedProduct,
+        channel: product.channel,
       },
-      publishedChannels: product.publishedProducts.map((pp) => {
+      publishedChannels: product.publishedProducts.map((pp: any) => {
         // Shop 발행과 채널 발행을 구분하여 반환
         // Shop 발행: shopId가 있고 channelId가 없는 경우
         // 채널 발행: channelId가 있는 경우
@@ -143,6 +137,7 @@ export async function GET(request: NextRequest) {
           shopId: pp.shopId,
           shopName: pp.shop?.name || null,
           shopSubdomain: pp.shop?.subdomain || null,
+          isActive: pp.isActive,
           publishedAt: pp.publishedAt,
           createdAt: pp.createdAt,
           updatedAt: pp.updatedAt,
@@ -237,7 +232,7 @@ export async function DELETE(request: NextRequest) {
         error: '발행상품을 삭제할 수 없습니다.',
         reason: `${reasons.join(', ')}이 존재하는 상품은 삭제할 수 없습니다.`,
         details: {
-          productName: publishedProduct.product.name,
+          productName: publishedProduct.product?.name || 'Unknown',
           orderCount: publishedProduct._count.orderItems,
           inquiryCount: publishedProduct._count.inquiries,
         },

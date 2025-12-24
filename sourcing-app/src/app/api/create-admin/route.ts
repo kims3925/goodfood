@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { hashPassword } from '@/modules/auth/auth.service'

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
@@ -43,14 +45,15 @@ export async function GET(request: NextRequest) {
       totalAmount: number
     }>()
 
-    // 공통 쿼리 조건 (도매처 필터)
+    // 공통 쿼리 조건 (도매처 필터) - Product.channelId가 도매처를 가리킴
     const channelFilter = wholesaleChannelId ? { id: parseInt(wholesaleChannelId) } : undefined
 
-    // 1. 회원 주문 (Order + OrderItem) 조회
+    // 1. 회원 주문 (Order + OrderItem) 조회 - Product.channelId 사용 (소싱 출처)
+    // PAID, PREPARING 상태만 조회 (배송 시작 전 = 발주 대상)
     const memberOrderItems = await prisma.orderItem.findMany({
       where: {
         order: {
-          status: 'PAID',
+          status: { in: ['PAID', 'PREPARING'] },
           paidAt: {
             not: null,
             gte: fromDate,
@@ -60,13 +63,9 @@ export async function GET(request: NextRequest) {
         publishedProduct: {
           userId: user.userId,
           product: {
-            collectedProduct: {
-              post: {
-                channel: {
-                  kind: 'WHOLESALE',
-                  ...channelFilter,
-                },
-              },
+            channel: {
+              kind: 'WHOLESALE',
+              ...channelFilter,
             },
           },
         },
@@ -89,20 +88,12 @@ export async function GET(request: NextRequest) {
                     wholesalePrice: true,
                   },
                 },
-                collectedProduct: {
-                  include: {
-                    post: {
-                      include: {
-                        channel: {
-                          select: {
-                            id: true,
-                            name: true,
-                            kind: true,
-                            coverUrl: true,
-                          },
-                        },
-                      },
-                    },
+                channel: {
+                  select: {
+                    id: true,
+                    name: true,
+                    kind: true,
+                    coverUrl: true,
                   },
                 },
               },
@@ -118,11 +109,12 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // 2. 비회원 주문 (GuestOrder + GuestOrderItem) 조회
+    // 2. 비회원 주문 (GuestOrder + GuestOrderItem) 조회 - Product.channelId 사용 (소싱 출처)
+    // PAID, PREPARING 상태만 조회 (배송 시작 전 = 발주 대상)
     const guestOrderItems = await prisma.guestOrderItem.findMany({
       where: {
         guestOrder: {
-          status: 'PAID',
+          status: { in: ['PAID', 'PREPARING'] },
           paidAt: {
             not: null,
             gte: fromDate,
@@ -132,13 +124,9 @@ export async function GET(request: NextRequest) {
         publishedProduct: {
           userId: user.userId,
           product: {
-            collectedProduct: {
-              post: {
-                channel: {
-                  kind: 'WHOLESALE',
-                  ...channelFilter,
-                },
-              },
+            channel: {
+              kind: 'WHOLESALE',
+              ...channelFilter,
             },
           },
         },
@@ -161,20 +149,12 @@ export async function GET(request: NextRequest) {
                     wholesalePrice: true,
                   },
                 },
-                collectedProduct: {
-                  include: {
-                    post: {
-                      include: {
-                        channel: {
-                          select: {
-                            id: true,
-                            name: true,
-                            kind: true,
-                            coverUrl: true,
-                          },
-                        },
-                      },
-                    },
+                channel: {
+                  select: {
+                    id: true,
+                    name: true,
+                    kind: true,
+                    coverUrl: true,
                   },
                 },
               },
@@ -192,7 +172,7 @@ export async function GET(request: NextRequest) {
 
     // 회원 주문 집계
     for (const item of memberOrderItems) {
-      const channel = item.publishedProduct?.product?.collectedProduct?.post?.channel
+      const channel = item.publishedProduct?.product?.channel
       if (!channel || channel.kind !== 'WHOLESALE') continue
 
       const wholesalePrice = getWholesalePrice(item)
@@ -217,7 +197,7 @@ export async function GET(request: NextRequest) {
 
     // 비회원 주문 집계
     for (const item of guestOrderItems) {
-      const channel = item.publishedProduct?.product?.collectedProduct?.post?.channel
+      const channel = item.publishedProduct?.product?.channel
       if (!channel || channel.kind !== 'WHOLESALE') continue
 
       const wholesalePrice = getWholesalePrice(item)
@@ -250,9 +230,78 @@ export async function GET(request: NextRequest) {
       totalAmount: s.totalAmount,
     })).sort((a, b) => b.totalAmount - a.totalAmount)
 
+    // 발주 누락 주문 조회 (선택된 날짜 이전의 PAID/PREPARING 상태 주문)
+    const [missedMemberOrders, missedGuestOrders] = await Promise.all([
+      prisma.order.findMany({
+        where: {
+          status: { in: ['PAID', 'PREPARING'] },
+          paidAt: {
+            not: null,
+            lt: fromDate, // 선택된 날짜 이전
+          },
+          items: {
+            some: {
+              publishedProduct: {
+                userId: user.userId,
+                product: {
+                  channel: {
+                    kind: 'WHOLESALE',
+                  },
+                },
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          orderNumber: true,
+          paidAt: true,
+        },
+      }),
+      prisma.guestOrder.findMany({
+        where: {
+          status: { in: ['PAID', 'PREPARING'] },
+          paidAt: {
+            not: null,
+            lt: fromDate, // 선택된 날짜 이전
+          },
+          items: {
+            some: {
+              publishedProduct: {
+                userId: user.userId,
+                product: {
+                  channel: {
+                    kind: 'WHOLESALE',
+                  },
+                },
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          orderNumber: true,
+          paidAt: true,
+        },
+      }),
+    ])
+
+    // 누락 주문 정보 (가장 오래된 날짜 기준)
+    const allMissedOrders = [
+      ...missedMemberOrders.map(o => ({ ...o, isMember: true })),
+      ...missedGuestOrders.map(o => ({ ...o, isMember: false })),
+    ].sort((a, b) => new Date(a.paidAt!).getTime() - new Date(b.paidAt!).getTime())
+
+    const missedOrdersInfo = allMissedOrders.length > 0 ? {
+      count: allMissedOrders.length,
+      oldestDate: allMissedOrders[0].paidAt?.toISOString().split('T')[0],
+      newestDate: allMissedOrders[allMissedOrders.length - 1].paidAt?.toISOString().split('T')[0],
+    } : null
+
     return NextResponse.json({
       success: true,
       data: summaries,
+      missedOrders: missedOrdersInfo,
     })
   } catch (error) {
     console.error('도매처 발주 집계 조회 실패:', error)

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Shop Settings API Routes
  * 쇼핑몰 설정 조회 API
@@ -45,8 +47,6 @@ export async function GET(req: NextRequest) {
       ],
       showTimeSale: true,
       showBestProducts: true,
-      freeShippingAmount: 30000,
-      defaultShippingFee: 3000,
       tossClientKey: process.env.TOSS_PAYMENTS_CLIENT_KEY || '',
     }
 

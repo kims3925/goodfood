@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Automation Config API
  * 자동화 설정 CRUD
@@ -46,6 +48,12 @@ export async function GET() {
           lastRunAt: null,
           nextRunAt: null,
           shopIds: [],
+          pipelineSteps: {
+            collection: true,
+            transform: true,
+            productCreate: true,
+            publish: true,
+          },
         },
       })
     }
@@ -56,10 +64,16 @@ export async function GET() {
     // cronExpression에서 selectedHours 추출
     const selectedHours = cronToSelectedHours(config.cronExpression)
 
-    // Parse JSON strings back to arrays
+    // Parse JSON strings back to arrays/objects
     let channelIds: number[] = []
     let retailChannelIds: number[] = []
     let shopIds: number[] = []
+    let pipelineSteps: { collection: boolean; transform: boolean; productCreate: boolean; publish: boolean } = {
+      collection: true,
+      transform: true,
+      productCreate: true,
+      publish: true,
+    }
     try {
       channelIds = config.channelIds ? JSON.parse(config.channelIds) : []
     } catch { channelIds = [] }
@@ -69,6 +83,9 @@ export async function GET() {
     try {
       shopIds = config.shopIds ? JSON.parse(config.shopIds) : []
     } catch { shopIds = [] }
+    try {
+      pipelineSteps = config.pipelineSteps ? JSON.parse(config.pipelineSteps) : pipelineSteps
+    } catch { /* use default */ }
 
     return NextResponse.json({
       success: true,
@@ -80,6 +97,7 @@ export async function GET() {
         wholesaleChannelIds: channelIds,
         retailChannelIds,
         shopIds,
+        pipelineSteps,
       },
     })
   } catch (error) {
@@ -116,12 +134,19 @@ export async function POST(request: NextRequest) {
       pricingPolicyId,
       retailChannelIds,
       shopIds,
+      pipelineSteps,
     } = body
 
     // wholesaleChannelIds 또는 channelIds 둘 다 지원 (하위 호환성)
     const finalChannelIds = wholesaleChannelIds || channelIds || []
     const finalRetailChannelIds = retailChannelIds || []
     const finalShopIds = shopIds || []
+    const finalPipelineSteps = pipelineSteps || {
+      collection: true,
+      transform: true,
+      productCreate: true,
+      publish: true,
+    }
 
     // selectedHours가 있으면 해당 시간들로 cron expression 생성, 없으면 기존 cronInterval 사용
     let cronExpression: string | null = null
@@ -148,6 +173,7 @@ export async function POST(request: NextRequest) {
         pricingPolicyId: pricingPolicyId || null,
         retailChannelIds: JSON.stringify(finalRetailChannelIds),
         shopIds: JSON.stringify(finalShopIds),
+        pipelineSteps: JSON.stringify(finalPipelineSteps),
         nextRunAt,
       },
       update: {
@@ -158,6 +184,7 @@ export async function POST(request: NextRequest) {
         pricingPolicyId: pricingPolicyId || null,
         retailChannelIds: JSON.stringify(finalRetailChannelIds),
         shopIds: JSON.stringify(finalShopIds),
+        pipelineSteps: JSON.stringify(finalPipelineSteps),
         nextRunAt,
       },
     })

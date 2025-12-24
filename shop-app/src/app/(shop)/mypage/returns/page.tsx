@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { RotateCcw, Package, Calendar, CreditCard, ChevronRight } from 'lucide-react'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import { useShop } from '@/contexts/ShopContext'
 
 interface OrderItem {
   id: number
@@ -58,6 +59,8 @@ export default function ReturnsPage() {
   const { data: session, status: sessionStatus } = useSession()
   const router = useRouter()
   const { getPath, getApiPath } = useShopUrl()
+  const { shop } = useShop()
+  const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
   const [orders, setOrders] = useState<CancelledOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedType, setSelectedType] = useState<string | null>(null)
@@ -115,20 +118,18 @@ export default function ReturnsPage() {
 
   if (sessionStatus === 'loading' || (loading && orders.length === 0)) {
     return (
-      <div className="kurly-container py-12">
-        <div className="text-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B6B] mx-auto"></div>
-          <p className="mt-4 text-gray-600">취소/반품 내역을 불러오는 중...</p>
-        </div>
+      <div className="text-center py-20">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: primaryColor }}></div>
+        <p className="mt-4 text-gray-600">취소/반품 내역을 불러오는 중...</p>
       </div>
     )
   }
 
   return (
-    <div className="kurly-container py-12">
+    <>
       {/* 헤더 */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">취소/반품 내역</h1>
+      <div className="mb-6">
+        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">취소/반품 내역</h1>
         <p className="text-gray-600">취소 및 환불 처리된 주문을 확인하실 수 있습니다</p>
       </div>
 
@@ -138,9 +139,10 @@ export default function ReturnsPage() {
           onClick={() => handleTypeFilter(null)}
           className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors ${
             selectedType === null
-              ? 'bg-[#FF6B6B] text-white'
+              ? 'text-white'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
+          style={selectedType === null ? { backgroundColor: primaryColor } : {}}
         >
           전체
         </button>
@@ -148,9 +150,10 @@ export default function ReturnsPage() {
           onClick={() => handleTypeFilter('CANCELLED')}
           className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors ${
             selectedType === 'CANCELLED'
-              ? 'bg-[#FF6B6B] text-white'
+              ? 'text-white'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
+          style={selectedType === 'CANCELLED' ? { backgroundColor: primaryColor } : {}}
         >
           취소
         </button>
@@ -158,9 +161,10 @@ export default function ReturnsPage() {
           onClick={() => handleTypeFilter('REFUNDED')}
           className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors ${
             selectedType === 'REFUNDED'
-              ? 'bg-[#FF6B6B] text-white'
+              ? 'text-white'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
+          style={selectedType === 'REFUNDED' ? { backgroundColor: primaryColor } : {}}
         >
           환불
         </button>
@@ -169,13 +173,13 @@ export default function ReturnsPage() {
       {/* 로딩 오버레이 */}
       {loading && orders.length > 0 && (
         <div className="fixed inset-0 bg-white/50 z-50 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF6B6B]"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: primaryColor }}></div>
         </div>
       )}
 
       {/* 취소/반품 목록 */}
       {orders.length === 0 ? (
-        <div className="text-center py-20 bg-gray-50 rounded-lg">
+        <div className="text-center py-20 bg-gray-50 rounded-lg w-full">
           <RotateCcw className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">
             {selectedType
@@ -184,7 +188,8 @@ export default function ReturnsPage() {
           </p>
           <Link
             href={getPath('/mypage/orders')}
-            className="inline-block px-6 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] transition-colors"
+            className="inline-block px-6 py-3 text-white rounded-md hover:opacity-90 transition-colors"
+            style={{ backgroundColor: primaryColor }}
           >
             주문 내역 보기
           </Link>
@@ -198,7 +203,7 @@ export default function ReturnsPage() {
                 className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
               >
                 {/* 주문 헤더 */}
-                <div className="bg-gray-50 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="bg-gray-50 px-4 lg:px-6 py-3 lg:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Calendar className="w-4 h-4" />
@@ -218,11 +223,11 @@ export default function ReturnsPage() {
                 </div>
 
                 {/* 주문 상품 */}
-                <div className="p-6">
+                <div className="p-4 lg:p-6">
                   <div className="space-y-4">
                     {order.items.slice(0, 2).map((item) => (
                       <div key={item.id} className="flex gap-4">
-                        <div className="relative w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                        <div className="relative w-16 h-16 lg:w-20 lg:h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                           {item.thumbnailUrl ? (
                             <Image
                               src={item.thumbnailUrl}
@@ -291,7 +296,7 @@ export default function ReturnsPage() {
                       <span className="text-gray-600">
                         {order.status === 'CANCELLED' ? '취소금액' : '환불금액'}
                       </span>
-                      <span className="text-xl font-bold text-[#FF6B6B]">
+                      <span className="text-xl font-bold" style={{ color: primaryColor }}>
                         {formatPrice(order.totalAmount)}
                       </span>
                     </div>
@@ -345,9 +350,10 @@ export default function ReturnsPage() {
                         onClick={() => setCurrentPage(page)}
                         className={`w-10 h-10 rounded-md transition-colors ${
                           currentPage === page
-                            ? 'bg-[#FF6B6B] text-white'
+                            ? 'text-white'
                             : 'border border-gray-300 hover:bg-gray-50'
                         }`}
+                        style={currentPage === page ? { backgroundColor: primaryColor } : {}}
                       >
                         {page}
                       </button>
@@ -365,6 +371,6 @@ export default function ReturnsPage() {
           )}
         </>
       )}
-    </div>
+    </>
   )
 }

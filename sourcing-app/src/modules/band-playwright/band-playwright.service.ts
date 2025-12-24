@@ -11,6 +11,8 @@ import {
   BandPublishResult,
   BandBatchPublishParams,
   BandBatchPublishResult,
+  BandDeleteParams,
+  BandDeleteResult,
   BandPlaywrightError,
   BandPlaywrightErrorCode,
 } from './types'
@@ -160,6 +162,58 @@ export class BandPlaywrightService {
           success: false,
           error: error.message || '배치 발행 중 오류가 발생했습니다.',
         })),
+      }
+    }
+  }
+
+  /**
+   * Playwright를 사용하여 게시물 삭제
+   */
+  async deletePost(params: BandDeleteParams): Promise<BandDeleteResult> {
+    const { channelId, bandKey, bandName, postKey } = params
+
+    console.log(`[BandPlaywrightService] Deleting post ${postKey} from band ${bandKey}`)
+
+    try {
+      // 1. 세션 확보
+      const session = await sessionManager.getValidSession(channelId)
+
+      if (!session) {
+        return {
+          success: false,
+          error: '세션을 획득할 수 없습니다. 채널 설정에서 쿠키를 등록해주세요.',
+        }
+      }
+
+      // 2. 브라우저 컨텍스트 가져오기 (쿠키 주입)
+      const context = await browserPool.getContext(channelId, session.cookies)
+      const page = await context.newPage()
+
+      try {
+        // 3. 게시물 삭제
+        const result = await postAutomation.deletePost(page, bandKey, bandName, postKey)
+        return result
+      } finally {
+        await page.close()
+        await browserPool.releaseContext(channelId)
+      }
+    } catch (error: any) {
+      console.error('[BandPlaywrightService] Delete failed:', error)
+
+      // 세션 만료 에러인 경우
+      if (
+        error instanceof BandPlaywrightError &&
+        error.code === BandPlaywrightErrorCode.SESSION_EXPIRED
+      ) {
+        return {
+          success: false,
+          error: '세션이 만료되었습니다. 채널 설정에서 밴드 로그인을 다시 해주세요.',
+        }
+      }
+
+      return {
+        success: false,
+        error: error.message || '게시물 삭제 중 오류가 발생했습니다.',
       }
     }
   }

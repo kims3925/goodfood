@@ -1,32 +1,28 @@
 'use client'
 
 import Link from 'next/link'
-import { Phone, MessageSquare, HelpCircle, Package, ChevronRight } from 'lucide-react'
+import { Phone, MessageSquare, Package, ChevronRight } from 'lucide-react'
 import { useShop } from '@/contexts/ShopContext'
+import { useShopUrl } from '@/hooks/useShopUrl'
+import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
 
 export default function CustomerServicePage() {
   const { shop } = useShop()
+  const { getPath } = useShopUrl()
   const contactPhone = shop?.contactPhone || '-'
   const menuItems = [
-    {
-      icon: HelpCircle,
-      title: '자주 묻는 질문',
-      description: '자주 묻는 질문과 답변을 확인하세요',
-      href: '/cs/faq',
-      color: 'bg-blue-500',
-    },
     {
       icon: MessageSquare,
       title: '1:1 문의',
       description: '궁금한 사항을 문의해 주세요',
-      href: '/cs/inquiry',
+      href: getPath('/cs/inquiry'),
       color: 'bg-green-500',
     },
     {
       icon: Package,
       title: '주문/배송 조회',
       description: '주문 및 배송 현황을 확인하세요',
-      href: '/mypage/orders',
+      href: getPath('/mypage/orders'),
       color: 'bg-purple-500',
     },
   ]
@@ -48,19 +44,19 @@ export default function CustomerServicePage() {
             </div>
             <div>
               <p className="text-sm opacity-90">고객행복센터</p>
-              <p className="text-3xl font-bold">{contactPhone}</p>
+              <p className="text-3xl font-bold">{formatPhoneNumber(contactPhone)}</p>
             </div>
           </div>
           <div className="text-center md:text-right">
             <p className="text-sm opacity-90">운영시간</p>
-            <p className="font-medium">월~토 오전 7시 ~ 오후 6시</p>
-            <p className="text-sm opacity-75 mt-1">일요일/공휴일 휴무</p>
+            <p className="font-medium">월~금 오전 9시 ~ 오후 6시</p>
+            <p className="text-sm opacity-75 mt-1">토/일/공휴일 휴무</p>
           </div>
         </div>
       </div>
 
       {/* Menu Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
         {menuItems.map((item) => (
           <Link
             key={item.title}

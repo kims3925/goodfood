@@ -18,6 +18,7 @@ import {
   Trash2,
   Loader2,
   AlertOctagon,
+  X,
 } from 'lucide-react'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -30,6 +31,13 @@ const BandIcon = ({ size = 14, className = '' }: { size?: number; className?: st
   </svg>
 )
 
+interface ChannelShop {
+  id: number
+  name: string
+  subdomain: string
+  isActive: boolean
+}
+
 interface Channel {
   id: number
   name: string
@@ -37,6 +45,7 @@ interface Channel {
   coverUrl: string | null
   platform: string | null
   isActive: boolean
+  shop: ChannelShop | null
 }
 
 interface Shop {
@@ -111,16 +120,26 @@ export default function PublishPage() {
   const [showPriceWarning, setShowPriceWarning] = useState(false)
   const [warningProduct, setWarningProduct] = useState<Product | null>(null)
 
+  // 쇼핑몰 미연결 경고 모달
+  const [showShopConnectionWarning, setShowShopConnectionWarning] = useState(false)
+  const [unconnectedChannels, setUnconnectedChannels] = useState<Channel[]>([])
+
   // 발행 취소 확인 모달
   const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false)
   const [unpublishTarget, setUnpublishTarget] = useState<{
     productId: number
     productName: string
-    shopId: number
-    shopName: string
+    targetType: 'shop' | 'channel'
+    targetId: number
+    targetName: string
     publishId: number
   } | null>(null)
   const [isUnpublishing, setIsUnpublishing] = useState(false)
+  const [unpublishResult, setUnpublishResult] = useState<{
+    status: 'idle' | 'success' | 'warning' | 'error'
+    message: string
+    details?: string
+  }>({ status: 'idle', message: '' })
 
   // 발행 진행 모달 상태
   interface PublishProgressItem {
@@ -252,10 +271,44 @@ export default function PublishPage() {
       label: string
       icon: React.ReactNode
       items: (Channel | Shop)[]
+      headerBgColor: string
+      headerTextColor: string
+      cellBgColor: string
+      badgeColor: string
     }[] = [
-      { type: 'shop', platform: 'SHOP', label: 'Shop', icon: <ShoppingCart size={14} />, items: [] },
-      { type: 'channel', platform: 'BAND', label: '밴드', icon: <BandIcon size={14} />, items: [] },
-      { type: 'channel', platform: 'OTHER', label: '기타', icon: <Store size={14} />, items: [] },
+      {
+        type: 'shop',
+        platform: 'SHOP',
+        label: '쇼핑몰',
+        icon: <ShoppingCart size={16} />,
+        items: [],
+        headerBgColor: 'bg-blue-100',
+        headerTextColor: 'text-blue-800',
+        cellBgColor: 'bg-blue-50/30',
+        badgeColor: 'bg-blue-500',
+      },
+      {
+        type: 'channel',
+        platform: 'BAND',
+        label: '소매밴드',
+        icon: <BandIcon size={16} />,
+        items: [],
+        headerBgColor: 'bg-green-100',
+        headerTextColor: 'text-green-800',
+        cellBgColor: 'bg-green-50/30',
+        badgeColor: 'bg-green-500',
+      },
+      {
+        type: 'channel',
+        platform: 'OTHER',
+        label: '기타 채널',
+        icon: <Store size={16} />,
+        items: [],
+        headerBgColor: 'bg-gray-100',
+        headerTextColor: 'text-gray-700',
+        cellBgColor: 'bg-gray-50/30',
+        badgeColor: 'bg-gray-500',
+      },
     ]
 
     // Shop 추가
@@ -319,6 +372,13 @@ export default function PublishPage() {
     return publishedShop?.publishId
   }
 
+  // 채널 발행의 publishId 조회
+  const getChannelPublishId = (productId: number, channelId: number) => {
+    const product = products.find((p) => p.id === productId)
+    const publishedChannel = product?.publishedChannels?.find((pc) => pc.channelId === channelId)
+    return publishedChannel?.publishId
+  }
+
   // 셀 키 생성 (type-productId-targetId)
   const cellKey = (productId: number, targetType: 'shop' | 'channel', targetId: number) =>
     `${targetType}-${productId}-${targetId}`
@@ -330,11 +390,11 @@ export default function PublishPage() {
   }
 
   const handleCellClick = (productId: number, targetType: 'shop' | 'channel', targetId: number) => {
-    // 발행된 Shop 셀 클릭 시 취소 확인 모달 표시
+    // 발행된 셀 클릭 시 취소 확인 모달 표시
     if (isPublished(productId, targetType, targetId)) {
-      // Shop 발행만 취소 가능
+      const product = getProduct(productId)
+
       if (targetType === 'shop') {
-        const product = getProduct(productId)
         const shop = shops.find((s) => s.id === targetId)
         const publishId = getShopPublishId(productId, targetId)
 
@@ -342,12 +402,33 @@ export default function PublishPage() {
           setUnpublishTarget({
             productId,
             productName: product.name,
-            shopId: targetId,
-            shopName: shop.name,
+            targetType: 'shop',
+            targetId,
+            targetName: shop.name,
             publishId,
           })
           setShowUnpublishConfirm(true)
         }
+      } else {
+        // 채널(소매밴드) 발행 취소 - 비활성화 (로직은 유지)
+        // 소매밴드는 발행 취소 기능을 막아둠
+        return
+        /* 취소 로직 (비활성화됨)
+        const channel = channels.find((c) => c.id === targetId)
+        const publishId = getChannelPublishId(productId, targetId)
+
+        if (product && channel && publishId) {
+          setUnpublishTarget({
+            productId,
+            productName: product.name,
+            targetType: 'channel',
+            targetId,
+            targetName: channel.name,
+            publishId,
+          })
+          setShowUnpublishConfirm(true)
+        }
+        */
       }
       return
     }
@@ -430,6 +511,26 @@ export default function PublishPage() {
   const handlePublishSelected = async () => {
     if (selectedCells.size === 0) return
     if (isPublishing) return  // 중복 호출 방지
+
+    // 소매밴드(채널) 발행 시 쇼핑몰 연결 여부 체크
+    const selectedChannelIds = new Set<number>()
+    selectedCells.forEach((key) => {
+      const { type, targetId } = parseCellKey(key)
+      if (type === 'channel') {
+        selectedChannelIds.add(targetId)
+      }
+    })
+
+    // 쇼핑몰 미연결 채널 확인
+    const channelsWithoutShop = channels.filter(
+      (ch) => selectedChannelIds.has(ch.id) && !ch.shop
+    )
+
+    if (channelsWithoutShop.length > 0) {
+      setUnconnectedChannels(channelsWithoutShop)
+      setShowShopConnectionWarning(true)
+      return
+    }
 
     // 발행 진행 항목 준비
     const progressItems: PublishProgressItem[] = []
@@ -766,22 +867,7 @@ export default function PublishPage() {
         return next
       })
 
-      // 결과 알림
-      if (totalFailed > 0) {
-        // 중복 제거 후 첫 번째 에러 메시지 표시
-        const uniqueErrors = [...new Set(errorMessages)]
-        const firstError = uniqueErrors[0]
-        if (firstError) {
-          toast.error(`발행 실패: ${firstError}`)
-        } else {
-          toast.warning(`발행 결과: 성공 ${totalSuccess}개, 건너뜀 ${totalSkipped}개, 실패 ${totalFailed}개`)
-        }
-      } else if (totalSuccess > 0) {
-        toast.success(`${totalSuccess}개 상품 발행 완료`)
-      } else if (totalSkipped > 0) {
-        toast.info(`${totalSkipped}개 상품 이미 발행됨`)
-      }
-
+      // 발행 결과는 모달에서 확인하므로 토스트 제거
       loadProducts()
     } catch (error) {
       console.error('발행 실패:', error)
@@ -798,6 +884,8 @@ export default function PublishPage() {
     if (isUnpublishing) return
 
     setIsUnpublishing(true)
+    setUnpublishResult({ status: 'idle', message: '' })
+
     try {
       const response = await fetch(`/api/shop/publish?ids=${unpublishTarget.publishId}`, {
         method: 'DELETE',
@@ -806,25 +894,54 @@ export default function PublishPage() {
       const data = await response.json()
 
       if (data.success) {
-        toast.success('발행이 취소되었습니다.')
-        setShowUnpublishConfirm(false)
-        setUnpublishTarget(null)
+        // Band 삭제 에러가 있는 경우 (DB는 삭제됨)
+        if (data.bandDeleteErrors && data.bandDeleteErrors.length > 0) {
+          setUnpublishResult({
+            status: 'warning',
+            message: '발행 취소 완료 (밴드 게시물 삭제 실패)',
+            details: data.bandDeleteErrors[0],
+          })
+        } else {
+          setUnpublishResult({
+            status: 'success',
+            message: '발행이 취소되었습니다.',
+          })
+        }
         loadProducts()
       } else {
-        // 주문/문의가 있어서 삭제 불가한 경우
+        // 완전 실패
         if (data.cannotDelete && data.cannotDelete.length > 0) {
           const item = data.cannotDelete[0]
-          toast.error(`발행 취소 불가: ${item.reason}이 있습니다.`)
+          setUnpublishResult({
+            status: 'error',
+            message: '발행 취소 불가',
+            details: `${item.reason}이 있어 취소할 수 없습니다.`,
+          })
         } else {
-          toast.error(data.error || '발행 취소에 실패했습니다.')
+          setUnpublishResult({
+            status: 'error',
+            message: '발행 취소 실패',
+            details: data.error || '알 수 없는 오류가 발생했습니다.',
+          })
         }
       }
     } catch (error) {
       console.error('발행 취소 실패:', error)
-      toast.error('발행 취소 중 오류가 발생했습니다.')
+      setUnpublishResult({
+        status: 'error',
+        message: '발행 취소 실패',
+        details: '네트워크 오류가 발생했습니다.',
+      })
     } finally {
       setIsUnpublishing(false)
     }
+  }
+
+  // 발행 취소 모달 닫기
+  const closeUnpublishModal = () => {
+    setShowUnpublishConfirm(false)
+    setUnpublishTarget(null)
+    setUnpublishResult({ status: 'idle', message: '' })
   }
 
   const formatPrice = (price: number | null) => (!price ? '-' : `₩${price.toLocaleString()}`)
@@ -875,7 +992,7 @@ export default function PublishPage() {
         </div>
 
         {/* 통계 및 액션 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-gray-100 rounded-lg">
@@ -887,6 +1004,31 @@ export default function PublishPage() {
               </div>
             </div>
           </div>
+          {/* 쇼핑몰 카드 */}
+          <div className="bg-white rounded-lg shadow-sm border-2 border-blue-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <ShoppingCart size={24} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-blue-600 font-medium">쇼핑몰</p>
+                <p className="text-2xl font-bold text-blue-700">{stats.totalShops}</p>
+              </div>
+            </div>
+          </div>
+          {/* 소매채널 카드 */}
+          <div className="bg-white rounded-lg shadow-sm border-2 border-green-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <BandIcon size={24} className="text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-green-600 font-medium">소매채널</p>
+                <p className="text-2xl font-bold text-green-700">{stats.totalChannels}</p>
+              </div>
+            </div>
+          </div>
+          {/* 발행 현황 카드 */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-green-100 rounded-lg">
@@ -898,34 +1040,23 @@ export default function PublishPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <XCircle size={24} className="text-gray-500" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">미발행</p>
-                <p className="text-2xl font-bold text-gray-500">{stats.unpublishedCells}</p>
-              </div>
-            </div>
-          </div>
           {/* 선택 발행 카드 */}
           <button
             onClick={handlePublishSelected}
             disabled={selectedUnpublishedCount === 0 || isPublishing}
             className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
               selectedUnpublishedCount > 0 && !isPublishing
-                ? 'hover:border-purple-300 hover:bg-purple-50 cursor-pointer'
+                ? 'hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
                 : 'opacity-50 cursor-not-allowed'
             }`}
           >
             <div className="flex items-center gap-3">
-              <div className={`p-3 rounded-lg ${selectedUnpublishedCount > 0 ? 'bg-purple-100' : 'bg-gray-100'}`}>
-                <Send size={24} className={selectedUnpublishedCount > 0 ? 'text-purple-600' : 'text-gray-400'} />
+              <div className={`p-3 rounded-lg ${selectedUnpublishedCount > 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                <Send size={24} className={selectedUnpublishedCount > 0 ? 'text-blue-600' : 'text-gray-400'} />
               </div>
               <div>
                 <p className="text-sm text-gray-500">선택 발행</p>
-                <p className={`text-lg font-bold ${selectedUnpublishedCount > 0 ? 'text-purple-600' : 'text-gray-400'}`}>
+                <p className={`text-lg font-bold ${selectedUnpublishedCount > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
                   {selectedUnpublishedCount}개 선택됨
                 </p>
               </div>
@@ -1031,34 +1162,47 @@ export default function PublishPage() {
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="bg-gray-50">
-                    <th className="sticky left-0 z-20 bg-gray-50 border-b border-r border-gray-200 p-2 text-left min-w-[100px]">
-                      <span className="text-xs font-medium text-gray-500 uppercase">상품</span>
+                  {/* 그룹 헤더 (쇼핑몰 / 소매밴드 구분) */}
+                  <tr>
+                    <th className="sticky left-0 z-20 bg-gray-100 border-b-2 border-r-2 border-gray-300 p-3 text-left min-w-[100px]">
+                      <span className="text-sm font-bold text-gray-700">상품</span>
                     </th>
-                    {groupedTargets.map((group) => (
+                    {groupedTargets.map((group, groupIndex) => (
                       <th
                         key={group.platform}
                         colSpan={group.items.length}
-                        className="border-b border-gray-200 p-2 text-center"
+                        className={`border-b-2 border-gray-300 p-3 text-center ${group.headerBgColor} ${
+                          groupIndex < groupedTargets.length - 1 ? 'border-r-2' : ''
+                        }`}
                       >
-                        <div className="flex items-center justify-center gap-1 text-xs font-medium text-gray-700">
-                          {group.icon}
-                          {group.label}
+                        <div className={`flex items-center justify-center gap-2 font-bold ${group.headerTextColor}`}>
+                          <div className={`p-1.5 rounded-lg ${group.badgeColor} text-white`}>
+                            {group.icon}
+                          </div>
+                          <span className="text-sm">{group.label}</span>
+                          <span className={`ml-1 px-2 py-0.5 rounded-full text-xs ${group.badgeColor} text-white`}>
+                            {group.items.length}
+                          </span>
                         </div>
                       </th>
                     ))}
                   </tr>
-                  <tr className="bg-gray-50">
-                    <th className="sticky left-0 z-20 bg-gray-50 border-b border-r border-gray-200 p-2" />
-                    {groupedTargets.map((group) =>
-                      group.items.map((item) => (
+                  {/* 개별 타겟 헤더 */}
+                  <tr>
+                    <th className="sticky left-0 z-20 bg-gray-50 border-b border-r-2 border-gray-300 p-2" />
+                    {groupedTargets.map((group, groupIndex) =>
+                      group.items.map((item, itemIndex) => (
                         <th
                           key={`${group.type}-${item.id}`}
-                          className="border-b border-gray-200 p-1 min-w-[80px] cursor-pointer hover:bg-gray-100"
+                          className={`border-b border-gray-200 p-1.5 min-w-[80px] cursor-pointer transition-colors ${group.cellBgColor} hover:opacity-80 ${
+                            groupIndex < groupedTargets.length - 1 && itemIndex === group.items.length - 1
+                              ? 'border-r-2 border-gray-300'
+                              : ''
+                          }`}
                           onClick={() => handleSelectColumn(group.type, item.id)}
                           title={`${item.name} 전체 선택/해제`}
                         >
-                          <div className="text-xs text-gray-600 truncate max-w-[80px] mx-auto" title={item.name}>
+                          <div className={`text-xs font-medium truncate max-w-[80px] mx-auto ${group.headerTextColor}`} title={item.name}>
                             {item.name.length > 8 ? item.name.slice(0, 8) + '...' : item.name}
                           </div>
                         </th>
@@ -1068,9 +1212,9 @@ export default function PublishPage() {
                 </thead>
                 <tbody>
                   {products.map((product) => (
-                    <tr key={product.id} className="hover:bg-gray-50">
+                    <tr key={product.id} className="hover:bg-gray-50/50">
                       <td
-                        className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 p-2 cursor-pointer hover:bg-gray-100 min-w-[200px] max-w-[300px]"
+                        className="sticky left-0 z-10 bg-white border-b border-r-2 border-gray-300 p-2 cursor-pointer hover:bg-gray-100 min-w-[200px] max-w-[300px]"
                         onClick={() => handleSelectRow(product.id)}
                         title="행 전체 선택/해제"
                       >
@@ -1087,33 +1231,38 @@ export default function PublishPage() {
                           </div>
                         </div>
                       </td>
-                      {groupedTargets.map((group) =>
-                        group.items.map((item) => {
+                      {groupedTargets.map((group, groupIndex) =>
+                        group.items.map((item, itemIndex) => {
                           const published = isPublished(product.id, group.type, item.id)
                           const selected = selectedCells.has(cellKey(product.id, group.type, item.id))
                           const priceSet = hasPrice(product.id)
-                          const isShopPublished = published && group.type === 'shop'
+                          const isLastInGroup = itemIndex === group.items.length - 1
+                          const hasNextGroup = groupIndex < groupedTargets.length - 1
 
                           return (
                             <td
                               key={`${group.type}-${item.id}`}
-                              className="border-b border-gray-200 p-1 text-center"
+                              className={`border-b border-gray-200 p-1 text-center ${group.cellBgColor} ${
+                                isLastInGroup && hasNextGroup ? 'border-r-2 border-gray-300' : ''
+                              }`}
                             >
                               <button
                                 onClick={() => handleCellClick(product.id, group.type, item.id)}
                                 className={`w-8 h-8 rounded transition-all ${
                                   selected
-                                    ? 'bg-purple-500 hover:bg-purple-600 cursor-pointer'
-                                    : isShopPublished
-                                    ? 'bg-green-500 hover:bg-green-600 cursor-pointer'
+                                    ? 'bg-purple-500 hover:bg-purple-600 cursor-pointer ring-2 ring-purple-300'
                                     : published
-                                    ? 'bg-green-500 cursor-not-allowed'
+                                    ? (group.type === 'shop'
+                                        ? 'bg-green-500 hover:bg-green-600 cursor-pointer'
+                                        : 'bg-green-500 cursor-default')
                                     : !priceSet
                                     ? 'bg-amber-100 hover:bg-amber-200 cursor-pointer border-2 border-dashed border-amber-300'
                                     : 'bg-gray-200 hover:bg-gray-300 cursor-pointer'
                                 }`}
                                 title={`${product.name} → ${item.name}: ${
-                                  isShopPublished ? '발행됨 (클릭하여 취소)' : published ? '발행됨' : !priceSet ? '가격 미설정 (설정 필요)' : '미발행'
+                                  published
+                                    ? (group.type === 'shop' ? '발행됨 (클릭하여 취소)' : '발행됨')
+                                    : !priceSet ? '가격 미설정 (설정 필요)' : '미발행'
                                 }`}
                               >
                                 {published && <Check size={16} className="text-white mx-auto" />}
@@ -1270,51 +1419,62 @@ export default function PublishPage() {
         </div>
       )}
 
-      {/* 발행 취소 확인 모달 */}
-      {showUnpublishConfirm && unpublishTarget && (
+      {/* 쇼핑몰 미연결 경고 모달 */}
+      {showShopConnectionWarning && unconnectedChannels.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
             className="absolute inset-0 bg-black/50"
             onClick={() => {
-              if (!isUnpublishing) {
-                setShowUnpublishConfirm(false)
-                setUnpublishTarget(null)
-              }
+              setShowShopConnectionWarning(false)
+              setUnconnectedChannels([])
             }}
           />
           <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
             {/* 헤더 */}
-            <div className="bg-red-50 p-6 border-b border-red-100">
+            <div className="bg-orange-50 p-6 border-b border-orange-100">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-red-100 rounded-full">
-                  <Trash2 size={24} className="text-red-600" />
+                <div className="p-3 bg-orange-100 rounded-full">
+                  <AlertTriangle size={24} className="text-orange-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">발행 취소</h3>
-                  <p className="text-sm text-gray-600">쇼핑몰에서 상품을 제거합니다</p>
+                  <h3 className="text-lg font-bold text-gray-900">쇼핑몰 연결 필요</h3>
+                  <p className="text-sm text-gray-600">소매밴드에 쇼핑몰이 연결되어 있지 않습니다</p>
                 </div>
               </div>
             </div>
 
             {/* 콘텐츠 */}
             <div className="p-6">
-              <div className="p-4 bg-gray-50 rounded-xl mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-500">상품</span>
-                  <span className="font-medium text-gray-900 truncate max-w-[200px]">{unpublishTarget.productName}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">쇼핑몰</span>
-                  <span className="font-medium text-gray-900">{unpublishTarget.shopName}</span>
-                </div>
+              <p className="text-sm text-gray-600 mb-4">
+                다음 소매밴드에 연결된 쇼핑몰이 없습니다:
+              </p>
+              <div className="space-y-2 mb-4 max-h-40 overflow-y-auto">
+                {unconnectedChannels.map((channel) => (
+                  <div
+                    key={channel.id}
+                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                  >
+                    {channel.coverUrl ? (
+                      <img
+                        src={channel.coverUrl}
+                        alt={channel.name}
+                        className="w-10 h-10 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center">
+                        <BandIcon size={20} className="text-gray-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{channel.name}</p>
+                      <p className="text-xs text-orange-500">쇼핑몰 미연결</p>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <p className="text-sm text-gray-600 mb-6">
-                이 상품의 발행을 취소하시겠습니까?
-                <br />
-                <span className="text-red-500">
-                  주문 또는 문의가 있는 상품은 취소할 수 없습니다.
-                </span>
+                소매밴드에 상품을 발행하려면 먼저 쇼핑몰을 연결해주세요.
               </p>
 
               <div className="flex gap-3">
@@ -1322,23 +1482,162 @@ export default function PublishPage() {
                   variant="secondary"
                   className="flex-1"
                   onClick={() => {
-                    setShowUnpublishConfirm(false)
-                    setUnpublishTarget(null)
+                    setShowShopConnectionWarning(false)
+                    setUnconnectedChannels([])
                   }}
-                  disabled={isUnpublishing}
                 >
                   닫기
                 </Button>
                 <Button
-                  className="flex-1 bg-red-600 hover:bg-red-700"
-                  onClick={handleUnpublish}
-                  loading={isUnpublishing}
+                  className="flex-1"
+                  onClick={() => {
+                    router.push('/sourcing/channel')
+                  }}
                 >
-                  <Trash2 size={16} className="mr-2" />
-                  발행 취소
+                  <ExternalLink size={16} className="mr-2" />
+                  채널 관리
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 발행 취소 확인 모달 */}
+      {showUnpublishConfirm && unpublishTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => {
+              if (!isUnpublishing) {
+                closeUnpublishModal()
+              }
+            }}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            {/* 결과 표시 (성공/경고/에러) */}
+            {unpublishResult.status !== 'idle' ? (
+              <>
+                {/* 결과 헤더 */}
+                <div className={`p-6 border-b ${
+                  unpublishResult.status === 'success' ? 'bg-green-50 border-green-100' :
+                  unpublishResult.status === 'warning' ? 'bg-yellow-50 border-yellow-100' :
+                  'bg-red-50 border-red-100'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`p-3 rounded-full ${
+                      unpublishResult.status === 'success' ? 'bg-green-100' :
+                      unpublishResult.status === 'warning' ? 'bg-yellow-100' :
+                      'bg-red-100'
+                    }`}>
+                      {unpublishResult.status === 'success' ? (
+                        <Check size={24} className="text-green-600" />
+                      ) : unpublishResult.status === 'warning' ? (
+                        <AlertTriangle size={24} className="text-yellow-600" />
+                      ) : (
+                        <X size={24} className="text-red-600" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">{unpublishResult.message}</h3>
+                      <p className="text-sm text-gray-600">
+                        {unpublishTarget.productName} → {unpublishTarget.targetName}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 결과 콘텐츠 */}
+                <div className="p-6">
+                  {unpublishResult.details && (
+                    <div className={`p-4 rounded-xl mb-4 ${
+                      unpublishResult.status === 'success' ? 'bg-green-50 text-green-700' :
+                      unpublishResult.status === 'warning' ? 'bg-yellow-50 text-yellow-700' :
+                      'bg-red-50 text-red-700'
+                    }`}>
+                      <p className="text-sm">{unpublishResult.details}</p>
+                    </div>
+                  )}
+
+                  <Button
+                    className="w-full"
+                    onClick={closeUnpublishModal}
+                  >
+                    닫기
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* 확인 헤더 */}
+                <div className="bg-red-50 p-6 border-b border-red-100">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-red-100 rounded-full">
+                      <Trash2 size={24} className="text-red-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">발행 취소</h3>
+                      <p className="text-sm text-gray-600">
+                        {unpublishTarget.targetType === 'channel'
+                          ? '소매밴드에서 게시물을 삭제합니다'
+                          : '쇼핑몰에서 상품을 제거합니다'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 확인 콘텐츠 */}
+                <div className="p-6">
+                  <div className="p-4 bg-gray-50 rounded-xl mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-500">상품</span>
+                      <span className="font-medium text-gray-900 truncate max-w-[200px]">{unpublishTarget.productName}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500">
+                        {unpublishTarget.targetType === 'channel' ? '소매밴드' : '쇼핑몰'}
+                      </span>
+                      <span className="font-medium text-gray-900">{unpublishTarget.targetName}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-gray-600 mb-6">
+                    이 상품의 발행을 취소하시겠습니까?
+                    <br />
+                    {unpublishTarget.targetType === 'channel' ? (
+                      <span className="text-red-500">
+                        소매밴드에서 해당 게시물이 삭제됩니다.
+                        <br />
+                        주문 또는 문의가 있는 상품은 취소할 수 없습니다.
+                      </span>
+                    ) : (
+                      <span className="text-red-500">
+                        주문 또는 문의가 있는 상품은 취소할 수 없습니다.
+                      </span>
+                    )}
+                  </p>
+
+                  <div className="flex gap-3">
+                    <Button
+                      variant="secondary"
+                      className="flex-1"
+                      onClick={closeUnpublishModal}
+                      disabled={isUnpublishing}
+                    >
+                      닫기
+                    </Button>
+                    <Button
+                      className="flex-1 bg-red-600 hover:bg-red-700"
+                      onClick={handleUnpublish}
+                      loading={isUnpublishing}
+                    >
+                      <Trash2 size={16} className="mr-2" />
+                      발행 취소
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1347,29 +1646,64 @@ export default function PublishPage() {
       {showPublishProgress && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" />
-          <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden max-h-[80vh] flex flex-col">
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-xl w-full mx-4 overflow-hidden max-h-[80vh] flex flex-col">
             {/* 헤더 */}
-            <div className={`p-6 border-b ${isPublishing ? 'bg-blue-50 border-blue-100' : 'bg-green-50 border-green-100'}`}>
-              <div className="flex items-center gap-3">
-                <div className={`p-3 rounded-full ${isPublishing ? 'bg-blue-100' : 'bg-green-100'}`}>
-                  {isPublishing ? (
-                    <Loader2 size={24} className="text-blue-600 animate-spin" />
-                  ) : (
-                    <CheckCircle size={24} className="text-green-600" />
-                  )}
+            {(() => {
+              const successCount = publishProgressItems.filter((i) => i.status === 'success').length
+              const failedCount = publishProgressItems.filter((i) => i.status === 'failed').length
+              const allFailed = !isPublishing && failedCount > 0 && successCount === 0
+              const hasFailed = !isPublishing && failedCount > 0
+
+              return (
+                <div className={`p-6 border-b ${
+                  isPublishing
+                    ? 'bg-blue-50 border-blue-100'
+                    : allFailed
+                    ? 'bg-red-50 border-red-100'
+                    : hasFailed
+                    ? 'bg-amber-50 border-amber-100'
+                    : 'bg-green-50 border-green-100'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`p-3 rounded-full ${
+                      isPublishing
+                        ? 'bg-blue-100'
+                        : allFailed
+                        ? 'bg-red-100'
+                        : hasFailed
+                        ? 'bg-amber-100'
+                        : 'bg-green-100'
+                    }`}>
+                      {isPublishing ? (
+                        <Loader2 size={24} className="text-blue-600 animate-spin" />
+                      ) : allFailed ? (
+                        <XCircle size={24} className="text-red-600" />
+                      ) : hasFailed ? (
+                        <AlertTriangle size={24} className="text-amber-600" />
+                      ) : (
+                        <CheckCircle size={24} className="text-green-600" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">
+                        {isPublishing
+                          ? '발행 진행 중...'
+                          : allFailed
+                          ? '발행 실패'
+                          : hasFailed
+                          ? '발행 일부 실패'
+                          : '발행 완료'}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {isPublishing
+                          ? '페이지를 나가거나 새로고침하면 발행이 취소될 수 있습니다.'
+                          : `${successCount}개 성공, ${failedCount}개 실패`}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">
-                    {isPublishing ? '발행 진행 중...' : '발행 완료'}
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    {isPublishing
-                      ? '페이지를 나가거나 새로고침하면 발행이 취소될 수 있습니다.'
-                      : `${publishProgressItems.filter((i) => i.status === 'success').length}개 성공, ${publishProgressItems.filter((i) => i.status === 'failed').length}개 실패`}
-                  </p>
-                </div>
-              </div>
-            </div>
+              )
+            })()}
 
             {/* 경고 메시지 (발행 중일 때만) */}
             {isPublishing && (
@@ -1419,7 +1753,7 @@ export default function PublishPage() {
                         <p className="text-xs text-gray-500 flex items-center gap-1">
                           <span>→</span>
                           <span className={`px-1.5 py-0.5 rounded text-xs ${
-                            item.targetType === 'shop' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                            item.targetType === 'shop' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
                           }`}>
                             {item.targetType === 'shop' ? 'Shop' : '밴드'}
                           </span>
@@ -1467,13 +1801,14 @@ export default function PublishPage() {
                             {item.publishMethod === 'playwright' ? '이미지 포함' : '텍스트만'}
                           </p>
                         )}
-                        {item.message && (
-                          <p className="text-xs text-gray-500 mt-0.5 max-w-[150px] truncate" title={item.message}>
-                            {item.message}
-                          </p>
-                        )}
                       </div>
                     </div>
+                    {/* 실패 사유 표시 (별도 줄) */}
+                    {item.status === 'failed' && item.message && (
+                      <div className="mt-2 p-2 bg-red-100 rounded text-xs text-red-700">
+                        <span className="font-medium">실패 사유:</span> {item.message}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

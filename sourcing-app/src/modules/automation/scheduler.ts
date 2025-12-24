@@ -63,8 +63,35 @@ function registerSchedulerSilent(userId: number, cronExpression: string): void {
     console.log(`[Scheduler] 자동화 실행 시작 (user: ${userId})`)
 
     try {
+      // 자동화 설정 조회하여 pipelineSteps 가져오기
+      const config = await prisma.automationConfig.findUnique({
+        where: { userId },
+      })
+
+      // pipelineSteps를 skip options로 변환
+      let options: {
+        skipCollection?: boolean
+        skipTransform?: boolean
+        skipProductCreate?: boolean
+        skipPublish?: boolean
+      } | undefined = undefined
+
+      if (config?.pipelineSteps) {
+        try {
+          const pipelineSteps = JSON.parse(config.pipelineSteps)
+          options = {
+            skipCollection: !pipelineSteps.collection,
+            skipTransform: !pipelineSteps.transform,
+            skipProductCreate: !pipelineSteps.productCreate,
+            skipPublish: !pipelineSteps.publish,
+          }
+        } catch (e) {
+          console.error(`[Scheduler] pipelineSteps 파싱 실패:`, e)
+        }
+      }
+
       // Lock 기반 실행 (중복 실행 자동 방지)
-      const result = await executeFullPipelineWithLock(userId, undefined, TriggerType.SCHEDULED)
+      const result = await executeFullPipelineWithLock(userId, options, TriggerType.SCHEDULED)
 
       if (result) {
         console.log(`[Scheduler] 자동화 완료: ${result.overallStatus}`)
@@ -100,8 +127,35 @@ export function registerScheduler(userId: number, cronExpression: string): void 
     console.log(`[Scheduler] 자동화 실행 시작 (user: ${userId})`)
 
     try {
+      // 자동화 설정 조회하여 pipelineSteps 가져오기
+      const config = await prisma.automationConfig.findUnique({
+        where: { userId },
+      })
+
+      // pipelineSteps를 skip options로 변환
+      let options: {
+        skipCollection?: boolean
+        skipTransform?: boolean
+        skipProductCreate?: boolean
+        skipPublish?: boolean
+      } | undefined = undefined
+
+      if (config?.pipelineSteps) {
+        try {
+          const pipelineSteps = JSON.parse(config.pipelineSteps)
+          options = {
+            skipCollection: !pipelineSteps.collection,
+            skipTransform: !pipelineSteps.transform,
+            skipProductCreate: !pipelineSteps.productCreate,
+            skipPublish: !pipelineSteps.publish,
+          }
+        } catch (e) {
+          console.error(`[Scheduler] pipelineSteps 파싱 실패:`, e)
+        }
+      }
+
       // Lock 기반 실행 (중복 실행 자동 방지)
-      const result = await executeFullPipelineWithLock(userId, undefined, TriggerType.SCHEDULED)
+      const result = await executeFullPipelineWithLock(userId, options, TriggerType.SCHEDULED)
 
       if (result) {
         console.log(`[Scheduler] 자동화 완료: ${result.overallStatus}`)

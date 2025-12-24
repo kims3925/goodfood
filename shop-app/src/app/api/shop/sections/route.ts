@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Shop Sections API
  * Shop별 상품 섹션 조회
@@ -45,10 +47,11 @@ export async function GET(req: NextRequest) {
     // 2. 각 소매채널별로 발행된 상품 조회
     const sections = await Promise.all(
       retailChannels.map(async (channel) => {
-        // 해당 채널에 발행된 상품 조회 (published_product 테이블 사용)
+        // 해당 채널에 발행된 활성 상품만 조회 (published_product 테이블 사용)
         const publishedProducts = await prisma.publishedProduct.findMany({
           where: {
             channelId: channel.id,
+            isActive: true, // 활성 상태인 상품만 노출
           },
           include: {
             product: {
@@ -57,16 +60,8 @@ export async function GET(req: NextRequest) {
                   orderBy: { id: 'asc' },
                   take: 1,
                 },
-                collectedProduct: {
-                  include: {
-                    post: {
-                      include: {
-                        images: {
-                          orderBy: { sortOrder: 'asc' },
-                        },
-                      },
-                    },
-                  },
+                images: {
+                  orderBy: { sortOrder: 'asc' },
                 },
               },
             },
@@ -79,17 +74,20 @@ export async function GET(req: NextRequest) {
         const products = publishedProducts
           .filter((pp) => pp.product)
           .map((pp) => {
-            const product = pp.product
-            const mainVariant = product.variants[0]
-            const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
+            const product = pp.product!
+            const mainVariant = product?.variants[0]
+            const images = product.images?.map((img) => img.url) || []
 
-            const salePrice = mainVariant?.price || 0
+            // 배송비 포함 가격 계산 (상품 상세 페이지와 동일)
+            const basePrice = mainVariant?.price || 0
+            const shippingFee = product.shippingFee || 0
+            const salePrice = basePrice + shippingFee
             const originalPrice = salePrice
             const discount = 0
 
             return {
-              id: product.id.toString(),
-              publishedProductId: pp.id.toString(), // 추가: 장바구니/주문에 필요
+              id: product.id,
+              publishedProductId: pp.id,
               title: product.name,
               description: product.description,
               originalPrice,
@@ -114,98 +112,10 @@ export async function GET(req: NextRequest) {
     // 상품이 있는 섹션만 필터링
     const filteredSections = sections.filter((section) => section.products.length > 0)
 
-    // 3. 도매채널별 섹션 (발행된 상품만 포함)
-    // 쇼핑몰에서는 product_publish를 통해서만 상품을 판매할 수 있음
-    const wholesaleChannels = await prisma.channel.findMany({
-      where: {
-        isActive: true,
-        kind: ChannelKind.WHOLESALE,
-      },
-      orderBy: { name: 'asc' },
-    })
-
-    const wholesaleSections = await Promise.all(
-      wholesaleChannels.map(async (channel) => {
-        // 해당 도매채널의 상품 중 발행된 것만 조회
-        const publishedProducts = await prisma.publishedProduct.findMany({
-          where: {
-            product: {
-              collectedProduct: {
-                post: {
-                  channelId: channel.id,
-                },
-              },
-            },
-          },
-          include: {
-            product: {
-              include: {
-                variants: {
-                  orderBy: { id: 'asc' },
-                  take: 1,
-                },
-                collectedProduct: {
-                  include: {
-                    post: {
-                      include: {
-                        images: {
-                          orderBy: { sortOrder: 'asc' },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: limit,
-        })
-
-        const formattedProducts = publishedProducts
-          .filter((pp) => pp.product)
-          .map((pp) => {
-            const product = pp.product
-            const mainVariant = product.variants[0]
-            const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
-
-            const salePrice = mainVariant?.price || 0
-            const originalPrice = salePrice
-            const discount = 0
-
-            return {
-              id: product.id.toString(),
-              publishedProductId: pp.id.toString(), // 추가: 장바구니/주문에 필요
-              title: product.name,
-              description: product.description,
-              originalPrice,
-              salePrice,
-              discount,
-              images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
-              category: product.categoryId || '',
-              rating: 4.5,
-              reviews: 100,
-            }
-          })
-
-        return {
-          id: `wholesale_${channel.id}`,
-          name: channel.name,
-          coverUrl: channel.coverUrl,
-          type: 'wholesale',
-          products: formattedProducts,
-        }
-      })
-    )
-
-    const filteredWholesaleSections = wholesaleSections.filter(
-      (section) => section.products.length > 0
-    )
-
     return NextResponse.json({
       success: true,
       retailSections: filteredSections,
-      wholesaleSections: filteredWholesaleSections,
+      wholesaleSections: [],
     })
   } catch (error: any) {
     console.error('Shop sections GET error:', error)
@@ -245,10 +155,11 @@ async function getShopProducts(shopId: number, limit: number) {
     })
   }
 
-  // 해당 Shop에 발행된 상품 조회
+  // 해당 Shop에 발행된 활성 상품만 조회 (비활성 상품은 품절 처리)
   const publishedProducts = await prisma.publishedProduct.findMany({
     where: {
       shopId: shopId,
+      isActive: true, // 활성 상태인 상품만 노출
     },
     include: {
       product: {
@@ -257,16 +168,8 @@ async function getShopProducts(shopId: number, limit: number) {
             orderBy: { id: 'asc' },
             take: 1,
           },
-          collectedProduct: {
-            include: {
-              post: {
-                include: {
-                  images: {
-                    orderBy: { sortOrder: 'asc' },
-                  },
-                },
-              },
-            },
+          images: {
+            orderBy: { sortOrder: 'asc' },
           },
         },
       },
@@ -279,17 +182,20 @@ async function getShopProducts(shopId: number, limit: number) {
   const products = publishedProducts
     .filter((pp) => pp.product)
     .map((pp) => {
-      const product = pp.product
-      const mainVariant = product.variants[0]
-      const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
+      const product = pp.product!
+      const mainVariant = product?.variants[0]
+      const images = product.images?.map((img) => img.url) || []
 
-      const salePrice = mainVariant?.price || 0
+      // 배송비 포함 가격 계산 (상품 상세 페이지와 동일)
+      const basePrice = mainVariant?.price || 0
+      const shippingFee = product.shippingFee || 0
+      const salePrice = basePrice + shippingFee
       const originalPrice = salePrice
       const discount = 0
 
       return {
-        id: product.id.toString(),
-        publishedProductId: pp.id.toString(),
+        id: product.id,
+        publishedProductId: pp.id,
         title: product.name,
         description: product.description,
         originalPrice,
@@ -334,10 +240,11 @@ async function getChannelProducts(channelId: number, limit: number) {
     })
   }
 
-  // 해당 채널에 발행된 상품 조회
+  // 해당 채널에 발행된 활성 상품만 조회 (비활성 상품은 품절 처리)
   const publishedProducts = await prisma.publishedProduct.findMany({
     where: {
       channelId: channelId,
+      isActive: true, // 활성 상태인 상품만 노출
     },
     include: {
       product: {
@@ -346,16 +253,8 @@ async function getChannelProducts(channelId: number, limit: number) {
             orderBy: { id: 'asc' },
             take: 1,
           },
-          collectedProduct: {
-            include: {
-              post: {
-                include: {
-                  images: {
-                    orderBy: { sortOrder: 'asc' },
-                  },
-                },
-              },
-            },
+          images: {
+            orderBy: { sortOrder: 'asc' },
           },
         },
       },
@@ -368,17 +267,20 @@ async function getChannelProducts(channelId: number, limit: number) {
   const products = publishedProducts
     .filter((pp) => pp.product)
     .map((pp) => {
-      const product = pp.product
-      const mainVariant = product.variants[0]
-      const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
+      const product = pp.product!
+      const mainVariant = product?.variants[0]
+      const images = product.images?.map((img) => img.url) || []
 
-      const salePrice = mainVariant?.price || 0
+      // 배송비 포함 가격 계산 (상품 상세 페이지와 동일)
+      const basePrice = mainVariant?.price || 0
+      const shippingFee = product.shippingFee || 0
+      const salePrice = basePrice + shippingFee
       const originalPrice = salePrice
       const discount = 0
 
       return {
-        id: product.id.toString(),
-        publishedProductId: pp.id.toString(),
+        id: product.id,
+        publishedProductId: pp.id,
         title: product.name,
         description: product.description,
         originalPrice,

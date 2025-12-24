@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Package, ChevronRight, Calendar, CreditCard } from 'lucide-react'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import { useShop } from '@/contexts/ShopContext'
 
 interface OrderItem {
   id: number
@@ -77,6 +78,8 @@ export default function OrdersPage() {
   const { data: session, status: sessionStatus } = useSession()
   const router = useRouter()
   const { getPath, getApiPath } = useShopUrl()
+  const { shop } = useShop()
+  const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null)
@@ -135,20 +138,18 @@ export default function OrdersPage() {
 
   if (sessionStatus === 'loading' || (loading && orders.length === 0)) {
     return (
-      <div className="kurly-container py-12">
-        <div className="text-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B6B] mx-auto"></div>
-          <p className="mt-4 text-gray-600">주문 내역을 불러오는 중...</p>
-        </div>
+      <div className="text-center py-20">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: primaryColor }}></div>
+        <p className="mt-4 text-gray-600">주문 내역을 불러오는 중...</p>
       </div>
     )
   }
 
   return (
-    <div className="kurly-container py-12">
+    <>
       {/* 헤더 */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">주문내역</h1>
+      <div className="mb-6">
+        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">주문내역</h1>
         <p className="text-gray-600">주문하신 상품의 배송 현황을 확인하실 수 있습니다</p>
       </div>
 
@@ -158,9 +159,10 @@ export default function OrdersPage() {
           onClick={() => handleStatusFilter(null)}
           className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors ${
             selectedStatus === null
-              ? 'bg-[#FF6B6B] text-white'
+              ? 'text-white'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
+          style={selectedStatus === null ? { backgroundColor: primaryColor } : {}}
         >
           전체
         </button>
@@ -170,9 +172,10 @@ export default function OrdersPage() {
             onClick={() => handleStatusFilter(status)}
             className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors ${
               selectedStatus === status
-                ? 'bg-[#FF6B6B] text-white'
+                ? 'text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
+            style={selectedStatus === status ? { backgroundColor: primaryColor } : {}}
           >
             {label}
           </button>
@@ -182,20 +185,21 @@ export default function OrdersPage() {
       {/* 로딩 오버레이 */}
       {loading && orders.length > 0 && (
         <div className="fixed inset-0 bg-white/50 z-50 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF6B6B]"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: primaryColor }}></div>
         </div>
       )}
 
       {/* 주문 목록 */}
       {orders.length === 0 ? (
-        <div className="text-center py-20 bg-gray-50 rounded-lg">
+        <div className="text-center py-20 bg-gray-50 rounded-lg w-full">
           <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">
             {selectedStatus ? `${statusLabels[selectedStatus]} 주문이 없습니다` : '주문 내역이 없습니다'}
           </p>
           <Link
             href={getPath('/main')}
-            className="inline-block px-6 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] transition-colors"
+            className="inline-block px-6 py-3 text-white rounded-md hover:opacity-90 transition-colors"
+            style={{ backgroundColor: primaryColor }}
           >
             쇼핑 시작하기
           </Link>
@@ -206,7 +210,7 @@ export default function OrdersPage() {
             {orders.map((order) => (
               <div key={order.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
                 {/* 주문 헤더 */}
-                <div className="bg-gray-50 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="bg-gray-50 px-4 lg:px-6 py-3 lg:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Calendar className="w-4 h-4" />
@@ -231,11 +235,11 @@ export default function OrdersPage() {
                 </div>
 
                 {/* 주문 상품 */}
-                <div className="p-6">
+                <div className="p-4 lg:p-6">
                   <div className="space-y-4">
                     {order.items.slice(0, 2).map((item) => (
                       <div key={item.id} className="flex gap-4">
-                        <div className="relative w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                        <div className="relative w-16 h-16 lg:w-20 lg:h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                           {(item.thumbnailUrl || item.product?.thumbnailUrl) ? (
                             <Image
                               src={item.thumbnailUrl || item.product?.thumbnailUrl || ''}
@@ -288,12 +292,38 @@ export default function OrdersPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-600">총 결제금액</span>
-                      <span className="text-xl font-bold text-[#FF6B6B]">
-                        {formatPrice(order.totalAmount)}
-                      </span>
-                    </div>
+                    {(() => {
+                      // 상품 금액 합계 계산 (각 아이템의 totalPrice 합)
+                      const itemsTotal = order.items.reduce((sum, item) => sum + item.totalPrice, 0)
+                      // 실제 할인 금액 계산 (저장된 값이 없으면 계산)
+                      const actualDiscount = order.discountAmount > 0
+                        ? order.discountAmount
+                        : Math.max(0, itemsTotal - order.totalAmount)
+
+                      return (
+                        <div className="flex flex-col items-end gap-1">
+                          {/* 할인이 있는 경우 상품금액과 할인금액 표시 */}
+                          {actualDiscount > 0 && (
+                            <>
+                              <div className="flex items-center gap-2 text-sm text-gray-500">
+                                <span>상품금액</span>
+                                <span>{formatPrice(itemsTotal)}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-green-600">
+                                <span>묶음 할인</span>
+                                <span>-{formatPrice(actualDiscount)}</span>
+                              </div>
+                            </>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-600">총 결제금액</span>
+                            <span className="text-xl font-bold" style={{ color: primaryColor }}>
+                              {formatPrice(order.totalAmount)}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* 액션 버튼 */}
@@ -308,7 +338,8 @@ export default function OrdersPage() {
                     {order.hasWritableReview && (
                       <Link
                         href={getPath('/mypage/reviews')}
-                        className="flex-1 px-4 py-2.5 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] text-center font-medium transition-colors"
+                        className="flex-1 px-4 py-2.5 text-white rounded-md hover:opacity-90 text-center font-medium transition-colors"
+                        style={{ backgroundColor: primaryColor }}
                       >
                         후기작성
                       </Link>
@@ -350,9 +381,10 @@ export default function OrdersPage() {
                         onClick={() => setCurrentPage(page)}
                         className={`w-10 h-10 rounded-md transition-colors ${
                           currentPage === page
-                            ? 'bg-[#FF6B6B] text-white'
+                            ? 'text-white'
                             : 'border border-gray-300 hover:bg-gray-50'
                         }`}
+                        style={currentPage === page ? { backgroundColor: primaryColor } : {}}
                       >
                         {page}
                       </button>
@@ -370,6 +402,6 @@ export default function OrdersPage() {
           )}
         </>
       )}
-    </div>
+    </>
   )
 }

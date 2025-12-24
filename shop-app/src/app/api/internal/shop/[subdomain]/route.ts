@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 
@@ -26,8 +28,6 @@ export async function GET(
         name: true,
         coverUrl: true,
         isActive: true,
-        freeShippingAmount: true,
-        defaultShippingFee: true,
         contactPhone: true,
         contactEmail: true,
         bankName: true,

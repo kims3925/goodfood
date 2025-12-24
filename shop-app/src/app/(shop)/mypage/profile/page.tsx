@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { User } from 'lucide-react'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import { useShop } from '@/contexts/ShopContext'
 
 export default function ProfilePage() {
   const { data: session } = useSession()
   const { getApiPath } = useShopUrl()
+  const { shop } = useShop()
+  const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
   const [loading, setLoading] = useState(true)
   const [formData, setFormData] = useState({
     name: '',
@@ -81,25 +83,22 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="kurly-container py-12">
-        <div className="text-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B6B] mx-auto"></div>
-        </div>
+      <div className="text-center py-20">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: primaryColor }}></div>
       </div>
     )
   }
 
   return (
-    <div className="kurly-container py-12">
-      <div className="max-w-2xl mx-auto">
-        {/* 헤더 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">회원 정보 관리</h1>
-          <p className="text-gray-600">개인정보를 안전하게 관리하세요</p>
-        </div>
+    <>
+      {/* 헤더 */}
+      <div className="mb-6">
+        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">회원 정보 관리</h1>
+        <p className="text-gray-600">개인정보를 안전하게 관리하세요</p>
+      </div>
 
-        {/* 폼 */}
-        <div className="bg-white border border-gray-200 rounded-lg p-8">
+      {/* 폼 */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 lg:p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* 이메일 (수정 불가) */}
             <div>
@@ -125,7 +124,8 @@ export default function ProfilePage() {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-[#FF6B6B]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1"
+                style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
               />
             </div>
 
@@ -139,7 +139,8 @@ export default function ProfilePage() {
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="010-1234-5678"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-[#FF6B6B]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1"
+                style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
               />
             </div>
 
@@ -162,7 +163,8 @@ export default function ProfilePage() {
                   onChange={(e) =>
                     setFormData({ ...formData, currentPassword: e.target.value })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-[#FF6B6B]"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1"
+                style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
                 />
               </div>
 
@@ -176,7 +178,8 @@ export default function ProfilePage() {
                   onChange={(e) =>
                     setFormData({ ...formData, newPassword: e.target.value })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-[#FF6B6B]"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1"
+                style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
                 />
               </div>
 
@@ -190,7 +193,8 @@ export default function ProfilePage() {
                   onChange={(e) =>
                     setFormData({ ...formData, confirmPassword: e.target.value })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-[#FF6B6B]"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1"
+                style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
                 />
               </div>
             </div>
@@ -199,14 +203,14 @@ export default function ProfilePage() {
             <div className="pt-6">
               <button
                 type="submit"
-                className="w-full px-6 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252] font-medium"
+                className="w-full px-6 py-3 text-white rounded-md hover:opacity-90 font-medium"
+                style={{ backgroundColor: primaryColor }}
               >
                 저장하기
               </button>
             </div>
           </form>
         </div>
-      </div>
-    </div>
+    </>
   )
 }

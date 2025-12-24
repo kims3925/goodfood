@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Cart Item API
  * 장바구니 아이템 개별 조작
@@ -8,6 +10,7 @@ import { headers } from 'next/headers'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
 import prisma from '@bandauto/db'
+import { getCartService } from '@/modules/cart/services/cart.service'
 
 function getSessionId(req: NextRequest): string | null {
   return req.cookies.get('cart_session')?.value || null
@@ -142,23 +145,20 @@ export async function PATCH(
       )
     }
 
-    const cart = await findCart(sessionId, userId, shopId)
-
-    if (!cart) {
-      return NextResponse.json(
-        { success: false, error: '장바구니를 찾을 수 없습니다' },
-        { status: 404 }
-      )
-    }
-
-    await prisma.cartItem.update({
-      where: { id: itemId, cartId: cart.id },
-      data: { quantity },
-    })
+    // CartService를 사용해서 수량 업데이트 및 cart 반환
+    const cartService = getCartService()
+    const updatedCart = await cartService.updateItemQuantity(
+      sessionId || '',
+      itemId,
+      quantity,
+      userId,
+      shopId
+    )
 
     return NextResponse.json({
       success: true,
       message: '수량이 업데이트되었습니다',
+      cart: updatedCart,
     })
   } catch (error: any) {
     console.error('Cart item PATCH error:', error)

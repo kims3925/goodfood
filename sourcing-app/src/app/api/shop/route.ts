@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
@@ -98,8 +100,6 @@ export async function POST(request: NextRequest) {
       bankName,
       bankAccount,
       accountHolder,
-      freeShippingAmount,
-      defaultShippingFee,
       contactPhone,
       contactEmail,
     } = body
@@ -142,8 +142,6 @@ export async function POST(request: NextRequest) {
         bankName: bankName || null,
         bankAccount: bankAccount || null,
         accountHolder: accountHolder || null,
-        freeShippingAmount: freeShippingAmount || null,
-        defaultShippingFee: defaultShippingFee || null,
         contactPhone: contactPhone || null,
         contactEmail: contactEmail || null,
       },

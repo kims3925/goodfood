@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Published Product Detail API
  * publishedProductId로 상품 정보 조회
@@ -27,17 +29,8 @@ export async function GET(
       include: {
         product: {
           include: {
-            collectedProduct: {
-              include: {
-                post: {
-                  include: {
-                    images: {
-                      orderBy: { sortOrder: 'asc' },
-                    },
-                    channel: true,
-                  },
-                },
-              },
+            images: {
+              orderBy: { sortOrder: 'asc' },
             },
             variants: {
               orderBy: { id: 'asc' },

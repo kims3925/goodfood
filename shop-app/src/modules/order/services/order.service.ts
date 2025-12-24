@@ -18,6 +18,10 @@ import {
   NotFoundError,
   BusinessLogicError,
 } from '@/modules/common/utils/src/errors/handlers'
+import {
+  createOrderNotification,
+  createCancelNotification,
+} from '@/services/notification.service'
 
 // ============================================
 // Types
@@ -156,35 +160,50 @@ export class OrderService {
     }
 
     // 주문 아이템 데이터 준비
+    // cart.items에는 formatCart에서 계산된 itemTotal(할인 반영)이 포함됨
     const orderItems: OrderItemInput[] = cart.items.map((item: any) => {
       const publishedProduct = item.publishedProduct
-      const product = publishedProduct.product
+      const product = publishedProduct?.product
       const variant = item.variant
-      const mainVariant = product.variants[0]
-      const unitPrice = variant?.price || mainVariant?.price || 0
+      const mainVariant = product?.variants?.[0]
+
+      // 원래 단가 (할인 전)
+      const originalUnitPrice = Number(item.originalPrice || variant?.price || mainVariant?.price || 0)
+
+      // 할인 반영된 총액과 단가
+      const itemTotalWithDiscount = Number(item.itemTotal || originalUnitPrice * item.quantity)
+      const unitPriceWithDiscount = Math.round(itemTotalWithDiscount / item.quantity)
 
       // variant가 있으면 해당 옵션 사용, 없으면 첫 번째 variant의 옵션 사용
-      const optionSummary = variant?.optionSummary || mainVariant?.optionSummary || null
+      const optionSummary = item.optionSummary || variant?.optionSummary || mainVariant?.optionSummary || null
 
       return {
-        publishedProductId: publishedProduct.id,
-        variantId: variant?.id || null,
-        productName: product.name,
+        publishedProductId: publishedProduct?.id || item.publishedProductId,
+        variantId: variant?.id || item.variantId || null,
+        productName: item.name || product?.name || "",
         optionSummary,
-        thumbnailUrl: product.thumbnailUrl,
+        thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity,
-        unitPrice: Number(unitPrice),
+        unitPrice: unitPriceWithDiscount, // 할인 반영된 단가
+        originalUnitPrice, // 할인 전 단가 (참조용)
+        itemTotal: itemTotalWithDiscount, // 할인 반영된 아이템 총액
       }
     })
 
     // 금액 계산
-    const subtotal = orderItems.reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity,
+    // subtotalBeforeDiscount: 할인 전 총액 (원래 단가 × 수량)
+    // subtotal: 할인 후 총액 (장바구니에서 계산된 값)
+    const subtotalBeforeDiscount = orderItems.reduce(
+      (sum, item) => sum + (item.originalUnitPrice || item.unitPrice) * item.quantity,
       0
     )
-    const shippingFee = subtotal >= 30000 ? 0 : 3000
-    const discountAmount = 0
-    const totalAmount = subtotal + shippingFee - discountAmount
+    const subtotal = orderItems.reduce(
+      (sum, item) => sum + (item.itemTotal || item.unitPrice * item.quantity),
+      0
+    )
+    const shippingFee = 0 // 배송비는 판매가에 포함
+    const discountAmount = subtotalBeforeDiscount - subtotal // 할인 금액 계산
+    const totalAmount = subtotal // 할인 반영된 총액
 
     // 주문 생성 (주문자 정보는 user 테이블에서)
     const orderInput: CreateOrderInput = {
@@ -200,14 +219,30 @@ export class OrderService {
         addressDetail: shippingAddress.addressDetail,
         deliveryMemo: shippingAddress.deliveryMemo,
       },
-      subtotalAmount: subtotal,
+      subtotalAmount: subtotalBeforeDiscount, // 할인 전 상품 총액
       shippingFee,
-      discountAmount,
-      totalAmount,
+      discountAmount, // 합배송 할인 금액
+      totalAmount, // 실제 결제 금액 (할인 후)
       items: orderItems,
     }
 
     const order = await this.orderRepository.create(orderInput)
+
+    // 알림 생성 (shopId가 있는 경우에만 - 샵 소유자에게 알림)
+    if (shopId) {
+      const shop = await prisma.shop.findUnique({
+        where: { id: shopId },
+        select: { userId: true },
+      })
+      if (shop?.userId) {
+        createOrderNotification(shop.userId, shopId, {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          totalAmount,
+          customerName: shippingAddress.recipientName,
+        })
+      }
+    }
 
     // TossPayments 결제 요청 정보 생성 (주문자 정보는 user에서)
     // 경로 기반 URL: /{shopSlug}/payment/success
@@ -288,7 +323,7 @@ export class OrderService {
       }
 
       const product = publishedProduct.product
-      const mainVariant = product.variants[0]
+      const mainVariant = product?.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || 0
 
       // variant가 있으면 해당 옵션 사용, 없으면 첫 번째 variant의 옵션 사용
@@ -297,9 +332,9 @@ export class OrderService {
       orderItems.push({
         publishedProductId: publishedProduct.id,
         variantId: variant?.id || null,
-        productName: product.name,
+        productName: product?.name || "",
         optionSummary,
-        thumbnailUrl: product.thumbnailUrl,
+        thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity || 1,
         unitPrice: Number(unitPrice),
       })
@@ -310,7 +345,7 @@ export class OrderService {
       (sum, item) => sum + item.unitPrice * item.quantity,
       0
     )
-    const shippingFee = subtotal >= 30000 ? 0 : 3000
+    const shippingFee = 0 // 배송비는 판매가에 포함
     const discountAmount = 0
     const totalAmount = subtotal + shippingFee - discountAmount
 
@@ -336,6 +371,22 @@ export class OrderService {
     }
 
     const order = await this.orderRepository.create(orderInput)
+
+    // 알림 생성 (shopId가 있는 경우에만 - 샵 소유자에게 알림)
+    if (shopId) {
+      const shop = await prisma.shop.findUnique({
+        where: { id: shopId },
+        select: { userId: true },
+      })
+      if (shop?.userId) {
+        createOrderNotification(shop.userId, shopId, {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          totalAmount,
+          customerName: shippingAddress.recipientName,
+        })
+      }
+    }
 
     // TossPayments 결제 요청 정보 생성 (주문자 정보는 user에서)
     // 경로 기반 URL: /{shopSlug}/payment/success
@@ -459,6 +510,21 @@ export class OrderService {
     }
 
     const cancelledOrder = await this.orderRepository.cancel(orderId, reason, cancelledBy)
+
+    // 취소 알림 생성 (shopId가 있는 경우에만 - 샵 소유자에게 알림)
+    if (order.shopId) {
+      const shop = await prisma.shop.findUnique({
+        where: { id: order.shopId },
+        select: { userId: true },
+      })
+      if (shop?.userId) {
+        createCancelNotification(shop.userId, order.shopId, {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          customerName: order.shippingAddress?.recipientName,
+        })
+      }
+    }
 
     return this.formatOrderResponse(cancelledOrder)
   }

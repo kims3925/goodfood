@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * SSE Endpoint for Publish Streaming
  * 실시간 발행 진행 상태를 SSE로 스트리밍

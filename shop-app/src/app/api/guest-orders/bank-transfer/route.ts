@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * 비회원 무통장입금 주문 생성 API
  */
@@ -6,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import prisma, { Prisma } from '@bandauto/db'
 import { generateGuestAccessToken } from '@/lib/guest-token'
+import { calculateItemPrice } from '@/lib/price-calculator'
 
 const Decimal = Prisma.Decimal
 
@@ -29,11 +32,10 @@ function getSessionId(req: NextRequest): string | null {
   return req.cookies.get('cart_session')?.value || null
 }
 
-// 입금 기한 계산 (3일 후)
+// 입금 기한 계산 (3시간 후)
 function getDepositDeadline(): Date {
   const deadline = new Date()
-  deadline.setDate(deadline.getDate() + 3)
-  deadline.setHours(23, 59, 59, 999)
+  deadline.setHours(deadline.getHours() + 3)
   return deadline
 }
 
@@ -114,6 +116,7 @@ export async function POST(req: NextRequest) {
 
     // 주문 아이템 검증 및 금액 계산
     let orderItems: any[] = []
+    let totalAmount = 0
 
     if (fromCart) {
       // 세션 장바구니에서 주문
@@ -134,7 +137,7 @@ export async function POST(req: NextRequest) {
               publishedProduct: {
                 include: {
                   product: {
-                    include: { variants: { take: 1 } },
+                    include: { variants: true },
                   },
                 },
               },
@@ -155,22 +158,41 @@ export async function POST(req: NextRequest) {
         const publishedProduct = item.publishedProduct
         const product = publishedProduct.product
         const variant = item.variant
-        const mainVariant = product.variants[0]
-        const unitPrice = variant?.price || mainVariant?.price || 0
+        const mainVariant = product?.variants[0]
+        const basePrice = variant?.price || mainVariant?.price || 0
+        const quantity = item.quantity
+
+        // 공통 가격 계산 함수 사용
+        const shippingFee = product?.shippingFee || 0
+        const bundleMaxQty = product?.bundleMaxQty || 1
+        const bundleUnit = variant?.bundleUnit || 1
+
+        const priceResult = calculateItemPrice({
+          basePrice: Number(basePrice),
+          shippingFee,
+          quantity,
+          bundleMaxQty,
+          bundleUnit,
+          bundleShippingType: product?.bundleShippingType || null,
+        })
 
         return {
           publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
-          productName: product.name,
+          productName: product?.name || '',
           optionSummary: variant?.optionSummary || null,
-          thumbnailUrl: product.thumbnailUrl,
-          quantity: item.quantity,
-          unitPrice: Number(unitPrice),
+          thumbnailUrl: product?.thumbnailUrl || null,
+          quantity,
+          unitPrice: priceResult.originalPrice,
+          itemTotal: priceResult.itemTotal,
           cartId: cart.id,
         }
       })
+
+      // 합배송 적용된 총액 사용
+      totalAmount = orderItems.reduce((sum, item) => sum + item.itemTotal, 0)
     } else {
-      // 직접 상품 지정
+      // 직접 상품 지정 (바로구매)
       if (!items || items.length === 0) {
         return NextResponse.json(
           { success: false, error: '주문 상품이 없습니다' },
@@ -185,7 +207,7 @@ export async function POST(req: NextRequest) {
           },
           include: {
             product: {
-              include: { variants: { take: 1 } },
+              include: { variants: true },
             },
           },
         })
@@ -205,28 +227,43 @@ export async function POST(req: NextRequest) {
         }
 
         const product = publishedProduct.product
-        const mainVariant = product.variants[0]
-        const unitPrice = variant?.price || mainVariant?.price || 0
+        const mainVariant = product?.variants[0]
+        const basePrice = variant?.price || mainVariant?.price || 0
+        const quantity = item.quantity || 1
+
+        // 공통 가격 계산 함수 사용
+        const shippingFee = product?.shippingFee || 0
+        const bundleMaxQty = product?.bundleMaxQty || 1
+        const bundleUnit = variant?.bundleUnit || 1
+
+        const priceResult = calculateItemPrice({
+          basePrice: Number(basePrice),
+          shippingFee,
+          quantity,
+          bundleMaxQty,
+          bundleUnit,
+          bundleShippingType: product?.bundleShippingType || null,
+        })
 
         orderItems.push({
           publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
-          productName: product.name,
+          productName: product?.name || '',
           optionSummary: variant?.optionSummary || null,
-          thumbnailUrl: product.thumbnailUrl,
-          quantity: item.quantity || 1,
-          unitPrice: Number(unitPrice),
+          thumbnailUrl: product?.thumbnailUrl || null,
+          quantity,
+          unitPrice: priceResult.originalPrice,
+          itemTotal: priceResult.itemTotal,
         })
       }
+
+      // 합배송 적용된 총액 사용
+      totalAmount = orderItems.reduce((sum, item) => sum + item.itemTotal, 0)
     }
 
-    // 금액 계산
-    const subtotal = orderItems.reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity,
-      0
-    )
-    const shippingFee = subtotal >= 30000 ? 0 : 3000
-    const totalAmount = subtotal + shippingFee
+    // 금액 계산 (합배송 적용된 총액 사용)
+    const subtotal = totalAmount
+    const shippingFee = 0
     const depositDeadline = getDepositDeadline()
 
     // 트랜잭션으로 비회원 주문 생성
@@ -256,7 +293,7 @@ export async function POST(req: NextRequest) {
               thumbnailUrl: item.thumbnailUrl,
               quantity: item.quantity,
               unitPrice: new Decimal(item.unitPrice),
-              totalPrice: new Decimal(item.unitPrice * item.quantity),
+              totalPrice: new Decimal(item.itemTotal), // 합배송 적용된 총액
             })),
           },
           // 배송지 정보 (ShippingAddress 테이블에 저장)
@@ -319,7 +356,7 @@ export async function POST(req: NextRequest) {
           productName: item.productName,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          totalPrice: item.unitPrice * item.quantity,
+          totalPrice: item.itemTotal, // 합배송 적용된 총액
         })),
       },
       bankInfo: {

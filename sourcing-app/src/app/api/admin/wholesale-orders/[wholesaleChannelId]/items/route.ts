@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
@@ -5,6 +7,7 @@ import { getCurrentUser } from '@/modules/auth/auth.service'
 // 통합 주문 아이템 타입
 interface UnifiedOrderItem {
   orderItemId: number
+  orderId: number  // 발주완료 처리용
   orderNumber: string
   orderedAt: string
   isMember: boolean
@@ -58,25 +61,21 @@ export async function GET(
     const toDate = new Date(to)
     toDate.setHours(23, 59, 59, 999)
 
-    // 결제완료(PAID)만 조회 (배송중/배송완료/취소 제외)
+    // 배송 시작 전 주문만 조회 (PAID, PREPARING = 발주 대상)
 
-    // 공통 쿼리 조건
+    // 공통 쿼리 조건 (Product의 channelId 참조 - 소싱 출처인 도매처)
     const productCondition = {
       userId: user.userId,
       product: {
-        collectedProduct: {
-          post: {
-            channelId: channelId,
-          },
-        },
+        channelId: channelId,
       },
     }
 
-    // 1. 회원 주문 조회
+    // 1. 회원 주문 조회 (배송 시작 전)
     const memberItems = await prisma.orderItem.findMany({
       where: {
         order: {
-          status: 'PAID',
+          status: { in: ['PAID', 'PREPARING'] },
           paidAt: {
             not: null,
             gte: fromDate,
@@ -144,11 +143,11 @@ export async function GET(
       },
     })
 
-    // 2. 비회원 주문 조회
+    // 2. 비회원 주문 조회 (배송 시작 전)
     const guestItems = await prisma.guestOrderItem.findMany({
       where: {
         guestOrder: {
-          status: 'PAID',
+          status: { in: ['PAID', 'PREPARING'] },
           paidAt: {
             not: null,
             gte: fromDate,
@@ -236,6 +235,7 @@ export async function GET(
 
       unifiedItems.push({
         orderItemId: item.id,
+        orderId: item.order.id,
         orderNumber: item.order.orderNumber,
         orderedAt: item.order.orderedAt.toISOString(),
         isMember: true,
@@ -271,6 +271,7 @@ export async function GET(
 
       unifiedItems.push({
         orderItemId: item.id,
+        orderId: item.guestOrder.id,
         orderNumber: item.guestOrder.orderNumber,
         orderedAt: item.guestOrder.orderedAt.toISOString(),
         isMember: false,

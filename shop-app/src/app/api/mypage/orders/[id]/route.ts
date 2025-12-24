@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * MyPage Order Detail API
  * 마이페이지 주문 상세 조회 (회원 + 비회원 주문 통합)

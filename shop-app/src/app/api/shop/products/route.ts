@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Shop Products API
  * 쇼핑몰 상품 목록 조회
@@ -24,9 +26,11 @@ export async function GET(req: NextRequest) {
     const currentShopId = shopIdHeader ? parseInt(shopIdHeader) : null
 
     // 기본 조건: 발행된 상품만 (published_product 테이블을 통해)
+    // isActive가 true인 상품만 노출 (비활성 상품은 품절 처리)
     const where: any = {
       publishedProducts: {
         some: {
+          isActive: true, // 활성 상태인 상품만 목록에 노출
           // shopId 기반 필터링 (우선)
           ...(currentShopId ? { shopId: currentShopId } : {}),
           // channelId 하위 호환
@@ -62,16 +66,8 @@ export async function GET(req: NextRequest) {
             orderBy: { id: 'asc' },
             take: 1,
           },
-          collectedProduct: {
-            include: {
-              post: {
-                include: {
-                  images: {
-                    orderBy: { sortOrder: 'asc' },
-                  },
-                },
-              },
-            },
+          images: {
+            orderBy: { sortOrder: 'asc' },
           },
         },
         orderBy,
@@ -83,15 +79,15 @@ export async function GET(req: NextRequest) {
 
     // 프론트엔드 형식으로 변환
     const formattedProducts = products.map((product) => {
-      const mainVariant = product.variants[0]
-      const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
+      const mainVariant = product?.variants[0]
+      const images = product.images?.map((img) => img.url) || []
 
       const salePrice = mainVariant?.price || 0
       const originalPrice = salePrice
       const discount = 0
 
       return {
-        id: product.id.toString(),
+        id: product.id,
         title: product.name,
         description: product.description,
         originalPrice,

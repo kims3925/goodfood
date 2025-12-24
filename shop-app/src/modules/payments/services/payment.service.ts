@@ -345,15 +345,15 @@ export class PaymentService {
         const publishedProduct = item.publishedProduct
         const product = publishedProduct.product
         const variant = item.variant
-        const mainVariant = product.variants[0]
+        const mainVariant = product?.variants[0]
         const unitPrice = variant?.price || mainVariant?.price || 0
 
         return {
           publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
-          productName: product.name,
+          productName: product?.name || "",
           optionSummary: variant?.optionSummary || null,
-          thumbnailUrl: product.thumbnailUrl,
+          thumbnailUrl: product?.thumbnailUrl || null,
           quantity: item.quantity,
           unitPrice: Number(unitPrice),
         }
@@ -384,15 +384,15 @@ export class PaymentService {
         }
 
         const product = publishedProduct.product
-        const mainVariant = product.variants[0]
+        const mainVariant = product?.variants[0]
         const unitPrice = variant?.price || mainVariant?.price || 0
 
         orderItems.push({
           publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
-          productName: product.name,
+          productName: product?.name || "",
           optionSummary: variant?.optionSummary || null,
-          thumbnailUrl: product.thumbnailUrl,
+          thumbnailUrl: product?.thumbnailUrl || null,
           quantity: item.quantity || 1,
           unitPrice: Number(unitPrice),
         })
@@ -417,17 +417,8 @@ export class PaymentService {
       console.warn('주문 금액 재계산 (prepareData.amounts 없음)')
       subtotal = orderItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
 
-      // Shop의 배송비 설정 조회
+      // 배송비는 상품별 설정 또는 0원 처리
       shippingFee = 0
-      if (prepareData.shopId) {
-        const shop = await prisma.shop.findUnique({
-          where: { id: prepareData.shopId },
-          select: { freeShippingAmount: true, defaultShippingFee: true },
-        })
-        if (shop?.freeShippingAmount != null && shop?.defaultShippingFee != null) {
-          shippingFee = subtotal >= shop.freeShippingAmount ? 0 : shop.defaultShippingFee
-        }
-      }
 
       // 쿠폰 할인 금액 적용
       discountAmount = 0

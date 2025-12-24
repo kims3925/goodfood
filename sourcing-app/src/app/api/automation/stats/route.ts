@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Automation Stats API
  * 자동화 통계 조회 (헤더용)

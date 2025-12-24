@@ -133,8 +133,38 @@ export class GeminiClient extends BaseAiClient {
       if (error instanceof ProductTransformationError) {
         throw error
       }
-      // 토큰/할당량 관련 에러 처리 (일시적 에러 - 재시도 가능)
+
       const errorMsg = error.message || ''
+      const errorName = error.name || ''
+
+      // 디버깅 로그
+      console.log('[GeminiClient Error]', {
+        name: errorName,
+        message: errorMsg,
+        fullError: error.toString()
+      })
+
+      // 네트워크 오류 처리 (일시적 에러 - 재시도 가능)
+      const isNetworkError =
+        (errorName === 'TypeError' && errorMsg.includes('fetch failed')) ||
+        errorName === 'TypeError' ||  // fetch 관련 TypeError 전체 포함
+        errorMsg.includes('ECONNREFUSED') ||
+        errorMsg.includes('ETIMEDOUT') ||
+        errorMsg.includes('ENOTFOUND') ||
+        errorMsg.includes('network') ||
+        errorMsg.includes('NetworkError') ||
+        errorMsg.includes('fetch')
+
+      if (isNetworkError) {
+        throw new ProductTransformationError(
+          '네트워크 연결에 실패했습니다. 인터넷 연결을 확인하고 다시 시도해주세요.',
+          TransformationErrorCode.AI_API_ERROR,
+          { originalError: error },
+          TransformationErrorType.TRANSIENT  // 일시적 에러
+        )
+      }
+
+      // 토큰/할당량 관련 에러 처리 (일시적 에러 - 재시도 가능)
       if (errorMsg.includes('quota') || errorMsg.includes('limit') || errorMsg.includes('token') || errorMsg.includes('rate')) {
         throw new ProductTransformationError(
           'API 할당량이 초과되었습니다. 잠시 후 다시 시도하거나 AI 설정을 확인해주세요.',
@@ -143,6 +173,7 @@ export class GeminiClient extends BaseAiClient {
           TransformationErrorType.TRANSIENT  // 일시적 에러
         )
       }
+
       // API 키 관련 에러 (영구적 에러 - 재시도 불가)
       if (errorMsg.includes('API key') || errorMsg.includes('authentication') || errorMsg.includes('401')) {
         throw new ProductTransformationError(
@@ -152,6 +183,7 @@ export class GeminiClient extends BaseAiClient {
           TransformationErrorType.PERMANENT  // 영구적 에러
         )
       }
+
       // 기타 에러는 영구적으로 분류 (기본값)
       throw new ProductTransformationError(
         `Gemini API 오류: ${error.message}`,

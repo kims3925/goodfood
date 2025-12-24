@@ -64,7 +64,7 @@ function LoginContent() {
   // 로딩 중이면 스피너 표시
   if (status === 'loading') {
     return (
-      <div className="bg-gray-50 flex justify-center py-12 px-4">
+      <div className="bg-gray-50 flex-1 flex items-center justify-center py-12 md:py-16 px-4">
         <div
           className="animate-spin rounded-full h-10 w-10 border-b-2"
           style={{ borderColor: primaryColor }}
@@ -74,7 +74,7 @@ function LoginContent() {
   }
 
   return (
-    <div className="bg-gray-50 flex justify-center py-6 px-4">
+    <div className="bg-gray-50 flex-1 flex items-center justify-center py-12 md:py-16 px-4">
       <div className="max-w-md w-full">
         {/* Shop Name */}
         <div className="text-center mb-4">
@@ -191,7 +191,7 @@ function LoginContent() {
 
 function LoginFallback() {
   return (
-    <div className="bg-gray-50 flex justify-center py-12 px-4">
+    <div className="bg-gray-50 flex-1 flex items-center justify-center py-12 md:py-16 px-4">
       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-400" />
     </div>
   )

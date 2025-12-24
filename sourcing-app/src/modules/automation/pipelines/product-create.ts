@@ -6,7 +6,7 @@
  * CollectedProduct의 rawMetadata에 저장된 AI 분석 결과를 사용하여 Product 생성
  */
 
-import prisma from '@bandauto/db'
+import prisma, { BundleShippingType } from '@bandauto/db'
 import { getBatchContext, checkCancellation } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { downloadAndSaveProductImages } from '@/modules/utils/imageUtils'
@@ -45,16 +45,14 @@ export async function runProductCreatePipeline(
 
   console.log(`[ProductCreate] Starting for user ${userId}`)
 
-  // Product가 없는 CollectedProduct 조회
+  // Product가 없는 CollectedProduct 조회 (isConverted=false)
   const whereClause: any = {
     userId,
-    products: {
-      none: {}, // Product가 아직 없는 수집상품만
-    },
+    isConverted: false, // Product로 아직 변환되지 않은 수집상품만
   }
 
-  if (config.collectedProductIds?.length) {
-    whereClause.id = { in: config.collectedProductIds }
+  if (config.channelIds?.length) {
+    whereClause.id = { in: config.channelIds }
   }
 
   const collectedProducts = await prisma.collectedProduct.findMany({
@@ -140,7 +138,7 @@ export async function runProductCreatePipeline(
     }
 
     const result: CreatedProductResult = {
-      collectedProductId: collectedProduct.id,
+      channelId: collectedProduct.id,
       status: 'pending' as any,
     }
 
@@ -158,9 +156,26 @@ export async function runProductCreatePipeline(
       }
       const options = metadata.options || []
       const variants = metadata.variants || []
+      const wholesalePrice = metadata.wholesalePrice ?? null
+      const price = metadata.price ?? null
       const shipping = metadata.shipping || {
         shippingFee: metadata.shippingFee ?? null,
         shippingInfo: metadata.shippingInfo ?? null,
+      }
+      const bundleMaxQty = metadata.bundleMaxQty ?? metadata.shipping?.bundleMaxQty ?? null
+
+      // 합배송 타입 자동 추론
+      // 1. shippingInfo에 "포함"이 있으면 → INCLUDED (배송비 포함형)
+      // 2. shippingFee > 0 이면 → SEPARATE (배송비 별도형)
+      // 3. 그 외 → NONE
+      let bundleShippingType: BundleShippingType = BundleShippingType.NONE
+      const shippingInfoStr = String(shipping.shippingInfo || '')
+      const shippingFeeNum = typeof shipping.shippingFee === 'number' ? shipping.shippingFee : 0
+
+      if (shippingInfoStr.includes('포함')) {
+        bundleShippingType = BundleShippingType.INCLUDED
+      } else if (shippingFeeNum > 0) {
+        bundleShippingType = BundleShippingType.SEPARATE
       }
 
       // 게시물 이미지 URL 수집
@@ -170,13 +185,17 @@ export async function runProductCreatePipeline(
       const product = await prisma.product.create({
         data: {
           userId,
-          collectedProductId: collectedProduct.id,
+          channelId: collectedProduct.id,
           name: collectedProduct.name || '상품명 없음',
           description: collectedProduct.description || null,
           categoryId: metadata.category || null,
           currency: collectedProduct.currency || 'KRW',
+          wholesalePrice: typeof wholesalePrice === 'number' ? wholesalePrice : null,
+          price: typeof price === 'number' ? price : null,
           shippingFee: typeof shipping.shippingFee === 'number' ? shipping.shippingFee : null,
           shippingInfo: typeof shipping.shippingInfo === 'string' ? shipping.shippingInfo : null,
+          bundleMaxQty: typeof bundleMaxQty === 'number' ? bundleMaxQty : null,
+          bundleShippingType,
           thumbnailUrl: collectedProduct.post.images[0]?.url || null,
           options: options.length
             ? {
@@ -227,6 +246,12 @@ export async function runProductCreatePipeline(
           // 이미지 실패해도 상품 생성은 성공으로 처리
         }
       }
+
+      // 수집상품의 isConverted를 true로 업데이트
+      await prisma.collectedProduct.update({
+        where: { id: collectedProduct.id },
+        data: { isConverted: true },
+      })
 
       result.status = 'success'
       result.productId = product.id

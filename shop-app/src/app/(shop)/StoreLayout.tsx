@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
-import { Search, ShoppingCart, User, MapPin, ChevronDown, Phone, HelpCircle, MessageSquare, LogOut } from 'lucide-react'
+import { Search, ShoppingCart, User, MapPin, ChevronDown, Phone, MessageSquare, LogOut } from 'lucide-react'
 import { CartNotificationProvider, useCartNotification } from '@/contexts/CartNotificationContext'
 import CartNotificationBubble from '@/components/cart/CartNotificationBubble'
 import { useShop } from '@/contexts/ShopContext'
@@ -153,16 +153,8 @@ function StoreLayoutContent({
                     <div className="absolute top-full right-0 w-[200px] bg-white border border-gray-200 shadow-lg z-50 py-2 mt-1 rounded-md">
                       <div className="px-4 py-3 border-b border-gray-100">
                         <p className="font-bold text-lg text-abc-coral">{formatPhoneNumber(contactPhone)}</p>
-                        <p className="text-gray-500 text-xs mt-1">월~토 오전 7시 ~ 오후 6시</p>
+                        <p className="text-gray-500 text-xs mt-1">월~금 오전 9시 ~ 오후 6시</p>
                       </div>
-                      <Link
-                        href={getPath('/cs/faq')}
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
-                        onClick={() => setIsCustomerServiceOpen(false)}
-                      >
-                        <HelpCircle className="w-4 h-4" />
-                        자주묻는질문
-                      </Link>
                       <Link
                         href={getPath('/cs/inquiry')}
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
@@ -258,45 +250,42 @@ function StoreLayoutContent({
       </header>
 
       {/* Main Content */}
-      <main className="flex-1">
+      <main className="flex-1 flex flex-col">
         {children}
       </main>
 
       {/* Footer */}
       <footer className="kurly-footer">
         <div className="kurly-container">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-            <div>
+          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 ${relatedShops.length > 0 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+            <div className="text-center sm:text-left">
               <h4 className="font-bold text-gray-900 mb-3 md:mb-4">고객행복센터</h4>
               <p className="text-xl md:text-2xl font-bold mb-2 text-abc-coral">{formatPhoneNumber(contactPhone)}</p>
-              <p className="text-xs md:text-sm text-gray-600">월~토 오전 7시 ~ 오후 6시</p>
+              <p className="text-xs md:text-sm text-gray-600">월~금 오전 9시 ~ 오후 6시</p>
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <h4 className="font-bold text-gray-900 mb-3 md:mb-4">{shopName}</h4>
               <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-600">
-                <li><Link href={getPath('/about')} className="hover:opacity-70">회사소개</Link></li>
-                <li><Link href={getPath('/careers')} className="hover:opacity-70">채용정보</Link></li>
                 <li><Link href={getPath('/terms')} className="hover:opacity-70">이용약관</Link></li>
                 <li><Link href={getPath('/privacy')} className="hover:opacity-70">개인정보처리방침</Link></li>
               </ul>
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <h4 className="font-bold text-gray-900 mb-3 md:mb-4">고객센터</h4>
               <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-600">
                 <li><Link href={getPath('/cs')} className="hover:opacity-70">고객센터</Link></li>
-                <li><Link href={getPath('/cs/faq')} className="hover:opacity-70">자주묻는질문</Link></li>
                 <li><Link href={getPath('/cs/inquiry')} className="hover:opacity-70">1:1문의</Link></li>
               </ul>
             </div>
-            {relatedShops.length > 0 ? (
-              <div>
+            {relatedShops.length > 0 && (
+              <div className="text-center sm:text-left">
                 <h4 className="font-bold text-gray-900 mb-3 md:mb-4">관련 쇼핑몰</h4>
                 <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-600">
                   {relatedShops.map((s) => (
                     <li key={s.id}>
                       <a
                         href={getShopUrl(s.subdomain)}
-                        className="flex items-center gap-2 hover:opacity-70"
+                        className="flex items-center justify-center sm:justify-start gap-2 hover:opacity-70"
                       >
                         {s.logoUrl ? (
                           <Image src={s.logoUrl} alt={s.name} width={60} height={16} className="h-4 w-auto" unoptimized />
@@ -307,26 +296,11 @@ function StoreLayoutContent({
                   ))}
                 </ul>
               </div>
-            ) : (
-              <div>
-                <h4 className="font-bold text-gray-900 mb-3 md:mb-4">SNS</h4>
-                <div className="flex gap-3 md:gap-4">
-                  <a href="#" className="w-8 h-8 md:w-10 md:h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
-                    <span className="text-gray-600 text-sm md:text-base">f</span>
-                  </a>
-                  <a href="#" className="w-8 h-8 md:w-10 md:h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
-                    <span className="text-gray-600 text-sm md:text-base">in</span>
-                  </a>
-                  <a href="#" className="w-8 h-8 md:w-10 md:h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
-                    <span className="text-gray-600 text-sm md:text-base">yt</span>
-                  </a>
-                </div>
-              </div>
             )}
           </div>
           <div className="mt-6 md:mt-8 pt-6 md:pt-8 border-t border-gray-200 text-center text-xs md:text-sm text-gray-500">
-            <p>{shopName} | 대표: 홍길동 | 사업자등록번호: 123-45-67890</p>
-            <p className="mt-2">Copyright &copy; 2024 {shopName}. All rights reserved.</p>
+            <p>{shopName} | 대표: 강리안 | 사업자등록번호: 732-81-03103</p>
+            <p className="mt-2">Copyright &copy; 2025 조이펀테크주식회사. All rights reserved.</p>
           </div>
         </div>
       </footer>
@@ -337,7 +311,9 @@ function StoreLayoutContent({
 // Provider로 감싸서 export
 export default function StoreLayout({
   children,
-}: {
+
+}:
+ {
   children: React.ReactNode
 }) {
   return (

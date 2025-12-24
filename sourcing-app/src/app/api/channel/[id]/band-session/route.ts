@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Band 세션 관리 API
  * Chrome Extension에서 세션 쿠키 저장/조회/삭제

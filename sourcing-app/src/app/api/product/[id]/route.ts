@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import prisma from '@bandauto/db'
@@ -34,18 +36,7 @@ export async function GET(
         userId, // Ensure user owns the product
       },
       include: {
-        collectedProduct: {
-          include: {
-            post: {
-              include: {
-                images: {
-                  orderBy: { sortOrder: 'asc' },
-                },
-                channel: true,
-              },
-            },
-          },
-        },
+        channel: true,
         images: {
           orderBy: { sortOrder: 'asc' },
         },

@@ -12,6 +12,7 @@ import {
   NotFoundError,
   BusinessLogicError
 } from '@/modules/common/utils/src/errors/handlers'
+import { calculateItemPrice } from '@/lib/price-calculator'
 
 // 세션 만료 시간 (7일)
 const SESSION_EXPIRY_DAYS = 7
@@ -35,11 +36,16 @@ export interface CartItemResponse {
   optionSummary: string | null
   image: string
   price: number
+  originalPrice: number // 배송비 미포함 원가
+  itemTotal: number // 정확한 아이템 총액 (반올림 오차 없음)
   quantity: number
   stock: number
   // 배송 정보
   shippingFee: number | null
-  freeShippingAmount: number | null
+  // 합배송 정보
+  bundleMaxQty: number
+  bundleUnit: number  // 옵션별 합배송 단위 수
+  isBundleDiscount: boolean  // 할인형 여부 (true: 할인 차감, false: 배송비 추가)
 }
 
 export interface CartResponse {
@@ -57,6 +63,7 @@ export interface AddToCartDTO {
   publishedProductId: number
   variantId?: number
   quantity?: number
+  isBundleItem?: boolean // 묶음 상품 여부 (true면 기존 아이템과 합치지 않고 새로 추가)
 }
 
 // 장바구니 조회에 필요한 include 옵션
@@ -67,17 +74,9 @@ const cartIncludeOptions = {
         include: {
           product: {
             include: {
-              collectedProduct: {
-                include: {
-                  post: {
-                    include: {
-                      images: {
-                        orderBy: { sortOrder: 'asc' as const },
-                        take: 1,
-                      },
-                    },
-                  },
-                },
+              images: {
+                orderBy: { sortOrder: 'asc' as const },
+                take: 1,
               },
               variants: {
                 take: 1,
@@ -92,16 +91,6 @@ const cartIncludeOptions = {
     },
     orderBy: { createdAt: 'desc' as const },
   },
-}
-
-// 배송 정보 파싱 헬퍼
-function parseShippingInfo(shippingInfoStr: string | null): { freeShippingAmount?: number } {
-  if (!shippingInfoStr) return {}
-  try {
-    return JSON.parse(shippingInfoStr)
-  } catch {
-    return {}
-  }
 }
 
 /**
@@ -213,10 +202,8 @@ export class CartService {
       }
 
       if (userCart) {
-        await prisma.cart.update({
-          where: { id: userCart.id },
-          data: { expiresAt },
-        })
+        // expiresAt 업데이트 - 동시성 충돌 방지를 위해 executeRaw 사용
+        await prisma.$executeRaw`UPDATE cart SET expires_at = ${expiresAt} WHERE id = ${userCart.id}`
       }
 
       return userCart!
@@ -234,10 +221,8 @@ export class CartService {
       })
 
       if (cart) {
-        await prisma.cart.update({
-          where: { id: cart.id },
-          data: { expiresAt },
-        })
+        // expiresAt 업데이트 - 동시성 충돌 방지를 위해 executeRaw 사용
+        await prisma.$executeRaw`UPDATE cart SET expires_at = ${expiresAt} WHERE id = ${cart.id}`
         return cart
       }
 
@@ -272,15 +257,33 @@ export class CartService {
 
   /**
    * 장바구니 데이터 포맷팅
+   * 배송비가 상품 가격에 포함되어 계산됨
    */
   formatCart(cart: any): CartResponse {
     const items: CartItemResponse[] = cart.items.map((item: any) => {
       const publishedProduct = item.publishedProduct
       const product = publishedProduct.product
       const variant = item.variant
-      const mainVariant = product.variants[0]
-      const image = product.collectedProduct?.post?.images?.[0]?.url || product.thumbnailUrl || '/placeholder.jpg'
-      const shippingInfo = parseShippingInfo(product.shippingInfo)
+      const mainVariant = product?.variants[0]
+      const image = product.images?.[0]?.url || product.thumbnailUrl || '/placeholder.jpg'
+
+      const basePrice = variant?.price || mainVariant?.price || 0
+      const shippingFee = product.shippingFee || 0
+      const bundleMaxQty = product.bundleMaxQty || 1
+      const variantBundleUnit = variant?.bundleUnit || 1  // 옵션별 합배송 단위 수
+      const quantity = item.quantity
+
+      // 공통 가격 계산 함수 사용
+      const priceResult = calculateItemPrice({
+        basePrice,
+        shippingFee,
+        quantity,
+        bundleMaxQty,
+        bundleUnit: variantBundleUnit,
+        bundleShippingType: product.bundleShippingType,
+      })
+
+      const { unitPrice, itemTotal, isBundleDiscount } = priceResult
 
       return {
         id: item.id,
@@ -295,40 +298,27 @@ export class CartService {
         name: product.name,
         optionSummary: variant?.optionSummary || null,
         image,
-        price: variant?.price || mainVariant?.price || 0,
+        price: unitPrice,
+        originalPrice: basePrice, // 배송비 미포함 원가
+        itemTotal, // 정확한 아이템 총액 (반올림 오차 없음)
         quantity: item.quantity,
         stock: variant?.stock || mainVariant?.stock || 100,
-        // 배송 정보
-        shippingFee: product.shippingFee,
-        freeShippingAmount: shippingInfo.freeShippingAmount ?? null,
+        // 배송 정보 (참조용으로 유지)
+        shippingFee: shippingFee,
+        // 합배송 정보
+        bundleMaxQty: bundleMaxQty,
+        bundleUnit: variantBundleUnit,  // 옵션별 합배송 단위 수
+        isBundleDiscount: isBundleDiscount,  // 할인형 여부
       }
     })
 
     const shopId = cart.shopId || null
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
-    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const subtotal = items.reduce((sum, item) => sum + item.itemTotal, 0)
 
-    // 배송비 계산: 상품별 배송비 중 가장 높은 값 사용
-    // 각 상품의 무료배송 기준을 만족하면 해당 상품 배송비는 0
-    let shippingFee = 0
-    for (const item of items) {
-      const itemTotal = item.price * item.quantity
-      const itemShippingFee = item.shippingFee ?? 0
-      const freeShippingAmount = item.freeShippingAmount
-
-      // 무료배송 조건 충족 여부 확인
-      if (freeShippingAmount != null && itemTotal >= freeShippingAmount) {
-        // 무료배송 조건 충족 - 배송비 0
-        continue
-      }
-
-      // 배송비가 있는 경우, 가장 높은 배송비 적용
-      if (itemShippingFee > shippingFee) {
-        shippingFee = itemShippingFee
-      }
-    }
-
-    const total = subtotal + shippingFee
+    // 배송비는 이미 상품 가격에 포함되어 있으므로 0으로 설정
+    const shippingFee = 0
+    const total = subtotal
 
     return {
       id: cart.id,
@@ -351,13 +341,13 @@ export class CartService {
     userId: number | null = null,
     shopId: number | null = null
   ): Promise<{ cart: CartResponse; isExisting: boolean; newSessionId?: string }> {
-    const { publishedProductId, variantId, quantity = 1 } = data
+    const { publishedProductId, variantId, quantity = 1, isBundleItem = false } = data
 
     if (!publishedProductId) {
       throw new ValidationError('publishedProductId는 필수입니다')
     }
 
-    // publishedProduct 확인 (존재 여부만 확인)
+    // publishedProduct 확인 (존재 여부 및 활성 상태 확인)
     const publishedProduct = await prisma.publishedProduct.findFirst({
       where: {
         id: publishedProductId,
@@ -375,12 +365,53 @@ export class CartService {
       throw new NotFoundError('상품', String(publishedProductId))
     }
 
+    // 비활성(품절) 상품은 장바구니에 추가할 수 없음
+    if (!publishedProduct.isActive) {
+      throw new BusinessLogicError('품절된 상품은 장바구니에 담을 수 없습니다')
+    }
+
     const cart = await this.getOrCreateCart(sessionId, userId, shopId)
-    const price = publishedProduct.product.variants[0]?.price || 0
+    const price = publishedProduct.product?.variants[0]?.price || 0
 
     const newSessionId = (cart as any).__newSessionId
 
-    // 기존 아이템 확인
+    // 묶음 상품이면 항상 새로운 아이템으로 추가 (합치지 않음)
+    if (isBundleItem) {
+      // 기존 아이템이 있는지 확인하고 있으면 수량 업데이트
+      const existingItem = await prisma.cartItem.findFirst({
+        where: {
+          cartId: cart.id,
+          publishedProductId,
+          variantId: variantId || null,
+        },
+      })
+
+      if (existingItem) {
+        await prisma.cartItem.update({
+          where: { id: existingItem.id },
+          data: { quantity: existingItem.quantity + quantity },
+        })
+      } else {
+        await prisma.cartItem.create({
+          data: {
+            cartId: cart.id,
+            publishedProductId,
+            variantId: variantId || null,
+            quantity,
+            priceAt: price,
+          },
+        })
+      }
+
+      const updatedCart = await this.getOrCreateCart(newSessionId || sessionId, userId, shopId)
+      return {
+        cart: this.formatCart(updatedCart),
+        isExisting: false,
+        newSessionId,
+      }
+    }
+
+    // 일반 상품: 기존 아이템 확인 후 합치기
     const existingItem = await prisma.cartItem.findFirst({
       where: {
         cartId: cart.id,

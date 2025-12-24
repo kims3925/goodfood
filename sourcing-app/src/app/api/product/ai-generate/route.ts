@@ -1,8 +1,105 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { transformPostToProduct } from '@/modules/transformation'
 import { settingsService } from '@/modules/config/domain/src/settings'
-import prisma from '@bandauto/db'
+import prisma, { AiProvider } from '@bandauto/db'
+
+// =============================================
+// MODEL-SPECIFIC RATE LIMITS
+// =============================================
+
+interface ModelRateLimit {
+  rpm: number
+  tpm: number
+  rpd: number
+}
+
+const GEMINI_RATE_LIMITS: Record<string, ModelRateLimit> = {
+  'gemini-2.5-flash': { rpm: 5, tpm: 250000, rpd: 20 },
+  'gemini-2.5-flash-lite': { rpm: 10, tpm: 250000, rpd: 20 },
+  'gemini-3-flash': { rpm: 5, tpm: 250000, rpd: 20 },
+  'default': { rpm: 5, tpm: 250000, rpd: 20 },
+}
+
+const OPENAI_RATE_LIMITS: Record<string, ModelRateLimit> = {
+  'gpt-4o': { rpm: 500, tpm: 800000, rpd: 10000 },
+  'gpt-4o-mini': { rpm: 500, tpm: 2000000, rpd: 10000 },
+  'gpt-4-turbo': { rpm: 500, tpm: 800000, rpd: 10000 },
+  'default': { rpm: 60, tpm: 150000, rpd: 10000 },
+}
+
+function getModelRateLimit(provider: AiProvider, model: string): ModelRateLimit {
+  if (provider === AiProvider.GEMINI) {
+    return GEMINI_RATE_LIMITS[model] || GEMINI_RATE_LIMITS['default']
+  } else if (provider === AiProvider.OPENAI) {
+    return OPENAI_RATE_LIMITS[model] || OPENAI_RATE_LIMITS['default']
+  }
+  return { rpm: 5, tpm: 250000, rpd: 20 }
+}
+
+/**
+ * 로컬 날짜 문자열 반환 (YYYY-MM-DD)
+ */
+function getLocalDateString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * DB 저장용 로컬 날짜 생성 (UTC 변환 시 날짜가 밀리지 않도록 정오 기준)
+ * 로컬 00:00 → UTC 변환 시 하루 전이 될 수 있음
+ * 로컬 12:00 → UTC 변환 시에도 같은 날짜 유지
+ */
+function getLocalNoonDate(): Date {
+  const now = new Date()
+  now.setHours(12, 0, 0, 0)
+  return now
+}
+
+/**
+ * 일일 사용량 체크 및 리셋
+ */
+async function checkAndResetDailyUsage(aiConfigId: number): Promise<number> {
+  const now = new Date()
+  const todayStr = getLocalDateString(now) // 로컬 시간 기준 "2025-12-18"
+
+  const aiConfig = await prisma.aiApiConfig.findUnique({
+    where: { id: aiConfigId },
+    select: { dailyUsageCount: true, dailyResetDate: true },
+  })
+
+  if (!aiConfig) return 0
+
+  // DB에서 가져온 날짜를 로컬 날짜 문자열로 변환
+  const resetDateStr = aiConfig.dailyResetDate
+    ? getLocalDateString(new Date(aiConfig.dailyResetDate))
+    : null
+
+  console.log('[Daily Usage Check]', {
+    todayStr,
+    resetDateStr,
+    currentCount: aiConfig.dailyUsageCount,
+    needsReset: resetDateStr !== todayStr
+  })
+
+  if (resetDateStr !== todayStr) {
+    await prisma.aiApiConfig.update({
+      where: { id: aiConfigId },
+      data: {
+        dailyUsageCount: 0,
+        dailyResetDate: getLocalNoonDate(),  // UTC 변환 시에도 같은 날짜 유지
+      },
+    })
+    console.log('[Daily Usage Check] Reset to 0')
+    return 0
+  }
+
+  return aiConfig.dailyUsageCount
+}
 
 /**
  * POST /api/product/ai-generate
@@ -66,26 +163,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Note: 수집상품 등록 여부는 여기서 체크하지 않음
-    // 수집상품 페이지에서 AI 변환 후 CollectedProduct를 직접 생성하기 때문
-    // Product 생성 여부만 체크 (중복 상품 방지)
-    const existingProduct = await prisma.product.findFirst({
-      where: {
-        collectedProduct: {
-          postId: post.id,
-        },
-      },
-    })
-
-    if (existingProduct) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: '이미 이 게시물로 생성된 상품이 있습니다.',
-        },
-        { status: 400 }
-      )
-    }
+    // Note: 가공상품이 생성되면 CollectedPost가 삭제되므로
+    // 위의 findUnique에서 자연스럽게 404가 반환됨 (중복 생성 방지)
 
     // Get AI config
     const aiConfigProvider = aiProvider || 'GEMINI'
@@ -112,6 +191,25 @@ export async function POST(request: NextRequest) {
       model: aiConfig.model,
     })
 
+    // RPD 제한 체크
+    const rateLimit = getModelRateLimit(aiConfig.provider, aiConfig.model)
+    const currentDailyUsage = await checkAndResetDailyUsage(aiConfig.id)
+
+    console.log('[AI Product Generation] Daily usage:', `${currentDailyUsage}/${rateLimit.rpd} RPD`)
+
+    if (currentDailyUsage >= rateLimit.rpd) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `일일 API 호출 한도(${rateLimit.rpd}회)에 도달했습니다. 내일 다시 시도해주세요.`,
+          code: 'RPD_LIMIT_EXCEEDED',
+          dailyUsage: currentDailyUsage,
+          dailyLimit: rateLimit.rpd,
+        },
+        { status: 429 }
+      )
+    }
+
     // Get custom prompt if exists
     const promptConfig = await settingsService.getPromptByType(userId, 'product_extraction')
     const customPrompt = promptConfig?.prompt || undefined
@@ -137,13 +235,47 @@ export async function POST(request: NextRequest) {
       variantCount: draft.variants.length,
     })
 
-    // Update AI config usage
+    // 가격 정책 적용 검증 (정책이 설정된 경우에만)
+    let pricePolicyWarning: string | undefined
+    if (policyContent && draft.variants && draft.variants.length > 0) {
+      const unpricedVariants = draft.variants.filter(v =>
+        v.wholesalePrice !== undefined &&
+        v.wholesalePrice !== null &&
+        v.price !== undefined &&
+        v.wholesalePrice === v.price
+      )
+
+      if (unpricedVariants.length > 0) {
+        const failedOptions = unpricedVariants.map(v => v.optionSummary || '기본').join(', ')
+        pricePolicyWarning = `가격 정책 미적용: ${unpricedVariants.length}개 옵션의 도매가와 소매가가 동일합니다. (${failedOptions})`
+
+        console.log('[AI Product Generation] Price policy validation failed:', pricePolicyWarning)
+
+        // 가격 정책 미적용 시 실패로 처리
+        return NextResponse.json(
+          {
+            success: false,
+            error: pricePolicyWarning,
+            code: 'PRICE_POLICY_NOT_APPLIED',
+            draft,  // draft도 함께 반환하여 사용자가 확인할 수 있게
+            unpricedVariants: unpricedVariants.map(v => ({
+              optionSummary: v.optionSummary,
+              wholesalePrice: v.wholesalePrice,
+              price: v.price,
+            })),
+          },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Update AI config usage (총 사용량 + 일일 사용량)
     await prisma.aiApiConfig.update({
       where: { id: aiConfig.id },
       data: {
-        usageCount: {
-          increment: 1,
-        },
+        usageCount: { increment: 1 },
+        dailyUsageCount: { increment: 1 },
+        dailyResetDate: getLocalNoonDate(),  // UTC 변환 시에도 같은 날짜 유지
         lastUsedAt: new Date(),
       },
     })

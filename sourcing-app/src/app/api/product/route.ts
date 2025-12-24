@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { productService } from '@/modules/catalog/domain/src/product'
@@ -15,7 +17,6 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const postId = searchParams.get('postId')
-    const collectedProductId = searchParams.get('collectedProductId')
     const search = searchParams.get('search')
     const channelId = searchParams.get('channelId')
     const sourcePlatform = searchParams.get('sourcePlatform')
@@ -27,7 +28,6 @@ export async function GET(request: NextRequest) {
     const result = await productService.getList({
       userId: currentUser.userId,
       postId: postId ? parseInt(postId) : undefined,
-      collectedProductId: collectedProductId ? parseInt(collectedProductId) : undefined,
       search: search || undefined,
       channelId: channelId ? parseInt(channelId) : undefined,
       sourcePlatform: sourcePlatform || undefined,
@@ -67,11 +67,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       postId,
-      collectedProductId,
+      channelId,
       name,
       description,
       categoryId,
       currency,
+      wholesalePrice,
+      price,
       shippingFee,
       shippingInfo,
       options,
@@ -86,21 +88,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!postId && !collectedProductId) {
-      return NextResponse.json(
-        { success: false, error: 'postId 또는 collectedProductId가 필요합니다.' },
-        { status: 400 }
-      )
-    }
-
     const product = await productService.create({
       userId: currentUser.userId,
       postId,
-      collectedProductId,
+      channelId,
       name,
       description,
       categoryId,
       currency,
+      wholesalePrice,
+      price,
       shippingFee,
       shippingInfo,
       options,
@@ -144,7 +141,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, name, description, categoryId, shippingFee, shippingInfo, options, variants } = body
+    const { id, name, description, categoryId, shippingFee, shippingInfo, bundleMaxQty, bundleUnit, options, variants } = body
 
     if (!id) {
       return NextResponse.json(
@@ -159,6 +156,8 @@ export async function PUT(request: NextRequest) {
       categoryId,
       shippingFee,
       shippingInfo,
+      bundleMaxQty,
+      bundleUnit,
       options,
       variants,
     })

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * Shop Product Detail API
  * 쇼핑몰 상품 상세 조회
@@ -46,17 +48,8 @@ export async function GET(
         options: {
           orderBy: { sortOrder: 'asc' },
         },
-        collectedProduct: {
-          include: {
-            post: {
-              include: {
-                images: {
-                  orderBy: { sortOrder: 'asc' },
-                },
-                channel: true, // 판매자(도매채널) 정보
-              },
-            },
-          },
+        images: {
+          orderBy: { sortOrder: 'asc' },
         },
         publishedProducts: {
           where: publishedProductsWhere,
@@ -76,8 +69,8 @@ export async function GET(
       )
     }
 
-    const mainVariant = product.variants[0]
-    const images = product.collectedProduct?.post?.images?.map((img) => img.url) || []
+    const mainVariant = product?.variants[0]
+    const images = product.images?.map((img) => img.url) || []
 
     // 옵션 그룹화
     const optionGroups = product.options.reduce((acc: Record<string, string[]>, option) => {
@@ -88,13 +81,31 @@ export async function GET(
       return acc
     }, {})
 
+    // 배송비 (발행 시 판매가에 포함)
+    const shippingFee = product.shippingFee ?? 0
+    const bundleMaxQty = (product as any).bundleMaxQty ?? 1
+    const bundleShippingType = (product as any).bundleShippingType || 'NONE'
+
+    // 배송비 포함형(INCLUDED)인지 여부
+    // INCLUDED: 소매가에 이미 배송비 포함, 합배송 시 할인
+    // SEPARATE/NONE: 소매가 + 배송비 별도, 합배송 시 배송비 절약
+    const isBundleIncluded = bundleShippingType === 'INCLUDED'
+
     // variants 정보 (id 포함)
     const formattedVariants = product.variants.map((variant) => ({
       id: variant.id,
       optionSummary: variant.optionSummary || product.name,
-      price: variant.price,
+      // INCLUDED: 이미 배송비 포함된 가격 그대로 사용
+      // SEPARATE/NONE: 배송비 추가
+      price: isBundleIncluded ? variant.price : variant.price + shippingFee,
+      originalPrice: variant.price, // DB에 저장된 원래 가격
       wholesalePrice: variant.wholesalePrice,
+      bundleUnit: variant.bundleUnit || 1,
     }))
+
+    // 합배송 옵션 계산 (bundleMaxQty > 1인 경우)
+    // 참고: 실제 계산은 ProductDetailClient에서 bundleUnit을 고려하여 다시 계산됨
+    const bundleOptions: any[] = []
 
     // 채널 정보 가져오기 (published_product -> channel)
     const publishedProduct = product.publishedProducts[0]
@@ -103,9 +114,10 @@ export async function GET(
     const channelName = channel?.name || null
     const publishChannelId = channel?.id || null
     const publishedProductId = publishedProduct?.id || null
+    const isActive = publishedProduct?.isActive ?? true // 발행 상품의 활성 상태 (비활성이면 품절)
 
-    // 판매자 정보 가져오기 (collectedProduct -> post -> channel)
-    const sellerName = product.collectedProduct?.post?.channel?.name || null
+    // 판매자 정보 (추후 별도 필드로 관리)
+    const sellerName = null
 
     // 배송 정보 파싱 (상품별 배송 정보)
     let parsedShippingInfo: any = {}
@@ -118,13 +130,9 @@ export async function GET(
       }
     }
 
-    // Shop 배송 설정 (쇼핑몰 전역 설정)
-    const shopShippingFee = shop?.defaultShippingFee ?? null
-    const shopFreeShippingAmount = shop?.freeShippingAmount ?? null
-
     const formattedProduct = {
-      id: product.id.toString(),
-      publishedProductId: publishedProductId?.toString() || null, // 추가: 장바구니/주문에 필요
+      id: product.id,
+      publishedProductId: publishedProductId || null, // 추가: 장바구니/주문에 필요
       title: product.name,
       description: product.description || '',
       images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
@@ -140,14 +148,22 @@ export async function GET(
       sellerName,
       shippingFee: product.shippingFee,
       shippingInfo: {
-        // Shop 설정 우선, 없으면 상품별 설정 사용
-        defaultShippingFee: shopShippingFee ?? product.shippingFee ?? 0,
-        freeShippingAmount: shopFreeShippingAmount ?? parsedShippingInfo.freeShippingAmount ?? 0,
+        // 상품별 배송 설정 사용
+        defaultShippingFee: product.shippingFee ?? 0,
+        freeShippingAmount: parsedShippingInfo.freeShippingAmount ?? 0,
         ...parsedShippingInfo,
       },
-      // variants 정보 (가격은 variant에서 가져옴)
+      // variants 정보 (가격은 variant에서 가져옴, 배송비 포함)
       variants: formattedVariants,
       optionGroups: Object.keys(optionGroups).length > 0 ? optionGroups : undefined,
+      // 합배송 옵션 (bundleMaxQty > 1인 경우에만)
+      bundleOptions: bundleOptions.length > 0 ? bundleOptions : undefined,
+      bundleMaxQty: bundleMaxQty > 1 ? bundleMaxQty : undefined,
+      // 합배송 타입: NONE(없음), INCLUDED(배송비 포함형), SEPARATE(배송비 별도형)
+      bundleShippingType: product.bundleShippingType || 'NONE',
+      // 품절 상태 (isActive가 false면 품절)
+      isActive,
+      isSoldOut: !isActive,
     }
 
     return NextResponse.json({

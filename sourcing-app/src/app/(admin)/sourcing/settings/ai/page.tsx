@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, Save, Check, AlertCircle, Sparkles, Zap, DollarSign, TestTube } from 'lucide-react'
+import { Settings, Save, Check, AlertCircle, Sparkles, Zap, DollarSign } from 'lucide-react'
 
 interface AISettings {
   provider: 'gemini' | 'openai'
@@ -54,6 +54,7 @@ export default function AISettingsPage() {
   const saveSettings = async () => {
     try {
       setIsSaving(true)
+      setTestResult(null)
 
       const response = await fetch('/api/settings/ai', {
         method: 'POST',
@@ -61,7 +62,7 @@ export default function AISettingsPage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          provider: settings.provider,
+          provider: settings.provider.toUpperCase(),
           settings: {
             apiKey: settings.provider === 'gemini' ? settings.geminiApiKey : settings.openaiApiKey,
             model: settings.provider === 'gemini' ? settings.geminiModel : settings.openaiModel,
@@ -73,13 +74,14 @@ export default function AISettingsPage() {
       const data = await response.json()
 
       if (data.success) {
-        setTestResult(null)
-        setIsTestSuccess(false)
+        setTestResult({ success: true, message: '설정이 저장되었습니다.' })
         await loadSettings()
       } else {
+        setTestResult({ success: false, message: data.error || '설정 저장에 실패했습니다.' })
       }
     } catch (error) {
       console.error('설정 저장 실패:', error)
+      setTestResult({ success: false, message: '설정 저장 중 오류가 발생했습니다.' })
     } finally {
       setIsSaving(false)
     }
@@ -292,9 +294,9 @@ export default function AISettingsPage() {
                     }}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
-                    <option value="o3-mini">o3-mini ($1.1/1M 입력, 추론 최적화)</option>
+                    <option value="gpt-4.1-nano">GPT-4.1-nano ($0.10/1M 입력, 빠르고 저렴, 추천!)</option>
                     <option value="gpt-4o-mini">GPT-4o-mini ($0.15/1M 입력, 가성비)</option>
-                    <option value="gpt-5-mini">GPT-5-mini (최신, 고성능)</option>
+                    <option value="o3-mini">o3-mini ($1.1/1M 입력, 추론 최적화)</option>
                     <option value="gpt-4o">GPT-4o ($2.5/1M 입력, 고성능)</option>
                   </select>
                 </div>
@@ -306,10 +308,10 @@ export default function AISettingsPage() {
                     <span className="text-sm font-medium text-green-800">가격 정보</span>
                   </div>
                   <div className="text-xs text-green-700 space-y-1">
-                    <div>• o3-mini: 입력 $1.1/1M, 출력 $4.4/1M (추론 최적화, 추천!)</div>
-                    <div>• GPT-4o-mini: 입력 $0.15/1M, 출력 $0.6/1M (가성비)</div>
+                    <div>• GPT-4.1-nano: 입력 $0.10/1M, 출력 $0.40/1M (빠르고 저렴, 추천!)</div>
+                    <div>• GPT-4o-mini: 입력 $0.15/1M, 출력 $0.60/1M (가성비)</div>
+                    <div>• o3-mini: 입력 $1.1/1M, 출력 $4.4/1M (추론 최적화)</div>
                     <div>• GPT-4o: 입력 $2.5/1M, 출력 $10/1M (고성능)</div>
-                    <div>• 신규 사용자: $5 무료 크레딧 (3개월 유효)</div>
                   </div>
                 </div>
 
@@ -391,39 +393,44 @@ export default function AISettingsPage() {
               )}
 
               {/* Helper Text */}
-              {!isTestSuccess && (
+              {!currentApiKey ? (
                 <p className="text-xs text-gray-500 text-right mb-2">
-                  * 연결 테스트를 먼저 완료해주세요
+                  * API Key를 입력해주세요
+                </p>
+              ) : !isTestSuccess && (
+                <p className="text-xs text-gray-500 text-right mb-2">
+                  * 연결 테스트 후 저장할 수 있습니다
                 </p>
               )}
 
               <div className="flex justify-end gap-3">
-                {/* Connection Test Button */}
+                {/* 연결 테스트 버튼 */}
                 <button
                   onClick={testConnection}
                   disabled={isTesting || !currentApiKey}
-                  className={`flex items-center gap-2 px-6 py-2 text-white rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
-                    settings.provider === 'gemini' ? 'bg-purple-500' : 'bg-green-500'
-                  }`}
+                  className="flex items-center gap-2 px-6 py-2 border border-gray-300 text-gray-700 bg-white rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isTesting ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
                       테스트 중...
                     </>
                   ) : (
                     <>
-                      <TestTube className="h-4 w-4" />
+                      <Zap className="h-4 w-4" />
                       연결 테스트
                     </>
                   )}
                 </button>
 
-                {/* Save Settings Button */}
+                {/* 저장 버튼 - 연결 테스트 성공 후 활성화 */}
                 <button
                   onClick={saveSettings}
-                  disabled={isSaving || !isTestSuccess}
-                  className="flex items-center gap-2 px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  disabled={isSaving || !currentApiKey || !isTestSuccess}
+                  className={`flex items-center gap-2 px-6 py-2 text-white rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+                    settings.provider === 'gemini' ? 'bg-purple-500' : 'bg-green-500'
+                  }`}
+                  title={!isTestSuccess ? '연결 테스트를 먼저 진행해주세요' : ''}
                 >
                   {isSaving ? (
                     <>
@@ -433,7 +440,7 @@ export default function AISettingsPage() {
                   ) : (
                     <>
                       <Save className="h-4 w-4" />
-                      설정 저장
+                      저장
                     </>
                   )}
                 </button>

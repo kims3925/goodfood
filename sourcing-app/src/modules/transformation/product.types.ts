@@ -55,7 +55,6 @@ export interface OptionPrice {
  */
 export interface ShippingInfo {
   shippingIncluded: boolean        // 배송비 포함 여부
-  bundleDiscount?: string | null   // 묶음 할인 정보 (예: "2세트이상 4000원 차감")
   maxBundle?: number | null        // 합배송 최대 수량
 }
 
@@ -65,6 +64,7 @@ export interface ShippingInfo {
 export interface ShippingExtracted {
   shippingFee: number | null       // 배송비 금액 (null이면 정보 없음)
   shippingInfo: string | null      // 배송 관련 원문 정보
+  bundleMaxQty: number | null      // 합배송 최대 수량 (null이면 합배송 불가)
 }
 
 /**
@@ -84,6 +84,7 @@ export interface GeneratedVariant {
   options: Record<string, string>          // { "색상": "빨강", "사이즈": "L" }
   wholesalePrice?: number                  // 도매가
   price?: number                           // 판매가
+  bundleUnit?: number                      // 합배송 단위 수 (예: 2박스 옵션이면 2)
 }
 
 /**
@@ -104,8 +105,9 @@ export interface ProductDraft {
   price?: number         // 판매가 (selling price)
 
   // Shipping
-  shippingFee?: number   // 배송비 금액
-  shippingInfo?: string  // 배송 관련 원문 정보
+  shippingFee?: number       // 배송비 금액
+  shippingInfo?: string      // 배송 관련 원문 정보
+  bundleMaxQty?: number      // 합배송 최대 수량
 
   // Options & Variants
   options: OptionGroup[]

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus, Upload, Info } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus, Upload, Info, Truck } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -19,31 +19,27 @@ interface ProductImage {
 
 interface Product {
   id: number
-  collectedProductId: number | null
+  channelId: number | null
   name: string
   description: string | null
   thumbnailUrl: string | null
   categoryId: string | null
+  wholesalePrice: number | null
+  price: number | null
   currency: string
+  shippingFee: number | null
+  shippingInfo: string | null
+  bundleMaxQty: number | null
+  bundleUnit: string | null
+  bundleShippingType: 'NONE' | 'INCLUDED' | 'SEPARATE'
   createdAt: string
   updatedAt: string
   images: ProductImage[]
-  collectedProduct?: {
+  channel?: {
     id: number
-    post?: {
-      id: number
-      title: string
-      content: string | null
-      channel: {
-        id: number
-        name: string
-        coverUrl: string | null
-      }
-      images: Array<{
-        id: number
-        imageUrl: string
-      }>
-    }
+    name: string
+    coverUrl: string | null
+    platform?: string
   } | null
   options: Array<{
     id: number
@@ -59,7 +55,7 @@ interface Product {
   }>
 }
 
-interface PublishHistory {
+interface PublishedProduct {
   id: number
   status: 'PENDING' | 'SUCCESS' | 'FAILED'
   publishType: 'RETAIL_BAND' | 'SHOPPING_MALL'
@@ -105,7 +101,7 @@ export default function ProductDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false)
 
   // 발행현황 상태
-  const [publishHistory, setPublishHistory] = useState<PublishHistory[]>([])
+  const [publishedProducts, setPublishedProducts] = useState<PublishedProduct[]>([])
   const [isLoadingPublish, setIsLoadingPublish] = useState(false)
 
   // 옵션 편집 상태
@@ -122,6 +118,24 @@ export default function ProductDetailPage() {
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // 배송비 편집 상태
+  const [isEditingShipping, setIsEditingShipping] = useState(false)
+  const [isSavingShipping, setIsSavingShipping] = useState(false)
+  const [shippingFormData, setShippingFormData] = useState({
+    shippingFee: 0,
+    shippingInfo: '',
+    bundleMaxQty: 1,
+    bundleUnit: '개',
+    bundleShippingType: 'NONE' as 'NONE' | 'INCLUDED' | 'SEPARATE',
+  })
+  const [originalShippingData, setOriginalShippingData] = useState({
+    shippingFee: 0,
+    shippingInfo: '',
+    bundleMaxQty: 1,
+    bundleUnit: '개',
+    bundleShippingType: 'NONE' as 'NONE' | 'INCLUDED' | 'SEPARATE',
+  })
+
   useEffect(() => {
     if (productId) {
       loadProduct()
@@ -130,7 +144,7 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (activeTab === 'publish' && productId) {
-      loadPublishHistory()
+      loadPublishedProducts()
     }
   }, [activeTab, productId])
 
@@ -149,6 +163,17 @@ export default function ProductDetailPage() {
           description: data.data.description || '',
           categoryId: data.data.categoryId || '',
         })
+        // 배송비 데이터 초기화
+        const shippingData = {
+          shippingFee: data.data.shippingFee || 0,
+          shippingInfo: data.data.shippingInfo || '',
+          bundleMaxQty: data.data.bundleMaxQty || 1,
+          bundleUnit: data.data.bundleUnit || '개',
+          bundleShippingType: (data.data.bundleShippingType || 'NONE') as 'NONE' | 'INCLUDED' | 'SEPARATE',
+        }
+        setShippingFormData(shippingData)
+        setOriginalShippingData(shippingData)
+
         if (data.data.images) {
           setImages(data.data.images.map((img: any) => ({
             id: img.id,
@@ -168,14 +193,14 @@ export default function ProductDetailPage() {
     }
   }
 
-  const loadPublishHistory = async () => {
+  const loadPublishedProducts = async () => {
     try {
       setIsLoadingPublish(true)
       const response = await fetch(`/api/product/publish?productId=${productId}`)
       const data = await response.json()
 
       if (data.success) {
-        setPublishHistory(data.data || [])
+        setPublishedProducts(data.data || [])
       }
     } catch (err) {
       console.error('발행현황 로드 실패:', err)
@@ -214,6 +239,47 @@ export default function ProductDetailPage() {
     } finally {
       setIsSavingInfo(false)
     }
+  }
+
+  // 배송비 저장
+  const handleSaveShipping = async () => {
+    if (!product) return
+
+    setIsSavingShipping(true)
+    try {
+      const response = await fetch('/api/product', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: product.id,
+          shippingFee: shippingFormData.shippingFee,
+          shippingInfo: shippingFormData.shippingInfo.trim() || null,
+          bundleMaxQty: shippingFormData.bundleMaxQty,
+          bundleUnit: shippingFormData.bundleUnit.trim() || '개',
+        }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        toast.success('배송 정보가 저장되었습니다.')
+        // 저장 후 원래 데이터 업데이트
+        setOriginalShippingData({ ...shippingFormData })
+        loadProduct()
+        setIsEditingShipping(false)
+      } else {
+        toast.error('배송 정보 저장에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('배송 정보 저장 실패:', error)
+      toast.error('배송 정보 저장에 실패했습니다.')
+    } finally {
+      setIsSavingShipping(false)
+    }
+  }
+
+  // 배송비 원래 값으로 되돌리기
+  const handleResetShipping = () => {
+    setShippingFormData({ ...originalShippingData })
   }
 
   // 옵션 편집 시작
@@ -636,11 +702,11 @@ export default function ProductDetailPage() {
               }`}
             >
               발행현황
-              {publishHistory.length > 0 && (
+              {publishedProducts.length > 0 && (
                 <span className={`px-1.5 py-0.5 rounded-full text-xs ${
                   activeTab === 'publish' ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-600'
                 }`}>
-                  {publishHistory.length}
+                  {publishedProducts.length}
                 </span>
               )}
             </button>
@@ -947,6 +1013,7 @@ export default function ProductDetailPage() {
                           </div>
                         </div>
                       )}
+
                     </div>
                   )}
                 </div>
@@ -1272,24 +1339,194 @@ export default function ProductDetailPage() {
                 </div>
               </div>
 
-              {/* 원본 게시물 정보 */}
-              {product.collectedProduct?.post && (
+              {/* 배송비 정보 */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-sky-100 rounded-lg">
+                        <Truck size={18} className="text-sky-600" />
+                      </div>
+                      <span className="font-semibold text-slate-900">배송 정보</span>
+                    </div>
+                    {isEditingShipping ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setIsEditingShipping(false)
+                            setShippingFormData({ ...originalShippingData })
+                          }}
+                        >
+                          <X size={14} className="mr-1" />
+                          취소
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={handleSaveShipping}
+                          disabled={isSavingShipping}
+                        >
+                          <Save size={14} className="mr-1" />
+                          {isSavingShipping ? '저장중...' : '저장'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setIsEditingShipping(true)}
+                      >
+                        <Edit size={14} className="mr-1" />
+                        수정
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  {isEditingShipping ? (
+                    <>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">배송비</label>
+                        <div className="flex items-center gap-2 flex-nowrap">
+                          <Input
+                            type="number"
+                            value={shippingFormData.shippingFee || ''}
+                            onChange={(e) => setShippingFormData({ ...shippingFormData, shippingFee: parseInt(e.target.value) || 0 })}
+                            placeholder="0"
+                            className="!rounded-xl w-24"
+                          />
+                          <span className="text-slate-500 text-sm whitespace-nowrap">원</span>
+                          <button
+                            onClick={handleResetShipping}
+                            className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors whitespace-nowrap"
+                          >
+                            복구
+                          </button>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">0원 입력 시 무료배송으로 표시됩니다</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">최대 합배송</label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            value={shippingFormData.bundleMaxQty || ''}
+                            onChange={(e) => setShippingFormData({ ...shippingFormData, bundleMaxQty: parseInt(e.target.value) || 1 })}
+                            placeholder="1"
+                            min={1}
+                            className="!rounded-xl w-16"
+                          />
+                          <select
+                            value={shippingFormData.bundleUnit}
+                            onChange={(e) => setShippingFormData({ ...shippingFormData, bundleUnit: e.target.value })}
+                            className="px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                          >
+                            <option value="개">개</option>
+                            <option value="박스">박스</option>
+                            <option value="kg">kg</option>
+                            <option value="세트">세트</option>
+                            <option value="팩">팩</option>
+                          </select>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">1 입력 시 합배송 불가로 표시됩니다</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">배송 안내</label>
+                        <textarea
+                          value={shippingFormData.shippingInfo}
+                          onChange={(e) => setShippingFormData({ ...shippingFormData, shippingInfo: e.target.value })}
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent resize-none"
+                          rows={4}
+                          placeholder="배송 안내 문구를 입력하세요"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-xl">
+                            <Truck size={18} className="text-slate-500" />
+                          </div>
+                          <div>
+                            <p className="text-slate-500 text-xs">배송비</p>
+                            <p className="font-medium text-slate-900">
+                              {product.shippingFee === 0 ? '무료배송' : product.shippingFee ? `₩${product.shippingFee.toLocaleString()}` : '정보 없음'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-10 h-10 bg-sky-50 rounded-xl">
+                            <Package size={18} className="text-sky-500" />
+                          </div>
+                          <div>
+                            <p className="text-slate-500 text-xs">최대 합배송</p>
+                            <p className="font-medium text-slate-900">
+                              {product.bundleMaxQty && product.bundleMaxQty > 1
+                                ? `${product.bundleMaxQty}${product.bundleUnit || '개'}`
+                                : '합배송 불가'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-10 h-10 bg-purple-50 rounded-xl">
+                            <Tag size={18} className="text-purple-500" />
+                          </div>
+                          <div>
+                            <p className="text-slate-500 text-xs">합배송 타입</p>
+                            <p className="font-medium text-slate-900">
+                              {product.bundleShippingType === 'INCLUDED' && (
+                                <span className="text-green-600">배송비 포함형</span>
+                              )}
+                              {product.bundleShippingType === 'SEPARATE' && (
+                                <span className="text-blue-600">배송비 별도형</span>
+                              )}
+                              {product.bundleShippingType === 'NONE' && (
+                                <span className="text-slate-400">합배송 없음</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {product.shippingInfo && (
+                        <div className="pt-4 border-t border-slate-100">
+                          <p className="text-slate-500 text-xs mb-2">배송 안내</p>
+                          <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                            <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                              {product.shippingInfo}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* 출처 채널 정보 */}
+              {product.channel && (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                   <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                     <div className="flex items-center gap-2">
                       <div className="p-2 bg-amber-100 rounded-lg">
                         <FileText size={18} className="text-amber-600" />
                       </div>
-                      <span className="font-semibold text-slate-900">원본 게시물 정보</span>
+                      <span className="font-semibold text-slate-900">출처 채널 정보</span>
                     </div>
                   </div>
 
                   <div className="p-6 space-y-4">
                     <div className="flex items-center gap-3">
-                      {product.collectedProduct.post.channel.coverUrl ? (
+                      {product.channel.coverUrl ? (
                         <img
-                          src={product.collectedProduct.post.channel.coverUrl}
-                          alt={product.collectedProduct.post.channel.name}
+                          src={product.channel.coverUrl}
+                          alt={product.channel.name}
                           className="w-10 h-10 rounded-xl object-cover"
                         />
                       ) : (
@@ -1299,22 +1536,9 @@ export default function ProductDetailPage() {
                       )}
                       <div>
                         <p className="text-slate-500 text-xs">출처 채널</p>
-                        <p className="font-medium text-slate-900">{product.collectedProduct.post.channel.name}</p>
+                        <p className="font-medium text-slate-900">{product.channel.name}</p>
                       </div>
                     </div>
-
-                    <div>
-                      <p className="text-slate-500 text-xs mb-1">게시물 제목</p>
-                      <p className="text-slate-900 font-medium">{product.collectedProduct.post.title}</p>
-                    </div>
-
-                    <Link
-                      href={`/collected-product/${product.collectedProductId}`}
-                      className="inline-flex items-center gap-2 text-amber-600 hover:text-amber-700 text-sm font-medium transition-colors"
-                    >
-                      <ExternalLink size={16} />
-                      수집 상품 상세 보기
-                    </Link>
                   </div>
                 </div>
               )}
@@ -1338,9 +1562,9 @@ export default function ProductDetailPage() {
                 <div className="flex justify-center py-12">
                   <Loading />
                 </div>
-              ) : publishHistory.length > 0 ? (
+              ) : publishedProducts.length > 0 ? (
                 <div className="space-y-3">
-                  {publishHistory.map((publish) => (
+                  {publishedProducts.map((publish) => (
                     <div
                       key={publish.id}
                       className="group relative bg-gradient-to-r from-slate-50 to-white p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors"

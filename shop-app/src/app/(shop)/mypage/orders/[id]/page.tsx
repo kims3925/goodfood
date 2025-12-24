@@ -27,6 +27,8 @@ import {
 } from 'lucide-react'
 import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import { useShop } from '@/contexts/ShopContext'
+import toast from 'react-hot-toast'
 
 // 취소 사유 목록
 const CANCEL_REASONS = [
@@ -36,6 +38,31 @@ const CANCEL_REASONS = [
   { value: 'DELIVERY_DELAY', label: '배송 지연' },
   { value: 'OUT_OF_STOCK', label: '상품 품절' },
   { value: 'OTHER', label: '기타' },
+]
+
+// 은행 목록
+const BANK_LIST = [
+  { code: 'KB', name: 'KB국민은행' },
+  { code: 'SHINHAN', name: '신한은행' },
+  { code: 'WOORI', name: '우리은행' },
+  { code: 'HANA', name: '하나은행' },
+  { code: 'NH', name: 'NH농협은행' },
+  { code: 'IBK', name: 'IBK기업은행' },
+  { code: 'SC', name: 'SC제일은행' },
+  { code: 'CITI', name: '한국씨티은행' },
+  { code: 'KAKAO', name: '카카오뱅크' },
+  { code: 'TOSS', name: '토스뱅크' },
+  { code: 'KBANK', name: '케이뱅크' },
+  { code: 'POST', name: '우체국' },
+  { code: 'SUHYUP', name: '수협은행' },
+  { code: 'BUSAN', name: '부산은행' },
+  { code: 'DAEGU', name: '대구은행' },
+  { code: 'KWANGJU', name: '광주은행' },
+  { code: 'JEONBUK', name: '전북은행' },
+  { code: 'JEJU', name: '제주은행' },
+  { code: 'KYONGNAM', name: '경남은행' },
+  { code: 'SAEMAUL', name: '새마을금고' },
+  { code: 'SHINHYUP', name: '신협' },
 ]
 
 // 취소 가능한 상태
@@ -150,6 +177,8 @@ export default function OrderDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { getPath, getApiPath } = useShopUrl()
+  const { shop } = useShop()
+  const primaryColor = shop?.theme?.primaryColor || '#FF6B6B'
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -161,6 +190,11 @@ export default function OrderDetailPage() {
   const [cancelReason, setCancelReason] = useState('')
   const [customReason, setCustomReason] = useState('')
   const [cancelLoading, setCancelLoading] = useState(false)
+
+  // 환불 계좌 상태 (무통장입금용)
+  const [refundBankName, setRefundBankName] = useState('')
+  const [refundAccountNumber, setRefundAccountNumber] = useState('')
+  const [refundAccountHolder, setRefundAccountHolder] = useState('')
 
   const orderId = params.id as string
 
@@ -261,7 +295,14 @@ export default function OrderDetailPage() {
     setCancelModalOpen(false)
     setCancelReason('')
     setCustomReason('')
+    setRefundBankName('')
+    setRefundAccountNumber('')
+    setRefundAccountHolder('')
   }
+
+  // 무통장입금/가상계좌 결제 여부 확인
+  const isVirtualAccountPayment = order?.payment?.method === 'VIRTUAL_ACCOUNT' || order?.payment?.method === 'BANK_TRANSFER'
+  const needsRefundAccount = isVirtualAccountPayment && order?.status === 'PAID'
 
   // 주문 취소 처리
   const handleCancelOrder = async () => {
@@ -273,16 +314,35 @@ export default function OrderDetailPage() {
       return
     }
 
+    // 무통장입금 환불 계좌 검증
+    if (needsRefundAccount) {
+      if (!refundBankName || !refundAccountNumber.trim() || !refundAccountHolder.trim()) {
+        toast.error('환불 계좌 정보를 모두 입력해주세요.')
+        return
+      }
+    }
+
     try {
       setCancelLoading(true)
+
+      const requestBody: any = {
+        reason: cancelReason,
+        customReason: cancelReason === 'OTHER' ? customReason : undefined,
+      }
+
+      // 무통장입금 환불 계좌 정보 추가
+      if (needsRefundAccount) {
+        requestBody.refundAccount = {
+          bankName: refundBankName,
+          accountNumber: refundAccountNumber.trim(),
+          accountHolder: refundAccountHolder.trim(),
+        }
+      }
 
       const response = await fetch(getApiPath(`/api/orders/${order.id}/cancel`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reason: cancelReason,
-          customReason: cancelReason === 'OTHER' ? customReason : undefined,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       const data = await response.json()
@@ -290,9 +350,12 @@ export default function OrderDetailPage() {
       if (data.success) {
         closeCancelModal()
         fetchOrder() // 주문 정보 새로고침
+      } else {
+        toast.error(data.error || '주문 취소에 실패했습니다.')
       }
     } catch (error) {
       console.error('주문 취소 오류:', error)
+      toast.error('주문 취소 중 오류가 발생했습니다.')
     } finally {
       setCancelLoading(false)
     }
@@ -300,10 +363,14 @@ export default function OrderDetailPage() {
 
   // 배송 진행 상태 계산
   const getDeliverySteps = () => {
+    // 상품준비중: PREPARING, SHIPPED, DELIVERED 상태이면 완료
+    const preparingCompleted = order?.status === 'PREPARING' || order?.status === 'SHIPPED' || order?.status === 'DELIVERED'
+
     const steps = [
       { key: 'ordered', label: '주문접수', date: order?.orderedAt, completed: true },
       { key: 'paid', label: '결제완료', date: order?.paidAt, completed: !!order?.paidAt },
-      { key: 'shipped', label: '배송시작', date: order?.shippedAt, completed: !!order?.shippedAt },
+      { key: 'preparing', label: '상품준비', date: null, completed: preparingCompleted },
+      { key: 'shipped', label: '배송중', date: order?.shippedAt, completed: !!order?.shippedAt },
       { key: 'delivered', label: '배송완료', date: order?.deliveredAt, completed: !!order?.deliveredAt },
     ]
     return steps
@@ -313,7 +380,7 @@ export default function OrderDetailPage() {
     return (
       <div className="kurly-container py-12">
         <div className="text-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B6B] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: primaryColor }}></div>
           <p className="mt-4 text-gray-600">주문 정보를 불러오는 중...</p>
         </div>
       </div>
@@ -328,7 +395,8 @@ export default function OrderDetailPage() {
           <p className="text-gray-600 mb-4">{error || '주문을 찾을 수 없습니다'}</p>
           <Link
             href={getPath('/mypage/orders')}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#FF6B6B] text-white rounded-md hover:bg-[#FF5252]"
+            className="inline-flex items-center gap-2 px-6 py-3 text-white rounded-md hover:opacity-90"
+            style={{ backgroundColor: primaryColor }}
           >
             <ArrowLeft className="w-4 h-4" />
             주문 목록으로
@@ -424,7 +492,7 @@ export default function OrderDetailPage() {
               </div>
               <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
                 <span className="text-gray-500 text-sm">입금 금액</span>
-                <span className="text-xl font-bold text-[#FF6B6B]">{formatPrice(order.totalAmount)}</span>
+                <span className="text-xl font-bold" style={{ color: primaryColor }}>{formatPrice(order.totalAmount)}</span>
               </div>
             </div>
           </div>
@@ -459,16 +527,17 @@ export default function OrderDetailPage() {
       {!isCancelled && (
         <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
           <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <Truck className="w-5 h-5 text-[#FF6B6B]" />
+            <Truck className="w-5 h-5" style={{ color: primaryColor }} />
             배송 현황
           </h2>
-          <div className="relative">
+          <div className="relative max-w-2xl mx-auto">
             {/* Progress Line */}
             <div className="absolute top-6 left-6 right-6 h-0.5 bg-gray-200">
               <div
-                className="absolute top-0 left-0 h-full bg-[#FF6B6B] transition-all"
+                className="absolute top-0 left-0 h-full transition-all"
                 style={{
-                  width: `${(deliverySteps.filter(s => s.completed).length - 1) / (deliverySteps.length - 1) * 100}%`
+                  width: `${(deliverySteps.filter(s => s.completed).length - 1) / (deliverySteps.length - 1) * 100}%`,
+                  backgroundColor: primaryColor
                 }}
               ></div>
             </div>
@@ -479,9 +548,10 @@ export default function OrderDetailPage() {
                   <div
                     className={`w-12 h-12 rounded-full flex items-center justify-center z-10 ${
                       step.completed
-                        ? 'bg-[#FF6B6B] text-white'
+                        ? 'text-white'
                         : 'bg-gray-200 text-gray-400'
                     }`}
+                    style={step.completed ? { backgroundColor: primaryColor } : {}}
                   >
                     {step.completed ? (
                       <CheckCircle className="w-6 h-6" />
@@ -513,7 +583,7 @@ export default function OrderDetailPage() {
           {/* 주문 상품 목록 */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Package className="w-5 h-5 text-[#FF6B6B]" />
+              <Package className="w-5 h-5" style={{ color: primaryColor }} />
               주문 상품 ({order.items.length}개)
             </h2>
             <div className="space-y-4">
@@ -559,7 +629,7 @@ export default function OrderDetailPage() {
           {order.shippingAddress && (
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-[#FF6B6B]" />
+                <MapPin className="w-5 h-5" style={{ color: primaryColor }} />
                 배송지 정보
               </h2>
               <div className="space-y-3 text-sm">
@@ -606,38 +676,49 @@ export default function OrderDetailPage() {
           {/* 결제 금액 */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[#FF6B6B]" />
+              <FileText className="w-5 h-5" style={{ color: primaryColor }} />
               결제 금액
             </h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">상품 금액</span>
-                <span className="text-gray-900">{formatPrice(order.subtotalAmount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">배송비</span>
-                <span className={order.shippingFee === 0 ? 'text-green-600' : 'text-gray-900'}>
-                  {order.shippingFee === 0 ? '무료' : formatPrice(order.shippingFee)}
-                </span>
-              </div>
-              {order.discountAmount > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">할인 금액</span>
-                  <span className="text-red-600">-{formatPrice(order.discountAmount)}</span>
+            {(() => {
+              // 상품 금액 합계 계산 (각 아이템의 totalPrice 합)
+              const itemsTotal = order.items.reduce((sum, item) => sum + item.totalPrice, 0)
+              // 실제 할인 금액 계산 (저장된 값이 없으면 계산)
+              const actualDiscount = order.discountAmount > 0
+                ? order.discountAmount
+                : Math.max(0, itemsTotal - order.totalAmount)
+
+              return (
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">상품 금액</span>
+                    <span className="text-gray-900">{formatPrice(itemsTotal)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">배송비</span>
+                    <span className={order.shippingFee === 0 ? 'text-green-600' : 'text-gray-900'}>
+                      {order.shippingFee === 0 ? '무료' : formatPrice(order.shippingFee)}
+                    </span>
+                  </div>
+                  {actualDiscount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">묶음 할인</span>
+                      <span className="text-green-600">-{formatPrice(actualDiscount)}</span>
+                    </div>
+                  )}
+                  <div className="pt-3 border-t border-gray-200 flex justify-between">
+                    <span className="font-bold text-gray-900">총 결제금액</span>
+                    <span className="text-xl font-bold" style={{ color: primaryColor }}>{formatPrice(order.totalAmount)}</span>
+                  </div>
                 </div>
-              )}
-              <div className="pt-3 border-t border-gray-200 flex justify-between">
-                <span className="font-bold text-gray-900">총 결제금액</span>
-                <span className="text-xl font-bold text-[#FF6B6B]">{formatPrice(order.totalAmount)}</span>
-              </div>
-            </div>
+              )
+            })()}
           </div>
 
           {/* 결제 정보 */}
           {order.payment && (
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-[#FF6B6B]" />
+                <CreditCard className="w-5 h-5" style={{ color: primaryColor }} />
                 결제 정보
               </h2>
               <div className="space-y-3 text-sm">
@@ -698,7 +779,7 @@ export default function OrderDetailPage() {
           {/* 주문자 정보 */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <User className="w-5 h-5 text-[#FF6B6B]" />
+              <User className="w-5 h-5" style={{ color: primaryColor }} />
               주문자 정보
             </h2>
             <div className="space-y-3 text-sm">
@@ -726,7 +807,8 @@ export default function OrderDetailPage() {
             {order.hasWritableReview && (
               <Link
                 href={getPath('/mypage/reviews')}
-                className="block w-full px-4 py-3 bg-[#FF6B6B] text-white text-center rounded-lg font-medium hover:bg-[#FF5252] transition-colors"
+                className="block w-full px-4 py-3 text-white text-center rounded-lg font-medium hover:opacity-90 transition-colors"
+                style={{ backgroundColor: primaryColor }}
               >
                 후기 작성하기
               </Link>
@@ -783,7 +865,7 @@ export default function OrderDetailPage() {
                 <select
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">취소 사유를 선택해주세요</option>
                   {CANCEL_REASONS.map((reason) => (
@@ -804,8 +886,65 @@ export default function OrderDetailPage() {
                     onChange={(e) => setCustomReason(e.target.value)}
                     placeholder="취소 사유를 입력해주세요"
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent resize-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
                   />
+                </div>
+              )}
+
+              {/* 무통장입금 환불 계좌 입력 */}
+              {needsRefundAccount && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-blue-800 mb-2">
+                    <Building2 className="w-4 h-4" />
+                    <p className="text-sm font-medium">환불 계좌 정보</p>
+                  </div>
+                  <p className="text-xs text-blue-600 mb-3">
+                    무통장입금 환불을 위해 계좌 정보를 입력해주세요.
+                  </p>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      은행 선택 <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={refundBankName}
+                      onChange={(e) => setRefundBankName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    >
+                      <option value="">은행을 선택해주세요</option>
+                      {BANK_LIST.map((bank) => (
+                        <option key={bank.code} value={bank.name}>
+                          {bank.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      계좌번호 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={refundAccountNumber}
+                      onChange={(e) => setRefundAccountNumber(e.target.value.replace(/[^0-9-]/g, ''))}
+                      placeholder="'-' 없이 숫자만 입력"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      예금주 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={refundAccountHolder}
+                      onChange={(e) => setRefundAccountHolder(e.target.value)}
+                      placeholder="예금주명 입력"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -821,7 +960,7 @@ export default function OrderDetailPage() {
               </button>
               <button
                 onClick={handleCancelOrder}
-                disabled={cancelLoading || !cancelReason}
+                disabled={cancelLoading || !cancelReason || (needsRefundAccount && (!refundBankName || !refundAccountNumber || !refundAccountHolder))}
                 className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {cancelLoading ? (

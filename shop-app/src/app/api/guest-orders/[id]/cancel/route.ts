@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * 비회원 주문 취소 API
  * 토큰 검증 후 취소 처리
@@ -55,7 +57,7 @@ export async function POST(
 
     // 요청 본문 파싱
     const body = await req.json()
-    const { reason } = body
+    const { reason, refundAccount } = body
 
     if (!reason) {
       return NextResponse.json(
@@ -99,6 +101,17 @@ export async function POST(
       )
     }
 
+    // 무통장입금/가상계좌 결제의 경우 환불 계좌 정보 필수 확인
+    const isVirtualAccountPayment = guestOrder.payment?.method === 'VIRTUAL_ACCOUNT' || guestOrder.payment?.method === 'BANK_TRANSFER'
+    if (isVirtualAccountPayment && guestOrder.status === 'PAID') {
+      if (!refundAccount || !refundAccount.bankName || !refundAccount.accountNumber || !refundAccount.accountHolder) {
+        return NextResponse.json(
+          { success: false, error: '무통장입금 환불을 위해 환불 계좌 정보를 입력해주세요' },
+          { status: 400 }
+        )
+      }
+    }
+
     // 주문 취소 처리
     const cancelledOrder = await prisma.$transaction(async (tx) => {
       // 주문 상태 업데이트
@@ -122,6 +135,19 @@ export async function POST(
             updatedAt: new Date(),
           },
         })
+      }
+
+      // 무통장입금/가상계좌 환불 계좌 정보 저장
+      if (isVirtualAccountPayment && refundAccount) {
+        await tx.refundAccount.create({
+          data: {
+            guestOrderId: updatedOrder.id,
+            bankName: refundAccount.bankName,
+            accountNumber: refundAccount.accountNumber,
+            accountHolder: refundAccount.accountHolder,
+          },
+        })
+        console.log(`비회원 환불 계좌 정보 저장: ${refundAccount.bankName} ${refundAccount.accountNumber}`)
       }
 
       return updatedOrder
