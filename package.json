@@ -20,7 +20,7 @@
     "build:sourcing": "cd sourcing-app && npm run build",
     "build:all": "npm run build:shop && npm run build:sourcing",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx --ignore-path .gitignore",
     "test": "npx playwright test",
     "test:headed": "npx playwright test --headed",
     "test:ui": "npx playwright test --ui",
