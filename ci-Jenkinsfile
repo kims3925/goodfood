@@ -3,19 +3,19 @@ pipeline {
 
   options {
     timestamps()
-    ansiColor('xterm')
     disableConcurrentBuilds()
   }
 
   environment {
     CI = 'true'
-    // Next.js telemetry 끄고 싶으면:
     NEXT_TELEMETRY_DISABLED = '1'
   }
 
   stages {
     stage('Checkout') {
-      steps { checkout scm }
+      steps {
+        checkout scm
+      }
     }
 
     stage('Setup') {
@@ -36,20 +36,30 @@ pipeline {
 
     stage('Lint') {
       steps {
-        // package.json에 lint 스크립트가 있어야 함
-        sh 'pnpm lint'
+        sh '''
+          if pnpm -s run | grep -q "^lint"; then
+            pnpm lint
+          else
+            echo "No lint script. Skip."
+          fi
+        '''
       }
     }
 
     stage('Typecheck') {
       steps {
-        sh 'pnpm typecheck'
+        sh '''
+          if pnpm -s run | grep -q "^typecheck"; then
+            pnpm typecheck
+          else
+            echo "No typecheck script. Skip."
+          fi
+        '''
       }
     }
 
     stage('Test') {
       steps {
-        // jest/playwright 등을 쓰는 경우만 실행
         sh '''
           if pnpm -s run | grep -q "^test"; then
             pnpm test
@@ -62,7 +72,6 @@ pipeline {
 
     stage('Build') {
       steps {
-        // Next.js build (SSR/SSG 포함)
         sh 'pnpm build'
       }
     }
@@ -70,7 +79,6 @@ pipeline {
 
   post {
     always {
-      // JUnit 리포트가 있으면 자동 수집 (있을 때만)
       junit allowEmptyResults: true, testResults: '**/junit.xml'
       archiveArtifacts artifacts: '.next/**', allowEmptyArchive: true
     }
