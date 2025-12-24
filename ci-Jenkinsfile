@@ -1,82 +1,91 @@
 pipeline {
   agent any
+
   options {
     timestamps()
     disableConcurrentBuilds()
   }
+
   environment {
     CI = 'true'
     NEXT_TELEMETRY_DISABLED = '1'
-    PNPM_VERSION = '9.15.4'
   }
+
   stages {
     stage('Checkout') {
-      steps { checkout scm }
+      steps {
+        checkout scm
+      }
     }
+
     stage('Setup') {
       steps {
         sh '''
           set -eux
           node -v
-          corepack --version
-          corepack prepare pnpm@${PNPM_VERSION} --activate
-          corepack pnpm -v
+          npm -v
         '''
       }
     }
+
     stage('Install') {
       steps {
         sh '''
           set -eux
-          corepack pnpm install --frozen-lockfile
+          npm ci
         '''
       }
     }
+
     stage('Lint') {
       steps {
         sh '''
           set -eux
-          if corepack pnpm -s run | grep -q "^lint"; then
-            corepack pnpm lint
+          if npm run | grep -q " lint"; then
+            npm run lint
           else
             echo "No lint script. Skip."
           fi
         '''
       }
     }
+
     stage('Typecheck') {
       steps {
         sh '''
           set -eux
-          if corepack pnpm -s run | grep -q "^typecheck"; then
-            corepack pnpm typecheck
+          if npm run | grep -q " typecheck"; then
+            npm run typecheck
           else
             echo "No typecheck script. Skip."
           fi
         '''
       }
     }
+
     stage('Test') {
       steps {
         sh '''
           set -eux
-          if corepack pnpm -s run | grep -q "^test"; then
-            corepack pnpm test
+          if npm run | grep -q " test"; then
+            npm test
           else
             echo "No test script. Skip."
           fi
         '''
       }
     }
+
     stage('Build') {
       steps {
         sh '''
           set -eux
-          corepack pnpm build
+          npm run build
         '''
       }
     }
   }
+
   post {
     always {
       junit allowEmptyResults: true, testResults: '**/junit.xml'
@@ -84,10 +93,3 @@ pipeline {
     }
   }
 }
-
-
-
-
-
-
-
