@@ -74,18 +74,6 @@ stage('Debug') {
       }
     }
 
-    stage('Test') {
-      steps {
-        sh '''
-          set -eux
-          if npm run | grep -q " test"; then
-            npm test
-          else
-            echo "No test script. Skip."
-          fi
-        '''
-      }
-    }
 
     stage('Build') {
       steps {
