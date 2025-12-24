@@ -27,7 +27,18 @@ pipeline {
         '''
       }
     }
-
+stage('Debug') {
+  steps {
+    sh '''
+      set -eux
+      git rev-parse HEAD
+      git log -1 --oneline
+      ls -al package.json package-lock.json
+      node -e "console.log('pkg nodemailer=', require('./package.json').dependencies?.nodemailer || require('./package.json').devDependencies?.nodemailer)"
+      node -e "console.log('lock nodemailer=', require('./package-lock.json').packages?.['']?.dependencies?.nodemailer)"
+    '''
+  }
+}
     stage('Install') {
       steps {
         sh '''
