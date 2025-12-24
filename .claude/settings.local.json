@@ -45,7 +45,8 @@
       "mcp__filesystem__list_directory",
       "Bash(git checkout:*)",
       "WebSearch",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLeft, ChevronRight, Clock, Download, Upload, Zap, Settings2, ShoppingBag, AlertTriangle, ExternalLink, Settings, Info } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
+import { PipelineStatusPanel, DisableAutomationModal } from '@/components/automation'
 
 interface ChannelShop {
   id: number
@@ -45,6 +46,35 @@ interface PipelineSteps {
   transform: boolean
   productCreate: boolean
   publish: boolean
+}
+
+interface StageProgress {
+  completed: boolean
+  total?: number
+  success?: number
+  failed?: number
+  totalNewPosts?: number
+  channelResults?: Array<{ channelId: number; channelName: string; newPosts: number }>
+  batchProgress?: { current: number; total: number }
+  currentChannel?: string
+  currentProgress?: { current: number; total: number }
+}
+
+interface PipelineWorkflow {
+  id: number
+  type: string
+  status: string
+  startedAt: string
+  totalItems: number
+  successCount: number
+  failedCount: number
+  currentStage: 'collection' | 'transform' | 'productCreate' | 'publish' | null
+  stageProgress: {
+    collection?: StageProgress
+    transform?: StageProgress
+    productCreate?: StageProgress
+    publish?: StageProgress
+  }
 }
 
 interface AutomationConfig {
@@ -177,6 +207,12 @@ export default function AutomationSettingsPage() {
   // 쇼핑몰 미연결 경고 모달
   const [showShopConnectionWarning, setShowShopConnectionWarning] = useState(false)
   const [unconnectedChannels, setUnconnectedChannels] = useState<Channel[]>([])
+
+  // 파이프라인 상태 추적
+  const [pipelineStatus, setPipelineStatus] = useState<PipelineWorkflow | null>(null)
+  const [isPipelineRunning, setIsPipelineRunning] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [showDisableModal, setShowDisableModal] = useState(false)
 
   const CHANNELS_PER_PAGE = 4
 
@@ -323,8 +359,60 @@ export default function AutomationSettingsPage() {
 
   // 자동화 중지 핸들러
   const handleStopAutomation = () => {
+    // 실행 중인 파이프라인이 있으면 모달 표시
+    if (isPipelineRunning && pipelineStatus) {
+      setShowDisableModal(true)
+      return
+    }
+    // 없으면 바로 비활성화
     saveAutomationState(false)
   }
+
+  // 비활성화 모달 확인 핸들러
+  const handleDisableConfirm = async (cancelPipeline: boolean) => {
+    if (cancelPipeline && pipelineStatus) {
+      await handleCancelPipeline(pipelineStatus.id)
+    }
+    await saveAutomationState(false)
+    setShowDisableModal(false)
+  }
+
+  // 파이프라인 취소 핸들러
+  const handleCancelPipeline = async (workflowId: number) => {
+    setIsCancelling(true)
+    try {
+      const res = await fetch(`/api/automation/execute?workflowId=${workflowId}`, {
+        method: 'DELETE'
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('파이프라인이 취소되었습니다')
+        setPipelineStatus(null)
+        setIsPipelineRunning(false)
+      } else {
+        toast.error(data.error || '취소에 실패했습니다')
+      }
+    } catch (error) {
+      console.error('파이프라인 취소 실패:', error)
+      toast.error('취소 요청 중 오류가 발생했습니다')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
+  // 파이프라인 상태 조회
+  const fetchPipelineStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/automation/execute')
+      const data = await res.json()
+      if (data.success) {
+        setPipelineStatus(data.data?.workflow || null)
+        setIsPipelineRunning(data.data?.isRunning || false)
+      }
+    } catch (error) {
+      // 조용히 실패 처리 (네트워크 오류 등)
+    }
+  }, [])
 
   useEffect(() => {
     loadData()
@@ -344,6 +432,19 @@ export default function AutomationSettingsPage() {
 
     return () => clearInterval(interval)
   }, [config.selectedHours])
+
+  // 파이프라인 상태 폴링 (5초마다)
+  useEffect(() => {
+    // 초기 로드 (자동화 상태와 관계없이 항상 확인)
+    fetchPipelineStatus()
+
+    // 5초마다 폴링 (실행 중인 파이프라인이 있으면 계속 폴링)
+    const interval = setInterval(() => {
+      fetchPipelineStatus()
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [fetchPipelineStatus])
 
   const loadData = async () => {
     try {
@@ -666,6 +767,15 @@ export default function AutomationSettingsPage() {
           </button>
         </div>
       </div>
+
+      {/* 파이프라인 실행 상태 패널 */}
+      {isPipelineRunning && pipelineStatus && (
+        <PipelineStatusPanel
+          workflow={pipelineStatus}
+          onCancel={handleCancelPipeline}
+          isCancelling={isCancelling}
+        />
+      )}
 
       {/* Schedule Settings - 독립 섹션 */}
       <Card className={`overflow-hidden transition-all ${warningSections.includes('schedule') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasScheduleProblem ? 'ring-2 ring-red-300' : ''}`}>
@@ -1753,6 +1863,20 @@ export default function AutomationSettingsPage() {
           </div>
         </div>
       )}
+
+      {/* 비활성화 확인 모달 */}
+      <DisableAutomationModal
+        isOpen={showDisableModal}
+        onClose={() => setShowDisableModal(false)}
+        onConfirm={handleDisableConfirm}
+        workflow={{
+          id: pipelineStatus?.id || 0,
+          currentStage: pipelineStatus?.currentStage || null,
+          successCount: pipelineStatus?.successCount || 0,
+          totalItems: pipelineStatus?.totalItems || 0,
+        }}
+        isLoading={isCancelling}
+      />
     </div>
   )
 }

@@ -27,6 +27,61 @@ import {
 import { createPipelineNotification } from './notification-helper'
 
 // =============================================
+// LOGGER
+// =============================================
+
+const LOG_PREFIX = '[Pipeline]'
+
+interface LogContext {
+  userId?: number
+  workflowId?: number
+  stage?: string
+}
+
+function formatTimestamp(): string {
+  return new Date().toISOString().replace('T', ' ').substring(0, 19)
+}
+
+function log(level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG', message: string, context?: LogContext) {
+  const timestamp = formatTimestamp()
+  const contextStr = context
+    ? ` [user:${context.userId || '-'}][wf:${context.workflowId || '-'}]${context.stage ? `[${context.stage}]` : ''}`
+    : ''
+
+  const prefix = `${timestamp} ${LOG_PREFIX}${contextStr}`
+
+  switch (level) {
+    case 'ERROR':
+      console.error(`${prefix} ❌ ${message}`)
+      break
+    case 'WARN':
+      console.warn(`${prefix} ⚠️ ${message}`)
+      break
+    case 'DEBUG':
+      console.log(`${prefix} 🔍 ${message}`)
+      break
+    default:
+      console.log(`${prefix} ✅ ${message}`)
+  }
+}
+
+function logStageStart(stage: string, context: LogContext) {
+  log('INFO', `━━━ ${stage} 단계 시작 ━━━`, context)
+}
+
+function logStageComplete(stage: string, result: { successCount: number; failedCount: number; totalItems: number }, context: LogContext) {
+  const status = result.failedCount === 0 ? '성공' : result.successCount > 0 ? '부분 성공' : '실패'
+  log('INFO', `━━━ ${stage} 단계 완료 (${status}) - 성공: ${result.successCount}, 실패: ${result.failedCount}, 총: ${result.totalItems}건 ━━━`, context)
+}
+
+function logStageError(stage: string, error: Error, context: LogContext) {
+  log('ERROR', `${stage} 단계 실패: ${error.message}`, context)
+  if (error.stack) {
+    log('DEBUG', `Stack trace: ${error.stack.split('\n').slice(0, 3).join(' -> ')}`, context)
+  }
+}
+
+// =============================================
 // HELPER FUNCTIONS
 // =============================================
 
@@ -298,8 +353,12 @@ export async function executeFullPipeline(
   let productCreateResult: ProductCreateResult | undefined
   let publishResult: PublishResult | undefined
 
+  const logCtx: LogContext = { userId, workflowId: logId }
+
   try {
-    console.log(`[FullPipeline] Starting for user ${userId}`)
+    log('INFO', `═══════════════════════════════════════════════════════════`, logCtx)
+    log('INFO', `전체 파이프라인 시작 (trigger: ${triggerType})`, logCtx)
+    log('INFO', `═══════════════════════════════════════════════════════════`, logCtx)
 
     // 자동화 설정 조회
     const automationConfig = await prisma.automationConfig.findUnique({
@@ -310,8 +369,14 @@ export async function executeFullPipeline(
     })
 
     if (!automationConfig) {
+      log('ERROR', '자동화 설정이 없습니다. 설정 페이지에서 자동화를 먼저 설정해주세요.', logCtx)
       throw new Error('자동화 설정이 없습니다')
     }
+
+    // 설정 정보 로그
+    const channelIds = parseNumberArray(automationConfig.channelIds)
+    const retailChannelIds = parseNumberArray(automationConfig.retailChannelIds)
+    log('DEBUG', `설정 - 수집채널: ${channelIds.length}개, 발행채널: ${retailChannelIds.length}개, AI: ${automationConfig.aiProvider}`, logCtx)
 
     // 누적 카운터
     let totalItems = 0
@@ -320,26 +385,42 @@ export async function executeFullPipeline(
 
     // 1. 수집 단계
     if (!options?.skipCollection) {
-      console.log('[FullPipeline] Step 1: Collection')
-      collectionResult = await runCollectionPipeline({
-        channelIds: parseNumberArray(automationConfig.channelIds),
-        limit: 10,  // 자동화 파이프라인: 최근 10개만 수집
-      })
+      logStageStart('수집(Collection)', { ...logCtx, stage: 'COLLECT' })
 
-      // 진행 상황 및 details 업데이트 (단계별 누적 저장)
-      totalItems += collectionResult.totalItems
-      successCount += collectionResult.successCount
-      failedCount += collectionResult.failedCount
-      await updateWorkflowProgress(logId, totalItems, successCount, failedCount, {
-        collection: collectionResult.details,
-      })
+      if (channelIds.length === 0) {
+        log('WARN', '수집할 채널이 설정되지 않았습니다. 이 단계를 건너뜁니다.', { ...logCtx, stage: 'COLLECT' })
+      } else {
+        log('DEBUG', `수집 대상 채널: ${channelIds.join(', ')}`, { ...logCtx, stage: 'COLLECT' })
 
-      console.log(`[FullPipeline] Collection completed: ${collectionResult.successCount} new posts`)
+        collectionResult = await runCollectionPipeline({
+          channelIds,
+          limit: 10,
+        })
+
+        totalItems += collectionResult.totalItems
+        successCount += collectionResult.successCount
+        failedCount += collectionResult.failedCount
+        await updateWorkflowProgress(logId, totalItems, successCount, failedCount, {
+          collection: collectionResult.details,
+        })
+
+        logStageComplete('수집(Collection)', collectionResult, { ...logCtx, stage: 'COLLECT' })
+
+        if (collectionResult.details?.channelResults) {
+          for (const ch of collectionResult.details.channelResults) {
+            log('DEBUG', `  - ${ch.channelName}: 신규 ${ch.newPosts || 0}건${ch.failed ? `, 실패 ${ch.failed}건` : ''}`, { ...logCtx, stage: 'COLLECT' })
+          }
+        }
+      }
+    } else {
+      log('INFO', '수집 단계 건너뜀 (skipCollection=true)', logCtx)
     }
 
     // 2. 변환 단계
     if (!options?.skipTransform) {
-      console.log('[FullPipeline] Step 2: Transform')
+      logStageStart('AI변환(Transform)', { ...logCtx, stage: 'TRANSFORM' })
+      log('DEBUG', `AI 제공자: ${automationConfig.aiProvider}, 가격정책ID: ${automationConfig.pricingPolicyId || '미설정'}`, { ...logCtx, stage: 'TRANSFORM' })
+
       transformResult = await runTransformPipeline({
         aiProvider: automationConfig.aiProvider,
         pricingPolicyId: automationConfig.pricingPolicyId,
@@ -347,7 +428,6 @@ export async function executeFullPipeline(
         transformPendingOnly: true,
       })
 
-      // 진행 상황 및 details 업데이트 (단계별 누적 저장)
       totalItems += transformResult.totalItems
       successCount += transformResult.successCount
       failedCount += transformResult.failedCount
@@ -356,17 +436,26 @@ export async function executeFullPipeline(
         transform: transformResult.details,
       })
 
-      console.log(`[FullPipeline] Transform completed: ${transformResult.successCount} collected products created`)
+      logStageComplete('AI변환(Transform)', transformResult, { ...logCtx, stage: 'TRANSFORM' })
+
+      if (transformResult.failedCount > 0 && transformResult.details?.errors) {
+        log('WARN', `변환 실패 항목:`, { ...logCtx, stage: 'TRANSFORM' })
+        for (const err of transformResult.details.errors.slice(0, 3)) {
+          log('WARN', `  - Post ${err.postId}: ${err.message}`, { ...logCtx, stage: 'TRANSFORM' })
+        }
+      }
+    } else {
+      log('INFO', 'AI변환 단계 건너뜀 (skipTransform=true)', logCtx)
     }
 
     // 3. 상품 생성 단계
     if (!options?.skipProductCreate) {
-      console.log('[FullPipeline] Step 3: Product Create')
+      logStageStart('상품생성(ProductCreate)', { ...logCtx, stage: 'PRODUCT' })
+
       productCreateResult = await runProductCreatePipeline({
         createPendingOnly: true,
       })
 
-      // 진행 상황 및 details 업데이트 (단계별 누적 저장)
       totalItems += productCreateResult.totalItems
       successCount += productCreateResult.successCount
       failedCount += productCreateResult.failedCount
@@ -376,27 +465,43 @@ export async function executeFullPipeline(
         productCreate: productCreateResult.details,
       })
 
-      console.log(`[FullPipeline] Product Create completed: ${productCreateResult.successCount} products created`)
+      logStageComplete('상품생성(ProductCreate)', productCreateResult, { ...logCtx, stage: 'PRODUCT' })
+
+      if (productCreateResult.failedCount > 0 && productCreateResult.details?.createdProducts) {
+        const failedProducts = productCreateResult.details.createdProducts.filter((p: any) => p.status !== 'success')
+        if (failedProducts.length > 0) {
+          log('WARN', `상품 생성 실패 항목:`, { ...logCtx, stage: 'PRODUCT' })
+          for (const p of failedProducts.slice(0, 3)) {
+            log('WARN', `  - ${p.productName || 'Unknown'}: ${p.error || '알 수 없는 오류'}`, { ...logCtx, stage: 'PRODUCT' })
+          }
+        }
+      }
+    } else {
+      log('INFO', '상품생성 단계 건너뜀 (skipProductCreate=true)', logCtx)
     }
 
     // 4. 발행 단계
     if (!options?.skipPublish) {
-      const channelIdsForPublish = parseNumberArray(automationConfig.retailChannelIds)
-      if (channelIdsForPublish.length) {
-        console.log('[FullPipeline] Step 4: Publish')
+      if (retailChannelIds.length === 0) {
+        log('WARN', '발행할 채널이 설정되지 않았습니다. 발행 단계를 건너뜁니다.', logCtx)
+      } else {
+        logStageStart('발행(Publish)', { ...logCtx, stage: 'PUBLISH' })
+        log('DEBUG', `발행 대상 채널: ${retailChannelIds.join(', ')}`, { ...logCtx, stage: 'PUBLISH' })
 
-        // 방금 생성된 상품 IDs 추출 (있으면 해당 상품만 발행)
         const newlyCreatedProductIds = productCreateResult?.details?.createdProducts
-          ?.filter(p => p.status === 'success' && p.productId)
-          .map(p => p.productId!) || []
+          ?.filter((p: any) => p.status === 'success' && p.productId)
+          .map((p: any) => p.productId!) || []
+
+        if (newlyCreatedProductIds.length > 0) {
+          log('DEBUG', `이번에 생성된 상품 ${newlyCreatedProductIds.length}개 발행 대상`, { ...logCtx, stage: 'PUBLISH' })
+        }
 
         publishResult = await runPublishPipeline({
-          channelIds: channelIdsForPublish,
+          channelIds: retailChannelIds,
           productIds: newlyCreatedProductIds.length > 0 ? newlyCreatedProductIds : undefined,
           publishReadyOnly: true,
         })
 
-        // 진행 상황 및 details 업데이트 (단계별 누적 저장)
         totalItems += publishResult.totalItems
         successCount += publishResult.successCount
         failedCount += publishResult.failedCount
@@ -407,8 +512,20 @@ export async function executeFullPipeline(
           publish: publishResult.details,
         })
 
-        console.log(`[FullPipeline] Publish completed: ${publishResult.successCount} published`)
+        logStageComplete('발행(Publish)', publishResult, { ...logCtx, stage: 'PUBLISH' })
+
+        if (publishResult.failedCount > 0 && publishResult.details?.publishedProducts) {
+          const failedPublishes = publishResult.details.publishedProducts.filter((p: any) => p.status?.toUpperCase() === 'FAILED')
+          if (failedPublishes.length > 0) {
+            log('WARN', `발행 실패 항목:`, { ...logCtx, stage: 'PUBLISH' })
+            for (const p of failedPublishes.slice(0, 3)) {
+              log('WARN', `  - ${p.productName || 'Unknown'}: ${p.error || '알 수 없는 오류'}`, { ...logCtx, stage: 'PUBLISH' })
+            }
+          }
+        }
       }
+    } else {
+      log('INFO', '발행 단계 건너뜀 (skipPublish=true)', logCtx)
     }
 
     const completedAt = new Date()
@@ -442,7 +559,11 @@ export async function executeFullPipeline(
       })
     }
 
-    console.log(`[FullPipeline] Completed with status: ${overallStatus}`)
+    log('INFO', `═══════════════════════════════════════════════════════════`, logCtx)
+    log('INFO', `전체 파이프라인 완료 - 상태: ${overallStatus}`, logCtx)
+    log('INFO', `최종 결과: 총 ${totalItems}건 처리 (성공: ${successCount}, 실패: ${failedCount})`, logCtx)
+    log('INFO', `소요 시간: ${((completedAt.getTime() - startedAt.getTime()) / 1000).toFixed(1)}초`, logCtx)
+    log('INFO', `═══════════════════════════════════════════════════════════`, logCtx)
 
     // 파이프라인 완료 알림 생성
     const pipelineResult: FullPipelineResult = {
@@ -464,15 +585,20 @@ export async function executeFullPipeline(
 
     return pipelineResult
   } catch (error: any) {
-    // 취소 에러는 로깅만 하고 넘어감
-    if (error instanceof CancellationError) {
-      console.log(`[FullPipeline] Cancelled by user`)
+    const completedAt = new Date()
+    const duration = ((completedAt.getTime() - startedAt.getTime()) / 1000).toFixed(1)
 
-      // 취소 시에도 알림 생성
+    // 취소 에러는 별도 처리
+    if (error instanceof CancellationError) {
+      log('WARN', `═══════════════════════════════════════════════════════════`, logCtx)
+      log('WARN', `파이프라인 취소됨 (사용자 요청)`, logCtx)
+      log('WARN', `소요 시간: ${duration}초`, logCtx)
+      log('WARN', `═══════════════════════════════════════════════════════════`, logCtx)
+
       const cancelledResult: FullPipelineResult = {
         success: false,
         startedAt,
-        completedAt: new Date(),
+        completedAt,
         collection: collectionResult,
         transform: transformResult,
         productCreate: productCreateResult,
@@ -489,7 +615,28 @@ export async function executeFullPipeline(
 
       return cancelledResult
     } else {
-      console.error('[FullPipeline] Error:', error)
+      // 일반 에러 처리
+      log('ERROR', `═══════════════════════════════════════════════════════════`, logCtx)
+      log('ERROR', `파이프라인 실패`, logCtx)
+      log('ERROR', `에러 메시지: ${error.message}`, logCtx)
+      log('ERROR', `소요 시간: ${duration}초`, logCtx)
+      log('ERROR', `═══════════════════════════════════════════════════════════`, logCtx)
+
+      // 에러 유형별 추가 안내
+      if (error.message?.includes('API') || error.message?.includes('fetch')) {
+        log('ERROR', `→ AI API 연결 문제일 수 있습니다. API 키와 네트워크 상태를 확인해주세요.`, logCtx)
+      } else if (error.message?.includes('timeout') || error.message?.includes('시간 초과')) {
+        log('ERROR', `→ 요청 시간이 초과되었습니다. 네트워크 상태를 확인하거나 잠시 후 다시 시도해주세요.`, logCtx)
+      } else if (error.message?.includes('rate limit') || error.message?.includes('quota')) {
+        log('ERROR', `→ API 사용량 한도를 초과했습니다. 잠시 후 다시 시도해주세요.`, logCtx)
+      } else if (error.message?.includes('설정')) {
+        log('ERROR', `→ 자동화 설정을 확인해주세요.`, logCtx)
+      }
+
+      if (error.stack) {
+        log('DEBUG', `Stack: ${error.stack.split('\n').slice(0, 5).join(' | ')}`, logCtx)
+      }
+
       await failWorkflowLog(logId, error.message, {
         collection: collectionResult?.details,
         transform: transformResult?.details,
@@ -497,11 +644,10 @@ export async function executeFullPipeline(
         publish: publishResult?.details,
       })
 
-      // 에러 발생 시 알림 생성
       const errorResult: FullPipelineResult = {
         success: false,
         startedAt,
-        completedAt: new Date(),
+        completedAt,
         collection: collectionResult,
         transform: transformResult,
         productCreate: productCreateResult,
@@ -601,7 +747,7 @@ export async function executeFullPipelineWithLock(
   const logId = await acquireExecutionLock(userId, WorkflowType.FULL_PIPELINE, triggerType)
 
   if (!logId) {
-    console.log(`[Executor] Lock 획득 실패 - 이미 실행 중인 작업이 있음 (user: ${userId})`)
+    log('WARN', `Lock 획득 실패 - 이미 실행 중인 작업이 있습니다`, { userId })
     return null
   }
 
@@ -610,6 +756,7 @@ export async function executeFullPipelineWithLock(
   setBatchContext(context)
 
   const startedAt = new Date()
+  const logCtx: LogContext = { userId, workflowId: logId }
 
   let collectionResult: CollectionResult | undefined
   let transformResult: TransformResult | undefined
@@ -617,7 +764,9 @@ export async function executeFullPipelineWithLock(
   let publishResult: PublishResult | undefined
 
   try {
-    console.log(`[FullPipeline] Starting for user ${userId} (workflow: ${logId})`)
+    log('INFO', `═══════════════════════════════════════════════════════════`, logCtx)
+    log('INFO', `전체 파이프라인 시작 (trigger: ${triggerType}, Lock 획득 완료)`, logCtx)
+    log('INFO', `═══════════════════════════════════════════════════════════`, logCtx)
 
     // 자동화 설정 조회
     const automationConfig = await prisma.automationConfig.findUnique({
@@ -628,8 +777,14 @@ export async function executeFullPipelineWithLock(
     })
 
     if (!automationConfig) {
+      log('ERROR', '자동화 설정이 없습니다. 설정 페이지에서 자동화를 먼저 설정해주세요.', logCtx)
       throw new Error('자동화 설정이 없습니다')
     }
+
+    // 설정 정보 로그
+    const channelIds = parseNumberArray(automationConfig.channelIds)
+    const retailChannelIds = parseNumberArray(automationConfig.retailChannelIds)
+    log('DEBUG', `설정 - 수집채널: ${channelIds.length}개, 발행채널: ${retailChannelIds.length}개, AI: ${automationConfig.aiProvider}`, logCtx)
 
     // 누적 카운터
     let totalItems = 0
@@ -638,28 +793,35 @@ export async function executeFullPipelineWithLock(
 
     // 1. 수집 단계
     if (!options?.skipCollection) {
-      await throwIfCancelled() // 취소 체크
-      console.log('[FullPipeline] Step 1: Collection')
-      collectionResult = await runCollectionPipeline({
-        channelIds: parseNumberArray(automationConfig.channelIds),
-        limit: 10,  // 자동화 파이프라인: 최근 10개만 수집
-      })
+      await throwIfCancelled()
+      logStageStart('수집(Collection)', { ...logCtx, stage: 'COLLECT' })
 
-      // 진행 상황 및 details 업데이트 (단계별 누적 저장)
-      totalItems += collectionResult.totalItems
-      successCount += collectionResult.successCount
-      failedCount += collectionResult.failedCount
-      await updateWorkflowProgress(logId, totalItems, successCount, failedCount, {
-        collection: collectionResult.details,
-      })
+      if (channelIds.length === 0) {
+        log('WARN', '수집할 채널이 설정되지 않았습니다.', { ...logCtx, stage: 'COLLECT' })
+      } else {
+        collectionResult = await runCollectionPipeline({
+          channelIds,
+          limit: 10,
+        })
 
-      console.log(`[FullPipeline] Collection completed: ${collectionResult.successCount} new posts`)
+        totalItems += collectionResult.totalItems
+        successCount += collectionResult.successCount
+        failedCount += collectionResult.failedCount
+        await updateWorkflowProgress(logId, totalItems, successCount, failedCount, {
+          collection: collectionResult.details,
+        })
+
+        logStageComplete('수집(Collection)', collectionResult, { ...logCtx, stage: 'COLLECT' })
+      }
+    } else {
+      log('INFO', '수집 단계 건너뜀', logCtx)
     }
 
     // 2. 변환 단계
     if (!options?.skipTransform) {
-      await throwIfCancelled() // 취소 체크
-      console.log('[FullPipeline] Step 2: Transform')
+      await throwIfCancelled()
+      logStageStart('AI변환(Transform)', { ...logCtx, stage: 'TRANSFORM' })
+
       transformResult = await runTransformPipeline({
         aiProvider: automationConfig.aiProvider,
         pricingPolicyId: automationConfig.pricingPolicyId,
@@ -667,7 +829,6 @@ export async function executeFullPipelineWithLock(
         transformPendingOnly: true,
       })
 
-      // 진행 상황 및 details 업데이트 (단계별 누적 저장)
       totalItems += transformResult.totalItems
       successCount += transformResult.successCount
       failedCount += transformResult.failedCount
@@ -676,18 +837,20 @@ export async function executeFullPipelineWithLock(
         transform: transformResult.details,
       })
 
-      console.log(`[FullPipeline] Transform completed: ${transformResult.successCount} collected products created`)
+      logStageComplete('AI변환(Transform)', transformResult, { ...logCtx, stage: 'TRANSFORM' })
+    } else {
+      log('INFO', 'AI변환 단계 건너뜀', logCtx)
     }
 
     // 3. 상품 생성 단계
     if (!options?.skipProductCreate) {
-      await throwIfCancelled() // 취소 체크
-      console.log('[FullPipeline] Step 3: Product Create')
+      await throwIfCancelled()
+      logStageStart('상품생성(ProductCreate)', { ...logCtx, stage: 'PRODUCT' })
+
       productCreateResult = await runProductCreatePipeline({
         createPendingOnly: true,
       })
 
-      // 진행 상황 및 details 업데이트 (단계별 누적 저장)
       totalItems += productCreateResult.totalItems
       successCount += productCreateResult.successCount
       failedCount += productCreateResult.failedCount
@@ -697,21 +860,25 @@ export async function executeFullPipelineWithLock(
         productCreate: productCreateResult.details,
       })
 
-      console.log(`[FullPipeline] Product Create completed: ${productCreateResult.successCount} products created`)
+      logStageComplete('상품생성(ProductCreate)', productCreateResult, { ...logCtx, stage: 'PRODUCT' })
+    } else {
+      log('INFO', '상품생성 단계 건너뜀', logCtx)
     }
 
     // 4. 발행 단계
     if (!options?.skipPublish) {
-      await throwIfCancelled() // 취소 체크
-      const channelIdsForPublish = parseNumberArray(automationConfig.retailChannelIds)
-      if (channelIdsForPublish.length) {
-        console.log('[FullPipeline] Step 4: Publish')
+      await throwIfCancelled()
+
+      if (retailChannelIds.length === 0) {
+        log('WARN', '발행할 채널이 설정되지 않았습니다.', logCtx)
+      } else {
+        logStageStart('발행(Publish)', { ...logCtx, stage: 'PUBLISH' })
+
         publishResult = await runPublishPipeline({
-          channelIds: channelIdsForPublish,
+          channelIds: retailChannelIds,
           publishReadyOnly: true,
         })
 
-        // 진행 상황 및 details 업데이트 (단계별 누적 저장)
         totalItems += publishResult.totalItems
         successCount += publishResult.successCount
         failedCount += publishResult.failedCount
@@ -722,8 +889,10 @@ export async function executeFullPipelineWithLock(
           publish: publishResult.details,
         })
 
-        console.log(`[FullPipeline] Publish completed: ${publishResult.successCount} published`)
+        logStageComplete('발행(Publish)', publishResult, { ...logCtx, stage: 'PUBLISH' })
       }
+    } else {
+      log('INFO', '발행 단계 건너뜀', logCtx)
     }
 
     const completedAt = new Date()
@@ -760,7 +929,11 @@ export async function executeFullPipelineWithLock(
       })
     }
 
-    console.log(`[FullPipeline] Completed with status: ${overallStatus} (workflow: ${logId})`)
+    log('INFO', `═══════════════════════════════════════════════════════════`, logCtx)
+    log('INFO', `전체 파이프라인 완료 - 상태: ${overallStatus}`, logCtx)
+    log('INFO', `최종 결과: 총 ${totalItems}건 처리 (성공: ${successCount}, 실패: ${failedCount})`, logCtx)
+    log('INFO', `소요 시간: ${((completedAt.getTime() - startedAt.getTime()) / 1000).toFixed(1)}초`, logCtx)
+    log('INFO', `═══════════════════════════════════════════════════════════`, logCtx)
 
     // 파이프라인 완료 알림 생성
     const pipelineResult: FullPipelineResult = {
@@ -782,10 +955,16 @@ export async function executeFullPipelineWithLock(
 
     return pipelineResult
   } catch (error: any) {
+    const completedAt = new Date()
+    const duration = ((completedAt.getTime() - startedAt.getTime()) / 1000).toFixed(1)
+
     // 취소 에러는 별도 처리 (이미 DB에서 FAILED로 마킹됨)
     if (error instanceof CancellationError) {
-      console.log(`[FullPipeline] Cancelled by user (workflow: ${logId})`)
-      // 취소 시에도 현재까지의 details를 저장 (이미 FAILED 상태)
+      log('WARN', `═══════════════════════════════════════════════════════════`, logCtx)
+      log('WARN', `파이프라인 취소됨 (사용자 요청)`, logCtx)
+      log('WARN', `소요 시간: ${duration}초`, logCtx)
+      log('WARN', `═══════════════════════════════════════════════════════════`, logCtx)
+
       await prisma.workflowLog.update({
         where: { id: logId },
         data: {
@@ -794,16 +973,15 @@ export async function executeFullPipelineWithLock(
             transform: transformResult?.details,
             productCreate: productCreateResult?.details,
             publish: publishResult?.details,
-            cancelledAt: new Date().toISOString(),
+            cancelledAt: completedAt.toISOString(),
           }),
         },
       })
 
-      // 취소 시에도 알림 생성
       const cancelledResult: FullPipelineResult = {
         success: false,
         startedAt,
-        completedAt: new Date(),
+        completedAt,
         collection: collectionResult,
         transform: transformResult,
         productCreate: productCreateResult,
@@ -821,7 +999,25 @@ export async function executeFullPipelineWithLock(
       return cancelledResult
     }
 
-    console.error('[FullPipeline] Error:', error)
+    // 일반 에러 처리
+    log('ERROR', `═══════════════════════════════════════════════════════════`, logCtx)
+    log('ERROR', `파이프라인 실패`, logCtx)
+    log('ERROR', `에러 메시지: ${error.message}`, logCtx)
+    log('ERROR', `소요 시간: ${duration}초`, logCtx)
+    log('ERROR', `═══════════════════════════════════════════════════════════`, logCtx)
+
+    // 에러 유형별 추가 안내
+    if (error.message?.includes('API') || error.message?.includes('fetch')) {
+      log('ERROR', `→ AI API 연결 문제일 수 있습니다. API 키와 네트워크 상태를 확인해주세요.`, logCtx)
+    } else if (error.message?.includes('timeout') || error.message?.includes('시간 초과')) {
+      log('ERROR', `→ 요청 시간이 초과되었습니다. 네트워크 상태를 확인하거나 잠시 후 다시 시도해주세요.`, logCtx)
+    } else if (error.message?.includes('rate limit') || error.message?.includes('quota')) {
+      log('ERROR', `→ API 사용량 한도를 초과했습니다. 잠시 후 다시 시도해주세요.`, logCtx)
+    }
+
+    if (error.stack) {
+      log('DEBUG', `Stack: ${error.stack.split('\n').slice(0, 5).join(' | ')}`, logCtx)
+    }
     await failWorkflowLog(logId, error.message, {
       collection: collectionResult?.details,
       transform: transformResult?.details,

@@ -588,14 +588,17 @@ export default function AutomationLogsPage() {
   }
 
   const formatFullDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString('ko-KR', {
+    const date = new Date(dateStr)
+    const datePart = date.toLocaleDateString('ko-KR', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
+    }).replace(/\. /g, '-').replace(/\.$/, '')
+    const timePart = date.toLocaleTimeString('ko-KR', {
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
     })
+    return `${datePart} ${timePart}`
   }
 
   const formatDuration = (start: string, end: string | null) => {
