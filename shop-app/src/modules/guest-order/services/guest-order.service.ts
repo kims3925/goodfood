@@ -20,6 +20,7 @@ import {
   NotFoundError,
   BusinessLogicError,
 } from '@/modules/common/utils/src/errors/handlers'
+import { calculateItemPrice } from '@/lib/price-calculator'
 
 // ============================================
 // Types
@@ -183,33 +184,18 @@ export class GuestOrderService {
       const variantBundleUnit = variant?.bundleUnit || 1
       const quantity = item.quantity
 
-      // 합배송 타입: INCLUDED (할인형) vs SEPARATE (배송비형)
-      const isBundleDiscount = product?.bundleShippingType === 'INCLUDED'
+      // 공통 가격 계산 함수 사용
+      const priceResult = calculateItemPrice({
+        basePrice: originalUnitPrice,
+        shippingFee: shippingFeePerItem,
+        quantity,
+        bundleMaxQty,
+        bundleUnit: variantBundleUnit,
+        bundleShippingType: product?.bundleShippingType,
+      })
 
-      // 할인 반영된 아이템 총액 계산
-      let itemTotalWithDiscount = originalUnitPrice * quantity
-
-      if (bundleMaxQty > 1 && shippingFeePerItem > 0) {
-        // 합배송 상품
-        const totalBundleUnits = quantity * variantBundleUnit
-        const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
-        const remainder = totalBundleUnits % bundleMaxQty
-        const shippingCount = fullBundles + (remainder > 0 ? 1 : 0)
-
-        if (isBundleDiscount) {
-          // 할인형: 첫 번째 수량은 배송비 포함, 2번째 수량부터 할인
-          const discountCount = Math.max(0, quantity - shippingCount)
-          itemTotalWithDiscount = (originalUnitPrice * quantity) - (shippingFeePerItem * discountCount)
-        } else {
-          // 배송비형: 묶음당 배송비 적용
-          itemTotalWithDiscount = (originalUnitPrice * quantity) + (shippingFeePerItem * shippingCount)
-        }
-      } else if (shippingFeePerItem > 0 && !isBundleDiscount) {
-        // 일반 상품 (배송비 별도)
-        itemTotalWithDiscount = (originalUnitPrice + shippingFeePerItem) * quantity
-      }
-
-      const unitPriceWithDiscount = Math.round(itemTotalWithDiscount / quantity)
+      const itemTotalWithDiscount = priceResult.itemTotal
+      const unitPriceWithDiscount = priceResult.unitPrice
 
       return {
         publishedProductId: publishedProduct.id,

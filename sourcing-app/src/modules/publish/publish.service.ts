@@ -14,6 +14,7 @@
 import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { NaverBandClient } from '@/modules/sourcing/domain/src/channel'
 import { bandPlaywrightService } from '@/modules/band-playwright/band-playwright.service'
+import { calculateSellingPrice } from '@/lib/price-calculator'
 import type {
   PublishToChannelParams,
   PublishToChannelResult,
@@ -65,22 +66,6 @@ function isQuotaError(error: any): boolean {
  */
 function formatPrice(price: number): string {
   return price.toLocaleString('ko-KR')
-}
-
-/**
- * 판매가 계산
- * - 배송비 포함 상품 (INCLUDED): 판매가 = 소매가
- * - 배송비 별도 상품: 판매가 = 소매가 + 배송비
- */
-function calculateSellingPrice(
-  price: number,
-  shippingFee: number,
-  bundleShippingType: string | null
-): number {
-  if (bundleShippingType === 'INCLUDED') {
-    return price // 배송비 이미 포함
-  }
-  return price + shippingFee // 배송비 추가
 }
 
 /**

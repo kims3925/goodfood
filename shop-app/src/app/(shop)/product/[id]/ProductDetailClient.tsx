@@ -6,14 +6,14 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, Heart, Share2, Minus, Plus, Star, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useCartNotification } from '@/contexts/CartNotificationContext'
+import { useCartNotification, dispatchCartUpdate } from '@/contexts/CartNotificationContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
 
 export default function ProductDetailClient() {
   const params = useParams()
   const searchParams = useSearchParams()
   const { data: session } = useSession()
-  const { showNotification, refreshCartCount } = useCartNotification()
+  const { showNotification } = useCartNotification()
   const { getPath, getApiPath } = useShopUrl()
   const bandId = searchParams.get('bandId')
   const [product, setProduct] = useState<any>(null)
@@ -377,7 +377,7 @@ export default function ProductDetailClient() {
         }
 
         if (totalAdded > 0) {
-          await refreshCartCount()
+          dispatchCartUpdate()
           showNotification({
             title: product.title,
             image: product.images?.[0] || '/images/placeholder.png',
@@ -405,7 +405,7 @@ export default function ProductDetailClient() {
         const data = await response.json()
 
         if (data.success) {
-          await refreshCartCount()
+          dispatchCartUpdate()
           showNotification({
             title: product.title,
             image: product.images?.[0] || '/images/placeholder.png',
@@ -769,21 +769,19 @@ export default function ProductDetailClient() {
                 const bundleMaxQty = product.bundleMaxQty || activeBundleOptions.length
                 const isUnlimited = bundleMaxQty >= 999
                 const shippingFee = product.shippingFee || 0
-                const isBundleDiscount = activeBundleOptions[0]?.isBundleDiscount
+                const maxDiscount = activeBundleOptions[activeBundleOptions.length - 1]?.discount || 0
 
                 return (
                   <div className="bg-[#FFF5F5] rounded-lg px-3 py-2.5">
                     <p className="text-sm text-[#FF6B6B] font-medium">
                       {isUnlimited
-                        ? `2개 이상 구매 시 개당 ${formatPrice(shippingFee)}원 할인!`
-                        : `${bundleMaxQty}개 묶음 구매 시 ${isBundleDiscount ? '할인' : '배송비 할인'}!`
+                        ? `2개 이상 묶음 구매 할인, 개당 ${formatPrice(shippingFee)}원 할인`
+                        : `${bundleMaxQty}개 묶음 구매 할인`
                       }
                     </p>
-                    {!isUnlimited && (
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        최대 {formatPrice(activeBundleOptions[activeBundleOptions.length - 1]?.discount || 0)}원 할인
-                      </p>
-                    )}
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      묶음 당 최대 {formatPrice(isUnlimited ? shippingFee * (bundleMaxQty - 1) : maxDiscount)}원 할인
+                    </p>
                   </div>
                 )
               })()}

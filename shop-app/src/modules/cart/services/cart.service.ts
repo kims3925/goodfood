@@ -12,6 +12,7 @@ import {
   NotFoundError,
   BusinessLogicError
 } from '@/modules/common/utils/src/errors/handlers'
+import { calculateItemPrice } from '@/lib/price-calculator'
 
 // 세션 만료 시간 (7일)
 const SESSION_EXPIRY_DAYS = 7
@@ -272,47 +273,17 @@ export class CartService {
       const variantBundleUnit = variant?.bundleUnit || 1  // 옵션별 합배송 단위 수
       const quantity = item.quantity
 
-      // 합배송 타입으로 할인형 vs 배송비형 구분
-      // INCLUDED: 배송비 포함형 (할인) - 소매가에 배송비 포함, 합배송 시 할인
-      // SEPARATE: 배송비 별도형 (절약) - 소매가 + 배송비, 합배송 시 배송비 절약
-      const isBundleDiscount = product.bundleShippingType === 'INCLUDED'
+      // 공통 가격 계산 함수 사용
+      const priceResult = calculateItemPrice({
+        basePrice,
+        shippingFee,
+        quantity,
+        bundleMaxQty,
+        bundleUnit: variantBundleUnit,
+        bundleShippingType: product.bundleShippingType,
+      })
 
-      // 가격 계산
-      // 합배송 상품인 경우 (bundleMaxQty > 1 && shippingFee > 0): 묶음 단위로 배송비/할인 적용
-      // 일반 상품인 경우: 소매가 + 배송비
-      let unitPrice = basePrice
-      let itemTotal = 0
-      if (bundleMaxQty > 1 && shippingFee > 0) {
-        // 합배송 상품: bundleMaxQty 단위로 묶음을 분리
-        // variantBundleUnit을 고려하여 총 합배송 단위 계산
-        // 예: 2박스 옵션(bundleUnit=2) 2개 구매 시, totalBundleUnits = 4
-        const totalBundleUnits = quantity * variantBundleUnit
-        const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
-        const remainder = totalBundleUnits % bundleMaxQty
-
-        // 배송비/할인 횟수 계산 (ceil)
-        const shippingCount = fullBundles + (remainder > 0 ? 1 : 0)
-
-        if (isBundleDiscount) {
-          // 할인형: 첫 번째 수량은 배송비 포함, 2번째 수량부터 할인
-          // 할인 개수 = 수량 - 배송 횟수 (첫 번째 수량 제외)
-          const discountCount = Math.max(0, quantity - shippingCount)
-          itemTotal = (basePrice * quantity) - (shippingFee * discountCount)
-        } else {
-          // 배송비형: 배송비 별도 상품, 묶음당 배송비 적용
-          // 총 가격 = (상품가 × 수량) + (배송비 × 횟수)
-          itemTotal = (basePrice * quantity) + (shippingFee * shippingCount)
-        }
-
-        unitPrice = Math.round(itemTotal / quantity)
-      } else if (shippingFee > 0 && !isBundleDiscount) {
-        // 일반 상품 (배송비 별도): 배송비 포함
-        unitPrice = basePrice + shippingFee
-        itemTotal = unitPrice * quantity
-      } else {
-        // 배송비 없는 상품 또는 배송비 포함 상품
-        itemTotal = basePrice * quantity
-      }
+      const { unitPrice, itemTotal, isBundleDiscount } = priceResult
 
       return {
         id: item.id,

@@ -25,7 +25,6 @@ export async function GET() {
       },
       include: {
         payment: true,
-        userCoupons: true,
       },
     })
 
@@ -65,15 +64,13 @@ export async function GET() {
           }
 
           // 3. 연결된 쿠폰이 있다면 연결 해제 (사용 안 함 상태 유지)
-          if (order.userCoupons && order.userCoupons.length > 0) {
-            await tx.userCoupon.updateMany({
-              where: { orderId: order.id },
-              data: {
-                orderId: null,
-                isUsed: false,
-              },
-            })
-          }
+          await tx.userCoupon.updateMany({
+            where: { orderId: order.id },
+            data: {
+              orderId: null,
+              isUsed: false,
+            },
+          })
         })
 
         cancelledOrderIds.push(order.id)

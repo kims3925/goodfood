@@ -11,6 +11,7 @@ import prisma from '@bandauto/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
 import { getCartService } from '@/modules/cart/services/cart.service'
+import { calculateItemPrice } from '@/lib/price-calculator'
 
 // 주문번호 생성
 function generateOrderNumber(): string {
@@ -254,34 +255,21 @@ export async function POST(req: NextRequest) {
         const basePrice = variant?.price || mainVariant?.price || 0
         const quantity = item.quantity || 1
 
-        // 합배송 로직 적용 (CartService와 동일)
+        // 공통 가격 계산 함수 사용
         const shippingFee = product?.shippingFee || 0
         const bundleMaxQty = product?.bundleMaxQty || 1
         const bundleUnit = variant?.bundleUnit || 1
-        const isBundleDiscount = product?.bundleShippingType === 'INCLUDED'
 
-        let itemTotal = 0
-        if (bundleMaxQty > 1 && shippingFee > 0) {
-          // 합배송 상품
-          const totalBundleUnits = quantity * bundleUnit
-          const shippingCount = Math.floor(totalBundleUnits / bundleMaxQty) +
-            (totalBundleUnits % bundleMaxQty > 0 ? 1 : 0)
+        const priceResult = calculateItemPrice({
+          basePrice,
+          shippingFee,
+          quantity,
+          bundleMaxQty,
+          bundleUnit,
+          bundleShippingType: product?.bundleShippingType || null,
+        })
 
-          if (isBundleDiscount) {
-            // 할인형: 첫 번째 수량은 배송비 포함, 2번째부터 할인
-            const discountCount = Math.max(0, quantity - shippingCount)
-            itemTotal = (basePrice * quantity) - (shippingFee * discountCount)
-          } else {
-            // 배송비형: (원가 × 수량) + (배송비 × 횟수)
-            itemTotal = (basePrice * quantity) + (shippingFee * shippingCount)
-          }
-        } else if (shippingFee > 0 && !isBundleDiscount) {
-          // 일반 상품 (배송비 별도)
-          itemTotal = (basePrice + shippingFee) * quantity
-        } else {
-          // 배송비 없는 상품
-          itemTotal = basePrice * quantity
-        }
+        const itemTotal = priceResult.itemTotal
 
         orderItems.push({
           publishedProductId: publishedProduct.id,

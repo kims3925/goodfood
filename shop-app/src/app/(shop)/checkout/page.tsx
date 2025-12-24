@@ -10,6 +10,7 @@ import TossPaymentWidget from '@/modules/payments/components/TossPaymentWidget'
 import { useShop } from '@/contexts/ShopContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
 import toast from 'react-hot-toast'
+import { calculateItemPrice as calcPrice } from '@/lib/price-calculator'
 
 declare global {
   interface Window {
@@ -365,16 +366,17 @@ function CheckoutContent() {
           ? product.variants?.find((v: any) => v.id === parseInt(variantId))
           : product.variants?.[0]
 
-        // 합배송 옵션 계산 (상품 상세 페이지와 동일한 로직)
+        // 합배송 옵션 계산 (공통 모듈 사용)
         const shippingFee = product.shippingFee ?? 0
         const bundleMaxQty = product.bundleMaxQty ?? 1
         const variantPrice = selectedVariant?.price || 0
         const bundleUnit = selectedVariant?.bundleUnit || 1
+        const bundleShippingType = product.bundleShippingType || 'NONE'
 
         // bundleShippingType에 따른 가격 계산
         // INCLUDED: 할인형 - 가격에 배송비 포함, 합배송 시 할인
         // SEPARATE: 배송비형 - 가격 + 배송비, 합배송 시 배송비 절약
-        const isBundleDiscount = product.bundleShippingType === 'INCLUDED'
+        const isBundleDiscount = bundleShippingType === 'INCLUDED'
 
         let bundleOptions: any[] = []
         if (bundleMaxQty > 1 && shippingFee > 0) {
@@ -382,30 +384,21 @@ function CheckoutContent() {
           const maxDisplayQty = Math.floor(bundleMaxQty / bundleUnit) || 1
 
           for (let qty = 1; qty <= maxDisplayQty; qty++) {
-            const totalBundleUnits = qty * bundleUnit
-            const shippingCount = Math.ceil(totalBundleUnits / bundleMaxQty)
-
-            let totalPrice: number
-            let discount: number
-
-            if (isBundleDiscount) {
-              // 할인형: 첫 번째 수량은 배송비 포함, 2번째부터 할인
-              const discountCount = Math.max(0, qty - shippingCount)
-              totalPrice = (variantPrice * qty) - (shippingFee * discountCount)
-              discount = shippingFee * discountCount
-            } else {
-              // 배송비형: 원가 + (배송비 × 횟수)
-              const originalPrice = variantPrice - shippingFee
-              totalPrice = (originalPrice * qty) + (shippingFee * shippingCount)
-              const fullPrice = variantPrice * qty
-              discount = fullPrice - totalPrice
-            }
+            // 공통 모듈 사용
+            const priceResult = calcPrice({
+              basePrice: variantPrice,
+              shippingFee,
+              quantity: qty,
+              bundleMaxQty,
+              bundleUnit,
+              bundleShippingType,
+            })
 
             bundleOptions.push({
               qty,
-              totalPrice,
-              discount,
-              unitPrice: Math.round(totalPrice / qty),
+              totalPrice: priceResult.itemTotal,
+              discount: priceResult.discountAmount,
+              unitPrice: priceResult.unitPrice,
               isBundleDiscount,
               bundleUnit,
             })
@@ -739,57 +732,33 @@ function CheckoutContent() {
       ? `${cartItems[0].name} 외 ${cartItems.length - 1}건`
       : cartItems[0].name
 
-    // 합배송 할인액 계산 (bundleUnit 고려)
-    // - 배송비형: 합배송으로 절약되는 배송비
-    // - 할인형: 첫 번째 제외, 2번째부터 할인
+    // 합배송 할인액 계산 (공통 모듈 사용)
     bundleDiscount = cartItems.reduce((sum, item) => {
-      const bundleUnit = item.bundleUnit || 1
-      const isBundleDiscount = item.isBundleDiscount || false
-
-      // 합배송 상품
-      if (item.bundleMaxQty > 1 && item.shippingFee && item.shippingFee > 0) {
-        const totalBundleUnits = item.quantity * bundleUnit
-        const shippingCount = Math.floor(totalBundleUnits / item.bundleMaxQty) +
-          (totalBundleUnits % item.bundleMaxQty > 0 ? 1 : 0)
-
-        if (isBundleDiscount) {
-          // 할인형: 첫 번째 수량 제외, 2번째 수량부터 할인
-          const discountCount = Math.max(0, item.quantity - shippingCount)
-          return sum + (item.shippingFee * discountCount)
-        } else if (item.quantity > 1) {
-          // 배송비형: 합배송으로 절약되는 배송비
-          const savings = (item.quantity * item.shippingFee) - (shippingCount * item.shippingFee)
-          return sum + Math.max(0, savings)
-        }
-      }
-      return sum
+      const bundleShippingType = item.isBundleDiscount ? 'INCLUDED' : (item.shippingFee ? 'SEPARATE' : 'NONE')
+      const priceResult = calcPrice({
+        basePrice: item.originalPrice,
+        shippingFee: item.shippingFee || 0,
+        quantity: item.quantity,
+        bundleMaxQty: item.bundleMaxQty || 1,
+        bundleUnit: item.bundleUnit || 1,
+        bundleShippingType,
+      })
+      return sum + priceResult.discountAmount
     }, 0)
   } else if (product) {
-    // 합배송 옵션이 있으면 bundleUnit 고려하여 가격 계산
+    // 합배송 옵션이 있으면 공통 모듈로 가격 계산
     if (product.bundleOptions && product.bundleOptions.length > 0) {
-      const bundleMaxQty = product.bundleMaxQty || 1
-      const bundleUnit = product.bundleUnit || 1
-      const isBundleDiscount = product.isBundleDiscount || false
-      const shippingFee = product.shippingFee || 0
-      const basePrice = product.salePrice || 0
-
-      // bundleUnit을 고려한 총 합배송 단위 계산
-      const totalBundleUnits = quantity * bundleUnit
-      const shippingCount = Math.floor(totalBundleUnits / bundleMaxQty) +
-        (totalBundleUnits % bundleMaxQty > 0 ? 1 : 0)
-
-      if (isBundleDiscount) {
-        // 할인형: 첫 번째 수량은 배송비 포함, 2번째부터 할인
-        const discountCount = Math.max(0, quantity - shippingCount)
-        subtotal = (basePrice * quantity) - (shippingFee * discountCount)
-        bundleDiscount = shippingFee * discountCount
-      } else {
-        // 배송비형: (원가 × 수량) + (배송비 × 횟수)
-        const originalPrice = basePrice - shippingFee
-        subtotal = (originalPrice * quantity) + (shippingFee * shippingCount)
-        // 절약액 = (매번 배송비 낼 경우) - (실제 배송비)
-        bundleDiscount = (shippingFee * quantity) - (shippingFee * shippingCount)
-      }
+      const bundleShippingType = product.isBundleDiscount ? 'INCLUDED' : (product.shippingFee ? 'SEPARATE' : 'NONE')
+      const priceResult = calcPrice({
+        basePrice: product.salePrice || 0,
+        shippingFee: product.shippingFee || 0,
+        quantity,
+        bundleMaxQty: product.bundleMaxQty || 1,
+        bundleUnit: product.bundleUnit || 1,
+        bundleShippingType,
+      })
+      subtotal = priceResult.itemTotal
+      bundleDiscount = priceResult.discountAmount
     } else {
       subtotal = product.salePrice * quantity
     }
@@ -1569,9 +1538,7 @@ function CheckoutContent() {
                       >
                         {isSubmitting
                           ? '주문 생성 중...'
-                          : paymentMethod === 'BANK_TRANSFER'
-                            ? `${formatPrice(totalAmount)}원 주문하기`
-                            : `${formatPrice(totalAmount)}원 결제하기`
+                          : `${formatPrice(totalAmount)}원 주문하기`
                         }
                       </button>
                     </div>
