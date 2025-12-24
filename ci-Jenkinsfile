@@ -9,6 +9,8 @@ pipeline {
   environment {
     CI = 'true'
     NEXT_TELEMETRY_DISABLED = '1'
+    // 원하면 pnpm 버전 고정 (프로젝트에 맞춰 수정)
+    PNPM_VERSION = '9.15.4'
   }
 
   stages {
@@ -21,8 +23,12 @@ pipeline {
     stage('Setup') {
       steps {
         sh '''
+          set -eux
           node -v
-          corepack enable
+
+          corepack --version
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+
           pnpm -v
         '''
       }
@@ -30,13 +36,17 @@ pipeline {
 
     stage('Install') {
       steps {
-        sh 'pnpm install --frozen-lockfile'
+        sh '''
+          set -eux
+          pnpm install --frozen-lockfile
+        '''
       }
     }
 
     stage('Lint') {
       steps {
         sh '''
+          set -eux
           if pnpm -s run | grep -q "^lint"; then
             pnpm lint
           else
@@ -49,6 +59,7 @@ pipeline {
     stage('Typecheck') {
       steps {
         sh '''
+          set -eux
           if pnpm -s run | grep -q "^typecheck"; then
             pnpm typecheck
           else
@@ -61,6 +72,7 @@ pipeline {
     stage('Test') {
       steps {
         sh '''
+          set -eux
           if pnpm -s run | grep -q "^test"; then
             pnpm test
           else
@@ -72,7 +84,10 @@ pipeline {
 
     stage('Build') {
       steps {
-        sh 'pnpm build'
+        sh '''
+          set -eux
+          pnpm build
+        '''
       }
     }
   }
