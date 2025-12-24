@@ -1,0 +1,78 @@
+pipeline {
+  agent any
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    disableConcurrentBuilds()
+  }
+
+  environment {
+    CI = 'true'
+    // Next.js telemetry 끄고 싶으면:
+    NEXT_TELEMETRY_DISABLED = '1'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps { checkout scm }
+    }
+
+    stage('Setup') {
+      steps {
+        sh '''
+          node -v
+          corepack enable
+          pnpm -v
+        '''
+      }
+    }
+
+    stage('Install') {
+      steps {
+        sh 'pnpm install --frozen-lockfile'
+      }
+    }
+
+    stage('Lint') {
+      steps {
+        // package.json에 lint 스크립트가 있어야 함
+        sh 'pnpm lint'
+      }
+    }
+
+    stage('Typecheck') {
+      steps {
+        sh 'pnpm typecheck'
+      }
+    }
+
+    stage('Test') {
+      steps {
+        // jest/playwright 등을 쓰는 경우만 실행
+        sh '''
+          if pnpm -s run | grep -q "^test"; then
+            pnpm test
+          else
+            echo "No test script. Skip."
+          fi
+        '''
+      }
+    }
+
+    stage('Build') {
+      steps {
+        // Next.js build (SSR/SSG 포함)
+        sh 'pnpm build'
+      }
+    }
+  }
+
+  post {
+    always {
+      // JUnit 리포트가 있으면 자동 수집 (있을 때만)
+      junit allowEmptyResults: true, testResults: '**/junit.xml'
+      archiveArtifacts artifacts: '.next/**', allowEmptyArchive: true
+    }
+  }
+}
