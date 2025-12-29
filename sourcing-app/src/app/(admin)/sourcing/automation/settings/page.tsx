@@ -1277,14 +1277,14 @@ export default function AutomationSettingsPage() {
               <div className="p-4 bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl border border-gray-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    {configuredAiProviders.length > 0 ? (
+                    {config.aiProvider ? (
                       <>
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                          configuredAiProviders[0].provider === 'GEMINI'
+                          config.aiProvider === 'GEMINI'
                             ? 'bg-gradient-to-br from-blue-500 to-purple-600'
                             : 'bg-gradient-to-br from-emerald-500 to-teal-600'
                         }`}>
-                          {configuredAiProviders[0].provider === 'GEMINI' ? (
+                          {config.aiProvider === 'GEMINI' ? (
                             <Sparkles size={20} className="text-white" />
                           ) : (
                             <Bot size={20} className="text-white" />
@@ -1292,12 +1292,13 @@ export default function AutomationSettingsPage() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-gray-800">{configuredAiProviders[0].name}</span>
+                            <span className="font-semibold text-gray-800">
+                              {config.aiProvider === 'GEMINI' ? 'Google Gemini' : 'OpenAI GPT'}
+                            </span>
                             <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">활성</span>
                           </div>
                           <p className="text-xs text-gray-500">
-                            {configuredAiProviders[0].provider === 'GEMINI' ? 'Google AI' : 'OpenAI'} •
-                            {configuredAiProviders.length > 1 && ` 외 ${configuredAiProviders.length - 1}개 설정됨`}
+                            {config.aiProvider === 'GEMINI' ? 'Google AI' : 'OpenAI'} • AI 설정에서 변경 가능
                           </p>
                         </div>
                       </>

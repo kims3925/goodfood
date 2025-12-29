@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { settingsService } from '@/modules/config/domain/src/settings'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import prisma from '@bandauto/db'
 
 // =============================================
 // AI 연결 테스트 함수
@@ -146,6 +147,20 @@ export async function POST(request: NextRequest) {
 
     // 연결 테스트 성공 시 저장 (provider를 소문자로 변환)
     const aiConfig = await settingsService.saveAiSettings(currentUser.userId, provider.toLowerCase(), settings)
+
+    // 자동화 설정의 aiProvider도 함께 업데이트 (마지막 저장된 AI를 사용하도록)
+    await prisma.automationConfig.upsert({
+      where: { userId: currentUser.userId },
+      create: {
+        userId: currentUser.userId,
+        aiProvider: provider.toUpperCase(),
+        isEnabled: false,
+      },
+      update: {
+        aiProvider: provider.toUpperCase(),
+      },
+    })
+    console.log('[AI 설정 저장] automationConfig.aiProvider도 업데이트:', provider.toUpperCase())
 
     return NextResponse.json({ success: true, data: aiConfig })
   } catch (error: any) {

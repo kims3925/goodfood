@@ -477,6 +477,36 @@ function parsePrice(value: any): number | undefined {
 }
 
 /**
+ * 배송비/합배송 관련 값을 숫자로 안전하게 변환
+ * 문자열 "4000", "4,000", "4000원" 등을 숫자로 변환
+ * 0도 유효한 값으로 허용 (무료배송)
+ */
+function parseShippingValue(value: any): number | null {
+  // null/undefined인 경우
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  // 이미 숫자인 경우 (0도 허용)
+  if (typeof value === 'number' && !isNaN(value)) {
+    return value
+  }
+
+  // 문자열인 경우 파싱 시도
+  if (typeof value === 'string') {
+    // 콤마, 원, ₩, 공백 등 제거 후 숫자 추출
+    const cleaned = value.replace(/[,원₩￦\s]/g, '')
+    const parsed = parseInt(cleaned, 10)
+    if (!isNaN(parsed)) {
+      console.log(`📦 배송비 문자열 변환: "${value}" -> ${parsed}`)
+      return parsed
+    }
+  }
+
+  return null
+}
+
+/**
  * Parse AI-extracted variants from raw response
  * Returns only variants with at least one price (wholesalePrice or price)
  * 개선: 문자열 가격도 숫자로 변환하여 처리
@@ -980,16 +1010,20 @@ function parseAiResponse(aiResponse: AiResponse): AiProductAnalysis {
     // AI가 직접 추출한 variants 파싱
     const aiVariants = parseAiVariants(parsed.variants)
 
-    // 배송비 정보 파싱
-    const shippingFee = typeof parsed.shipping?.shippingFee === 'number'
-      ? parsed.shipping.shippingFee
-      : null
+    // 배송비 정보 파싱 (문자열도 숫자로 변환)
+    const shippingFee = parseShippingValue(parsed.shipping?.shippingFee)
     const shippingInfo = typeof parsed.shipping?.shippingInfo === 'string'
       ? parsed.shipping.shippingInfo
       : null
-    const bundleMaxQty = typeof parsed.shipping?.bundleMaxQty === 'number'
-      ? parsed.shipping.bundleMaxQty
-      : 1 // 기본값: 합배송 불가
+    const bundleMaxQty = parseShippingValue(parsed.shipping?.bundleMaxQty) ?? 1
+
+    console.log('📦 배송비 파싱 결과:', {
+      rawShippingFee: parsed.shipping?.shippingFee,
+      parsedShippingFee: shippingFee,
+      rawShippingInfo: parsed.shipping?.shippingInfo,
+      rawBundleMaxQty: parsed.shipping?.bundleMaxQty,
+      parsedBundleMaxQty: bundleMaxQty,
+    })
 
     // Build analysis result
     const analysis: AiProductAnalysis = {
@@ -1652,16 +1686,20 @@ function parseIndividualResult(item: any): AiProductAnalysis {
                        item.pricing?.sellingPrice ||
                        basePrice
 
-  // 배송비 정보 파싱
-  const shippingFee = typeof item.shipping?.shippingFee === 'number'
-    ? item.shipping.shippingFee
-    : null
+  // 배송비 정보 파싱 (문자열도 숫자로 변환)
+  const shippingFee = parseShippingValue(item.shipping?.shippingFee)
   const shippingInfo = typeof item.shipping?.shippingInfo === 'string'
     ? item.shipping.shippingInfo
     : null
-  const bundleMaxQty = typeof item.shipping?.bundleMaxQty === 'number'
-    ? item.shipping.bundleMaxQty
-    : 1
+  const bundleMaxQty = parseShippingValue(item.shipping?.bundleMaxQty) ?? 1
+
+  console.log('📦 배송비 파싱 결과:', {
+    rawShippingFee: item.shipping?.shippingFee,
+    parsedShippingFee: shippingFee,
+    rawShippingInfo: item.shipping?.shippingInfo,
+    rawBundleMaxQty: item.shipping?.bundleMaxQty,
+    parsedBundleMaxQty: bundleMaxQty,
+  })
 
   return {
     productName: item.productName,

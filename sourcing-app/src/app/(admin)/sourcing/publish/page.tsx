@@ -19,6 +19,7 @@ import {
   Loader2,
   AlertOctagon,
   X,
+  Clock,
 } from 'lucide-react'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -162,6 +163,13 @@ export default function PublishPage() {
   const [showPublishProgress, setShowPublishProgress] = useState(false)
   const [publishProgressItems, setPublishProgressItems] = useState<PublishProgressItem[]>([])
   const [currentPublishIndex, setCurrentPublishIndex] = useState(0)
+
+  // 세션 만료 모달 상태
+  const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false)
+  const [expiredChannelInfo, setExpiredChannelInfo] = useState<{
+    channelId: number
+    channelName: string
+  } | null>(null)
 
   // 페이지 이탈 경고 (발행 중일 때)
   useEffect(() => {
@@ -813,6 +821,18 @@ export default function PublishPage() {
                         totalFailed++
                         if (progress.error) {
                           errorMessages.push(progress.error)
+
+                          // 세션 만료 감지 시 모달 표시
+                          const isSessionError = progress.error.includes('세션') &&
+                            (progress.error.includes('만료') || progress.error.includes('없'))
+                          if (isSessionError && !showSessionExpiredModal) {
+                            const channel = channels.find(ch => ch.id === Number(channelId))
+                            setExpiredChannelInfo({
+                              channelId: Number(channelId),
+                              channelName: channel?.name || `채널 ${channelId}`
+                            })
+                            setShowSessionExpiredModal(true)
+                          }
                         }
                         if (itemIdx !== -1) {
                           setPublishProgressItems((prev) => {
@@ -1496,6 +1516,68 @@ export default function PublishPage() {
                 >
                   <ExternalLink size={16} className="mr-2" />
                   채널 관리
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 세션 만료 알림 모달 */}
+      {showSessionExpiredModal && expiredChannelInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowSessionExpiredModal(false)}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            {/* 헤더 */}
+            <div className="bg-amber-50 p-6 border-b border-amber-100">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-100 rounded-full">
+                  <Clock size={24} className="text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">밴드 로그인 세션 만료</h3>
+                  <p className="text-sm text-gray-600">
+                    채널 세션이 만료되어 발행할 수 없습니다
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 콘텐츠 */}
+            <div className="p-6">
+              <div className="p-4 bg-gray-50 rounded-xl mb-4">
+                <div className="flex items-center gap-3">
+                  <BandIcon size={20} className="text-amber-600" />
+                  <div>
+                    <p className="font-medium text-gray-900">{expiredChannelInfo.channelName}</p>
+                    <p className="text-xs text-amber-600">세션 만료됨</p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-6">
+                채널 설정 페이지에서 밴드에 다시 로그인해주세요.
+              </p>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => setShowSessionExpiredModal(false)}
+                >
+                  닫기
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    router.push(`/sourcing/channel/detail/${expiredChannelInfo.channelId}`)
+                  }}
+                >
+                  <ExternalLink size={16} className="mr-2" />
+                  채널 설정으로 이동
                 </Button>
               </div>
             </div>

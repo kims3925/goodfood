@@ -56,6 +56,10 @@ export class BandPlaywrightService {
     } catch (error: any) {
       console.error('[BandPlaywrightService] Publish failed:', error)
 
+      // 발행 실패 시 컨텍스트 무효화 (상태 꼬임 방지)
+      console.log(`[BandPlaywrightService] Closing context for channel ${channelId} due to error`)
+      await browserPool.closeContext(channelId)
+
       // 세션 만료 에러인 경우 재시도
       if (
         error instanceof BandPlaywrightError &&
@@ -64,6 +68,16 @@ export class BandPlaywrightService {
       ) {
         console.log('[BandPlaywrightService] Session expired, retrying with new session')
         await sessionManager.invalidateSession(channelId)
+        return this.publishWithImages(params, retryCount + 1)
+      }
+
+      // POST_FAILED 에러는 새 컨텍스트로 재시도 (1회)
+      if (
+        error instanceof BandPlaywrightError &&
+        error.code === BandPlaywrightErrorCode.POST_FAILED &&
+        retryCount < 1
+      ) {
+        console.log('[BandPlaywrightService] Post failed, retrying with fresh context')
         return this.publishWithImages(params, retryCount + 1)
       }
 
@@ -141,6 +155,10 @@ export class BandPlaywrightService {
     } catch (error: any) {
       console.error('[BandPlaywrightService] Batch publish failed:', error)
 
+      // 발행 실패 시 컨텍스트 무효화 (상태 꼬임 방지)
+      console.log(`[BandPlaywrightService] Closing context for channel ${channelId} due to batch error`)
+      await browserPool.closeContext(channelId)
+
       // 세션 만료 에러인 경우 재시도
       if (
         error instanceof BandPlaywrightError &&
@@ -149,6 +167,16 @@ export class BandPlaywrightService {
       ) {
         console.log('[BandPlaywrightService] Session expired, retrying with new session')
         await sessionManager.invalidateSession(channelId)
+        return this.publishBatchWithImages(params, retryCount + 1)
+      }
+
+      // POST_FAILED 에러는 새 컨텍스트로 재시도 (1회)
+      if (
+        error instanceof BandPlaywrightError &&
+        error.code === BandPlaywrightErrorCode.POST_FAILED &&
+        retryCount < 1
+      ) {
+        console.log('[BandPlaywrightService] Batch post failed, retrying with fresh context')
         return this.publishBatchWithImages(params, retryCount + 1)
       }
 
