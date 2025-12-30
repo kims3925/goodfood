@@ -8,6 +8,8 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   X,
   Trash2,
   Filter,
@@ -24,11 +26,38 @@ import Loading from '@/components/ui/Loading'
 // 알림 타입 (소싱용)
 type NotificationType = 'COLLECT' | 'TRANSFORM' | 'PUBLISH' | 'ERROR' | 'INFO'
 
+interface NotificationMetadata {
+  overallStatus?: string
+  duration?: string
+  collection?: {
+    successCount: number
+    failedCount: number
+    bandResults: Array<{ bandName: string; count: number }>
+  }
+  transform?: {
+    successCount: number
+    failedCount: number
+    productNames: string[]
+  }
+  productCreate?: {
+    successCount: number
+    failedCount: number
+    productNames: string[]
+  }
+  publish?: {
+    successCount: number
+    failedCount: number
+    channelName?: string
+    productNames: string[]
+  }
+}
+
 interface Notification {
   id: number
   type: NotificationType
   title: string
   message: string
+  metadata?: NotificationMetadata
   isRead: boolean
   createdAt: string
   link?: string
@@ -83,6 +112,108 @@ const typeConfig: Record<NotificationType, { icon: React.ReactNode; bg: string; 
   },
 }
 
+// Metadata 정형화 표시 컴포넌트
+function MetadataDisplay({ metadata, type }: { metadata?: NotificationMetadata; type: NotificationType }) {
+  if (!metadata) return null
+
+  return (
+    <div className="mt-3 space-y-2 text-sm">
+      {/* 수집 결과 */}
+      {metadata.collection && (
+        <div className="space-y-1">
+          <div className="font-medium text-gray-700 flex items-center gap-1">
+            <Package size={14} /> 수집 결과
+          </div>
+          <div className="pl-5 space-y-0.5">
+            {metadata.collection.bandResults?.map((band, i) => (
+              <div key={i} className="text-gray-600">
+                • {band.bandName}: <span className="font-medium">{band.count}건</span>
+              </div>
+            ))}
+            <div className="text-gray-500 text-xs mt-1">
+              총 {metadata.collection.successCount}건 성공
+              {metadata.collection.failedCount > 0 && `, ${metadata.collection.failedCount}건 실패`}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 변환 결과 */}
+      {metadata.transform && (
+        <div className="space-y-1">
+          <div className="font-medium text-gray-700 flex items-center gap-1">
+            <Zap size={14} /> AI 변환 결과
+          </div>
+          <div className="pl-5 space-y-0.5">
+            {metadata.transform.productNames?.slice(0, 3).map((name, i) => (
+              <div key={i} className="text-gray-600">• {name}</div>
+            ))}
+            {metadata.transform.productNames?.length > 3 && (
+              <div className="text-gray-400 text-xs">외 {metadata.transform.productNames.length - 3}건...</div>
+            )}
+            <div className="text-gray-500 text-xs mt-1">
+              총 {metadata.transform.successCount}건 성공
+              {metadata.transform.failedCount > 0 && `, ${metadata.transform.failedCount}건 실패`}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 상품 생성 결과 */}
+      {metadata.productCreate && (
+        <div className="space-y-1">
+          <div className="font-medium text-gray-700 flex items-center gap-1">
+            <Package size={14} /> 상품 생성 결과
+          </div>
+          <div className="pl-5 space-y-0.5">
+            {metadata.productCreate.productNames?.slice(0, 3).map((name, i) => (
+              <div key={i} className="text-gray-600">• {name}</div>
+            ))}
+            {metadata.productCreate.productNames?.length > 3 && (
+              <div className="text-gray-400 text-xs">외 {metadata.productCreate.productNames.length - 3}건...</div>
+            )}
+            <div className="text-gray-500 text-xs mt-1">
+              총 {metadata.productCreate.successCount}건 성공
+              {metadata.productCreate.failedCount > 0 && `, ${metadata.productCreate.failedCount}건 실패`}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 발행 결과 */}
+      {metadata.publish && (
+        <div className="space-y-1">
+          <div className="font-medium text-gray-700 flex items-center gap-1">
+            <Upload size={14} /> 발행 결과
+            {metadata.publish.channelName && (
+              <span className="text-gray-500 font-normal">({metadata.publish.channelName})</span>
+            )}
+          </div>
+          <div className="pl-5 space-y-0.5">
+            {metadata.publish.productNames?.slice(0, 3).map((name, i) => (
+              <div key={i} className="text-gray-600">• {name}</div>
+            ))}
+            {metadata.publish.productNames?.length > 3 && (
+              <div className="text-gray-400 text-xs">외 {metadata.publish.productNames.length - 3}건...</div>
+            )}
+            <div className="text-gray-500 text-xs mt-1">
+              총 {metadata.publish.successCount}건 성공
+              {metadata.publish.failedCount > 0 && `, ${metadata.publish.failedCount}건 실패`}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 처리 시간 */}
+      {metadata.duration && (
+        <div className="text-xs text-gray-400 pt-1 border-t border-gray-100">
+          처리 시간: {metadata.duration}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SourcingNotificationPage() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<NotificationData | null>(null)
@@ -100,6 +231,9 @@ export default function SourcingNotificationPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteTargetIds, setDeleteTargetIds] = useState<number[]>([])
+
+  // 펼쳐진 알림
+  const [expandedIds, setExpandedIds] = useState<number[]>([])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -231,6 +365,13 @@ export default function SourcingNotificationPage() {
   // 개별 선택
   const handleSelect = (id: number) => {
     setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    )
+  }
+
+  // 드롭다운 토글
+  const toggleExpand = (id: number) => {
+    setExpandedIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     )
   }
@@ -459,13 +600,14 @@ export default function SourcingNotificationPage() {
             <div className="divide-y divide-gray-200">
               {data.notifications.map((notification) => {
                 const config = typeConfig[notification.type] || typeConfig.INFO
+                const isExpanded = expandedIds.includes(notification.id)
                 return (
                   <div
                     key={notification.id}
-                    className={`p-4 hover:bg-gray-50 transition-colors ${
+                    className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
                       !notification.isRead ? 'bg-blue-50/30' : ''
-                    } ${notification.link ? 'cursor-pointer' : ''}`}
-                    onClick={() => notification.link && handleNotificationClick(notification)}
+                    }`}
+                    onClick={() => toggleExpand(notification.id)}
                   >
                     <div className="flex items-start gap-4">
                       <input
@@ -493,8 +635,38 @@ export default function SourcingNotificationPage() {
                             <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded">NEW</span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600 line-clamp-2">{notification.message}</p>
-                        <p className="text-xs text-gray-400 mt-2">{formatDate(notification.createdAt)}</p>
+                        {/* 펼치기 전: 제목만, 펼치면: 상세 정보 */}
+                        {isExpanded && (
+                          <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            {/* metadata가 있으면 정형화해서 표시, 없으면 message 표시 */}
+                            {notification.metadata ? (
+                              <MetadataDisplay metadata={notification.metadata} type={notification.type} />
+                            ) : (
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                                {notification.message}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        <div className={`flex items-center justify-between mt-2 ${isExpanded ? 'pt-2' : ''}`}>
+                          <p className="text-xs text-gray-400">{formatDate(notification.createdAt)}</p>
+                          {isExpanded && notification.link && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleNotificationClick(notification)
+                              }}
+                              className="px-3 py-1.5 bg-blue-500 text-white text-xs font-medium rounded-lg hover:bg-blue-600 flex items-center gap-1"
+                            >
+                              상세 보기
+                              <ChevronRight size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {/* 펼침/접힘 아이콘 */}
+                      <div className="text-gray-400">
+                        {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                       </div>
                     </div>
                   </div>

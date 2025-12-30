@@ -1184,6 +1184,45 @@ export class BandPostAutomation {
   }
 
   /**
+   * 글씨 스타일 설정 (크게 + 볼드)
+   * CKEditor 툴바에서 글씨 크기 "크게"와 볼드를 선택
+   */
+  private async setTextStyle(page: Page): Promise<void> {
+    try {
+      // 1. 글씨 크기 버튼 클릭 (span의 부모 a 태그)
+      const fontSizeButton = await page.$('.cke_button__fontsize_icon')
+      if (fontSizeButton) {
+        const parent = await fontSizeButton.$('xpath=..')
+        if (parent) {
+          await parent.click()
+          await page.waitForTimeout(500)
+
+          // 2. "크게" 옵션 클릭
+          const largeOption = await page.$('a[title="크게"]')
+          if (largeOption) {
+            await largeOption.click()
+            await page.waitForTimeout(300)
+            console.log('[밴드자동화] 글씨 크기 "크게" 선택 완료')
+          }
+        }
+      }
+
+      // 3. 볼드 버튼 클릭 (span의 부모 a 태그)
+      const boldButton = await page.$('.cke_button__bold_icon')
+      if (boldButton) {
+        const parent = await boldButton.$('xpath=..')
+        if (parent) {
+          await parent.click()
+          await page.waitForTimeout(300)
+          console.log('[밴드자동화] 볼드 선택 완료')
+        }
+      }
+    } catch (error) {
+      console.warn('[밴드자동화] 글씨 스타일 설정 실패 (무시하고 계속):', error)
+    }
+  }
+
+  /**
    * 본문 입력
    * Band UI 패턴에 따라 레이어 팝업 내 에디터 또는 인라인 에디터에 입력
    */
@@ -1275,6 +1314,9 @@ export class BandPostAutomation {
     if (isContentEditable) {
       await editor.click()
       await page.waitForTimeout(500)
+
+      // 글씨 스타일 설정 (크게 + 볼드)
+      await this.setTextStyle(page)
 
       // 실제 키보드 입력으로 내용 입력 (Band가 이벤트 감지하도록)
       // 먼저 기존 내용 삭제

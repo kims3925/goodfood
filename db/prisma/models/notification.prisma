@@ -6,6 +6,7 @@ model Notification {
   type            NotificationType
   title           String                @db.VarChar(255)
   message         String                @db.Text
+  metadata        Json?                 // 상세 데이터 (JSON)
   isRead          Boolean               @default(false) @map("is_read")
   link            String?               @db.VarChar(500)
 

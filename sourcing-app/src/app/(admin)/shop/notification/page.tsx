@@ -8,6 +8,8 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   X,
   Check,
   Trash2,
@@ -110,6 +112,9 @@ export default function ShopNotificationPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteTargetIds, setDeleteTargetIds] = useState<number[]>([])
+
+  // 펼쳐진 알림
+  const [expandedIds, setExpandedIds] = useState<number[]>([])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -243,6 +248,13 @@ export default function ShopNotificationPage() {
   // 개별 선택
   const handleSelect = (id: number) => {
     setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    )
+  }
+
+  // 드롭다운 토글
+  const toggleExpand = (id: number) => {
+    setExpandedIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     )
   }
@@ -478,13 +490,14 @@ export default function ShopNotificationPage() {
             <div className="divide-y divide-gray-200">
               {data.notifications.map((notification) => {
                 const config = typeConfig[notification.type] || typeConfig.ORDER
+                const isExpanded = expandedIds.includes(notification.id)
                 return (
                   <div
                     key={notification.id}
-                    className={`p-4 hover:bg-gray-50 transition-colors ${
+                    className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
                       !notification.isRead ? 'bg-blue-50/30' : ''
-                    } ${notification.link ? 'cursor-pointer' : ''}`}
-                    onClick={() => notification.link && handleNotificationClick(notification)}
+                    }`}
+                    onClick={() => toggleExpand(notification.id)}
                   >
                     <div className="flex items-start gap-4">
                       <input
@@ -512,15 +525,40 @@ export default function ShopNotificationPage() {
                             <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded">NEW</span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600 line-clamp-2">{notification.message}</p>
-                        <div className="flex items-center gap-3 mt-2">
-                          <p className="text-xs text-gray-400">{formatDate(notification.createdAt)}</p>
-                          {notification.shop && (
-                            <p className="text-xs text-gray-400">
-                              <span className="text-gray-300">|</span> {notification.shop.name}
+                        {/* 펼치기 전: 제목만, 펼치면: 상세 정보 */}
+                        {isExpanded && (
+                          <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                              {notification.message}
                             </p>
+                          </div>
+                        )}
+                        <div className={`flex items-center justify-between mt-2 ${isExpanded ? 'pt-2' : ''}`}>
+                          <div className="flex items-center gap-3">
+                            <p className="text-xs text-gray-400">{formatDate(notification.createdAt)}</p>
+                            {notification.shop && (
+                              <p className="text-xs text-gray-400">
+                                <span className="text-gray-300">|</span> {notification.shop.name}
+                              </p>
+                            )}
+                          </div>
+                          {isExpanded && notification.link && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleNotificationClick(notification)
+                              }}
+                              className="px-3 py-1.5 bg-blue-500 text-white text-xs font-medium rounded-lg hover:bg-blue-600 flex items-center gap-1"
+                            >
+                              상세 보기
+                              <ChevronRight size={14} />
+                            </button>
                           )}
                         </div>
+                      </div>
+                      {/* 펼침/접힘 아이콘 */}
+                      <div className="text-gray-400">
+                        {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                       </div>
                     </div>
                   </div>
