@@ -68,8 +68,17 @@ export class SettingsService {
 
     if (provider === 'band') {
       configData.accessToken = settings.accessToken || null
-      configData.refreshToken = null
-      configData.metadata = null
+      configData.refreshToken = settings.refreshToken || null
+      // OAuth 메타데이터 저장 (만료시간 등)
+      if (settings.expiresIn || settings.tokenType) {
+        configData.metadata = JSON.stringify({
+          expiresIn: settings.expiresIn || null,
+          tokenType: settings.tokenType || 'Bearer',
+          updatedAt: new Date().toISOString(),
+        })
+      } else {
+        configData.metadata = null
+      }
     } else if (provider === 'aliexpress') {
       configData.apiKey = settings.apiKey || null
       configData.accessToken = settings.accessToken || null

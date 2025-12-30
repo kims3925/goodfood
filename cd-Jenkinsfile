@@ -60,7 +60,7 @@ pipeline {
         }
 
         stage('Deploy') {
-            
+
             steps {
                 echo 'Deploying application...'
                 sh """
@@ -73,9 +73,63 @@ pipeline {
                     git fetch origin main
                     git reset --hard origin/main
 
-                    # Install dependencies
-                    echo ">>> Installing dependencies..."
-                    npm ci --legacy-peer-deps
+                    # =============================================
+                    # node_modules 자동 복구 로직
+                    # =============================================
+                    echo ">>> Checking node_modules integrity..."
+
+                    NEED_REINSTALL=false
+
+                    # 1. node_modules가 없으면 재설치 필요
+                    if [ ! -d "node_modules" ]; then
+                        echo ">>> node_modules not found, will reinstall"
+                        NEED_REINSTALL=true
+                    fi
+
+                    # 2. package-lock.json이 변경되었으면 재설치 필요
+                    if [ -f ".npm-checksum" ]; then
+                        OLD_CHECKSUM=\$(cat .npm-checksum)
+                        NEW_CHECKSUM=\$(md5sum package-lock.json | cut -d' ' -f1)
+                        if [ "\$OLD_CHECKSUM" != "\$NEW_CHECKSUM" ]; then
+                            echo ">>> package-lock.json changed, will reinstall"
+                            NEED_REINSTALL=true
+                        fi
+                    else
+                        NEED_REINSTALL=true
+                    fi
+
+                    # 3. node_modules 손상 체크 (주요 패키지 확인)
+                    if [ "\$NEED_REINSTALL" = "false" ]; then
+                        for pkg in next react prisma; do
+                            if [ ! -d "node_modules/\$pkg" ]; then
+                                echo ">>> Missing package: \$pkg, will reinstall"
+                                NEED_REINSTALL=true
+                                break
+                            fi
+                        done
+                    fi
+
+                    # 재설치 실행
+                    if [ "\$NEED_REINSTALL" = "true" ]; then
+                        echo ">>> Cleaning and reinstalling dependencies..."
+                        rm -rf node_modules
+                        rm -rf .next
+                        rm -rf shop-app/.next
+                        rm -rf sourcing-app/.next
+                        npm ci --legacy-peer-deps
+
+                        # 체크섬 저장
+                        md5sum package-lock.json | cut -d' ' -f1 > .npm-checksum
+                        echo ">>> Dependencies reinstalled successfully"
+                    else
+                        echo ">>> node_modules is up to date"
+                        # 혹시 모를 문제에 대비해 npm ci 시도
+                        npm ci --legacy-peer-deps || {
+                            echo ">>> npm ci failed, force reinstalling..."
+                            rm -rf node_modules
+                            npm ci --legacy-peer-deps
+                        }
+                    fi
 
                     # Generate Prisma client
                     echo ">>> Generating Prisma client..."
@@ -83,10 +137,24 @@ pipeline {
                     npx prisma generate --schema prisma
                     cd ..
 
-                    # Build applications
+                    # Clean Next.js cache before build
+                    echo ">>> Cleaning Next.js cache..."
+                    rm -rf shop-app/.next/cache
+                    rm -rf sourcing-app/.next/cache
+
+                    # Build applications (with retry on failure)
                     echo ">>> Building applications..."
-                    npm run build:shop
-                    npm run build:sourcing
+                    npm run build:shop || {
+                        echo ">>> shop-app build failed, retrying with clean cache..."
+                        rm -rf shop-app/.next
+                        npm run build:shop
+                    }
+
+                    npm run build:sourcing || {
+                        echo ">>> sourcing-app build failed, retrying with clean cache..."
+                        rm -rf sourcing-app/.next
+                        npm run build:sourcing
+                    }
 
                     # Restart PM2
                     echo ">>> Restarting PM2 processes..."
