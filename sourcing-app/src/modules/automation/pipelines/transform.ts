@@ -268,7 +268,12 @@ export async function runTransformPipeline(
   }
 
   // 모델에 따른 Rate Limit 정보 조회
+  const rateLimit = getModelRateLimit(config.aiProvider, aiConfig.model)
   const requestIntervalMs = getRequestIntervalMs(config.aiProvider, aiConfig.model)
+
+  // 일일 사용량 체크 및 리셋
+  const currentDailyUsage = await checkAndResetDailyUsage(aiConfig.id)
+  console.log(`[Transform] Daily usage: ${currentDailyUsage}/${rateLimit.rpd} RPD`)
 
   // 채널별로 게시물 그룹화 (같은 채널은 같은 정책 적용)
   const postsByChannel = new Map<number, typeof posts>()
@@ -302,8 +307,30 @@ export async function runTransformPipeline(
 
   console.log(`[Transform] Split into ${batches.length} batches across ${postsByChannel.size} channels (interval: ${requestIntervalMs / 1000}s)`)
 
-  // 각 배치 처리
+  // 각 배치 처리 (RPD 제한 적용)
+  let currentRpdUsage = currentDailyUsage
   for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    // RPD 제한 체크: 처리 전에 확인
+    if (currentRpdUsage >= rateLimit.rpd) {
+      console.log(`[Transform] RPD limit reached (${currentRpdUsage}/${rateLimit.rpd}). Stopping.`)
+      const remainingPosts = batches.slice(batchIndex).flatMap(b => b.posts)
+      errors.push({
+        itemId: 0,
+        message: `일일 API 호출 한도(${rateLimit.rpd}회)에 도달하여 ${remainingPosts.length}개 게시물을 처리하지 못했습니다.`,
+        timestamp: new Date(),
+      })
+      // 남은 게시물들을 retryable로 표시
+      for (const post of remainingPosts) {
+        transformedPosts.push({
+          postId: post.id,
+          status: 'skipped',
+          error: 'RPD 한도 초과',
+          retryable: true,
+        })
+      }
+      break
+    }
+
     // 취소 체크: 각 배치 처리 전에 확인
     if (await checkCancellation()) {
       console.log(`[Transform] Cancelled by user before batch ${batchIndex + 1}`)
@@ -508,11 +535,14 @@ export async function runTransformPipeline(
         },
       })
 
+      // 현재 RPD 사용량 증가
+      currentRpdUsage++
+
       if (tokensUsed > 0) {
         console.log(`[Transform] Batch ${batchIndex + 1} used ${tokensUsed} tokens`)
       }
 
-      console.log(`[Transform] Batch ${batchIndex + 1} completed`)
+      console.log(`[Transform] Batch ${batchIndex + 1} completed (RPD: ${currentRpdUsage}/${rateLimit.rpd})`)
 
     } catch (batchError: any) {
       console.error(`[Transform] Batch ${batchIndex + 1} failed:`, batchError)
