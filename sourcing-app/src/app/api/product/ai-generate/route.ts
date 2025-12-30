@@ -26,6 +26,8 @@ const GEMINI_RATE_LIMITS: Record<string, ModelRateLimit> = {
 const OPENAI_RATE_LIMITS: Record<string, ModelRateLimit> = {
   'gpt-4o': { rpm: 500, tpm: 800000, rpd: 10000 },
   'gpt-4o-mini': { rpm: 500, tpm: 2000000, rpd: 10000 },
+  'gpt-4.1-mini': { rpm: 500, tpm: 2000000, rpd: 10000 },
+  'gpt-4.1-nano': { rpm: 500, tpm: 2000000, rpd: 10000 },
   'gpt-4-turbo': { rpm: 500, tpm: 800000, rpd: 10000 },
   'default': { rpm: 60, tpm: 150000, rpd: 10000 },
 }
