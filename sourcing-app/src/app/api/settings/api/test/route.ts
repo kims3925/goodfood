@@ -117,14 +117,13 @@ async function testBandConnection(settings: {
     // 에러 코드별 메시지
     const errorInfo = getBandErrorMessage(data.result_code)
     if (errorInfo) {
-      return { success: false, ...errorInfo, errorCode: data.result_code }
+      return { success: false, ...errorInfo }
     }
 
     return {
       success: false,
       message: `Band API 오류: ${data.result_msg || data.message || '알 수 없는 오류'}`,
       detail: `에러 코드: ${data.result_code}`,
-      errorCode: data.result_code,
     }
   } catch (error: any) {
     console.error('[Band API Test] 오류:', error)

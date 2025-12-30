@@ -136,9 +136,12 @@ export async function createPipelineNotification(
     }
 
     // metadata 구성
+    const duration = result.completedAt && result.startedAt
+      ? new Date(result.completedAt).getTime() - new Date(result.startedAt).getTime()
+      : undefined
     const metadata: Record<string, any> = {
       overallStatus: result.overallStatus,
-      duration: result.duration,
+      duration,
     }
 
     // 수집 결과
@@ -148,7 +151,7 @@ export async function createPipelineNotification(
         failedCount: result.collection.failedCount,
         bandResults: result.collection.details?.channelResults?.map(ch => ({
           bandName: ch.channelName || ch.channelId,
-          count: ch.postsCollected || 0,
+          count: ch.newPosts || 0,
         })) || [],
       }
     }
@@ -158,10 +161,6 @@ export async function createPipelineNotification(
       metadata.transform = {
         successCount: result.transform.successCount,
         failedCount: result.transform.failedCount,
-        productNames: result.transform.details?.transformedPosts
-          ?.filter(p => p.status === 'success')
-          ?.slice(0, 5)
-          ?.map(p => p.productName || '이름 없음') || [],
       }
     }
 
@@ -182,11 +181,11 @@ export async function createPipelineNotification(
       metadata.publish = {
         successCount: result.publish.successCount,
         failedCount: result.publish.failedCount,
-        channelName: result.publish.details?.channelName,
-        productNames: result.publish.details?.publishedProducts
-          ?.filter(p => p.status === 'SUCCESS')
-          ?.slice(0, 5)
-          ?.map(p => p.productName || '이름 없음') || [],
+        channelResults: result.publish.details?.channelResults?.map(ch => ({
+          channelName: ch.channelName,
+          success: ch.success,
+          failed: ch.failed,
+        })) || [],
       }
     }
 
