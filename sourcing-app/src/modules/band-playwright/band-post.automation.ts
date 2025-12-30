@@ -111,41 +111,12 @@ export class BandPostAutomation {
    * Band API의 bandKey는 항상 AAC... 형식이므로 채널명으로 찾아야 함
    */
   private async navigateToBand(page: Page, bandKey: string, bandName: string): Promise<void> {
-    console.log(`[밴드자동화] 밴드 이동: "${bandName}" (bandKey=${bandKey})`)
+    console.log(`[밴드자동화] 밴드 이동: "${bandName}"`)
 
-    // 방법 1: bandKey로 직접 URL 이동 시도 (가장 빠름)
-    if (bandKey && bandKey.startsWith('AAC')) {
-      console.log(`[밴드자동화] bandKey로 직접 URL 이동 시도...`)
-      const directUrl = `https://band.us/band/${bandKey}`
-      await page.goto(directUrl, {
-        waitUntil: 'networkidle',
-        timeout: POST_TIMEOUT_MS,
-      })
-
-      // 로그인 리다이렉트 체크
-      const currentUrl = page.url()
-      if (currentUrl.includes('signin') || currentUrl.includes('login')) {
-        throw new BandPlaywrightError(
-          '로그인이 필요합니다. 세션이 만료되었을 수 있습니다.',
-          BandPlaywrightErrorCode.SESSION_EXPIRED
-        )
-      }
-
-      // 밴드 페이지로 이동했는지 확인
-      if (currentUrl.includes('/band/') && !currentUrl.includes('/home')) {
-        console.log(`[밴드자동화] 밴드 페이지 이동 성공: ${currentUrl}`)
-        await page.waitForTimeout(2000)
-        await this.saveDebugScreenshot(page, 'band-direct-nav')
-        return
-      }
-
-      console.log(`[밴드자동화] 직접 URL 이동 실패, 검색으로 전환...`)
-    }
-
-    // 방법 2: Band 홈에서 채널명으로 밴드 찾기 (폴백)
+    // Band 홈에서 채널명으로 밴드 찾기
     console.log(`[밴드자동화] Band 홈에서 밴드 검색 중...`)
     await page.goto('https://band.us/home', {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',  // networkidle → domcontentloaded (최적화)
       timeout: POST_TIMEOUT_MS,
     })
 
@@ -158,12 +129,11 @@ export class BandPostAutomation {
       )
     }
 
-    await page.waitForTimeout(2000)
+    await page.waitForTimeout(1000)  // 2000 → 1000 (최적화)
     await this.saveDebugScreenshot(page, 'band-home')
 
-    // 사이드바에서 채널명과 일치하는 밴드 찾기
-    // 밴드 목록은 보통 사이드바에 있음
-    const bandLinkSelector = `a[href*="/band/"]`
+    // 밴드 커버 링크에서 채널명과 일치하는 밴드 찾기 (a.bandCover._link)
+    const bandLinkSelector = `a.bandCover._link, a[href*="/band/"]`
 
     // 모든 밴드 링크에서 텍스트와 href 수집
     const bandLinks = await page.$$eval(bandLinkSelector, (links) =>
@@ -172,6 +142,8 @@ export class BandPostAutomation {
         text: link.textContent?.trim() || '',
         // 이미지 alt도 체크 (밴드 아이콘에 이름이 있을 수 있음)
         imgAlt: link.querySelector('img')?.getAttribute('alt') || '',
+        // bandName 클래스 내 텍스트도 체크
+        bandNameText: link.querySelector('.bandName')?.textContent?.trim() || '',
       }))
     )
 
@@ -183,17 +155,19 @@ export class BandPostAutomation {
         link.text === bandName ||
         link.text.includes(bandName) ||
         link.imgAlt === bandName ||
-        link.imgAlt.includes(bandName)
+        link.imgAlt.includes(bandName) ||
+        link.bandNameText === bandName ||
+        link.bandNameText.includes(bandName)
     )
 
     if (matchedLink) {
-      console.log(`[밴드자동화] 일치하는 밴드 발견: "${matchedLink.text || matchedLink.imgAlt}" -> ${matchedLink.href}`)
+      console.log(`[밴드자동화] 일치하는 밴드 발견: "${matchedLink.text || matchedLink.bandNameText || matchedLink.imgAlt}" -> ${matchedLink.href}`)
 
       // 해당 링크 클릭
       const linkElement = await page.$(`a[href="${matchedLink.href}"]`)
       if (linkElement) {
         await linkElement.click()
-        await page.waitForLoadState('networkidle')
+        await page.waitForLoadState('domcontentloaded')  // networkidle → domcontentloaded (최적화)
         console.log(`[밴드자동화] 밴드 페이지 이동 완료: ${page.url()}`)
         return
       }
@@ -213,7 +187,7 @@ export class BandPostAutomation {
         const linkElement = await page.$(`a[href="${link.href}"]`)
         if (linkElement) {
           await linkElement.click()
-          await page.waitForLoadState('networkidle')
+          await page.waitForLoadState('domcontentloaded')  // networkidle → domcontentloaded (최적화)
           console.log(`[밴드자동화] 밴드 페이지 이동 완료: ${page.url()}`)
           return
         }
@@ -260,8 +234,14 @@ export class BandPostAutomation {
       // 0. 준비 단계
       await reportStage('preparing')
 
-      // 1. 밴드 페이지로 이동
-      await this.navigateToBand(page, bandKey, bandName)
+      // 1. 밴드 페이지로 이동 (1회 재시도)
+      try {
+        await this.navigateToBand(page, bandKey, bandName)
+      } catch (navError: any) {
+        console.warn(`[밴드자동화] 밴드 찾기 실패, 1회 재시도: ${navError.message}`)
+        await page.waitForTimeout(2000)
+        await this.navigateToBand(page, bandKey, bandName)
+      }
 
       // 현재 URL 확인 (로그인 리다이렉트 체크)
       const currentUrl = page.url()
@@ -596,9 +576,14 @@ export class BandPostAutomation {
 
     // 실제 Band UI의 사진 버튼 셀렉터 (우선순위 순)
     const imageButtonSelectors = [
+      // 글쓰기 모달 내 사진 버튼 (label 태그)
+      'label.photo._btnAttachPhoto',
+      'label._btnAttachPhoto',
       // 레이어 팝업 내 사진 버튼
+      '[data-viewname="DPostWriteLayerView"] label.photo',
       '[data-viewname="DPostWriteLayerView"] button.photo',
       '[data-viewname="DPostWriteLayerView"] button[data-attachment="photo"]',
+      '.layerContainer label.photo',
       '.layerContainer button.photo',
       // 글쓰기 레이어 내 사진 버튼 (실제 Band DOM 기반)
       'button.photo[data-attachment="photo"]',
@@ -648,13 +633,10 @@ export class BandPostAutomation {
         })
         console.log('[밴드자동화] change/input 이벤트 발생')
 
-        // 파일 선택 후 잠시 대기
-        await page.waitForTimeout(1500)
+        // 팝업 내에서 이미지 업로드 완료 대기 후 "첨부하기" 클릭
+        await this.waitForPopupUploadAndAttach(page, imagePaths.length)
 
-        // "첨부하기" 버튼 먼저 클릭
-        await this.clickAttachButtonIfPresent(page)
-
-        // 업로드 완료 대기
+        // 게시글 영역에 이미지가 추가될 때까지 대기
         await this.waitForUploadComplete(page, imagePaths.length)
         return
       }
@@ -714,14 +696,10 @@ export class BandPostAutomation {
       }
     }
 
-    // 파일 선택 후 잠시 대기 (Band UI가 파일 인식하도록)
-    await page.waitForTimeout(1500)
+    // 팝업 내에서 이미지 업로드 완료 대기 후 "첨부하기" 클릭
+    await this.waitForPopupUploadAndAttach(page, imagePaths.length)
 
-    // "사진 올리기" 팝업에서 "첨부하기" 버튼 클릭 (먼저!)
-    // Band는 파일 선택 후 "첨부하기" 버튼을 눌러야 이미지가 글쓰기 영역에 추가됨
-    await this.clickAttachButtonIfPresent(page)
-
-    // 첨부하기 버튼 클릭 후 업로드 완료 대기
+    // 게시글 영역에 이미지가 추가될 때까지 대기
     await this.waitForUploadComplete(page, imagePaths.length)
   }
 
@@ -757,8 +735,13 @@ export class BandPostAutomation {
 
     // 사진 버튼 찾기
     const imageButtonSelectors = [
+      // 글쓰기 모달 내 사진 버튼 (label 태그)
+      'label.photo._btnAttachPhoto',
+      'label._btnAttachPhoto',
+      '[data-viewname="DPostWriteLayerView"] label.photo',
       '[data-viewname="DPostWriteLayerView"] button.photo',
       '[data-viewname="DPostWriteLayerView"] button[data-attachment="photo"]',
+      '.layerContainer label.photo',
       '.layerContainer button.photo',
       'button.photo[data-attachment="photo"]',
       'button[data-attachment="photo"]',
@@ -799,8 +782,11 @@ export class BandPostAutomation {
           el.dispatchEvent(new Event('change', { bubbles: true }))
           el.dispatchEvent(new Event('input', { bubbles: true }))
         })
-        await page.waitForTimeout(1500)
-        await this.clickAttachButtonIfPresent(page)
+
+        // 팝업 내에서 이미지 업로드 완료 대기 후 "첨부하기" 클릭
+        await this.waitForPopupUploadAndAttach(page, imagePaths.length)
+
+        // 게시글 영역에 이미지가 추가될 때까지 대기
         await this.waitForUploadCompleteWithProgress(page, imagePaths.length, onProgress)
         return
       }
@@ -811,32 +797,33 @@ export class BandPostAutomation {
     }
 
     // 파일 선택 대화상자 처리
-    try {
-      const [fileChooser] = await Promise.all([
-        page.waitForEvent('filechooser', { timeout: 10000 }),
-        imageButton.click(),
-      ])
-      await fileChooser.setFiles(imagePaths)
-    } catch {
-      console.warn('[밴드자동화] 파일 선택창 이벤트 실패, hidden input 시도...')
-      const fileInput = await page.$('input[type="file"][accept*="image"]') ||
-                        await page.$('input[type="file"]')
-      if (fileInput) {
-        await fileInput.setInputFiles(imagePaths)
-        await fileInput.evaluate((el) => {
-          el.dispatchEvent(new Event('change', { bubbles: true }))
-          el.dispatchEvent(new Event('input', { bubbles: true }))
-        })
-      } else {
-        throw new BandPlaywrightError(
-          '파일 선택창을 열 수 없습니다.',
-          BandPlaywrightErrorCode.UPLOAD_TIMEOUT
-        )
-      }
+    // 1. 먼저 사진 버튼 클릭 (커서 위치 확보)
+    console.log('[밴드자동화] 사진 버튼 클릭...')
+    await imageButton.click()
+    await page.waitForTimeout(500)
+
+    // 2. hidden file input에 파일 설정
+    console.log('[밴드자동화] hidden file input 찾는 중...')
+    const fileInput = await page.$('input[type="file"][accept*="image"]') ||
+                      await page.$('input[type="file"]')
+
+    if (fileInput) {
+      console.log('[밴드자동화] hidden file input 발견, 파일 설정 중...')
+      await fileInput.setInputFiles(imagePaths)
+      console.log('[밴드자동화] 파일 설정 완료')
+    } else {
+      console.error('[밴드자동화] hidden file input을 찾을 수 없음')
+      throw new BandPlaywrightError(
+        '파일 입력 요소를 찾을 수 없습니다.',
+        BandPlaywrightErrorCode.UPLOAD_TIMEOUT
+      )
     }
 
-    await page.waitForTimeout(1500)
-    await this.clickAttachButtonIfPresent(page)
+    // 팝업 내에서 이미지 업로드 완료 대기 후 "첨부하기" 클릭
+    console.log('[밴드자동화] 팝업 업로드 대기 시작...')
+    await this.waitForPopupUploadAndAttach(page, imagePaths.length)
+
+    // 게시글 영역에 이미지가 추가될 때까지 대기
     await this.waitForUploadCompleteWithProgress(page, imagePaths.length, onProgress)
   }
 
@@ -1082,63 +1069,172 @@ export class BandPostAutomation {
   }
 
   /**
-   * "첨부하기" 버튼 클릭 (팝업이 있는 경우)
-   * Band의 "사진 올리기" 팝업에서 첨부하기 버튼을 클릭
+   * 팝업 내 이미지 업로드 완료 대기 후 "첨부하기" 클릭
+   * 1. 팝업에서 이미지 업로드 완료 대기
+   * 2. "첨부하기" 버튼 클릭
    */
-  private async clickAttachButtonIfPresent(page: Page): Promise<void> {
-    // 팝업이 열릴 시간 대기
-    await page.waitForTimeout(1000)
+  private async waitForPopupUploadAndAttach(page: Page, expectedCount: number): Promise<void> {
+    const FORBIDDEN_TEXTS = ['게시', '등록', 'post', 'submit']
+    const maxWaitTime = 60000 // 60초 (이미지가 많으면 오래 걸릴 수 있음)
+    const checkInterval = 500
+    const startTime = Date.now()
 
-    // 다양한 "첨부하기" 버튼 셀렉터 (role="dialog" 팝업 포함)
-    const attachButtonSelectors = [
-      // role="dialog" 팝업 내 버튼 (DLayerContainerInnerView)
-      '[role="dialog"] button.confirm',
-      '[role="dialog"] button._btnConfirmAttach',
-      '[role="dialog"] .uButton.-confirm',
-      '[role="dialog"] .layerFooter button',
-      // view-name 기반
-      '[view-name="DLayerContainerInnerView"] button',
-      // 기존 셀렉터
-      'button._btnConfirmAttach',
-      '.layerFooter button.confirm',
-      '.layerFooter button._confirm',
-      '.photoAttachLayer button.confirm',
-      '.uModalBtnArea button.confirm',
+    console.log(`[밴드자동화] 팝업 내 ${expectedCount}개 이미지 업로드 대기 중...`)
+
+    // 팝업 내 업로드 진행 상태 확인
+    const popupLoadingSelectors = [
+      '[role="dialog"] .uploading',
+      '[role="dialog"] .loading',
+      '[role="dialog"] [class*="progress"]',
+      '[role="dialog"] [class*="loading"]',
+      '.uLayer .uploading',
+      '.uLayer .loading',
     ]
 
-    for (const selector of attachButtonSelectors) {
-      try {
-        const attachButton = await page.$(selector)
-        if (attachButton && await attachButton.isVisible()) {
-          const buttonText = await attachButton.textContent()
-          console.log(`[밴드자동화] 첨부하기 버튼 발견: ${selector}, 텍스트="${buttonText?.trim()}", 클릭...`)
-          await attachButton.click()
-          await page.waitForTimeout(1500)
-          // 팝업이 닫혔는지 확인
-          const dialogStillOpen = await page.$('[role="dialog"]')
-          if (!dialogStillOpen || !(await dialogStillOpen.isVisible())) {
-            console.log('[밴드자동화] 첨부하기 버튼 클릭 후 팝업 닫힘')
+    // 팝업 내 업로드된 이미지/썸네일 셀렉터
+    const popupImageSelectors = [
+      '[role="dialog"] img[src*="phinf"]',
+      '[role="dialog"] .thumbnail img',
+      '[role="dialog"] .photoItem img',
+      '.uLayer img[src*="phinf"]',
+      '.uLayer .thumbnail img',
+    ]
+
+    let uploadedCount = 0
+
+    while (Date.now() - startTime < maxWaitTime) {
+      // 로딩 중인지 확인
+      let isLoading = false
+      for (const selector of popupLoadingSelectors) {
+        try {
+          const loadingEl = await page.$(selector)
+          if (loadingEl && await loadingEl.isVisible()) {
+            isLoading = true
+            break
           }
-          return
-        }
-      } catch {
-        // 무시
+        } catch { /* 무시 */ }
       }
+
+      // 업로드된 이미지 수 확인
+      for (const selector of popupImageSelectors) {
+        try {
+          const images = await page.$$(selector)
+          if (images.length > 0) {
+            uploadedCount = images.length
+            break
+          }
+        } catch { /* 무시 */ }
+      }
+
+      // 로딩이 끝나고 이미지가 있으면 "첨부하기" 버튼 클릭 시도
+      if (!isLoading && uploadedCount > 0) {
+        console.log(`[밴드자동화] 팝업 내 ${uploadedCount}개 이미지 업로드 완료, 첨부하기 버튼 찾는 중...`)
+
+        // "첨부하기" 버튼 찾기
+        const attachButtonSelector = 'button.uButton.-confirm._submitBtn'
+        const buttons = await page.$$(attachButtonSelector)
+
+        for (const btn of buttons) {
+          try {
+            const buttonText = (await btn.textContent())?.trim() || ''
+
+            // "게시" 버튼이면 스킵
+            if (FORBIDDEN_TEXTS.some(t => buttonText.toLowerCase().includes(t.toLowerCase()))) {
+              continue
+            }
+
+            // "첨부하기" 텍스트인 버튼만 클릭
+            if (buttonText === '첨부하기' || buttonText.includes('첨부하기')) {
+              const isVisible = await btn.isVisible()
+              if (isVisible) {
+                console.log(`[밴드자동화] 첨부하기 버튼 클릭: "${buttonText}"`)
+                await btn.click()
+                await page.waitForTimeout(1500)
+                return
+              }
+            }
+          } catch { /* 무시 */ }
+        }
+      }
+
+      // 대기 후 재시도
+      await page.waitForTimeout(checkInterval)
     }
 
-    // 텍스트로 버튼 찾기 (role="dialog" 팝업 내 우선)
-    const dialogButtons = await page.$$('[role="dialog"] button')
-    for (const btn of dialogButtons) {
+    // 타임아웃 - 첨부하기 버튼을 끝까지 찾지 못함
+    throw new BandPlaywrightError(
+      `팝업 내 이미지 업로드 시간 초과: ${expectedCount}개 중 ${uploadedCount}개만 업로드됨`,
+      BandPlaywrightErrorCode.UPLOAD_TIMEOUT
+    )
+  }
+
+  /**
+   * "첨부하기" 버튼 클릭 (팝업이 있는 경우)
+   * Band의 "사진 올리기" 팝업에서 첨부하기 버튼을 클릭
+   * 주의: "게시" 버튼은 절대 클릭하지 않음! (같은 셀렉터를 공유함)
+   */
+  private async clickAttachButtonIfPresent(page: Page): Promise<void> {
+    // "게시" 버튼은 절대 클릭하지 않음!
+    const FORBIDDEN_TEXTS = ['게시', '등록', 'post', 'submit']
+    const attachButtonSelector = 'button.uButton.-confirm._submitBtn'
+
+    // 최대 5초 동안 "첨부하기" 버튼이 나타날 때까지 대기
+    const maxWaitTime = 5000
+    const checkInterval = 500
+    const startTime = Date.now()
+
+    console.log('[밴드자동화] 첨부하기 버튼 대기 중...')
+
+    while (Date.now() - startTime < maxWaitTime) {
+      // 모든 일치하는 버튼을 찾고, 텍스트가 "첨부하기"인 것만 클릭
+      const buttons = await page.$$(attachButtonSelector)
+
+      for (const btn of buttons) {
+        try {
+          const buttonText = (await btn.textContent())?.trim() || ''
+
+          // "게시" 버튼이면 스킵
+          if (FORBIDDEN_TEXTS.some(t => buttonText.toLowerCase().includes(t.toLowerCase()))) {
+            continue
+          }
+
+          // "첨부하기" 텍스트인 버튼만 클릭
+          if (buttonText === '첨부하기' || buttonText.includes('첨부하기')) {
+            const isVisible = await btn.isVisible()
+            if (isVisible) {
+              console.log(`[밴드자동화] 첨부하기 버튼 발견: "${buttonText}", 클릭...`)
+              await btn.click()
+              await page.waitForTimeout(1500)
+              return
+            }
+          }
+        } catch {
+          // 무시
+        }
+      }
+
+      // 못 찾았으면 잠시 대기 후 재시도
+      await page.waitForTimeout(checkInterval)
+    }
+
+    // 5초 후에도 못 찾으면 다른 방법 시도
+    console.log('[밴드자동화] 첨부하기 버튼 대기 타임아웃, 다른 셀렉터 시도...')
+
+    // 모든 버튼에서 "첨부하기" 텍스트 검색
+    const allButtons = await page.$$('button')
+    for (const btn of allButtons) {
       try {
-        const text = await btn.textContent()
-        const buttonText = text?.trim() || ''
-        if (
-          (buttonText.includes('첨부하기') || buttonText.includes('확인') || buttonText === '완료' || buttonText === '올리기') &&
-          !buttonText.includes('취소')
-        ) {
+        const buttonText = (await btn.textContent())?.trim() || ''
+
+        // "게시" 버튼이면 스킵
+        if (FORBIDDEN_TEXTS.some(t => buttonText.toLowerCase().includes(t.toLowerCase()))) {
+          continue
+        }
+
+        if (buttonText === '첨부하기') {
           const isVisible = await btn.isVisible()
           if (isVisible) {
-            console.log(`[밴드자동화] 다이얼로그 내 첨부 버튼 발견: "${buttonText}"`)
+            console.log(`[밴드자동화] 첨부하기 버튼 발견 (일반 검색): "${buttonText}"`)
             await btn.click()
             await page.waitForTimeout(1500)
             return
@@ -1149,38 +1245,68 @@ export class BandPostAutomation {
       }
     }
 
-    // 일반 버튼에서도 검색
-    const buttons = await page.$$('button')
-    for (const btn of buttons) {
-      try {
-        const text = await btn.textContent()
-        const buttonText = text?.trim() || ''
-        if (
-          (buttonText.includes('첨부하기') || buttonText.includes('확인') || buttonText === '완료') &&
-          !buttonText.includes('취소')
-        ) {
-          const isVisible = await btn.isVisible()
-          if (isVisible) {
-            // 모달 내부의 버튼인지 확인 (레이어 팝업)
-            const parentLayer = await btn.evaluate(el => {
-              const layer = el.closest('.layerContainer, .uLayer, [class*="Layer"], [role="dialog"]')
-              return layer ? (layer.getAttribute('role') || layer.className) : null
-            })
+    console.log('[밴드자동화] 첨부하기 버튼을 찾지 못함')
+  }
 
-            if (parentLayer) {
-              console.log(`[밴드자동화] 레이어 내 첨부 버튼 발견: "${buttonText}" (레이어: ${parentLayer})`)
-              await btn.click()
-              await page.waitForTimeout(1500)
-              return
+  /**
+   * 글씨 스타일 설정 (크게 + 볼드)
+   * CKEditor 툴바에서 글씨 크기 "크게"와 볼드를 선택
+   */
+  private async setTextStyle(page: Page): Promise<void> {
+    try {
+      // 1. 글씨 크기 버튼 클릭 (span의 부모 a 태그)
+      const fontSizeButton = await page.$('.cke_button__fontsize_icon')
+      if (fontSizeButton) {
+        console.log('[밴드자동화] 글씨 크기 버튼 발견')
+        const parent = await fontSizeButton.$('xpath=..')
+        if (parent) {
+          await parent.click()
+          await page.waitForTimeout(500)
+
+          // 2. CKEditor 드롭다운은 iframe 안에 있음 - iframe 프레임 찾기
+          const panelFrame = page.frameLocator('.cke_panel_frame')
+          if (panelFrame) {
+            // iframe 내부에서 "크게" 옵션 찾기
+            const largeOption = panelFrame.locator('a[title="크게"]')
+            if (await largeOption.count() > 0) {
+              await largeOption.click()
+              await page.waitForTimeout(300)
+              console.log('[밴드자동화] 글씨 크기 "크게" 선택 완료 (iframe)')
+            } else {
+              // 텍스트로도 시도
+              const largeByText = panelFrame.locator('a:has-text("크게")')
+              if (await largeByText.count() > 0) {
+                await largeByText.click()
+                await page.waitForTimeout(300)
+                console.log('[밴드자동화] 글씨 크기 "크게" 선택 완료 (텍스트)')
+              } else {
+                console.warn('[밴드자동화] iframe 내 "크게" 옵션을 찾을 수 없음')
+              }
             }
+          } else {
+            console.warn('[밴드자동화] CKEditor 패널 iframe을 찾을 수 없음')
           }
         }
-      } catch {
-        // 무시
+      } else {
+        console.warn('[밴드자동화] 글씨 크기 버튼(.cke_button__fontsize_icon)을 찾을 수 없음')
       }
-    }
 
-    console.log('[밴드자동화] 첨부하기 버튼 팝업 없음 (이미지가 직접 첨부되었을 수 있음)')
+      // 3. 볼드 버튼 클릭 (span의 부모 a 태그)
+      const boldButton = await page.$('.cke_button__bold_icon')
+      if (boldButton) {
+        console.log('[밴드자동화] 볼드 버튼 발견')
+        const parent = await boldButton.$('xpath=..')
+        if (parent) {
+          await parent.click()
+          await page.waitForTimeout(300)
+          console.log('[밴드자동화] 볼드 선택 완료')
+        }
+      } else {
+        console.warn('[밴드자동화] 볼드 버튼(.cke_button__bold_icon)을 찾을 수 없음')
+      }
+    } catch (error) {
+      console.warn('[밴드자동화] 글씨 스타일 설정 실패 (무시하고 계속):', error)
+    }
   }
 
   /**
@@ -1274,13 +1400,10 @@ export class BandPostAutomation {
     const isContentEditable = await editor.evaluate(el => el.getAttribute('contenteditable') === 'true')
     if (isContentEditable) {
       await editor.click()
-      await page.waitForTimeout(500)
+      await page.waitForTimeout(300)
 
-      // 실제 키보드 입력으로 내용 입력 (Band가 이벤트 감지하도록)
-      // 먼저 기존 내용 삭제
-      await page.keyboard.press('Control+a')
-      await page.keyboard.press('Backspace')
-      await page.waitForTimeout(200)
+      // 글씨 스타일 설정 (크게 + 볼드) - 텍스트 입력 전에 설정
+      await this.setTextStyle(page)
 
       // 타이핑으로 입력 (줄바꿈은 Enter로)
       const lines = content.split('\n')

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Sidebar from '@/components/layout/Sidebar'
 import { ToastProvider } from '@/components/ui/Toast'
+import { BandSessionProvider } from '@/contexts/BandSessionContext'
 import { AppSection, UserRole, getSectionFromPath, getDefaultPathBySection } from '@/config/navigation'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
@@ -94,31 +95,33 @@ export default function AdminLayout({
 
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-surface">
-        <Header
-          onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-          currentSection={currentSection}
-          onSectionChange={handleSectionChange}
-        />
-
-        <div className="flex h-[calc(100vh-4rem)]">
-          <Sidebar
-            isOpen={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-            collapsed={sidebarCollapsed}
-            onToggleCollapse={handleToggleCollapse}
+      <BandSessionProvider>
+        <div className="min-h-screen bg-surface">
+          <Header
+            onMenuClick={() => setSidebarOpen(!sidebarOpen)}
             currentSection={currentSection}
             onSectionChange={handleSectionChange}
-            userRole={userRole}
           />
 
-          <main className="flex-1 overflow-y-auto">
-            <div className="p-4 sm:p-6 lg:p-8">
-              {children}
-            </div>
-          </main>
+          <div className="flex h-[calc(100vh-4rem)]">
+            <Sidebar
+              isOpen={sidebarOpen}
+              onClose={() => setSidebarOpen(false)}
+              collapsed={sidebarCollapsed}
+              onToggleCollapse={handleToggleCollapse}
+              currentSection={currentSection}
+              onSectionChange={handleSectionChange}
+              userRole={userRole}
+            />
+
+            <main className="flex-1 overflow-y-auto">
+              <div className="p-4 sm:p-6 lg:p-8">
+                {children}
+              </div>
+            </main>
+          </div>
         </div>
-      </div>
+      </BandSessionProvider>
     </ToastProvider>
   )
 }

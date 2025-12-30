@@ -235,13 +235,36 @@ export async function runTransformPipeline(
   // 파이프라인 시작 시간 기록
   const pipelineStartTime = Date.now()
 
-  // 가격 정책 조회
-  let pricingPolicyContent: string | null = null
+  // 도매처(채널)별 가격 정책 조회
+  // 각 게시물의 channelId에 맞는 활성화된 정책을 매핑
+  const channelIds = [...new Set(posts.map(p => p.channelId))]
+  const channelPolicies = await prisma.pricingPolicy.findMany({
+    where: {
+      channelId: { in: channelIds },
+      userId,
+      isActive: true,
+    },
+    orderBy: { createdAt: 'desc' },  // 최신 정책 우선
+  })
+
+  // channelId -> policyContent 맵 생성
+  const policyByChannel = new Map<number, string>()
+  for (const policy of channelPolicies) {
+    // 채널당 첫 번째(최신) 활성 정책만 사용
+    if (!policyByChannel.has(policy.channelId)) {
+      policyByChannel.set(policy.channelId, policy.content)
+    }
+  }
+
+  console.log(`[Transform] Found policies for ${policyByChannel.size}/${channelIds.length} channels`)
+
+  // 기존 config.pricingPolicyId는 폴백으로 사용
+  let fallbackPolicyContent: string | null = null
   if (config.pricingPolicyId) {
     const policy = await prisma.pricingPolicy.findUnique({
       where: { id: config.pricingPolicyId },
     })
-    pricingPolicyContent = policy?.content || null
+    fallbackPolicyContent = policy?.content || null
   }
 
   // 모델에 따른 Rate Limit 정보 조회
@@ -252,43 +275,37 @@ export async function runTransformPipeline(
   const currentDailyUsage = await checkAndResetDailyUsage(aiConfig.id)
   console.log(`[Transform] Daily usage: ${currentDailyUsage}/${rateLimit.rpd} RPD`)
 
-  // 게시물을 배치로 나누기
-  const batches: typeof posts[] = []
-  for (let i = 0; i < posts.length; i += BATCH_SIZE) {
-    batches.push(posts.slice(i, i + BATCH_SIZE))
+  // 채널별로 게시물 그룹화 (같은 채널은 같은 정책 적용)
+  const postsByChannel = new Map<number, typeof posts>()
+  for (const post of posts) {
+    const channelPosts = postsByChannel.get(post.channelId) || []
+    channelPosts.push(post)
+    postsByChannel.set(post.channelId, channelPosts)
   }
 
-  // RPD 제한 체크: 처리할 배치 수가 남은 RPD를 초과하는지 확인
-  const remainingRpd = rateLimit.rpd - currentDailyUsage
-  if (remainingRpd <= 0) {
-    console.log(`[Transform] RPD limit reached (${currentDailyUsage}/${rateLimit.rpd}). Try again tomorrow.`)
-    return {
-      success: false,
-      totalItems: posts.length,
-      successCount: 0,
-      failedCount: posts.length,
-      details: {
-        transformedPosts: [],
-        createdProducts: 0,
-        skippedCount: posts.length,
-        retryablePostIds: posts.map(p => p.id),
-        rpdLimitReached: true,
-      },
-      errors: [{
-        itemId: 0,
-        message: `일일 API 호출 한도(${rateLimit.rpd}회)에 도달했습니다. 내일 다시 시도해주세요.`,
-        timestamp: new Date(),
-      }],
+  // 채널별로 배치 생성 (각 배치에 정책 정보 포함)
+  interface BatchWithPolicy {
+    posts: typeof posts
+    channelId: number
+    policyContent: string | null
+  }
+  const batches: BatchWithPolicy[] = []
+
+  for (const [channelId, channelPosts] of postsByChannel) {
+    // 해당 채널의 정책 조회 (없으면 폴백 정책 사용)
+    const policyContent = policyByChannel.get(channelId) || fallbackPolicyContent
+
+    // 채널 내 게시물을 BATCH_SIZE로 분할
+    for (let i = 0; i < channelPosts.length; i += BATCH_SIZE) {
+      batches.push({
+        posts: channelPosts.slice(i, i + BATCH_SIZE),
+        channelId,
+        policyContent,
+      })
     }
   }
 
-  // 처리 가능한 배치 수 계산
-  const processableBatches = Math.min(batches.length, remainingRpd)
-  if (processableBatches < batches.length) {
-    console.log(`[Transform] RPD limit: Can only process ${processableBatches}/${batches.length} batches today`)
-  }
-
-  console.log(`[Transform] Split into ${batches.length} batches (interval: ${requestIntervalMs / 1000}s, remaining RPD: ${remainingRpd})`)
+  console.log(`[Transform] Split into ${batches.length} batches across ${postsByChannel.size} channels (interval: ${requestIntervalMs / 1000}s)`)
 
   // 각 배치 처리 (RPD 제한 적용)
   let currentRpdUsage = currentDailyUsage
@@ -296,7 +313,7 @@ export async function runTransformPipeline(
     // RPD 제한 체크: 처리 전에 확인
     if (currentRpdUsage >= rateLimit.rpd) {
       console.log(`[Transform] RPD limit reached (${currentRpdUsage}/${rateLimit.rpd}). Stopping.`)
-      const remainingPosts = batches.slice(batchIndex).flat()
+      const remainingPosts = batches.slice(batchIndex).flatMap(b => b.posts)
       errors.push({
         itemId: 0,
         message: `일일 API 호출 한도(${rateLimit.rpd}회)에 도달하여 ${remainingPosts.length}개 게시물을 처리하지 못했습니다.`,
@@ -334,6 +351,7 @@ export async function runTransformPipeline(
     }
 
     const batch = batches[batchIndex]
+    const { posts: batchPosts, channelId: batchChannelId, policyContent: batchPolicyContent } = batch
 
     // 첫 번째 요청이 아니면 대기 (RPM 제한 대응)
     if (batchIndex > 0) {
@@ -341,11 +359,11 @@ export async function runTransformPipeline(
       await new Promise((resolve) => setTimeout(resolve, requestIntervalMs))
     }
 
-    console.log(`[Transform] Processing ${batchIndex + 1}/${batches.length} (RPD: ${currentRpdUsage + 1}/${rateLimit.rpd})`)
+    console.log(`[Transform] Processing batch ${batchIndex + 1}/${batches.length} (channel: ${batchChannelId}, policy: ${batchPolicyContent ? 'YES' : 'NO'})`)
 
     try {
       // 배치 입력 준비
-      const inputs = batch.map(post => ({
+      const inputs = batchPosts.map(post => ({
         post: post as any,
         aiProvider: config.aiProvider,
         aiConfig: {
@@ -354,7 +372,7 @@ export async function runTransformPipeline(
         },
       }))
 
-      // 배치 변환 실행 (재시도 로직 포함)
+      // 배치 변환 실행 (재시도 로직 포함) - 채널별 정책 적용
       const batchResults = await runBatchWithRetry(
         inputs,
         {
@@ -362,19 +380,38 @@ export async function runTransformPipeline(
           model: aiConfig.model,
           provider: config.aiProvider,
         },
-        pricingPolicyContent
+        batchPolicyContent  // 해당 채널의 정책 사용
       )
 
       // 결과 처리
       for (let i = 0; i < batchResults.length; i++) {
+        // 취소 체크: 각 결과 처리 전에 확인
+        if (await checkCancellation()) {
+          console.log(`[Transform] Cancelled by user during result processing`)
+          return {
+            success: false,
+            totalItems: posts.length,
+            successCount: transformedPosts.filter((p) => p.status === 'success').length,
+            failedCount: transformedPosts.filter((p) => p.status === 'failed').length,
+            details: {
+              transformedPosts,
+              createdProducts,
+              skippedCount: 0,
+              retryablePostIds: [],
+              cancelled: true,
+            },
+            errors: [...errors, { itemId: 0, message: '사용자에 의해 취소됨', timestamp: new Date() }],
+          }
+        }
+
         const result = batchResults[i]
-        const post = batch[i]
+        const post = batchPosts[i]
 
         let transformedPost: TransformedPost
 
         if (result.success && result.draft) {
           // 가격 정책 적용 검증 (정책이 설정된 경우에만)
-          if (pricingPolicyContent && result.draft.variants && result.draft.variants.length > 0) {
+          if (batchPolicyContent && result.draft.variants && result.draft.variants.length > 0) {
             const unpricedVariants = result.draft.variants.filter(v =>
               v.wholesalePrice !== undefined &&
               v.wholesalePrice !== null &&
@@ -423,9 +460,14 @@ export async function runTransformPipeline(
                   variants: result.draft.variants,
                   wholesalePrice: result.draft.wholesalePrice ?? null,
                   price: result.draft.price ?? null,
+                  // 배송비 정보 (최상위 레벨 + shipping 객체 둘 다 저장)
+                  shippingFee: result.draft.shippingFee ?? null,
+                  shippingInfo: result.draft.shippingInfo ?? null,
+                  bundleMaxQty: result.draft.bundleMaxQty ?? 1,
                   shipping: {
                     shippingFee: result.draft.shippingFee ?? null,
                     shippingInfo: result.draft.shippingInfo ?? null,
+                    bundleMaxQty: result.draft.bundleMaxQty ?? 1,
                   },
                 }),
               },
@@ -506,7 +548,7 @@ export async function runTransformPipeline(
       console.error(`[Transform] Batch ${batchIndex + 1} failed:`, batchError)
 
       // 배치 전체 실패 시 모든 게시물을 실패로 처리
-      for (const post of batch) {
+      for (const post of batchPosts) {
         const transformedPost: TransformedPost = {
           postId: post.id,
           status: 'failed',
@@ -567,7 +609,6 @@ export async function runTransformPipeline(
 
   console.log(`[Transform] Completed: ${successCount} success, ${failedCount} failed, ${skippedCount} skipped`)
   console.log(`[Transform] API calls made: ${batches.length} (batch mode)`)
-  console.log(`[Transform] RPD saved: ${posts.length - batches.length} requests`)
 
   if (retryablePostIds.length > 0) {
     console.log(`[Transform] Retryable post IDs: ${retryablePostIds.join(', ')}`)

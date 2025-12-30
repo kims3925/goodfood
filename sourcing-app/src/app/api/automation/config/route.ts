@@ -35,6 +35,14 @@ export async function GET() {
 
     // 설정이 없으면 기본값 반환
     if (!config) {
+      // 활성화된 AI 설정에서 provider 조회
+      const activeAiConfig = await prisma.aiApiConfig.findFirst({
+        where: { userId: currentUser.userId, isActive: true },
+        orderBy: { updatedAt: 'desc' },
+        select: { provider: true },
+      })
+      const defaultAiProvider = activeAiConfig?.provider || 'GEMINI'
+
       return NextResponse.json({
         success: true,
         data: {
@@ -43,7 +51,7 @@ export async function GET() {
           channelIds: [],
           wholesaleChannelIds: [],
           retailChannelIds: [],
-          aiProvider: 'GEMINI',
+          aiProvider: defaultAiProvider,
           pricingPolicyId: null,
           lastRunAt: null,
           nextRunAt: null,

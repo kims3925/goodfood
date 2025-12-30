@@ -26,6 +26,8 @@ const GEMINI_RATE_LIMITS: Record<string, ModelRateLimit> = {
 const OPENAI_RATE_LIMITS: Record<string, ModelRateLimit> = {
   'gpt-4o': { rpm: 500, tpm: 800000, rpd: 10000 },
   'gpt-4o-mini': { rpm: 500, tpm: 2000000, rpd: 10000 },
+  'gpt-4.1-mini': { rpm: 500, tpm: 2000000, rpd: 10000 },
+  'gpt-4.1-nano': { rpm: 500, tpm: 2000000, rpd: 10000 },
   'gpt-4-turbo': { rpm: 500, tpm: 800000, rpd: 10000 },
   'default': { rpm: 60, tpm: 150000, rpd: 10000 },
 }
@@ -166,21 +168,32 @@ export async function POST(request: NextRequest) {
     // Note: 가공상품이 생성되면 CollectedPost가 삭제되므로
     // 위의 findUnique에서 자연스럽게 404가 반환됨 (중복 생성 방지)
 
-    // Get AI config
-    const aiConfigProvider = aiProvider || 'GEMINI'
-    const aiConfig = await prisma.aiApiConfig.findFirst({
-      where: {
-        userId,
-        provider: aiConfigProvider,
-        isActive: true,
-      },
-    })
+    // Get AI config - aiProvider가 없으면 가장 최근에 업데이트된 활성 설정 사용
+    let aiConfig
+    if (aiProvider) {
+      aiConfig = await prisma.aiApiConfig.findFirst({
+        where: {
+          userId,
+          provider: aiProvider,
+          isActive: true,
+        },
+      })
+    } else {
+      // 가장 최근에 업데이트된 활성 AI 설정 조회
+      aiConfig = await prisma.aiApiConfig.findFirst({
+        where: {
+          userId,
+          isActive: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+      })
+    }
 
     if (!aiConfig) {
       return NextResponse.json(
         {
           success: false,
-          error: `${aiConfigProvider} AI 설정이 없습니다. 환경 설정에서 AI를 설정해주세요.`,
+          error: 'AI 설정이 없습니다. 환경 설정에서 AI를 설정해주세요.',
         },
         { status: 400 }
       )

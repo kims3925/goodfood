@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef, memo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check, AlertCircle, Info } from 'lucide-react'
+import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check, AlertCircle, Info, Wifi, WifiOff, RefreshCw } from 'lucide-react'
 import { AppSection, getDefaultPathBySection } from '@/config/navigation'
+import { useBandSession } from '@/contexts/BandSessionContext'
 
 // 상대 시간 표시 컴포넌트 (독립적으로 업데이트되어 반짝임 방지)
 const RelativeTime = memo(function RelativeTime({ dateString }: { dateString: string }) {
@@ -73,6 +74,95 @@ const notificationTypeConfig: Record<NotificationType, { icon: React.ReactNode; 
   INFO: { icon: <Info size={14} />, bg: 'bg-gray-100', text: 'text-gray-600' },
 }
 
+// 세션 상태 인디케이터 컴포넌트
+const SessionIndicator = memo(function SessionIndicator() {
+  const { summary, isLoading, checkSession, lastChecked, channels } = useBandSession()
+  const [showTooltip, setShowTooltip] = useState(false)
+
+  if (isLoading && !summary) {
+    return (
+      <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 rounded-full">
+        <RefreshCw size={14} className="text-gray-400 animate-spin" />
+        <span className="text-xs text-gray-500">확인 중...</span>
+      </div>
+    )
+  }
+
+  if (!summary || summary.total === 0) {
+    return null // 채널이 없으면 표시 안함
+  }
+
+  const isHealthy = summary.allValid
+  const hasExpired = summary.expired > 0
+
+  return (
+    <div className="relative">
+      <button
+        onClick={checkSession}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-colors ${
+          isHealthy
+            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+            : hasExpired
+            ? 'bg-red-100 text-red-700 hover:bg-red-200'
+            : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+        }`}
+        title="클릭하여 세션 상태 새로고침"
+      >
+        {isHealthy ? (
+          <Wifi size={14} />
+        ) : (
+          <WifiOff size={14} />
+        )}
+        <span className="text-xs font-medium">
+          {isHealthy
+            ? `세션 ${summary.valid}/${summary.total}`
+            : hasExpired
+            ? `만료 ${summary.expired}개`
+            : `미설정 ${summary.none}개`}
+        </span>
+        {isLoading && <RefreshCw size={12} className="animate-spin" />}
+      </button>
+
+      {/* 툴팁 */}
+      {showTooltip && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50">
+          <div className="text-xs font-medium text-gray-700 mb-2">Band 세션 상태</div>
+          <div className="space-y-1.5 max-h-40 overflow-y-auto">
+            {channels.map((ch) => (
+              <div key={ch.id} className="flex items-center justify-between text-xs">
+                <span className="text-gray-600 truncate max-w-[140px]">{ch.name}</span>
+                {ch.isValid ? (
+                  <span className="flex items-center gap-1 text-green-600">
+                    <Wifi size={10} />
+                    정상
+                  </span>
+                ) : ch.hasSession ? (
+                  <span className="flex items-center gap-1 text-red-600">
+                    <WifiOff size={10} />
+                    만료
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-gray-400">
+                    <WifiOff size={10} />
+                    미설정
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+          {lastChecked && (
+            <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-400">
+              마지막 확인: {lastChecked.toLocaleTimeString()}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+})
+
 export default function Header({ onMenuClick, currentSection, onSectionChange }: HeaderProps) {
   const router = useRouter()
   const [user, setUser] = useState<{ email: string; name?: string | null } | null>(null)
@@ -102,11 +192,11 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
     inquiries: 0,
   })
 
-  // 알림 데이터 로드 (현재 섹션에 따라)
+  // 알림 데이터 로드 (현재 섹션에 따라, 읽지 않은 알림만)
   const loadNotifications = async () => {
     try {
       setNotificationLoading(true)
-      const response = await fetch(`/api/admin/notifications?section=${currentSection}&limit=10`)
+      const response = await fetch(`/api/admin/notifications?section=${currentSection}&limit=10&isRead=false`)
       const data = await response.json()
       if (data.success) {
         setNotifications(data.data.notifications || [])
@@ -320,6 +410,9 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
 
           {/* Right side */}
           <div className="flex items-center gap-2">
+            {/* Band Session Status */}
+            <SessionIndicator />
+
             {/* Notifications */}
             <div className="relative" ref={notificationRef}>
               <button
@@ -339,7 +432,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
                   <div className="p-3 border-b border-divider flex items-center justify-between">
                     <h3 className="font-semibold text-text-primary">알림</h3>
                     <div className="flex items-center gap-2">
-                      {unreadCount > 0 && (
+                      {notifications.length > 0 && (
                         <button
                           onClick={handleMarkAllAsRead}
                           className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
@@ -355,9 +448,9 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
                       <div className="p-8 text-center text-gray-400">
                         <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full mx-auto"></div>
                       </div>
-                    ) : notifications.filter(n => !n.isRead).length > 0 ? (
+                    ) : notifications.length > 0 ? (
                       <div className="divide-y divide-gray-100">
-                        {notifications.filter(n => !n.isRead).map((notification) => {
+                        {notifications.map((notification) => {
                           const config = notificationTypeConfig[notification.type] || notificationTypeConfig.ORDER
                           return (
                             <div

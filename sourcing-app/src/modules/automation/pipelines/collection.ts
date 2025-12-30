@@ -4,7 +4,7 @@
  */
 
 import prisma, { ChannelKind } from '@bandauto/db'
-import { getBatchContext } from '../context'
+import { getBatchContext, checkCancellation } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import {
   CollectionConfig,
@@ -105,6 +105,24 @@ export async function runCollectionPipeline(
 
   // 각 채널에서 게시물 수집
   for (const channel of wholesaleChannels) {
+    // 취소 체크: 각 채널 처리 전에 확인
+    if (await checkCancellation()) {
+      console.log(`[Collection] Cancelled by user before channel ${channel.name}`)
+      errors.push({ itemId: 0, message: '사용자에 의해 취소됨', timestamp: new Date() })
+      return {
+        success: false,
+        totalItems: channelResults.reduce((sum, r) => sum + r.fetched, 0),
+        successCount: totalNewPosts,
+        failedCount: channelResults.reduce((sum, r) => sum + r.failed, 0),
+        details: {
+          channelResults,
+          totalNewPosts,
+          totalDuplicates,
+        },
+        errors,
+      }
+    }
+
     const channelResult: ChannelCollectionResult = {
       channelId: channel.id,
       channelName: channel.name,

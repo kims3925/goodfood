@@ -1,4 +1,4 @@
-import prisma, { ChannelKind } from '@bandauto/db'
+import prisma, { ChannelKind, BundleShippingType } from '@bandauto/db'
 import type { ProductListParams, ProductCreateInput, ProductUpdateInput } from '../types/product.types'
 import { downloadAndSaveProductImages } from '@/modules/utils/imageUtils'
 
@@ -201,6 +201,20 @@ export class ProductRepository {
   }
 
   async create(data: ProductCreateInput & { thumbnailUrl?: string | null; imageUrls?: string[] }) {
+    // 합배송 타입 자동 추론
+    // 1. shippingInfo에 "포함"이 있으면 → INCLUDED (배송비 포함형)
+    // 2. shippingFee > 0 이면 → SEPARATE (배송비 별도형)
+    // 3. 그 외 → NONE
+    let bundleShippingType: BundleShippingType = BundleShippingType.NONE
+    const shippingInfoStr = String(data.shippingInfo || '')
+    const shippingFeeNum = typeof data.shippingFee === 'number' ? data.shippingFee : 0
+
+    if (shippingInfoStr.includes('포함')) {
+      bundleShippingType = BundleShippingType.INCLUDED
+    } else if (shippingFeeNum > 0) {
+      bundleShippingType = BundleShippingType.SEPARATE
+    }
+
     // 상품 생성 (options와 variants 포함)
     const product = await prisma.product.create({
       data: {
@@ -215,6 +229,7 @@ export class ProductRepository {
         shippingFee: data.shippingFee || null,
         shippingInfo: data.shippingInfo || null,
         bundleMaxQty: data.bundleMaxQty || 1,
+        bundleShippingType,
         thumbnailUrl: data.thumbnailUrl || null,
         options: data.options?.length
           ? {

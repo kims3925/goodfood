@@ -135,6 +135,60 @@ export async function createPipelineNotification(
       }
     }
 
+    // metadata 구성
+    const duration = result.completedAt && result.startedAt
+      ? new Date(result.completedAt).getTime() - new Date(result.startedAt).getTime()
+      : undefined
+    const metadata: Record<string, any> = {
+      overallStatus: result.overallStatus,
+      duration,
+    }
+
+    // 수집 결과
+    if (result.collection) {
+      metadata.collection = {
+        successCount: result.collection.successCount,
+        failedCount: result.collection.failedCount,
+        bandResults: result.collection.details?.channelResults?.map(ch => ({
+          bandName: ch.channelName || ch.channelId,
+          count: ch.newPosts || 0,
+        })) || [],
+      }
+    }
+
+    // 변환 결과
+    if (result.transform) {
+      metadata.transform = {
+        successCount: result.transform.successCount,
+        failedCount: result.transform.failedCount,
+      }
+    }
+
+    // 상품 생성 결과
+    if (result.productCreate) {
+      metadata.productCreate = {
+        successCount: result.productCreate.successCount,
+        failedCount: result.productCreate.failedCount,
+        productNames: result.productCreate.details?.createdProducts
+          ?.filter(p => p.status === 'success')
+          ?.slice(0, 5)
+          ?.map(p => p.productName || '이름 없음') || [],
+      }
+    }
+
+    // 발행 결과
+    if (result.publish) {
+      metadata.publish = {
+        successCount: result.publish.successCount,
+        failedCount: result.publish.failedCount,
+        channelResults: result.publish.details?.channelResults?.map(ch => ({
+          channelName: ch.channelName,
+          success: ch.success,
+          failed: ch.failed,
+        })) || [],
+      }
+    }
+
     // 알림 생성
     await prisma.notification.create({
       data: {
@@ -143,6 +197,7 @@ export async function createPipelineNotification(
         type,
         title,
         message,
+        metadata,
         link: '/sourcing/automation/logs',
       },
     })

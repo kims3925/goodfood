@@ -474,7 +474,14 @@ export default function APISettingsPage() {
                     {testResult.message}
                   </p>
                   {testResult.detail && (
-                    <p className="text-sm text-green-700 mt-1">{testResult.detail}</p>
+                    <p className={`text-sm mt-1 ${testResult.success ? 'text-green-700' : 'text-red-600'}`}>
+                      {testResult.detail}
+                    </p>
+                  )}
+                  {testResult.errorCode && !testResult.success && (
+                    <p className="text-xs text-red-500 mt-1 font-mono">
+                      에러 코드: {testResult.errorCode}
+                    </p>
                   )}
                   {testResult.solution && !testResult.success && (
                     <div className="mt-2 p-3 bg-red-100/50 rounded-md">

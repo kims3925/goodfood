@@ -111,9 +111,15 @@ export async function GET(request: NextRequest) {
       prisma.collectedProduct.count({ where }),
     ])
 
+    // rawMetadata JSON 문자열을 객체로 파싱
+    const parsedData = data.map((item) => ({
+      ...item,
+      rawMetadata: item.rawMetadata ? JSON.parse(item.rawMetadata) : null,
+    }))
+
     return NextResponse.json({
       success: true,
-      data,
+      data: parsedData,
       total,
       page,
       limit,
@@ -213,9 +219,15 @@ export async function POST(request: NextRequest) {
 
     console.log('[CollectedProduct POST] Created:', collectedProduct.id)
 
+    // rawMetadata JSON 문자열을 객체로 파싱하여 반환
+    const parsedProduct = {
+      ...collectedProduct,
+      rawMetadata: collectedProduct.rawMetadata ? JSON.parse(collectedProduct.rawMetadata) : null,
+    }
+
     return NextResponse.json({
       success: true,
-      data: collectedProduct,
+      data: parsedProduct,
     })
   } catch (error: any) {
     console.error('[CollectedProduct POST] Error:', error)

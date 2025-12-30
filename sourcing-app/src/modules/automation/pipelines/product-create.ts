@@ -185,7 +185,7 @@ export async function runProductCreatePipeline(
       const product = await prisma.product.create({
         data: {
           userId,
-          channelId: collectedProduct.id,
+          channelId: collectedProduct.post.channelId,
           name: collectedProduct.name || '상품명 없음',
           description: collectedProduct.description || null,
           categoryId: metadata.category || null,

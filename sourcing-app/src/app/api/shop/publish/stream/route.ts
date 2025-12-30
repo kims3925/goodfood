@@ -66,11 +66,30 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder()
+        let isClosed = false
 
-        // SSE 이벤트 전송 헬퍼
+        // SSE 이벤트 전송 헬퍼 (컨트롤러 상태 체크)
         const sendEvent = (data: any) => {
-          const eventData = `data: ${JSON.stringify(data)}\n\n`
-          controller.enqueue(encoder.encode(eventData))
+          if (isClosed) return
+          try {
+            const eventData = `data: ${JSON.stringify(data)}\n\n`
+            controller.enqueue(encoder.encode(eventData))
+          } catch (e) {
+            // Controller가 이미 닫힌 경우 무시
+            console.log('[SSE] Controller already closed, skipping event')
+            isClosed = true
+          }
+        }
+
+        // 안전한 스트림 종료 헬퍼
+        const safeClose = () => {
+          if (isClosed) return
+          try {
+            controller.close()
+            isClosed = true
+          } catch (e) {
+            // 이미 닫힌 경우 무시
+          }
         }
 
         try {
@@ -86,7 +105,7 @@ export async function POST(request: NextRequest) {
           }
 
           // 스트림 종료
-          controller.close()
+          safeClose()
         } catch (error: any) {
           console.error('[SSE] Stream error:', error)
           sendEvent({
@@ -96,7 +115,7 @@ export async function POST(request: NextRequest) {
               error: error.message || '발행 중 오류가 발생했습니다.',
             },
           })
-          controller.close()
+          safeClose()
         }
       },
     })
