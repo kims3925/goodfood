@@ -1,0 +1,211 @@
+# ---------------------------------------------------------------- #
+# AI 기본 설정 (언어 및 페르소나)
+# ---------------------------------------------------------------- #
+
+# AI가 응답할 때 사용할 기본 언어를 설정합니다.
+language: "ko-KR"
+
+# AI의 페르소나와 응답 톤앤매너를 상세하게 지시합니다.
+tone_instructions: >
+  당신은 ABCPHARM 개발팀의 팀장이자 코드 리뷰어입니다. 목표는 팀원들이 코드 품질을 개선하며 성장하도록 돕는 것입니다.
+  1. 피드백은 명확하고 구체적이어야 하며, 문제의 원인과 개선 방법을 반드시 제시하세요.
+  2. 리뷰는 교육적이어야 하며, 관련 개념이나 공식 문서를 함께 추천하세요.
+  3. 비판보다는 개선 중심의 제안을 우선하세요.
+  4. 아키텍처 원칙(레이어 분리, Domain 독립성)을 특히 엄격하게 검토하세요.
+  5. 보안 취약점(XSS, SQL Injection, 인증/인가 우회)은 반드시 지적하세요.
+
+# ---------------------------------------------------------------- #
+# 코드 리뷰 기능 세부 설정
+# ---------------------------------------------------------------- #
+reviews:
+  # 리뷰의 전반적인 스타일을 설정합니다. 'chill'은 비교적 덜 엄격하고 부드러운 톤을 의미합니다.
+  profile: chill
+  # CodeRabbit의 코멘트를 모두 `resolve`하면, 자동으로 Approve를 하는 기능입니다.
+  request_changes_workflow: false
+  # PR의 전체적인 변경 사항에 대한 고수준의 요약(summary)을 생성할지 여부입니다.
+  high_level_summary: true
+  # 변경된 각 파일에 대한 요약을 생성할지 여부입니다. 
+  changed_files_summary: true
+  # 코드의 실행 흐름을 보여주는 시퀀스 다이어그램을 생성할지 여부입니다.
+  sequence_diagrams: true
+  # PR에 연결된 이슈(Issue)를 분석하여 리뷰 컨텍스트에 활용할지 여부입니다.
+  assess_linked_issues: true
+  # 연관된 다른 이슈를 찾아서 링크할지 여부입니다.
+  related_issues: false
+  # 연관된 다른 PR을 찾아서 링크할지 여부입니다.
+  related_prs: false
+  # PR에 적절한 레이블(e.g., 'bug', 'enhancement')을 제안할지 여부입니다.
+  suggested_labels: false
+  # 제안된 레이블을 자동으로 PR에 적용할지 여부입니다.
+  auto_apply_labels: false
+  # 이 PR을 리뷰할 만한 적절한 동료 리뷰어를 추천할지 여부입니다.
+  suggested_reviewers: false
+  # 추천된 리뷰어를 자동으로 할당할지 여부입니다.
+  auto_assign_reviewers: false
+  # 리뷰 요약에 위트 있는 시(poem)를 포함할지 여부입니다.
+  poem: true
+
+  # 전역 리뷰 지침
+  instructions: |
+    우리 팀은 ABCPHARM 개발표준정의서를 따릅니다.
+
+    ## 네이밍 규칙 (제10조)
+    - 변수/함수: camelCase 사용
+    - 클래스/타입: PascalCase 사용
+    - 상수: SCREAMING_SNAKE_CASE 사용
+    - 파일명: kebab-case 사용
+    - 폴더명: 단수형 명사 사용
+
+    ## TypeScript 규칙 (제11조)
+    - strict 모드 필수
+    - any 타입 사용 금지
+    - 모든 함수는 명확한 입력/출력 타입 명시 필수
+
+    ## 아키텍처 원칙 (제12조, 제13조)
+    - 레이어 분리: Controller/UI → Application(Service) → Domain → Infrastructure
+    - Domain: 비즈니스 규칙의 유일한 위치
+    - Application: 유스케이스 흐름 제어
+    - Controller/UI: 입출력 변환 역할만 담당
+    - Controller/UI 레이어에 비즈니스 로직 작성 금지
+    - Domain 레이어에서 ORM/Framework 의존 금지
+
+    ## 금지 사항 (제8장)
+    - Controller/UI 레이어에 비즈니스 로직 작성 금지
+    - Domain 레이어에서 ORM/Framework 의존 금지
+    - Hard Delete를 전제로 한 설계 금지
+    - TODO 또는 주석으로 로직 대체 금지
+    - 명확한 근거 없이 새로운 기술 도입 금지
+
+    ## 보안 규칙
+    - 하드코딩된 시크릿/비밀번호 금지
+    - SQL Injection 취약점 검사 (Raw Query 사용 시 파라미터 바인딩 필수)
+    - XSS 취약점 검사 (dangerouslySetInnerHTML 사용 시 DOMPurify 필수)
+    - 인증/인가 우회 로직 금지
+
+  # ---------------------------------------------------------------- #
+  # 경로별 리뷰 지침
+  # ---------------------------------------------------------------- #
+  path_instructions:
+    - path: "**/*.ts"
+      instructions: |
+        TypeScript 파일 리뷰 시:
+        1. strict 모드 준수 확인
+        2. any 타입 사용 여부 검사 (사용 시 거부)
+        3. 함수의 입력/출력 타입 명시 확인
+        4. 변수/함수명 camelCase 준수 확인
+        5. 클래스/타입명 PascalCase 준수 확인
+        6. 상수명 SCREAMING_SNAKE_CASE 준수 확인
+        7. 에러 처리 적절성 확인 (try-catch, 커스텀 예외)
+        8. 리뷰가 너무 많아서 피로감을 줄 수 있으니, 꼭 필요한 부분에 집중해주세요.
+
+    - path: "**/*.tsx"
+      instructions: |
+        React/TSX 파일 리뷰 시:
+        1. 컴포넌트명 PascalCase 준수 확인
+        2. 커스텀 훅은 `use` 접두사 사용 확인
+        3. UI 레이어에 비즈니스 로직 포함 여부 검사 (포함 시 거부)
+        4. any 타입 사용 금지
+        5. 명확한 Props 타입 정의 확인
+        6. XSS 취약점 검사 (dangerouslySetInnerHTML 사용 시 DOMPurify 필수)
+        7. 접근성(a11y) 이슈 확인 (alt, aria-label 등)
+        8. 불필요한 리렌더링 방지 (useMemo, useCallback 적절성)
+
+    - path: "**/modules/**"
+      instructions: |
+        modules 레이어 리뷰 시:
+        1. 비즈니스 규칙만 포함되어 있는지 확인
+        2. ORM/Framework 의존성 검사 (의존 시 거부)
+        3. 순수 비즈니스 로직만 존재해야 함
+        4. 외부 라이브러리 import 최소화 확인
+        5. 도메인 엔티티의 불변성 검토
+        6. 각 리뷰 포인트별로 문제점과 대안을 논리적으로 제시하세요.
+
+    - path: "**/services/**"
+      instructions: |
+        Application/Service 레이어 리뷰 시:
+        1. 유스케이스 흐름 제어 역할만 수행하는지 확인
+        2. 비즈니스 규칙이 Domain으로 분리되어 있는지 확인
+        3. 트랜잭션 경계 적절성 검토
+        4. 에러 핸들링 적절성 확인
+        5. 로깅 적절성 확인 (민감 정보 로깅 금지)
+
+    - path: "**/api/**"
+      instructions: |
+        API 레이어 리뷰 시:
+        1. 입출력 변환 역할만 수행하는지 확인
+        2. 비즈니스 로직 포함 여부 검사 (포함 시 거부)
+        3. 요청/응답 DTO 적절성 확인
+        4. RESTful 설계 원칙 준수 확인
+        5. 에러 응답 형식 일관성 확인
+
+    - path: "**/repository/**"
+      instructions: |
+        Repository/Infrastructure 레이어 리뷰 시:
+        1. 데이터 접근 로직만 포함되어 있는지 확인
+        2. N+1 쿼리 문제 검사
+        3. 인덱스 활용 적절성 검토
+        4. Soft Delete 적용 여부 확인 (Hard Delete 금지)
+        5. 트랜잭션 처리 적절성 확인
+
+    - path: "**/migration/**"
+      instructions: |
+        DB Migration 파일 리뷰 시:
+        1. 롤백 가능한 마이그레이션인지 확인
+        2. 대용량 테이블 영향도 확인
+        3. 인덱스 추가/삭제 적절성 검토
+        4. NOT NULL 제약 추가 시 기본값 또는 데이터 마이그레이션 확인
+        5. 운영 환경 다운타임 영향 검토
+
+  # ---------------------------------------------------------------- #
+  # 자동 리뷰 트리거 설정
+  # ---------------------------------------------------------------- #
+  auto_review:
+    # PR이 생성됐을 때 자동으로 리뷰를 시작할지 여부입니다.
+    enabled: true
+    # Draft PR에 대해서도 자동 리뷰를 수행할지 여부입니다.
+    drafts: false
+    # 이미 리뷰가 진행된 PR에 새로운 커밋이 추가될 때, 변경된 부분에 대해서만 자동으로 리뷰를 진행할지 여부입니다.
+    auto_incremental_review: false
+    # 자동 리뷰에서 무시할 경로 패턴입니다.
+    ignore_paths:
+      - "**/*.md"
+      - "**/*.json"
+      - "**/package-lock.json"
+      - "**/pnpm-lock.yaml"
+      - "**/.gitignore"
+
+# ---------------------------------------------------------------- #
+# 채팅 기능 설정
+# ---------------------------------------------------------------- #
+chat:
+  # 사용자가 @coderabbitai 태그를 지정하지 않아도 자동으로 답글을 달 수 있도록 설정합니다.
+  auto_reply: true
+
+# ---------------------------------------------------------------- #
+# CodeRabbit의 지식 기반(Knowledge Base) 설정
+# ---------------------------------------------------------------- #
+knowledge_base:
+  # 웹 검색을 통해 최신 정보나 문서를 참조할 수 있도록 허용할지 여부입니다.
+  web_search:
+    enabled: true
+  # 레포지토리 내의 특정 파일을 AI의 코드 스타일 가이드라인으로 사용하도록 설정합니다.
+  #code_guidelines:
+  #  enabled: true
+  #  filePatterns:
+  #    - "template/CLAUDE.md"
+  #    - "template/02_STRUCTURE.md"
+  #    - "template/03_API.md"
+  #    - "template/04_FRONTEND.md"
+  #    - "template/05_BACKEND.md"
+  #    - "template/06_DATABASE.md"
+  #    - "template/10_TESTING.md"
+  #    - "template/11_SECURITY.md"
+  # CodeRabbit이 대화나 리뷰를 통해 학습한 내용을 어디에 저장하고 참조할지 범위를 설정합니다.
+  learnings:
+    scope: local
+  # 이슈 정보를 참조할 범위를 설정합니다.
+  issues:
+    scope: local
+  # 풀 리퀘스트 정보를 참조할 범위를 설정합니다.
+  pull_requests:
+    scope: local
