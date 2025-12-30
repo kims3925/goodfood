@@ -158,7 +158,7 @@ pipeline {
 
                     # Restart PM2
                     echo ">>> Restarting PM2 processes..."
-                    pm2 reload all --update-env
+                    sudo -u ubuntu pm2 reload all --update-env
 
                     # Verify
                     echo ">>> Verifying deployment..."
