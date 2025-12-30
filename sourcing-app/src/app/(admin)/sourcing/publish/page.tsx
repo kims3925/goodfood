@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Store,
@@ -20,6 +20,7 @@ import {
   AlertOctagon,
   X,
   Clock,
+  StopCircle,
 } from 'lucide-react'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -163,6 +164,12 @@ export default function PublishPage() {
   const [showPublishProgress, setShowPublishProgress] = useState(false)
   const [publishProgressItems, setPublishProgressItems] = useState<PublishProgressItem[]>([])
   const [currentPublishIndex, setCurrentPublishIndex] = useState(0)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [publishCancelled, setPublishCancelled] = useState(false)
+
+  // 취소 상태 추적 (async 함수에서 즉시 확인 가능)
+  const publishCancelledRef = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // 세션 만료 모달 상태
   const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false)
@@ -516,6 +523,38 @@ export default function PublishPage() {
     })
   }
 
+  // 발행 취소 핸들러
+  const handleCancelPublish = () => {
+    if (!isPublishing) return
+
+    // 즉시 취소 상태 설정 (ref는 async 함수에서 바로 확인 가능)
+    publishCancelledRef.current = true
+    setPublishCancelled(true)
+    setIsCancelling(true)
+
+    // 진행 중인 SSE fetch 취소
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      console.log('[발행 취소] SSE 스트림 중단됨')
+    }
+
+    // 대기 중인 항목들을 취소됨 상태로 변경
+    setPublishProgressItems((prev) =>
+      prev.map((item) =>
+        item.status === 'pending' || item.status === 'publishing'
+          ? { ...item, status: 'failed' as const, message: '사용자에 의해 취소됨' }
+          : item
+      )
+    )
+
+    // 선택된 셀 모두 초기화 (다시 발행하려면 새로 선택해야 함)
+    setSelectedCells(new Set())
+
+    // 발행 상태 종료
+    setIsPublishing(false)
+    setIsCancelling(false)
+  }
+
   const handlePublishSelected = async () => {
     if (selectedCells.size === 0) return
     if (isPublishing) return  // 중복 호출 방지
@@ -570,6 +609,11 @@ export default function PublishPage() {
 
     if (progressItems.length === 0) return
 
+    // 취소 상태 초기화
+    publishCancelledRef.current = false
+    setPublishCancelled(false)
+    setIsCancelling(false)
+
     // 발행 진행 모달 표시
     setPublishProgressItems(progressItems)
     setCurrentPublishIndex(0)
@@ -604,6 +648,12 @@ export default function PublishPage() {
 
       // Shop 발행 처리
       for (const [shopId, productIds] of Object.entries(shopToProducts)) {
+        // 취소 확인
+        if (publishCancelledRef.current) {
+          console.log('[발행 취소] Shop 발행 루프 중단')
+          break
+        }
+
         if (productIds.length > 0) {
           // 현재 발행 중인 항목들 업데이트
           const shopItems = progressItems.filter(
@@ -696,6 +746,12 @@ export default function PublishPage() {
 
       // 채널 발행 처리 (SSE 스트리밍)
       for (const [channelId, productIds] of Object.entries(channelToProducts)) {
+        // 취소 확인
+        if (publishCancelledRef.current) {
+          console.log('[발행 취소] 채널 발행 루프 중단')
+          break
+        }
+
         if (productIds.length > 0) {
           // 현재 발행 중인 항목들을 대기 상태로 설정
           const channelItems = progressItems.filter(
@@ -704,10 +760,15 @@ export default function PublishPage() {
 
           // SSE 스트리밍으로 발행
           try {
+            // AbortController 생성 (취소 지원)
+            const abortController = new AbortController()
+            abortControllerRef.current = abortController
+
             const response = await fetch('/api/shop/publish/stream', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ productIds, channelId: Number(channelId) }),
+              signal: abortController.signal,
             })
 
             if (!response.ok) {
@@ -722,6 +783,13 @@ export default function PublishPage() {
             let buffer = ''
 
             while (true) {
+              // 취소 확인
+              if (publishCancelledRef.current) {
+                console.log('[발행 취소] SSE 스트림 읽기 중단')
+                reader.cancel()
+                break
+              }
+
               const { done, value } = await reader.read()
               if (done) break
 
@@ -860,22 +928,28 @@ export default function PublishPage() {
               }
             }
           } catch (error: any) {
-            console.error('SSE 스트림 오류:', error)
-            totalFailed += productIds.length
-            errorMessages.push(error.message || '발행 중 오류가 발생했습니다.')
-            // 모든 항목 실패 처리
-            channelItems.forEach((item) => {
-              const idx = progressItems.findIndex(
-                (p) => p.productId === item.productId && p.targetId === item.targetId && p.targetType === item.targetType
-              )
-              if (idx !== -1) {
-                setPublishProgressItems((prev) => {
-                  const updated = [...prev]
-                  updated[idx] = { ...updated[idx], status: 'failed', message: error.message }
-                  return updated
-                })
-              }
-            })
+            // AbortError는 사용자 취소이므로 별도 처리
+            if (error.name === 'AbortError' || publishCancelledRef.current) {
+              console.log('[발행 취소] SSE 스트림 취소됨')
+              // 취소된 경우 실패 처리하지 않음 (handleCancelPublish에서 이미 처리)
+            } else {
+              console.error('SSE 스트림 오류:', error)
+              totalFailed += productIds.length
+              errorMessages.push(error.message || '발행 중 오류가 발생했습니다.')
+              // 모든 항목 실패 처리
+              channelItems.forEach((item) => {
+                const idx = progressItems.findIndex(
+                  (p) => p.productId === item.productId && p.targetId === item.targetId && p.targetType === item.targetType
+                )
+                if (idx !== -1) {
+                  setPublishProgressItems((prev) => {
+                    const updated = [...prev]
+                    updated[idx] = { ...updated[idx], status: 'failed', message: error.message }
+                    return updated
+                  })
+                }
+              })
+            }
           }
         }
       }
@@ -1511,7 +1585,7 @@ export default function PublishPage() {
                 <Button
                   className="flex-1"
                   onClick={() => {
-                    router.push('/sourcing/channel')
+                    router.push('/sourcing/channel/list')
                   }}
                 >
                   <ExternalLink size={16} className="mr-2" />
@@ -1787,13 +1861,32 @@ export default function PublishPage() {
               )
             })()}
 
-            {/* 경고 메시지 (발행 중일 때만) */}
+            {/* 경고 메시지 + 취소 버튼 (발행 중일 때만) */}
             {isPublishing && (
-              <div className="bg-amber-50 border-b border-amber-100 px-6 py-3 flex items-center gap-2">
-                <AlertOctagon size={16} className="text-amber-600 flex-shrink-0" />
-                <p className="text-sm text-amber-800">
-                  발행이 완료될 때까지 이 창을 닫지 마세요.
-                </p>
+              <div className="bg-amber-50 border-b border-amber-100 px-6 py-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertOctagon size={16} className="text-amber-600 flex-shrink-0" />
+                  <p className="text-sm text-amber-800">
+                    발행이 완료될 때까지 이 창을 닫지 마세요.
+                  </p>
+                </div>
+                <button
+                  onClick={handleCancelPublish}
+                  disabled={isCancelling}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  {isCancelling ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      취소 중...
+                    </>
+                  ) : (
+                    <>
+                      <StopCircle size={14} />
+                      발행 취소
+                    </>
+                  )}
+                </button>
               </div>
             )}
 

@@ -102,11 +102,11 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
     inquiries: 0,
   })
 
-  // 알림 데이터 로드 (현재 섹션에 따라)
+  // 알림 데이터 로드 (현재 섹션에 따라, 읽지 않은 알림만)
   const loadNotifications = async () => {
     try {
       setNotificationLoading(true)
-      const response = await fetch(`/api/admin/notifications?section=${currentSection}&limit=10`)
+      const response = await fetch(`/api/admin/notifications?section=${currentSection}&limit=10&isRead=false`)
       const data = await response.json()
       if (data.success) {
         setNotifications(data.data.notifications || [])
@@ -339,7 +339,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
                   <div className="p-3 border-b border-divider flex items-center justify-between">
                     <h3 className="font-semibold text-text-primary">알림</h3>
                     <div className="flex items-center gap-2">
-                      {unreadCount > 0 && (
+                      {notifications.length > 0 && (
                         <button
                           onClick={handleMarkAllAsRead}
                           className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
@@ -355,9 +355,9 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
                       <div className="p-8 text-center text-gray-400">
                         <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full mx-auto"></div>
                       </div>
-                    ) : notifications.filter(n => !n.isRead).length > 0 ? (
+                    ) : notifications.length > 0 ? (
                       <div className="divide-y divide-gray-100">
-                        {notifications.filter(n => !n.isRead).map((notification) => {
+                        {notifications.map((notification) => {
                           const config = notificationTypeConfig[notification.type] || notificationTypeConfig.ORDER
                           return (
                             <div

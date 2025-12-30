@@ -1392,7 +1392,7 @@ export default function CollectedProductListPage() {
                                     </span>
                                   ) : (
                                     <Link
-                                      href="/settings/automation"
+                                      href="/sourcing/settings/prompt?tab=policy"
                                       className="text-xs text-blue-500 hover:text-blue-600 flex items-center gap-0.5"
                                       onClick={(e) => e.stopPropagation()}
                                     >
@@ -1653,7 +1653,7 @@ export default function CollectedProductListPage() {
 
             <div className="flex gap-3">
               {errorState.type === 'no_policy' && (
-                <Link href="/settings/automation">
+                <Link href="/sourcing/settings/prompt?tab=policy">
                   <Button variant="primary">
                     <ExternalLink size={16} />
                     정책 설정하기
@@ -1661,7 +1661,7 @@ export default function CollectedProductListPage() {
                 </Link>
               )}
               {errorState.type === 'no_selectable' && (
-                <Link href="/settings/automation">
+                <Link href="/sourcing/settings/prompt?tab=policy">
                   <Button variant="primary">
                     <ExternalLink size={16} />
                     정책 설정하기

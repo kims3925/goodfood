@@ -1853,7 +1853,7 @@ export default function AutomationSettingsPage() {
                   닫기
                 </Button>
                 <a
-                  href="/sourcing/channel"
+                  href="/sourcing/channel/list"
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-color hover:bg-primary-color/90 text-white text-sm font-medium rounded-lg transition-colors"
                 >
                   <ExternalLink size={16} />

@@ -369,11 +369,16 @@ export default function SourcingNotificationPage() {
     )
   }
 
-  // 드롭다운 토글
-  const toggleExpand = (id: number) => {
+  // 드롭다운 토글 (펼칠 때 읽음 처리)
+  const toggleExpand = (id: number, isRead: boolean) => {
+    const willExpand = !expandedIds.includes(id)
     setExpandedIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     )
+    // 펼칠 때 읽지 않은 알림이면 읽음 처리
+    if (willExpand && !isRead) {
+      handleMarkAsRead([id])
+    }
   }
 
   // 알림 클릭 시 해당 페이지로 이동
@@ -607,7 +612,7 @@ export default function SourcingNotificationPage() {
                     className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
                       !notification.isRead ? 'bg-blue-50/30' : ''
                     }`}
-                    onClick={() => toggleExpand(notification.id)}
+                    onClick={() => toggleExpand(notification.id, notification.isRead)}
                   >
                     <div className="flex items-start gap-4">
                       <input

@@ -77,7 +77,26 @@ async function testBandConnection(settings: {
       { method: 'GET' }
     )
 
-    const data = await response.json()
+    // 응답이 JSON인지 확인
+    const contentType = response.headers.get('content-type')
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text()
+      console.error('[Band API Test] 비정상 응답:', text.substring(0, 200))
+      return {
+        success: false,
+        message: 'Band API 서버 응답 오류',
+        detail: `예상치 못한 응답 형식입니다. (HTTP ${response.status})`,
+      }
+    }
+
+    const data = await response.json().catch(() => null)
+    if (!data) {
+      return {
+        success: false,
+        message: 'Band API 응답을 파싱할 수 없습니다.',
+        detail: '서버 응답이 올바른 JSON 형식이 아닙니다.',
+      }
+    }
 
     if (data.result_code === 1) {
       return {
