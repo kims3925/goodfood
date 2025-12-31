@@ -81,6 +81,16 @@ export class BandPlaywrightService {
         return this.publishWithImages(params, retryCount + 1)
       }
 
+      // UPLOAD_TIMEOUT 에러는 새 컨텍스트로 재시도 (1회)
+      if (
+        error instanceof BandPlaywrightError &&
+        error.code === BandPlaywrightErrorCode.UPLOAD_TIMEOUT &&
+        retryCount < 1
+      ) {
+        console.log('[BandPlaywrightService] Upload timeout, retrying with fresh context')
+        return this.publishWithImages(params, retryCount + 1)
+      }
+
       // CAPTCHA 에러는 재시도 불가
       if (
         error instanceof BandPlaywrightError &&

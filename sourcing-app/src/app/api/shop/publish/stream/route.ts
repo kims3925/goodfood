@@ -62,6 +62,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // AbortController 생성 (취소 신호 관리)
+    const abortController = new AbortController()
+    const signal = abortController.signal
+
     // SSE 스트림 생성
     const stream = new ReadableStream({
       async start(controller) {
@@ -98,9 +102,20 @@ export async function POST(request: NextRequest) {
             userId,
             productIds,
             channelId: channel.id,
+            signal, // 취소 신호 전달
           })
 
           for await (const event of eventGenerator) {
+            // 취소 신호 확인
+            if (signal.aborted) {
+              console.log('[SSE] 발행 취소됨 (for await 루프)')
+              sendEvent({
+                type: 'cancelled',
+                timestamp: Date.now(),
+                data: { message: '발행이 취소되었습니다.' },
+              })
+              break
+            }
             sendEvent(event)
           }
 
@@ -117,6 +132,12 @@ export async function POST(request: NextRequest) {
           })
           safeClose()
         }
+      },
+
+      // 클라이언트가 연결을 끊을 때 호출
+      cancel() {
+        console.log('[SSE] 클라이언트 연결 끊김 - 발행 취소')
+        abortController.abort()
       },
     })
 

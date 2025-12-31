@@ -178,7 +178,7 @@ export default function PublishPage() {
     channelName: string
   } | null>(null)
 
-  // 페이지 이탈 경고 (발행 중일 때)
+  // 페이지 이탈 경고 및 작업 중단 (발행 중일 때)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isPublishing) {
@@ -191,6 +191,20 @@ export default function PublishPage() {
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [isPublishing])
+
+  // 컴포넌트 언마운트 시 (페이지 이탈 시) 발행 작업 중단
+  useEffect(() => {
+    return () => {
+      // 컴포넌트가 언마운트될 때 진행 중인 작업 취소
+      if (abortControllerRef.current) {
+        console.log('[페이지 이탈] 진행 중인 발행 작업 중단')
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
+      }
+      // 취소 상태로 설정하여 진행 중인 루프 중단
+      publishCancelledRef.current = true
+    }
+  }, [])
 
   // 초기 로드
   useEffect(() => {
@@ -673,73 +687,103 @@ export default function PublishPage() {
             }
           })
 
-          const response = await fetch('/api/shop/publish', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ productIds, shopId: Number(shopId) }),
-          })
+          try {
+            // AbortController 생성 (취소 지원)
+            const shopAbortController = new AbortController()
+            abortControllerRef.current = shopAbortController
 
-          const data = await response.json()
-
-          if (data.results) {
-            for (const result of data.results) {
-              const itemIdx = progressItems.findIndex(
-                (p) => p.productId === result.productId && p.targetId === Number(shopId) && p.targetType === 'shop'
-              )
-
-              if (result.status === 'SUCCESS') {
-                successfulCells.add(cellKey(result.productId, 'shop', Number(shopId)))
-                totalSuccess++
-                if (itemIdx !== -1) {
-                  setPublishProgressItems((prev) => {
-                    const updated = [...prev]
-                    updated[itemIdx] = { ...updated[itemIdx], status: 'success' }
-                    return updated
-                  })
-                }
-              } else if (result.status === 'SKIPPED') {
-                successfulCells.add(cellKey(result.productId, 'shop', Number(shopId)))
-                totalSkipped++
-                if (itemIdx !== -1) {
-                  setPublishProgressItems((prev) => {
-                    const updated = [...prev]
-                    updated[itemIdx] = { ...updated[itemIdx], status: 'success', message: '이미 발행됨' }
-                    return updated
-                  })
-                }
-              } else if (result.status === 'FAILED') {
-                totalFailed++
-                if (result.message) {
-                  errorMessages.push(result.message)
-                }
-                if (itemIdx !== -1) {
-                  setPublishProgressItems((prev) => {
-                    const updated = [...prev]
-                    updated[itemIdx] = { ...updated[itemIdx], status: 'failed', message: result.message }
-                    return updated
-                  })
-                }
-              }
-              processedIndex++
-            }
-          } else if (!data.success) {
-            totalFailed += productIds.length
-            if (data.error) {
-              errorMessages.push(data.error)
-            }
-            // 모든 항목 실패 처리
-            shopItems.forEach((item) => {
-              const idx = progressItems.findIndex(
-                (p) => p.productId === item.productId && p.targetId === item.targetId && p.targetType === item.targetType
-              )
-              if (idx !== -1) {
-                setPublishProgressItems((prev) => {
-                  const updated = [...prev]
-                  updated[idx] = { ...updated[idx], status: 'failed', message: data.error }
-                  return updated
-                })
-              }
+            const response = await fetch('/api/shop/publish', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ productIds, shopId: Number(shopId) }),
+              signal: shopAbortController.signal,
             })
+
+            const data = await response.json()
+
+            if (data.results) {
+              for (const result of data.results) {
+                const itemIdx = progressItems.findIndex(
+                  (p) => p.productId === result.productId && p.targetId === Number(shopId) && p.targetType === 'shop'
+                )
+
+                if (result.status === 'SUCCESS') {
+                  successfulCells.add(cellKey(result.productId, 'shop', Number(shopId)))
+                  totalSuccess++
+                  if (itemIdx !== -1) {
+                    setPublishProgressItems((prev) => {
+                      const updated = [...prev]
+                      updated[itemIdx] = { ...updated[itemIdx], status: 'success' }
+                      return updated
+                    })
+                  }
+                } else if (result.status === 'SKIPPED') {
+                  successfulCells.add(cellKey(result.productId, 'shop', Number(shopId)))
+                  totalSkipped++
+                  if (itemIdx !== -1) {
+                    setPublishProgressItems((prev) => {
+                      const updated = [...prev]
+                      updated[itemIdx] = { ...updated[itemIdx], status: 'success', message: '이미 발행됨' }
+                      return updated
+                    })
+                  }
+                } else if (result.status === 'FAILED') {
+                  totalFailed++
+                  if (result.message) {
+                    errorMessages.push(result.message)
+                  }
+                  if (itemIdx !== -1) {
+                    setPublishProgressItems((prev) => {
+                      const updated = [...prev]
+                      updated[itemIdx] = { ...updated[itemIdx], status: 'failed', message: result.message }
+                      return updated
+                    })
+                  }
+                }
+                processedIndex++
+              }
+            } else if (!data.success) {
+              totalFailed += productIds.length
+              if (data.error) {
+                errorMessages.push(data.error)
+              }
+              // 모든 항목 실패 처리
+              shopItems.forEach((item) => {
+                const idx = progressItems.findIndex(
+                  (p) => p.productId === item.productId && p.targetId === item.targetId && p.targetType === item.targetType
+                )
+                if (idx !== -1) {
+                  setPublishProgressItems((prev) => {
+                    const updated = [...prev]
+                    updated[idx] = { ...updated[idx], status: 'failed', message: data.error }
+                    return updated
+                  })
+                }
+              })
+            }
+          } catch (error: any) {
+            // AbortError는 사용자 취소 또는 페이지 이탈이므로 별도 처리
+            if (error.name === 'AbortError' || publishCancelledRef.current) {
+              console.log('[발행 취소] Shop 발행 요청 취소됨')
+              break
+            } else {
+              console.error('Shop 발행 오류:', error)
+              totalFailed += productIds.length
+              errorMessages.push(error.message || 'Shop 발행 중 오류가 발생했습니다.')
+              // 모든 항목 실패 처리
+              shopItems.forEach((item) => {
+                const idx = progressItems.findIndex(
+                  (p) => p.productId === item.productId && p.targetId === item.targetId && p.targetType === item.targetType
+                )
+                if (idx !== -1) {
+                  setPublishProgressItems((prev) => {
+                    const updated = [...prev]
+                    updated[idx] = { ...updated[idx], status: 'failed', message: error.message }
+                    return updated
+                  })
+                }
+              })
+            }
           }
         }
       }

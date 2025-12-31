@@ -1132,8 +1132,9 @@ export class PublishService {
     userId: number
     productIds: number[]
     channelId: number
+    signal?: AbortSignal // 취소 신호
   }): AsyncGenerator<PublishSSEEvent, void, unknown> {
-    const { userId, productIds, channelId } = params
+    const { userId, productIds, channelId, signal } = params
 
     // 이벤트 큐 (콜백에서 발생한 이벤트 저장)
     const eventQueue: PublishSSEEvent[] = []
@@ -1183,6 +1184,24 @@ export class PublishService {
     let lastPublishMethod: 'playwright' | 'api' | null = null
 
     for (let i = 0; i < productIds.length; i++) {
+      // 취소 신호 확인
+      if (signal?.aborted) {
+        console.log(`[PublishService] 발행 취소됨 (${i}/${productIds.length} 처리 후)`)
+        yield {
+          type: 'cancelled',
+          timestamp: Date.now(),
+          data: {
+            message: '발행이 취소되었습니다.',
+            processedCount: i,
+            totalCount: productIds.length,
+            successCount,
+            failedCount,
+            skippedCount,
+          },
+        }
+        return
+      }
+
       const productId = productIds[i]
       const productName = productNameMap.get(productId) || `상품 ${productId}`
 
@@ -1204,10 +1223,16 @@ export class PublishService {
         },
       }
 
-      // 쿨다운 대기
+      // 쿨다운 대기 (취소 가능하도록 분할)
       if (i > 0 && lastPublishMethod) {
         const cooldownMs = lastPublishMethod === 'playwright' ? PLAYWRIGHT_COOLDOWN_MS : BAND_API_COOLDOWN_MS
-        await delay(cooldownMs)
+        // 500ms 단위로 분할하여 취소 신호 확인
+        const chunks = Math.ceil(cooldownMs / 500)
+        for (let j = 0; j < chunks; j++) {
+          if (signal?.aborted) break
+          await delay(Math.min(500, cooldownMs - j * 500))
+        }
+        if (signal?.aborted) continue // 다음 반복에서 취소 처리
       }
 
       // 이벤트 큐 초기화
@@ -1256,6 +1281,14 @@ export class PublishService {
 
       // 발행 완료까지 이벤트 큐 체크
       while (!publishDone) {
+        // 취소 신호 확인
+        if (signal?.aborted) {
+          console.log(`[PublishService] 발행 취소됨 (상품 ${productId} 처리 중)`)
+          // 현재 진행 중인 발행은 완료될 때까지 기다림 (graceful shutdown)
+          // 하지만 다음 상품은 처리하지 않음
+          break
+        }
+
         await delay(100)
 
         // 큐에 있는 이벤트 모두 yield

@@ -116,9 +116,17 @@ export class BandPostAutomation {
     // Band 홈에서 채널명으로 밴드 찾기
     console.log(`[밴드자동화] Band 홈에서 밴드 검색 중...`)
     await page.goto('https://band.us/home', {
-      waitUntil: 'domcontentloaded',  // networkidle → domcontentloaded (최적화)
+      waitUntil: 'load',  // 페이지 완전 로드 대기
       timeout: POST_TIMEOUT_MS,
     })
+
+    // 로딩 스피너가 사라질 때까지 대기 (최대 10초)
+    try {
+      await page.waitForSelector('text=로딩 중입니다', { state: 'hidden', timeout: 10000 })
+      console.log('[밴드자동화] 로딩 완료')
+    } catch {
+      console.log('[밴드자동화] 로딩 스피너 대기 타임아웃 (계속 진행)')
+    }
 
     // 로그인 체크
     const currentUrl = page.url()
@@ -129,25 +137,97 @@ export class BandPostAutomation {
       )
     }
 
-    await page.waitForTimeout(1000)  // 2000 → 1000 (최적화)
+    // 밴드 목록이 로드될 때까지 대기 (최대 10초)
+    try {
+      await page.waitForSelector('.bandCardItem a.bandCover, a.bandCover._link', { timeout: 10000 })
+      console.log('[밴드자동화] 밴드 목록 로드됨')
+    } catch {
+      console.log('[밴드자동화] 밴드 목록 로드 대기 타임아웃')
+    }
+
     await this.saveDebugScreenshot(page, 'band-home')
 
-    // 밴드 커버 링크에서 채널명과 일치하는 밴드 찾기 (a.bandCover._link)
-    const bandLinkSelector = `a.bandCover._link, a[href*="/band/"]`
+    // 밴드 커버 링크에서 채널명과 일치하는 밴드 찾기
+    // Band 웹사이트 구조: li.bandCardItem > div > div > a.bandCover._link
+    const bandLinkSelector = `.bandCardItem a.bandCover, a.bandCover._link, .bandList a[href*="/band/"], .myBandList a[href*="/band/"], .bandItem a[href*="/band/"]`
 
-    // 모든 밴드 링크에서 텍스트와 href 수집
-    const bandLinks = await page.$$eval(bandLinkSelector, (links) =>
-      links.map((link) => ({
-        href: link.getAttribute('href') || '',
-        text: link.textContent?.trim() || '',
-        // 이미지 alt도 체크 (밴드 아이콘에 이름이 있을 수 있음)
-        imgAlt: link.querySelector('img')?.getAttribute('alt') || '',
-        // bandName 클래스 내 텍스트도 체크
-        bandNameText: link.querySelector('.bandName')?.textContent?.trim() || '',
-      }))
-    )
+    // 밴드 링크 수집 함수
+    const collectBandLinks = async () => {
+      return await page.$$eval(bandLinkSelector, (links) =>
+        links.map((link) => ({
+          href: link.getAttribute('href') || '',
+          text: link.textContent?.trim() || '',
+          imgAlt: link.querySelector('img')?.getAttribute('alt') || '',
+          // .bandName .uriText 에서 밴드 이름만 추출 (Band 웹사이트 구조)
+          bandNameText: (
+            link.querySelector('.bandName .uriText')?.textContent?.trim() ||
+            link.querySelector('.bandName p.uriText')?.textContent?.trim() ||
+            ''
+          ),
+        }))
+      )
+    }
 
-    console.log(`[밴드자동화] ${bandLinks.length}개 밴드 링크 발견`)
+    // 첫 번째 시도: 밴드 링크 찾기
+    let rawBandLinks = await collectBandLinks()
+
+    // 밴드 목록이 없으면 "내 밴드" 탭 클릭 후 재시도
+    if (rawBandLinks.length === 0) {
+      console.log('[밴드자동화] 밴드 목록 없음, "내 밴드" 탭 클릭 시도...')
+      try {
+        const myBandTab = await page.$('a:has-text("내 밴드"), button:has-text("내 밴드"), [class*="myBand"] a')
+        if (myBandTab) {
+          await myBandTab.click()
+          await page.waitForTimeout(1500)
+          rawBandLinks = await collectBandLinks()
+        }
+      } catch { /* 무시 */ }
+    }
+
+    // 여전히 없으면 페이지 새로고침 후 재시도
+    if (rawBandLinks.length === 0) {
+      console.log('[밴드자동화] 밴드 목록 여전히 없음, 페이지 새로고침...')
+      await page.reload({ waitUntil: 'load' })
+
+      // 로딩 스피너가 사라질 때까지 대기
+      try {
+        await page.waitForSelector('text=로딩 중입니다', { state: 'hidden', timeout: 15000 })
+        console.log('[밴드자동화] 새로고침 후 로딩 완료')
+      } catch {
+        console.log('[밴드자동화] 새로고침 후 로딩 대기 타임아웃')
+      }
+
+      // 밴드 목록 로드 대기
+      try {
+        await page.waitForSelector('.bandCardItem a.bandCover, a.bandCover._link', { timeout: 10000 })
+        console.log('[밴드자동화] 새로고침 후 밴드 목록 로드됨')
+      } catch {
+        console.log('[밴드자동화] 새로고침 후 밴드 목록 로드 실패')
+      }
+
+      await this.saveDebugScreenshot(page, 'band-home-refreshed')
+      rawBandLinks = await collectBandLinks()
+    }
+
+    // UI 버튼 텍스트 및 유효하지 않은 링크 필터링
+    const uiButtonTexts = ['이 밴드로 이동', '밴드 가이드 보기', '밴드 만들기', '더보기', '설정']
+    const bandLinks = rawBandLinks.filter((link) => {
+      // href가 /band/숫자 형태인지 확인
+      const bandIdMatch = link.href.match(/\/band\/(\d+)/)
+      if (!bandIdMatch) return false
+
+      // UI 버튼 텍스트 제외
+      const linkText = link.text || link.bandNameText || link.imgAlt
+      if (uiButtonTexts.some((btn) => linkText === btn || linkText.includes(btn))) return false
+
+      // 텍스트가 너무 짧거나 없는 경우 (UI 요소일 가능성)
+      const effectiveText = link.bandNameText || link.imgAlt || link.text
+      if (!effectiveText || effectiveText.length < 2) return false
+
+      return true
+    })
+
+    console.log(`[밴드자동화] ${bandLinks.length}개 밴드 링크 발견 (필터링 후, 원본: ${rawBandLinks.length}개)`)
 
     // 채널명과 일치하는 링크 찾기 (정확히 일치하거나 포함)
     const matchedLink = bandLinks.find(
@@ -195,7 +275,7 @@ export class BandPostAutomation {
     }
 
     // 찾지 못한 경우 에러
-    console.log(`[밴드자동화] 사용 가능한 밴드:`, bandLinks.map(l => l.text || l.imgAlt).join(', '))
+    console.log(`[밴드자동화] 사용 가능한 밴드:`, bandLinks.map(l => l.bandNameText || l.imgAlt || l.text).join(', '))
     throw new BandPlaywrightError(
       `밴드를 찾을 수 없습니다. bandName: ${bandName}`,
       BandPlaywrightErrorCode.POST_FAILED
@@ -266,46 +346,60 @@ export class BandPostAutomation {
       // 2. 글쓰기 레이어 열기
       console.log('[밴드자동화] 2단계: 글쓰기 레이어 열기')
 
-      // 방법 1: 글쓰기 버튼 클릭 (사이드바)
-      const writeButton = await page.$('button._btnPostWrite')
-      if (writeButton && await writeButton.isVisible()) {
-        console.log('[밴드자동화] 사이드바 글쓰기 버튼 발견, 클릭...')
-        await writeButton.click()
-        await page.waitForTimeout(2000)
-      } else {
-        // 방법 2: 가짜 에디터 영역 클릭
-        const fakeEditor = await page.$('[data-viewname="DPostFakeEditorView"], button._btnOpenWriteLayer')
-        if (fakeEditor && await fakeEditor.isVisible()) {
-          console.log('[밴드자동화] 에디터 영역 발견, 클릭...')
-          await fakeEditor.click()
+      // 글쓰기 버튼 클릭 시도 (최대 2회)
+      for (let attempt = 0; attempt < 2; attempt++) {
+        // 글쓰기 버튼 셀렉터들 (우선순위 순)
+        const writeButtonSelectors = [
+          'button._btnOpenWriteLayer',           // 실제 Band UI 글쓰기 버튼
+          'button.cPostWriteEventWrapper',       // 글쓰기 래퍼 버튼
+          'button._btnPostWrite',                // 레거시 셀렉터
+          '[data-viewname="DPostFakeEditorView"]', // 가짜 에디터 영역
+        ]
+
+        let clicked = false
+        for (const selector of writeButtonSelectors) {
+          const writeButton = await page.$(selector)
+          if (writeButton && await writeButton.isVisible()) {
+            console.log(`[밴드자동화] 글쓰기 버튼 발견: ${selector} (시도 ${attempt + 1})`)
+            await writeButton.click()
+            clicked = true
+            break
+          }
+        }
+
+        if (!clicked) {
+          console.warn('[밴드자동화] 글쓰기 버튼을 찾을 수 없음')
+        }
+
+        // 에디터(contenteditable)가 나타날 때까지 대기 (최대 5초)
+        try {
+          await page.waitForSelector('[data-viewname="DPostWriteLayerView"] [contenteditable="true"], .cPostWrite [contenteditable="true"].cke_editable', {
+            timeout: 5000,
+            state: 'visible'
+          })
+          console.log('[밴드자동화] 에디터 로드됨')
+          break  // 성공하면 루프 종료
+        } catch {
+          console.warn(`[밴드자동화] 에디터 대기 타임아웃 (시도 ${attempt + 1})`)
+          // 실패 시 페이지 새로고침 후 재시도
+          console.log('[밴드자동화] 페이지 새로고침 후 재시도...')
+          await page.reload({ waitUntil: 'load' })
           await page.waitForTimeout(2000)
-        } else {
-          console.warn('[밴드자동화] 글쓰기 영역을 찾을 수 없음')
         }
       }
 
       await this.saveDebugScreenshot(page, 'step2-write-layer-opened')
 
-      // 글쓰기 레이어가 열렸는지 확인 (레이어 팝업)
-      const writeLayerSelectors = [
-        '[data-viewname="DPostWriteLayerView"]',
-        '.layerContainerView [data-viewname*="PostWrite"]',
-        '.cPostWrite:not(.-standby)',
-      ]
-
-      let writeLayerOpened = false
-      for (const selector of writeLayerSelectors) {
-        const layer = await page.$(selector)
-        if (layer && await layer.isVisible()) {
-          writeLayerOpened = true
-          console.log(`[밴드자동화] 글쓰기 레이어 열림: ${selector}`)
-          break
-        }
+      // 글쓰기 레이어가 열렸는지 최종 확인 (에디터 기준)
+      const editorExists = await page.$('[data-viewname="DPostWriteLayerView"] [contenteditable="true"], .cPostWrite [contenteditable="true"].cke_editable')
+      if (!editorExists || !(await editorExists.isVisible())) {
+        console.error('[밴드자동화] 글쓰기 레이어 열기 실패!')
+        throw new BandPlaywrightError(
+          '글쓰기 레이어를 열 수 없습니다.',
+          BandPlaywrightErrorCode.POST_FAILED
+        )
       }
-
-      if (!writeLayerOpened) {
-        console.warn('[밴드자동화] 글쓰기 레이어가 열리지 않았을 수 있음, 계속 진행...')
-      }
+      console.log('[밴드자동화] 글쓰기 레이어 열림 확인')
 
       // 3. 본문 입력 (먼저 입력해야 게시물 상단에 표시됨)
       await reportStage('entering')
@@ -773,7 +867,41 @@ export class BandPostAutomation {
 
     // file input 직접 찾기 (버튼이 없을 경우)
     if (!imageButton) {
-      console.warn('[밴드자동화] 사진 버튼을 찾을 수 없음, file input 직접 시도')
+      console.warn('[밴드자동화] 사진 버튼을 찾을 수 없음, JavaScript로 버튼 검색 시도')
+
+      // JavaScript로 "사진" 관련 버튼/라벨 찾기
+      const photoButtonFound = await page.evaluate(() => {
+        // 모든 버튼과 라벨에서 "사진" 텍스트 또는 photo 클래스 찾기
+        const elements = document.querySelectorAll('button, label, a')
+        for (const el of elements) {
+          const text = el.textContent?.trim() || ''
+          const className = el.className || ''
+          const ariaLabel = el.getAttribute('aria-label') || ''
+
+          if (className.includes('photo') ||
+              className.includes('Photo') ||
+              text.includes('사진') ||
+              ariaLabel.includes('사진') ||
+              ariaLabel.includes('photo')) {
+            // 클릭 가능하고 보이는지 확인
+            const rect = el.getBoundingClientRect()
+            if (rect.width > 0 && rect.height > 0) {
+              console.log('[JS] 사진 버튼 발견:', className, text)
+              ;(el as HTMLElement).click()
+              return true
+            }
+          }
+        }
+        return false
+      })
+
+      if (photoButtonFound) {
+        console.log('[밴드자동화] JavaScript로 사진 버튼 클릭 성공')
+        await page.waitForTimeout(1000) // 팝업 열릴 시간 대기
+      } else {
+        console.warn('[밴드자동화] JavaScript로도 사진 버튼 못 찾음, file input 직접 시도')
+      }
+
       const fileInput = await page.$('input[type="file"][accept*="image"]')
       if (fileInput) {
         console.log('[밴드자동화] file input 발견, 파일 직접 설정')
@@ -1070,37 +1198,151 @@ export class BandPostAutomation {
 
   /**
    * 팝업 내 이미지 업로드 완료 대기 후 "첨부하기" 클릭
-   * 1. 팝업에서 이미지 업로드 완료 대기
-   * 2. "첨부하기" 버튼 클릭
+   * 1. 팝업이 열렸는지 확인 (5초 대기)
+   * 2. 팝업이 있으면 업로드 완료 대기 후 "첨부하기" 클릭
+   * 3. 팝업이 없으면 인라인 업로드 방식으로 처리 (바로 return)
    */
   private async waitForPopupUploadAndAttach(page: Page, expectedCount: number): Promise<void> {
     const FORBIDDEN_TEXTS = ['게시', '등록', 'post', 'submit']
-    const maxWaitTime = 60000 // 60초 (이미지가 많으면 오래 걸릴 수 있음)
-    const checkInterval = 500
+    // 이미지 개수에 따라 타임아웃 동적 조정 (기본 30초 + 이미지당 10초)
+    const baseTimeout = 30000
+    const perImageTimeout = 10000
+    const maxWaitTime = baseTimeout + (expectedCount * perImageTimeout) // 10개면 130초
+    const checkInterval = 500 // 500ms로 체크
     const startTime = Date.now()
+    const NO_PROGRESS_TIMEOUT = 15000 // 15초간 진행 없으면 현재 개수로 진행
+
+    console.log(`[밴드자동화] 업로드 타임아웃: ${maxWaitTime / 1000}초 (이미지 ${expectedCount}개)`)
 
     console.log(`[밴드자동화] 팝업 내 ${expectedCount}개 이미지 업로드 대기 중...`)
 
-    // 팝업 내 업로드 진행 상태 확인
+    // 팝업 셀렉터 (Band UI의 다양한 팝업 구조 지원)
+    const popupSelectors = [
+      '[role="dialog"]',
+      '.uLayer',
+      '.uLayerContainer',
+      '.photoUploadLayer',
+      '.photoAttachLayer',
+      '.layerContainer[style*="display: block"]',
+      // 사진 올리기 팝업 관련
+      '[data-viewname*="Photo"]',
+      '[data-viewname*="photo"]',
+      '[data-viewname*="Attach"]',
+      '.dPhotoUploadView',
+      '.photoUploadWrap',
+      // 레이어 팝업 (일반)
+      '.uLayerView',
+      '.layerPopup',
+    ]
+
+    // 1. 팝업이 열렸는지 먼저 확인 (최대 10초 대기)
+    let popupFound = false
+    const popupWaitStart = Date.now()
+    while (Date.now() - popupWaitStart < 10000) {
+      for (const selector of popupSelectors) {
+        try {
+          const popup = await page.$(selector)
+          if (popup && await popup.isVisible()) {
+            console.log(`[밴드자동화] 팝업 발견: ${selector}`)
+            popupFound = true
+            break
+          }
+        } catch { /* 무시 */ }
+      }
+      if (popupFound) break
+      await page.waitForTimeout(300)
+    }
+
+    // 셀렉터로 못 찾으면 JavaScript로 팝업 찾기
+    if (!popupFound) {
+      console.log('[밴드자동화] 셀렉터로 팝업 못 찾음, JavaScript로 검색...')
+      popupFound = await page.evaluate(() => {
+        // 모든 요소에서 "사진 올리기" 텍스트를 포함한 팝업 찾기
+        const allElements = document.querySelectorAll('*')
+        for (const el of allElements) {
+          const text = el.textContent || ''
+          const className = el.className || ''
+          const style = window.getComputedStyle(el)
+
+          // 팝업 특성: position fixed/absolute, z-index 높음, "사진" 또는 "올리기" 텍스트
+          if (
+            (style.position === 'fixed' || style.position === 'absolute') &&
+            parseInt(style.zIndex) > 100 &&
+            (text.includes('사진') || text.includes('올리기') || text.includes('첨부') ||
+             className.includes('Layer') || className.includes('layer') ||
+             className.includes('Popup') || className.includes('popup'))
+          ) {
+            const rect = el.getBoundingClientRect()
+            if (rect.width > 100 && rect.height > 100) {
+              console.log('[JS] 팝업 발견:', className.substring(0, 50), rect.width, rect.height)
+              return true
+            }
+          }
+        }
+        return false
+      })
+
+      if (popupFound) {
+        console.log('[밴드자동화] JavaScript로 팝업 발견')
+      }
+    }
+
+    // 팝업이 열리지 않으면 에러 (호출측에서 재시도)
+    if (!popupFound) {
+      console.error('[밴드자동화] 팝업이 열리지 않음 - 이미지 업로드 실패')
+      // 디버그: 현재 페이지의 레이어 요소들 출력
+      await page.evaluate(() => {
+        const layers = document.querySelectorAll('[class*="layer"], [class*="Layer"], [class*="popup"], [class*="Popup"], [role="dialog"]')
+        console.log('[DEBUG] 현재 페이지 레이어 요소:', layers.length)
+        layers.forEach((el, i) => {
+          const rect = el.getBoundingClientRect()
+          console.log(`[DEBUG] ${i}: ${el.className.substring(0, 80)} - ${rect.width}x${rect.height}`)
+        })
+      })
+      throw new BandPlaywrightError(
+        '이미지 업로드 팝업이 열리지 않습니다. 페이지 새로고침 후 재시도해주세요.',
+        BandPlaywrightErrorCode.UPLOAD_TIMEOUT
+      )
+    }
+
+    // 팝업 내 업로드 진행 상태 확인 (로딩 인디케이터)
     const popupLoadingSelectors = [
       '[role="dialog"] .uploading',
       '[role="dialog"] .loading',
       '[role="dialog"] [class*="progress"]',
       '[role="dialog"] [class*="loading"]',
+      '[role="dialog"] .spinner',
       '.uLayer .uploading',
       '.uLayer .loading',
+      '.uLayer .spinner',
+      // 업로드 진행 바
+      '.photoUploadLayer [class*="progress"]',
+      '.photoUploadLayer .loading',
     ]
 
-    // 팝업 내 업로드된 이미지/썸네일 셀렉터
+    // 팝업 내 업로드된 이미지/썸네일 셀렉터 (다양한 Band UI 지원)
     const popupImageSelectors = [
+      // role="dialog" 팝업
       '[role="dialog"] img[src*="phinf"]',
       '[role="dialog"] .thumbnail img',
       '[role="dialog"] .photoItem img',
+      '[role="dialog"] .thumbItem img',
+      '[role="dialog"] .previewItem img',
+      // uLayer 팝업
       '.uLayer img[src*="phinf"]',
       '.uLayer .thumbnail img',
+      '.uLayer .thumbItem img',
+      // 사진 올리기 레이어
+      '.photoUploadLayer .thumbItem',
+      '.photoUploadLayer img',
+      // blob URL 이미지 (업로드 중)
+      '[role="dialog"] img[src*="blob:"]',
+      '.uLayer img[src*="blob:"]',
     ]
 
     let uploadedCount = 0
+    let lastUploadedCount = 0
+    let lastProgressTime = Date.now()
 
     while (Date.now() - startTime < maxWaitTime) {
       // 로딩 중인지 확인
@@ -1126,9 +1368,26 @@ export class BandPostAutomation {
         } catch { /* 무시 */ }
       }
 
-      // 로딩이 끝나고 이미지가 있으면 "첨부하기" 버튼 클릭 시도
-      if (!isLoading && uploadedCount > 0) {
-        console.log(`[밴드자동화] 팝업 내 ${uploadedCount}개 이미지 업로드 완료, 첨부하기 버튼 찾는 중...`)
+      // 진행 상태 추적 - 이미지 수 증가 또는 로딩 중이면 시간 갱신
+      if (uploadedCount > lastUploadedCount) {
+        lastUploadedCount = uploadedCount
+        lastProgressTime = Date.now()
+        console.log(`[밴드자동화] 팝업 내 이미지 업로드 진행: ${uploadedCount}/${expectedCount}`)
+      } else if (isLoading) {
+        // 로딩 인디케이터가 보이면 업로드가 진행 중이므로 시간 갱신
+        lastProgressTime = Date.now()
+      }
+
+      // 모든 이미지가 업로드되었거나, 로딩이 끝나고 진행이 멈춘 경우
+      const allUploaded = uploadedCount >= expectedCount
+      const noProgressTimeout = !isLoading && uploadedCount > 0 && (Date.now() - lastProgressTime > NO_PROGRESS_TIMEOUT)
+
+      if (allUploaded || noProgressTimeout) {
+        if (noProgressTimeout && uploadedCount < expectedCount) {
+          console.warn(`[밴드자동화] 팝업 내 ${NO_PROGRESS_TIMEOUT/1000}초간 진행 없음 - ${uploadedCount}/${expectedCount}개로 계속 진행`)
+        } else {
+          console.log(`[밴드자동화] 팝업 내 ${uploadedCount}개 이미지 업로드 완료, 첨부하기 버튼 찾는 중...`)
+        }
 
         // "첨부하기" 버튼 찾기
         const attachButtonSelector = 'button.uButton.-confirm._submitBtn'
