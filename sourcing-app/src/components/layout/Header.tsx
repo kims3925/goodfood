@@ -163,6 +163,17 @@ const SessionIndicator = memo(function SessionIndicator() {
               </div>
             </div>
           )}
+          {/* 미설정 채널이 있을 때 확장프로그램 안내 */}
+          {summary && summary.none > 0 && (
+            <div className="mt-2 pt-2 border-t border-gray-100">
+              <div className="flex items-start gap-1.5 text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
+                <span>
+                  미설정 채널은 <strong>Chrome 확장프로그램</strong>을 통해 세션을 수집해주세요.
+                </span>
+              </div>
+            </div>
+          )}
           {lastChecked && (
             <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-400">
               마지막 확인: {lastChecked.toLocaleTimeString()}
