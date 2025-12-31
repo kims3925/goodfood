@@ -137,10 +137,15 @@ pipeline {
                     npx prisma generate --schema prisma
                     cd ..
 
+                    # Stop PM2 before cleaning (파일 잠금 해제)
+                    echo ">>> Stopping PM2 processes for clean build..."
+                    sudo -u ubuntu pm2 stop all || true
+                    sleep 2
+
                     # Clean Next.js cache before build
                     echo ">>> Cleaning Next.js cache..."
-                    rm -rf shop-app/.next/cache
-                    rm -rf sourcing-app/.next/cache
+                    rm -rf shop-app/.next
+                    rm -rf sourcing-app/.next
 
                     # Build applications (with retry on failure)
                     echo ">>> Building applications..."
