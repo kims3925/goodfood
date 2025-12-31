@@ -212,13 +212,8 @@ pipeline {
         }
         always {
             echo "Build #${env.BUILD_NUMBER} finished with status: ${currentBuild.currentResult}"
-            // cleanWs()는 다른 파이프라인 워크스페이스에 영향을 줄 수 있으므로
-            // 현재 워크스페이스의 불필요한 파일만 정리
-            sh '''
-                rm -rf node_modules/.cache || true
-                rm -rf shop-app/.next || true
-                rm -rf sourcing-app/.next || true
-            '''
+            // 빌드 완료 후 워크스페이스 정리 (디스크 공간 확보)
+            cleanWs()
         }
     }
 }
