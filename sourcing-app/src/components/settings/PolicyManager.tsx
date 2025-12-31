@@ -38,6 +38,7 @@ export default function PolicyManager({ onToast }: PolicyManagerProps) {
 
   useEffect(() => {
     loadPolicies()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadPolicies = async () => {

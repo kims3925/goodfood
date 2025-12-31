@@ -246,6 +246,7 @@ export default function ChannelFormModal({
         coverUrl: ''
       }))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.kind, configuredPlatforms, isEditMode])
 
   const validateForm = () => {

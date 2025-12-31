@@ -47,7 +47,8 @@
       "WebSearch",
       "Bash(npx tsx:*)",
       "Bash(dir:*)",
-      "WebFetch(domain:developers.band.us)"
+      "WebFetch(domain:developers.band.us)",
+      "Bash(gh pr list:*)"
     ],
     "deny": [],
     "ask": []

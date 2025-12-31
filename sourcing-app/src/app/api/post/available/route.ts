@@ -123,52 +123,20 @@ export async function GET(request: NextRequest) {
         const data = await response.json()
 
         if (data.result_data && data.result_data.items) {
-          // 게시물 데이터 변환 (채널 정보 포함)
-          const posts = await Promise.all(
-            data.result_data.items.map(async (item: any) => {
-              // 각 게시물의 댓글 조회
-              let comments: any[] = []
-              try {
-                const commentsApiUrl = `https://openapi.band.us/v2/band/post/comments`
-                const commentsResponse = await fetch(
-                  `${commentsApiUrl}?access_token=${accessToken}&band_key=${channel.channelKey}&post_key=${item.post_key}`,
-                  {
-                    method: 'GET',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                  }
-                )
-
-                if (commentsResponse.ok) {
-                  const commentsData = await commentsResponse.json()
-                  if (commentsData.result_data && commentsData.result_data.items) {
-                    comments = commentsData.result_data.items.map((comment: any) => ({
-                      comment_key: comment.comment_key,
-                      author: comment.author?.name || '알 수 없음',
-                      content: comment.content || '',
-                    }))
-                  }
-                }
-              } catch (error) {
-                console.error(`댓글 조회 실패 (post_key: ${item.post_key}):`, error)
-              }
-
-              return {
-                post_key: item.post_key,
-                title: item.content ? item.content.substring(0, 100) : '(제목 없음)',
-                content: item.content || '',
-                author: item.author?.name || '알 수 없음',
-                images: item.photos ? item.photos.map((photo: any) => photo.url) : [],
-                comments,
-                channel: {
-                  id: channel.id,
-                  name: channel.name,
-                  channelKey: channel.channelKey,
-                },
-              }
-            })
-          )
+          // 게시물 데이터 변환 (채널 정보 포함) - 댓글 조회 제거하여 API 호출 최소화
+          const posts = data.result_data.items.map((item: any) => ({
+            post_key: item.post_key,
+            title: item.content ? item.content.substring(0, 100) : '(제목 없음)',
+            content: item.content || '',
+            author: item.author?.name || '알 수 없음',
+            images: item.photos ? item.photos.map((photo: any) => photo.url) : [],
+            comments: [], // 댓글 조회 제거 - API 호출 최소화
+            channel: {
+              id: channel.id,
+              name: channel.name,
+              channelKey: channel.channelKey,
+            },
+          }))
 
           allPosts.push(...posts)
         }

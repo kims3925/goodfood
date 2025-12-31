@@ -61,20 +61,41 @@ export default function ImageWithFallback({
   // 외부 URL인지 확인 (http:// 또는 https://로 시작)
   const isExternalUrl = src.startsWith('http://') || src.startsWith('https://')
 
-  // 외부 URL인 경우 일반 img 태그 사용
+  // 외부 URL인 경우에도 Next.js Image 컴포넌트 사용 (unoptimized로 외부 이미지 지원)
   if (isExternalUrl) {
+    if (fill) {
+      return (
+        <div className="relative w-full h-full" onClick={onClick}>
+          {isLoading && (
+            <div className={`absolute inset-0 bg-gray-100 animate-pulse ${className}`} />
+          )}
+          <Image
+            src={src}
+            alt={alt}
+            fill
+            sizes={sizes || '(max-width: 768px) 100vw, 50vw'}
+            className={className}
+            onError={handleError}
+            onLoad={handleLoad}
+            unoptimized
+          />
+        </div>
+      )
+    }
     return (
-      <div className={`relative ${fill ? 'w-full h-full' : ''}`} onClick={onClick}>
+      <div className="relative" onClick={onClick}>
         {isLoading && (
           <div className={`absolute inset-0 bg-gray-100 animate-pulse ${className}`} />
         )}
-        <img
+        <Image
           src={src}
           alt={alt}
+          width={width || 100}
+          height={height || 100}
           className={className}
           onError={handleError}
           onLoad={handleLoad}
-          style={fill ? { objectFit: 'cover', width: '100%', height: '100%' } : undefined}
+          unoptimized
         />
       </div>
     )

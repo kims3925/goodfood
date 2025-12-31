@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { ImageIcon, Package } from 'lucide-react'
 
 interface ThumbnailImageProps {
@@ -80,12 +81,14 @@ export default function ThumbnailImage({
       {isLoading && <div className="absolute inset-0 bg-gray-100 animate-pulse" />}
 
       {/* 이미지 */}
-      <img
+      <Image
         src={src}
         alt={alt}
-        className="w-full h-full object-cover"
+        fill
+        className="object-cover"
         onError={handleError}
         onLoad={handleLoad}
+        unoptimized
       />
 
       {/* 배지 (선택사항) */}
