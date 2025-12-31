@@ -167,6 +167,7 @@ export type PublishSSEEventType =
   | 'product_complete'     // 개별 상품 발행 완료
   | 'batch_complete'       // 배치 발행 완료
   | 'error'                // 에러 발생
+  | 'cancelled'            // 발행 취소됨
 
 /**
  * SSE 이벤트
@@ -191,6 +192,13 @@ export interface PublishSSEEvent {
 
     // 에러 정보
     error?: string
+
+    // 메시지 (취소 등)
+    message?: string
+
+    // 취소 시 처리 정보
+    processedCount?: number
+    totalCount?: number
   }
 }
 
