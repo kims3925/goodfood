@@ -160,12 +160,12 @@ pipeline {
                     sudo -u ubuntu pm2 stop shop-app sourcing-app shop sourcing 2>/dev/null || true
 
                     # Verify processes are stopped (최대 10초 대기)
-                    for i in {1..5}; do
+                    for i in 1 2 3 4 5; do
                         if ! sudo -u ubuntu pm2 list | grep -E 'shop|sourcing' | grep -q 'online'; then
                             echo ">>> All target processes stopped"
                             break
                         fi
-                        echo ">>> Waiting for processes to stop... ($i/5)"
+                        echo ">>> Waiting for processes to stop... (\$i/5)"
                         sleep 2
                     done
 
