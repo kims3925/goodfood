@@ -228,6 +228,12 @@ export class BandPostAutomation {
     })
 
     console.log(`[밴드자동화] ${bandLinks.length}개 밴드 링크 발견 (필터링 후, 원본: ${rawBandLinks.length}개)`)
+    // 디버그: 각 밴드의 bandNameText 값 출력
+    console.log(`[밴드자동화] 밴드 목록:`, bandLinks.map(l => ({
+      bandNameText: l.bandNameText,
+      imgAlt: l.imgAlt,
+      href: l.href,
+    })))
 
     // 채널명과 일치하는 링크 찾기 (정확히 일치하거나 포함)
     const matchedLink = bandLinks.find(
@@ -241,7 +247,8 @@ export class BandPostAutomation {
     )
 
     if (matchedLink) {
-      console.log(`[밴드자동화] 일치하는 밴드 발견: "${matchedLink.text || matchedLink.bandNameText || matchedLink.imgAlt}" -> ${matchedLink.href}`)
+      // bandNameText 우선 출력 (정확한 밴드 이름)
+      console.log(`[밴드자동화] 일치하는 밴드 발견: "${matchedLink.bandNameText || matchedLink.imgAlt || matchedLink.text}" -> ${matchedLink.href}`)
 
       // 해당 링크 클릭
       const linkElement = await page.$(`a[href="${matchedLink.href}"]`)
@@ -256,7 +263,8 @@ export class BandPostAutomation {
     // 정확히 일치하는 게 없으면 부분 일치로 재시도
     console.log(`[밴드자동화] 정확히 일치하는 밴드 없음, 부분 일치 시도...`)
     for (const link of bandLinks) {
-      const linkText = link.text || link.imgAlt
+      // bandNameText 우선 사용 (정확한 밴드 이름)
+      const linkText = link.bandNameText || link.imgAlt || link.text
       // 공백/특수문자 제거 후 비교
       const normalizedBandName = bandName.replace(/\s+/g, '').toLowerCase()
       const normalizedLinkText = linkText.replace(/\s+/g, '').toLowerCase()
@@ -289,8 +297,19 @@ export class BandPostAutomation {
     page: Page,
     params: BandPublishParams
   ): Promise<BandPublishResult> {
-    const { bandKey, bandName, content, imageUrls, onStageProgress } = params
+    const { bandKey, bandName, content, imageUrls, onStageProgress, signal } = params
     const tempFiles: string[] = []
+
+    // 취소 확인 헬퍼
+    const checkCancelled = () => {
+      if (signal?.aborted) {
+        console.log('[밴드자동화] 작업 취소됨')
+        throw new BandPlaywrightError(
+          '발행이 취소되었습니다.',
+          BandPlaywrightErrorCode.POST_FAILED
+        )
+      }
+    }
 
     // 단계 진행 알림 헬퍼
     const reportStage = async (
@@ -308,6 +327,9 @@ export class BandPostAutomation {
     }
 
     try {
+      // 취소 확인
+      checkCancelled()
+
       console.log(`[밴드자동화] 게시물 작성 시작: ${bandName} (key: ${bandKey})`)
       console.log(`[밴드자동화] 내용 길이: ${content.length}, 이미지: ${imageUrls.length}개`)
 
@@ -343,6 +365,9 @@ export class BandPostAutomation {
 
       await this.saveDebugScreenshot(page, 'step1-page-loaded')
 
+      // 취소 확인
+      checkCancelled()
+
       // 2. 글쓰기 레이어 열기
       console.log('[밴드자동화] 2단계: 글쓰기 레이어 열기')
 
@@ -350,7 +375,8 @@ export class BandPostAutomation {
       for (let attempt = 0; attempt < 2; attempt++) {
         // 글쓰기 버튼 셀렉터들 (우선순위 순)
         const writeButtonSelectors = [
-          'button._btnOpenWriteLayer',           // 실제 Band UI 글쓰기 버튼
+          'button.uButton._btnPostWrite',        // 실제 Band UI 글쓰기 버튼 (정확)
+          'button._btnOpenWriteLayer',           // 글쓰기 레이어 열기 버튼
           'button.cPostWriteEventWrapper',       // 글쓰기 래퍼 버튼
           'button._btnPostWrite',                // 레거시 셀렉터
           '[data-viewname="DPostFakeEditorView"]', // 가짜 에디터 영역
@@ -401,11 +427,17 @@ export class BandPostAutomation {
       }
       console.log('[밴드자동화] 글쓰기 레이어 열림 확인')
 
+      // 취소 확인
+      checkCancelled()
+
       // 3. 본문 입력 (먼저 입력해야 게시물 상단에 표시됨)
       await reportStage('entering')
       console.log('[밴드자동화] 3단계: 본문 입력')
       await this.inputContent(page, content)
       await this.saveDebugScreenshot(page, 'step3-content-entered')
+
+      // 취소 확인
+      checkCancelled()
 
       // 4. 이미지 다운로드 및 업로드 (본문 아래에 표시됨)
       const imagesToUpload = imageUrls.slice(0, MAX_IMAGES)
@@ -435,6 +467,9 @@ export class BandPostAutomation {
         }
 
         if (downloadedImages.length > 0) {
+          // 취소 확인
+          checkCancelled()
+
           // 업로드 단계
           await reportStage('uploading', { current: 0, total: downloadedImages.length })
           console.log('[밴드자동화] 5단계: 이미지 업로드')
@@ -449,6 +484,9 @@ export class BandPostAutomation {
           await this.saveDebugScreenshot(page, 'step5-images-uploaded')
         }
       }
+
+      // 취소 확인
+      checkCancelled()
 
       // 5. 게시 버튼 클릭
       await reportStage('submitting')
@@ -1218,19 +1256,20 @@ export class BandPostAutomation {
 
     // 팝업 셀렉터 (Band UI의 다양한 팝업 구조 지원)
     const popupSelectors = [
+      // 사진 올리기 팝업 (최우선)
+      'section[data-viewname="DPhotoUploadLayoutView"]',
+      '[data-viewname="DPhotoUploadLayoutView"]',
+      // 기타 팝업 구조
       '[role="dialog"]',
+      '[role="document"]',
       '.uLayer',
       '.uLayerContainer',
       '.photoUploadLayer',
       '.photoAttachLayer',
       '.layerContainer[style*="display: block"]',
-      // 사진 올리기 팝업 관련
-      '[data-viewname*="Photo"]',
-      '[data-viewname*="photo"]',
       '[data-viewname*="Attach"]',
       '.dPhotoUploadView',
       '.photoUploadWrap',
-      // 레이어 팝업 (일반)
       '.uLayerView',
       '.layerPopup',
     ]
@@ -1322,27 +1361,36 @@ export class BandPostAutomation {
 
     // 팝업 내 업로드된 이미지/썸네일 셀렉터 (다양한 Band UI 지원)
     const popupImageSelectors = [
+      // DPhotoUploadLayoutView 팝업 (최우선) - 실제 DOM 구조
+      '[data-viewname="DPhotoUploadLayoutView"] [data-viewname="DPhotoUploadItemView"]',
+      '[data-viewname="DPhotoUploadLayoutView"] img._thumbImg',
+      '[data-viewname="DPhotoUploadLayoutView"] .mediaListItem img._thumbImg',
+      '[data-viewname="DPhotoUploadLayoutView"] .mediaListItem img',
+      '[data-viewname="DPhotoUploadLayoutView"] img[src*="phinf"]',
+      '[data-viewname="DPhotoUploadLayoutView"] img[src*="blob:"]',
+      '[data-viewname*="Attach"] img[src*="phinf"]',
+      '[data-viewname*="Attach"] img[src*="blob:"]',
       // role="dialog" 팝업
       '[role="dialog"] img[src*="phinf"]',
       '[role="dialog"] .thumbnail img',
       '[role="dialog"] .photoItem img',
       '[role="dialog"] .thumbItem img',
       '[role="dialog"] .previewItem img',
+      '[role="dialog"] img[src*="blob:"]',
       // uLayer 팝업
       '.uLayer img[src*="phinf"]',
       '.uLayer .thumbnail img',
       '.uLayer .thumbItem img',
+      '.uLayer img[src*="blob:"]',
       // 사진 올리기 레이어
       '.photoUploadLayer .thumbItem',
       '.photoUploadLayer img',
-      // blob URL 이미지 (업로드 중)
-      '[role="dialog"] img[src*="blob:"]',
-      '.uLayer img[src*="blob:"]',
     ]
 
     let uploadedCount = 0
     let lastUploadedCount = 0
     let lastProgressTime = Date.now()
+    let debugLogged = false
 
     while (Date.now() - startTime < maxWaitTime) {
       // 로딩 중인지 확인
@@ -1357,7 +1405,8 @@ export class BandPostAutomation {
         } catch { /* 무시 */ }
       }
 
-      // 업로드된 이미지 수 확인
+      // 업로드된 이미지 수 확인 (여러 셀렉터 시도)
+      uploadedCount = 0
       for (const selector of popupImageSelectors) {
         try {
           const images = await page.$$(selector)
@@ -1366,6 +1415,75 @@ export class BandPostAutomation {
             break
           }
         } catch { /* 무시 */ }
+      }
+
+      // 셀렉터로 못 찾으면 JavaScript로 직접 찾기
+      if (uploadedCount === 0) {
+        uploadedCount = await page.evaluate(() => {
+          // 1. DPhotoUploadItemView로 직접 카운트 (가장 정확)
+          const uploadItems = document.querySelectorAll('[data-viewname="DPhotoUploadLayoutView"] [data-viewname="DPhotoUploadItemView"]')
+          if (uploadItems.length > 0) {
+            return uploadItems.length
+          }
+
+          // 2. img._thumbImg로 카운트
+          const thumbImgs = document.querySelectorAll('[data-viewname="DPhotoUploadLayoutView"] img._thumbImg')
+          if (thumbImgs.length > 0) {
+            return thumbImgs.length
+          }
+
+          // 3. 폴백: 다른 팝업 구조에서 찾기
+          const popupSelectors = [
+            '[data-viewname*="Attach"]',
+            '[role="dialog"]',
+            '.uLayer',
+          ]
+
+          let count = 0
+          for (const selector of popupSelectors) {
+            const containers = document.querySelectorAll(selector)
+            for (const container of containers) {
+              const style = window.getComputedStyle(container)
+              if (style.display !== 'none' && style.visibility !== 'hidden') {
+                const rect = container.getBoundingClientRect()
+                if (rect.width < 200 || rect.height < 200) continue
+
+                const imgs = container.querySelectorAll('img')
+                for (const img of imgs) {
+                  const src = img.src || ''
+                  if (src.includes('phinf') || src.startsWith('blob:')) {
+                    const imgRect = img.getBoundingClientRect()
+                    if (imgRect.width >= 20 && imgRect.width <= 200 && imgRect.height >= 20 && imgRect.height <= 200) {
+                      count++
+                    }
+                  }
+                }
+                if (count > 0) return count
+              }
+            }
+          }
+          return count
+        })
+      }
+
+      // 디버그: 5초 후에도 이미지가 0개면 팝업 구조 출력
+      if (!debugLogged && Date.now() - startTime > 5000 && uploadedCount === 0) {
+        debugLogged = true
+        console.warn('[밴드자동화] 5초 경과, 이미지 0개 - 팝업 구조 디버그 출력')
+        await page.evaluate(() => {
+          const popups = document.querySelectorAll('[role="dialog"], .uLayer, [class*="layer"], [class*="Layer"], [class*="popup"], [class*="Popup"]')
+          console.log(`[DEBUG] 팝업 요소 ${popups.length}개 발견`)
+          popups.forEach((p, i) => {
+            const style = window.getComputedStyle(p)
+            if (style.display !== 'none') {
+              const imgs = p.querySelectorAll('img')
+              console.log(`[DEBUG] 팝업${i}: ${p.className.substring(0, 60)}, 이미지: ${imgs.length}개`)
+              imgs.forEach((img, j) => {
+                console.log(`[DEBUG]   img${j}: src=${img.src?.substring(0, 80)}...`)
+              })
+            }
+          })
+        })
       }
 
       // 진행 상태 추적 - 이미지 수 증가 또는 로딩 중이면 시간 갱신
@@ -1389,30 +1507,39 @@ export class BandPostAutomation {
           console.log(`[밴드자동화] 팝업 내 ${uploadedCount}개 이미지 업로드 완료, 첨부하기 버튼 찾는 중...`)
         }
 
-        // "첨부하기" 버튼 찾기
-        const attachButtonSelector = 'button.uButton.-confirm._submitBtn'
-        const buttons = await page.$$(attachButtonSelector)
+        // "첨부하기" 버튼 찾기 (팝업 내에서 우선 검색)
+        const attachButtonSelectors = [
+          '[data-viewname="DPhotoUploadLayoutView"] button.uButton.-confirm._submitBtn',
+          '[data-viewname*="Attach"] button.uButton.-confirm._submitBtn',
+          '[role="dialog"] button.uButton.-confirm._submitBtn',
+          '.uLayer button.uButton.-confirm._submitBtn',
+          'button.uButton.-confirm._submitBtn', // 폴백
+        ]
 
-        for (const btn of buttons) {
-          try {
-            const buttonText = (await btn.textContent())?.trim() || ''
+        for (const selector of attachButtonSelectors) {
+          const buttons = await page.$$(selector)
 
-            // "게시" 버튼이면 스킵
-            if (FORBIDDEN_TEXTS.some(t => buttonText.toLowerCase().includes(t.toLowerCase()))) {
-              continue
-            }
+          for (const btn of buttons) {
+            try {
+              const buttonText = (await btn.textContent())?.trim() || ''
 
-            // "첨부하기" 텍스트인 버튼만 클릭
-            if (buttonText === '첨부하기' || buttonText.includes('첨부하기')) {
-              const isVisible = await btn.isVisible()
-              if (isVisible) {
-                console.log(`[밴드자동화] 첨부하기 버튼 클릭: "${buttonText}"`)
-                await btn.click()
-                await page.waitForTimeout(1500)
-                return
+              // "게시" 버튼이면 스킵
+              if (FORBIDDEN_TEXTS.some(t => buttonText.toLowerCase().includes(t.toLowerCase()))) {
+                continue
               }
-            }
-          } catch { /* 무시 */ }
+
+              // "첨부하기" 텍스트인 버튼만 클릭
+              if (buttonText === '첨부하기' || buttonText.includes('첨부하기')) {
+                const isVisible = await btn.isVisible()
+                if (isVisible) {
+                  console.log(`[밴드자동화] 첨부하기 버튼 클릭: "${buttonText}" (${selector})`)
+                  await btn.click()
+                  await page.waitForTimeout(1500)
+                  return
+                }
+              }
+            } catch { /* 무시 */ }
+          }
         }
       }
 
@@ -2583,7 +2710,8 @@ export class BandPostAutomation {
 
     // 4. 글쓰기 영역 클릭
     const writeAreaSelectors = [
-      // 글쓰기 버튼 (레이어 팝업 열기)
+      // 글쓰기 버튼 (정확한 셀렉터 우선)
+      'button.uButton._btnPostWrite',
       'button._btnOpenWriteLayer',
       'button._btnPostWrite',
       // 가짜 에디터 내부의 클릭 영역

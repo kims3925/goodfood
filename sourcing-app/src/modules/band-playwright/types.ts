@@ -21,6 +21,8 @@ export interface BandPublishParams {
   imageUrls: string[]   // 상품 이미지 URL 목록
   /** 단계별 진행 콜백 (실시간 상태 업데이트용) */
   onStageProgress?: BandStageProgressCallback
+  /** 취소 신호 (발행 중단용) */
+  signal?: AbortSignal
 }
 
 export interface BandPublishResult {

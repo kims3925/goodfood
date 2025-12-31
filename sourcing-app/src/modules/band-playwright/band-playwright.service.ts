@@ -25,7 +25,16 @@ export class BandPlaywrightService {
     params: BandPublishParams,
     retryCount: number = 0
   ): Promise<BandPublishResult> {
-    const { channelId, bandKey, content, imageUrls } = params
+    const { channelId, bandKey, content, imageUrls, signal } = params
+
+    // 취소 신호 확인
+    if (signal?.aborted) {
+      console.log(`[BandPlaywrightService] 발행 취소됨 (시작 전)`)
+      return {
+        success: false,
+        error: '발행이 취소되었습니다.',
+      }
+    }
 
     console.log(`[BandPlaywrightService] Publishing to band ${bandKey} with ${imageUrls.length} images`)
 
@@ -37,6 +46,15 @@ export class BandPlaywrightService {
         return {
           success: false,
           error: '세션을 획득할 수 없습니다. 채널 설정에서 쿠키를 등록해주세요.',
+        }
+      }
+
+      // 취소 신호 확인
+      if (signal?.aborted) {
+        console.log(`[BandPlaywrightService] 발행 취소됨 (세션 확보 후)`)
+        return {
+          success: false,
+          error: '발행이 취소되었습니다.',
         }
       }
 

@@ -736,10 +736,22 @@ export class PublishService {
   async publishToChannelWithProgress(
     params: PublishToChannelParams & {
       onStageProgress?: PublishStageCallback
+      signal?: AbortSignal // 취소 신호
     },
     retryCount: number = 0
   ): Promise<PublishToChannelResult> {
-    const { userId, productId, channelId, onStageProgress } = params
+    const { userId, productId, channelId, onStageProgress, signal } = params
+
+    // 취소 신호 확인
+    if (signal?.aborted) {
+      console.log(`[PublishService] 발행 취소됨 (상품 ${productId} 시작 전)`)
+      return {
+        success: false,
+        productId,
+        channelId,
+        error: '발행이 취소되었습니다.',
+      }
+    }
 
     try {
       // 1. 채널 정보 조회
@@ -934,6 +946,17 @@ export class PublishService {
             await delay(IMAGE_UPLOAD_RETRY_DELAY_MS)
           }
 
+          // 취소 신호 확인
+          if (signal?.aborted) {
+            console.log(`[PublishService] Playwright 발행 취소됨 (시도 ${attempt + 1} 전)`)
+            return {
+              success: false,
+              productId,
+              channelId,
+              error: '발행이 취소되었습니다.',
+            }
+          }
+
           console.log(`[PublishService] Playwright 발행 시도 ${attempt + 1}/${MAX_IMAGE_UPLOAD_RETRIES + 1} (${imageUrls.length}개 이미지) - 진행률 추적`)
 
           const playwrightResult = await bandPlaywrightService.publishWithImages({
@@ -942,6 +965,7 @@ export class PublishService {
             bandName: channel.name,
             content: postContent,
             imageUrls,
+            signal, // 취소 신호 전달
             // 진행률 콜백 전달
             onStageProgress: onStageProgress
               ? (progress) => onStageProgress({
@@ -1243,6 +1267,7 @@ export class PublishService {
         userId,
         productId,
         channelId,
+        signal, // 취소 신호 전달
         onStageProgress: async (progress) => {
           // 콜백에서 이벤트 큐에 추가
           eventQueue.push({
