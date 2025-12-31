@@ -41,7 +41,7 @@
 
 ## 디렉토리 구조
 
-```
+```text
 bandauto/
 ├── db/                           # 공유 Prisma 패키지 (@bandauto/db)
 │   ├── prisma/
@@ -117,7 +117,7 @@ bandauto/
 
 sourcing-app의 modules 폴더는 DDD 패턴을 따릅니다:
 
-```
+```text
 modules/{feature}/
 ├── domain/
 │   └── src/
@@ -152,7 +152,7 @@ modules/{feature}/
 
 ### 폴더 구조 예시
 
-```
+```text
 app/(admin)/sourcing/
 ├── channels/
 │   ├── wholesale/
@@ -221,7 +221,7 @@ import type { Product } from '@/types/product.types'
 
 ## 레이어 의존성
 
-```
+```text
 ┌─────────────────┐
 │   app/pages     │  ← UI Layer
 ├─────────────────┤
@@ -245,7 +245,7 @@ import type { Product } from '@/types/product.types'
 
 ## Prisma 스키마 구조
 
-```
+```text
 db/prisma/
 ├── schema.prisma                 # generator, datasource, enum 정의
 └── models/

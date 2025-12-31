@@ -30,13 +30,13 @@
 
 ### CI Pipeline (ci-Jenkinsfile)
 
-```
+```text
 Push → Install → Prisma Generate → Build (parallel) → Success
 ```
 
 ### CD Pipeline (cd-Jenkinsfile)
 
-```
+```text
 Checkout → Install → Prisma Generate → Build → Deploy
 ```
 

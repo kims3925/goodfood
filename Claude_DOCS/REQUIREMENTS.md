@@ -6,7 +6,7 @@
 
 ## REQ-ID 규칙
 
-```
+```text
 REQ-{CATEGORY}-{NUMBER}
 ```
 

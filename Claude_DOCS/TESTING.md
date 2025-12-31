@@ -89,7 +89,7 @@ npm install -D @playwright/test
 
 ## 네이밍 규칙
 
-```
+```text
 {테스트대상}_{시나리오}_{기대결과}
 ```
 
@@ -102,7 +102,7 @@ npm install -D @playwright/test
 
 ## 테스트 구조 (AAA)
 
-```
+```text
 Arrange (준비) → Act (실행) → Assert (검증)
 ```
 

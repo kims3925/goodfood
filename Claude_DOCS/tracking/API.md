@@ -6,7 +6,7 @@
 
 ## Next.js API Routes 구조
 
-```
+```text
 app/api/
 ├── auth/                    # NextAuth.js 인증
 │   └── [...nextauth]/

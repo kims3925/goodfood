@@ -6,7 +6,7 @@
 
 ## TR-ID 규칙
 
-```
+```text
 TR-{YYYYMMDD}-{NUMBER}
 ```
 

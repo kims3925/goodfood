@@ -8,7 +8,7 @@
 
 ### 전체 파이프라인
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        SOURCING FLOW                                 │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -51,7 +51,7 @@
 
 ### 데이터 흐름
 
-```
+```text
 도매밴드 (Band Open API)
         │
         ▼
@@ -94,7 +94,7 @@
 
 ### AI 변환 프로세스
 
-```
+```text
 CollectedPost (원본 게시물)
         │
         ▼
@@ -125,7 +125,7 @@ CollectedPost (원본 게시물)
 
 ### 가격 계산 (PricingPolicy)
 
-```
+```text
 소매가 = 도매가 × 마진율 + 기본마진
 배송비 = 정책에 따른 배송비 계산
 ```
@@ -143,7 +143,7 @@ CollectedPost (원본 게시물)
 
 ### 데이터 흐름
 
-```
+```text
 Product (변환된 상품)
         │
         ▼
@@ -181,7 +181,7 @@ Product (변환된 상품)
 
 ### 상태 전이
 
-```
+```text
 PENDING ──(결제완료)─→ PAID ──(상품준비)─→ PREPARING
     │                    │                     │
     │                    │                     ▼
@@ -195,7 +195,7 @@ PENDING ──(결제완료)─→ PAID ──(상품준비)─→ PREPARING
 
 ### 주문 생성 흐름
 
-```
+```text
 Cart (장바구니)
         │
         ▼
@@ -239,7 +239,7 @@ Cart (장바구니)
 
 ### Toss Payments 연동
 
-```
+```text
 1. 결제 요청 (클라이언트)
    → tossPayments.requestPayment()
 
@@ -271,7 +271,7 @@ Cart (장바구니)
 
 ### 파이프라인 구성
 
-```
+```text
 AutomationConfig
         │
         ├── channelIds (도매채널 목록)
@@ -284,7 +284,7 @@ AutomationConfig
 
 ### 실행 로그
 
-```
+```text
 WorkflowLog
 ├── workflowType: FULL_PIPELINE
 ├── triggerType: SCHEDULED | MANUAL
@@ -346,7 +346,7 @@ WorkflowLog
 
 ### 알림 저장
 
-```
+```text
 Notification
 ├── userId
 ├── shopId (shop 알림인 경우)

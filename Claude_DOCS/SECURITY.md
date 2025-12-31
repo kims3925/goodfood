@@ -214,7 +214,7 @@ const user = await prisma.$queryRawUnsafe(
 
 ### .gitignore 설정
 
-```
+```text
 .env
 .env.*
 *.local

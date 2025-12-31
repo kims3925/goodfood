@@ -33,7 +33,7 @@
 
 ### sourcing-app (포트 3001)
 
-```
+```text
 src/
 ├── app/
 │   ├── (admin)/              # 인증 필요 라우트
@@ -60,7 +60,7 @@ src/
 
 ### shop-app (포트 3000)
 
-```
+```text
 src/
 ├── app/
 │   ├── (shop)/               # 쇼핑몰 라우트
@@ -311,7 +311,7 @@ setSettings(prev => ({
 
 ### 공통 컬러 팔레트
 
-```
+```text
 primary: blue-600
 secondary: gray-600
 success: green-600

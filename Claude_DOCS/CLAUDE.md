@@ -50,7 +50,7 @@
 
 ## 핵심 원칙 (반드시 준수)
 
-```
+```text
 1. 문서 먼저 → 코드 나중
 2. Soft Delete 기본 (Hard Delete 금지)
 3. 트랜잭션 없이 다중 테이블 변경 금지
@@ -102,7 +102,7 @@ npx prisma studio --schema prisma
 
 ## 추적 워크플로우 (필수)
 
-```
+```text
 1. REQUIREMENTS.md에서 REQ-ID 확인/생성
        ↓
 2. 구현 시작 → tracking/CHANGELOG.md에 TR-ID 생성 (REQ-ID 참조)
@@ -149,7 +149,7 @@ npx prisma studio --schema prisma
 
 ### 커밋 메시지 형식
 
-```
+```text
 type(scope): 한 줄 요약
 
 type: feat, fix, refactor, perf, test, docs, chore
