@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, memo } from 'react'
+import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check, AlertCircle, Info, Wifi, WifiOff, RefreshCw } from 'lucide-react'
 import { AppSection, getDefaultPathBySection } from '@/config/navigation'
@@ -163,6 +163,17 @@ const SessionIndicator = memo(function SessionIndicator() {
               </div>
             </div>
           )}
+          {/* 미설정 채널이 있을 때 확장프로그램 안내 */}
+          {summary && summary.none > 0 && (
+            <div className="mt-2 pt-2 border-t border-gray-100">
+              <div className="flex items-start gap-1.5 text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
+                <span>
+                  미설정 채널은 <strong>Chrome 확장프로그램</strong>을 통해 세션을 수집해주세요.
+                </span>
+              </div>
+            </div>
+          )}
           {lastChecked && (
             <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-400">
               마지막 확인: {lastChecked.toLocaleTimeString()}
@@ -204,7 +215,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
   })
 
   // 알림 데이터 로드 (현재 섹션에 따라, 읽지 않은 알림만)
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     try {
       setNotificationLoading(true)
       const response = await fetch(`/api/admin/notifications?section=${currentSection}&limit=10&isRead=false`)
@@ -218,7 +229,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
     } finally {
       setNotificationLoading(false)
     }
-  }
+  }, [currentSection])
 
   // 알림 읽음 처리
   const handleMarkAsRead = async (ids: number[]) => {
@@ -261,8 +272,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
       const notificationInterval = setInterval(loadNotifications, 30000)
       return () => clearInterval(notificationInterval)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, currentSection])
+  }, [user, loadNotifications])
 
   // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {

@@ -68,10 +68,28 @@ pipeline {
 
                     echo "=== Starting deployment ==="
 
+                    # Backup .env files before git reset
+                    echo ">>> Backing up .env files..."
+                    [ -f .env ] && cp .env /tmp/.env.backup || true
+                    [ -f db/.env ] && cp db/.env /tmp/.env.db.backup || true
+                    [ -f shop-app/.env ] && cp shop-app/.env /tmp/.env.shop.backup || true
+                    [ -f shop-app/.env.local ] && cp shop-app/.env.local /tmp/.env.shop.local.backup || true
+                    [ -f sourcing-app/.env ] && cp sourcing-app/.env /tmp/.env.sourcing.backup || true
+                    [ -f sourcing-app/.env.local ] && cp sourcing-app/.env.local /tmp/.env.sourcing.local.backup || true
+
                     # Git pull
                     echo ">>> Pulling latest code..."
                     git fetch origin main
                     git reset --hard origin/main
+
+                    # Restore .env files after git reset
+                    echo ">>> Restoring .env files..."
+                    [ -f /tmp/.env.backup ] && cp /tmp/.env.backup .env || true
+                    [ -f /tmp/.env.db.backup ] && cp /tmp/.env.db.backup db/.env || true
+                    [ -f /tmp/.env.shop.backup ] && cp /tmp/.env.shop.backup shop-app/.env || true
+                    [ -f /tmp/.env.shop.local.backup ] && cp /tmp/.env.shop.local.backup shop-app/.env.local || true
+                    [ -f /tmp/.env.sourcing.backup ] && cp /tmp/.env.sourcing.backup sourcing-app/.env || true
+                    [ -f /tmp/.env.sourcing.local.backup ] && cp /tmp/.env.sourcing.local.backup sourcing-app/.env.local || true
 
                     # =============================================
                     # node_modules 자동 복구 로직
@@ -137,10 +155,25 @@ pipeline {
                     npx prisma generate --schema prisma
                     cd ..
 
-                    # Clean Next.js cache before build
-                    echo ">>> Cleaning Next.js cache..."
-                    rm -rf shop-app/.next/cache
-                    rm -rf sourcing-app/.next/cache
+                    # Stop specific PM2 processes before cleaning (파일 잠금 해제)
+                    echo ">>> Stopping PM2 processes for clean build..."
+                    sudo -u ubuntu pm2 stop shop-app sourcing-app shop sourcing 2>/dev/null || true
+
+                    # Verify processes are stopped (최대 10초 대기)
+                    for i in {1..5}; do
+                        if ! sudo -u ubuntu pm2 list | grep -E 'shop|sourcing' | grep -q 'online'; then
+                            echo ">>> All target processes stopped"
+                            break
+                        fi
+                        echo ">>> Waiting for processes to stop... ($i/5)"
+                        sleep 2
+                    done
+
+                    # Clean npm cache and Next.js cache
+                    echo ">>> Cleaning caches..."
+                    npm cache clean --force || true
+                    rm -rf shop-app/.next
+                    rm -rf sourcing-app/.next
 
                     # Build applications (with retry on failure)
                     echo ">>> Building applications..."
