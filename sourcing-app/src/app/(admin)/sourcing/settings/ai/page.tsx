@@ -38,14 +38,14 @@ export default function AISettingsPage() {
       const data = await response.json()
 
       if (data.success && data.settings) {
-        setSettings({
-          ...settings,
+        setSettings(prev => ({
+          ...prev,
           geminiApiKey: data.settings.gemini?.apiKey || '',
           openaiApiKey: data.settings.openai?.apiKey || '',
           geminiModel: data.settings.gemini?.model || 'gemini-2.5-flash',
           openaiModel: data.settings.openai?.model || 'gpt-4.1-mini',
           temperature: data.settings.gemini?.temperature || 0.7,
-        })
+        }))
       }
     } catch (error) {
       console.error('설정 로드 실패:', error)

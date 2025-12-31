@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, memo } from 'react'
+import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check, AlertCircle, Info, Wifi, WifiOff, RefreshCw } from 'lucide-react'
 import { AppSection, getDefaultPathBySection } from '@/config/navigation'
@@ -204,7 +204,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
   })
 
   // 알림 데이터 로드 (현재 섹션에 따라, 읽지 않은 알림만)
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     try {
       setNotificationLoading(true)
       const response = await fetch(`/api/admin/notifications?section=${currentSection}&limit=10&isRead=false`)
@@ -218,7 +218,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
     } finally {
       setNotificationLoading(false)
     }
-  }
+  }, [currentSection])
 
   // 알림 읽음 처리
   const handleMarkAsRead = async (ids: number[]) => {
@@ -261,8 +261,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
       const notificationInterval = setInterval(loadNotifications, 30000)
       return () => clearInterval(notificationInterval)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, currentSection])
+  }, [user, loadNotifications])
 
   // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
