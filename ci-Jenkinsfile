@@ -106,7 +106,8 @@ stage('Debug') {
   post {
     always {
       junit allowEmptyResults: true, testResults: '**/junit.xml'
-      archiveArtifacts artifacts: '.next/**', allowEmptyArchive: true
+      // .next 폴더는 shop-app, sourcing-app 하위에 있음
+      archiveArtifacts artifacts: '*-app/.next/**', allowEmptyArchive: true
     }
   }
 }
