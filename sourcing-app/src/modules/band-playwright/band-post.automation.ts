@@ -1346,6 +1346,11 @@ export class BandPostAutomation {
 
     // 팝업 내 업로드 진행 상태 확인 (로딩 인디케이터)
     const popupLoadingSelectors = [
+      // Band 실제 로딩 인디케이터 (최우선)
+      '[data-viewname="DPhotoUploadLayoutView"] .uLoading',
+      '[data-viewname="DPhotoUploadLayoutView"] p.uLoading',
+      '[data-viewname="DPhotoUploadItemView"] .uLoading',
+      // 기타 로딩 인디케이터
       '[role="dialog"] .uploading',
       '[role="dialog"] .loading',
       '[role="dialog"] [class*="progress"]',
@@ -1354,6 +1359,7 @@ export class BandPostAutomation {
       '.uLayer .uploading',
       '.uLayer .loading',
       '.uLayer .spinner',
+      '.uLayer .uLoading',
       // 업로드 진행 바
       '.photoUploadLayer [class*="progress"]',
       '.photoUploadLayer .loading',
@@ -1368,6 +1374,12 @@ export class BandPostAutomation {
       '[data-viewname="DPhotoUploadLayoutView"] .mediaListItem img',
       '[data-viewname="DPhotoUploadLayoutView"] img[src*="phinf"]',
       '[data-viewname="DPhotoUploadLayoutView"] img[src*="blob:"]',
+      // lyWrap 클래스 (layer_wrap) 팝업 구조
+      '.lyWrap[data-viewname="DPhotoUploadLayoutView"] img._thumbImg',
+      '.lyWrap.layer_wrap img._thumbImg',
+      '.layer_wrap img._thumbImg',
+      'section.lyWrap img._thumbImg',
+      // Attach 관련
       '[data-viewname*="Attach"] img[src*="phinf"]',
       '[data-viewname*="Attach"] img[src*="blob:"]',
       // role="dialog" 팝업
@@ -1385,6 +1397,8 @@ export class BandPostAutomation {
       // 사진 올리기 레이어
       '.photoUploadLayer .thumbItem',
       '.photoUploadLayer img',
+      // 일반적인 이미지 (최후 폴백)
+      'img._thumbImg',
     ]
 
     let uploadedCount = 0
@@ -1393,53 +1407,128 @@ export class BandPostAutomation {
     let debugLogged = false
 
     while (Date.now() - startTime < maxWaitTime) {
-      // 로딩 중인지 확인
+      // 로딩 중인지 확인 (uLoading의 display 속성 체크)
       let isLoading = false
-      for (const selector of popupLoadingSelectors) {
-        try {
-          const loadingEl = await page.$(selector)
-          if (loadingEl && await loadingEl.isVisible()) {
-            isLoading = true
-            break
+      let loadingFoundBy = ''
+
+      // 먼저 Band의 uLoading 요소를 JavaScript로 직접 체크 (display: none이 아닌 경우 로딩 중)
+      const uLoadingVisible = await page.evaluate(() => {
+        const loadings = document.querySelectorAll('[data-viewname="DPhotoUploadLayoutView"] .uLoading')
+        for (const el of loadings) {
+          const style = window.getComputedStyle(el)
+          if (style.display !== 'none') {
+            return true
           }
-        } catch { /* 무시 */ }
+        }
+        return false
+      })
+
+      if (uLoadingVisible) {
+        isLoading = true
+        loadingFoundBy = 'uLoading (display:block)'
+      }
+
+      // 폴백: 다른 로딩 인디케이터 확인
+      if (!isLoading) {
+        for (const selector of popupLoadingSelectors) {
+          try {
+            const loadingEl = await page.$(selector)
+            if (loadingEl && await loadingEl.isVisible()) {
+              isLoading = true
+              loadingFoundBy = selector
+              break
+            }
+          } catch { /* 무시 */ }
+        }
+      }
+
+      // 첫 3초 동안 로딩 상태 로그
+      if (Date.now() - startTime < 3000 && isLoading) {
+        console.log(`[밴드자동화] 업로드 진행 중: ${loadingFoundBy}`)
       }
 
       // 업로드된 이미지 수 확인 (여러 셀렉터 시도)
       uploadedCount = 0
+      let foundSelector = ''
       for (const selector of popupImageSelectors) {
         try {
           const images = await page.$$(selector)
           if (images.length > 0) {
             uploadedCount = images.length
+            foundSelector = selector
             break
           }
         } catch { /* 무시 */ }
       }
 
-      // 셀렉터로 못 찾으면 JavaScript로 직접 찾기
+      // 첫 3초 동안만 매 체크마다 로그 출력 (디버깅용)
+      if (Date.now() - startTime < 3000) {
+        if (foundSelector) {
+          console.log(`[밴드자동화] 이미지 감지: ${uploadedCount}개 (${foundSelector})`)
+        }
+      }
+
+      // 셀렉터로 못 찾으면 JavaScript로 직접 찾기 (업로드 완료된 이미지만 카운트)
       if (uploadedCount === 0) {
-        uploadedCount = await page.evaluate(() => {
-          // 1. DPhotoUploadItemView로 직접 카운트 (가장 정확)
+        const jsResult = await page.evaluate(() => {
+          const result = { count: 0, method: '', details: '' }
+
+          // 1. DPhotoUploadItemView에서 업로드 완료된 이미지만 카운트
+          // 조건: img._thumbImg가 존재하고, 해당 아이템의 .uLoading이 display:none
           const uploadItems = document.querySelectorAll('[data-viewname="DPhotoUploadLayoutView"] [data-viewname="DPhotoUploadItemView"]')
           if (uploadItems.length > 0) {
-            return uploadItems.length
+            let completedCount = 0
+            for (const item of uploadItems) {
+              const thumb = item.querySelector('img._thumbImg') as HTMLImageElement | null
+              const loading = item.querySelector('.uLoading')
+              const loadingStyle = loading ? window.getComputedStyle(loading) : null
+
+              // 썸네일이 있고 로딩이 없거나 로딩이 숨겨진 경우
+              if (thumb && thumb.src && thumb.src.length > 10) {
+                if (!loading || loadingStyle?.display === 'none') {
+                  completedCount++
+                }
+              }
+            }
+            if (completedCount > 0) {
+              result.count = completedCount
+              result.method = 'DPhotoUploadItemView (완료된 것만)'
+              result.details = `총 ${uploadItems.length}개 중 ${completedCount}개 완료`
+              return result
+            }
+            // 완료된 게 없으면 전체 개수 반환 (아직 로딩 중)
+            result.count = uploadItems.length
+            result.method = 'DPhotoUploadItemView (전체)'
+            return result
           }
 
           // 2. img._thumbImg로 카운트
           const thumbImgs = document.querySelectorAll('[data-viewname="DPhotoUploadLayoutView"] img._thumbImg')
           if (thumbImgs.length > 0) {
-            return thumbImgs.length
+            result.count = thumbImgs.length
+            result.method = 'img._thumbImg'
+            return result
           }
 
-          // 3. 폴백: 다른 팝업 구조에서 찾기
+          // 3. layer_wrap 클래스를 가진 팝업 내 이미지 찾기
+          const layerWrap = document.querySelector('.layer_wrap[data-viewname="DPhotoUploadLayoutView"]')
+          if (layerWrap) {
+            const imgs = layerWrap.querySelectorAll('img[src*="phinf"], img[src*="blob:"]')
+            if (imgs.length > 0) {
+              result.count = imgs.length
+              result.method = 'layer_wrap 내 이미지'
+              return result
+            }
+          }
+
+          // 4. 폴백: 다른 팝업 구조에서 찾기
           const popupSelectors = [
             '[data-viewname*="Attach"]',
             '[role="dialog"]',
             '.uLayer',
+            '.lyWrap',
           ]
 
-          let count = 0
           for (const selector of popupSelectors) {
             const containers = document.querySelectorAll(selector)
             for (const container of containers) {
@@ -1449,6 +1538,7 @@ export class BandPostAutomation {
                 if (rect.width < 200 || rect.height < 200) continue
 
                 const imgs = container.querySelectorAll('img')
+                let count = 0
                 for (const img of imgs) {
                   const src = img.src || ''
                   if (src.includes('phinf') || src.startsWith('blob:')) {
@@ -1458,32 +1548,75 @@ export class BandPostAutomation {
                     }
                   }
                 }
-                if (count > 0) return count
+                if (count > 0) {
+                  result.count = count
+                  result.method = `폴백: ${selector}`
+                  return result
+                }
               }
             }
           }
-          return count
+          return result
         })
+
+        if (jsResult.count > 0) {
+          uploadedCount = jsResult.count
+          if (Date.now() - startTime < 3000) {
+            console.log(`[밴드자동화] JS 이미지 감지: ${jsResult.count}개 (${jsResult.method}) ${jsResult.details || ''}`)
+          }
+        }
       }
 
-      // 디버그: 5초 후에도 이미지가 0개면 팝업 구조 출력
+      // 디버그: 5초 후에도 이미지가 0개면 팝업 구조 출력 (터미널에 표시되도록 결과 반환)
       if (!debugLogged && Date.now() - startTime > 5000 && uploadedCount === 0) {
         debugLogged = true
         console.warn('[밴드자동화] 5초 경과, 이미지 0개 - 팝업 구조 디버그 출력')
-        await page.evaluate(() => {
-          const popups = document.querySelectorAll('[role="dialog"], .uLayer, [class*="layer"], [class*="Layer"], [class*="popup"], [class*="Popup"]')
-          console.log(`[DEBUG] 팝업 요소 ${popups.length}개 발견`)
+
+        const debugInfo = await page.evaluate(() => {
+          const results: string[] = []
+
+          // DPhotoUploadLayoutView 직접 확인
+          const photoUpload = document.querySelector('[data-viewname="DPhotoUploadLayoutView"]')
+          if (photoUpload) {
+            results.push(`[DEBUG] DPhotoUploadLayoutView 발견: ${photoUpload.className}`)
+            const items = photoUpload.querySelectorAll('[data-viewname="DPhotoUploadItemView"]')
+            results.push(`[DEBUG] DPhotoUploadItemView 개수: ${items.length}`)
+            const thumbImgs = photoUpload.querySelectorAll('img._thumbImg')
+            results.push(`[DEBUG] img._thumbImg 개수: ${thumbImgs.length}`)
+            const allImgs = photoUpload.querySelectorAll('img')
+            results.push(`[DEBUG] 전체 img 개수: ${allImgs.length}`)
+            allImgs.forEach((img, i) => {
+              results.push(`[DEBUG]   img${i}: class="${img.className}", src=${img.src?.substring(0, 60)}...`)
+            })
+            // 로딩 인디케이터 확인
+            const loadings = photoUpload.querySelectorAll('.uLoading')
+            loadings.forEach((loading, i) => {
+              const style = window.getComputedStyle(loading)
+              results.push(`[DEBUG]   loading${i}: display=${style.display}`)
+            })
+          } else {
+            results.push('[DEBUG] DPhotoUploadLayoutView 없음!')
+          }
+
+          // 다른 팝업 요소들
+          const popups = document.querySelectorAll('[role="dialog"], .uLayer, [class*="layer"], [class*="Layer"]')
+          results.push(`[DEBUG] 기타 팝업 요소 ${popups.length}개`)
           popups.forEach((p, i) => {
             const style = window.getComputedStyle(p)
             if (style.display !== 'none') {
-              const imgs = p.querySelectorAll('img')
-              console.log(`[DEBUG] 팝업${i}: ${p.className.substring(0, 60)}, 이미지: ${imgs.length}개`)
-              imgs.forEach((img, j) => {
-                console.log(`[DEBUG]   img${j}: src=${img.src?.substring(0, 80)}...`)
-              })
+              const rect = (p as HTMLElement).getBoundingClientRect()
+              if (rect.width > 100 && rect.height > 100) {
+                const imgs = p.querySelectorAll('img')
+                results.push(`[DEBUG] 팝업${i}: ${p.className.substring(0, 40)}, size=${rect.width}x${rect.height}, imgs=${imgs.length}`)
+              }
             }
           })
+
+          return results
         })
+
+        // 터미널에 출력
+        debugInfo.forEach(line => console.log(line))
       }
 
       // 진행 상태 추적 - 이미지 수 증가 또는 로딩 중이면 시간 갱신
@@ -1510,13 +1643,19 @@ export class BandPostAutomation {
         // "첨부하기" 버튼 찾기 (팝업 내에서 우선 검색)
         const attachButtonSelectors = [
           '[data-viewname="DPhotoUploadLayoutView"] button.uButton.-confirm._submitBtn',
+          '.lyWrap[data-viewname="DPhotoUploadLayoutView"] button._submitBtn',
+          'section.lyWrap button.uButton.-confirm._submitBtn',
+          '.layer_wrap button.uButton.-confirm._submitBtn',
           '[data-viewname*="Attach"] button.uButton.-confirm._submitBtn',
           '[role="dialog"] button.uButton.-confirm._submitBtn',
           '.uLayer button.uButton.-confirm._submitBtn',
           'button.uButton.-confirm._submitBtn', // 폴백
         ]
 
+        let buttonClicked = false
+
         for (const selector of attachButtonSelectors) {
+          if (buttonClicked) break
           const buttons = await page.$$(selector)
 
           for (const btn of buttons) {
@@ -1534,11 +1673,49 @@ export class BandPostAutomation {
                 if (isVisible) {
                   console.log(`[밴드자동화] 첨부하기 버튼 클릭: "${buttonText}" (${selector})`)
                   await btn.click()
-                  await page.waitForTimeout(1500)
+                  buttonClicked = true
+                  await page.waitForTimeout(1000)
+
+                  // 팝업이 닫혔는지 확인
+                  const popupStillOpen = await page.$('[data-viewname="DPhotoUploadLayoutView"]')
+                  if (popupStillOpen && await popupStillOpen.isVisible()) {
+                    console.log('[밴드자동화] 첨부하기 클릭 후에도 팝업이 열려있음, 재클릭 시도...')
+                    await btn.click()
+                    await page.waitForTimeout(500)
+                  }
                   return
                 }
               }
             } catch { /* 무시 */ }
+          }
+        }
+
+        // 셀렉터로 못 찾으면 JavaScript로 직접 찾기
+        if (!buttonClicked) {
+          console.log('[밴드자동화] 셀렉터로 첨부하기 버튼 못 찾음, JavaScript로 검색...')
+          const jsClicked = await page.evaluate(() => {
+            const buttons = document.querySelectorAll('button')
+            for (const btn of buttons) {
+              const text = btn.textContent?.trim() || ''
+              if (text === '첨부하기') {
+                const style = window.getComputedStyle(btn)
+                if (style.display !== 'none' && style.visibility !== 'hidden') {
+                  const rect = btn.getBoundingClientRect()
+                  if (rect.width > 0 && rect.height > 0) {
+                    console.log('[JS] 첨부하기 버튼 발견, 클릭')
+                    ;(btn as HTMLButtonElement).click()
+                    return true
+                  }
+                }
+              }
+            }
+            return false
+          })
+
+          if (jsClicked) {
+            console.log('[밴드자동화] JavaScript로 첨부하기 버튼 클릭 성공')
+            await page.waitForTimeout(1500)
+            return
           }
         }
       }
