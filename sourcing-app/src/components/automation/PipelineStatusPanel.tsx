@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Download, Sparkles, ShoppingBag, Upload, X, Check, Loader2, AlertCircle, Clock, RefreshCw } from 'lucide-react'
 import { checkExtensionInstalled, saveSessionViaExtension } from '@/lib/band-extension'
 
@@ -61,21 +61,8 @@ export default function PipelineStatusPanel({ workflow, onCancel, onResume, isCa
     checkExtensionInstalled().then(setExtensionAvailable)
   }, [])
 
-  // 세션 대기 상태 자동 복구
-  useEffect(() => {
-    if (
-      workflow.status === 'WAITING_SESSION' &&
-      extensionAvailable &&
-      !autoRecoveryAttemptedRef.current &&
-      !isAutoRecovering
-    ) {
-      autoRecoveryAttemptedRef.current = true
-      handleAutoRecovery()
-    }
-  }, [workflow.status, extensionAvailable])
-
-  // 자동 복구 핸들러
-  const handleAutoRecovery = async () => {
+  // 자동 복구 핸들러 (useCallback으로 메모이제이션)
+  const handleAutoRecovery = useCallback(async () => {
     setIsAutoRecovering(true)
     setRecoveryMessage('Extension에서 세션 저장 중...')
 
@@ -102,6 +89,7 @@ export default function PipelineStatusPanel({ workflow, onCancel, onResume, isCa
 
       if (!response.ok || result.waitingSession) {
         setRecoveryMessage(result.message || '재개 실패: 세션이 여전히 만료 상태입니다')
+        setIsAutoRecovering(false)
         return
       }
 
@@ -117,7 +105,20 @@ export default function PipelineStatusPanel({ workflow, onCancel, onResume, isCa
     } finally {
       setIsAutoRecovering(false)
     }
-  }
+  }, [onResume])
+
+  // 세션 대기 상태 자동 복구
+  useEffect(() => {
+    if (
+      workflow.status === 'WAITING_SESSION' &&
+      extensionAvailable &&
+      !autoRecoveryAttemptedRef.current &&
+      !isAutoRecovering
+    ) {
+      autoRecoveryAttemptedRef.current = true
+      handleAutoRecovery()
+    }
+  }, [workflow.status, extensionAvailable, isAutoRecovering, handleAutoRecovery])
 
   // 수동 재시도 핸들러
   const handleManualRetry = () => {

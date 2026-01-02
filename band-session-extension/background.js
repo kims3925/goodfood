@@ -11,8 +11,7 @@ try {
   importScripts('config.js');
 } catch (error) {
   console.error('[Band Session] config.js 로드 실패:', error.message);
-  console.error('[Band Session] Service Worker를 종료합니다. 확장 프로그램을 다시 설치해주세요.');
-  self.close();
+  console.error('[Band Session] 확장 프로그램을 다시 설치해주세요.');
   throw new Error('config.js 로드 실패 - Service Worker 종료');
 }
 
@@ -54,7 +53,7 @@ async function getBandCookies() {
     path: cookie.path || '/',
     expires: cookie.expirationDate || -1,
     httpOnly: cookie.httpOnly || false,
-    secure: cookie.secure || false,
+    secure: cookie.secure || true,
     sameSite: cookie.sameSite === 'no_restriction' ? 'None' :
               cookie.sameSite === 'lax' ? 'Lax' :
               cookie.sameSite === 'strict' ? 'Strict' : 'Lax'

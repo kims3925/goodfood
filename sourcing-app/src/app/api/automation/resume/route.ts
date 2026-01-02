@@ -64,7 +64,7 @@ interface WorkflowProgress {
     // 이전 진행 상황과 합산
     const totalSuccess = (currentProgress?.successCount || 0) + result.successCount
     const totalFailed = (currentProgress?.failedCount || 0) + result.failedCount
-    const totalItems = (currentProgress?.totalItems || 0)
+    const totalItems = (currentProgress?.totalItems || 0) + (result.successCount + result.failedCount + result.skippedCount)
 
     // 세션 만료 에러가 또 발생했는지 확인
     const SESSION_ERROR_KEYWORDS = ['세션', '만료', '없'] as const
