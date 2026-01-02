@@ -15,6 +15,7 @@ import {
   TOSS_ERROR_CODES,
   getErrorDetails,
 } from '@/modules/payments/constants/toss-error-codes'
+import { calculateItemPrice } from '@/lib/price-calculator'
 
 const Decimal = Prisma.Decimal
 
@@ -253,7 +254,22 @@ export async function POST(req: NextRequest) {
           const product = publishedProduct.product
           const variant = item.variant
           const mainVariant = product?.variants[0]
-          const unitPrice = variant?.price || mainVariant?.price || 0
+          const basePrice = variant?.price || mainVariant?.price || 0
+          const quantity = item.quantity
+
+          // 배송비 포함된 가격 계산
+          const shippingFee = product?.shippingFee || 0
+          const bundleMaxQty = product?.bundleMaxQty || 1
+          const bundleUnit = variant?.bundleUnit || 1
+
+          const priceResult = calculateItemPrice({
+            basePrice,
+            shippingFee,
+            quantity,
+            bundleMaxQty,
+            bundleUnit,
+            bundleShippingType: product?.bundleShippingType || null,
+          })
 
           return {
             publishedProductId: publishedProduct.id,
@@ -261,8 +277,9 @@ export async function POST(req: NextRequest) {
             productName: product?.name || '',
             optionSummary: variant?.optionSummary || null,
             thumbnailUrl: product?.thumbnailUrl || null,
-            quantity: item.quantity,
-            unitPrice: Number(unitPrice),
+            quantity,
+            unitPrice: priceResult.unitPrice, // 배송비 포함된 단가
+            itemTotal: priceResult.itemTotal, // 합배송 적용된 총액
             cartId: cart.id,
           }
         })
@@ -272,7 +289,7 @@ export async function POST(req: NextRequest) {
             where: { id: item.publishedProductId },
             include: {
               product: {
-                include: { variants: { take: 1 } },
+                include: { variants: true },
               },
             },
           })
@@ -294,7 +311,22 @@ export async function POST(req: NextRequest) {
 
           const product = publishedProduct.product
           const mainVariant = product?.variants[0]
-          const unitPrice = variant?.price || mainVariant?.price || 0
+          const basePrice = variant?.price || mainVariant?.price || 0
+          const quantity = item.quantity || 1
+
+          // 배송비 포함된 가격 계산
+          const shippingFee = product?.shippingFee || 0
+          const bundleMaxQty = product?.bundleMaxQty || 1
+          const bundleUnit = variant?.bundleUnit || 1
+
+          const priceResult = calculateItemPrice({
+            basePrice,
+            shippingFee,
+            quantity,
+            bundleMaxQty,
+            bundleUnit,
+            bundleShippingType: product?.bundleShippingType || null,
+          })
 
           orderItems.push({
             publishedProductId: publishedProduct.id,
@@ -302,19 +334,20 @@ export async function POST(req: NextRequest) {
             productName: product?.name || '',
             optionSummary: variant?.optionSummary || null,
             thumbnailUrl: product?.thumbnailUrl || null,
-            quantity: item.quantity || 1,
-            unitPrice: Number(unitPrice),
+            quantity,
+            unitPrice: priceResult.unitPrice, // 배송비 포함된 단가
+            itemTotal: priceResult.itemTotal, // 합배송 적용된 총액
           })
         }
       }
 
-      // 6. 금액 계산 및 검증
+      // 6. 금액 계산 및 검증 (itemTotal 사용)
       const subtotal = orderItems.reduce(
-        (sum, item) => sum + item.unitPrice * item.quantity,
+        (sum, item: any) => sum + (item.itemTotal ?? (item.unitPrice * item.quantity)),
         0
       )
 
-      // 배송비는 상품별 설정 또는 0원 처리
+      // 배송비는 이미 상품 가격에 포함됨
       const shippingFee = 0
 
       const totalAmount = subtotal + shippingFee
@@ -366,7 +399,7 @@ export async function POST(req: NextRequest) {
             totalAmount: new Decimal(totalAmount),
             paidAt: tossResult.status === 'WAITING_FOR_DEPOSIT' ? null : new Date(),
             items: {
-              create: orderItems.map((item) => ({
+              create: orderItems.map((item: any) => ({
                 publishedProductId: item.publishedProductId,
                 variantId: item.variantId,
                 productName: item.productName,
@@ -374,7 +407,8 @@ export async function POST(req: NextRequest) {
                 thumbnailUrl: item.thumbnailUrl,
                 quantity: item.quantity,
                 unitPrice: new Decimal(item.unitPrice),
-                totalPrice: new Decimal(item.unitPrice * item.quantity),
+                // itemTotal이 있으면 사용 (합배송 적용된 정확한 총액), 없으면 계산
+                totalPrice: new Decimal(item.itemTotal ?? (item.unitPrice * item.quantity)),
               })),
             },
             // 배송지 정보
