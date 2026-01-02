@@ -52,8 +52,8 @@ async function getBandCookies() {
     domain: cookie.domain,
     path: cookie.path || '/',
     expires: cookie.expirationDate || -1,
-    httpOnly: cookie.httpOnly || false,
-    secure: cookie.secure || true,
+    httpOnly: cookie.httpOnly ?? false,
+    secure: cookie.secure ?? true,
     sameSite: cookie.sameSite === 'no_restriction' ? 'None' :
               cookie.sameSite === 'lax' ? 'Lax' :
               cookie.sameSite === 'strict' ? 'Strict' : 'Lax'

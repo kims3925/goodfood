@@ -14,6 +14,7 @@ import {
 } from '@/modules/automation/workflow-service'
 import { publishService } from '@/modules/publish'
 import { WorkflowStatus } from '@bandauto/db'
+import { isSessionExpiredError } from '@/modules/automation/session-utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,10 +68,7 @@ interface WorkflowProgress {
     const totalItems = (currentProgress?.totalItems || 0) + (result.successCount + result.failedCount + result.skippedCount)
 
     // 세션 만료 에러가 또 발생했는지 확인
-    const SESSION_ERROR_KEYWORDS = ['세션', '만료', '없'] as const
-    const sessionExpiredError = result.errors.find(e =>
-      SESSION_ERROR_KEYWORDS.every(keyword => e.includes(keyword))
-    )
+    const sessionExpiredError = result.errors.find(e => isSessionExpiredError(e))
 
     if (sessionExpiredError) {
       // 또 세션 만료 - 다시 WAITING_SESSION 상태로

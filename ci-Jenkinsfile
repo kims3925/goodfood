@@ -33,6 +33,8 @@ pipeline {
     stage('Checkout') {
       when { environment name: 'SHOULD_BUILD', value: 'true' }
       steps {
+        // 이전 빌드 잔여물 정리 (권한 문제 방지)
+        sh 'rm -rf sourcing-app/.next shop-app/.next || true'
         checkout scm
       }
     }
