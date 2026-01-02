@@ -200,12 +200,12 @@ export default function ChannelDetailPage({
       } else {
         console.error('[ChannelPage] API 에러:', data.error)
         toast.error(data.error || '채널을 불러오는데 실패했습니다.')
-        router.push('/channel')
+        router.push('/sourcing/channel/list')
       }
     } catch (error) {
       console.error('[ChannelPage] 예외 발생:', error)
       toast.error('채널을 불러오는데 실패했습니다.')
-      router.push('/channel')
+      router.push('/sourcing/channel/list')
     } finally {
       setIsLoading(false)
     }
@@ -291,7 +291,7 @@ export default function ChannelDetailPage({
 
       if (data.success) {
         toast.success('채널이 삭제되었습니다.')
-        router.push('/channel')
+        router.push('/sourcing/channel/list')
       } else {
         toast.error(data.error || '채널 삭제에 실패했습니다.')
       }
