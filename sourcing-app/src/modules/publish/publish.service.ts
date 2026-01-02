@@ -1156,7 +1156,20 @@ export class PublishService {
       if (isQuotaError(error) && retryCount < MAX_QUOTA_RETRIES) {
         const delayMs = QUOTA_RETRY_BASE_DELAY_MS * Math.pow(2, retryCount)
         console.log(`[PublishService] 쿼터 에러 발생, ${delayMs / 1000}초 후 재시도 (${retryCount + 1}/${MAX_QUOTA_RETRIES})...`)
-        await delay(delayMs)
+        // 500ms 단위로 분할하여 취소 신호 확인
+        const chunks = Math.ceil(delayMs / 500)
+        for (let j = 0; j < chunks; j++) {
+          if (signal?.aborted) {
+            console.log(`[PublishService] 재시도 대기 중 취소됨`)
+            return {
+              success: false,
+              productId,
+              channelId,
+              error: '발행이 취소되었습니다.',
+            }
+          }
+          await delay(Math.min(500, delayMs - j * 500))
+        }
         return this.publishToChannelWithProgress({ userId, productId, channelId, onStageProgress, signal }, retryCount + 1)
       }
 
