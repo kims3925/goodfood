@@ -131,9 +131,6 @@ pipeline {
                     if [ "\$NEED_REINSTALL" = "true" ]; then
                         echo ">>> Cleaning and reinstalling dependencies..."
                         rm -rf node_modules
-                        sudo rm -rf .next || true
-                        sudo rm -rf shop-app/.next || true
-                        sudo rm -rf sourcing-app/.next || true
                         npm ci --legacy-peer-deps
 
                         # 체크섬 저장
@@ -169,25 +166,14 @@ pipeline {
                         sleep 2
                     done
 
-                    # Clean npm cache and Next.js cache
+                    # Clean npm cache (skip .next deletion due to permission issues)
                     echo ">>> Cleaning caches..."
                     npm cache clean --force || true
-                    sudo rm -rf shop-app/.next || true
-                    sudo rm -rf sourcing-app/.next || true
 
-                    # Build applications (with retry on failure)
+                    # Build applications
                     echo ">>> Building applications..."
-                    npm run build:shop || {
-                        echo ">>> shop-app build failed, retrying with clean cache..."
-                        sudo rm -rf shop-app/.next || true
-                        npm run build:shop
-                    }
-
-                    npm run build:sourcing || {
-                        echo ">>> sourcing-app build failed, retrying with clean cache..."
-                        sudo rm -rf sourcing-app/.next || true
-                        npm run build:sourcing
-                    }
+                    npm run build:shop
+                    npm run build:sourcing
 
                     # Restart PM2
                     echo ">>> Restarting PM2 processes..."
