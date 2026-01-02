@@ -4,6 +4,8 @@ pipeline {
   options {
     timestamps()
     disableConcurrentBuilds()
+    // 빌드 보존 정책: 최근 5개만 유지, 7일 이상 된 빌드 삭제
+    buildDiscarder(logRotator(numToKeepStr: '5', daysToKeepStr: '7'))
   }
 
   environment {
@@ -12,6 +14,19 @@ pipeline {
   }
 
   stages {
+    stage('Branch Filter') {
+      steps {
+        script {
+          // main, release-*, PR만 빌드 (개인 브랜치 제외)
+          def dominated = env.BRANCH_NAME ==~ /(main|release-.*)/ || env.CHANGE_ID
+          if (!dominated) {
+            currentBuild.result = 'NOT_BUILT'
+            error("Skipping build for branch: ${env.BRANCH_NAME} (only main, release-*, PR allowed)")
+          }
+        }
+      }
+    }
+
     stage('Checkout') {
       steps {
         checkout scm

@@ -54,7 +54,7 @@ async function getBandCookies() {
     path: cookie.path || '/',
     expires: cookie.expirationDate || -1,
     httpOnly: cookie.httpOnly || false,
-    secure: cookie.secure || true,
+    secure: cookie.secure || false,
     sameSite: cookie.sameSite === 'no_restriction' ? 'None' :
               cookie.sameSite === 'lax' ? 'Lax' :
               cookie.sameSite === 'strict' ? 'Strict' : 'Lax'
@@ -188,7 +188,7 @@ async function autoSaveSession() {
 
     // 성공 시 상태 업데이트
     lastAutoSaveTime = now;
-    chrome.storage.local.set({ lastAutoSaveTime: now });
+    await chrome.storage.local.set({ lastAutoSaveTime: now });
     console.log(`[Band Session] 자동 저장 완료: ${data.channelCount}개 채널`);
 
   } catch (error) {
@@ -279,7 +279,7 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
 
         // 성공 시 상태 업데이트
         lastAutoSaveTime = Date.now();
-        chrome.storage.local.set({ lastAutoSaveTime });
+        await chrome.storage.local.set({ lastAutoSaveTime });
         console.log(`[Band Session] 웹 앱 요청 저장 완료: ${data.channelCount}개 채널`);
 
         sendResponse({

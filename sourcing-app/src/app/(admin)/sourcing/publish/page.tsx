@@ -967,7 +967,13 @@ export default function PublishPage() {
 
                             // Extension 설치되어 있으면 자동 재시도, 아니면 모달 표시
                             if (extensionAvailable) {
-                              console.log('[발행] 세션 만료 감지 - 자동 재시도 시작')
+                              console.log('[발행] 세션 만료 감지 - 기존 스트림 중단 후 자동 재시도 시작')
+                              // 기존 SSE 스트림 중단 (레이스 컨디션 방지)
+                              if (abortControllerRef.current) {
+                                abortControllerRef.current.abort()
+                                abortControllerRef.current = null
+                              }
+                              publishCancelledRef.current = true
                               setAutoRetryTriggered(true)
                             } else {
                               setShowSessionExpiredModal(true)
@@ -2099,19 +2105,34 @@ export default function PublishPage() {
                   </Button>
                 )}
 
-                <div className="flex gap-3">
+                <div className="flex gap-2">
+                  {/* 닫기: 상태 유지 (나중에 재시도 가능) */}
                   <Button
                     variant="secondary"
                     className="flex-1"
                     onClick={() => {
                       setShowSessionExpiredModal(false)
-                      setFailedPublishItems([])
-                      setRetryMessage('')
+                      // failedPublishItems와 retryMessage 유지 - 나중에 재시도 가능
                     }}
                     disabled={isRetrying}
                   >
                     닫기
                   </Button>
+                  {/* 포기: 실패 항목 삭제 */}
+                  {failedPublishItems.length > 0 && (
+                    <Button
+                      variant="secondary"
+                      className="flex-1 text-red-600 hover:bg-red-50"
+                      onClick={() => {
+                        setShowSessionExpiredModal(false)
+                        setFailedPublishItems([])
+                        setRetryMessage('')
+                      }}
+                      disabled={isRetrying}
+                    >
+                      포기
+                    </Button>
+                  )}
                   <Button
                     variant="secondary"
                     className="flex-1"
