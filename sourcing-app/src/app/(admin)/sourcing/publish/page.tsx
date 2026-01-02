@@ -223,21 +223,6 @@ export default function PublishPage() {
     checkExtensionInstalled().then(setExtensionAvailable)
   }, [])
 
-  // 자동 재시도 트리거 감지 - Extension 설치 시 자동으로 세션 저장 후 재시도
-  useEffect(() => {
-    if (autoRetryTriggered && extensionAvailable && failedPublishItems.length > 0 && !autoRetryAttemptedRef.current) {
-      autoRetryAttemptedRef.current = true
-      setAutoRetryTriggered(false)
-      // 자동 재시도 실행
-      handleAutoRetry()
-    }
-  }, [autoRetryTriggered, extensionAvailable, failedPublishItems])
-
-  // 페이지/필터 변경 시 상품 로드
-  useEffect(() => {
-    loadProducts()
-  }, [currentPage, selectedWholesaleChannel])
-
   const loadChannels = async () => {
     try {
       setIsLoadingChannels(true)
@@ -268,7 +253,7 @@ export default function PublishPage() {
     }
   }
 
-  const loadProducts = async (resetPage = false) => {
+  const loadProducts = useCallback(async (resetPage = false) => {
     try {
       setIsLoading(true)
       const page = resetPage ? 1 : currentPage
@@ -311,7 +296,13 @@ export default function PublishPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- searchTerm은 Enter 키를 눌러야 적용됨
+  }, [currentPage, selectedWholesaleChannel])
+
+  // 페이지/필터 변경 시 상품 로드
+  useEffect(() => {
+    loadProducts()
+  }, [loadProducts])
 
   // 플랫폼별 채널 그룹 (Shop 포함)
   const groupedTargets = useMemo(() => {
@@ -1054,7 +1045,7 @@ export default function PublishPage() {
   }
 
   // 자동 재시도 핸들러 (세션 만료 시 자동으로 실행)
-  const handleAutoRetry = async () => {
+  const handleAutoRetry = useCallback(async () => {
     if (!expiredChannelInfo || failedPublishItems.length === 0) {
       console.log('[자동 재시도] 필요한 정보 없음, 건너뜀')
       return
@@ -1224,7 +1215,18 @@ export default function PublishPage() {
       setIsPublishing(false)
       // failedPublishItems는 성공 시에만 초기화 (catch에서 모달 표시 시 유지)
     }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadProducts는 항상 최신 상태를 사용
+  }, [expiredChannelInfo, failedPublishItems, toast])
+
+  // 자동 재시도 트리거 감지 - Extension 설치 시 자동으로 세션 저장 후 재시도
+  useEffect(() => {
+    if (autoRetryTriggered && extensionAvailable && failedPublishItems.length > 0 && !autoRetryAttemptedRef.current) {
+      autoRetryAttemptedRef.current = true
+      setAutoRetryTriggered(false)
+      // 자동 재시도 실행
+      handleAutoRetry()
+    }
+  }, [autoRetryTriggered, extensionAvailable, failedPublishItems, handleAutoRetry])
 
   // 세션 저장 후 재시도 핸들러 (수동 - 모달에서 버튼 클릭 시)
   const handleRetryWithSessionSave = async () => {

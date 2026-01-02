@@ -83,6 +83,93 @@ async function checkBandLoginStatus() {
   return bandCookies.some(c => c.name === 'band_session');
 }
 
+// =============================================
+// 세션 저장 핵심 로직 (공통 헬퍼)
+// =============================================
+
+/**
+ * 세션 저장 수행 (공통 로직)
+ * 검증 또는 네트워크 에러 시 throw
+ * @returns {Promise<{channelCount: number}>} 서버 응답 데이터
+ * @throws {Error} 검증 실패 또는 네트워크 에러
+ */
+async function performSessionSave() {
+  // 1. Sourcing App 로그인 확인
+  const authToken = await getAuthToken();
+  if (!authToken) {
+    throw new Error('Sourcing App에 로그인해주세요.');
+  }
+
+  // 2. Band 로그인 확인
+  const isBandLoggedIn = await checkBandLoginStatus();
+  if (!isBandLoggedIn) {
+    throw new Error('Band에 로그인해주세요.');
+  }
+
+  // 3. 쿠키 수집
+  const bandCookies = await getBandCookies();
+  if (bandCookies.length === 0) {
+    throw new Error('Band 쿠키를 찾을 수 없습니다.');
+  }
+
+  // 4. 서버로 전송 (타임아웃 포함)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30초 타임아웃
+
+  try {
+    const response = await fetch(`${SERVER_URL}/api/band-session/save-all`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        cookieString: JSON.stringify(bandCookies)
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    // 응답 상태 확인 - 실패 시 본문 로그
+    if (!response.ok) {
+      let errorBody = '';
+      try {
+        errorBody = await response.text();
+      } catch {
+        errorBody = '(응답 본문 읽기 실패)';
+      }
+      console.error(`[Band Session] 서버 에러 응답 (${response.status}):`, errorBody.substring(0, 500));
+      throw new Error(`서버 응답 에러: ${response.status} ${response.statusText}`);
+    }
+
+    // JSON 파싱 (실패 시 상세 로그)
+    let result;
+    try {
+      result = await response.json();
+    } catch (parseError) {
+      console.error('[Band Session] JSON 파싱 실패:', parseError.message);
+      throw new Error('서버 응답을 파싱할 수 없습니다.');
+    }
+
+    if (!result.success) {
+      throw new Error(result.error || '서버에서 저장 실패');
+    }
+
+    return result.data;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('서버 요청 시간 초과 (30초)');
+    }
+    throw error;
+  }
+}
+
+// =============================================
+// 자동 저장
+// =============================================
+
 /**
  * 세션 자동 저장
  */
@@ -96,54 +183,21 @@ async function autoSaveSession() {
   }
 
   try {
-    // 1. Sourcing App 로그인 확인
-    const authToken = await getAuthToken();
-    if (!authToken) {
-      console.log('[Band Session] 자동 저장 스킵 (Sourcing App 미로그인)');
-      return;
-    }
-
-    // 2. Band 로그인 확인
-    const isBandLoggedIn = await checkBandLoginStatus();
-    if (!isBandLoggedIn) {
-      console.log('[Band Session] 자동 저장 스킵 (Band 미로그인)');
-      return;
-    }
-
-    // 3. 쿠키 수집
-    const bandCookies = await getBandCookies();
-    if (bandCookies.length === 0) {
-      console.log('[Band Session] 자동 저장 스킵 (쿠키 없음)');
-      return;
-    }
-
-    // 4. 서버로 전송
     console.log('[Band Session] 자동 저장 시작...');
-    const response = await fetch(`${SERVER_URL}/api/band-session/save-all`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify({
-        cookieString: JSON.stringify(bandCookies)
-      })
-    });
+    const data = await performSessionSave();
 
-    const result = await response.json();
-
-    if (result.success) {
-      lastAutoSaveTime = now;
-      console.log(`[Band Session] 자동 저장 완료: ${result.data.channelCount}개 채널`);
-
-      // 저장 시간 기록 (브라우저 재시작 시에도 유지)
-      chrome.storage.local.set({ lastAutoSaveTime: now });
-    } else {
-      console.error('[Band Session] 자동 저장 실패:', result.error);
-    }
+    // 성공 시 상태 업데이트
+    lastAutoSaveTime = now;
+    chrome.storage.local.set({ lastAutoSaveTime: now });
+    console.log(`[Band Session] 자동 저장 완료: ${data.channelCount}개 채널`);
 
   } catch (error) {
-    console.error('[Band Session] 자동 저장 에러:', error);
+    // 검증 실패는 스킵으로 처리 (로그인 안됨 등)
+    if (error.message.includes('로그인') || error.message.includes('쿠키')) {
+      console.log(`[Band Session] 자동 저장 스킵: ${error.message}`);
+    } else {
+      console.error('[Band Session] 자동 저장 에러:', error.message);
+    }
   }
 }
 
@@ -157,8 +211,19 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (tab.url.includes('band.us')) {
       console.log('[Band Session] Band 페이지 감지:', tab.url);
       // 약간의 딜레이 후 자동 저장 시도 (쿠키 설정 완료 대기)
-      setTimeout(autoSaveSession, 2000);
+      // Service Worker가 중지될 수 있으므로 chrome.alarms 사용
+      chrome.alarms.create('autoSaveSession', { delayInMinutes: 2 / 60 }); // 2초
     }
+  }
+});
+
+/**
+ * Alarm 이벤트 리스너 (Service Worker 안정성을 위해 setTimeout 대신 사용)
+ */
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'autoSaveSession') {
+    console.log('[Band Session] Alarm 트리거: autoSaveSession');
+    autoSaveSession();
   }
 });
 
@@ -209,59 +274,23 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
   if (request.action === 'saveSession') {
     (async () => {
       try {
-        // 1. Sourcing App 로그인 확인
-        const authToken = await getAuthToken();
-        if (!authToken) {
-          sendResponse({ success: false, error: 'Sourcing App에 로그인해주세요.' });
-          return;
-        }
-
-        // 2. Band 로그인 확인
-        const isBandLoggedIn = await checkBandLoginStatus();
-        if (!isBandLoggedIn) {
-          sendResponse({ success: false, error: 'Band에 로그인해주세요.' });
-          return;
-        }
-
-        // 3. 쿠키 수집
-        const bandCookies = await getBandCookies();
-        if (bandCookies.length === 0) {
-          sendResponse({ success: false, error: 'Band 쿠키를 찾을 수 없습니다.' });
-          return;
-        }
-
-        // 4. 서버로 전송
         console.log('[Band Session] 웹 앱 요청으로 세션 저장 시작...');
-        const response = await fetch(`${SERVER_URL}/api/band-session/save-all`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
-            cookieString: JSON.stringify(bandCookies)
-          })
+        const data = await performSessionSave();
+
+        // 성공 시 상태 업데이트
+        lastAutoSaveTime = Date.now();
+        chrome.storage.local.set({ lastAutoSaveTime });
+        console.log(`[Band Session] 웹 앱 요청 저장 완료: ${data.channelCount}개 채널`);
+
+        sendResponse({
+          success: true,
+          data: {
+            channelCount: data.channelCount,
+            savedAt: new Date().toISOString()
+          }
         });
-
-        const result = await response.json();
-
-        if (result.success) {
-          lastAutoSaveTime = Date.now();
-          chrome.storage.local.set({ lastAutoSaveTime });
-          console.log(`[Band Session] 웹 앱 요청 저장 완료: ${result.data.channelCount}개 채널`);
-          sendResponse({
-            success: true,
-            data: {
-              channelCount: result.data.channelCount,
-              savedAt: new Date().toISOString()
-            }
-          });
-        } else {
-          sendResponse({ success: false, error: result.error });
-        }
-
       } catch (error) {
-        console.error('[Band Session] 웹 앱 요청 저장 에러:', error);
+        console.error('[Band Session] 웹 앱 요청 저장 에러:', error.message);
         sendResponse({ success: false, error: error.message });
       }
     })();
