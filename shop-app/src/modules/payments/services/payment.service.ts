@@ -21,6 +21,7 @@ import {
   NotFoundError,
   BusinessLogicError,
 } from '@/modules/common/utils/src/errors/handlers'
+import { calculateItemPrice } from '@/lib/price-calculator'
 
 const Decimal = Prisma.Decimal
 
@@ -346,7 +347,22 @@ export class PaymentService {
         const product = publishedProduct.product
         const variant = item.variant
         const mainVariant = product?.variants[0]
-        const unitPrice = variant?.price || mainVariant?.price || 0
+        const basePrice = variant?.price || mainVariant?.price || 0
+        const quantity = item.quantity
+
+        // 배송비 포함된 가격 계산
+        const shippingFee = product?.shippingFee || 0
+        const bundleMaxQty = product?.bundleMaxQty || 1
+        const bundleUnit = variant?.bundleUnit || 1
+
+        const priceResult = calculateItemPrice({
+          basePrice,
+          shippingFee,
+          quantity,
+          bundleMaxQty,
+          bundleUnit,
+          bundleShippingType: product?.bundleShippingType || null,
+        })
 
         return {
           publishedProductId: publishedProduct.id,
@@ -354,8 +370,9 @@ export class PaymentService {
           productName: product?.name || "",
           optionSummary: variant?.optionSummary || null,
           thumbnailUrl: product?.thumbnailUrl || null,
-          quantity: item.quantity,
-          unitPrice: Number(unitPrice),
+          quantity,
+          unitPrice: priceResult.unitPrice, // 배송비 포함된 단가
+          itemTotal: priceResult.itemTotal, // 합배송 적용된 총액
         }
       })
     } else if (prepareData.items) {
@@ -367,7 +384,7 @@ export class PaymentService {
           },
           include: {
             product: {
-              include: { variants: { take: 1 } },
+              include: { variants: true },
             },
           },
         })
@@ -385,7 +402,22 @@ export class PaymentService {
 
         const product = publishedProduct.product
         const mainVariant = product?.variants[0]
-        const unitPrice = variant?.price || mainVariant?.price || 0
+        const basePrice = variant?.price || mainVariant?.price || 0
+        const quantity = item.quantity || 1
+
+        // 배송비 포함된 가격 계산
+        const shippingFee = product?.shippingFee || 0
+        const bundleMaxQty = product?.bundleMaxQty || 1
+        const bundleUnit = variant?.bundleUnit || 1
+
+        const priceResult = calculateItemPrice({
+          basePrice,
+          shippingFee,
+          quantity,
+          bundleMaxQty,
+          bundleUnit,
+          bundleShippingType: product?.bundleShippingType || null,
+        })
 
         orderItems.push({
           publishedProductId: publishedProduct.id,
@@ -393,8 +425,9 @@ export class PaymentService {
           productName: product?.name || "",
           optionSummary: variant?.optionSummary || null,
           thumbnailUrl: product?.thumbnailUrl || null,
-          quantity: item.quantity || 1,
-          unitPrice: Number(unitPrice),
+          quantity,
+          unitPrice: priceResult.unitPrice, // 배송비 포함된 단가
+          itemTotal: priceResult.itemTotal, // 합배송 적용된 총액
         })
       }
     }
@@ -446,7 +479,7 @@ export class PaymentService {
         discountAmount: new Decimal(discountAmount),
         totalAmount: new Decimal(totalAmount),
         items: {
-          create: orderItems.map((item) => ({
+          create: orderItems.map((item: any) => ({
             publishedProductId: item.publishedProductId,
             variantId: item.variantId,
             productName: item.productName,
@@ -454,7 +487,8 @@ export class PaymentService {
             thumbnailUrl: item.thumbnailUrl,
             quantity: item.quantity,
             unitPrice: new Decimal(item.unitPrice),
-            totalPrice: new Decimal(item.unitPrice * item.quantity),
+            // itemTotal이 있으면 사용 (합배송 적용된 정확한 총액), 없으면 계산
+            totalPrice: new Decimal(item.itemTotal ?? (item.unitPrice * item.quantity)),
           })),
         },
         // 배송지 정보 (수령인 - ShippingAddress 테이블에 저장)

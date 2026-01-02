@@ -981,7 +981,7 @@ function CheckoutContent() {
                         <p className="text-sm text-gray-600 mb-2">{product.category}</p>
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-gray-600">수량: {quantity}개</span>
-                          <span className="font-semibold text-[#FF6B6B]">{formatPrice(product.salePrice)}원</span>
+                          <span className="font-semibold text-[#FF6B6B]">{formatPrice(subtotal)}원</span>
                         </div>
                       </div>
                     </div>

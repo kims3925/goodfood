@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
         optionSummary: item.optionSummary || null,
         thumbnailUrl: item.image || null,
         quantity: item.quantity,
-        unitPrice: item.originalPrice, // 원가 (배송비 미포함)
+        unitPrice: item.price, // 배송비 포함된 단가 (합배송 적용)
         itemTotal: item.itemTotal, // 합배송 적용된 정확한 총액
       }))
 
@@ -278,7 +278,7 @@ export async function POST(req: NextRequest) {
           optionSummary: variant?.optionSummary || null,
           thumbnailUrl: product?.thumbnailUrl || null,
           quantity,
-          unitPrice: Number(basePrice),
+          unitPrice: priceResult.unitPrice, // 배송비 포함된 단가 (합배송 적용)
           itemTotal, // 합배송 적용된 총액
         })
       }
