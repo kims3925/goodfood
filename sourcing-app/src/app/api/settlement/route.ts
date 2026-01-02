@@ -100,9 +100,14 @@ export async function GET(request: NextRequest) {
           status: { not: 'CANCELLED' },
         },
       },
-      select: { orderItemId: true },
+      select: { orderItemId: true, guestOrderItemId: true },
     })
-    const settledOrderItemIds = new Set(existingSettlementItems.map(i => i.orderItemId))
+    const settledOrderItemIds = new Set(
+      existingSettlementItems.filter(i => i.orderItemId).map(i => i.orderItemId)
+    )
+    const settledGuestOrderItemIds = new Set(
+      existingSettlementItems.filter(i => i.guestOrderItemId).map(i => i.guestOrderItemId)
+    )
 
     // 쇼핑몰 주문 조회 (Shop별로 그룹화)
     // Shop 소유자의 주문을 조회 (Order.userId는 주문한 고객, Shop.userId가 소유자)
@@ -169,6 +174,48 @@ export async function GET(request: NextRequest) {
       }
       return null
     }
+
+    // 비회원 주문(GuestOrder) 조회
+    const guestOrders = await prisma.guestOrder.findMany({
+      where: {
+        shop: { userId: user.userId },  // Shop 소유자 기준으로 필터링
+        status: 'DELIVERED',  // 배송완료된 주문만 정산 대상
+        shopId: { not: null },
+        ...(Object.keys(dateFilter).length > 0 ? { orderedAt: dateFilter } : {}),
+      },
+      include: {
+        shop: {
+          select: { id: true, name: true, subdomain: true },
+        },
+        shippingAddress: {
+          select: { recipientName: true },
+        },
+        items: {
+          include: {
+            variant: {
+              select: { wholesalePrice: true },
+            },
+            publishedProduct: {
+              include: {
+                product: {
+                  include: {
+                    variants: {
+                      take: 1,
+                      select: { wholesalePrice: true },
+                    },
+                    images: {
+                      take: 1,
+                      orderBy: { sortOrder: 'asc' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { orderedAt: 'desc' },
+    })
 
     // 쇼핑몰 주문 아이템 처리
     for (const order of shopOrders) {
@@ -254,6 +301,100 @@ export async function GET(request: NextRequest) {
           shopId: orderShopId,
           shopName: shopData.name,
           isSettled,
+        })
+
+        shopData.itemCount++
+        shopData.totalQuantity += item.quantity
+        shopData.totalAmount += Number(item.totalPrice)
+      }
+    }
+
+    // 비회원 주문(GuestOrder) 아이템 처리
+    for (const guestOrder of guestOrders) {
+      const orderShopId = guestOrder.shopId
+
+      if (!orderShopId) {
+        // shopId가 없는 주문은 미분류
+        for (const item of guestOrder.items) {
+          const isSettled = settledGuestOrderItemIds.has(item.id)
+          const wholesalePrice = getWholesalePrice(item)
+          const marginRate = calculateMarginRate(Number(item.unitPrice), wholesalePrice)
+          const margin = wholesalePrice ? Number(item.unitPrice) - wholesalePrice : null
+
+          unclassifiedItems.push({
+            id: item.id,
+            orderId: guestOrder.id,
+            orderNumber: guestOrder.orderNumber,
+            customerName: guestOrder.shippingAddress?.recipientName || guestOrder.guestName || '비회원',
+            productName: item.productName,
+            thumbnailUrl: item.thumbnailUrl || null,
+            quantity: item.quantity,
+            unitPrice: Number(item.unitPrice),
+            totalPrice: Number(item.totalPrice),
+            wholesalePrice,
+            marginRate,
+            margin,
+            status: guestOrder.status,
+            orderedAt: guestOrder.orderedAt.toISOString(),
+            shopId: null,
+            shopName: null,
+            isSettled,
+            isGuestOrder: true,  // 비회원 주문 표시
+          })
+        }
+        continue
+      }
+
+      let shopData = shopDataMap.get(orderShopId)
+
+      // Shop이 맵에 없으면 새로 추가
+      if (!shopData && guestOrder.shop) {
+        shopData = {
+          id: guestOrder.shop.id,
+          name: guestOrder.shop.name,
+          subdomain: guestOrder.shop.subdomain,
+          coverUrl: null,
+          logoUrl: null,
+          channelId: null,
+          channelName: null,
+          items: [],
+          itemCount: 0,
+          totalQuantity: 0,
+          totalAmount: 0,
+        }
+        shopDataMap.set(orderShopId, shopData)
+      }
+
+      if (!shopData) continue
+
+      for (const item of guestOrder.items) {
+        const isSettled = settledGuestOrderItemIds.has(item.id)
+        const wholesalePrice = getWholesalePrice(item)
+        const marginRate = calculateMarginRate(Number(item.unitPrice), wholesalePrice)
+        const margin = wholesalePrice ? Number(item.unitPrice) - wholesalePrice : null
+
+        const thumbnailUrl = item.thumbnailUrl ||
+          item.publishedProduct?.product?.images?.[0]?.url || null
+
+        shopData.items.push({
+          id: item.id,
+          orderId: guestOrder.id,
+          orderNumber: guestOrder.orderNumber,
+          customerName: guestOrder.shippingAddress?.recipientName || guestOrder.guestName || '비회원',
+          productName: item.productName,
+          thumbnailUrl,
+          quantity: item.quantity,
+          unitPrice: Number(item.unitPrice),
+          totalPrice: Number(item.totalPrice),
+          wholesalePrice,
+          marginRate,
+          margin,
+          status: guestOrder.status,
+          orderedAt: guestOrder.orderedAt.toISOString(),
+          shopId: orderShopId,
+          shopName: shopData.name,
+          isSettled,
+          isGuestOrder: true,  // 비회원 주문 표시
         })
 
         shopData.itemCount++
@@ -362,9 +503,14 @@ export async function POST(request: NextRequest) {
           status: { not: 'CANCELLED' },
         },
       },
-      select: { orderItemId: true },
+      select: { orderItemId: true, guestOrderItemId: true },
     })
-    const settledOrderItemIds = new Set(existingSettlementItems.map(i => i.orderItemId))
+    const settledOrderItemIds = new Set(
+      existingSettlementItems.filter(i => i.orderItemId).map(i => i.orderItemId)
+    )
+    const settledGuestOrderItemIds = new Set(
+      existingSettlementItems.filter(i => i.guestOrderItemId).map(i => i.guestOrderItemId)
+    )
 
     // Shop 기준 주문 조회 (아직 정산되지 않은 주문만)
     // Shop 소유권은 위에서 이미 확인됨, Order.userId는 주문한 고객이므로 제거
@@ -385,8 +531,27 @@ export async function POST(request: NextRequest) {
       orderBy: { orderedAt: 'asc' },
     })
 
+    // 비회원 주문(GuestOrder) 조회
+    const guestOrders = await prisma.guestOrder.findMany({
+      where: {
+        shopId: parseInt(shopId),
+        status: 'DELIVERED',  // 배송완료된 주문만 정산 대상
+        ...(filterStart || filterEnd ? {
+          orderedAt: {
+            ...(filterStart ? { gte: filterStart } : {}),
+            ...(filterEnd ? { lte: filterEnd } : {}),
+          }
+        } : {}),
+      },
+      include: {
+        items: true,
+      },
+      orderBy: { orderedAt: 'asc' },
+    })
+
     // 정산 대상 주문 아이템 필터링 (이미 정산된 아이템 제외)
-    const settlementItems: Array<{
+    // 회원 주문 아이템
+    const orderSettlementItems: Array<{
       orderItemId: number
       orderId: number
       quantity: number
@@ -397,7 +562,7 @@ export async function POST(request: NextRequest) {
     for (const order of orders) {
       for (const item of order.items) {
         if (!settledOrderItemIds.has(item.id)) {
-          settlementItems.push({
+          orderSettlementItems.push({
             orderItemId: item.id,
             orderId: order.id,
             quantity: item.quantity,
@@ -408,7 +573,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (settlementItems.length === 0) {
+    // 비회원 주문 아이템
+    const guestOrderSettlementItems: Array<{
+      guestOrderItemId: number
+      guestOrderId: number
+      quantity: number
+      unitPrice: number
+      totalPrice: number
+    }> = []
+
+    for (const guestOrder of guestOrders) {
+      for (const item of guestOrder.items) {
+        if (!settledGuestOrderItemIds.has(item.id)) {
+          guestOrderSettlementItems.push({
+            guestOrderItemId: item.id,
+            guestOrderId: guestOrder.id,
+            quantity: item.quantity,
+            unitPrice: Number(item.unitPrice),
+            totalPrice: Number(item.totalPrice),
+          })
+        }
+      }
+    }
+
+    const totalSettlementItemCount = orderSettlementItems.length + guestOrderSettlementItems.length
+
+    if (totalSettlementItemCount === 0) {
       return NextResponse.json(
         { success: false, error: '정산할 주문이 없습니다. 해당 기간에 새로운 주문이 없거나 이미 정산되었습니다.' },
         { status: 400 }
@@ -416,17 +606,28 @@ export async function POST(request: NextRequest) {
     }
 
     // 실제 정산 기간 계산 (포함된 주문들의 날짜 범위)
-    const includedOrderIds = new Set(settlementItems.map(item => item.orderId))
+    const includedOrderIds = new Set(orderSettlementItems.map(item => item.orderId))
+    const includedGuestOrderIds = new Set(guestOrderSettlementItems.map(item => item.guestOrderId))
     const includedOrders = orders.filter(o => includedOrderIds.has(o.id))
-    const actualPeriodStart = includedOrders.length > 0
-      ? includedOrders[0].orderedAt
+    const includedGuestOrders = guestOrders.filter(o => includedGuestOrderIds.has(o.id))
+
+    // 모든 주문의 날짜를 합쳐서 기간 계산
+    const allOrderDates = [
+      ...includedOrders.map(o => o.orderedAt),
+      ...includedGuestOrders.map(o => o.orderedAt),
+    ].sort((a, b) => a.getTime() - b.getTime())
+
+    const actualPeriodStart = allOrderDates.length > 0
+      ? allOrderDates[0]
       : new Date()
-    const actualPeriodEnd = includedOrders.length > 0
-      ? includedOrders[includedOrders.length - 1].orderedAt
+    const actualPeriodEnd = allOrderDates.length > 0
+      ? allOrderDates[allOrderDates.length - 1]
       : new Date()
 
-    const totalOrders = settlementItems.length
-    const totalAmount = settlementItems.reduce((sum, item) => sum + item.totalPrice, 0)
+    const totalOrders = totalSettlementItemCount
+    const totalAmount =
+      orderSettlementItems.reduce((sum, item) => sum + item.totalPrice, 0) +
+      guestOrderSettlementItems.reduce((sum, item) => sum + item.totalPrice, 0)
 
     // 트랜잭션으로 정산 및 정산 아이템 생성
     const settlement = await prisma.$transaction(async (tx) => {
@@ -445,17 +646,33 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // 정산 아이템 생성
-      await tx.settlementItem.createMany({
-        data: settlementItems.map(item => ({
-          settlementId: newSettlement.id,
-          orderItemId: item.orderItemId,
-          orderId: item.orderId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          totalPrice: item.totalPrice,
-        })),
-      })
+      // 정산 아이템 생성 - 회원 주문
+      if (orderSettlementItems.length > 0) {
+        await tx.settlementItem.createMany({
+          data: orderSettlementItems.map(item => ({
+            settlementId: newSettlement.id,
+            orderItemId: item.orderItemId,
+            orderId: item.orderId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+          })),
+        })
+      }
+
+      // 정산 아이템 생성 - 비회원 주문
+      if (guestOrderSettlementItems.length > 0) {
+        await tx.settlementItem.createMany({
+          data: guestOrderSettlementItems.map(item => ({
+            settlementId: newSettlement.id,
+            guestOrderItemId: item.guestOrderItemId,
+            guestOrderId: item.guestOrderId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+          })),
+        })
+      }
 
       return newSettlement
     })

@@ -24,20 +24,25 @@ model Settlement {
 }
 
 model SettlementItem {
-  id           Int        @id @default(autoincrement())
-  settlementId Int        @map("settlement_id")
-  orderItemId  Int        @map("order_item_id")
-  orderId      Int        @map("order_id")
-  quantity     Int
-  unitPrice    Decimal    @map("unit_price") @db.Decimal(10, 2)
-  totalPrice   Decimal    @map("total_price") @db.Decimal(12, 2)
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
-  settlement   Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  id               Int        @id @default(autoincrement())
+  settlementId     Int        @map("settlement_id")
+  orderItemId      Int?       @map("order_item_id")
+  orderId          Int?       @map("order_id")
+  guestOrderItemId Int?       @map("guest_order_item_id")
+  guestOrderId     Int?       @map("guest_order_id")
+  quantity         Int
+  unitPrice        Decimal    @map("unit_price") @db.Decimal(10, 2)
+  totalPrice       Decimal    @map("total_price") @db.Decimal(12, 2)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
+  settlement       Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
 
   @@unique([settlementId, orderItemId])
+  @@unique([settlementId, guestOrderItemId])
   @@index([settlementId])
   @@index([orderItemId])
   @@index([orderId])
+  @@index([guestOrderItemId])
+  @@index([guestOrderId])
   @@map("settlement_item")
 }
 
