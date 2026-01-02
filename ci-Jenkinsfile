@@ -135,10 +135,8 @@ pipeline {
   post {
     always {
       junit allowEmptyResults: true, testResults: '**/junit.xml'
-      // .next 폴더는 shop-app, sourcing-app 하위에 있음
-      archiveArtifacts artifacts: '*-app/.next/**', allowEmptyArchive: true
       // 빌드 완료 후 워크스페이스 정리 (디스크 공간 확보)
-      // cleanWs()
+      cleanWs()
     }
   }
 }

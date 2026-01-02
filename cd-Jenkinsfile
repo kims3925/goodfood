@@ -131,9 +131,9 @@ pipeline {
                     if [ "\$NEED_REINSTALL" = "true" ]; then
                         echo ">>> Cleaning and reinstalling dependencies..."
                         rm -rf node_modules
-                        rm -rf .next
-                        rm -rf shop-app/.next
-                        rm -rf sourcing-app/.next
+                        sudo rm -rf .next || true
+                        sudo rm -rf shop-app/.next || true
+                        sudo rm -rf sourcing-app/.next || true
                         npm ci --legacy-peer-deps
 
                         # 체크섬 저장
@@ -172,20 +172,20 @@ pipeline {
                     # Clean npm cache and Next.js cache
                     echo ">>> Cleaning caches..."
                     npm cache clean --force || true
-                    rm -rf shop-app/.next
-                    rm -rf sourcing-app/.next
+                    sudo rm -rf shop-app/.next || true
+                    sudo rm -rf sourcing-app/.next || true
 
                     # Build applications (with retry on failure)
                     echo ">>> Building applications..."
                     npm run build:shop || {
                         echo ">>> shop-app build failed, retrying with clean cache..."
-                        rm -rf shop-app/.next
+                        sudo rm -rf shop-app/.next || true
                         npm run build:shop
                     }
 
                     npm run build:sourcing || {
                         echo ">>> sourcing-app build failed, retrying with clean cache..."
-                        rm -rf sourcing-app/.next
+                        sudo rm -rf sourcing-app/.next || true
                         npm run build:sourcing
                     }
 
