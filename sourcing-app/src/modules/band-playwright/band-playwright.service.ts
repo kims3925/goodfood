@@ -78,15 +78,22 @@ export class BandPlaywrightService {
       console.log(`[BandPlaywrightService] Closing context for channel ${channelId} due to error`)
       await browserPool.closeContext(channelId)
 
-      // 세션 만료 에러인 경우 재시도
+      // 세션 만료 에러인 경우
       if (
         error instanceof BandPlaywrightError &&
-        error.code === BandPlaywrightErrorCode.SESSION_EXPIRED &&
-        retryCount < 1
+        error.code === BandPlaywrightErrorCode.SESSION_EXPIRED
       ) {
-        console.log('[BandPlaywrightService] Session expired, retrying with new session')
-        await sessionManager.invalidateSession(channelId)
-        return this.publishWithImages(params, retryCount + 1)
+        // 1회 재시도
+        if (retryCount < 1) {
+          console.log('[BandPlaywrightService] Session expired, retrying with new session')
+          await sessionManager.invalidateSession(channelId)
+          return this.publishWithImages(params, retryCount + 1)
+        }
+        // 재시도 후에도 실패하면 명확한 메시지 반환
+        return {
+          success: false,
+          error: 'Band 세션이 만료되었습니다. Chrome Extension에서 Band 세션을 다시 저장해주세요.',
+        }
       }
 
       // POST_FAILED 에러는 새 컨텍스트로 재시도 (1회)
@@ -187,15 +194,30 @@ export class BandPlaywrightService {
       console.log(`[BandPlaywrightService] Closing context for channel ${channelId} due to batch error`)
       await browserPool.closeContext(channelId)
 
-      // 세션 만료 에러인 경우 재시도
+      // 세션 만료 에러인 경우
       if (
         error instanceof BandPlaywrightError &&
-        error.code === BandPlaywrightErrorCode.SESSION_EXPIRED &&
-        retryCount < 1
+        error.code === BandPlaywrightErrorCode.SESSION_EXPIRED
       ) {
-        console.log('[BandPlaywrightService] Session expired, retrying with new session')
-        await sessionManager.invalidateSession(channelId)
-        return this.publishBatchWithImages(params, retryCount + 1)
+        // 1회 재시도
+        if (retryCount < 1) {
+          console.log('[BandPlaywrightService] Session expired, retrying with new session')
+          await sessionManager.invalidateSession(channelId)
+          return this.publishBatchWithImages(params, retryCount + 1)
+        }
+        // 재시도 후에도 실패하면 명확한 메시지 반환
+        const sessionExpiredError = 'Band 세션이 만료되었습니다. Chrome Extension에서 Band 세션을 다시 저장해주세요.'
+        return {
+          success: false,
+          total: items.length,
+          successCount: 0,
+          failedCount: items.length,
+          results: items.map(item => ({
+            productId: item.productId,
+            success: false,
+            error: sessionExpiredError,
+          })),
+        }
       }
 
       // POST_FAILED 에러는 새 컨텍스트로 재시도 (1회)
@@ -263,7 +285,7 @@ export class BandPlaywrightService {
       ) {
         return {
           success: false,
-          error: '세션이 만료되었습니다. 채널 설정에서 밴드 로그인을 다시 해주세요.',
+          error: 'Band 세션이 만료되었습니다. Chrome Extension에서 Band 세션을 다시 저장해주세요.',
         }
       }
 

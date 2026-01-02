@@ -19,6 +19,8 @@ export interface BandPublishParams {
   bandName: string      // 밴드 이름 (Band 홈에서 채널 찾기용)
   content: string
   imageUrls: string[]   // 상품 이미지 URL 목록
+  /** 저장된 밴드 URL (직접 접속용, 없으면 밴드 목록에서 검색) */
+  bandPostUrl?: string
   /** 단계별 진행 콜백 (실시간 상태 업데이트용) */
   onStageProgress?: BandStageProgressCallback
   /** 취소 신호 (발행 중단용) */
@@ -30,12 +32,16 @@ export interface BandPublishResult {
   postKey?: string
   error?: string
   imageCount?: number
+  /** 접속 성공한 밴드 URL (첫 접속 시 저장용) */
+  bandPostUrl?: string
 }
 
 export interface BandBatchPublishParams {
   channelId: number
   bandKey: string       // Band API의 band_key (AAC... 형식)
   bandName: string      // 밴드 이름 (Band 홈에서 채널 찾기용)
+  /** 저장된 밴드 URL (직접 접속용, 없으면 밴드 목록에서 검색) */
+  bandPostUrl?: string
   items: {
     productId: number
     content: string
@@ -74,6 +80,8 @@ export interface BandBatchPublishResult {
   successCount: number
   failedCount: number
   results: BandBatchItemResult[]
+  /** 접속 성공한 밴드 URL (첫 접속 시 저장용) */
+  bandPostUrl?: string
 }
 
 export interface BandLoginResult {

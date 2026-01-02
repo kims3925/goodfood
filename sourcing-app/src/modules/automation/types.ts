@@ -147,6 +147,9 @@ export interface PublishResult extends PipelineResult {
       reason: string
     }[]
     cancelled?: boolean          // 사용자 취소 여부
+    waitingSession?: boolean     // 세션 대기 중 여부
+    pendingChannel?: { id: number; name: string }  // 대기 중인 채널 정보
+    pendingProductIds?: number[] // 대기 중인 상품 IDs
   }
 }
 

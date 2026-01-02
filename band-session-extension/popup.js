@@ -1,11 +1,4 @@
-// 서버 URL (프로덕션: HTTPS, 개발: HTTP:3001)
-
-// const SERVER_URL = 'http://localhost:3001';
-// const APP_DOMAIN = 'localhost';
-
-// 프로덕션용
-const SERVER_URL = 'https://snsauto.abcpharm.net';
-const APP_DOMAIN = 'snsauto.abcpharm.net';
+// 서버 URL은 config.js에서 로드됨 (SERVER_URL, APP_DOMAIN)
 
 // DOM 요소
 const loadingState = document.getElementById('loadingState');

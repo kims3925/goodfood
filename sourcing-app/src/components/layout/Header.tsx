@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check, AlertCircle, Info, Wifi, WifiOff, RefreshCw } from 'lucide-react'
+import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check, AlertCircle, Info, Wifi, WifiOff, RefreshCw, Save } from 'lucide-react'
 import { AppSection, getDefaultPathBySection } from '@/config/navigation'
 import { useBandSession } from '@/contexts/BandSessionContext'
+import { checkExtensionInstalled, saveSessionViaExtension } from '@/lib/band-extension'
 
 // 상대 시간 표시 컴포넌트 (독립적으로 업데이트되어 반짝임 방지)
 const RelativeTime = memo(function RelativeTime({ dateString }: { dateString: string }) {
@@ -78,6 +79,51 @@ const notificationTypeConfig: Record<NotificationType, { icon: React.ReactNode; 
 const SessionIndicator = memo(function SessionIndicator() {
   const { summary, isLoading, checkSession, lastChecked, channels } = useBandSession()
   const [showTooltip, setShowTooltip] = useState(false)
+  const [extensionAvailable, setExtensionAvailable] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Extension 설치 여부 확인
+  useEffect(() => {
+    checkExtensionInstalled().then(setExtensionAvailable)
+  }, [])
+
+  // 세션 저장 핸들러
+  const handleSaveSession = async () => {
+    if (isSaving) return
+
+    setIsSaving(true)
+    setSaveMessage(null)
+
+    try {
+      const result = await saveSessionViaExtension()
+
+      if (result.success && result.data) {
+        setSaveMessage({
+          type: 'success',
+          text: `${result.data.channelCount}개 채널 저장 완료!`,
+        })
+        // 저장 후 즉시 세션 상태 새로고침
+        checkSession()
+        // 메시지는 2초 후 제거
+        setTimeout(() => setSaveMessage(null), 2000)
+      } else {
+        setSaveMessage({
+          type: 'error',
+          text: result.error || '저장 실패',
+        })
+        setTimeout(() => setSaveMessage(null), 3000)
+      }
+    } catch (error) {
+      setSaveMessage({
+        type: 'error',
+        text: 'Extension 통신 오류',
+      })
+      setTimeout(() => setSaveMessage(null), 3000)
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   if (isLoading && !summary) {
     return (
@@ -96,7 +142,35 @@ const SessionIndicator = memo(function SessionIndicator() {
   const hasExpired = summary.expired > 0
 
   return (
-    <div className="relative">
+    <div className="relative flex items-center gap-1">
+      {/* 세션 저장 버튼 (Extension 설치 시만 표시) */}
+      {extensionAvailable && (
+        <button
+          onClick={handleSaveSession}
+          disabled={isSaving}
+          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+            isSaving
+              ? 'bg-gray-100 text-gray-400 cursor-wait'
+              : saveMessage?.type === 'success'
+              ? 'bg-green-100 text-green-700'
+              : saveMessage?.type === 'error'
+              ? 'bg-red-100 text-red-700'
+              : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+          }`}
+          title="Band 세션 저장 (Extension)"
+        >
+          {isSaving ? (
+            <RefreshCw size={12} className="animate-spin" />
+          ) : saveMessage ? (
+            saveMessage.type === 'success' ? <Check size={12} /> : <AlertCircle size={12} />
+          ) : (
+            <Save size={12} />
+          )}
+          <span>{saveMessage?.text || '세션 저장'}</span>
+        </button>
+      )}
+
+      {/* 세션 상태 표시 버튼 */}
       <button
         onClick={checkSession}
         onMouseEnter={() => setShowTooltip(true)}
@@ -127,7 +201,7 @@ const SessionIndicator = memo(function SessionIndicator() {
 
       {/* 툴팁 */}
       {showTooltip && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50">
+        <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50">
           <div className="text-xs font-medium text-gray-700 mb-2">Band 세션 상태</div>
           <div className="space-y-1.5 max-h-40 overflow-y-auto">
             {channels.map((ch) => (
@@ -152,24 +226,13 @@ const SessionIndicator = memo(function SessionIndicator() {
               </div>
             ))}
           </div>
-          {/* 미설정 채널이 있을 때 확장프로그램 안내 */}
-          {summary && summary.none > 0 && (
+          {/* Extension 미설치 안내 */}
+          {!extensionAvailable && (summary.none > 0 || summary.expired > 0) && (
             <div className="mt-2 pt-2 border-t border-gray-100">
               <div className="flex items-start gap-1.5 text-xs text-amber-600 bg-amber-50 p-2 rounded">
                 <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
                 <span>
-                  미설정 채널은 <strong>Chrome 확장프로그램</strong>을 통해 세션을 수집해주세요.
-                </span>
-              </div>
-            </div>
-          )}
-          {/* 미설정 채널이 있을 때 확장프로그램 안내 */}
-          {summary && summary.none > 0 && (
-            <div className="mt-2 pt-2 border-t border-gray-100">
-              <div className="flex items-start gap-1.5 text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
-                <span>
-                  미설정 채널은 <strong>Chrome 확장프로그램</strong>을 통해 세션을 수집해주세요.
+                  <strong>Chrome Extension</strong>을 설치하면 여기서 바로 세션을 저장할 수 있어요.
                 </span>
               </div>
             </div>

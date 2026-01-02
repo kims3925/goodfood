@@ -74,7 +74,7 @@
 | sourcing-app | `/sourcing-app` | 소싱 관리 앱 (상품 수집, AI 변환, 발행) |
 | shop-app | `/shop-app` | 쇼핑몰 앱 (주문, 결제, CS) |
 | db | `/db` | 공유 Prisma 클라이언트 (@bandauto/db) |
-| band-session-extension | `/band-session-extension` | Chrome 확장프로그램 (Band 세션 수집) |
+| band-session-extension | `/band-session-extension` | Chrome 확장프로그램 (Band 세션 수집, 자동 저장, 웹 연동) |
 
 ### 포트 설정
 

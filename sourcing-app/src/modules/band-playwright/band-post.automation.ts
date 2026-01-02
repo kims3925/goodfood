@@ -107,11 +107,47 @@ export class BandPostAutomation {
   }
 
   /**
+   * URL에서 밴드 ID를 추출하여 post URL 형태로 반환
+   * @param url 현재 URL (예: https://band.us/band/82426338/tab/posts)
+   * @returns 밴드 post URL (예: https://band.us/band/82426338/post)
+   */
+  private extractBandPostUrl(url: string): string {
+    const match = url.match(/band\.us\/band\/(\d+)/)
+    if (match) {
+      return `https://band.us/band/${match[1]}/post`
+    }
+    return url
+  }
+
+  /**
    * Band 홈에서 채널명으로 밴드를 찾아 해당 페이지로 이동
    * Band API의 bandKey는 항상 AAC... 형식이므로 채널명으로 찾아야 함
+   * @returns 접속 성공한 밴드 URL (예: https://band.us/band/82426338/post)
    */
-  private async navigateToBand(page: Page, bandKey: string, bandName: string): Promise<void> {
+  private async navigateToBand(page: Page, bandKey: string, bandName: string, bandPostUrl?: string): Promise<string> {
     console.log(`[밴드자동화] 밴드 이동: "${bandName}"`)
+
+    // 저장된 URL이 있으면 직접 접속 시도
+    if (bandPostUrl) {
+      console.log(`[밴드자동화] 저장된 URL로 직접 접속: ${bandPostUrl}`)
+      try {
+        await page.goto(bandPostUrl, {
+          waitUntil: 'load',
+          timeout: POST_TIMEOUT_MS,
+        })
+
+        // 로그인 체크
+        const directUrl = page.url()
+        if (directUrl.includes('signin') || directUrl.includes('login')) {
+          console.log('[밴드자동화] 직접 접속 실패 - 로그인 필요, 밴드 검색으로 폴백')
+        } else if (directUrl.includes('/band/')) {
+          console.log(`[밴드자동화] 직접 접속 성공: ${directUrl}`)
+          return bandPostUrl
+        }
+      } catch (error: any) {
+        console.warn(`[밴드자동화] 직접 접속 실패: ${error.message}, 밴드 검색으로 폴백`)
+      }
+    }
 
     // Band 홈에서 채널명으로 밴드 찾기
     console.log(`[밴드자동화] Band 홈에서 밴드 검색 중...`)
@@ -255,8 +291,9 @@ export class BandPostAutomation {
       if (linkElement) {
         await linkElement.click()
         await page.waitForLoadState('domcontentloaded')  // networkidle → domcontentloaded (최적화)
-        console.log(`[밴드자동화] 밴드 페이지 이동 완료: ${page.url()}`)
-        return
+        const currentUrl = page.url()
+        console.log(`[밴드자동화] 밴드 페이지 이동 완료: ${currentUrl}`)
+        return this.extractBandPostUrl(currentUrl)
       }
     }
 
@@ -276,14 +313,24 @@ export class BandPostAutomation {
         if (linkElement) {
           await linkElement.click()
           await page.waitForLoadState('domcontentloaded')  // networkidle → domcontentloaded (최적화)
-          console.log(`[밴드자동화] 밴드 페이지 이동 완료: ${page.url()}`)
-          return
+          const currentUrl = page.url()
+          console.log(`[밴드자동화] 밴드 페이지 이동 완료: ${currentUrl}`)
+          return this.extractBandPostUrl(currentUrl)
         }
       }
     }
 
     // 찾지 못한 경우 에러
     console.log(`[밴드자동화] 사용 가능한 밴드:`, bandLinks.map(l => l.bandNameText || l.imgAlt || l.text).join(', '))
+
+    // 밴드 목록이 0개면 세션 만료로 판단
+    if (bandLinks.length === 0) {
+      throw new BandPlaywrightError(
+        '밴드 목록을 불러올 수 없습니다. Chrome Extension에서 Band 세션을 다시 저장해주세요.',
+        BandPlaywrightErrorCode.SESSION_EXPIRED
+      )
+    }
+
     throw new BandPlaywrightError(
       `밴드를 찾을 수 없습니다. bandName: ${bandName}`,
       BandPlaywrightErrorCode.POST_FAILED
@@ -297,8 +344,9 @@ export class BandPostAutomation {
     page: Page,
     params: BandPublishParams
   ): Promise<BandPublishResult> {
-    const { bandKey, bandName, content, imageUrls, onStageProgress, signal } = params
+    const { bandKey, bandName, content, imageUrls, bandPostUrl, onStageProgress, signal } = params
     const tempFiles: string[] = []
+    let navigatedBandUrl: string | undefined
 
     // 취소 확인 헬퍼
     const checkCancelled = () => {
@@ -338,11 +386,11 @@ export class BandPostAutomation {
 
       // 1. 밴드 페이지로 이동 (1회 재시도)
       try {
-        await this.navigateToBand(page, bandKey, bandName)
+        navigatedBandUrl = await this.navigateToBand(page, bandKey, bandName, bandPostUrl)
       } catch (navError: any) {
         console.warn(`[밴드자동화] 밴드 찾기 실패, 1회 재시도: ${navError.message}`)
         await page.waitForTimeout(2000)
-        await this.navigateToBand(page, bandKey, bandName)
+        navigatedBandUrl = await this.navigateToBand(page, bandKey, bandName, bandPostUrl)
       }
 
       // 현재 URL 확인 (로그인 리다이렉트 체크)
@@ -371,17 +419,38 @@ export class BandPostAutomation {
       // 2. 글쓰기 레이어 열기
       console.log('[밴드자동화] 2단계: 글쓰기 레이어 열기')
 
+      // 글쓰기 버튼 셀렉터들 (우선순위 순)
+      const writeButtonSelectors = [
+        'button.uButton._btnPostWrite',        // 실제 Band UI 글쓰기 버튼 (정확)
+        'button._btnOpenWriteLayer',           // 글쓰기 레이어 열기 버튼
+        'button.cPostWriteEventWrapper',       // 글쓰기 래퍼 버튼
+        'button._btnPostWrite',                // 레거시 셀렉터
+        '[data-viewname="DPostFakeEditorView"]', // 가짜 에디터 영역
+      ]
+
+      // JavaScript 렌더링 완료 대기 (네트워크 idle 상태)
+      console.log('[밴드자동화] 페이지 렌더링 대기 중...')
+      try {
+        await page.waitForLoadState('networkidle', { timeout: 10000 })
+        console.log('[밴드자동화] 페이지 렌더링 완료')
+      } catch {
+        console.warn('[밴드자동화] 네트워크 idle 대기 타임아웃, 계속 진행...')
+      }
+
+      // 글쓰기 버튼이 나타날 때까지 대기 (최대 10초)
+      console.log('[밴드자동화] 글쓰기 버튼 대기 중...')
+      try {
+        await page.waitForSelector(writeButtonSelectors.join(', '), {
+          timeout: 10000,
+          state: 'visible'
+        })
+        console.log('[밴드자동화] 글쓰기 버튼 준비됨')
+      } catch {
+        console.warn('[밴드자동화] 글쓰기 버튼 대기 타임아웃')
+      }
+
       // 글쓰기 버튼 클릭 시도 (최대 2회)
       for (let attempt = 0; attempt < 2; attempt++) {
-        // 글쓰기 버튼 셀렉터들 (우선순위 순)
-        const writeButtonSelectors = [
-          'button.uButton._btnPostWrite',        // 실제 Band UI 글쓰기 버튼 (정확)
-          'button._btnOpenWriteLayer',           // 글쓰기 레이어 열기 버튼
-          'button.cPostWriteEventWrapper',       // 글쓰기 래퍼 버튼
-          'button._btnPostWrite',                // 레거시 셀렉터
-          '[data-viewname="DPostFakeEditorView"]', // 가짜 에디터 영역
-        ]
-
         let clicked = false
         for (const selector of writeButtonSelectors) {
           const writeButton = await page.$(selector)
@@ -479,7 +548,8 @@ export class BandPostAutomation {
             downloadedImages,
             async (current, total) => {
               await reportStage('uploading', { current, total })
-            }
+            },
+            signal
           )
           await this.saveDebugScreenshot(page, 'step5-images-uploaded')
         }
@@ -508,6 +578,7 @@ export class BandPostAutomation {
         success: true,
         postKey,
         imageCount: tempFiles.length,
+        bandPostUrl: navigatedBandUrl,  // 첫 접속 성공 시 저장용
       }
     } catch (error: any) {
       console.error('[밴드자동화] 게시물 작성 실패:', error)
@@ -669,7 +740,7 @@ export class BandPostAutomation {
           }
         }
         if (visibleItems.length > 0) {
-          console.log(`[밴드자동화] ${visibleItems.length}개 업로드된 이미지 발견: ${selector}`)
+          // 호출자에서 상태 변경 시에만 로그 출력하므로 여기선 생략
           return visibleItems.length
         }
       } catch {
@@ -684,7 +755,13 @@ export class BandPostAutomation {
    * 이미지 업로드
    * 레이어 팝업과 인라인 에디터 모두 지원
    */
-  private async uploadImages(page: Page, imagePaths: string[]): Promise<void> {
+  private async uploadImages(page: Page, imagePaths: string[], signal?: AbortSignal): Promise<void> {
+    // 시작 전 취소 확인
+    if (signal?.aborted) {
+      console.log('[밴드자동화] 이미지 업로드 취소됨 (시작 전)')
+      throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+    }
+
     console.log(`[밴드자동화] ${imagePaths.length}개 이미지 업로드 시작`)
 
     // 글쓰기 레이어 컨테이너 확인 (레이어 팝업 우선)
@@ -766,10 +843,10 @@ export class BandPostAutomation {
         console.log('[밴드자동화] change/input 이벤트 발생')
 
         // 팝업 내에서 이미지 업로드 완료 대기 후 "첨부하기" 클릭
-        await this.waitForPopupUploadAndAttach(page, imagePaths.length)
+        await this.waitForPopupUploadAndAttach(page, imagePaths.length, signal)
 
         // 게시글 영역에 이미지가 추가될 때까지 대기
-        await this.waitForUploadComplete(page, imagePaths.length)
+        await this.waitForUploadComplete(page, imagePaths.length, signal)
         return
       }
       throw new BandPlaywrightError(
@@ -829,10 +906,10 @@ export class BandPostAutomation {
     }
 
     // 팝업 내에서 이미지 업로드 완료 대기 후 "첨부하기" 클릭
-    await this.waitForPopupUploadAndAttach(page, imagePaths.length)
+    await this.waitForPopupUploadAndAttach(page, imagePaths.length, signal)
 
     // 게시글 영역에 이미지가 추가될 때까지 대기
-    await this.waitForUploadComplete(page, imagePaths.length)
+    await this.waitForUploadComplete(page, imagePaths.length, signal)
   }
 
   /**
@@ -841,8 +918,14 @@ export class BandPostAutomation {
   private async uploadImagesWithProgress(
     page: Page,
     imagePaths: string[],
-    onProgress?: (current: number, total: number) => void | Promise<void>
+    onProgress?: (current: number, total: number) => void | Promise<void>,
+    signal?: AbortSignal
   ): Promise<void> {
+    // 취소 확인
+    if (signal?.aborted) {
+      console.log('[밴드자동화] 이미지 업로드 취소됨 (시작 전)')
+      throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+    }
     // 기존 uploadImages와 동일한 로직, 단 waitForUploadComplete에 콜백 전달
     console.log(`[밴드자동화] ${imagePaths.length}개 이미지 업로드 시작 (진행률 추적)`)
 
@@ -950,10 +1033,10 @@ export class BandPostAutomation {
         })
 
         // 팝업 내에서 이미지 업로드 완료 대기 후 "첨부하기" 클릭
-        await this.waitForPopupUploadAndAttach(page, imagePaths.length)
+        await this.waitForPopupUploadAndAttach(page, imagePaths.length, signal)
 
         // 게시글 영역에 이미지가 추가될 때까지 대기
-        await this.waitForUploadCompleteWithProgress(page, imagePaths.length, onProgress)
+        await this.waitForUploadCompleteWithProgress(page, imagePaths.length, onProgress, signal)
         return
       }
       throw new BandPlaywrightError(
@@ -962,35 +1045,66 @@ export class BandPostAutomation {
       )
     }
 
-    // 파일 선택 대화상자 처리
-    // 1. 먼저 사진 버튼 클릭 (커서 위치 확보)
-    console.log('[밴드자동화] 사진 버튼 클릭...')
-    await imageButton.click()
-    await page.waitForTimeout(500)
+    // 파일 선택 대화상자 처리 (FileChooser 사용)
+    console.log('[밴드자동화] 사진 버튼 클릭, 파일 선택창 대기...')
 
-    // 2. hidden file input에 파일 설정
-    console.log('[밴드자동화] hidden file input 찾는 중...')
-    const fileInput = await page.$('input[type="file"][accept*="image"]') ||
-                      await page.$('input[type="file"]')
+    try {
+      const [fileChooser] = await Promise.all([
+        page.waitForEvent('filechooser', { timeout: 10000 }),
+        imageButton.click(),
+      ])
 
-    if (fileInput) {
-      console.log('[밴드자동화] hidden file input 발견, 파일 설정 중...')
-      await fileInput.setInputFiles(imagePaths)
-      console.log('[밴드자동화] 파일 설정 완료')
-    } else {
-      console.error('[밴드자동화] hidden file input을 찾을 수 없음')
-      throw new BandPlaywrightError(
-        '파일 입력 요소를 찾을 수 없습니다.',
-        BandPlaywrightErrorCode.UPLOAD_TIMEOUT
-      )
+      // 취소 확인
+      if (signal?.aborted) {
+        console.log('[밴드자동화] 이미지 업로드 취소됨 (파일 설정 전)')
+        throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+
+      console.log(`[밴드자동화] 파일 선택창 열림, ${imagePaths.length}개 파일 설정`)
+      await fileChooser.setFiles(imagePaths)
+      console.log('[밴드자동화] FileChooser로 파일 설정 완료')
+    } catch (error: any) {
+      // 취소로 인한 에러면 다시 throw
+      if (error instanceof BandPlaywrightError) throw error
+
+      // FileChooser 이벤트 실패 시 hidden input 폴백
+      console.warn('[밴드자동화] 파일 선택창 이벤트 실패:', error.message)
+      console.log('[밴드자동화] hidden file input 폴백 시도...')
+
+      // 취소 확인
+      if (signal?.aborted) {
+        console.log('[밴드자동화] 이미지 업로드 취소됨 (폴백 전)')
+        throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+
+      const fileInput = await page.$('input[type="file"][accept*="image"]') ||
+                        await page.$('input[type="file"]')
+
+      if (fileInput) {
+        console.log('[밴드자동화] hidden file input 발견, 파일 설정 중...')
+        await fileInput.setInputFiles(imagePaths)
+
+        // Band UI가 파일 변경을 감지하도록 change 이벤트 트리거
+        await fileInput.evaluate((el) => {
+          el.dispatchEvent(new Event('change', { bubbles: true }))
+          el.dispatchEvent(new Event('input', { bubbles: true }))
+        })
+        console.log('[밴드자동화] 파일 설정 완료 (change 이벤트 발생)')
+      } else {
+        console.error('[밴드자동화] hidden file input을 찾을 수 없음')
+        throw new BandPlaywrightError(
+          '파일 입력 요소를 찾을 수 없습니다.',
+          BandPlaywrightErrorCode.UPLOAD_TIMEOUT
+        )
+      }
     }
 
     // 팝업 내에서 이미지 업로드 완료 대기 후 "첨부하기" 클릭
     console.log('[밴드자동화] 팝업 업로드 대기 시작...')
-    await this.waitForPopupUploadAndAttach(page, imagePaths.length)
+    await this.waitForPopupUploadAndAttach(page, imagePaths.length, signal)
 
     // 게시글 영역에 이미지가 추가될 때까지 대기
-    await this.waitForUploadCompleteWithProgress(page, imagePaths.length, onProgress)
+    await this.waitForUploadCompleteWithProgress(page, imagePaths.length, onProgress, signal)
   }
 
   /**
@@ -998,10 +1112,16 @@ export class BandPostAutomation {
    * 실제 업로드 상태를 확인하고 게시 버튼 활성화를 대기
    * 상태 변화가 없으면 조기 타임아웃
    */
-  private async waitForUploadComplete(page: Page, expectedCount: number): Promise<void> {
+  private async waitForUploadComplete(page: Page, expectedCount: number, signal?: AbortSignal): Promise<void> {
     const maxWaitTime = IMAGE_UPLOAD_TIMEOUT_MS // 60초
     const startTime = Date.now()
     const MAX_NO_PROGRESS_COUNT = 40 // 20초간 진행 없으면 타임아웃 (500ms * 40)
+
+    // 시작 전 취소 확인
+    if (signal?.aborted) {
+      console.log('[이미지업로드] 작업 취소됨 (시작 전)')
+      throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+    }
 
     console.log(`[이미지업로드] ${expectedCount}개 이미지 업로드 대기 중 (최대 ${maxWaitTime / 1000}초)`)
 
@@ -1021,6 +1141,12 @@ export class BandPostAutomation {
     let lastIsLoading = false
 
     while (Date.now() - startTime < maxWaitTime) {
+      // 취소 신호 확인
+      if (signal?.aborted) {
+        console.log('[이미지업로드] 작업 취소됨')
+        throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+
       // 1. 로딩 인디케이터가 보이는지 확인
       let isLoading = false
       let loadingSelector = ''
@@ -1132,7 +1258,8 @@ export class BandPostAutomation {
   private async waitForUploadCompleteWithProgress(
     page: Page,
     expectedCount: number,
-    onProgress?: (current: number, total: number) => void | Promise<void>
+    onProgress?: (current: number, total: number) => void | Promise<void>,
+    signal?: AbortSignal
   ): Promise<void> {
     const maxWaitTime = IMAGE_UPLOAD_TIMEOUT_MS
     const startTime = Date.now()
@@ -1150,6 +1277,12 @@ export class BandPostAutomation {
     let lastIsLoading = false
 
     while (Date.now() - startTime < maxWaitTime) {
+      // 취소 신호 확인
+      if (signal?.aborted) {
+        console.log('[이미지업로드] 작업 취소됨')
+        throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+
       // 로딩 인디케이터 확인
       let isLoading = false
       for (const selector of loadingIndicators) {
@@ -1240,7 +1373,7 @@ export class BandPostAutomation {
    * 2. 팝업이 있으면 업로드 완료 대기 후 "첨부하기" 클릭
    * 3. 팝업이 없으면 인라인 업로드 방식으로 처리 (바로 return)
    */
-  private async waitForPopupUploadAndAttach(page: Page, expectedCount: number): Promise<void> {
+  private async waitForPopupUploadAndAttach(page: Page, expectedCount: number, signal?: AbortSignal): Promise<void> {
     const FORBIDDEN_TEXTS = ['게시', '등록', 'post', 'submit']
     // 이미지 개수에 따라 타임아웃 동적 조정 (기본 30초 + 이미지당 10초)
     const baseTimeout = 30000
@@ -1249,6 +1382,12 @@ export class BandPostAutomation {
     const checkInterval = 500 // 500ms로 체크
     const startTime = Date.now()
     const NO_PROGRESS_TIMEOUT = 15000 // 15초간 진행 없으면 현재 개수로 진행
+
+    // 취소 확인
+    if (signal?.aborted) {
+      console.log('[밴드자동화] 팝업 업로드 취소됨 (시작 전)')
+      throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+    }
 
     console.log(`[밴드자동화] 업로드 타임아웃: ${maxWaitTime / 1000}초 (이미지 ${expectedCount}개)`)
 
@@ -1274,56 +1413,124 @@ export class BandPostAutomation {
       '.layerPopup',
     ]
 
-    // 1. 팝업이 열렸는지 먼저 확인 (최대 10초 대기)
+    // 1. 업로드 진행률 추적 (DProgressBarView) + 팝업 대기
     let popupFound = false
     const popupWaitStart = Date.now()
-    while (Date.now() - popupWaitStart < 10000) {
+    const IDLE_TIMEOUT = 30000 // 진행 없이 30초면 타임아웃
+    let progressBarSeen = false
+    let uploadCompletedLogged = false // 업로드 완료 로그 출력 여부
+    let lastProgressLog = 0
+    let lastProgressInfo = '' // 마지막 진행률 (변경 시에만 로그)
+    let lastStateLog = 0
+    let lastActivityTime = Date.now() // 마지막 활동 시간
+
+    console.log(`[밴드자동화] 파일 준비 및 업로드 대기 중...`)
+
+    while (true) {
+      // 취소 신호 확인
+      if (signal?.aborted) {
+        console.log('[밴드자동화] 팝업 대기 중 취소됨')
+        throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+
+      const now = Date.now()
+      const elapsed = now - popupWaitStart
+      const idleTime = now - lastActivityTime
+
+      // 진행 없이 30초 경과하면 타임아웃
+      if (idleTime > IDLE_TIMEOUT) {
+        console.error(`[밴드자동화] ${IDLE_TIMEOUT / 1000}초간 진행 없음 - 타임아웃`)
+        break
+      }
+
+      // DProgressBarView (업로드 진행률 팝업) 확인
+      const progressBar = await page.$('[data-viewname="DProgressBarView"]')
+      if (progressBar && await progressBar.isVisible()) {
+        lastActivityTime = now // 활동 있음!
+
+        // 처음 발견 시 로그
+        if (!progressBarSeen) {
+          console.log(`[밴드자동화] 업로드 시작됨 (${Math.floor(elapsed / 1000)}초 후)`)
+          progressBarSeen = true
+        }
+
+        // 진행률 정보 추출 (1초마다 로그)
+        if (now - lastProgressLog >= 1000) {
+          lastProgressLog = now
+          const progressInfo = await page.evaluate(() => {
+            const progressView = document.querySelector('[data-viewname="DProgressBarView"]')
+            if (!progressView) return null
+
+            const fileIndex = progressView.querySelector('[data-uiselector="totalFileIndexSpan"]')
+            const totalProgress = progressView.querySelector('[data-uiselector="totalProgressBar"]')
+            const currentPercent = progressView.querySelector('[data-uiselector="currentFilePercentSpan"]')
+
+            return {
+              fileIndex: fileIndex?.textContent?.trim() || '',
+              totalWidth: (totalProgress as HTMLElement)?.style?.width || '0%',
+              currentPercent: currentPercent?.textContent?.trim() || '',
+            }
+          })
+
+          if (progressInfo) {
+            const progressInfoStr = `${progressInfo.fileIndex}|${progressInfo.totalWidth}|${progressInfo.currentPercent}`
+            // 변경되었을 때만 로그 출력
+            if (progressInfoStr !== lastProgressInfo) {
+              lastProgressInfo = progressInfoStr
+              console.log(`[밴드자동화] 📤 ${progressInfo.fileIndex} | 전체: ${progressInfo.totalWidth} | 현재 파일: ${progressInfo.currentPercent}`)
+            }
+          }
+        }
+
+        await page.waitForTimeout(200) // 진행률 확인 주기
+        continue
+      }
+
+      // 진행률 팝업이 보였다가 사라졌으면 → 업로드 완료!
+      if (progressBarSeen && !uploadCompletedLogged) {
+        console.log('[밴드자동화] ✅ 업로드 완료!')
+        uploadCompletedLogged = true
+        lastActivityTime = now // 완료도 활동!
+      }
+
+      // DPhotoUploadLayoutView 우선 확인
+      const photoUploadPopup = await page.$('[data-viewname="DPhotoUploadLayoutView"]')
+      if (photoUploadPopup && await photoUploadPopup.isVisible()) {
+        console.log('[밴드자동화] 사진 선택 팝업 발견')
+        popupFound = true
+        break
+      }
+
+      // 기타 셀렉터 확인
       for (const selector of popupSelectors) {
         try {
           const popup = await page.$(selector)
           if (popup && await popup.isVisible()) {
-            console.log(`[밴드자동화] 팝업 발견: ${selector}`)
-            popupFound = true
-            break
+            // "사진 올리기" 제목이 있는지 확인
+            const hasPhotoTitle = await page.evaluate((sel) => {
+              const el = document.querySelector(sel)
+              if (!el) return false
+              const title = el.querySelector('h1, .title')
+              return title?.textContent?.includes('사진 올리기') || false
+            }, selector)
+
+            if (hasPhotoTitle) {
+              console.log(`[밴드자동화] 팝업 발견: ${selector}`)
+              popupFound = true
+              break
+            }
           }
         } catch { /* 무시 */ }
       }
       if (popupFound) break
-      await page.waitForTimeout(300)
-    }
 
-    // 셀렉터로 못 찾으면 JavaScript로 팝업 찾기
-    if (!popupFound) {
-      console.log('[밴드자동화] 셀렉터로 팝업 못 찾음, JavaScript로 검색...')
-      popupFound = await page.evaluate(() => {
-        // 모든 요소에서 "사진 올리기" 텍스트를 포함한 팝업 찾기
-        const allElements = document.querySelectorAll('*')
-        for (const el of allElements) {
-          const text = el.textContent || ''
-          const className = el.className || ''
-          const style = window.getComputedStyle(el)
-
-          // 팝업 특성: position fixed/absolute, z-index 높음, "사진" 또는 "올리기" 텍스트
-          if (
-            (style.position === 'fixed' || style.position === 'absolute') &&
-            parseInt(style.zIndex) > 100 &&
-            (text.includes('사진') || text.includes('올리기') || text.includes('첨부') ||
-             className.includes('Layer') || className.includes('layer') ||
-             className.includes('Popup') || className.includes('popup'))
-          ) {
-            const rect = el.getBoundingClientRect()
-            if (rect.width > 100 && rect.height > 100) {
-              console.log('[JS] 팝업 발견:', className.substring(0, 50), rect.width, rect.height)
-              return true
-            }
-          }
-        }
-        return false
-      })
-
-      if (popupFound) {
-        console.log('[밴드자동화] JavaScript로 팝업 발견')
+      // 5초마다 상태 로그 (진행률 팝업이 아직 안 나타났을 때)
+      if (!progressBarSeen && now - lastStateLog >= 5000) {
+        lastStateLog = now
+        console.log(`[밴드자동화] ⏳ 파일 준비 중... ${Math.floor(elapsed / 1000)}초 경과`)
       }
+
+      await page.waitForTimeout(300)
     }
 
     // 팝업이 열리지 않으면 에러 (호출측에서 재시도)
@@ -1407,6 +1614,12 @@ export class BandPostAutomation {
     let debugLogged = false
 
     while (Date.now() - startTime < maxWaitTime) {
+      // 취소 신호 확인
+      if (signal?.aborted) {
+        console.log('[밴드자동화] 이미지 업로드 대기 중 취소됨')
+        throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+
       // 로딩 중인지 확인 (uLoading의 display 속성 체크)
       let isLoading = false
       let loadingFoundBy = ''
@@ -2511,16 +2724,17 @@ export class BandPostAutomation {
     page: Page,
     params: BandBatchPublishParams
   ): Promise<BandBatchPublishResult> {
-    const { bandKey, bandName, items, onItemSuccess, onProgress } = params
+    const { bandKey, bandName, bandPostUrl, items, onItemSuccess, onProgress } = params
     const results: BandBatchItemResult[] = []
     let successCount = 0
     let failedCount = 0
+    let navigatedBandUrl: string | undefined
 
     console.log(`[밴드자동화] 배치 발행 시작: ${items.length} items to band "${bandName}"`)
 
     try {
       // 1. 밴드 페이지로 한 번만 이동
-      await this.navigateToBand(page, bandKey, bandName)
+      navigatedBandUrl = await this.navigateToBand(page, bandKey, bandName, bandPostUrl)
 
       // 현재 URL 확인 (로그인 리다이렉트 체크)
       const currentUrl = page.url()
@@ -2732,6 +2946,7 @@ export class BandPostAutomation {
       successCount,
       failedCount,
       results,
+      bandPostUrl: navigatedBandUrl,  // 첫 접속 성공 시 저장용
     }
   }
 
