@@ -52,8 +52,10 @@ export async function GET(
       )
     }
 
-    // 정산에 포함된 주문 아이템 상세 정보 조회
-    const orderItemIds = settlement.items.map(i => i.orderItemId)
+    // 정산에 포함된 주문 아이템 상세 정보 조회 (null 값 필터링)
+    const orderItemIds = settlement.items
+      .map(i => i.orderItemId)
+      .filter((id): id is number => id !== null)
     const orderItems = await prisma.orderItem.findMany({
       where: { id: { in: orderItemIds } },
       include: {
@@ -92,7 +94,7 @@ export async function GET(
         settledAt: settlement.settledAt?.toISOString() || null,
         createdAt: settlement.createdAt.toISOString(),
         items: settlement.items.map(item => {
-          const orderItem = orderItemMap.get(item.orderItemId)
+          const orderItem = item.orderItemId ? orderItemMap.get(item.orderItemId) : undefined
           return {
             id: item.id,
             orderItemId: item.orderItemId,
