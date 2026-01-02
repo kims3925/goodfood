@@ -8,7 +8,7 @@
 
 import prisma, { ChannelKind } from '@bandauto/db'
 import { getBatchContext, checkCancellation } from '../context'
-import { updateWorkflowProgress } from '../workflow-service'
+import { updateWorkflowProgress, setWaitingSessionStatus } from '../workflow-service'
 import { publishService } from '@/modules/publish'
 import {
   PublishConfig,
@@ -17,6 +17,7 @@ import {
   ChannelPublishResult,
   PipelineError,
 } from '../types'
+import { isSessionExpiredError } from '../session-utils'
 
 // =============================================
 // PUBLISH PIPELINE
@@ -294,6 +295,40 @@ export async function runPublishPipeline(
         })
       } : undefined,
     })
+
+    // 세션 만료 에러 감지 - 파이프라인 일시 중지
+    const sessionExpiredError = result.errors.find(e => isSessionExpiredError(e))
+    if (sessionExpiredError && workflowLogId) {
+      console.log(`[Publish Pipeline] 세션 만료 감지 - WAITING_SESSION 상태로 변경`)
+
+      // 아직 발행되지 않은 상품 ID들
+      const remainingProductIds = unpublishedProductIds.filter(
+        id => !publishedProducts.some(p => p.productId === id && p.channelId === channel.id && p.status === 'SUCCESS')
+      )
+
+      // 세션 대기 상태로 변경
+      await setWaitingSessionStatus(
+        workflowLogId,
+        { productIds: remainingProductIds, channelId: channel.id },
+        { successCount: currentSuccess, failedCount: currentFailed, totalItems }
+      )
+
+      // 결과 반환 (세션 대기 중)
+      return {
+        success: false,
+        totalItems,
+        successCount: currentSuccess,
+        failedCount: currentFailed,
+        details: {
+          publishedProducts,
+          channelResults,
+          waitingSession: true,
+          pendingChannel: { id: channel.id, name: channel.name },
+          pendingProductIds: remainingProductIds,
+        },
+        errors: [...errors, { itemId: 'session', message: sessionExpiredError, timestamp: new Date() }],
+      }
+    }
 
     // 채널별 결과 변환
     const channelResult: ChannelPublishResult = {

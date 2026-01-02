@@ -294,6 +294,7 @@ export class PublishService {
             channelId,
             bandKey: channel.channelKey,
             bandName: channel.name,
+            bandPostUrl: channel.bandPostUrl || undefined,  // 저장된 URL로 직접 접속
             content: postContent,
             imageUrls,
           })
@@ -304,6 +305,16 @@ export class PublishService {
             imageCount = imageUrls.length
             playwrightSuccess = true
             console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
+
+            // 첫 접속 성공 시 bandPostUrl 저장 (아직 저장되지 않은 경우에만)
+            if (playwrightResult.bandPostUrl && !channel.bandPostUrl) {
+              console.log(`[PublishService] 밴드 URL 저장: ${playwrightResult.bandPostUrl}`)
+              await prisma.channel.update({
+                where: { id: channelId },
+                data: { bandPostUrl: playwrightResult.bandPostUrl },
+              })
+            }
+
             break
           } else {
             lastError = playwrightResult.error
@@ -736,10 +747,22 @@ export class PublishService {
   async publishToChannelWithProgress(
     params: PublishToChannelParams & {
       onStageProgress?: PublishStageCallback
+      signal?: AbortSignal // 취소 신호
     },
     retryCount: number = 0
   ): Promise<PublishToChannelResult> {
-    const { userId, productId, channelId, onStageProgress } = params
+    const { userId, productId, channelId, onStageProgress, signal } = params
+
+    // 취소 신호 확인
+    if (signal?.aborted) {
+      console.log(`[PublishService] 발행 취소됨 (상품 ${productId} 시작 전)`)
+      return {
+        success: false,
+        productId,
+        channelId,
+        error: '발행이 취소되었습니다.',
+      }
+    }
 
     try {
       // 1. 채널 정보 조회
@@ -934,14 +957,27 @@ export class PublishService {
             await delay(IMAGE_UPLOAD_RETRY_DELAY_MS)
           }
 
+          // 취소 신호 확인
+          if (signal?.aborted) {
+            console.log(`[PublishService] Playwright 발행 취소됨 (시도 ${attempt + 1} 전)`)
+            return {
+              success: false,
+              productId,
+              channelId,
+              error: '발행이 취소되었습니다.',
+            }
+          }
+
           console.log(`[PublishService] Playwright 발행 시도 ${attempt + 1}/${MAX_IMAGE_UPLOAD_RETRIES + 1} (${imageUrls.length}개 이미지) - 진행률 추적`)
 
           const playwrightResult = await bandPlaywrightService.publishWithImages({
             channelId,
             bandKey: channel.channelKey,
             bandName: channel.name,
+            bandPostUrl: channel.bandPostUrl || undefined,  // 저장된 URL로 직접 접속
             content: postContent,
             imageUrls,
+            signal, // 취소 신호 전달
             // 진행률 콜백 전달
             onStageProgress: onStageProgress
               ? (progress) => onStageProgress({
@@ -958,6 +994,16 @@ export class PublishService {
             imageCount = imageUrls.length
             playwrightSuccess = true
             console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
+
+            // 첫 접속 성공 시 bandPostUrl 저장 (아직 저장되지 않은 경우에만)
+            if (playwrightResult.bandPostUrl && !channel.bandPostUrl) {
+              console.log(`[PublishService] 밴드 URL 저장: ${playwrightResult.bandPostUrl}`)
+              await prisma.channel.update({
+                where: { id: channelId },
+                data: { bandPostUrl: playwrightResult.bandPostUrl },
+              })
+            }
+
             break
           } else {
             lastError = playwrightResult.error
@@ -1110,8 +1156,21 @@ export class PublishService {
       if (isQuotaError(error) && retryCount < MAX_QUOTA_RETRIES) {
         const delayMs = QUOTA_RETRY_BASE_DELAY_MS * Math.pow(2, retryCount)
         console.log(`[PublishService] 쿼터 에러 발생, ${delayMs / 1000}초 후 재시도 (${retryCount + 1}/${MAX_QUOTA_RETRIES})...`)
-        await delay(delayMs)
-        return this.publishToChannelWithProgress({ userId, productId, channelId, onStageProgress }, retryCount + 1)
+        // 500ms 단위로 분할하여 취소 신호 확인
+        const chunks = Math.ceil(delayMs / 500)
+        for (let j = 0; j < chunks; j++) {
+          if (signal?.aborted) {
+            console.log(`[PublishService] 재시도 대기 중 취소됨`)
+            return {
+              success: false,
+              productId,
+              channelId,
+              error: '발행이 취소되었습니다.',
+            }
+          }
+          await delay(Math.min(500, delayMs - j * 500))
+        }
+        return this.publishToChannelWithProgress({ userId, productId, channelId, onStageProgress, signal }, retryCount + 1)
       }
 
       return {
@@ -1243,6 +1302,7 @@ export class PublishService {
         userId,
         productId,
         channelId,
+        signal, // 취소 신호 전달
         onStageProgress: async (progress) => {
           // 콜백에서 이벤트 큐에 추가
           eventQueue.push({

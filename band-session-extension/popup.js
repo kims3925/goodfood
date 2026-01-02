@@ -1,11 +1,3 @@
-// 서버 URL (프로덕션: HTTPS, 개발: HTTP:3001)
-
-// const SERVER_URL = 'http://localhost:3001';
-// const APP_DOMAIN = 'localhost';
-
-// 프로덕션용
-const SERVER_URL = 'https://snsauto.abcpharm.net';
-const APP_DOMAIN = 'snsauto.abcpharm.net';
 
 // DOM 요소
 const loadingState = document.getElementById('loadingState');
@@ -23,7 +15,13 @@ const saveSpinner = document.getElementById('saveSpinner');
 const openBandBtn = document.getElementById('openBandBtn');
 const openAppBtn = document.getElementById('openAppBtn');
 const retryBtn = document.getElementById('retryBtn');
-
+// 서버 URL은 config.js에서 로드됨 (SERVER_URL)
+if (typeof SERVER_URL === 'undefined') {
+  console.error('config.js가 로드되지 않았거나 SERVER_URL이 정의되지 않았습니다.');
+  hideAllStates();
+  errorState.classList.remove('hidden');
+  errorDesc.textContent = '설정 파일을 찾을 수 없습니다. 확장 프로그램을 다시 설치해주세요.';
+}
 // 모든 상태 카드 숨기기
 function hideAllStates() {
   loadingState.classList.add('hidden');

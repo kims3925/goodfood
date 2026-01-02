@@ -26,6 +26,7 @@ import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
+import { checkExtensionInstalled, saveSessionViaExtension } from '@/lib/band-extension'
 
 const BandIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -178,6 +179,14 @@ export default function PublishPage() {
     channelName: string
   } | null>(null)
 
+  // Extension 세션 저장 후 재시도 관련 상태
+  const [extensionAvailable, setExtensionAvailable] = useState(false)
+  const [isRetrying, setIsRetrying] = useState(false)
+  const [retryMessage, setRetryMessage] = useState('')
+  const [failedPublishItems, setFailedPublishItems] = useState<PublishProgressItem[]>([])
+  const [autoRetryTriggered, setAutoRetryTriggered] = useState(false) // 자동 재시도 트리거 플래그
+  const autoRetryAttemptedRef = useRef(false) // 자동 재시도 시도 여부 (무한 루프 방지)
+
   // 페이지 이탈 경고 및 작업 중단 (발행 중일 때)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -210,12 +219,9 @@ export default function PublishPage() {
   useEffect(() => {
     loadChannels()
     loadShops()
+    // Extension 설치 확인
+    checkExtensionInstalled().then(setExtensionAvailable)
   }, [])
-
-  // 페이지/필터 변경 시 상품 로드
-  useEffect(() => {
-    loadProducts()
-  }, [currentPage, selectedWholesaleChannel])
 
   const loadChannels = async () => {
     try {
@@ -247,7 +253,7 @@ export default function PublishPage() {
     }
   }
 
-  const loadProducts = async (resetPage = false) => {
+  const loadProducts = useCallback(async (resetPage = false) => {
     try {
       setIsLoading(true)
       const page = resetPage ? 1 : currentPage
@@ -290,7 +296,13 @@ export default function PublishPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- searchTerm은 Enter 키를 눌러야 적용됨
+  }, [currentPage, selectedWholesaleChannel])
+
+  // 페이지/필터 변경 시 상품 로드
+  useEffect(() => {
+    loadProducts()
+  }, [loadProducts])
 
   // 플랫폼별 채널 그룹 (Shop 포함)
   const groupedTargets = useMemo(() => {
@@ -623,10 +635,12 @@ export default function PublishPage() {
 
     if (progressItems.length === 0) return
 
-    // 취소 상태 초기화
+    // 취소 상태 및 자동 재시도 상태 초기화
     publishCancelledRef.current = false
+    autoRetryAttemptedRef.current = false
     setPublishCancelled(false)
     setIsCancelling(false)
+    setAutoRetryTriggered(false)
 
     // 발행 진행 모달 표시
     setPublishProgressItems(progressItems)
@@ -934,16 +948,36 @@ export default function PublishPage() {
                         if (progress.error) {
                           errorMessages.push(progress.error)
 
-                          // 세션 만료 감지 시 모달 표시
+                          // 세션 만료 감지 시 자동 재시도 또는 모달 표시
                           const isSessionError = progress.error.includes('세션') &&
                             (progress.error.includes('만료') || progress.error.includes('없'))
-                          if (isSessionError && !showSessionExpiredModal) {
+                          if (isSessionError && !showSessionExpiredModal && !autoRetryAttemptedRef.current) {
                             const channel = channels.find(ch => ch.id === Number(channelId))
                             setExpiredChannelInfo({
                               channelId: Number(channelId),
                               channelName: channel?.name || `채널 ${channelId}`
                             })
-                            setShowSessionExpiredModal(true)
+                            // 세션 만료로 실패한 채널의 모든 pending/failed 항목 저장 (재시도용)
+                            const failedItems = progressItems.filter(
+                              (p) => p.targetType === 'channel' &&
+                                     p.targetId === Number(channelId) &&
+                                     (p.status === 'pending' || p.status === 'failed' || p.status === 'publishing')
+                            )
+                            setFailedPublishItems(failedItems)
+
+                            // Extension 설치되어 있으면 자동 재시도, 아니면 모달 표시
+                            if (extensionAvailable) {
+                              console.log('[발행] 세션 만료 감지 - 기존 스트림 중단 후 자동 재시도 시작')
+                              // 기존 SSE 스트림 중단 (레이스 컨디션 방지)
+                              if (abortControllerRef.current) {
+                                abortControllerRef.current.abort()
+                                abortControllerRef.current = null
+                              }
+                              publishCancelledRef.current = true
+                              setAutoRetryTriggered(true)
+                            } else {
+                              setShowSessionExpiredModal(true)
+                            }
                           }
                         }
                         if (itemIdx !== -1) {
@@ -1013,6 +1047,352 @@ export default function PublishPage() {
     } finally {
       setIsPublishing(false)
       // 모달은 사용자가 닫을 때까지 유지
+    }
+  }
+
+  // 자동 재시도 핸들러 (세션 만료 시 자동으로 실행)
+  const handleAutoRetry = useCallback(async () => {
+    if (!expiredChannelInfo || failedPublishItems.length === 0) {
+      console.log('[자동 재시도] 필요한 정보 없음, 건너뜀')
+      return
+    }
+
+    console.log(`[자동 재시도] Extension으로 세션 저장 시작... (${failedPublishItems.length}개 항목)`)
+
+    // 진행 모달에 메시지 표시
+    setPublishProgressItems((prev) =>
+      prev.map((item) =>
+        item.status === 'failed'
+          ? { ...item, message: 'Extension에서 세션 저장 중...' }
+          : item
+      )
+    )
+
+    try {
+      // 1. Extension으로 세션 저장
+      const saveResult = await saveSessionViaExtension()
+
+      if (!saveResult.success) {
+        console.error('[자동 재시도] 세션 저장 실패:', saveResult.error)
+        // 실패 시 모달 표시
+        setShowSessionExpiredModal(true)
+        toast.error(`자동 세션 저장 실패: ${saveResult.error}`)
+        return
+      }
+
+      console.log('[자동 재시도] 세션 저장 완료, 재발행 시작...')
+      toast.info('세션 저장 완료! 재시도 중...')
+
+      // 2. 잠시 대기 (서버에 세션 저장 반영 시간)
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // 3. 실패한 항목들 재시도
+      const channelId = expiredChannelInfo.channelId
+      const productIds = failedPublishItems.map(item => item.productId)
+
+      // 발행 진행 모달 상태 리셋
+      setPublishProgressItems(failedPublishItems.map(item => ({ ...item, status: 'pending' as const, message: undefined })))
+      setIsPublishing(true)
+      publishCancelledRef.current = false
+
+      // SSE 스트리밍으로 재발행
+      const abortController = new AbortController()
+      abortControllerRef.current = abortController
+
+      const response = await fetch('/api/shop/publish/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productIds, channelId }),
+        signal: abortController.signal,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '재시도 요청 실패')
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('스트림을 읽을 수 없습니다.')
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let successCount = 0
+      let failCount = 0
+
+      while (true) {
+        if (publishCancelledRef.current) {
+          reader.cancel()
+          break
+        }
+
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6))
+
+              if (event.type === 'product_start' || event.type === 'stage_update' || event.type === 'image_progress') {
+                const itemIdx = failedPublishItems.findIndex(
+                  (p) => p.productId === event.data.progress.productId
+                )
+                if (itemIdx !== -1) {
+                  setPublishProgressItems((prev) => {
+                    const updated = [...prev]
+                    updated[itemIdx] = {
+                      ...updated[itemIdx],
+                      status: 'publishing',
+                      stage: event.data.progress.stage,
+                      stageLabel: event.data.progress.stageLabel,
+                      imageProgress: event.data.progress.imageProgress,
+                      publishMethod: event.data.progress.publishMethod,
+                    }
+                    return updated
+                  })
+                  setCurrentPublishIndex(itemIdx)
+                }
+              } else if (event.type === 'product_complete') {
+                const progress = event.data.progress
+                const itemIdx = failedPublishItems.findIndex(
+                  (p) => p.productId === progress.productId
+                )
+
+                if (progress.stage === 'completed' || progress.stage === 'skipped') {
+                  successCount++
+                  if (itemIdx !== -1) {
+                    setPublishProgressItems((prev) => {
+                      const updated = [...prev]
+                      updated[itemIdx] = {
+                        ...updated[itemIdx],
+                        status: 'success',
+                        stage: progress.stage,
+                        stageLabel: progress.stageLabel,
+                      }
+                      return updated
+                    })
+                  }
+                } else if (progress.stage === 'failed') {
+                  failCount++
+                  if (itemIdx !== -1) {
+                    setPublishProgressItems((prev) => {
+                      const updated = [...prev]
+                      updated[itemIdx] = {
+                        ...updated[itemIdx],
+                        status: 'failed',
+                        message: progress.error,
+                        stage: progress.stage,
+                        stageLabel: progress.stageLabel,
+                      }
+                      return updated
+                    })
+                  }
+                }
+              }
+            } catch (parseError) {
+              console.error('SSE 파싱 오류:', parseError)
+            }
+          }
+        }
+      }
+
+      // 완료
+      loadProducts()
+      if (successCount > 0) {
+        toast.success(`자동 재시도 완료: ${successCount}개 성공` + (failCount > 0 ? `, ${failCount}개 실패` : ''))
+      }
+
+      // 모든 항목이 성공한 경우에만 failedPublishItems 초기화
+      if (failCount === 0) {
+        setFailedPublishItems([])
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('[자동 재시도] 실패:', error)
+        toast.error(`자동 재시도 실패: ${error.message}`)
+        // 실패 시 모달 표시 (failedPublishItems는 유지하여 수동 재시도 가능하게 함)
+        setShowSessionExpiredModal(true)
+      }
+    } finally {
+      setIsPublishing(false)
+      // failedPublishItems는 성공 시에만 초기화 (catch에서 모달 표시 시 유지)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadProducts는 항상 최신 상태를 사용
+  }, [expiredChannelInfo, failedPublishItems, toast])
+
+  // 자동 재시도 트리거 감지 - Extension 설치 시 자동으로 세션 저장 후 재시도
+  useEffect(() => {
+    if (autoRetryTriggered && extensionAvailable && failedPublishItems.length > 0 && !autoRetryAttemptedRef.current) {
+      autoRetryAttemptedRef.current = true
+      setAutoRetryTriggered(false)
+      // 자동 재시도 실행
+      handleAutoRetry()
+    }
+  }, [autoRetryTriggered, extensionAvailable, failedPublishItems, handleAutoRetry])
+
+  // 세션 저장 후 재시도 핸들러 (수동 - 모달에서 버튼 클릭 시)
+  const handleRetryWithSessionSave = async () => {
+    if (!expiredChannelInfo || failedPublishItems.length === 0) return
+    if (isRetrying) return
+
+    setIsRetrying(true)
+    setRetryMessage('Extension에서 세션 저장 중...')
+
+    try {
+      // 1. Extension으로 세션 저장
+      const saveResult = await saveSessionViaExtension()
+
+      if (!saveResult.success) {
+        setRetryMessage(`세션 저장 실패: ${saveResult.error}`)
+        setTimeout(() => setRetryMessage(''), 3000)
+        return
+      }
+
+      setRetryMessage('세션 저장 완료! 발행 재시도 중...')
+
+      // 2. 잠시 대기 (서버에 세션 저장 반영 시간)
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // 3. 실패한 항목들 재시도
+      const channelId = expiredChannelInfo.channelId
+      const productIds = failedPublishItems.map(item => item.productId)
+
+      // 발행 진행 모달 다시 표시
+      setShowSessionExpiredModal(false)
+      setPublishProgressItems(failedPublishItems.map(item => ({ ...item, status: 'pending' as const })))
+      setShowPublishProgress(true)
+      setIsPublishing(true)
+      publishCancelledRef.current = false
+
+      // SSE 스트리밍으로 재발행
+      const abortController = new AbortController()
+      abortControllerRef.current = abortController
+
+      const response = await fetch('/api/shop/publish/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productIds, channelId }),
+        signal: abortController.signal,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '재시도 요청 실패')
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('스트림을 읽을 수 없습니다.')
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let successCount = 0
+      let failCount = 0
+
+      while (true) {
+        if (publishCancelledRef.current) {
+          reader.cancel()
+          break
+        }
+
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6))
+
+              if (event.type === 'product_start' || event.type === 'stage_update' || event.type === 'image_progress') {
+                const itemIdx = failedPublishItems.findIndex(
+                  (p) => p.productId === event.data.progress.productId
+                )
+                if (itemIdx !== -1) {
+                  setPublishProgressItems((prev) => {
+                    const updated = [...prev]
+                    updated[itemIdx] = {
+                      ...updated[itemIdx],
+                      status: 'publishing',
+                      stage: event.data.progress.stage,
+                      stageLabel: event.data.progress.stageLabel,
+                      imageProgress: event.data.progress.imageProgress,
+                      publishMethod: event.data.progress.publishMethod,
+                    }
+                    return updated
+                  })
+                  setCurrentPublishIndex(itemIdx)
+                }
+              } else if (event.type === 'product_complete') {
+                const progress = event.data.progress
+                const itemIdx = failedPublishItems.findIndex(
+                  (p) => p.productId === progress.productId
+                )
+
+                if (progress.stage === 'completed' || progress.stage === 'skipped') {
+                  successCount++
+                  if (itemIdx !== -1) {
+                    setPublishProgressItems((prev) => {
+                      const updated = [...prev]
+                      updated[itemIdx] = {
+                        ...updated[itemIdx],
+                        status: 'success',
+                        stage: progress.stage,
+                        stageLabel: progress.stageLabel,
+                      }
+                      return updated
+                    })
+                  }
+                } else if (progress.stage === 'failed') {
+                  failCount++
+                  if (itemIdx !== -1) {
+                    setPublishProgressItems((prev) => {
+                      const updated = [...prev]
+                      updated[itemIdx] = {
+                        ...updated[itemIdx],
+                        status: 'failed',
+                        message: progress.error,
+                        stage: progress.stage,
+                        stageLabel: progress.stageLabel,
+                      }
+                      return updated
+                    })
+                  }
+                }
+              }
+            } catch (parseError) {
+              console.error('SSE 파싱 오류:', parseError)
+            }
+          }
+        }
+      }
+
+      // 완료
+      loadProducts()
+      toast.success(`재시도 완료: ${successCount}개 성공, ${failCount}개 실패`)
+
+      // 모든 항목이 성공한 경우에만 failedPublishItems 초기화
+      if (failCount === 0) {
+        setFailedPublishItems([])
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('재시도 실패:', error)
+        setRetryMessage(`재시도 실패: ${error.message}`)
+        setTimeout(() => setRetryMessage(''), 3000)
+        // 실패 시 모달 다시 표시하여 재시도 가능하게 함
+        setShowSessionExpiredModal(true)
+      }
+    } finally {
+      setIsRetrying(false)
+      setIsPublishing(false)
+      // failedPublishItems는 성공 시에만 초기화
     }
   }
 
@@ -1646,7 +2026,7 @@ export default function PublishPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
             className="absolute inset-0 bg-black/50"
-            onClick={() => setShowSessionExpiredModal(false)}
+            onClick={() => !isRetrying && setShowSessionExpiredModal(false)}
           />
           <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
             {/* 헤더 */}
@@ -1676,27 +2056,95 @@ export default function PublishPage() {
                 </div>
               </div>
 
-              <p className="text-sm text-gray-600 mb-6">
-                채널 설정 페이지에서 밴드에 다시 로그인해주세요.
-              </p>
+              {/* Extension 사용 가능 시 재시도 옵션 */}
+              {extensionAvailable && failedPublishItems.length > 0 && (
+                <div className="p-4 bg-blue-50 rounded-xl mb-4 border border-blue-100">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                      <RefreshCw size={16} className="text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-900">자동 복구 가능</p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        Band Session Helper에서 세션을 저장한 후 {failedPublishItems.length}개 상품을 자동으로 재시도합니다.
+                      </p>
+                      {retryMessage && (
+                        <p className="text-xs text-blue-600 mt-2 flex items-center gap-1">
+                          {isRetrying && <Loader2 size={12} className="animate-spin" />}
+                          {retryMessage}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
-              <div className="flex gap-3">
-                <Button
-                  variant="secondary"
-                  className="flex-1"
-                  onClick={() => setShowSessionExpiredModal(false)}
-                >
-                  닫기
-                </Button>
-                <Button
-                  className="flex-1"
-                  onClick={() => {
-                    router.push(`/sourcing/channel/detail/${expiredChannelInfo.channelId}`)
-                  }}
-                >
-                  <ExternalLink size={16} className="mr-2" />
-                  채널 설정으로 이동
-                </Button>
+              {!extensionAvailable && (
+                <p className="text-sm text-gray-600 mb-6">
+                  채널 설정 페이지에서 밴드에 다시 로그인해주세요.
+                </p>
+              )}
+
+              {extensionAvailable && failedPublishItems.length === 0 && (
+                <p className="text-sm text-gray-600 mb-6">
+                  Band Session Helper로 세션을 저장한 후 다시 발행해주세요.
+                </p>
+              )}
+
+              <div className="flex flex-col gap-2">
+                {/* Extension 사용 가능 + 실패 항목이 있을 때만 재시도 버튼 표시 */}
+                {extensionAvailable && failedPublishItems.length > 0 && (
+                  <Button
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    onClick={handleRetryWithSessionSave}
+                    loading={isRetrying}
+                    disabled={isRetrying}
+                  >
+                    <RefreshCw size={16} className="mr-2" />
+                    세션 저장 후 재시도 ({failedPublishItems.length}개)
+                  </Button>
+                )}
+
+                <div className="flex gap-2">
+                  {/* 닫기: 상태 유지 (나중에 재시도 가능) */}
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
+                    onClick={() => {
+                      setShowSessionExpiredModal(false)
+                      // failedPublishItems와 retryMessage 유지 - 나중에 재시도 가능
+                    }}
+                    disabled={isRetrying}
+                  >
+                    닫기
+                  </Button>
+                  {/* 포기: 실패 항목 삭제 */}
+                  {failedPublishItems.length > 0 && (
+                    <Button
+                      variant="secondary"
+                      className="flex-1 text-red-600 hover:bg-red-50"
+                      onClick={() => {
+                        setShowSessionExpiredModal(false)
+                        setFailedPublishItems([])
+                        setRetryMessage('')
+                      }}
+                      disabled={isRetrying}
+                    >
+                      포기
+                    </Button>
+                  )}
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
+                    onClick={() => {
+                      router.push(`/sourcing/channel/detail/${expiredChannelInfo.channelId}`)
+                    }}
+                    disabled={isRetrying}
+                  >
+                    <ExternalLink size={16} className="mr-2" />
+                    채널 설정
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

@@ -99,9 +99,11 @@ bandauto/
 │   └── public/                   # 정적 파일
 │
 ├── band-session-extension/       # Chrome 확장프로그램
-│   ├── manifest.json
-│   ├── popup.html
-│   └── scripts/
+│   ├── manifest.json             # 확장 설정 (externally_connectable 포함)
+│   ├── config.js                 # 공통 설정 (SERVER_URL, AUTO_SAVE_INTERVAL)
+│   ├── background.js             # 서비스 워커 (자동 저장, 웹 연동)
+│   ├── popup.html                # 팝업 UI
+│   └── popup.js                  # 팝업 로직
 │
 ├── scripts/                      # 빌드/배포 스크립트
 ├── docs/                         # 기존 문서

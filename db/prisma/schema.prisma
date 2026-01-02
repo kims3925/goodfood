@@ -52,6 +52,7 @@ enum WorkflowStatus {
   COMPLETED
   FAILED
   PARTIAL_SUCCESS
+  WAITING_SESSION    // 세션 만료로 대기 중 (프론트엔드에서 세션 저장 후 재개)
 }
 
 enum TriggerType {

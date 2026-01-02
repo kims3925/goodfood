@@ -424,6 +424,80 @@ export async function getRunningWorkflow(userId: number) {
 }
 
 /**
+ * 워크플로우를 세션 대기 상태로 변경
+ * 세션 만료 시 호출되어 프론트엔드에서 세션 저장을 기다림
+ */
+export async function setWaitingSessionStatus(
+  logId: number,
+  pendingItems: { productIds: number[]; channelId: number },
+  currentProgress?: { successCount: number; failedCount: number; totalItems: number }
+): Promise<void> {
+  await prisma.workflowLog.update({
+    where: { id: logId },
+    data: {
+      status: WorkflowStatus.WAITING_SESSION,
+      details: JSON.stringify({
+        waitingSession: true,
+        pendingItems,
+        currentProgress,
+        waitingSince: new Date().toISOString(),
+      }),
+    },
+  })
+  console.log(`[WorkflowService] 워크플로우 ${logId} 세션 대기 상태로 변경`)
+}
+
+/**
+ * 세션 대기 중인 워크플로우 조회
+ */
+export async function getWaitingSessionWorkflow(userId: number) {
+  return prisma.workflowLog.findFirst({
+    where: {
+      userId,
+      status: WorkflowStatus.WAITING_SESSION,
+    },
+    orderBy: { startedAt: 'desc' },
+  })
+}
+
+/**
+ * 세션 대기 워크플로우를 RUNNING 상태로 재개
+ */
+export async function resumeWorkflow(logId: number): Promise<{
+  pendingItems: { productIds: number[]; channelId: number } | null
+  currentProgress: { successCount: number; failedCount: number; totalItems: number } | null
+}> {
+  const workflow = await prisma.workflowLog.findUnique({
+    where: { id: logId },
+  })
+
+  if (!workflow || workflow.status !== WorkflowStatus.WAITING_SESSION) {
+    throw new Error('재개할 수 있는 워크플로우가 없습니다')
+  }
+
+  const details = workflow.details ? JSON.parse(workflow.details as string) : {}
+
+  await prisma.workflowLog.update({
+    where: { id: logId },
+    data: {
+      status: WorkflowStatus.RUNNING,
+      details: JSON.stringify({
+        ...details,
+        waitingSession: false,
+        resumedAt: new Date().toISOString(),
+      }),
+    },
+  })
+
+  console.log(`[WorkflowService] 워크플로우 ${logId} 재개`)
+
+  return {
+    pendingItems: details.pendingItems || null,
+    currentProgress: details.currentProgress || null,
+  }
+}
+
+/**
  * 워크플로우 취소 (RUNNING -> FAILED로 변경)
  */
 export async function cancelWorkflow(
