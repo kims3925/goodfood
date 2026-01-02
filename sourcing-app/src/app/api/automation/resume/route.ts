@@ -13,6 +13,7 @@ import {
   failWorkflowLog,
 } from '@/modules/automation/workflow-service'
 import { publishService } from '@/modules/publish'
+import { WorkflowStatus } from '@bandauto/db'
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,10 +35,17 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[Resume API] 워크플로우 ${waitingWorkflow.id} 재개 시작`)
-
+interface WorkflowProgress {
+  successCount: number
+  failedCount: number
+  totalItems: number
+  retryCount?: number
+}
     // 워크플로우 상태를 RUNNING으로 변경하고 pendingItems 조회
-    const { pendingItems, currentProgress } = await resumeWorkflow(waitingWorkflow.id)
-
+    const { pendingItems, currentProgress } = await resumeWorkflow(waitingWorkflow.id) as {
+      pendingItems: { productIds: number[]; channelId: number } | null
+      currentProgress: WorkflowProgress | null
+    }
     if (!pendingItems || !pendingItems.productIds || pendingItems.productIds.length === 0) {
       await failWorkflowLog(waitingWorkflow.id, '재개할 항목이 없습니다')
       return NextResponse.json(
@@ -59,8 +67,9 @@ export async function POST(request: NextRequest) {
     const totalItems = (currentProgress?.totalItems || 0)
 
     // 세션 만료 에러가 또 발생했는지 확인
+    const SESSION_ERROR_KEYWORDS = ['세션', '만료', '없'] as const
     const sessionExpiredError = result.errors.find(e =>
-      e.includes('세션') && (e.includes('만료') || e.includes('없'))
+      SESSION_ERROR_KEYWORDS.every(keyword => e.includes(keyword))
     )
 
     if (sessionExpiredError) {
@@ -72,13 +81,13 @@ export async function POST(request: NextRequest) {
       await prisma.workflowLog.update({
         where: { id: waitingWorkflow.id },
         data: {
-          status: 'WAITING_SESSION',
+          status: WorkflowStatus.WAITING_SESSION,
           details: JSON.stringify({
             waitingSession: true,
             pendingItems: { productIds: remainingProductIds, channelId: pendingItems.channelId },
             currentProgress: { successCount: totalSuccess, failedCount: totalFailed, totalItems },
             waitingSince: new Date().toISOString(),
-            retryCount: ((currentProgress as any)?.retryCount || 0) + 1,
+            retryCount: (currentProgress?.retryCount || 0) + 1,
           }),
         },
       })

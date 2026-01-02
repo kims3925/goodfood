@@ -318,7 +318,7 @@ export async function runPublishPipeline(
 
       // 아직 발행되지 않은 상품 ID들
       const remainingProductIds = unpublishedProductIds.filter(
-        id => !publishedProducts.some(p => p.productId === id && p.status === 'SUCCESS')
+        id => !publishedProducts.some(p => p.productId === id && p.channelId === channel.id && p.status === 'SUCCESS')
       )
 
       // 세션 대기 상태로 변경
