@@ -1157,7 +1157,7 @@ export class PublishService {
         const delayMs = QUOTA_RETRY_BASE_DELAY_MS * Math.pow(2, retryCount)
         console.log(`[PublishService] 쿼터 에러 발생, ${delayMs / 1000}초 후 재시도 (${retryCount + 1}/${MAX_QUOTA_RETRIES})...`)
         await delay(delayMs)
-        return this.publishToChannelWithProgress({ userId, productId, channelId, onStageProgress }, retryCount + 1)
+        return this.publishToChannelWithProgress({ userId, productId, channelId, onStageProgress, signal }, retryCount + 1)
       }
 
       return {
