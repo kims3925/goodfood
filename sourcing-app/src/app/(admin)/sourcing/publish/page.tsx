@@ -1208,16 +1208,21 @@ export default function PublishPage() {
       if (successCount > 0) {
         toast.success(`자동 재시도 완료: ${successCount}개 성공` + (failCount > 0 ? `, ${failCount}개 실패` : ''))
       }
+
+      // 모든 항목이 성공한 경우에만 failedPublishItems 초기화
+      if (failCount === 0) {
+        setFailedPublishItems([])
+      }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('[자동 재시도] 실패:', error)
         toast.error(`자동 재시도 실패: ${error.message}`)
-        // 실패 시 모달 표시
+        // 실패 시 모달 표시 (failedPublishItems는 유지하여 수동 재시도 가능하게 함)
         setShowSessionExpiredModal(true)
       }
     } finally {
       setIsPublishing(false)
-      setFailedPublishItems([])
+      // failedPublishItems는 성공 시에만 초기화 (catch에서 모달 표시 시 유지)
     }
   }
 
@@ -1363,16 +1368,23 @@ export default function PublishPage() {
       // 완료
       loadProducts()
       toast.success(`재시도 완료: ${successCount}개 성공, ${failCount}개 실패`)
+
+      // 모든 항목이 성공한 경우에만 failedPublishItems 초기화
+      if (failCount === 0) {
+        setFailedPublishItems([])
+      }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('재시도 실패:', error)
         setRetryMessage(`재시도 실패: ${error.message}`)
         setTimeout(() => setRetryMessage(''), 3000)
+        // 실패 시 모달 다시 표시하여 재시도 가능하게 함
+        setShowSessionExpiredModal(true)
       }
     } finally {
       setIsRetrying(false)
       setIsPublishing(false)
-      setFailedPublishItems([])
+      // failedPublishItems는 성공 시에만 초기화
     }
   }
 

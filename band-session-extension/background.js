@@ -3,8 +3,39 @@
  * Band 페이지 방문 시 자동으로 세션 저장
  */
 
-// 설정 import
-importScripts('config.js');
+// =============================================
+// 설정 import (에러 처리 포함)
+// =============================================
+
+try {
+  importScripts('config.js');
+} catch (error) {
+  console.error('[Band Session] config.js 로드 실패:', error.message);
+  console.error('[Band Session] Service Worker를 종료합니다. 확장 프로그램을 다시 설치해주세요.');
+  self.close();
+  throw new Error('config.js 로드 실패 - Service Worker 종료');
+}
+
+// 필수 설정 변수 검증
+if (typeof SERVER_URL === 'undefined' || !SERVER_URL) {
+  console.error('[Band Session] SERVER_URL이 정의되지 않았습니다.');
+  console.error('[Band Session] Service Worker를 종료합니다.');
+  self.close();
+  throw new Error('SERVER_URL 미정의 - Service Worker 종료');
+}
+
+if (typeof AUTO_SAVE_INTERVAL === 'undefined' || !AUTO_SAVE_INTERVAL) {
+  console.error('[Band Session] AUTO_SAVE_INTERVAL이 정의되지 않았습니다.');
+  console.error('[Band Session] Service Worker를 종료합니다.');
+  self.close();
+  throw new Error('AUTO_SAVE_INTERVAL 미정의 - Service Worker 종료');
+}
+
+console.log('[Band Session] config.js 로드 완료 - SERVER_URL:', SERVER_URL);
+
+// =============================================
+// 상태 관리
+// =============================================
 
 // 마지막 자동 저장 시간
 let lastAutoSaveTime = 0;
