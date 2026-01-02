@@ -11,29 +11,34 @@ pipeline {
   environment {
     CI = 'true'
     NEXT_TELEMETRY_DISABLED = '1'
+    // 브랜치 필터 조건
+    SHOULD_BUILD = "${env.BRANCH_NAME ==~ /(main|release-.*)/ || env.CHANGE_ID ? 'true' : 'false'}"
   }
 
   stages {
-    stage('Branch Filter') {
+    stage('Branch Check') {
       steps {
         script {
-          // main, release-*, PR만 빌드 (개인 브랜치 제외)
-          def dominated = env.BRANCH_NAME ==~ /(main|release-.*)/ || env.CHANGE_ID
-          if (!dominated) {
-            currentBuild.result = 'NOT_BUILT'
-            error("Skipping build for branch: ${env.BRANCH_NAME} (only main, release-*, PR allowed)")
+          if (env.SHOULD_BUILD != 'true') {
+            currentBuild.result = 'SUCCESS'
+            currentBuild.description = "Skipped: ${env.BRANCH_NAME} (only main, release-*, PR)"
+            echo "Skipping build for branch: ${env.BRANCH_NAME}"
+          } else {
+            echo "Building branch: ${env.BRANCH_NAME}"
           }
         }
       }
     }
 
     stage('Checkout') {
+      when { environment name: 'SHOULD_BUILD', value: 'true' }
       steps {
         checkout scm
       }
     }
 
     stage('Setup') {
+      when { environment name: 'SHOULD_BUILD', value: 'true' }
       steps {
         sh '''
           set -eux
@@ -42,19 +47,23 @@ pipeline {
         '''
       }
     }
-stage('Debug') {
-  steps {
-    sh '''
-      set -eux
-      git rev-parse HEAD
-      git log -1 --oneline
-      ls -al package.json package-lock.json
-      node -e "console.log('pkg nodemailer=', require('./package.json').dependencies?.nodemailer || require('./package.json').devDependencies?.nodemailer)"
-      node -e "console.log('lock nodemailer=', require('./package-lock.json').packages?.['']?.dependencies?.nodemailer)"
-    '''
-  }
-}
+
+    stage('Debug') {
+      when { environment name: 'SHOULD_BUILD', value: 'true' }
+      steps {
+        sh '''
+          set -eux
+          git rev-parse HEAD
+          git log -1 --oneline
+          ls -al package.json package-lock.json
+          node -e "console.log('pkg nodemailer=', require('./package.json').dependencies?.nodemailer || require('./package.json').devDependencies?.nodemailer)"
+          node -e "console.log('lock nodemailer=', require('./package-lock.json').packages?.['']?.dependencies?.nodemailer)"
+        '''
+      }
+    }
+
     stage('Install') {
+      when { environment name: 'SHOULD_BUILD', value: 'true' }
       steps {
         sh '''
           set -eux
@@ -64,6 +73,7 @@ stage('Debug') {
     }
 
     stage('Generate Prisma Client') {
+      when { environment name: 'SHOULD_BUILD', value: 'true' }
       steps {
         sh '''
           set -eux
@@ -75,6 +85,7 @@ stage('Debug') {
     }
 
     stage('Lint') {
+      when { environment name: 'SHOULD_BUILD', value: 'true' }
       steps {
         sh '''
           set -eux
@@ -88,6 +99,7 @@ stage('Debug') {
     }
 
     stage('Typecheck') {
+      when { environment name: 'SHOULD_BUILD', value: 'true' }
       steps {
         sh '''
           set -eux
@@ -100,8 +112,8 @@ stage('Debug') {
       }
     }
 
-
     stage('Build') {
+      when { environment name: 'SHOULD_BUILD', value: 'true' }
       steps {
         withCredentials([
           string(credentialsId: 'nextauth-secret', variable: 'NEXTAUTH_SECRET'),
