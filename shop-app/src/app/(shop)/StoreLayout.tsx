@@ -28,21 +28,8 @@ function StoreLayoutContent({
   const shopName = shop?.name || 'ABC마켓'
   const logoUrl = shop?.theme?.logoUrl
   const contactPhone = shop?.contactPhone || '1234-5678'
-  const relatedShops = shop?.relatedShops || []
-
-  // 경로 기반 URL 생성 (다른 Shop으로 이동)
-  const getShopUrl = (shopSlug: string) => {
-    // 개발 환경
-    const isDev = process.env.NODE_ENV !== 'production'
-
-    if (isDev) {
-      return `/${shopSlug}/main`
-    }
-
-    // 프로덕션: 같은 도메인, 경로만 변경
-    return `/${shopSlug}/main`
-  }
-
+  const ownerName = shop?.ownerName
+  const businessNumber = shop?.businessNumber
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -257,7 +244,7 @@ function StoreLayoutContent({
       {/* Footer */}
       <footer className="kurly-footer">
         <div className="kurly-container">
-          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 ${relatedShops.length > 0 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
             <div className="text-center sm:text-left">
               <h4 className="font-bold text-gray-900 mb-3 md:mb-4">고객행복센터</h4>
               <p className="text-xl md:text-2xl font-bold mb-2 text-abc-coral">{formatPhoneNumber(contactPhone)}</p>
@@ -277,30 +264,14 @@ function StoreLayoutContent({
                 <li><Link href={getPath('/cs/inquiry')} className="hover:opacity-70">1:1문의</Link></li>
               </ul>
             </div>
-            {relatedShops.length > 0 && (
-              <div className="text-center sm:text-left">
-                <h4 className="font-bold text-gray-900 mb-3 md:mb-4">관련 쇼핑몰</h4>
-                <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-600">
-                  {relatedShops.map((s) => (
-                    <li key={s.id}>
-                      <a
-                        href={getShopUrl(s.subdomain)}
-                        className="flex items-center justify-center sm:justify-start gap-2 hover:opacity-70"
-                      >
-                        {s.logoUrl ? (
-                          <Image src={s.logoUrl} alt={s.name} width={60} height={16} className="h-4 w-auto" unoptimized />
-                        ) : null}
-                        <span>{s.name}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
           <div className="mt-6 md:mt-8 pt-6 md:pt-8 border-t border-gray-200 text-center text-xs md:text-sm text-gray-500">
-            <p>{shopName} | 대표: 강리안 | 사업자등록번호: 732-81-03103</p>
-            <p className="mt-2">Copyright &copy; 2025 조이펀테크주식회사. All rights reserved.</p>
+            <p>
+              {shopName}
+              {ownerName && <span> | 대표: {ownerName}</span>}
+              {businessNumber && <span> | 사업자등록번호: {businessNumber}</span>}
+            </p>
+            <p className="mt-2">Copyright &copy; {new Date().getFullYear()} {shopName}. All rights reserved.</p>
           </div>
         </div>
       </footer>

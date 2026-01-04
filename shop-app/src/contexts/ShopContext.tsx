@@ -30,6 +30,8 @@ export interface ShopInfo {
   coverUrl?: string
   contactPhone?: string
   contactEmail?: string
+  ownerName?: string
+  businessNumber?: string
   bankInfo?: ShopBankInfo
   theme?: ShopThemeInfo
   relatedShops?: RelatedShop[]

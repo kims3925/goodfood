@@ -53,6 +53,8 @@ interface Shop {
   accountHolder: string | null
   contactPhone: string | null
   contactEmail: string | null
+  ownerName: string | null
+  businessNumber: string | null
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -102,6 +104,10 @@ export default function ShopDetailPage({
   // 연락처 필드
   const [contactPhone, setContactPhone] = useState('')
   const [contactEmail, setContactEmail] = useState('')
+
+  // 사업자 정보 필드
+  const [ownerName, setOwnerName] = useState('')
+  const [businessNumber, setBusinessNumber] = useState('')
 
   // 테마 필드
   const [primaryColor, setPrimaryColor] = useState('')
@@ -234,6 +240,9 @@ export default function ShopDetailPage({
         // 연락처
         setContactPhone(s.contactPhone || '')
         setContactEmail(s.contactEmail || '')
+        // 사업자 정보
+        setOwnerName(s.ownerName || '')
+        setBusinessNumber(s.businessNumber || '')
         // 테마
         if (s.theme) {
           setPrimaryColor(s.theme.primaryColor || '')
@@ -305,6 +314,8 @@ export default function ShopDetailPage({
         accountHolder: accountHolder || null,
         contactPhone: contactPhone || null,
         contactEmail: contactEmail || null,
+        ownerName: ownerName || null,
+        businessNumber: businessNumber || null,
         theme: {
           primaryColor: primaryColor || null,
           secondaryColor: secondaryColor || null,
@@ -383,6 +394,8 @@ export default function ShopDetailPage({
       }
       setContactPhone(shop.contactPhone || '')
       setContactEmail(shop.contactEmail || '')
+      setOwnerName(shop.ownerName || '')
+      setBusinessNumber(shop.businessNumber || '')
       if (shop.theme) {
         setPrimaryColor(shop.theme.primaryColor || '')
         setSecondaryColor(shop.theme.secondaryColor || '')
@@ -799,7 +812,7 @@ export default function ShopDetailPage({
                   <span className="font-semibold text-slate-900">연락처 정보</span>
                 </div>
               </div>
-              <div className="p-6">
+              <div className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-500 mb-1">연락처</label>
@@ -823,6 +836,36 @@ export default function ShopDetailPage({
                       />
                     ) : (
                       <p className="text-gray-900">{shop.contactEmail || '-'}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">대표명</label>
+                    {isEditMode ? (
+                      <Input
+                        value={ownerName}
+                        onChange={(e) => setOwnerName(e.target.value)}
+                        placeholder="홍길동"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{shop.ownerName || '-'}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">사업자등록번호</label>
+                    {isEditMode ? (
+                      <Input
+                        value={businessNumber}
+                        onChange={(e) => {
+                          // 숫자와 하이픈만 허용
+                          const value = e.target.value.replace(/[^0-9-]/g, '')
+                          setBusinessNumber(value)
+                        }}
+                        placeholder="123-45-67890"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{shop.businessNumber || '-'}</p>
                     )}
                   </div>
                 </div>

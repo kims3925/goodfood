@@ -155,6 +155,8 @@ export async function PUT(
       accountHolder,
       contactPhone,
       contactEmail,
+      ownerName,
+      businessNumber,
       isActive,
       theme,
     } = body
@@ -197,6 +199,8 @@ export async function PUT(
     if (accountHolder !== undefined) updateData.accountHolder = accountHolder || null
     if (contactPhone !== undefined) updateData.contactPhone = contactPhone || null
     if (contactEmail !== undefined) updateData.contactEmail = contactEmail || null
+    if (ownerName !== undefined) updateData.ownerName = ownerName || null
+    if (businessNumber !== undefined) updateData.businessNumber = businessNumber || null
     if (isActive !== undefined) updateData.isActive = isActive
 
     // 트랜잭션으로 쇼핑몰과 테마 함께 업데이트

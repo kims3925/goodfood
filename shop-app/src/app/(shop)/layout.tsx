@@ -59,6 +59,8 @@ async function getShopFromHeaders(): Promise<ShopInfo | null> {
         coverUrl: true,
         contactPhone: true,
         contactEmail: true,
+        ownerName: true,
+        businessNumber: true,
         bankName: true,
         bankAccount: true,
         accountHolder: true,
@@ -83,6 +85,8 @@ async function getShopFromHeaders(): Promise<ShopInfo | null> {
       coverUrl: shop.coverUrl || undefined,
       contactPhone: shop.contactPhone || undefined,
       contactEmail: shop.contactEmail || undefined,
+      ownerName: shop.ownerName || undefined,
+      businessNumber: shop.businessNumber || undefined,
       bankInfo: shop.bankName
         ? {
             bankName: shop.bankName,
