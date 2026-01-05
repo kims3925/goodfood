@@ -129,12 +129,14 @@ export async function GET(request: NextRequest) {
             title: item.content ? item.content.substring(0, 100) : '(제목 없음)',
             content: item.content || '',
             author: item.author?.name || '알 수 없음',
+            created_at: item.created_at || null,
             images: item.photos ? item.photos.map((photo: any) => photo.url) : [],
             comments: [], // 댓글 조회 제거 - API 호출 최소화
             channel: {
               id: channel.id,
               name: channel.name,
               channelKey: channel.channelKey,
+              coverUrl: channel.coverUrl,
             },
           }))
 

@@ -56,6 +56,7 @@ interface AvailablePost {
   title: string
   content: string
   author: string
+  created_at: number | null
   images: string[]
   comments: Array<{
     comment_key: string
@@ -66,6 +67,7 @@ interface AvailablePost {
     id: number
     name: string
     channelKey: string
+    coverUrl: string | null
   }
 }
 
@@ -333,7 +335,7 @@ export default function PostsManagePage() {
     }
     acc[channelKey].posts.push(post)
     return acc
-  }, {} as Record<string, { channel: { id: number; name: string; channelKey: string }; posts: AvailablePost[] }>)
+  }, {} as Record<string, { channel: { id: number; name: string; channelKey: string; coverUrl: string | null }; posts: AvailablePost[] }>)
 
   const handleAddSelectedPosts = async () => {
     if (selectedPostKeys.length === 0) {
@@ -795,7 +797,7 @@ export default function PostsManagePage() {
           setExpandedBandKeys([])
         }}
         title="게시물 추가"
-        size="2xl"
+        size="4xl"
         footer={
           <div className="flex items-center justify-end gap-3">
             <Button
@@ -847,7 +849,7 @@ export default function PostsManagePage() {
           </div>
 
           {/* 게시물 목록 영역 - 고정 높이 */}
-          <div className="h-[500px] border border-gray-200 rounded-lg overflow-hidden">
+          <div className="h-[750px] overflow-hidden">
             {isLoadingPosts ? (
               <div className="h-full flex flex-col items-center justify-center">
                 <Loading />
@@ -890,16 +892,11 @@ export default function PostsManagePage() {
                 </div>
               </div>
             ) : (
-              <div className="h-full flex flex-col">
-                <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
-                  <span className="text-sm font-medium text-gray-700">밴드별 게시물</span>
-                  <p className="text-sm text-gray-600">
-                    선택: {selectedPostKeys.length}개 / 전체: {availablePosts.length}개
-                  </p>
-                </div>
-                <div className="flex-1 overflow-y-auto p-2">
-                  {/* 채널별 그룹 */}
-                  <div className="space-y-3">
+              <div className="h-full flex flex-col p-3">
+                <p className="text-sm text-gray-600 mb-3 text-right">
+                  선택: {selectedPostKeys.length}개 / 전체: {availablePosts.length}개
+                </p>
+                <div className="flex-1 overflow-y-auto space-y-3">
                 {Object.entries(groupedPosts).map(([channelKey, group]) => {
                   const isChannelExpanded = expandedChannelKeys.includes(channelKey)
                   const channelPostKeys = group.posts.map(p => p.post_key)
@@ -909,7 +906,7 @@ export default function PostsManagePage() {
                   return (
                     <div key={channelKey} className="border rounded-lg bg-white">
                       {/* 채널 헤더 */}
-                      <div className="p-3 bg-gray-50 border-b flex items-center gap-3">
+                      <div className="p-4 bg-gray-50 border-b flex items-center gap-3">
                         <input
                           type="checkbox"
                           checked={allChannelSelected}
@@ -921,19 +918,30 @@ export default function PostsManagePage() {
                             handleToggleChannelSelectAll(channelKey, channelPostKeys)
                           }}
                           onClick={(e) => e.stopPropagation()}
-                          className="w-4 h-4 cursor-pointer"
+                          className="w-5 h-5 cursor-pointer"
                         />
                         <div
                           className="flex-1 flex items-center justify-between cursor-pointer hover:bg-gray-100 rounded -m-1 p-1 transition-colors"
                           onClick={() => handleToggleChannelExpand(channelKey)}
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-3">
                             {isChannelExpanded ? (
-                              <ChevronDown size={20} className="text-gray-600" />
+                              <ChevronDown size={22} className="text-gray-600" />
                             ) : (
-                              <ChevronRight size={20} className="text-gray-600" />
+                              <ChevronRight size={22} className="text-gray-600" />
                             )}
-                            <h3 className="font-semibold text-gray-900">{group.channel.name}</h3>
+                            {group.channel.coverUrl ? (
+                              <img
+                                src={group.channel.coverUrl}
+                                alt={group.channel.name}
+                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                <Store size={20} className="text-gray-400" />
+                              </div>
+                            )}
+                            <h3 className="font-semibold text-gray-900 text-base">{group.channel.name}</h3>
                             <span className="text-sm text-gray-500">
                               ({selectedInChannel > 0 ? `${selectedInChannel}/` : ''}{group.posts.length}개)
                             </span>
@@ -972,6 +980,11 @@ export default function PostsManagePage() {
                                       <h4 className="font-medium text-gray-900 truncate">{post.title}</h4>
                                       <p className="text-sm text-gray-500 mt-1">
                                         작성자: {post.author || '알 수 없음'}
+                                        {post.created_at && (
+                                          <span className="ml-2 text-gray-400">
+                                            · {new Date(post.created_at).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                          </span>
+                                        )}
                                       </p>
                                     </div>
                                     <button
@@ -1044,7 +1057,6 @@ export default function PostsManagePage() {
                     </div>
                   )
                     })}
-                  </div>
                 </div>
               </div>
             )}
