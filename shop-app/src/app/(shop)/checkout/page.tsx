@@ -94,7 +94,7 @@ function CheckoutContent() {
   const [isLoading, setIsLoading] = useState(true)
 
   // 결제 방식 관련
-  const [paymentMethod, setPaymentMethod] = useState<'TOSS' | 'BANK_TRANSFER'>('TOSS')
+  const [paymentMethod, setPaymentMethod] = useState<'TOSS' | 'BANK_TRANSFER'>('BANK_TRANSFER')
 
   // 회원 배송지 관련
   const [addresses, setAddresses] = useState<Address[]>([])
@@ -1304,6 +1304,36 @@ function CheckoutContent() {
 
 
                   <div className="space-y-3">
+                    {/* 무통장입금 */}
+                    <label
+                      className={`flex items-center p-4 border rounded-lg cursor-pointer transition-all ${
+                        paymentMethod === 'BANK_TRANSFER'
+                          ? 'border-[#FF6B6B] bg-[#FFF5F5]'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="BANK_TRANSFER"
+                        checked={paymentMethod === 'BANK_TRANSFER'}
+                        onChange={() => setPaymentMethod('BANK_TRANSFER')}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center gap-3 flex-1">
+                        <Building2 className={`w-5 h-5 ${paymentMethod === 'BANK_TRANSFER' ? 'text-[#FF6B6B]' : 'text-gray-400'}`} />
+                        <div>
+                          <span className={`font-medium ${paymentMethod === 'BANK_TRANSFER' ? 'text-gray-900' : 'text-gray-700'}`}>
+                            무통장입금
+                          </span>
+                          <p className="text-xs text-gray-500 mt-0.5">계좌이체로 직접 입금</p>
+                        </div>
+                      </div>
+                      {paymentMethod === 'BANK_TRANSFER' && (
+                        <Check className="w-5 h-5 text-[#FF6B6B]" />
+                      )}
+                    </label>
+
                     {/* 토스 결제 - 회원/비회원 모두 */}
                     <label
                       className={`flex items-center p-4 border rounded-lg cursor-pointer transition-all ${
@@ -1332,35 +1362,6 @@ function CheckoutContent() {
                         </div>
                       </div>
                       {paymentMethod === 'TOSS' && (
-                        <Check className="w-5 h-5 text-[#FF6B6B]" />
-                      )}
-                    </label>
-
-                    <label
-                      className={`flex items-center p-4 border rounded-lg cursor-pointer transition-all ${
-                        paymentMethod === 'BANK_TRANSFER'
-                          ? 'border-[#FF6B6B] bg-[#FFF5F5]'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        value="BANK_TRANSFER"
-                        checked={paymentMethod === 'BANK_TRANSFER'}
-                        onChange={() => setPaymentMethod('BANK_TRANSFER')}
-                        className="sr-only"
-                      />
-                      <div className="flex items-center gap-3 flex-1">
-                        <Building2 className={`w-5 h-5 ${paymentMethod === 'BANK_TRANSFER' ? 'text-[#FF6B6B]' : 'text-gray-400'}`} />
-                        <div>
-                          <span className={`font-medium ${paymentMethod === 'BANK_TRANSFER' ? 'text-gray-900' : 'text-gray-700'}`}>
-                            무통장입금
-                          </span>
-                          <p className="text-xs text-gray-500 mt-0.5">계좌이체로 직접 입금</p>
-                        </div>
-                      </div>
-                      {paymentMethod === 'BANK_TRANSFER' && (
                         <Check className="w-5 h-5 text-[#FF6B6B]" />
                       )}
                     </label>
