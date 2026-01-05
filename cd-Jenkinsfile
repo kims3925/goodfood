@@ -152,26 +152,41 @@ pipeline {
                     npx prisma generate --schema prisma
 
                     # =============================================
-                    # Prisma 마이그레이션 자동 적용
+                    # Prisma 마이그레이션 자동 적용 (안전장치 포함)
                     # =============================================
                     echo ">>> Checking for pending migrations..."
 
-                    # 마이그레이션 상태 확인 및 적용
+                    # 마이그레이션 상태 확인
                     MIGRATE_STATUS=\$(npx prisma migrate status --schema prisma 2>&1) || true
+                    echo ">>> Current migration status:"
+                    echo "\$MIGRATE_STATUS"
 
                     if echo "\$MIGRATE_STATUS" | grep -q "Database schema is up to date"; then
-                        echo ">>> Database schema is already up to date"
+                        echo ">>> ✅ Database schema is already up to date"
                     elif echo "\$MIGRATE_STATUS" | grep -q "Following migrations have not yet been applied"; then
-                        echo ">>> Pending migrations found. Applying..."
-                        npx prisma migrate deploy --schema prisma
-                        echo ">>> Migrations applied successfully"
+                        echo ">>> ⚠️  Pending migrations found. Applying..."
+
+                        # 마이그레이션 적용 (실패 시 배포 중단)
+                        if npx prisma migrate deploy --schema prisma; then
+                            echo ">>> ✅ Migrations applied successfully"
+                        else
+                            echo ">>> ❌ ERROR: Migration failed! Aborting deployment."
+                            echo ">>> Please check the migration files and database state."
+                            exit 1
+                        fi
+                    elif echo "\$MIGRATE_STATUS" | grep -q "drift"; then
+                        echo ">>> ❌ ERROR: Database schema drift detected!"
+                        echo ">>> The database schema differs from the migration history."
+                        echo ">>> Please resolve the drift before deploying."
+                        exit 1
                     else
-                        echo ">>> Migration status:"
-                        echo "\$MIGRATE_STATUS"
-                        # 마이그레이션이 없거나 다른 상태일 경우에도 deploy 시도
-                        npx prisma migrate deploy --schema prisma || {
-                            echo ">>> Warning: migrate deploy failed, but continuing..."
-                        }
+                        echo ">>> Attempting migrate deploy..."
+                        if npx prisma migrate deploy --schema prisma; then
+                            echo ">>> ✅ Migrate deploy completed"
+                        else
+                            echo ">>> ❌ ERROR: Migrate deploy failed! Aborting deployment."
+                            exit 1
+                        fi
                     fi
 
                     cd ..

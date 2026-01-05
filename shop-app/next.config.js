@@ -11,6 +11,8 @@ const nextConfig = {
     return config
   },
   images: {
+    // 이미지 최적화 비활성화 (서버 부하 감소)
+    unoptimized: true,
     // 프로덕션 배포 시 실제 사용하는 도메인만 추가하세요
     // 예: CDN 도메인, S3 버킷 도메인 등
     remotePatterns: [
