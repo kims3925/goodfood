@@ -84,8 +84,11 @@ export default function ChannelFormModal({
   const [isLoadingApiSettings, setIsLoadingApiSettings] = useState(false)
 
 
-  // 기존 채널 키 목록 (DB에서 조회, 도매/소매 구분 없이 전체)
-  const [existingChannelKeys, setExistingChannelKeys] = useState<string[]>([])
+  // 기존 채널 키 목록 (DB에서 조회, 도매/소매 분리)
+  const [existingChannelKeys, setExistingChannelKeys] = useState<{
+    wholesale: string[]
+    retail: string[]
+  }>({ wholesale: [], retail: [] })
 
   // 설정된 API 플랫폼 조회
   const fetchConfiguredPlatforms = useCallback(async () => {
@@ -113,13 +116,16 @@ export default function ChannelFormModal({
     }
   }, [])
 
-  // 기존 채널 키 조회 (DB에서, 도매/소매 구분 없이 전체)
+  // 기존 채널 키 조회 (DB에서, 도매/소매 분리)
   const fetchExistingChannelKeys = useCallback(async () => {
     try {
       const response = await fetch('/api/channel/keys')
       const data = await response.json()
       if (data.success) {
-        setExistingChannelKeys(data.data.all || [])
+        setExistingChannelKeys({
+          wholesale: data.data.wholesale || [],
+          retail: data.data.retail || [],
+        })
       }
     } catch (error) {
       console.error('기존 채널 키 조회 실패:', error)
@@ -491,8 +497,11 @@ export default function ChannelFormModal({
     ? PLATFORM_OPTIONS.filter((p) => p.kinds.includes(formData.kind))
     : PLATFORM_OPTIONS.filter((p) => p.kinds.includes(formData.kind) && configuredPlatforms.includes(p.value))
 
-  // 이미 등록된 채널 키를 제외한 밴드 목록 (도매/소매 구분 없이 전체 중복 필터링)
-  const filteredBandList = bandList.filter((band) => !existingChannelKeys.includes(band.bandKey))
+  // 이미 등록된 채널 키를 제외한 밴드 목록 (현재 선택된 kind에 해당하는 채널만 필터링)
+  const currentKindChannelKeys = formData.kind === 'WHOLESALE'
+    ? existingChannelKeys.wholesale
+    : existingChannelKeys.retail
+  const filteredBandList = bandList.filter((band) => !currentKindChannelKeys.includes(band.bandKey))
 
   return (
     <Modal
