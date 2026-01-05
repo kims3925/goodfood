@@ -780,7 +780,10 @@ export default function ProductDetailClient() {
                       }
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      묶음 당 최대 {formatPrice(isUnlimited ? shippingFee * (bundleMaxQty - 1) : maxDiscount)}원 할인
+                      {isUnlimited
+                        ? `수량 제한 없이 개당 ${formatPrice(shippingFee)}원씩 할인`
+                        : `묶음 당 최대 ${formatPrice(maxDiscount)}원 할인`
+                      }
                     </p>
                   </div>
                 )
@@ -791,41 +794,6 @@ export default function ProductDetailClient() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <label className="text-sm font-medium text-gray-700">수량</label>
-                    {/* 합배송 묶음 단위 표시 (bundleUnit 고려) */}
-                    {hasBundleOptions && (() => {
-                      const bundleMaxQty = product.bundleMaxQty || activeBundleOptions.length
-                      const bundleUnit = selectedVariant?.bundleUnit || 1
-                      const totalBundleUnits = quantity * bundleUnit
-                      const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
-                      const remainder = totalBundleUnits % bundleMaxQty
-
-                      // bundleUnit > 1이면 박스 수 표시
-                      if (bundleUnit > 1) {
-                        return (
-                          <span className="text-xs text-[#FF6B6B] font-medium">
-                            = {totalBundleUnits}박스
-                            {fullBundles > 0 && ` (${fullBundles}묶음${remainder > 0 ? ` + ${remainder}박스` : ''})`}
-                          </span>
-                        )
-                      }
-
-                      // bundleUnit = 1인 경우 기존 로직
-                      if (quantity > bundleMaxQty || (fullBundles >= 1 && remainder > 0)) {
-                        const parts = []
-                        if (fullBundles > 0) {
-                          parts.push(`${bundleMaxQty}개 × ${fullBundles}`)
-                        }
-                        if (remainder > 0) {
-                          parts.push(`${remainder}개`)
-                        }
-                        return (
-                          <span className="text-xs text-gray-500">
-                            ({parts.join(' + ')})
-                          </span>
-                        )
-                      }
-                      return null
-                    })()}
                   </div>
                   <div className="flex items-center gap-3">
                     {/* 수량 조절 버튼 */}
