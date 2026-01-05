@@ -161,6 +161,10 @@ function GuestOrderDetailContent() {
   useEffect(() => {
     if (orderId && token) {
       fetchOrderDetail()
+    } else if (orderId && !token) {
+      // token이 없으면 에러 표시
+      setError('주문 조회를 위한 인증 정보가 없습니다')
+      setIsLoading(false)
     }
   }, [orderId, token, fetchOrderDetail])
 
