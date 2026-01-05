@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { ChevronLeft, Send, MessageSquare, Clock, CheckCircle } from 'lucide-react'
@@ -53,13 +53,7 @@ export default function InquiryPage() {
     content: '',
   })
 
-  useEffect(() => {
-    if (session && activeTab === 'list') {
-      loadInquiries()
-    }
-  }, [session, activeTab])
-
-  const loadInquiries = async () => {
+  const loadInquiries = useCallback(async () => {
     try {
       setIsLoading(true)
       const response = await fetch(getApiPath('/api/cs/inquiry'))
@@ -72,7 +66,13 @@ export default function InquiryPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [getApiPath])
+
+  useEffect(() => {
+    if (session && activeTab === 'list') {
+      loadInquiries()
+    }
+  }, [session, activeTab, loadInquiries])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

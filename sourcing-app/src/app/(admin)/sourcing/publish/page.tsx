@@ -376,24 +376,24 @@ export default function PublishPage() {
   }, [channels, shops])
 
   // 채널 발행 여부 확인
-  const isPublishedToChannel = (productId: number, channelId: number) => {
+  const isPublishedToChannel = useCallback((productId: number, channelId: number) => {
     const product = products.find((p) => p.id === productId)
     return product?.publishedChannels?.some((pc) => pc.channelId === channelId)
-  }
+  }, [products])
 
   // Shop 발행 여부 확인
-  const isPublishedToShop = (productId: number, shopId: number) => {
+  const isPublishedToShop = useCallback((productId: number, shopId: number) => {
     const product = products.find((p) => p.id === productId)
     return product?.publishedShops?.some((ps) => ps.shopId === shopId)
-  }
+  }, [products])
 
   // 타겟에 발행되었는지 확인 (type으로 구분)
-  const isPublished = (productId: number, targetType: 'shop' | 'channel', targetId: number) => {
+  const isPublished = useCallback((productId: number, targetType: 'shop' | 'channel', targetId: number) => {
     if (targetType === 'shop') {
       return isPublishedToShop(productId, targetId)
     }
     return isPublishedToChannel(productId, targetId)
-  }
+  }, [isPublishedToShop, isPublishedToChannel])
 
   // 가격이 설정되어 있는지 확인
   const hasPrice = (productId: number) => {
@@ -1496,7 +1496,7 @@ export default function PublishPage() {
       publishedCells,
       unpublishedCells: totalCells - publishedCells,
     }
-  }, [products, channels, shops])
+  }, [products, channels, shops, isPublished])
 
   return (
     <div className="min-h-screen bg-gray-50">

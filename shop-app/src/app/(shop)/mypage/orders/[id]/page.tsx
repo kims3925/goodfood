@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -198,16 +198,7 @@ export default function OrderDetailPage() {
 
   const orderId = params.id as string
 
-  useEffect(() => {
-    if (sessionStatus === 'loading') return
-    if (!session) {
-      router.push(getPath('/auth/login?callbackUrl=/mypage/orders'))
-      return
-    }
-    fetchOrder()
-  }, [session, sessionStatus, orderId])
-
-  const fetchOrder = async () => {
+  const fetchOrder = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(getApiPath(`/api/mypage/orders/${orderId}`))
@@ -224,7 +215,16 @@ export default function OrderDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [getApiPath, orderId])
+
+  useEffect(() => {
+    if (sessionStatus === 'loading') return
+    if (!session) {
+      router.push(getPath('/auth/login?callbackUrl=/mypage/orders'))
+      return
+    }
+    fetchOrder()
+  }, [session, sessionStatus, orderId, fetchOrder, router, getPath])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)

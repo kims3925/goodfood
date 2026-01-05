@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
@@ -43,13 +43,7 @@ export default function WishlistPage() {
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [pendingRemoveId, setPendingRemoveId] = useState<number | null>(null)
 
-  useEffect(() => {
-    if (session) {
-      fetchWishlists()
-    }
-  }, [session])
-
-  const fetchWishlists = async () => {
+  const fetchWishlists = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(getApiPath('/api/mypage/wishlist'))
@@ -63,7 +57,13 @@ export default function WishlistPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [getApiPath])
+
+  useEffect(() => {
+    if (session) {
+      fetchWishlists()
+    }
+  }, [session, fetchWishlists])
 
   const handleRemove = (wishlistId: number) => {
     setPendingRemoveId(wishlistId)

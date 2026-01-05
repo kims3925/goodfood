@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight, ShoppingCart, Sparkles, Package } from 'lucide-react'
@@ -38,20 +38,7 @@ export default function StorePage() {
   const cardsPerView = 4
   const totalSlides = Math.max(1, Math.ceil(featuredProducts.length / cardsPerView))
 
-  useEffect(() => {
-    loadShopProducts()
-  }, [shop?.id])
-
-  // 자동 슬라이드 (3초마다)
-  useEffect(() => {
-    if (featuredProducts.length === 0) return
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % totalSlides)
-    }, 3000)
-    return () => clearInterval(timer)
-  }, [featuredProducts.length, totalSlides])
-
-  const loadShopProducts = async () => {
+  const loadShopProducts = useCallback(async () => {
     try {
       setIsLoading(true)
       const response = await fetch(getApiPath('/api/shop/sections?limit=50'))
@@ -71,7 +58,20 @@ export default function StorePage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [getApiPath])
+
+  useEffect(() => {
+    loadShopProducts()
+  }, [shop?.id, loadShopProducts])
+
+  // 자동 슬라이드 (3초마다)
+  useEffect(() => {
+    if (featuredProducts.length === 0) return
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % totalSlides)
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [featuredProducts.length, totalSlides])
 
   const formatPrice = (price: number) => price.toLocaleString()
   const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % totalSlides)

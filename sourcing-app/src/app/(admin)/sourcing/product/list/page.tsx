@@ -174,11 +174,7 @@ export default function ProductListPage() {
   })
   const [isSubmittingManual, setIsSubmittingManual] = useState(false)
 
-  useEffect(() => {
-    loadChannels()
-  }, [])
-
-  const loadChannels = async () => {
+  const loadChannels = useCallback(async () => {
     try {
       const response = await fetch('/api/channel?kind=WHOLESALE&limit=100')
       const data = await response.json()
@@ -189,7 +185,11 @@ export default function ProductListPage() {
       console.error('채널 목록 조회 실패:', error)
       toast.error('채널 목록을 불러오는데 실패했습니다.')
     }
-  }
+  }, [toast])
+
+  useEffect(() => {
+    loadChannels()
+  }, [loadChannels])
 
   // CollectedProduct 등록 관련 함수들
   const handleOpenCollectedProductModal = async () => {

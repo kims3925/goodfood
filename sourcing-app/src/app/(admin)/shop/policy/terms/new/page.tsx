@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -23,11 +23,7 @@ export default function TermsPolicyNewPage() {
     content: '',
   })
 
-  useEffect(() => {
-    fetchNextVersion()
-  }, [isMainVersion])
-
-  const fetchNextVersion = async () => {
+  const fetchNextVersion = useCallback(async () => {
     try {
       const response = await fetch('/api/policy/terms?limit=1')
       const data = await response.json()
@@ -46,7 +42,11 @@ export default function TermsPolicyNewPage() {
       console.error('버전 조회 실패:', error)
       setNextVersion('0.1')
     }
-  }
+  }, [isMainVersion])
+
+  useEffect(() => {
+    fetchNextVersion()
+  }, [fetchNextVersion])
 
   const handleSave = async () => {
     if (!formData.name.trim() || !formData.content.trim()) {

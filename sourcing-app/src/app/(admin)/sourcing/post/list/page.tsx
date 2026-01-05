@@ -149,13 +149,7 @@ export default function PostsManagePage() {
     loadChannels()
   }, [loadChannels])
 
-  useEffect(() => {
-    setSelectedPostIds([])
-    setSelectAllPosts(false)
-    loadPosts()
-  }, [currentPage, selectedChannelId, searchTerm])
-
-  const loadPosts = async () => {
+  const loadPosts = useCallback(async () => {
     try {
       setIsLoading(true)
       const params = new URLSearchParams({
@@ -187,7 +181,13 @@ export default function PostsManagePage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentPage, selectedChannelId, searchTerm, itemsPerPage])
+
+  useEffect(() => {
+    setSelectedPostIds([])
+    setSelectAllPosts(false)
+    loadPosts()
+  }, [loadPosts])
 
   const handleChannelFilter = (channelId: number | null) => {
     setSelectedChannelId(channelId)

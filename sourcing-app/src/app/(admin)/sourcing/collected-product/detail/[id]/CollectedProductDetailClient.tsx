@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Package, Store, ExternalLink, Trash2, ImageIcon, Calendar, User, FileText, ShoppingBag, Layers, Grid3X3, Truck, RefreshCw } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -81,11 +81,7 @@ export default function CollectedProductDetailClient({ id }: { id: string }) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isUpdatingConversion, setIsUpdatingConversion] = useState(false)
 
-  useEffect(() => {
-    loadProduct()
-  }, [id])
-
-  const loadProduct = async () => {
+  const loadProduct = useCallback(async () => {
     try {
       setIsLoading(true)
       const response = await fetch(`/api/collected-product/${id}`)
@@ -104,7 +100,11 @@ export default function CollectedProductDetailClient({ id }: { id: string }) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [id, router, toast])
+
+  useEffect(() => {
+    loadProduct()
+  }, [loadProduct])
 
   const handleConversionStatusChange = async (newStatus: boolean) => {
     if (!product) return

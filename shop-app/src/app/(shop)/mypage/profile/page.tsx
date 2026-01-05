@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useShopUrl } from '@/hooks/useShopUrl'
 import { useShop } from '@/contexts/ShopContext'
@@ -19,13 +19,7 @@ export default function ProfilePage() {
     confirmPassword: '',
   })
 
-  useEffect(() => {
-    if (session) {
-      fetchProfile()
-    }
-  }, [session])
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(getApiPath('/api/mypage/profile'))
@@ -45,7 +39,13 @@ export default function ProfilePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [getApiPath])
+
+  useEffect(() => {
+    if (session) {
+      fetchProfile()
+    }
+  }, [session, fetchProfile])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

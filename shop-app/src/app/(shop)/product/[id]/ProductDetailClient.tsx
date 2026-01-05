@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
@@ -46,22 +46,90 @@ export default function ProductDetailClient() {
   const [reviewTotalPages, setReviewTotalPages] = useState(1)
   const [reviewSortBy, setReviewSortBy] = useState('recent')
 
+  const loadProduct = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      const apiUrl = bandId
+        ? getApiPath(`/api/shop/products/${params.id}?bandId=${bandId}`)
+        : getApiPath(`/api/shop/products/${params.id}`)
+      const response = await fetch(apiUrl)
+      const data = await response.json()
+
+      if (data.success) {
+        setProduct(data.product)
+        // 첫 번째 variant를 기본 선택
+        if (data.product.variants && data.product.variants.length > 0) {
+          setSelectedVariant(data.product.variants[0])
+        }
+      } else {
+        console.error('Failed to load product:', data.error)
+        setProduct(null)
+      }
+    } catch (error) {
+      console.error('Failed to load product:', error)
+      setProduct(null)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [params.id, bandId, getApiPath])
+
+  const checkWishlistStatus = useCallback(async () => {
+    if (!session) return
+
+    try {
+      const response = await fetch(getApiPath('/api/mypage/wishlist'))
+      const data = await response.json()
+
+      if (data.success) {
+        const isInWishlist = data.wishlists.some(
+          (item: any) => item.product.id === parseInt(params.id as string)
+        )
+        setIsWishlisted(isInWishlist)
+      }
+    } catch (error) {
+      console.error('Failed to check wishlist status:', error)
+    }
+  }, [session, params.id, getApiPath])
+
+  // 리뷰 로드 함수
+  const loadReviews = useCallback(async () => {
+    if (!product?.publishedProductId) return
+
+    try {
+      setReviewsLoading(true)
+      const response = await fetch(
+        getApiPath(`/api/shop/products/${product.publishedProductId}/reviews?page=${reviewPage}&limit=5&sortBy=${reviewSortBy}`)
+      )
+      const data = await response.json()
+
+      if (data.success) {
+        setReviews(data.reviews)
+        setReviewStats(data.stats)
+        setReviewTotalPages(data.pagination.totalPages)
+      }
+    } catch (error) {
+      console.error('Failed to load reviews:', error)
+    } finally {
+      setReviewsLoading(false)
+    }
+  }, [product?.publishedProductId, reviewPage, reviewSortBy, getApiPath])
+
   useEffect(() => {
     loadProduct()
-  }, [params.id, bandId])
+  }, [loadProduct])
 
   useEffect(() => {
     if (session && product) {
       checkWishlistStatus()
     }
-  }, [session, product])
+  }, [session, product, checkWishlistStatus])
 
   // 리뷰 섹션이 보이면 리뷰 로드
   useEffect(() => {
     if (activeTab === 'review' && product) {
       loadReviews()
     }
-  }, [activeTab, product, reviewPage, reviewSortBy])
+  }, [activeTab, product, loadReviews])
 
   // Scroll Spy: 스크롤 위치에 따라 활성 탭 변경
   useEffect(() => {
@@ -142,74 +210,6 @@ export default function ProductDetailClient() {
       })
     }
   }, [selectedImage, product?.images])
-
-  const loadProduct = async () => {
-    try {
-      setIsLoading(true)
-      const apiUrl = bandId
-        ? getApiPath(`/api/shop/products/${params.id}?bandId=${bandId}`)
-        : getApiPath(`/api/shop/products/${params.id}`)
-      const response = await fetch(apiUrl)
-      const data = await response.json()
-
-      if (data.success) {
-        setProduct(data.product)
-        // 첫 번째 variant를 기본 선택
-        if (data.product.variants && data.product.variants.length > 0) {
-          setSelectedVariant(data.product.variants[0])
-        }
-      } else {
-        console.error('Failed to load product:', data.error)
-        setProduct(null)
-      }
-    } catch (error) {
-      console.error('Failed to load product:', error)
-      setProduct(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const checkWishlistStatus = async () => {
-    if (!session) return
-
-    try {
-      const response = await fetch(getApiPath('/api/mypage/wishlist'))
-      const data = await response.json()
-
-      if (data.success) {
-        const isInWishlist = data.wishlists.some(
-          (item: any) => item.product.id === parseInt(params.id as string)
-        )
-        setIsWishlisted(isInWishlist)
-      }
-    } catch (error) {
-      console.error('Failed to check wishlist status:', error)
-    }
-  }
-
-  // 리뷰 로드 함수
-  const loadReviews = async () => {
-    if (!product?.publishedProductId) return
-
-    try {
-      setReviewsLoading(true)
-      const response = await fetch(
-        getApiPath(`/api/shop/products/${product.publishedProductId}/reviews?page=${reviewPage}&limit=5&sortBy=${reviewSortBy}`)
-      )
-      const data = await response.json()
-
-      if (data.success) {
-        setReviews(data.reviews)
-        setReviewStats(data.stats)
-        setReviewTotalPages(data.pagination.totalPages)
-      }
-    } catch (error) {
-      console.error('Failed to load reviews:', error)
-    } finally {
-      setReviewsLoading(false)
-    }
-  }
 
   // 별점 렌더링 헬퍼
   const renderStars = (rating: number, size: 'sm' | 'md' | 'lg' = 'md') => {

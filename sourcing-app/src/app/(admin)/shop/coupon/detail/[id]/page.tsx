@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Save, Trash2 } from 'lucide-react'
 import Input from '@/components/ui/Input'
@@ -48,11 +48,7 @@ export default function CouponDetailPage() {
     isActive: true,
   })
 
-  useEffect(() => {
-    loadCoupon()
-  }, [id])
-
-  const loadCoupon = async () => {
+  const loadCoupon = useCallback(async () => {
     try {
       setIsLoading(true)
       const response = await fetch(`/api/coupon/${id}`)
@@ -85,7 +81,11 @@ export default function CouponDetailPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [id, router, toast])
+
+  useEffect(() => {
+    loadCoupon()
+  }, [loadCoupon])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -86,7 +86,7 @@ function PaymentFailContent() {
     } finally {
       setIsDeleting(false)
     }
-  }, [code, message, isDeleting])
+  }, [code, message, isDeleting, getApiPath])
 
   useEffect(() => {
     const errorCode = code || 'UNKNOWN_ERROR'

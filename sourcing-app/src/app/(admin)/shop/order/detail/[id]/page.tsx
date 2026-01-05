@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import {
@@ -163,13 +163,7 @@ export default function UnifiedOrderDetailPage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (orderNumber) {
-      loadOrder()
-    }
-  }, [orderNumber, source])
-
-  const loadOrder = async () => {
+  const loadOrder = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
@@ -188,7 +182,13 @@ export default function UnifiedOrderDetailPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [orderNumber, source])
+
+  useEffect(() => {
+    if (orderNumber) {
+      loadOrder()
+    }
+  }, [orderNumber, loadOrder])
 
   const handleStatusChange = (newStatus: string) => {
     if (!order) return

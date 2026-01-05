@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { MessageSquare, CheckCircle, Clock } from 'lucide-react'
 import Image from 'next/image'
@@ -53,13 +53,7 @@ export default function InquiriesPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (session) {
-      fetchInquiries()
-    }
-  }, [session])
-
-  const fetchInquiries = async () => {
+  const fetchInquiries = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(getApiPath('/api/mypage/inquiries'))
@@ -73,7 +67,13 @@ export default function InquiriesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [getApiPath])
+
+  useEffect(() => {
+    if (session) {
+      fetchInquiries()
+    }
+  }, [session, fetchInquiries])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)

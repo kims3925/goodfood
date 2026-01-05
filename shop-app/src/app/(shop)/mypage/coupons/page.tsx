@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { Tag, Plus } from 'lucide-react'
 import { useShopUrl } from '@/hooks/useShopUrl'
@@ -35,13 +35,7 @@ export default function CouponsPage() {
   const [showCouponInput, setShowCouponInput] = useState(false)
   const [filter, setFilter] = useState<'all' | 'available' | 'used'>('available')
 
-  useEffect(() => {
-    if (session) {
-      fetchCoupons()
-    }
-  }, [session])
-
-  const fetchCoupons = async () => {
+  const fetchCoupons = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(getApiPath('/api/mypage/coupons'))
@@ -58,7 +52,13 @@ export default function CouponsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [getApiPath])
+
+  useEffect(() => {
+    if (session) {
+      fetchCoupons()
+    }
+  }, [session, fetchCoupons])
 
   const handleIssueCoupon = async () => {
     if (!couponCode.trim()) {

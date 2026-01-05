@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -92,7 +92,7 @@ export default function InquiryDetailPage({ params }: { params: { id: string } }
     return allReplies
   }
 
-  const loadInquiry = async () => {
+  const loadInquiry = useCallback(async () => {
     try {
       setIsLoading(true)
       const response = await fetch(`/api/cs/inquiry/${params.id}`)
@@ -111,11 +111,11 @@ export default function InquiryDetailPage({ params }: { params: { id: string } }
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [params.id, router, toast])
 
   useEffect(() => {
     loadInquiry()
-  }, [params.id])
+  }, [loadInquiry])
 
   const handleSubmitReply = async () => {
     if (!replyText.trim()) {

@@ -130,7 +130,7 @@ export default function UnifiedOrderListPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, selectedShopId, statusFilter])
+  }, [page, search, selectedShopId, statusFilter, toast])
 
   useEffect(() => {
     fetchOrders()

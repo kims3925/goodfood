@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, RefreshCw, Package, Trash2, Send, Store } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -99,11 +99,7 @@ export default function PublishedProductListPage() {
     return Array.from(grouped.values())
   }
 
-  useEffect(() => {
-    loadProducts()
-  }, [currentPage, statusFilter, searchTerm])
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     try {
       setIsLoading(true)
       const params = new URLSearchParams({
@@ -133,7 +129,11 @@ export default function PublishedProductListPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentPage, statusFilter, searchTerm, itemsPerPage, toast])
+
+  useEffect(() => {
+    loadProducts()
+  }, [loadProducts])
 
   // 현재 페이지에 해당하는 그룹화된 상품 가져오기
   const getCurrentPageProducts = () => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Package, Search, Edit3, Trash2, DollarSign, Calendar, Tag, Download, ChevronLeft, ChevronRight, CheckCircle, Plus } from 'lucide-react'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
@@ -127,7 +127,7 @@ export default function ProductsPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showDetailModal, currentDetailIndex])
+  }, [showDetailModal, currentDetailIndex, navigateToProduct])
 
   const loadProducts = async () => {
     try {
@@ -547,16 +547,16 @@ export default function ProductsPage() {
   }
 
   // 네비게이션 함수들
-  const navigateToProduct = (direction: 'prev' | 'next') => {
+  const navigateToProduct = useCallback((direction: 'prev' | 'next') => {
     if (paginatedProducts.length === 0) return
-    
+
     let newIndex = currentDetailIndex
     if (direction === 'prev') {
       newIndex = currentDetailIndex > 0 ? currentDetailIndex - 1 : paginatedProducts.length - 1
     } else {
       newIndex = currentDetailIndex < paginatedProducts.length - 1 ? currentDetailIndex + 1 : 0
     }
-    
+
     const newProduct = paginatedProducts[newIndex]
     if (newProduct) {
       setCurrentDetailIndex(newIndex)
@@ -564,7 +564,7 @@ export default function ProductsPage() {
       setEditedProduct({ ...newProduct })
       setIsEditing(false)
     }
-  }
+  }, [paginatedProducts, currentDetailIndex])
 
   // 개별 소싱 확정 처리
   const handleIndividualSourceConfirm = async () => {
