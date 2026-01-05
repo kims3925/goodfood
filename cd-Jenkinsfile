@@ -150,6 +150,30 @@ pipeline {
                     echo ">>> Generating Prisma client..."
                     cd db
                     npx prisma generate --schema prisma
+
+                    # =============================================
+                    # Prisma 마이그레이션 자동 적용
+                    # =============================================
+                    echo ">>> Checking for pending migrations..."
+
+                    # 마이그레이션 상태 확인 및 적용
+                    MIGRATE_STATUS=\$(npx prisma migrate status --schema prisma 2>&1) || true
+
+                    if echo "\$MIGRATE_STATUS" | grep -q "Database schema is up to date"; then
+                        echo ">>> Database schema is already up to date"
+                    elif echo "\$MIGRATE_STATUS" | grep -q "Following migrations have not yet been applied"; then
+                        echo ">>> Pending migrations found. Applying..."
+                        npx prisma migrate deploy --schema prisma
+                        echo ">>> Migrations applied successfully"
+                    else
+                        echo ">>> Migration status:"
+                        echo "\$MIGRATE_STATUS"
+                        # 마이그레이션이 없거나 다른 상태일 경우에도 deploy 시도
+                        npx prisma migrate deploy --schema prisma || {
+                            echo ">>> Warning: migrate deploy failed, but continuing..."
+                        }
+                    fi
+
                     cd ..
 
                     # Stop specific PM2 processes before cleaning (파일 잠금 해제)
