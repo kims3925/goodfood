@@ -11,18 +11,18 @@ const nextConfig = {
     return config
   },
   images: {
-    // Cloudinary CDN 사용 시 Next.js 자체 최적화 비활성화
+    // 이미지 최적화 비활성화 (서버 부하 감소)
     unoptimized: true,
     remotePatterns: [
-      // Cloudinary CDN (이미지 최적화 담당)
-      {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
-      },
       // AWS S3 버킷
       {
         protocol: 'https',
         hostname: '*.amazonaws.com',
+      },
+      // Cloudinary (예시)
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
       },
       // 로컬 개발용
       {

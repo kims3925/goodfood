@@ -122,14 +122,16 @@ export default function ProductDetailClient() {
     if (session && product) {
       checkWishlistStatus()
     }
-  }, [session, product, checkWishlistStatus])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- product?.id만 의존성으로 사용하여 불필요한 재실행 방지
+  }, [session, product?.id, checkWishlistStatus])
 
   // 리뷰 섹션이 보이면 리뷰 로드
   useEffect(() => {
     if (activeTab === 'review' && product) {
       loadReviews()
     }
-  }, [activeTab, product, loadReviews])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- product?.publishedProductId만 의존성으로 사용하여 불필요한 재실행 방지
+  }, [activeTab, product?.publishedProductId, loadReviews])
 
   // Scroll Spy: 스크롤 위치에 따라 활성 탭 변경
   useEffect(() => {
@@ -551,13 +553,14 @@ export default function ProductDetailClient() {
             <button
               onClick={handleToggleWishlist}
               disabled={wishlistLoading}
+              aria-label={isWishlisted ? '찜 해제' : '찜하기'}
               className="p-1"
             >
               <Heart
                 className={`h-5 w-5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-700'}`}
               />
             </button>
-            <button onClick={handleShare} className="p-1">
+            <button onClick={handleShare} aria-label="공유하기" className="p-1">
               <Share2 className="h-5 w-5" />
             </button>
           </div>
@@ -586,7 +589,7 @@ export default function ProductDetailClient() {
                       fill
                       sizes="430px"
                       className="object-cover"
-                      priority={index === 0}
+                      priority
                     />
                   </div>
                 ))}
@@ -732,7 +735,9 @@ export default function ProductDetailClient() {
                   ) : (
                     /* 드롭다운 (6개 이상일 때) */
                     <div className="relative">
+                      <label htmlFor="variant-select" className="sr-only">옵션 선택</label>
                       <select
+                        id="variant-select"
                         value={selectedVariant?.id || ''}
                         onChange={(e) => {
                           const variant = product.variants.find((v: any) => v.id === parseInt(e.target.value))
@@ -780,7 +785,10 @@ export default function ProductDetailClient() {
                       }
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      묶음 당 최대 {formatPrice(isUnlimited ? shippingFee * (bundleMaxQty - 1) : maxDiscount)}원 할인
+                      {isUnlimited
+                        ? `수량 제한 없이 개당 ${formatPrice(shippingFee)}원씩 할인`
+                        : `묶음 당 최대 ${formatPrice(maxDiscount)}원 할인`
+                      }
                     </p>
                   </div>
                 )
@@ -791,47 +799,13 @@ export default function ProductDetailClient() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <label className="text-sm font-medium text-gray-700">수량</label>
-                    {/* 합배송 묶음 단위 표시 (bundleUnit 고려) */}
-                    {hasBundleOptions && (() => {
-                      const bundleMaxQty = product.bundleMaxQty || activeBundleOptions.length
-                      const bundleUnit = selectedVariant?.bundleUnit || 1
-                      const totalBundleUnits = quantity * bundleUnit
-                      const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
-                      const remainder = totalBundleUnits % bundleMaxQty
-
-                      // bundleUnit > 1이면 박스 수 표시
-                      if (bundleUnit > 1) {
-                        return (
-                          <span className="text-xs text-[#FF6B6B] font-medium">
-                            = {totalBundleUnits}박스
-                            {fullBundles > 0 && ` (${fullBundles}묶음${remainder > 0 ? ` + ${remainder}박스` : ''})`}
-                          </span>
-                        )
-                      }
-
-                      // bundleUnit = 1인 경우 기존 로직
-                      if (quantity > bundleMaxQty || (fullBundles >= 1 && remainder > 0)) {
-                        const parts = []
-                        if (fullBundles > 0) {
-                          parts.push(`${bundleMaxQty}개 × ${fullBundles}`)
-                        }
-                        if (remainder > 0) {
-                          parts.push(`${remainder}개`)
-                        }
-                        return (
-                          <span className="text-xs text-gray-500">
-                            ({parts.join(' + ')})
-                          </span>
-                        )
-                      }
-                      return null
-                    })()}
                   </div>
                   <div className="flex items-center gap-3">
                     {/* 수량 조절 버튼 */}
                     <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
                       <button
                         onClick={() => handleQuantityChange('decrease')}
+                        aria-label="수량 감소"
                         className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
                       >
                         <Minus className="h-4 w-4 text-gray-600" />
@@ -839,6 +813,7 @@ export default function ProductDetailClient() {
                       <span className="w-14 text-center font-semibold text-gray-900">{quantity}</span>
                       <button
                         onClick={() => handleQuantityChange('increase')}
+                        aria-label="수량 증가"
                         className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
                       >
                         <Plus className="h-4 w-4 text-gray-600" />
@@ -1212,7 +1187,9 @@ export default function ProductDetailClient() {
 
                 {/* 정렬 옵션 */}
                 <div className="flex justify-end">
+                  <label htmlFor="review-sort" className="sr-only">리뷰 정렬</label>
                   <select
+                    id="review-sort"
                     value={reviewSortBy}
                     onChange={(e) => {
                       setReviewSortBy(e.target.value)

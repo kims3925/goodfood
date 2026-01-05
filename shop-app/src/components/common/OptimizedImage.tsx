@@ -2,12 +2,11 @@
 
 /**
  * OptimizedImage Component
- * Next.js Image 컴포넌트를 래핑하여 에러 처리, 플레이스홀더, Cloudinary CDN 최적화 제공
+ * Next.js Image 컴포넌트를 래핑하여 에러 처리 및 플레이스홀더 기능 제공
  */
 
 import Image, { ImageProps } from 'next/image'
-import { useState, useCallback, useMemo } from 'react'
-import { getCloudinaryUrl, getProductImageUrl } from '@/lib/cloudinary'
+import { useState, useCallback, useEffect } from 'react'
 
 // 기본 플레이스홀더 이미지 (1x1 투명 픽셀)
 const PLACEHOLDER_BLUR =
@@ -15,9 +14,6 @@ const PLACEHOLDER_BLUR =
 
 // 기본 폴백 이미지
 const DEFAULT_FALLBACK = '/images/placeholder.png'
-
-// Cloudinary 사용 여부 (환경변수로 설정)
-const USE_CLOUDINARY = !!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 
 interface OptimizedImageProps extends Omit<ImageProps, 'onError'> {
   fallbackSrc?: string
@@ -34,6 +30,12 @@ export function OptimizedImage({
 }: OptimizedImageProps) {
   const [imgSrc, setImgSrc] = useState(src)
   const [hasError, setHasError] = useState(false)
+
+  // src props 변경 시 상태 동기화
+  useEffect(() => {
+    setImgSrc(src)
+    setHasError(false)
+  }, [src])
 
   const handleError = useCallback(() => {
     if (!hasError) {
@@ -61,7 +63,6 @@ export function OptimizedImage({
 /**
  * 상품 이미지용 컴포넌트
  * 상품 목록, 상세, 장바구니 등에서 사용
- * Cloudinary CDN을 통한 자동 최적화 지원
  */
 interface ProductImageProps {
   src: string | null | undefined
@@ -72,8 +73,6 @@ interface ProductImageProps {
   priority?: boolean
   fill?: boolean
   sizes?: string
-  /** Cloudinary 이미지 크기 프리셋 */
-  imageSize?: 'thumbnail' | 'card' | 'detail' | 'full'
 }
 
 export function ProductImage({
@@ -85,19 +84,15 @@ export function ProductImage({
   priority = false,
   fill = false,
   sizes,
-  imageSize = 'card',
 }: ProductImageProps) {
-  // Cloudinary URL로 변환 (설정된 경우)
-  const optimizedSrc = useMemo(() => {
-    if (!src) return DEFAULT_FALLBACK
-    if (USE_CLOUDINARY) {
-      return getProductImageUrl(src, imageSize)
-    }
-    return src
-  }, [src, imageSize])
-
-  const [imgSrc, setImgSrc] = useState(optimizedSrc)
+  const [imgSrc, setImgSrc] = useState(src || DEFAULT_FALLBACK)
   const [hasError, setHasError] = useState(false)
+
+  // src 변경 시 상태 동기화
+  useEffect(() => {
+    setImgSrc(src || DEFAULT_FALLBACK)
+    setHasError(false)
+  }, [src])
 
   const handleError = useCallback(() => {
     if (!hasError) {
@@ -117,7 +112,7 @@ export function ProductImage({
         blurDataURL={PLACEHOLDER_BLUR}
         priority={priority}
         fill
-        sizes={sizes || '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'}
+        sizes={sizes || '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'}
         style={{ objectFit: 'cover' }}
         loading={priority ? 'eager' : 'lazy'}
       />
@@ -156,13 +151,20 @@ export function AvatarImage({
   size = 40,
   className = '',
 }: AvatarImageProps) {
-  const [imgSrc, setImgSrc] = useState(src || '/images/default-avatar.png')
+  const defaultAvatar = '/images/default-avatar.png'
+  const [imgSrc, setImgSrc] = useState(src || defaultAvatar)
   const [hasError, setHasError] = useState(false)
+
+  // src props 변경 시 상태 동기화
+  useEffect(() => {
+    setImgSrc(src || defaultAvatar)
+    setHasError(false)
+  }, [src])
 
   const handleError = useCallback(() => {
     if (!hasError) {
       setHasError(true)
-      setImgSrc('/images/default-avatar.png')
+      setImgSrc(defaultAvatar)
     }
   }, [hasError])
 

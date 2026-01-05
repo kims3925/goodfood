@@ -183,10 +183,11 @@ export default function InquiryPage() {
               )}
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label htmlFor="inquiry-type" className="block text-sm font-semibold text-gray-700 mb-2">
                   문의 유형
                 </label>
                 <select
+                  id="inquiry-type"
                   value={formData.inquiryType}
                   onChange={(e) => setFormData({ ...formData, inquiryType: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:bg-white transition-all text-sm sm:text-base"

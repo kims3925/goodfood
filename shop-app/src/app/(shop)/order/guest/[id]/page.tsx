@@ -161,6 +161,10 @@ function GuestOrderDetailContent() {
   useEffect(() => {
     if (orderId && token) {
       fetchOrderDetail()
+    } else if (orderId && !token) {
+      // token이 없으면 에러 표시
+      setError('주문 조회를 위한 인증 정보가 없습니다')
+      setIsLoading(false)
     }
   }, [orderId, token, fetchOrderDetail])
 
@@ -585,8 +589,9 @@ function GuestOrderDetailContent() {
                 <div className="space-y-3">
                   {/* 은행 선택 */}
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">은행 선택</label>
+                    <label htmlFor="guest-refund-bank" className="block text-xs text-gray-600 mb-1">은행 선택</label>
                     <select
+                      id="guest-refund-bank"
                       value={refundBankName}
                       onChange={(e) => setRefundBankName(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"

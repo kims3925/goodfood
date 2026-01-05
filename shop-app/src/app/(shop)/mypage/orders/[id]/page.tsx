@@ -859,10 +859,11 @@ export default function OrderDetailPage() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 mb-2">
                   취소 사유 <span className="text-red-500">*</span>
                 </label>
                 <select
+                  id="cancel-reason"
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -903,10 +904,11 @@ export default function OrderDetailPage() {
                   </p>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                    <label htmlFor="refund-bank" className="block text-xs font-medium text-gray-700 mb-1">
                       은행 선택 <span className="text-red-500">*</span>
                     </label>
                     <select
+                      id="refund-bank"
                       value={refundBankName}
                       onChange={(e) => setRefundBankName(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"

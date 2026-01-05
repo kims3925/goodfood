@@ -563,6 +563,7 @@ export default function CartPage() {
                             <button
                               onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
                               disabled={item.quantity <= 1}
+                              aria-label="수량 감소"
                               className="w-8 h-8 flex items-center justify-center hover:bg-gray-50 disabled:opacity-30"
                             >
                               <Minus className="w-3 h-3 text-gray-600" />
@@ -570,6 +571,7 @@ export default function CartPage() {
                             <span className="w-10 text-center text-sm text-gray-900 font-medium">{item.quantity}</span>
                             <button
                               onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                              aria-label="수량 증가"
                               className="w-8 h-8 flex items-center justify-center hover:bg-gray-50"
                             >
                               <Plus className="w-3 h-3 text-gray-600" />
@@ -581,6 +583,7 @@ export default function CartPage() {
                       {/* 삭제 버튼 */}
                       <button
                         onClick={() => handleRemoveItem(item.id)}
+                        aria-label="상품 삭제"
                         className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600"
                       >
                         <X className="w-5 h-5" />
