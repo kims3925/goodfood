@@ -707,7 +707,7 @@ export default function ChannelFormModal({
                             key={band.bandKey}
                             type="button"
                             onClick={() => handleBandSelect(band)}
-                            className={`w-full flex items-center pl-12 pr-4 py-4 border-b border-gray-100 text-left transition-colors ${
+                            className={`w-full flex items-center px-4 py-4 border-b border-gray-100 text-left transition-colors ${
                               isSelected
                                 ? 'bg-purple-50 hover:bg-purple-100'
                                 : 'hover:bg-gray-50'
@@ -864,7 +864,7 @@ export default function ChannelFormModal({
                             key={band.bandKey}
                             type="button"
                             onClick={() => handleBandSelect(band)}
-                            className={`w-full flex items-center pl-12 pr-4 py-4 border-b border-gray-100 text-left transition-colors ${
+                            className={`w-full flex items-center px-4 py-4 border-b border-gray-100 text-left transition-colors ${
                               isSelected
                                 ? 'bg-purple-50 hover:bg-purple-100'
                                 : 'hover:bg-gray-50'
