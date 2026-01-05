@@ -586,7 +586,7 @@ export default function ProductDetailClient() {
                       fill
                       sizes="430px"
                       className="object-cover"
-                      priority={index === 0}
+                      priority
                     />
                   </div>
                 ))}
