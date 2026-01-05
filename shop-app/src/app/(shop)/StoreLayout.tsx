@@ -11,6 +11,15 @@ import { useShop } from '@/contexts/ShopContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
 import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
 
+// 사업자등록번호 포맷팅 (XXX-XX-XXXXX 형식)
+const formatBusinessNumber = (number: string): string => {
+  const cleaned = number.replace(/[^0-9]/g, '')
+  if (cleaned.length === 10) {
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 5)}-${cleaned.slice(5)}`
+  }
+  return number
+}
+
 function StoreLayoutContent({
   children,
 }: {
@@ -269,7 +278,7 @@ function StoreLayoutContent({
             <p>
               {shopName}
               {ownerName && <span> | 대표: {ownerName}</span>}
-              {businessNumber && <span> | 사업자등록번호: {businessNumber}</span>}
+              {businessNumber && <span> | 사업자등록번호: {formatBusinessNumber(businessNumber)}</span>}
             </p>
             <p className="mt-2">Copyright &copy; {new Date().getFullYear()} {shopName}. All rights reserved.</p>
           </div>

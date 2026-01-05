@@ -506,6 +506,27 @@ export default function ShopDetailPage({
     setContactPhone(formatted)
   }
 
+  // 사업자등록번호 입력 핸들러 (자동 포맷팅)
+  const handleBusinessNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value
+    const digits = inputValue.replace(/\D/g, '')
+
+    // 최대 10자리 제한
+    const limitedDigits = digits.slice(0, 10)
+
+    // 자동 포맷팅: XXX-XX-XXXXX
+    let formatted = ''
+    if (limitedDigits.length <= 3) {
+      formatted = limitedDigits
+    } else if (limitedDigits.length <= 5) {
+      formatted = `${limitedDigits.slice(0, 3)}-${limitedDigits.slice(3)}`
+    } else {
+      formatted = `${limitedDigits.slice(0, 3)}-${limitedDigits.slice(3, 5)}-${limitedDigits.slice(5)}`
+    }
+
+    setBusinessNumber(formatted)
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -857,11 +878,7 @@ export default function ShopDetailPage({
                     {isEditMode ? (
                       <Input
                         value={businessNumber}
-                        onChange={(e) => {
-                          // 숫자와 하이픈만 허용
-                          const value = e.target.value.replace(/[^0-9-]/g, '')
-                          setBusinessNumber(value)
-                        }}
+                        onChange={handleBusinessNumberChange}
                         placeholder="123-45-67890"
                       />
                     ) : (
