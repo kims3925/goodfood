@@ -94,7 +94,7 @@ function CheckoutContent() {
   const [isLoading, setIsLoading] = useState(true)
 
   // 결제 방식 관련
-  const [paymentMethod, setPaymentMethod] = useState<'TOSS' | 'BANK_TRANSFER'>('TOSS')
+  const [paymentMethod, setPaymentMethod] = useState<'TOSS' | 'BANK_TRANSFER'>('BANK_TRANSFER')
 
   // 회원 배송지 관련
   const [addresses, setAddresses] = useState<Address[]>([])
