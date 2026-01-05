@@ -149,7 +149,7 @@ function StoreLayoutContent({
                     <div className="absolute top-full right-0 w-[200px] bg-white border border-gray-200 shadow-lg z-50 py-2 mt-1 rounded-md">
                       <div className="px-4 py-3 border-b border-gray-100">
                         <p className="font-bold text-lg text-abc-coral">{formatPhoneNumber(contactPhone)}</p>
-                        <p className="text-gray-500 text-xs mt-1">월~금 오전 9시 ~ 오후 6시</p>
+                        <p className="text-gray-500 text-xs mt-1">월~금 오전 10시 ~ 오후 5시</p>
                       </div>
                       <Link
                         href={getPath('/cs/inquiry')}
@@ -257,7 +257,7 @@ function StoreLayoutContent({
             <div className="text-center sm:text-left">
               <h4 className="font-bold text-gray-900 mb-3 md:mb-4">고객행복센터</h4>
               <p className="text-xl md:text-2xl font-bold mb-2 text-abc-coral">{formatPhoneNumber(contactPhone)}</p>
-              <p className="text-xs md:text-sm text-gray-600">월~금 오전 9시 ~ 오후 6시</p>
+              <p className="text-xs md:text-sm text-gray-600">월~금 오전 10시 ~ 오후 5시</p>
             </div>
             <div className="text-center sm:text-left">
               <h4 className="font-bold text-gray-900 mb-3 md:mb-4">{shopName}</h4>
