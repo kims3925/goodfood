@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState, useCallback } from 'react'
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -45,6 +45,7 @@ function PaymentFailContent() {
     orderId: string | null
   } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const isDeletingRef = useRef(false)  // useCallback 의존성에서 제외하기 위한 ref
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [copied, setCopied] = useState(false)
   const [showFaq, setShowFaq] = useState(false)
@@ -56,7 +57,9 @@ function PaymentFailContent() {
 
   // 주문 삭제 함수
   const deleteFailedOrder = useCallback(async (orderNumber: string) => {
-    if (isDeleting) return
+    // useRef로 중복 호출 방지 (의존성 배열에서 제외)
+    if (isDeletingRef.current) return
+    isDeletingRef.current = true
 
     try {
       setIsDeleting(true)
@@ -85,8 +88,9 @@ function PaymentFailContent() {
       console.error('주문 상태 업데이트 오류:', error)
     } finally {
       setIsDeleting(false)
+      isDeletingRef.current = false
     }
-  }, [code, message, isDeleting, getApiPath])
+  }, [code, message, getApiPath])
 
   useEffect(() => {
     const errorCode = code || 'UNKNOWN_ERROR'

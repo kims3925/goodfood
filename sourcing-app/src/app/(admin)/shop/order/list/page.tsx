@@ -130,7 +130,8 @@ export default function UnifiedOrderListPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, selectedShopId, statusFilter, toast])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- toast는 useMemo로 메모이제이션되어 안정적
+  }, [page, search, selectedShopId, statusFilter])
 
   useEffect(() => {
     fetchOrders()

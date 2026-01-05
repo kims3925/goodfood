@@ -34,9 +34,36 @@ export default function StorePage() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([])
   const [currentSlide, setCurrentSlide] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [cardsPerView, setCardsPerView] = useState(2)
 
-  const cardsPerView = 4
+  // 화면 크기에 따라 cardsPerView 조정
+  useEffect(() => {
+    const updateCardsPerView = () => {
+      const width = window.innerWidth
+      if (width < 640) {
+        setCardsPerView(2)  // 모바일: 2개
+      } else if (width < 768) {
+        setCardsPerView(3)  // sm: 3개
+      } else if (width < 1024) {
+        setCardsPerView(4)  // md: 4개
+      } else {
+        setCardsPerView(4)  // lg 이상: 4개
+      }
+    }
+
+    updateCardsPerView()
+    window.addEventListener('resize', updateCardsPerView)
+    return () => window.removeEventListener('resize', updateCardsPerView)
+  }, [])
+
   const totalSlides = Math.max(1, Math.ceil(featuredProducts.length / cardsPerView))
+
+  // cardsPerView 변경 시 currentSlide가 범위를 초과하지 않도록 조정
+  useEffect(() => {
+    if (currentSlide >= totalSlides) {
+      setCurrentSlide(Math.max(0, totalSlides - 1))
+    }
+  }, [cardsPerView, totalSlides, currentSlide])
 
   const loadShopProducts = useCallback(async () => {
     try {
