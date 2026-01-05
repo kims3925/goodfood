@@ -39,8 +39,6 @@ function StoreLayoutContent({
   const contactPhone = shop?.contactPhone || '1234-5678'
   const ownerName = shop?.ownerName
   const businessNumber = shop?.businessNumber
-  const ownerName = shop?.ownerName
-  const businessNumber = shop?.businessNumber
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
