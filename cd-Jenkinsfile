@@ -130,7 +130,7 @@ pipeline {
                     # 재설치 실행
                     if [ "\$NEED_REINSTALL" = "true" ]; then
                         echo ">>> Cleaning and reinstalling dependencies..."
-                        rm -rf node_modules
+                        sudo rm -rf node_modules || true
                         npm ci --legacy-peer-deps
 
                         # 체크섬 저장
@@ -141,7 +141,7 @@ pipeline {
                         # 혹시 모를 문제에 대비해 npm ci 시도
                         npm ci --legacy-peer-deps || {
                             echo ">>> npm ci failed, force reinstalling..."
-                            rm -rf node_modules
+                            sudo rm -rf node_modules || true
                             npm ci --legacy-peer-deps
                         }
                     fi
