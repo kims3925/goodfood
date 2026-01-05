@@ -748,9 +748,17 @@ function CheckoutContent() {
   } else if (product) {
     // 합배송 옵션이 있으면 공통 모듈로 가격 계산
     if (product.bundleOptions && product.bundleOptions.length > 0) {
-      const bundleShippingType = product.isBundleDiscount ? 'INCLUDED' : (product.shippingFee ? 'SEPARATE' : 'NONE')
+      const isBundleDiscount = product.isBundleDiscount || false
+      const bundleShippingType = isBundleDiscount ? 'INCLUDED' : (product.shippingFee ? 'SEPARATE' : 'NONE')
+
+      // 배송비형(SEPARATE)은 salePrice에 배송비가 포함되어 있으므로 원가로 변환
+      // 할인형(INCLUDED)은 salePrice가 이미 원가
+      const basePrice = isBundleDiscount
+        ? (product.salePrice || 0)
+        : (product.salePrice || 0) - (product.shippingFee || 0)
+
       const priceResult = calcPrice({
-        basePrice: product.salePrice || 0,
+        basePrice,
         shippingFee: product.shippingFee || 0,
         quantity,
         bundleMaxQty: product.bundleMaxQty || 1,
@@ -760,7 +768,17 @@ function CheckoutContent() {
       subtotal = priceResult.itemTotal
       bundleDiscount = priceResult.discountAmount
     } else {
-      subtotal = product.salePrice * quantity
+      // 합배송 옵션 없는 경우
+      const shippingFee = product.shippingFee || 0
+      const isBundleDiscount = product.isBundleDiscount || false
+
+      if (shippingFee > 0 && !isBundleDiscount) {
+        // 배송비 별도형: 원가 + 배송비
+        subtotal = (product.salePrice * quantity) + (shippingFee * quantity)
+      } else {
+        // 배송비 포함형 또는 배송비 없음: salePrice 그대로 사용
+        subtotal = product.salePrice * quantity
+      }
     }
     orderItemCount = quantity
     orderName = product.title

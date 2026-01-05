@@ -19,11 +19,6 @@ const nextConfig = {
         protocol: 'https',
         hostname: '*.amazonaws.com',
       },
-      // Cloudinary (예시)
-      {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
-      },
       // 로컬 개발용
       {
         protocol: 'http',
