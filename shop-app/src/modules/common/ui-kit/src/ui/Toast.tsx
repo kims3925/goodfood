@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react'
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react'
 
 type ToastType = 'success' | 'error' | 'info' | 'warning'
@@ -54,8 +54,14 @@ export function ToastProvider({ children }: ToastProviderProps) {
   const info = useCallback((message: string) => showToast(message, 'info'), [showToast])
   const warning = useCallback((message: string) => showToast(message, 'warning'), [showToast])
 
+  // 매 렌더링마다 새 객체 생성 방지를 위해 useMemo로 메모이제이션
+  const contextValue = useMemo(
+    () => ({ showToast, success, error, info, warning }),
+    [showToast, success, error, info, warning]
+  )
+
   return (
-    <ToastContext.Provider value={{ showToast, success, error, info, warning }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </ToastContext.Provider>

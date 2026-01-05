@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   TrendingUp,
   TrendingDown,
@@ -162,7 +162,7 @@ export default function ShopDashboardPage() {
   const [chartEndDate, setChartEndDate] = useState<string>(formatDateForInput(getToday()))
   const [isCustomDate, setIsCustomDate] = useState(false)
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setIsRefreshing(true)
     setError(null)
     try {
@@ -186,11 +186,11 @@ export default function ShopDashboardPage() {
     } finally {
       setIsRefreshing(false)
     }
-  }
+  }, [period, isCustomDate, chartStartDate, chartEndDate])
 
   useEffect(() => {
     fetchData()
-  }, [period, isCustomDate, chartStartDate, chartEndDate])
+  }, [fetchData])
 
   // 기간 프리셋 선택 시
   const handlePeriodChange = (newPeriod: PeriodFilter) => {

@@ -227,7 +227,7 @@ export default function WholesaleOrdersPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedDate])
+  }, [selectedDate, toast])
 
   // 발주 대기 상세 조회
   const fetchDetails = useCallback(async (channelId: number, page: number = 1) => {
@@ -255,7 +255,7 @@ export default function WholesaleOrdersPage() {
     } finally {
       setDetailLoading(false)
     }
-  }, [selectedDate])
+  }, [selectedDate, toast])
 
   // 발주 이력 조회 (최근 30일)
   const fetchHistory = useCallback(async (channelId: number) => {
@@ -285,7 +285,7 @@ export default function WholesaleOrdersPage() {
     } finally {
       setHistoryLoading(false)
     }
-  }, [])
+  }, [toast])
 
   // 이력 날짜별 상세 조회
   const fetchHistoryDetail = useCallback(async (channelId: number, date: string) => {
@@ -462,7 +462,7 @@ export default function WholesaleOrdersPage() {
       setHistoryDetailItems([])
       setSelectedShop('all') // 쇼핑몰 필터 초기화
     }
-  }, [selectedChannel])
+  }, [selectedChannel, fetchDetails, fetchHistory])
 
   // 포맷 함수들
   const formatPrice = (price: number) => {

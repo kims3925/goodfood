@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Store, Save, Trash2, Edit, X, Calendar, Link2, Power, Globe, Image, Key, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { ArrowLeft, Store, Save, Trash2, Edit, X, Calendar, Link2, Power, Globe, Image as ImageIcon, Key, CheckCircle, XCircle, Clock } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -692,7 +692,7 @@ export default function ChannelDetailPage({
                     <div className="p-4 bg-slate-50 rounded-xl">
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
                         <div className="flex items-center gap-2">
-                          <Image size={16} className="text-slate-500" />
+                          <ImageIcon size={16} className="text-slate-500" />
                           커버 이미지 URL
                         </div>
                       </label>

@@ -308,7 +308,7 @@ export class ProductRepository {
     if (data.shippingFee !== undefined) updateData.shippingFee = data.shippingFee
     if (data.shippingInfo !== undefined) updateData.shippingInfo = data.shippingInfo
     if (data.bundleMaxQty !== undefined) updateData.bundleMaxQty = data.bundleMaxQty
-    if (data.bundleUnit !== undefined) updateData.bundleUnit = data.bundleUnit
+    // bundleUnit은 ProductVariant에만 존재하므로 Product 업데이트에서 제외
 
     if (data.options !== undefined) {
       await prisma.productOption.deleteMany({ where: { productId: id } })

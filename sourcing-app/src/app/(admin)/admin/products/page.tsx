@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Package, Search, Edit3, Trash2, DollarSign, Calendar, Tag, Download, ChevronLeft, ChevronRight, CheckCircle, Plus } from 'lucide-react'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
@@ -108,26 +108,6 @@ export default function ProductsPage() {
     loadProducts()
   }, [])
 
-  // 키보드 네비게이션
-  useEffect(() => {
-    if (!showDetailModal) return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault()
-        navigateToProduct('prev')
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault()
-        navigateToProduct('next')
-      } else if (e.key === 'Escape') {
-        e.preventDefault()
-        setShowDetailModal(false)
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showDetailModal, currentDetailIndex])
 
   const loadProducts = async () => {
     try {
@@ -276,6 +256,47 @@ export default function ProductsPage() {
   const paginatedProducts = useMemo(() => {
     return filteredProducts.slice(startIndex, startIndex + itemsPerPage)
   }, [filteredProducts, startIndex, itemsPerPage])
+
+  // 네비게이션 함수
+  const navigateToProduct = useCallback((direction: 'prev' | 'next') => {
+    if (paginatedProducts.length === 0) return
+
+    let newIndex = currentDetailIndex
+    if (direction === 'prev') {
+      newIndex = currentDetailIndex > 0 ? currentDetailIndex - 1 : paginatedProducts.length - 1
+    } else {
+      newIndex = currentDetailIndex < paginatedProducts.length - 1 ? currentDetailIndex + 1 : 0
+    }
+
+    const newProduct = paginatedProducts[newIndex]
+    if (newProduct) {
+      setCurrentDetailIndex(newIndex)
+      setSelectedProduct(newProduct)
+      setEditedProduct({ ...newProduct })
+      setIsEditing(false)
+    }
+  }, [paginatedProducts, currentDetailIndex])
+
+  // 키보드 네비게이션
+  useEffect(() => {
+    if (!showDetailModal) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        navigateToProduct('prev')
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        navigateToProduct('next')
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        setShowDetailModal(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showDetailModal, navigateToProduct])
 
   const formatPrice = (price: number) => {
     return price.toLocaleString()
@@ -543,26 +564,6 @@ export default function ProductsPage() {
       console.error('일괄 삭제 오류:', error)
     } finally {
       setShowBatchDeleteConfirm(false)
-    }
-  }
-
-  // 네비게이션 함수들
-  const navigateToProduct = (direction: 'prev' | 'next') => {
-    if (paginatedProducts.length === 0) return
-    
-    let newIndex = currentDetailIndex
-    if (direction === 'prev') {
-      newIndex = currentDetailIndex > 0 ? currentDetailIndex - 1 : paginatedProducts.length - 1
-    } else {
-      newIndex = currentDetailIndex < paginatedProducts.length - 1 ? currentDetailIndex + 1 : 0
-    }
-    
-    const newProduct = paginatedProducts[newIndex]
-    if (newProduct) {
-      setCurrentDetailIndex(newIndex)
-      setSelectedProduct(newProduct)
-      setEditedProduct({ ...newProduct })
-      setIsEditing(false)
     }
   }
 

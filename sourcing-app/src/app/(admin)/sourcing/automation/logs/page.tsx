@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   RefreshCw, ChevronLeft, ChevronRight, CheckCircle, XCircle,
   AlertCircle, Clock, ChevronDown, ChevronUp, Download, Zap,
@@ -537,11 +537,7 @@ export default function AutomationLogsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [expandedLogId, setExpandedLogId] = useState<number | null>(null)
 
-  useEffect(() => {
-    loadLogs()
-  }, [currentPage, selectedType])
-
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     setIsLoading(true)
     try {
       const params = new URLSearchParams({
@@ -564,7 +560,11 @@ export default function AutomationLogsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentPage, selectedType])
+
+  useEffect(() => {
+    loadLogs()
+  }, [loadLogs])
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)

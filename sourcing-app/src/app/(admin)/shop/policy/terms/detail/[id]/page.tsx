@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import {
   ArrowLeft,
@@ -40,11 +40,7 @@ export default function TermsPolicyDetailPage() {
   })
   const [policy, setPolicy] = useState<TermsPolicy | null>(null)
 
-  useEffect(() => {
-    loadPolicy()
-  }, [id])
-
-  const loadPolicy = async () => {
+  const loadPolicy = useCallback(async () => {
     try {
       setIsLoading(true)
       const response = await fetch(`/api/policy/terms/${id}`)
@@ -67,7 +63,11 @@ export default function TermsPolicyDetailPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [id, router, toast])
+
+  useEffect(() => {
+    loadPolicy()
+  }, [loadPolicy])
 
   const handleSave = async () => {
     if (!formData.name.trim() || !formData.content.trim()) {

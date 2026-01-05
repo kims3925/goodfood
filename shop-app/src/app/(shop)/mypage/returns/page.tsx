@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -67,16 +67,7 @@ export default function ReturnsPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
 
-  useEffect(() => {
-    if (sessionStatus === 'loading') return
-    if (!session) {
-      router.push(getPath('/auth/login?callbackUrl=/mypage/returns'))
-      return
-    }
-    fetchCancelledOrders()
-  }, [session, sessionStatus, selectedType, currentPage])
-
-  const fetchCancelledOrders = async () => {
+  const fetchCancelledOrders = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -96,7 +87,16 @@ export default function ReturnsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [getApiPath, selectedType, currentPage])
+
+  useEffect(() => {
+    if (sessionStatus === 'loading') return
+    if (!session) {
+      router.push(getPath('/auth/login?callbackUrl=/mypage/returns'))
+      return
+    }
+    fetchCancelledOrders()
+  }, [session, sessionStatus, selectedType, currentPage, fetchCancelledOrders, router, getPath])
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-'

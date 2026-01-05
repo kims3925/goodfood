@@ -1,7 +1,16 @@
 import type { Metadata } from 'next'
+import localFont from 'next/font/local'
 import './globals.css'
 import SessionProvider from '@/modules/common/providers/SessionProvider'
 import { ToastProvider } from '@/modules/common/ui-kit/src/ui'
+
+// Pretendard 폰트 로컬 로딩 (CDN 불필요)
+const pretendard = localFont({
+  src: '../fonts/PretendardVariable.woff2',
+  variable: '--font-pretendard',
+  display: 'swap',
+  weight: '100 900',
+})
 
 export const metadata: Metadata = {
   title: '쇼핑몰 | 최고의 상품을 최저가로',
@@ -15,8 +24,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ko">
-      <body className="min-h-screen bg-gray-50">
+    <html lang="ko" className={pretendard.variable}>
+      <body className={`${pretendard.className} min-h-screen bg-gray-50`}>
         <SessionProvider>
           <ToastProvider>
             {children}

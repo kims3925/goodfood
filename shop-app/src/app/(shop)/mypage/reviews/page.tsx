@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Star, Package, X, Pencil, Trash2 } from 'lucide-react'
@@ -94,29 +94,7 @@ export default function ReviewsPage() {
   const [deletingReviewId, setDeletingReviewId] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
-    if (sessionStatus === 'loading') return
-    if (!session) {
-      router.push(getPath('/auth/login?callbackUrl=/mypage/reviews'))
-      return
-    }
-    fetchCounts()
-  }, [session, sessionStatus])
-
-  useEffect(() => {
-    if (session) {
-      setCurrentPage(1)
-      fetchData()
-    }
-  }, [activeTab, session])
-
-  useEffect(() => {
-    if (session) {
-      fetchData()
-    }
-  }, [currentPage])
-
-  const fetchCounts = async () => {
+  const fetchCounts = useCallback(async () => {
     try {
       const [writableRes, writtenRes] = await Promise.all([
         fetch(getApiPath('/api/mypage/reviews?tab=writable&limit=1')),
@@ -135,9 +113,9 @@ export default function ReviewsPage() {
     } catch (error) {
       console.error('Failed to fetch counts:', error)
     }
-  }
+  }, [getApiPath])
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -162,7 +140,29 @@ export default function ReviewsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [getApiPath, activeTab, currentPage])
+
+  useEffect(() => {
+    if (sessionStatus === 'loading') return
+    if (!session) {
+      router.push(getPath('/auth/login?callbackUrl=/mypage/reviews'))
+      return
+    }
+    fetchCounts()
+  }, [session, sessionStatus, fetchCounts, router, getPath])
+
+  useEffect(() => {
+    if (session) {
+      setCurrentPage(1)
+      fetchData()
+    }
+  }, [activeTab, session, fetchData])
+
+  useEffect(() => {
+    if (session) {
+      fetchData()
+    }
+  }, [currentPage, session, fetchData])
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-'

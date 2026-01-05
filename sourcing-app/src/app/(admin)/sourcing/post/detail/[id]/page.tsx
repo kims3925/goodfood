@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Edit, Save, X, Trash2, MessageCircle, ImageIcon, Calendar, User, ExternalLink } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -71,13 +71,7 @@ export default function PostDetailPage() {
     author: '',
   })
 
-  useEffect(() => {
-    if (postId) {
-      loadPost()
-    }
-  }, [postId])
-
-  const loadPost = async () => {
+  const loadPost = useCallback(async () => {
     try {
       setIsLoading(true)
       const response = await fetch(`/api/post/${postId}`)
@@ -99,7 +93,13 @@ export default function PostDetailPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [postId, router])
+
+  useEffect(() => {
+    if (postId) {
+      loadPost()
+    }
+  }, [postId, loadPost])
 
   const handleSave = async () => {
     if (!post) return

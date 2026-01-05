@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Plus,
@@ -82,11 +82,7 @@ export default function CouponListPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  useEffect(() => {
-    loadCoupons()
-  }, [currentPage, typeFilter, statusFilter, searchTerm])
-
-  const loadCoupons = async () => {
+  const loadCoupons = useCallback(async () => {
     try {
       setIsLoading(true)
       const params = new URLSearchParams({
@@ -123,7 +119,11 @@ export default function CouponListPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentPage, itemsPerPage, searchTerm, typeFilter, statusFilter, toast])
+
+  useEffect(() => {
+    loadCoupons()
+  }, [loadCoupons])
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)

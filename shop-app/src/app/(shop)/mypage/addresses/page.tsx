@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, usePathname } from 'next/navigation'
 import { MapPin, Plus, Edit2, Trash2, Check } from 'lucide-react'
@@ -89,13 +89,7 @@ export default function AddressesPage() {
     document.body.style.overflow = 'unset'
   }
 
-  useEffect(() => {
-    if (session) {
-      fetchAddresses()
-    }
-  }, [session])
-
-  const fetchAddresses = async () => {
+  const fetchAddresses = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(getApiPath('/api/mypage/addresses'))
@@ -109,7 +103,13 @@ export default function AddressesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [getApiPath])
+
+  useEffect(() => {
+    if (session) {
+      fetchAddresses()
+    }
+  }, [session, fetchAddresses])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { ChevronLeft, Send, MessageSquare, Clock, CheckCircle } from 'lucide-react'
@@ -53,13 +53,7 @@ export default function InquiryPage() {
     content: '',
   })
 
-  useEffect(() => {
-    if (session && activeTab === 'list') {
-      loadInquiries()
-    }
-  }, [session, activeTab])
-
-  const loadInquiries = async () => {
+  const loadInquiries = useCallback(async () => {
     try {
       setIsLoading(true)
       const response = await fetch(getApiPath('/api/cs/inquiry'))
@@ -72,7 +66,13 @@ export default function InquiryPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [getApiPath])
+
+  useEffect(() => {
+    if (session && activeTab === 'list') {
+      loadInquiries()
+    }
+  }, [session, activeTab, loadInquiries])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -183,10 +183,11 @@ export default function InquiryPage() {
               )}
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label htmlFor="inquiry-type" className="block text-sm font-semibold text-gray-700 mb-2">
                   문의 유형
                 </label>
                 <select
+                  id="inquiry-type"
                   value={formData.inquiryType}
                   onChange={(e) => setFormData({ ...formData, inquiryType: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:bg-white transition-all text-sm sm:text-base"

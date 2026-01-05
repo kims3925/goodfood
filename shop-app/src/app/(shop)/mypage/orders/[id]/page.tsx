@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -198,16 +198,7 @@ export default function OrderDetailPage() {
 
   const orderId = params.id as string
 
-  useEffect(() => {
-    if (sessionStatus === 'loading') return
-    if (!session) {
-      router.push(getPath('/auth/login?callbackUrl=/mypage/orders'))
-      return
-    }
-    fetchOrder()
-  }, [session, sessionStatus, orderId])
-
-  const fetchOrder = async () => {
+  const fetchOrder = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(getApiPath(`/api/mypage/orders/${orderId}`))
@@ -224,7 +215,16 @@ export default function OrderDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [getApiPath, orderId])
+
+  useEffect(() => {
+    if (sessionStatus === 'loading') return
+    if (!session) {
+      router.push(getPath('/auth/login?callbackUrl=/mypage/orders'))
+      return
+    }
+    fetchOrder()
+  }, [session, sessionStatus, orderId, fetchOrder, router, getPath])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -859,10 +859,11 @@ export default function OrderDetailPage() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 mb-2">
                   취소 사유 <span className="text-red-500">*</span>
                 </label>
                 <select
+                  id="cancel-reason"
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -903,10 +904,11 @@ export default function OrderDetailPage() {
                   </p>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                    <label htmlFor="refund-bank" className="block text-xs font-medium text-gray-700 mb-1">
                       은행 선택 <span className="text-red-500">*</span>
                     </label>
                     <select
+                      id="refund-bank"
                       value={refundBankName}
                       onChange={(e) => setRefundBankName(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"

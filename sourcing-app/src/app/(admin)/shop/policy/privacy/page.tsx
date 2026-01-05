@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Plus,
@@ -46,11 +46,7 @@ export default function PrivacyPolicyListPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  useEffect(() => {
-    loadItems()
-  }, [currentPage, searchTerm])
-
-  const loadItems = async () => {
+  const loadItems = useCallback(async () => {
     try {
       setIsLoading(true)
       const params = new URLSearchParams({
@@ -75,7 +71,11 @@ export default function PrivacyPolicyListPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentPage, itemsPerPage, searchTerm, toast])
+
+  useEffect(() => {
+    loadItems()
+  }, [loadItems])
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)

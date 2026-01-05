@@ -49,7 +49,7 @@ export default function CustomerServicePage() {
           </div>
           <div className="text-center md:text-right">
             <p className="text-sm opacity-90">운영시간</p>
-            <p className="font-medium">월~금 오전 9시 ~ 오후 6시</p>
+            <p className="font-medium">월~금 오전 10시 ~ 오후 5시</p>
             <p className="text-sm opacity-75 mt-1">토/일/공휴일 휴무</p>
           </div>
         </div>

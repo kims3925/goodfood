@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus, Upload, Info, Truck } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -136,19 +136,7 @@ export default function ProductDetailPage() {
     bundleShippingType: 'NONE' as 'NONE' | 'INCLUDED' | 'SEPARATE',
   })
 
-  useEffect(() => {
-    if (productId) {
-      loadProduct()
-    }
-  }, [productId])
-
-  useEffect(() => {
-    if (activeTab === 'publish' && productId) {
-      loadPublishedProducts()
-    }
-  }, [activeTab, productId])
-
-  const loadProduct = async () => {
+  const loadProduct = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
@@ -191,9 +179,9 @@ export default function ProductDetailPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [productId])
 
-  const loadPublishedProducts = async () => {
+  const loadPublishedProducts = useCallback(async () => {
     try {
       setIsLoadingPublish(true)
       const response = await fetch(`/api/product/publish?productId=${productId}`)
@@ -207,7 +195,19 @@ export default function ProductDetailPage() {
     } finally {
       setIsLoadingPublish(false)
     }
-  }
+  }, [productId])
+
+  useEffect(() => {
+    if (productId) {
+      loadProduct()
+    }
+  }, [productId, loadProduct])
+
+  useEffect(() => {
+    if (activeTab === 'publish' && productId) {
+      loadPublishedProducts()
+    }
+  }, [activeTab, productId, loadPublishedProducts])
 
   const handleSaveInfo = async () => {
     if (!product || !formData.name.trim()) return

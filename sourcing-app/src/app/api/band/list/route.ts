@@ -42,6 +42,7 @@ export async function GET() {
         bandKey: band.band_key,
         name: band.name,
         coverUrl: band.cover,
+        memberCount: band.member_count,
       })),
     })
   } catch (error: any) {

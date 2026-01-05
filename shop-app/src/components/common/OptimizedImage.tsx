@@ -6,7 +6,7 @@
  */
 
 import Image, { ImageProps } from 'next/image'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 // 기본 플레이스홀더 이미지 (1x1 투명 픽셀)
 const PLACEHOLDER_BLUR =
@@ -30,6 +30,12 @@ export function OptimizedImage({
 }: OptimizedImageProps) {
   const [imgSrc, setImgSrc] = useState(src)
   const [hasError, setHasError] = useState(false)
+
+  // src props 변경 시 상태 동기화
+  useEffect(() => {
+    setImgSrc(src)
+    setHasError(false)
+  }, [src])
 
   const handleError = useCallback(() => {
     if (!hasError) {
@@ -82,6 +88,12 @@ export function ProductImage({
   const [imgSrc, setImgSrc] = useState(src || DEFAULT_FALLBACK)
   const [hasError, setHasError] = useState(false)
 
+  // src 변경 시 상태 동기화
+  useEffect(() => {
+    setImgSrc(src || DEFAULT_FALLBACK)
+    setHasError(false)
+  }, [src])
+
   const handleError = useCallback(() => {
     if (!hasError) {
       setHasError(true)
@@ -102,6 +114,7 @@ export function ProductImage({
         fill
         sizes={sizes || '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'}
         style={{ objectFit: 'cover' }}
+        loading={priority ? 'eager' : 'lazy'}
       />
     )
   }
@@ -117,6 +130,7 @@ export function ProductImage({
       priority={priority}
       width={width}
       height={height}
+      loading={priority ? 'eager' : 'lazy'}
     />
   )
 }
@@ -137,13 +151,20 @@ export function AvatarImage({
   size = 40,
   className = '',
 }: AvatarImageProps) {
-  const [imgSrc, setImgSrc] = useState(src || '/images/default-avatar.png')
+  const defaultAvatar = '/images/default-avatar.png'
+  const [imgSrc, setImgSrc] = useState(src || defaultAvatar)
   const [hasError, setHasError] = useState(false)
+
+  // src props 변경 시 상태 동기화
+  useEffect(() => {
+    setImgSrc(src || defaultAvatar)
+    setHasError(false)
+  }, [src])
 
   const handleError = useCallback(() => {
     if (!hasError) {
       setHasError(true)
-      setImgSrc('/images/default-avatar.png')
+      setImgSrc(defaultAvatar)
     }
   }, [hasError])
 
