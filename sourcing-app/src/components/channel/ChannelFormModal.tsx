@@ -14,7 +14,7 @@ interface BandInfo {
   bandKey: string
   name: string
   coverUrl: string
-  memberCount: number
+  memberCount?: number
 }
 
 interface Channel {
