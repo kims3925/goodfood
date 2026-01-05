@@ -108,26 +108,6 @@ export default function ProductsPage() {
     loadProducts()
   }, [])
 
-  // 키보드 네비게이션
-  useEffect(() => {
-    if (!showDetailModal) return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault()
-        navigateToProduct('prev')
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault()
-        navigateToProduct('next')
-      } else if (e.key === 'Escape') {
-        e.preventDefault()
-        setShowDetailModal(false)
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showDetailModal, currentDetailIndex, navigateToProduct])
 
   const loadProducts = async () => {
     try {
@@ -276,6 +256,47 @@ export default function ProductsPage() {
   const paginatedProducts = useMemo(() => {
     return filteredProducts.slice(startIndex, startIndex + itemsPerPage)
   }, [filteredProducts, startIndex, itemsPerPage])
+
+  // 네비게이션 함수
+  const navigateToProduct = useCallback((direction: 'prev' | 'next') => {
+    if (paginatedProducts.length === 0) return
+
+    let newIndex = currentDetailIndex
+    if (direction === 'prev') {
+      newIndex = currentDetailIndex > 0 ? currentDetailIndex - 1 : paginatedProducts.length - 1
+    } else {
+      newIndex = currentDetailIndex < paginatedProducts.length - 1 ? currentDetailIndex + 1 : 0
+    }
+
+    const newProduct = paginatedProducts[newIndex]
+    if (newProduct) {
+      setCurrentDetailIndex(newIndex)
+      setSelectedProduct(newProduct)
+      setEditedProduct({ ...newProduct })
+      setIsEditing(false)
+    }
+  }, [paginatedProducts, currentDetailIndex])
+
+  // 키보드 네비게이션
+  useEffect(() => {
+    if (!showDetailModal) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        navigateToProduct('prev')
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        navigateToProduct('next')
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        setShowDetailModal(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showDetailModal, navigateToProduct])
 
   const formatPrice = (price: number) => {
     return price.toLocaleString()
@@ -545,26 +566,6 @@ export default function ProductsPage() {
       setShowBatchDeleteConfirm(false)
     }
   }
-
-  // 네비게이션 함수들
-  const navigateToProduct = useCallback((direction: 'prev' | 'next') => {
-    if (paginatedProducts.length === 0) return
-
-    let newIndex = currentDetailIndex
-    if (direction === 'prev') {
-      newIndex = currentDetailIndex > 0 ? currentDetailIndex - 1 : paginatedProducts.length - 1
-    } else {
-      newIndex = currentDetailIndex < paginatedProducts.length - 1 ? currentDetailIndex + 1 : 0
-    }
-
-    const newProduct = paginatedProducts[newIndex]
-    if (newProduct) {
-      setCurrentDetailIndex(newIndex)
-      setSelectedProduct(newProduct)
-      setEditedProduct({ ...newProduct })
-      setIsEditing(false)
-    }
-  }, [paginatedProducts, currentDetailIndex])
 
   // 개별 소싱 확정 처리
   const handleIndividualSourceConfirm = async () => {

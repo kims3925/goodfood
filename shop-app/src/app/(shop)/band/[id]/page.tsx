@@ -305,7 +305,9 @@ export default function BandProductsPage() {
               {/* 정렬 */}
               <div className="flex items-center gap-2">
                 <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                <label htmlFor="product-sort" className="sr-only">상품 정렬</label>
                 <select
+                  id="product-sort"
                   value={sort}
                   onChange={(e) => {
                     setSort(e.target.value)

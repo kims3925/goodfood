@@ -16,6 +16,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
+      <head>
+        {/* Preconnect: 외부 리소스 연결 최적화 */}
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
+        {/* AWS S3 이미지용 (필요시) */}
+        <link rel="dns-prefetch" href="https://s3.amazonaws.com" />
+      </head>
       <body className="min-h-screen bg-gray-50">
         <SessionProvider>
           <ToastProvider>

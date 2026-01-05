@@ -173,6 +173,7 @@ export default function StorePage() {
               {/* Left Arrow */}
               <button
                 onClick={prevSlide}
+                aria-label="이전 슬라이드"
                 className="absolute -left-2 md:left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 md:w-10 md:h-10 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50"
               >
                 <ChevronLeft className="w-4 h-4 md:w-5 md:h-5 text-gray-700" />
@@ -201,10 +202,10 @@ export default function StorePage() {
                                 />
                                 <button
                                   onClick={(e) => handleAddToCart(product, e)}
-                                  className="absolute bottom-2 right-2 w-7 h-7 md:w-9 md:h-9 bg-white rounded-full shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-50"
-                                  title="장바구니 담기"
+                                  className="absolute bottom-1 right-1 w-10 h-10 md:w-11 md:h-11 bg-white rounded-full shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-50"
+                                  aria-label="장바구니 담기"
                                 >
-                                  <ShoppingCart className="w-3 h-3 md:w-4 md:h-4 text-gray-700" />
+                                  <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-gray-700" />
                                 </button>
                                 {product.discount > 0 && (
                                   <span className="absolute top-2 left-2 px-1.5 md:px-2 py-0.5 md:py-1 text-[10px] md:text-xs font-bold text-white rounded bg-amber-500">
@@ -227,7 +228,7 @@ export default function StorePage() {
                                   </span>
                                 </div>
                                 {product.originalPrice > product.salePrice && (
-                                  <p className="text-[10px] md:text-xs text-gray-400 line-through">
+                                  <p className="text-[10px] md:text-xs text-gray-500 line-through">
                                     {formatPrice(product.originalPrice)}원
                                   </p>
                                 )}
@@ -243,21 +244,25 @@ export default function StorePage() {
               {/* Right Arrow */}
               <button
                 onClick={nextSlide}
+                aria-label="다음 슬라이드"
                 className="absolute -right-2 md:right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 md:w-10 md:h-10 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50"
               >
                 <ChevronRight className="w-4 h-4 md:w-5 md:h-5 text-gray-700" />
               </button>
 
               {/* Slide Indicators */}
-              <div className="flex justify-center gap-1.5 md:gap-2 mt-3 md:mt-4">
+              <div className="flex justify-center gap-1 md:gap-1.5 mt-3 md:mt-4">
                 {Array.from({ length: totalSlides }).map((_, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentSlide(index)}
-                    className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full transition-colors ${
+                    aria-label={`슬라이드 ${index + 1}`}
+                    className="p-2 -m-1"
+                  >
+                    <span className={`block w-2 h-2 md:w-2.5 md:h-2.5 rounded-full transition-colors ${
                       currentSlide === index ? 'bg-amber-500' : 'bg-gray-300'
-                    }`}
-                  />
+                    }`} />
+                  </button>
                 ))}
               </div>
             </div>
@@ -277,12 +282,22 @@ export default function StorePage() {
           </div>
 
           {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-rose-500"></div>
+            /* 스켈레톤 UI - 실제 상품 그리드와 동일한 레이아웃 */
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="aspect-square rounded-xl bg-gray-200" />
+                  <div className="mt-2 md:mt-3 space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-full" />
+                    <div className="h-4 bg-gray-200 rounded w-3/4" />
+                    <div className="h-4 bg-gray-200 rounded w-1/2" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : shopProducts.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-              {shopProducts.map((product) => (
+              {shopProducts.map((product, index) => (
                 <Link
                   key={`product-${product.publishedProductId || product.id}`}
                   href={getPath(`/product/${product.id}`)}
@@ -295,13 +310,14 @@ export default function StorePage() {
                       fill
                       sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
                       className="object-cover transition-transform group-hover:scale-105"
+                      priority={index < 4}
                     />
                     <button
                       onClick={(e) => handleAddToCart(product, e)}
-                      className="absolute bottom-2 right-2 w-8 h-8 md:w-9 md:h-9 bg-white rounded-full shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-50"
-                      title="장바구니 담기"
+                      className="absolute bottom-1 right-1 w-10 h-10 md:w-11 md:h-11 bg-white rounded-full shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-50"
+                      aria-label="장바구니 담기"
                     >
-                      <ShoppingCart className="w-4 h-4 text-gray-700" />
+                      <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-gray-700" />
                     </button>
                     {product.discount > 0 && (
                       <span className="absolute top-2 left-2 px-1.5 py-0.5 text-[10px] md:text-xs font-bold text-white rounded bg-rose-500">
@@ -329,7 +345,7 @@ export default function StorePage() {
                       </span>
                     </div>
                     {product.originalPrice > product.salePrice && (
-                      <p className="text-[10px] md:text-xs text-gray-400 line-through mt-0.5">
+                      <p className="text-[10px] md:text-xs text-gray-500 line-through mt-0.5">
                         {formatPrice(product.originalPrice)}원
                       </p>
                     )}
@@ -341,7 +357,7 @@ export default function StorePage() {
             <div className="flex flex-col items-center justify-center h-64 text-gray-500">
               <Package className="w-12 h-12 md:w-16 md:h-16 mb-4 text-gray-300" />
               <p className="text-sm md:text-base">등록된 상품이 없습니다</p>
-              <p className="text-xs text-gray-400 mt-1">관리자에게 문의해주세요</p>
+              <p className="text-xs text-gray-500 mt-1">관리자에게 문의해주세요</p>
             </div>
           )}
         </div>

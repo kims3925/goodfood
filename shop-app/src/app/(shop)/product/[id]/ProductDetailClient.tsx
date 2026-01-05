@@ -122,14 +122,16 @@ export default function ProductDetailClient() {
     if (session && product) {
       checkWishlistStatus()
     }
-  }, [session, product, checkWishlistStatus])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- product?.id만 의존성으로 사용하여 불필요한 재실행 방지
+  }, [session, product?.id, checkWishlistStatus])
 
   // 리뷰 섹션이 보이면 리뷰 로드
   useEffect(() => {
     if (activeTab === 'review' && product) {
       loadReviews()
     }
-  }, [activeTab, product, loadReviews])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- product?.publishedProductId만 의존성으로 사용하여 불필요한 재실행 방지
+  }, [activeTab, product?.publishedProductId, loadReviews])
 
   // Scroll Spy: 스크롤 위치에 따라 활성 탭 변경
   useEffect(() => {
@@ -551,13 +553,14 @@ export default function ProductDetailClient() {
             <button
               onClick={handleToggleWishlist}
               disabled={wishlistLoading}
+              aria-label={isWishlisted ? '찜 해제' : '찜하기'}
               className="p-1"
             >
               <Heart
                 className={`h-5 w-5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-700'}`}
               />
             </button>
-            <button onClick={handleShare} className="p-1">
+            <button onClick={handleShare} aria-label="공유하기" className="p-1">
               <Share2 className="h-5 w-5" />
             </button>
           </div>
@@ -732,7 +735,9 @@ export default function ProductDetailClient() {
                   ) : (
                     /* 드롭다운 (6개 이상일 때) */
                     <div className="relative">
+                      <label htmlFor="variant-select" className="sr-only">옵션 선택</label>
                       <select
+                        id="variant-select"
                         value={selectedVariant?.id || ''}
                         onChange={(e) => {
                           const variant = product.variants.find((v: any) => v.id === parseInt(e.target.value))
@@ -800,6 +805,7 @@ export default function ProductDetailClient() {
                     <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
                       <button
                         onClick={() => handleQuantityChange('decrease')}
+                        aria-label="수량 감소"
                         className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
                       >
                         <Minus className="h-4 w-4 text-gray-600" />
@@ -807,6 +813,7 @@ export default function ProductDetailClient() {
                       <span className="w-14 text-center font-semibold text-gray-900">{quantity}</span>
                       <button
                         onClick={() => handleQuantityChange('increase')}
+                        aria-label="수량 증가"
                         className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
                       >
                         <Plus className="h-4 w-4 text-gray-600" />
@@ -1180,7 +1187,9 @@ export default function ProductDetailClient() {
 
                 {/* 정렬 옵션 */}
                 <div className="flex justify-end">
+                  <label htmlFor="review-sort" className="sr-only">리뷰 정렬</label>
                   <select
+                    id="review-sort"
                     value={reviewSortBy}
                     onChange={(e) => {
                       setReviewSortBy(e.target.value)
