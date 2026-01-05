@@ -14,6 +14,7 @@ interface BandInfo {
   bandKey: string
   name: string
   coverUrl: string
+  memberCount: number
 }
 
 interface Channel {
@@ -508,7 +509,7 @@ export default function ChannelFormModal({
       isOpen={isOpen}
       onClose={onClose}
       title={isEditMode ? '채널 수정' : '채널 등록'}
-      size="xl"
+      size="2xl"
     >
       <div className="space-y-6">
         {/* 채널 유형 선택 (등록 시에만) */}
@@ -697,8 +698,8 @@ export default function ChannelFormModal({
                     <p className="text-sm text-gray-500">{bandList.length === 0 ? '등록된 밴드가 없습니다.' : '등록 가능한 밴드가 없습니다. (모든 밴드가 이미 등록됨)'}</p>
                   </div>
                 ) : (
-                  <div className="border border-gray-200 rounded-lg h-[450px] overflow-y-auto">
-                    <div className="grid grid-cols-1 gap-2 p-2">
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="h-[calc(60vh-10rem)] overflow-y-auto">
                       {filteredBandList.map((band) => {
                         const isSelected = selectedBands.some((b) => b.bandKey === band.bandKey)
                         return (
@@ -706,43 +707,51 @@ export default function ChannelFormModal({
                             key={band.bandKey}
                             type="button"
                             onClick={() => handleBandSelect(band)}
-                            className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
+                            className={`w-full flex items-center pl-12 pr-4 py-4 border-b border-gray-100 text-left transition-colors ${
                               isSelected
-                                ? 'border-purple-500 bg-purple-50'
-                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                ? 'bg-purple-50 hover:bg-purple-100'
+                                : 'hover:bg-gray-50'
                             }`}
                           >
-                            {band.coverUrl ? (
-                              <img
-                                src={band.coverUrl}
-                                alt={band.name}
-                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="w-16 flex-shrink-0">
+                              {band.coverUrl ? (
+                                <img
+                                  src={band.coverUrl}
+                                  alt={band.name}
+                                  className="w-14 h-14 rounded-lg object-cover"
+                                />
+                              ) : (
+                                <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center">
+                                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <div className="w-72 flex-shrink-0 ml-10">
+                              <span className="font-medium text-gray-900 truncate block">{band.name}</span>
+                            </div>
+                            <div className="flex-1 text-left">
+                              <span className="text-sm text-gray-500">
+                                {band.memberCount?.toLocaleString() || 0}명
+                              </span>
+                            </div>
+                            <div className="w-8 flex-shrink-0 flex justify-end">
+                              {isSelected && (
+                                <svg className="w-5 h-5 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
                                   <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                    clipRule="evenodd"
                                   />
                                 </svg>
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-gray-900 truncate">{band.name}</div>
-                              <div className="text-xs text-gray-500 truncate">{band.bandKey}</div>
+                              )}
                             </div>
-                            {isSelected && (
-                              <svg className="w-5 h-5 text-purple-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                <path
-                                  fillRule="evenodd"
-                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            )}
                           </button>
                         )
                       })}
@@ -846,8 +855,8 @@ export default function ChannelFormModal({
                     </p>
                   </div>
                 ) : (
-                  <div className="border border-gray-200 rounded-lg h-[450px] overflow-y-auto">
-                    <div className="grid grid-cols-1 gap-2 p-2">
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="h-[calc(60vh-10rem)] overflow-y-auto">
                       {filteredBandList.map((band) => {
                         const isSelected = selectedBands.some((b) => b.bandKey === band.bandKey)
                         return (
@@ -855,43 +864,51 @@ export default function ChannelFormModal({
                             key={band.bandKey}
                             type="button"
                             onClick={() => handleBandSelect(band)}
-                            className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
+                            className={`w-full flex items-center pl-12 pr-4 py-4 border-b border-gray-100 text-left transition-colors ${
                               isSelected
-                                ? 'border-purple-500 bg-purple-50'
-                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                ? 'bg-purple-50 hover:bg-purple-100'
+                                : 'hover:bg-gray-50'
                             }`}
                           >
-                            {band.coverUrl ? (
-                              <img
-                                src={band.coverUrl}
-                                alt={band.name}
-                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="w-16 flex-shrink-0">
+                              {band.coverUrl ? (
+                                <img
+                                  src={band.coverUrl}
+                                  alt={band.name}
+                                  className="w-14 h-14 rounded-lg object-cover"
+                                />
+                              ) : (
+                                <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center">
+                                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <div className="w-72 flex-shrink-0 ml-10">
+                              <span className="font-medium text-gray-900 truncate block">{band.name}</span>
+                            </div>
+                            <div className="flex-1 text-left">
+                              <span className="text-sm text-gray-500">
+                                {band.memberCount?.toLocaleString() || 0}명
+                              </span>
+                            </div>
+                            <div className="w-8 flex-shrink-0 flex justify-end">
+                              {isSelected && (
+                                <svg className="w-5 h-5 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
                                   <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                    clipRule="evenodd"
                                   />
                                 </svg>
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-gray-900 truncate">{band.name}</div>
-                              <div className="text-xs text-gray-500 truncate">{band.bandKey}</div>
+                              )}
                             </div>
-                            {isSelected && (
-                              <svg className="w-5 h-5 text-purple-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                <path
-                                  fillRule="evenodd"
-                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            )}
                           </button>
                         )
                       })}

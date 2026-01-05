@@ -236,7 +236,7 @@ export class NaverBandClient {
   /**
    * 밴드 목록 조회
    */
-  async getBands(): Promise<Array<{ band_key: string; name: string; cover: string }>> {
+  async getBands(): Promise<Array<{ band_key: string; name: string; cover: string; member_count: number }>> {
     const url = new URL(`${BAND_API_BASE_URL}/v2.1/bands`)
     url.searchParams.append('access_token', this.accessToken)
 
@@ -250,7 +250,7 @@ export class NaverBandClient {
       })
 
       clearTimeout(timeoutId)
-      const data: BandApiResponse<{ bands: Array<{ band_key: string; name: string; cover: string }> }> =
+      const data: BandApiResponse<{ bands: Array<{ band_key: string; name: string; cover: string; member_count: number }> }> =
         await response.json()
 
       if (data.result_code !== 1) {
