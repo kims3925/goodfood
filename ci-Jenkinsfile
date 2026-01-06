@@ -121,17 +121,11 @@ pipeline {
     stage('Build') {
       when { environment name: 'SHOULD_BUILD', value: 'true' }
       steps {
-        withCredentials([
-          string(credentialsId: 'nextauth-secret', variable: 'NEXTAUTH_SECRET'),
-          string(credentialsId: 'guest-secret', variable: 'GUEST_TOKEN_SECRET'),
-          string(credentialsId: 'jwt-secret', variable: 'JWT_SECRET')
-        ]) {
-          sh '''
-            set -eux
-            npm run build:shop
-            npm run build:sourcing
-          '''
-        }
+        sh '''
+          set -eux
+          npm run build:shop
+          npm run build:sourcing
+        '''
       }
     }
   }
