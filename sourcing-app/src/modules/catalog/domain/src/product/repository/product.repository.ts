@@ -202,14 +202,18 @@ export class ProductRepository {
 
   async create(data: ProductCreateInput & { thumbnailUrl?: string | null; imageUrls?: string[] }) {
     // 합배송 타입 자동 추론
-    // 1. shippingInfo에 "포함"이 있으면 → INCLUDED (배송비 포함형)
+    // 1. shippingInfo에 "배송비 포함", "택배비 포함", "무료배송" 등 명확한 패턴이 있으면 → INCLUDED
     // 2. shippingFee > 0 이면 → SEPARATE (배송비 별도형)
     // 3. 그 외 → NONE
     let bundleShippingType: BundleShippingType = BundleShippingType.NONE
     const shippingInfoStr = String(data.shippingInfo || '')
     const shippingFeeNum = typeof data.shippingFee === 'number' ? data.shippingFee : 0
 
-    if (shippingInfoStr.includes('포함')) {
+    // "배송비 포함", "택배비 포함", "무료배송" 등 명확한 패턴만 INCLUDED로 판단
+    // 단순히 "포함"만 있으면 "합배송 포함" 같은 오탐 발생
+    const isShippingIncluded = /배송비\s*포함|택배비\s*포함|무료\s*배송|배송\s*무료/.test(shippingInfoStr)
+
+    if (isShippingIncluded) {
       bundleShippingType = BundleShippingType.INCLUDED
     } else if (shippingFeeNum > 0) {
       bundleShippingType = BundleShippingType.SEPARATE

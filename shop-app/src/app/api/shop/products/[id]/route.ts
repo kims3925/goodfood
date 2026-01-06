@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
+import { calculateSellingPrice } from '@/lib/price-calculator'
 
 export async function GET(
   req: NextRequest,
@@ -86,18 +87,12 @@ export async function GET(
     const bundleMaxQty = (product as any).bundleMaxQty ?? 1
     const bundleShippingType = (product as any).bundleShippingType || 'NONE'
 
-    // 배송비 포함형(INCLUDED)인지 여부
-    // INCLUDED: 소매가에 이미 배송비 포함, 합배송 시 할인
-    // SEPARATE/NONE: 소매가 + 배송비 별도, 합배송 시 배송비 절약
-    const isBundleIncluded = bundleShippingType === 'INCLUDED'
-
-    // variants 정보 (id 포함)
+    // variants 정보 (id 포함) - 공통 모듈 사용
     const formattedVariants = product.variants.map((variant) => ({
       id: variant.id,
       optionSummary: variant.optionSummary || product.name,
-      // INCLUDED: 이미 배송비 포함된 가격 그대로 사용
-      // SEPARATE/NONE: 배송비 추가
-      price: isBundleIncluded ? variant.price : variant.price + shippingFee,
+      // 공통 모듈로 판매가 계산 (배송비 타입에 따라 자동 처리)
+      price: calculateSellingPrice(variant.price, shippingFee, bundleShippingType),
       originalPrice: variant.price, // DB에 저장된 원래 가격
       wholesalePrice: variant.wholesalePrice,
       bundleUnit: variant.bundleUnit || 1,

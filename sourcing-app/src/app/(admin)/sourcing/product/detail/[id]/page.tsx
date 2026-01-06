@@ -111,7 +111,7 @@ export default function ProductDetailPage() {
 
   // 변형상품 편집 상태
   const [isEditingVariants, setIsEditingVariants] = useState(false)
-  const [editingVariants, setEditingVariants] = useState<Array<{ id?: number; selectedOptions: Record<string, string>; price: number }>>([])
+  const [editingVariants, setEditingVariants] = useState<Array<{ id?: number; selectedOptions: Record<string, string>; price: number; wholesalePrice: number | null }>>([])
   const [isSavingVariants, setIsSavingVariants] = useState(false)
 
   // 이미지 업로드 상태
@@ -370,8 +370,9 @@ export default function ProductDetailPage() {
       id: v.id,
       selectedOptions: parseOptionSummary(v.optionSummary),
       price: v.price,
+      wholesalePrice: v.wholesalePrice,
     }))
-    setEditingVariants(variants.length > 0 ? variants : [{ selectedOptions: {}, price: 0 }])
+    setEditingVariants(variants.length > 0 ? variants : [{ selectedOptions: {}, price: 0, wholesalePrice: null }])
     setIsEditingVariants(true)
   }
 
@@ -397,6 +398,7 @@ export default function ProductDetailPage() {
     const newVariants = combinations.map(selectedOptions => ({
       selectedOptions,
       price: 0,
+      wholesalePrice: null,
     }))
 
     setEditingVariants(newVariants)
@@ -415,6 +417,7 @@ export default function ProductDetailPage() {
           id: v.id,
           optionSummary: buildOptionSummary(v.selectedOptions) || null,
           price: v.price,
+          wholesalePrice: v.wholesalePrice,
         }))
 
       const response = await fetch('/api/product', {
@@ -1287,7 +1290,7 @@ export default function ProductDetailPage() {
                               <button
                                 onClick={() => {
                                   const newVariants = editingVariants.filter((_, i) => i !== idx)
-                                  setEditingVariants(newVariants.length > 0 ? newVariants : [{ selectedOptions: {}, price: 0 }])
+                                  setEditingVariants(newVariants.length > 0 ? newVariants : [{ selectedOptions: {}, price: 0, wholesalePrice: null }])
                                 }}
                                 className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors mt-4"
                               >
@@ -1299,7 +1302,7 @@ export default function ProductDetailPage() {
                       </div>
 
                       <button
-                        onClick={() => setEditingVariants([...editingVariants, { selectedOptions: {}, price: 0 }])}
+                        onClick={() => setEditingVariants([...editingVariants, { selectedOptions: {}, price: 0, wholesalePrice: null }])}
                         className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 hover:border-emerald-300 hover:text-emerald-600 transition-colors"
                       >
                         <Plus size={18} />
