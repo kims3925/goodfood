@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
 import prisma from '@modules/common/utils/src/database/client'
+import { calculateSellingPrice } from '@/lib/price-calculator'
 
 // 찜한 상품 목록 조회
 export async function GET(request: NextRequest) {
@@ -31,6 +32,8 @@ export async function GET(request: NextRequest) {
             description: true,
             thumbnailUrl: true,
             currency: true,
+            shippingFee: true,
+            bundleShippingType: true,
             variants: {
               orderBy: { id: 'asc' },
               take: 1,
@@ -50,12 +53,18 @@ export async function GET(request: NextRequest) {
     })
 
     // 응답 형식 변환 (price를 variants에서, thumbnailUrl을 images에서 가져오기)
+    // 공통 가격 모듈(calculateSellingPrice)을 사용하여 배송비 타입에 따른 실제 판매가 계산
     const formattedWishlists = wishlists.map((w) => {
       const thumbnailUrl = w.product.thumbnailUrl || w.product.images[0]?.url || null
-      console.log('[Wishlist] Product:', w.product.id, w.product.name)
-      console.log('[Wishlist] thumbnailUrl:', w.product.thumbnailUrl)
-      console.log('[Wishlist] images:', w.product.images)
-      console.log('[Wishlist] final thumbnailUrl:', thumbnailUrl)
+      const basePrice = w.product.variants[0]?.price || null
+      const shippingFee = w.product.shippingFee ?? 0
+      const bundleShippingType = w.product.bundleShippingType || null
+
+      // 공통 모듈로 판매가 계산 (배송비 타입에 따라 자동 처리)
+      const sellingPrice = basePrice !== null
+        ? calculateSellingPrice(basePrice, shippingFee, bundleShippingType)
+        : null
+
       return {
         id: w.id,
         addedAt: w.addedAt,
@@ -64,7 +73,7 @@ export async function GET(request: NextRequest) {
           name: w.product.name,
           description: w.product.description,
           thumbnailUrl,
-          price: w.product.variants[0]?.price || null,
+          price: sellingPrice,
           currency: w.product.currency,
         },
       }

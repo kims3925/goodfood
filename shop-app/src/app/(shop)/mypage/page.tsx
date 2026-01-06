@@ -50,14 +50,7 @@ export default function MyPage() {
 
   return (
     <>
-      {/* 헤더 */}
-      <div className="mb-8">
-        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">마이페이지</h1>
-        <p className="text-gray-600">
-          안녕하세요, <span className="font-semibold" style={{ color: primaryColor }}>{session?.user?.name || '회원'}</span>님
-        </p>
-      </div>
-
+    
       {/* 메뉴 그리드 */}
       <div className="space-y-8">
         {menuItems.map((section, idx) => (

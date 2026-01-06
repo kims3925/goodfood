@@ -68,7 +68,7 @@
   }
 
   .kurly-search {
-    @apply flex-1 max-w-none md:max-w-[400px] mx-3 md:mx-6;
+    @apply flex-1 max-w-none md:max-w-[500px] lg:max-w-[600px] mx-3 md:mx-6;
   }
 
   .kurly-search-input {
@@ -323,6 +323,28 @@
   .checkbox {
     @apply w-5 h-5 rounded border-gray-300 text-abc-coral
            focus:ring-abc-coral cursor-pointer;
+  }
+
+  /* Mobile Bottom Navigation */
+  .mobile-bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 z-50
+           bg-white border-t border-gray-200 shadow-lg
+           flex justify-around items-center;
+    height: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .mobile-nav-item {
+    @apply flex flex-col items-center justify-center gap-1
+           text-gray-500 text-[10px] font-medium
+           py-2 px-3
+           hover:text-abc-coral active:text-abc-coral
+           transition-colors;
+  }
+
+  .mobile-nav-item:hover svg,
+  .mobile-nav-item:active svg {
+    @apply text-abc-coral;
   }
 }
 
