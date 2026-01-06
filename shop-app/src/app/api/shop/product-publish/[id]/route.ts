@@ -62,7 +62,7 @@ export async function GET(
     }
 
     const shippingFee = product.shippingFee ?? 0
-    const bundleShippingType = product.bundleShippingType || 'NONE'
+    const bundleShippingType = product.bundleShippingType || null
 
     const formattedVariants = product.variants.map((variant) => ({
       ...variant,

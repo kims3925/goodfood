@@ -37,7 +37,7 @@
 | Framework | Next.js API Routes |
 | Runtime | Node.js 20.x |
 | API Style | REST |
-| Authentication | JWT (jose, jsonwebtoken) |
+| Authentication | NextAuth.js 4.24 (JWT with jose) |
 | Scheduler | node-cron 4.2 |
 | Email | Nodemailer 7.0 |
 | Browser Automation | Playwright 1.55 |

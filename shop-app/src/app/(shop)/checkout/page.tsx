@@ -369,9 +369,11 @@ function CheckoutContent() {
         // 합배송 옵션 계산 (상품 상세 페이지와 동일한 로직)
         const shippingFee = product.shippingFee ?? 0
         const bundleMaxQty = product.bundleMaxQty ?? 1
-        const rawVariantPrice = selectedVariant?.price || 0  // DB 원가 (배송비 미포함)
+        // API가 variant.price에 배송비 포함 가격, variant.originalPrice에 원가를 반환
+        // 가격 계산 시 원가(originalPrice)를 사용해야 배송비 중복 방지
+        const rawVariantPrice = selectedVariant?.originalPrice ?? selectedVariant?.price ?? 0
         const bundleUnit = selectedVariant?.bundleUnit || 1
-        const bundleShippingType = product.bundleShippingType || 'NONE'
+        const bundleShippingType = product.bundleShippingType || null
 
         // bundleShippingType에 따른 가격 계산
         // INCLUDED: 할인형 - DB 가격에 이미 배송비 포함
@@ -758,37 +760,27 @@ function CheckoutContent() {
       return sum + priceResult.discountAmount
     }, 0)
   } else if (product) {
-    // 상품 상세 페이지와 동일한 가격 계산 로직
+    // 공통 모듈로 가격 계산
     const shippingFee = product.shippingFee || 0
     const bundleMaxQty = product.bundleMaxQty || 1
     const bundleUnit = product.bundleUnit || 1
     const isBundleDiscount = product.isBundleDiscount || false
+    const bundleShippingType = isBundleDiscount ? 'INCLUDED' : (shippingFee > 0 ? 'SEPARATE' : 'NONE')
 
-    // salePrice는 loadProduct()에서 배송비 포함 가격으로 설정됨
-    const basePrice = product.salePrice || 0
+    // originalPrice는 배송비 미포함 원가
+    const basePrice = product.originalPrice || 0
 
-    if (bundleMaxQty > 1 && shippingFee > 0) {
-      // 합배송 상품: 상품 상세 페이지와 동일한 직접 계산
-      const totalBundleUnits = quantity * bundleUnit
-      const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
-      const remainder = totalBundleUnits % bundleMaxQty
-      const shippingCount = fullBundles + (remainder > 0 ? 1 : 0)
+    const priceResult = calcPrice({
+      basePrice,
+      shippingFee,
+      quantity,
+      bundleMaxQty,
+      bundleUnit,
+      bundleShippingType,
+    })
 
-      if (isBundleDiscount) {
-        // 할인형: (배송비 포함 가격 × 수량) - (배송비 × 할인 개수)
-        const discountCount = Math.max(0, quantity - shippingCount)
-        subtotal = (basePrice * quantity) - (shippingFee * discountCount)
-        bundleDiscount = shippingFee * discountCount
-      } else {
-        // 배송비형: (원가 × 수량) + (배송비 × 배송 횟수)
-        const originalPrice = basePrice - shippingFee
-        subtotal = (originalPrice * quantity) + (shippingFee * shippingCount)
-        bundleDiscount = (shippingFee * quantity) - (shippingFee * shippingCount)
-      }
-    } else {
-      // 합배송 없는 경우: salePrice에 배송비 포함되어 있으므로 그대로 사용
-      subtotal = basePrice * quantity
-    }
+    subtotal = priceResult.itemTotal
+    bundleDiscount = priceResult.discountAmount
 
     orderItemCount = quantity
     orderName = product.title

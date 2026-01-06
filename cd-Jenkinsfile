@@ -69,13 +69,22 @@ pipeline {
                     echo "=== Starting deployment ==="
 
                     # Backup .env files before git reset
+                    # 보안: /tmp 대신 ubuntu 홈 디렉토리의 전용 백업 폴더 사용
+                    ENV_BACKUP_DIR="/home/ubuntu/.env-backup-\$\$"
+                    echo ">>> Creating secure backup directory: \$ENV_BACKUP_DIR"
+                    mkdir -p "\$ENV_BACKUP_DIR"
+                    chmod 700 "\$ENV_BACKUP_DIR"
+
                     echo ">>> Backing up .env files..."
-                    [ -f .env ] && cp .env /tmp/.env.backup || true
-                    [ -f db/.env ] && cp db/.env /tmp/.env.db.backup || true
-                    [ -f shop-app/.env ] && cp shop-app/.env /tmp/.env.shop.backup || true
-                    [ -f shop-app/.env.local ] && cp shop-app/.env.local /tmp/.env.shop.local.backup || true
-                    [ -f sourcing-app/.env ] && cp sourcing-app/.env /tmp/.env.sourcing.backup || true
-                    [ -f sourcing-app/.env.local ] && cp sourcing-app/.env.local /tmp/.env.sourcing.local.backup || true
+                    [ -f .env ] && cp .env "\$ENV_BACKUP_DIR/.env.backup" || true
+                    [ -f db/.env ] && cp db/.env "\$ENV_BACKUP_DIR/.env.db.backup" || true
+                    [ -f shop-app/.env ] && cp shop-app/.env "\$ENV_BACKUP_DIR/.env.shop.backup" || true
+                    [ -f shop-app/.env.local ] && cp shop-app/.env.local "\$ENV_BACKUP_DIR/.env.shop.local.backup" || true
+                    [ -f sourcing-app/.env ] && cp sourcing-app/.env "\$ENV_BACKUP_DIR/.env.sourcing.backup" || true
+                    [ -f sourcing-app/.env.local ] && cp sourcing-app/.env.local "\$ENV_BACKUP_DIR/.env.sourcing.local.backup" || true
+
+                    # 백업 파일에 엄격한 권한 적용 (소유자만 읽기/쓰기)
+                    chmod 600 "\$ENV_BACKUP_DIR"/.env.* 2>/dev/null || true
 
                     # Git pull
                     echo ">>> Pulling latest code..."
@@ -84,12 +93,16 @@ pipeline {
 
                     # Restore .env files after git reset
                     echo ">>> Restoring .env files..."
-                    [ -f /tmp/.env.backup ] && cp /tmp/.env.backup .env || true
-                    [ -f /tmp/.env.db.backup ] && cp /tmp/.env.db.backup db/.env || true
-                    [ -f /tmp/.env.shop.backup ] && cp /tmp/.env.shop.backup shop-app/.env || true
-                    [ -f /tmp/.env.shop.local.backup ] && cp /tmp/.env.shop.local.backup shop-app/.env.local || true
-                    [ -f /tmp/.env.sourcing.backup ] && cp /tmp/.env.sourcing.backup sourcing-app/.env || true
-                    [ -f /tmp/.env.sourcing.local.backup ] && cp /tmp/.env.sourcing.local.backup sourcing-app/.env.local || true
+                    [ -f "\$ENV_BACKUP_DIR/.env.backup" ] && cp "\$ENV_BACKUP_DIR/.env.backup" .env || true
+                    [ -f "\$ENV_BACKUP_DIR/.env.db.backup" ] && cp "\$ENV_BACKUP_DIR/.env.db.backup" db/.env || true
+                    [ -f "\$ENV_BACKUP_DIR/.env.shop.backup" ] && cp "\$ENV_BACKUP_DIR/.env.shop.backup" shop-app/.env || true
+                    [ -f "\$ENV_BACKUP_DIR/.env.shop.local.backup" ] && cp "\$ENV_BACKUP_DIR/.env.shop.local.backup" shop-app/.env.local || true
+                    [ -f "\$ENV_BACKUP_DIR/.env.sourcing.backup" ] && cp "\$ENV_BACKUP_DIR/.env.sourcing.backup" sourcing-app/.env || true
+                    [ -f "\$ENV_BACKUP_DIR/.env.sourcing.local.backup" ] && cp "\$ENV_BACKUP_DIR/.env.sourcing.local.backup" sourcing-app/.env.local || true
+
+                    # 복원 후 임시 백업 디렉토리 삭제 (민감 정보 노출 방지)
+                    echo ">>> Cleaning up temporary backup directory..."
+                    rm -rf "\$ENV_BACKUP_DIR"
 
                     # =============================================
                     # node_modules 자동 복구 로직

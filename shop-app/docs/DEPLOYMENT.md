@@ -57,17 +57,35 @@ Checkout → Install → Prisma Generate → Build → Deploy
 ### 1. .env 파일 보호
 
 ```bash
+# 보안: /tmp 대신 전용 백업 디렉토리 사용 (프로세스 ID 기반 고유 경로)
+ENV_BACKUP_DIR="/home/ubuntu/.env-backup-$$"
+mkdir -p "$ENV_BACKUP_DIR"
+chmod 700 "$ENV_BACKUP_DIR"  # 소유자만 접근 가능
+
 # 배포 전 .env 백업
-cp .env /tmp/.env.backup
-cp db/.env /tmp/.env.db.backup
-cp shop-app/.env /tmp/.env.shop.backup
-cp sourcing-app/.env /tmp/.env.sourcing.backup
+cp .env "$ENV_BACKUP_DIR/.env.backup"
+cp db/.env "$ENV_BACKUP_DIR/.env.db.backup"
+cp shop-app/.env "$ENV_BACKUP_DIR/.env.shop.backup"
+cp sourcing-app/.env "$ENV_BACKUP_DIR/.env.sourcing.backup"
+
+# 백업 파일 권한 제한 (소유자만 읽기/쓰기)
+chmod 600 "$ENV_BACKUP_DIR"/.env.*
 
 # git reset 후 복원
 git reset --hard origin/main
-cp /tmp/.env.backup .env
-# ... (각 앱별 복원)
+cp "$ENV_BACKUP_DIR/.env.backup" .env
+cp "$ENV_BACKUP_DIR/.env.db.backup" db/.env
+cp "$ENV_BACKUP_DIR/.env.shop.backup" shop-app/.env
+cp "$ENV_BACKUP_DIR/.env.sourcing.backup" sourcing-app/.env
+
+# 복원 후 임시 백업 삭제 (민감 정보 노출 방지)
+rm -rf "$ENV_BACKUP_DIR"
 ```
+
+> **보안 주의사항:**
+> - `/tmp`는 모든 사용자가 접근 가능하므로 민감 정보 백업에 부적합
+> - 백업 디렉토리에 `chmod 700`, 백업 파일에 `chmod 600` 적용 필수
+> - 복원 완료 후 반드시 임시 백업 삭제
 
 ### 2. 의존성 관리
 

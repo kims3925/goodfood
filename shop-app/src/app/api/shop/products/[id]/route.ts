@@ -85,7 +85,7 @@ export async function GET(
     // 배송비 (발행 시 판매가에 포함)
     const shippingFee = product.shippingFee ?? 0
     const bundleMaxQty = (product as any).bundleMaxQty ?? 1
-    const bundleShippingType = (product as any).bundleShippingType || 'NONE'
+    const bundleShippingType = (product as any).bundleShippingType || null
 
     // variants 정보 (id 포함) - 공통 모듈 사용
     const formattedVariants = product.variants.map((variant) => ({
@@ -155,7 +155,7 @@ export async function GET(
       bundleOptions: bundleOptions.length > 0 ? bundleOptions : undefined,
       bundleMaxQty: bundleMaxQty > 1 ? bundleMaxQty : undefined,
       // 합배송 타입: NONE(없음), INCLUDED(배송비 포함형), SEPARATE(배송비 별도형)
-      bundleShippingType: product.bundleShippingType || 'NONE',
+      bundleShippingType: product.bundleShippingType || null,
       // 품절 상태 (isActive가 false면 품절)
       isActive,
       isSoldOut: !isActive,
