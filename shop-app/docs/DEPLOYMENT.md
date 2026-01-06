@@ -50,22 +50,19 @@ Branch Check → Setup → Debug → Install → Prisma Generate → Lint → Ty
 ### CD Pipeline (cd-Jenkinsfile)
 
 > **트리거 조건**: CI Pipeline (`bandauto-ci`) 성공 시에만 자동 실행
-> CI Pipeline에서 빌드 검증 완료되므로, CD에서는 Deploy 단계에서만 빌드
+> **최적화**: Jenkins 서버에서 중복 작업 제거 → 배포 시간 ~5분 단축
 
 ```text
-CI Guard → Checkout → Install → Prisma Generate → Deploy (빌드 포함)
+CI Guard → Deploy (운영 서버에서 모든 작업 수행)
 ```
 
-| 단계 | 설명 | 실행 방식 |
+| 단계 | 설명 | 실행 위치 |
 |-----|-----|----------|
-| CI Guard | CI 성공 여부 확인 (수동 실행 시 경고) | 순차 |
-| Checkout | 소스 코드 가져오기 | 순차 |
-| Install Dependencies | `npm ci --legacy-peer-deps` | 순차 |
-| Generate Prisma Client | `npx prisma generate --schema prisma` | 순차 |
-| Deploy | 복합 배포 로직 (빌드 포함, 아래 상세) | 순차 |
+| CI Guard | CI 성공 여부 확인 (수동 실행 시 경고) | Jenkins |
+| Deploy | 운영 서버에서 git pull, npm ci, prisma, 빌드, PM2 재시작 | 운영 서버 |
 
 > **참고**: `triggers { upstream(...) }` 설정으로 CI 성공 시에만 CD가 트리거됨.
-> 수동 실행 시에는 경고 메시지 출력 (배포는 진행됨).
+> Checkout, Install, Prisma Generate는 운영 서버 Deploy에서 수행하므로 Jenkins에서 제거.
 
 ### Deploy 단계 상세
 
@@ -111,11 +108,12 @@ CI Guard → Checkout → Install → Prisma Generate → Deploy (빌드 포함)
 
 | 단계 | 실패 시 |
 |-----|--------|
-| Checkout | 차단 |
-| Install Dependencies | 차단 |
-| Generate Prisma Client | 차단 |
-| Prisma Migrate | 배포 중단 (스키마 드리프트 시 수동 개입 필요) |
-| Deploy (빌드 포함) | 롤백 |
+| CI Guard | 경고만 출력 (수동 실행 시) |
+| Deploy - git pull | 차단 |
+| Deploy - npm ci | 차단 |
+| Deploy - Prisma Migrate | 배포 중단 (스키마 드리프트 시 수동 개입 필요) |
+| Deploy - 빌드 | 롤백 |
+| Deploy - PM2 | 롤백 |
 
 ---
 

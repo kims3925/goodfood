@@ -24,6 +24,12 @@ pipeline {
         upstream(upstreamProjects: 'bandauto-ci', threshold: hudson.model.Result.SUCCESS)
     }
 
+    // CI 잡 성공 시에만 CD 파이프라인 트리거
+    // 참고: 수동 실행도 가능하지만, CI 실패 시 첫 stage에서 경고 출력
+    triggers {
+        upstream(upstreamProjects: 'bandauto-ci', threshold: hudson.model.Result.SUCCESS)
+    }
+
     stages {
         // CI 성공 여부 확인 (수동 실행 시 경고)
         stage('CI Guard') {
@@ -42,32 +48,9 @@ pipeline {
             }
         }
 
-        stage('Checkout') {
-            steps {
-                echo 'Checking out source code...'
-                checkout scm
-            }
-        }
-
-        stage('Install Dependencies') {
-            steps {
-                echo 'Installing dependencies...'
-                sh 'npm ci --legacy-peer-deps'
-            }
-        }
-
-        stage('Generate Prisma Client') {
-            steps {
-                echo 'Generating Prisma client...'
-                dir('db') {
-                    sh 'npx prisma generate --schema prisma'
-                }
-            }
-        }
-
-        // Build Applications 단계 제거
-        // - CI Pipeline에서 이미 빌드 검증 완료
-        // - 실제 빌드는 Deploy 단계에서 운영 서버에서 직접 수행
+        // Checkout, Install, Prisma Generate 단계 제거
+        // - 운영 서버의 Deploy 단계에서 모두 수행하므로 Jenkins 서버에서 중복 실행 불필요
+        // - 배포 시간 ~5분 단축
 
         stage('Deploy') {
 
@@ -95,6 +78,12 @@ pipeline {
 
                     # 백업 파일에 엄격한 권한 적용 (소유자만 읽기/쓰기)
                     chmod 600 "\$ENV_BACKUP_DIR"/.env.* 2>/dev/null || true
+
+                    # Git reset 전에 권한 문제 있는 폴더 정리
+                    # db/node_modules는 prisma generate 시 root 권한으로 생성될 수 있음
+                    echo ">>> Cleaning up problematic directories before git reset..."
+                    sudo rm -rf db/node_modules 2>/dev/null || true
+                    sudo rm -rf .git/index.lock 2>/dev/null || true
 
                     # Git pull
                     echo ">>> Pulling latest code..."
@@ -227,10 +216,6 @@ pipeline {
                         echo ">>> Waiting for processes to stop... (\$i/5)"
                         sleep 2
                     done
-
-                    # Clean npm cache (skip .next deletion due to permission issues)
-                    echo ">>> Cleaning caches..."
-                    npm cache clean --force || true
 
                     # Build applications
                     echo ">>> Building applications..."
