@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260106-013 | Done | 2026-01-06 | - | 발행 파이프라인 순서 변경 (쇼핑몰 먼저) | Low | Lee |
 | TR-20260106-012 | Done | 2026-01-06 | - | PostService.createBatch 진행률 계산 수정 | Low | Lee |
 | TR-20260106-011 | Done | 2026-01-06 | - | ProductService.createFromCollectedProducts 트랜잭션 적용 | Low | Lee |
 | TR-20260106-010 | Done | 2026-01-06 | - | ProductCreate 파이프라인 인덱스 불일치 버그 수정 | Low | Lee |
@@ -113,6 +114,46 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260106-013: 발행 파이프라인 순서 변경 (쇼핑몰 먼저)
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-06 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 발행 파이프라인에서 쇼핑몰(Shop) 발행을 먼저 수행하고, 채널(Band) 발행을 나중에 수행하도록 순서 변경
+- 기존: 채널(Band) 발행 → 쇼핑몰(Shop) 발행
+- 변경: 쇼핑몰(Shop) 발행 → 채널(Band) 발행
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/modules/automation/pipelines/publish.ts | Modified | 쇼핑몰 발행 로직을 채널 발행 전으로 이동 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| TypeScript Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Publish (소매밴드 발행)
+
+---
 
 ## TR-20260106-012: PostService.createBatch 진행률 계산 수정
 
