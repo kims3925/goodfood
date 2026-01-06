@@ -336,11 +336,17 @@ export default function UnifiedOrderDetailPage() {
                 {status.icon}
                 {order.statusLabel || status.label}
               </span>
-              {/* 무통장입금 배지 */}
+              {/* 결제 방식 배지 */}
               {isBankTransfer && (
                 <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 text-amber-700">
                   <Building2 size={16} />
                   무통장입금
+                </span>
+              )}
+              {order.paymentMethod === 'CARD' && (
+                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-indigo-100 text-indigo-700">
+                  <CreditCard size={16} />
+                  카드결제
                 </span>
               )}
             </div>
