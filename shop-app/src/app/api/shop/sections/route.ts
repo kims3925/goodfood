@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import prisma, { ChannelKind } from '@bandauto/db'
+import { calculateSellingPrice } from '@/lib/price-calculator'
 
 export async function GET(req: NextRequest) {
   try {
@@ -78,10 +79,11 @@ export async function GET(req: NextRequest) {
             const mainVariant = product?.variants[0]
             const images = product.images?.map((img) => img.url) || []
 
-            // 배송비 포함 가격 계산 (상품 상세 페이지와 동일)
+            // 공통 모듈로 판매가 계산 (배송비 타입에 따라 자동 처리)
             const basePrice = mainVariant?.price || 0
             const shippingFee = product.shippingFee || 0
-            const salePrice = basePrice + shippingFee
+            const bundleShippingType = product.bundleShippingType || null
+            const salePrice = calculateSellingPrice(basePrice, shippingFee, bundleShippingType)
             const originalPrice = salePrice
             const discount = 0
 
@@ -186,10 +188,11 @@ async function getShopProducts(shopId: number, limit: number) {
       const mainVariant = product?.variants[0]
       const images = product.images?.map((img) => img.url) || []
 
-      // 배송비 포함 가격 계산 (상품 상세 페이지와 동일)
+      // 공통 모듈로 판매가 계산 (배송비 타입에 따라 자동 처리)
       const basePrice = mainVariant?.price || 0
       const shippingFee = product.shippingFee || 0
-      const salePrice = basePrice + shippingFee
+      const bundleShippingType = product.bundleShippingType || null
+      const salePrice = calculateSellingPrice(basePrice, shippingFee, bundleShippingType)
       const originalPrice = salePrice
       const discount = 0
 
@@ -271,10 +274,11 @@ async function getChannelProducts(channelId: number, limit: number) {
       const mainVariant = product?.variants[0]
       const images = product.images?.map((img) => img.url) || []
 
-      // 배송비 포함 가격 계산 (상품 상세 페이지와 동일)
+      // 공통 모듈로 판매가 계산 (배송비 타입에 따라 자동 처리)
       const basePrice = mainVariant?.price || 0
       const shippingFee = product.shippingFee || 0
-      const salePrice = basePrice + shippingFee
+      const bundleShippingType = product.bundleShippingType || null
+      const salePrice = calculateSellingPrice(basePrice, shippingFee, bundleShippingType)
       const originalPrice = salePrice
       const discount = 0
 
