@@ -132,6 +132,7 @@ TR-{YYYYMMDD}-{NUMBER}
 - 기존: `channelId: -shopId` (음수로 Shop 구분 - 암시적)
 - 변경: `targetType: 'SHOP' | 'CHANNEL'`, `targetId`, `targetName` (명시적)
 - 하위 호환성을 위해 `channelId`, `channelName` 필드를 `@deprecated`로 유지
+- Shop 결과에도 `channelName` deprecated 필드 일관되게 채움
 - 팀 코딩 컨벤션 "암시적 동작보다 명시적 설계를 우선" 준수
 
 ### 변경 파일

@@ -261,6 +261,7 @@ export async function runPublishPipeline(
           error: productResult.error,
           // 하위 호환성을 위한 deprecated 필드
           channelId: shopId,
+          channelName: `Shop: ${shopResult.shopName}`,
         })
 
         if (!productResult.success && productResult.error) {
