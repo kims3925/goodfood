@@ -76,15 +76,6 @@ function LoginContent() {
   return (
     <div className="bg-gray-50 flex-1 flex items-center justify-center py-12 md:py-16 px-4">
       <div className="max-w-md w-full">
-        {/* Shop Name */}
-        <div className="text-center mb-4">
-          <Link href={getPath('/main')} className="inline-block">
-            <h1 className="text-4xl font-black" style={{ color: primaryColor }}>
-              {shopName}
-            </h1>
-          </Link>
-        </div>
-
         {/* Login Form */}
         <div className="bg-white rounded-lg shadow-md p-8">
           <h2 className="text-2xl font-bold text-center mb-6">로그인</h2>

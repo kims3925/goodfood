@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
-import { Search, ShoppingCart, User, MapPin, ChevronDown, Phone, MessageSquare, LogOut } from 'lucide-react'
+import { Search, ShoppingCart, User, MapPin, ChevronDown, Phone, MessageSquare, LogOut, Home, Headphones } from 'lucide-react'
 import { CartNotificationProvider, useCartNotification } from '@/contexts/CartNotificationContext'
 import CartNotificationBubble from '@/components/cart/CartNotificationBubble'
 import { useShop } from '@/contexts/ShopContext'
@@ -51,8 +51,31 @@ function StoreLayoutContent({
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
       <header className="kurly-header border-b border-gray-200">
-        {/* Top Utility Bar */}
-        <div className="border-b border-gray-100 bg-white">
+        {/* Mobile Top Bar - 쇼핑몰 이름만 표시 */}
+        <div className="md:hidden border-b border-gray-100 bg-white">
+          <div className="kurly-container">
+            <div className="flex justify-center items-center h-14">
+              <Link href={getPath('/main')} className="flex items-center gap-2">
+                {logoUrl && (
+                  <Image
+                    src={logoUrl}
+                    alt={`${shopName} 로고`}
+                    width={120}
+                    height={48}
+                    className="h-10 w-auto object-contain"
+                    unoptimized
+                  />
+                )}
+                <span className="text-2xl font-bold text-abc-coral">
+                  {shopName}
+                </span>
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Top Utility Bar - 모바일에서 숨김 */}
+        <div className="hidden md:block border-b border-gray-100 bg-white">
           <div className="kurly-container">
             <div className="flex justify-end items-center h-8 text-xs text-gray-600 gap-1">
               {status === 'loading' ? (
@@ -178,19 +201,19 @@ function StoreLayoutContent({
         {/* Main Header */}
         <div className="kurly-container">
           <div className="kurly-header-top">
-            {/* Logo - 로고 이미지 + Shop 이름 */}
-            <Link href={getPath('/main')} className="kurly-logo flex items-center gap-2">
+            {/* Logo - 로고 이미지 + Shop 이름 (데스크탑만) */}
+            <Link href={getPath('/main')} className="kurly-logo hidden md:flex items-center gap-2">
               {logoUrl && (
                 <Image
                   src={logoUrl}
                   alt={`${shopName} 로고`}
                   width={120}
                   height={48}
-                  className="h-8 md:h-10 lg:h-12 w-auto object-contain"
+                  className="h-10 lg:h-12 w-auto object-contain"
                   unoptimized
                 />
               )}
-              <span className="text-xl md:text-2xl lg:text-3xl font-black text-abc-coral">
+              <span className="text-2xl lg:text-3xl font-black text-abc-coral">
                 {shopName}
               </span>
             </Link>
@@ -214,23 +237,23 @@ function StoreLayoutContent({
               </div>
             </form>
 
-            {/* Header Icons */}
-            <div className="kurly-header-icons">
-              <Link href={getPath('/mypage/addresses')} className="kurly-header-icon hidden md:flex">
-                <MapPin className="w-5 h-5 md:w-6 md:h-6" />
+            {/* Header Icons - 데스크탑에서만 표시 */}
+            <div className="kurly-header-icons hidden md:flex">
+              <Link href={getPath('/mypage/addresses')} className="kurly-header-icon">
+                <MapPin className="w-6 h-6" />
                 <span className="kurly-header-icon-text">배송지</span>
               </Link>
-              <Link href={getPath('/mypage/wishlist')} className="kurly-header-icon hidden sm:flex">
-                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <Link href={getPath('/mypage/wishlist')} className="kurly-header-icon">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
                 <span className="kurly-header-icon-text">찜하기</span>
               </Link>
               <div className="relative">
                 <Link href={getPath('/cart')} className="kurly-header-icon relative">
-                  <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />
+                  <ShoppingCart className="w-6 h-6" />
                   {cartCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 md:w-5 md:h-5 bg-abc-coral text-white text-[10px] md:text-xs rounded-full flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-abc-coral text-white text-xs rounded-full flex items-center justify-center">
                       {cartCount > 99 ? '99+' : cartCount}
                     </span>
                   )}
@@ -245,42 +268,76 @@ function StoreLayoutContent({
 
       </header>
 
-      {/* Main Content */}
+      {/* Main Content - 모바일에서 하단 네비 공간 확보 */}
       <main className="flex-1 flex flex-col">
         {children}
       </main>
 
-      {/* Footer */}
-      <footer className="kurly-footer">
+      {/* Mobile Bottom Navigation - 모바일에서만 표시 */}
+      <nav className="mobile-bottom-nav md:hidden">
+        <Link href={getPath('/main')} className="mobile-nav-item">
+          <Home className="w-6 h-6" />
+          <span>홈</span>
+        </Link>
+        <Link href={getPath('/cart')} className="mobile-nav-item relative">
+          <ShoppingCart className="w-6 h-6" />
+          {cartCount > 0 && (
+            <span className="absolute -top-1 left-1/2 ml-2 w-5 h-5 bg-abc-coral text-white text-[10px] rounded-full flex items-center justify-center">
+              {cartCount > 99 ? '99+' : cartCount}
+            </span>
+          )}
+          <span>장바구니</span>
+        </Link>
+        <Link href={getPath('/mypage')} className="mobile-nav-item">
+          <User className="w-6 h-6" />
+          <span>마이페이지</span>
+        </Link>
+        <Link href={getPath('/cs')} className="mobile-nav-item">
+          <Headphones className="w-6 h-6" />
+          <span>고객센터</span>
+        </Link>
+      </nav>
+
+      {/* Footer - 모바일에서는 하단 네비 위에 표시 */}
+      <footer className="kurly-footer mb-16 md:mb-0">
         <div className="kurly-container">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-            <div className="text-center sm:text-left">
-              <h4 className="font-bold text-gray-900 mb-3 md:mb-4">고객행복센터</h4>
-              <p className="text-xl md:text-2xl font-bold mb-2 text-abc-coral">{formatPhoneNumber(contactPhone)}</p>
-              <p className="text-xs md:text-sm text-gray-600">월~금 오전 10시 ~ 오후 5시</p>
+          {/* 고객행복센터 - 모바일에서 상단 중앙 */}
+          <div className="text-center mb-4 md:hidden">
+            <h4 className="font-bold text-gray-900 mb-2">고객행복센터</h4>
+            <p className="text-xl font-bold text-abc-coral">{formatPhoneNumber(contactPhone)}</p>
+            <p className="text-xs text-gray-600">월~금 오전 10시 ~ 오후 5시</p>
+          </div>
+
+          {/* 모바일: 쇼핑몰명/고객센터 2열, 데스크탑: 3열 */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-8">
+            {/* 고객행복센터 - 데스크탑에서만 */}
+            <div className="hidden md:block text-left">
+              <h4 className="font-bold text-gray-900 mb-4">고객행복센터</h4>
+              <p className="text-2xl font-bold mb-2 text-abc-coral">{formatPhoneNumber(contactPhone)}</p>
+              <p className="text-sm text-gray-600">월~금 오전 10시 ~ 오후 5시</p>
             </div>
-            <div className="text-center sm:text-left">
-              <h4 className="font-bold text-gray-900 mb-3 md:mb-4">{shopName}</h4>
-              <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-600">
+            <div className="text-center md:text-left">
+              <h4 className="font-bold text-gray-900 mb-2 md:mb-4 text-sm md:text-base">{shopName}</h4>
+              <ul className="space-y-1 text-xs md:text-sm text-gray-600">
                 <li><Link href={getPath('/terms')} className="hover:opacity-70">이용약관</Link></li>
                 <li><Link href={getPath('/privacy')} className="hover:opacity-70">개인정보처리방침</Link></li>
               </ul>
             </div>
-            <div className="text-center sm:text-left">
-              <h4 className="font-bold text-gray-900 mb-3 md:mb-4">고객센터</h4>
-              <ul className="space-y-1 md:space-y-2 text-xs md:text-sm text-gray-600">
+            <div className="text-center md:text-left">
+              <h4 className="font-bold text-gray-900 mb-2 md:mb-4 text-sm md:text-base">고객센터</h4>
+              <ul className="space-y-1 text-xs md:text-sm text-gray-600">
                 <li><Link href={getPath('/cs')} className="hover:opacity-70">고객센터</Link></li>
                 <li><Link href={getPath('/cs/inquiry')} className="hover:opacity-70">1:1문의</Link></li>
               </ul>
             </div>
           </div>
-          <div className="mt-6 md:mt-8 pt-6 md:pt-8 border-t border-gray-200 text-center text-xs md:text-sm text-gray-500">
+          <div className="mt-4 md:mt-8 pt-4 md:pt-8 border-t border-gray-200 text-center text-xs md:text-sm text-gray-500">
             <p>
               {shopName}
               {ownerName && <span> | 대표: {ownerName}</span>}
               {businessNumber && <span> | 사업자등록번호: {formatBusinessNumber(businessNumber)}</span>}
             </p>
-            <p className="mt-2">Copyright &copy; {new Date().getFullYear()} {shopName}. All rights reserved.</p>
+            <p className="mt-1 md:mt-2">Copyright &copy; {new Date().getFullYear()} {shopName}. All rights reserved.</p>
           </div>
         </div>
       </footer>
