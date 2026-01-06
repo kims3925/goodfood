@@ -12,7 +12,6 @@ model Channel {
   shopId            Int?               @map("shop_id")
   bandSessionCookie String?            @map("band_session_cookie") @db.Text
   sessionExpiresAt  DateTime?          @map("session_expires_at")
-  bandPostUrl       String?            @map("band_post_url") @db.VarChar(500)
   shop              Shop?              @relation(fields: [shopId], references: [id])
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   collectedPosts    CollectedPost[]

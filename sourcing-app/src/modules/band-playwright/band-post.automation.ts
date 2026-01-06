@@ -124,30 +124,8 @@ export class BandPostAutomation {
    * Band API의 bandKey는 항상 AAC... 형식이므로 채널명으로 찾아야 함
    * @returns 접속 성공한 밴드 URL (예: https://band.us/band/82426338/post)
    */
-  private async navigateToBand(page: Page, bandKey: string, bandName: string, bandPostUrl?: string): Promise<string> {
+  private async navigateToBand(page: Page, bandKey: string, bandName: string): Promise<string> {
     console.log(`[밴드자동화] 밴드 이동: "${bandName}"`)
-
-    // 저장된 URL이 있으면 직접 접속 시도
-    if (bandPostUrl) {
-      console.log(`[밴드자동화] 저장된 URL로 직접 접속: ${bandPostUrl}`)
-      try {
-        await page.goto(bandPostUrl, {
-          waitUntil: 'load',
-          timeout: POST_TIMEOUT_MS,
-        })
-
-        // 로그인 체크
-        const directUrl = page.url()
-        if (directUrl.includes('signin') || directUrl.includes('login')) {
-          console.log('[밴드자동화] 직접 접속 실패 - 로그인 필요, 밴드 검색으로 폴백')
-        } else if (directUrl.includes('/band/')) {
-          console.log(`[밴드자동화] 직접 접속 성공: ${directUrl}`)
-          return bandPostUrl
-        }
-      } catch (error: any) {
-        console.warn(`[밴드자동화] 직접 접속 실패: ${error.message}, 밴드 검색으로 폴백`)
-      }
-    }
 
     // Band 홈에서 채널명으로 밴드 찾기
     console.log(`[밴드자동화] Band 홈에서 밴드 검색 중...`)
@@ -344,9 +322,8 @@ export class BandPostAutomation {
     page: Page,
     params: BandPublishParams
   ): Promise<BandPublishResult> {
-    const { bandKey, bandName, content, imageUrls, bandPostUrl, onStageProgress, signal } = params
+    const { bandKey, bandName, content, imageUrls, onStageProgress, signal } = params
     const tempFiles: string[] = []
-    let navigatedBandUrl: string | undefined
 
     // 취소 확인 헬퍼
     const checkCancelled = () => {
@@ -386,11 +363,11 @@ export class BandPostAutomation {
 
       // 1. 밴드 페이지로 이동 (1회 재시도)
       try {
-        navigatedBandUrl = await this.navigateToBand(page, bandKey, bandName, bandPostUrl)
+        await this.navigateToBand(page, bandKey, bandName)
       } catch (navError: any) {
         console.warn(`[밴드자동화] 밴드 찾기 실패, 1회 재시도: ${navError.message}`)
         await page.waitForTimeout(2000)
-        navigatedBandUrl = await this.navigateToBand(page, bandKey, bandName, bandPostUrl)
+        await this.navigateToBand(page, bandKey, bandName)
       }
 
       // 현재 URL 확인 (로그인 리다이렉트 체크)
@@ -578,7 +555,6 @@ export class BandPostAutomation {
         success: true,
         postKey,
         imageCount: tempFiles.length,
-        bandPostUrl: navigatedBandUrl,  // 첫 접속 성공 시 저장용
       }
     } catch (error: any) {
       console.error('[밴드자동화] 게시물 작성 실패:', error)
@@ -2724,17 +2700,16 @@ export class BandPostAutomation {
     page: Page,
     params: BandBatchPublishParams
   ): Promise<BandBatchPublishResult> {
-    const { bandKey, bandName, bandPostUrl, items, onItemSuccess, onProgress } = params
+    const { bandKey, bandName, items, onItemSuccess, onProgress } = params
     const results: BandBatchItemResult[] = []
     let successCount = 0
     let failedCount = 0
-    let navigatedBandUrl: string | undefined
 
     console.log(`[밴드자동화] 배치 발행 시작: ${items.length} items to band "${bandName}"`)
 
     try {
       // 1. 밴드 페이지로 한 번만 이동
-      navigatedBandUrl = await this.navigateToBand(page, bandKey, bandName, bandPostUrl)
+      await this.navigateToBand(page, bandKey, bandName)
 
       // 현재 URL 확인 (로그인 리다이렉트 체크)
       const currentUrl = page.url()
@@ -2946,7 +2921,6 @@ export class BandPostAutomation {
       successCount,
       failedCount,
       results,
-      bandPostUrl: navigatedBandUrl,  // 첫 접속 성공 시 저장용
     }
   }
 

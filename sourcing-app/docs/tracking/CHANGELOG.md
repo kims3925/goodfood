@@ -21,6 +21,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260106-004 | Done | 2026-01-06 | - | Channel 테이블 bandPostUrl 컬럼 삭제 | Low | Lee |
+| TR-20260106-003 | Done | 2026-01-06 | - | 자동화 로그 API 응답 구조 수정 | Low | Lee |
 | TR-20260106-002 | Done | 2026-01-06 | - | 자동화 파이프라인과 수동 실행 로직 통일 | Medium | Lee |
 | TR-20260106-001 | Done | 2026-01-06 | - | 자동화 설정 채널설정 버튼 제거 | Low | Lee |
 
@@ -103,6 +105,93 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260106-004: Channel 테이블 bandPostUrl 컬럼 삭제
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-06 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- Channel 테이블에서 사용하지 않는 `band_post_url` 컬럼 삭제
+- 관련 타입 정의(BandPublishParams, BandPublishResult 등)에서 bandPostUrl 필드 삭제
+- 발행 서비스에서 bandPostUrl 저장/전달 로직 삭제
+- Band 자동화에서 직접 URL 접속 로직 제거 (항상 밴드 홈에서 채널명으로 검색)
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| db/prisma/models/channel.prisma | Modified | bandPostUrl 필드 삭제 |
+| src/modules/publish/publish.service.ts | Modified | bandPostUrl 파라미터 전달 및 저장 로직 삭제 |
+| src/modules/band-playwright/types.ts | Modified | 4개 인터페이스에서 bandPostUrl 필드 삭제 |
+| src/modules/band-playwright/band-post.automation.ts | Modified | navigateToBand() 파라미터, 직접 접속 로직, 반환값에서 삭제 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [x] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Prisma Generate | Pass |
+| DB Push | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. npx prisma db push --schema prisma로 컬럼 복원
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Publish (소매밴드 발행)
+
+---
+
+## TR-20260106-003: 자동화 로그 API 응답 구조 수정
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-06 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 자동화 로그 API 응답 구조를 프론트엔드 기대 형식에 맞게 수정
+- 기존: `{ success, data: [...logs], totalPages }`
+- 변경: `{ success, data: { logs: [...], pagination: { total, page, limit, totalPages } } }`
+- 로그 페이지에서 데이터가 있어도 표시되지 않던 버그 수정
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/api/automation/logs/route.ts | Modified | 응답 구조 변경 |
+
+### 영향 분석
+- [x] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Manual | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+
+---
 
 ## TR-20260106-002: 자동화 파이프라인과 수동 실행 로직 통일
 
