@@ -49,8 +49,10 @@ Branch Check → Setup → Debug → Install → Prisma Generate → Lint → Ty
 
 ### CD Pipeline (cd-Jenkinsfile)
 
+> CI Pipeline에서 빌드 검증 완료되므로, CD에서는 Deploy 단계에서만 빌드
+
 ```text
-Checkout → Install → Prisma Generate → Build (parallel) → Deploy
+Checkout → Install → Prisma Generate → Deploy (빌드 포함)
 ```
 
 | 단계 | 설명 | 실행 방식 |
@@ -58,8 +60,7 @@ Checkout → Install → Prisma Generate → Build (parallel) → Deploy
 | Checkout | 소스 코드 가져오기 | 순차 |
 | Install Dependencies | `npm ci --legacy-peer-deps` | 순차 |
 | Generate Prisma Client | `npx prisma generate --schema prisma` | 순차 |
-| Build Applications | shop-app, sourcing-app | **병렬** |
-| Deploy | 복합 배포 로직 (아래 상세) | 순차 |
+| Deploy | 복합 배포 로직 (빌드 포함, 아래 상세) | 순차 |
 
 ### Deploy 단계 상세
 
@@ -108,9 +109,8 @@ Checkout → Install → Prisma Generate → Build (parallel) → Deploy
 | Checkout | 차단 |
 | Install Dependencies | 차단 |
 | Generate Prisma Client | 차단 |
-| Build Applications | 차단 |
 | Prisma Migrate | 배포 중단 (스키마 드리프트 시 수동 개입 필요) |
-| Deploy | 롤백 |
+| Deploy (빌드 포함) | 롤백 |
 
 ---
 
@@ -119,8 +119,8 @@ Checkout → Install → Prisma Generate → Build (parallel) → Deploy
 ### 1. .env 파일 보호
 
 ```bash
-# 보안: /tmp 대신 전용 백업 디렉토리 사용 (프로세스 ID 기반 고유 경로)
-ENV_BACKUP_DIR="/home/ubuntu/.env-backup-$$"
+# 보안: 프로젝트 디렉토리 내 전용 백업 폴더 사용 (Jenkins 권한 문제 해결)
+ENV_BACKUP_DIR="${PROJECT_PATH}/.env-backup-$$"
 mkdir -p "$ENV_BACKUP_DIR"
 chmod 700 "$ENV_BACKUP_DIR"  # 소유자만 접근 가능
 
