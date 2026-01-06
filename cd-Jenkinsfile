@@ -24,6 +24,12 @@ pipeline {
         upstream(upstreamProjects: 'bandauto-ci', threshold: hudson.model.Result.SUCCESS)
     }
 
+    // CI 잡 성공 시에만 CD 파이프라인 트리거
+    // 참고: 수동 실행도 가능하지만, CI 실패 시 첫 stage에서 경고 출력
+    triggers {
+        upstream(upstreamProjects: 'bandauto-ci', threshold: hudson.model.Result.SUCCESS)
+    }
+
     stages {
         // CI 성공 여부 확인 (수동 실행 시 경고)
         stage('CI Guard') {
