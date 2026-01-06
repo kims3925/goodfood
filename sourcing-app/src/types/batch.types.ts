@@ -44,6 +44,8 @@ export type ProgressCallback<T = unknown> = (params: {
   total: number
   /** 현재 항목 처리 결과 */
   result: BatchResultItem<T>
+  /** 현재 처리 중인 항목의 ID (선택) */
+  itemId?: number
 }) => Promise<void>
 
 /**

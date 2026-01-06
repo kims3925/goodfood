@@ -167,11 +167,11 @@ export class PostService {
           errorType: 'PERMANENT',
         })
 
-        // 진행 콜백 호출
+        // 진행 콜백 호출 (실제 처리된 항목 수 기반으로 current 계산)
         if (onProgress) {
           await onProgress({
-            current: i,
-            total: newPosts.length,
+            current: result.successCount + result.skippedCount + result.failedCount - 1,
+            total: posts.length,
             result: { success: false, error: error.message },
           })
         }
@@ -191,10 +191,10 @@ export class PostService {
             data: created as CollectedPost,
           })
 
-          // 진행 콜백 호출
+          // 진행 콜백 호출 (실제 처리된 항목 수 기반으로 current 계산)
           if (onProgress) {
             await onProgress({
-              current: skippedCount + i,
+              current: result.successCount + result.skippedCount + result.failedCount - 1,
               total: posts.length,
               result: { success: true, data: created as CollectedPost },
             })
@@ -220,7 +220,7 @@ export class PostService {
 
             if (onProgress) {
               await onProgress({
-                current: skippedCount + i,
+                current: result.successCount + result.skippedCount + result.failedCount - 1,
                 total: posts.length,
                 result: { success: true, data: created as CollectedPost },
               })
@@ -235,7 +235,7 @@ export class PostService {
 
             if (onProgress) {
               await onProgress({
-                current: skippedCount + i,
+                current: result.successCount + result.skippedCount + result.failedCount - 1,
                 total: posts.length,
                 result: { success: false, error: individualError.message },
               })

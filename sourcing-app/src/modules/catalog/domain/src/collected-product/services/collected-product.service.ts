@@ -96,12 +96,19 @@ export class CollectedProductService {
 
     result.total = data.length
 
+    // userId 일관성 검증: 배치의 모든 항목은 동일한 userId를 가져야 함
+    const userId = data[0].userId
+    const hasInconsistentUserId = data.some((d) => d.userId !== userId)
+    if (hasInconsistentUserId) {
+      throw new Error('배치 생성 시 모든 항목은 동일한 userId를 가져야 합니다.')
+    }
+
     // 배치 중복 체크
     const postIds = data.map((d) => d.postId)
     const existingProducts = await prisma.collectedProduct.findMany({
       where: {
         postId: { in: postIds },
-        userId: data[0].userId, // 같은 userId로 가정
+        userId,
       },
       select: { postId: true },
     })

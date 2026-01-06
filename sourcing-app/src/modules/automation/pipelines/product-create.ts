@@ -105,7 +105,7 @@ export async function runProductCreatePipeline(
   const batchResult = await productService.createFromCollectedProducts({
     userId,
     collectedProductIds,
-    onProgress: async ({ current, total, result: itemResult }) => {
+    onProgress: async ({ current, total, result: itemResult, itemId }) => {
       // 취소 체크
       if (await checkCancellation()) {
         throw new Error('CANCELLED_BY_USER')
@@ -126,9 +126,10 @@ export async function runProductCreatePipeline(
         consecutiveFailures = 0
       }
 
-      // 결과 수집
+      // 결과 수집 (서비스에서 전달된 itemId 사용으로 인덱스 불일치 문제 해결)
+      const collectedProductId = itemId ?? collectedProducts[current]?.id ?? 0
       const createdResult: CreatedProductResult = {
-        channelId: collectedProducts[current]?.id || 0,
+        channelId: collectedProductId,
         status: itemResult.success ? 'success' : 'failed',
         productId: itemResult.data?.id,
         productName: itemResult.data?.name,
@@ -140,7 +141,7 @@ export async function runProductCreatePipeline(
         totalCreated++
       } else if (itemResult.error) {
         errors.push({
-          itemId: collectedProducts[current]?.id || 0,
+          itemId: collectedProductId,
           message: itemResult.error,
           timestamp: new Date(),
         })

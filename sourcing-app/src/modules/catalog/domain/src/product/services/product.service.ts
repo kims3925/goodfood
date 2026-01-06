@@ -296,77 +296,84 @@ export class ProductService {
         // 게시물 이미지 URL 수집
         const imageUrls = collectedProduct.post.images.map((img) => img.url)
 
-        // Product 생성
-        const product = await prisma.product.create({
-          data: {
-            userId,
-            channelId: collectedProduct.post.channelId,
-            name: collectedProduct.name || '상품명 없음',
-            description: collectedProduct.description || null,
-            categoryId: metadata.category || null,
-            currency: collectedProduct.currency || 'KRW',
-            wholesalePrice: typeof wholesalePrice === 'number' ? wholesalePrice : null,
-            price: typeof price === 'number' ? price : null,
-            shippingFee: typeof shipping.shippingFee === 'number' ? shipping.shippingFee : null,
-            shippingInfo: typeof shipping.shippingInfo === 'string' ? shipping.shippingInfo : null,
-            bundleMaxQty: typeof bundleMaxQty === 'number' ? bundleMaxQty : null,
-            bundleShippingType,
-            thumbnailUrl: collectedProduct.post.images[0]?.url || null,
-            options: options.length
-              ? {
-                  create: options.flatMap((opt: any, groupIndex: number) =>
-                    (opt.values || []).map((value: string, valueIndex: number) => ({
-                      groupName: opt.groupName,
-                      value,
-                      sortOrder: groupIndex * 100 + valueIndex,
-                    }))
-                  ),
-                }
-              : undefined,
-            variants: variants.length
-              ? {
-                  create: variants.map((v: any) => ({
-                    optionSummary: v.optionSummary ?? null,
-                    wholesalePrice: v.wholesalePrice ?? null,
-                    price: v.price ?? 0,
-                  })),
-                }
-              : undefined,
-          },
-        })
-
-        // 이미지 다운로드 및 ProductImage 저장
+        // 이미지 다운로드 (트랜잭션 외부에서 수행 - 외부 I/O)
+        let downloadedImages: Awaited<ReturnType<typeof downloadAndSaveProductImages>> = []
         if (imageUrls.length > 0) {
           try {
-            const downloadedImages = await downloadAndSaveProductImages(imageUrls)
-
-            if (downloadedImages.length > 0) {
-              await prisma.productImage.createMany({
-                data: downloadedImages.map((img, index) => ({
-                  productId: product.id,
-                  url: img.url,
-                  fileHash: img.fileHash,
-                  fileName: img.fileName,
-                  fileSize: img.fileSize,
-                  sortOrder: index,
-                })),
-              })
-
-              await prisma.product.update({
-                where: { id: product.id },
-                data: { thumbnailUrl: downloadedImages[0].url },
-              })
-            }
+            downloadedImages = await downloadAndSaveProductImages(imageUrls)
           } catch (imageError) {
-            // 이미지 실패해도 상품 생성은 성공으로 처리
-            console.error(`[ProductService.createFromCollectedProducts] Image download failed for product ${product.id}:`, imageError)
+            // 이미지 실패해도 상품 생성은 계속 진행
+            console.error(`[ProductService.createFromCollectedProducts] Image download failed for collectedProduct ${collectedProduct.id}:`, imageError)
           }
         }
 
-        // 수집상품의 isConverted를 true로 업데이트
-        await prisma.collectedProduct.update({
-          where: { id: collectedProduct.id },
-          data: { isConverted: true },
+        // 트랜잭션으로 다중 테이블 변경 처리
+        const product = await prisma.$transaction(async (tx) => {
+          // 1. Product 생성
+          const newProduct = await tx.product.create({
+            data: {
+              userId,
+              channelId: collectedProduct.post.channelId,
+              name: collectedProduct.name || '상품명 없음',
+              description: collectedProduct.description || null,
+              categoryId: metadata.category || null,
+              currency: collectedProduct.currency || 'KRW',
+              wholesalePrice: typeof wholesalePrice === 'number' ? wholesalePrice : null,
+              price: typeof price === 'number' ? price : null,
+              shippingFee: typeof shipping.shippingFee === 'number' ? shipping.shippingFee : null,
+              shippingInfo: typeof shipping.shippingInfo === 'string' ? shipping.shippingInfo : null,
+              bundleMaxQty: typeof bundleMaxQty === 'number' ? bundleMaxQty : null,
+              bundleShippingType,
+              thumbnailUrl: collectedProduct.post.images[0]?.url || null,
+              options: options.length
+                ? {
+                    create: options.flatMap((opt: any, groupIndex: number) =>
+                      (opt.values || []).map((value: string, valueIndex: number) => ({
+                        groupName: opt.groupName,
+                        value,
+                        sortOrder: groupIndex * 100 + valueIndex,
+                      }))
+                    ),
+                  }
+                : undefined,
+              variants: variants.length
+                ? {
+                    create: variants.map((v: any) => ({
+                      optionSummary: v.optionSummary ?? null,
+                      wholesalePrice: v.wholesalePrice ?? null,
+                      price: v.price ?? 0,
+                    })),
+                  }
+                : undefined,
+            },
+          })
+
+          // 2. ProductImage 저장 및 썸네일 업데이트
+          if (downloadedImages.length > 0) {
+            await tx.productImage.createMany({
+              data: downloadedImages.map((img, index) => ({
+                productId: newProduct.id,
+                url: img.url,
+                fileHash: img.fileHash,
+                fileName: img.fileName,
+                fileSize: img.fileSize,
+                sortOrder: index,
+              })),
+            })
+
+            await tx.product.update({
+              where: { id: newProduct.id },
+              data: { thumbnailUrl: downloadedImages[0].url },
+            })
+          }
+
+          // 3. 수집상품의 isConverted를 true로 업데이트
+          await tx.collectedProduct.update({
+            where: { id: collectedProduct.id },
+            data: { isConverted: true },
+          })
+
+          return newProduct
         })
 
         result.successCount++
@@ -380,6 +387,7 @@ export class ProductService {
             current: i,
             total: collectedProducts.length,
             result: { success: true, data: product },
+            itemId: collectedProduct.id,
           })
         }
 
@@ -397,6 +405,7 @@ export class ProductService {
             current: i,
             total: collectedProducts.length,
             result: { success: false, error: error.message },
+            itemId: collectedProduct.id,
           })
         }
 

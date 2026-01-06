@@ -21,6 +21,10 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260106-012 | Done | 2026-01-06 | - | PostService.createBatch 진행률 계산 수정 | Low | Lee |
+| TR-20260106-011 | Done | 2026-01-06 | - | ProductService.createFromCollectedProducts 트랜잭션 적용 | Low | Lee |
+| TR-20260106-010 | Done | 2026-01-06 | - | ProductCreate 파이프라인 인덱스 불일치 버그 수정 | Low | Lee |
+| TR-20260106-009 | Done | 2026-01-06 | - | CollectedProductService.createBatch userId 검증 추가 | Low | Lee |
 | TR-20260106-008 | Done | 2026-01-06 | - | 발행 파이프라인 totalItems 실제 발행 대상만 카운트 | Low | Lee |
 | TR-20260106-007 | Done | 2026-01-06 | - | 자동화 실행 로그 발행 단계 상세 로그 표시 수정 | Low | Lee |
 | TR-20260106-006 | Done | 2026-01-06 | - | 자동화 대시보드 및 로그 UI/UX 개선 | Low | Lee |
@@ -109,6 +113,183 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260106-012: PostService.createBatch 진행률 계산 수정
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-06 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 코드 리뷰(CodeRabbit) 지적사항 반영
+- `onProgress` 콜백의 `current` 계산이 `skippedCount + i`에서 실제 처리된 항목 수 기반으로 변경
+- `current: result.successCount + result.skippedCount + result.failedCount - 1` 사용
+
+### 문제 상황
+- 기존 로직은 `skippedCount + i`로 진행률 계산
+- 중복 항목이 `posts` 배열의 앞쪽에만 있다고 가정
+- 준비 단계에서 실패한 항목이 있으면 `createdPosts[i]`와 원본 배열 인덱스가 불일치
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/modules/sourcing/domain/src/post/services/post.service.ts | Modified | `onProgress` 콜백의 `current` 계산 로직 수정 (4곳) |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| TypeScript Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Collection (게시물 수집)
+
+---
+
+## TR-20260106-011: ProductService.createFromCollectedProducts 트랜잭션 적용
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-06 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 코드 리뷰(CodeRabbit) 지적사항 반영
+- `createFromCollectedProducts` 메서드의 다중 테이블 변경을 `prisma.$transaction`으로 감싸기
+- 트랜잭션 내 작업: Product 생성 → ProductImage 저장 → Product 썸네일 업데이트 → CollectedProduct 상태 업데이트
+- 이미지 다운로드는 외부 I/O이므로 트랜잭션 외부에서 먼저 수행
+- 중간 실패 시 부분 생성 데이터가 남지 않도록 원자성 보장
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/modules/catalog/domain/src/product/services/product.service.ts | Modified | prisma.$transaction 적용 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: ProductCreate (상품 생성)
+
+---
+
+## TR-20260106-010: ProductCreate 파이프라인 인덱스 불일치 버그 수정
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-06 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 코드 리뷰(CodeRabbit) 지적사항 반영
+- ProductCreate 파이프라인에서 `onProgress` 콜백의 `current` 인덱스가 서비스 내부 배열 인덱스와 파이프라인 원본 배열 인덱스 불일치 문제 수정
+- `ProgressCallback` 타입에 `itemId` 필드 추가
+- `ProductService.createFromCollectedProducts()`에서 `itemId`를 콜백에 직접 전달
+- 파이프라인에서 `itemId`를 우선 사용하고 fallback으로 인덱스 사용
+
+### 문제 상황
+- 파이프라인과 서비스 모두 `isConverted: false` 조건으로 필터링 조회
+- 서비스 내부 배열의 인덱스(`current`)를 파이프라인이 자신의 원본 배열 인덱스로 해석
+- 동시성 이슈나 필터링 결과 차이로 `channelId`와 `itemId`가 잘못 매핑될 수 있음
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/types/batch.types.ts | Modified | `ProgressCallback`에 `itemId?: number` 필드 추가 |
+| src/modules/catalog/domain/src/product/services/product.service.ts | Modified | `onProgress` 콜백 호출 시 `itemId: collectedProduct.id` 전달 |
+| src/modules/automation/pipelines/product-create.ts | Modified | 콜백에서 `itemId`를 우선 사용하도록 수정 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| TypeScript Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: ProductCreate (상품 생성)
+
+---
+
+## TR-20260106-009: CollectedProductService.createBatch userId 검증 추가
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-06 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 코드 리뷰(CodeRabbit) 지적사항 반영
+- `createBatch` 메서드에서 `data[0].userId`로 모든 항목이 동일한 userId를 가진다고 암묵적으로 가정하던 문제 수정
+- 함수 초입에서 모든 항목의 userId가 동일함을 명시적으로 검증
+- 불일치 시 명확한 에러 메시지 발생
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/modules/catalog/domain/src/collected-product/services/collected-product.service.ts | Modified | userId 일관성 검증 로직 추가 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Transform (AI 변환)
+
+---
 
 ## TR-20260106-007: 자동화 실행 로그 발행 단계 상세 로그 표시 수정
 
