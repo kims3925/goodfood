@@ -49,18 +49,23 @@ Branch Check → Setup → Debug → Install → Prisma Generate → Lint → Ty
 
 ### CD Pipeline (cd-Jenkinsfile)
 
+> **트리거 조건**: CI Pipeline (`bandauto-ci`) 성공 시에만 자동 실행
 > CI Pipeline에서 빌드 검증 완료되므로, CD에서는 Deploy 단계에서만 빌드
 
 ```text
-Checkout → Install → Prisma Generate → Deploy (빌드 포함)
+CI Guard → Checkout → Install → Prisma Generate → Deploy (빌드 포함)
 ```
 
 | 단계 | 설명 | 실행 방식 |
 |-----|-----|----------|
+| CI Guard | CI 성공 여부 확인 (수동 실행 시 경고) | 순차 |
 | Checkout | 소스 코드 가져오기 | 순차 |
 | Install Dependencies | `npm ci --legacy-peer-deps` | 순차 |
 | Generate Prisma Client | `npx prisma generate --schema prisma` | 순차 |
 | Deploy | 복합 배포 로직 (빌드 포함, 아래 상세) | 순차 |
+
+> **참고**: `triggers { upstream(...) }` 설정으로 CI 성공 시에만 CD가 트리거됨.
+> 수동 실행 시에는 경고 메시지 출력 (배포는 진행됨).
 
 ### Deploy 단계 상세
 

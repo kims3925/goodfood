@@ -18,7 +18,30 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
+    // CI 잡 성공 시에만 CD 파이프라인 트리거
+    // 참고: 수동 실행도 가능하지만, CI 실패 시 첫 stage에서 경고 출력
+    triggers {
+        upstream(upstreamProjects: 'bandauto-ci', threshold: hudson.model.Result.SUCCESS)
+    }
+
     stages {
+        // CI 성공 여부 확인 (수동 실행 시 경고)
+        stage('CI Guard') {
+            steps {
+                script {
+                    // upstream trigger로 실행된 경우 자동으로 CI 성공 보장
+                    // 수동 실행 시 경고 메시지 출력
+                    if (!currentBuild.getBuildCauses('hudson.model.Cause$UpstreamCause')) {
+                        echo '⚠️  WARNING: Manual execution detected.'
+                        echo '⚠️  Please ensure CI pipeline passed before deploying.'
+                        echo '⚠️  For safety, this pipeline should be triggered by CI success.'
+                    } else {
+                        echo '✅ Triggered by upstream CI job success.'
+                    }
+                }
+            }
+        }
+
         stage('Checkout') {
             steps {
                 echo 'Checking out source code...'
