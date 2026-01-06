@@ -192,6 +192,83 @@ export class CollectedPostRepository {
       },
     })
   }
+
+  /**
+   * 채널 내에서 externalId 목록으로 존재하는 게시물 조회 (배치 중복 체크용)
+   */
+  async findManyByExternalIds(channelId: number, externalIds: string[]) {
+    return prisma.collectedPost.findMany({
+      where: {
+        channelId,
+        externalId: { in: externalIds },
+      },
+      select: { id: true, externalId: true },
+    })
+  }
+
+  /**
+   * 게시물 배치 생성 (이미지 포함)
+   * 트랜잭션으로 게시물과 이미지를 함께 생성
+   */
+  async createMany(data: Array<{
+    userId: number
+    channelId: number
+    externalId: string
+    title: string
+    content: string
+    author?: string
+    savedPostImages?: SavedPostImage[]
+  }>) {
+    // 트랜잭션으로 게시물과 이미지 일괄 생성
+    const results = await prisma.$transaction(async (tx) => {
+      const createdPosts = []
+
+      for (const post of data) {
+        const imagesToCreate = post.savedPostImages && post.savedPostImages.length > 0
+          ? post.savedPostImages.map((img, index) => ({
+              url: img.url,
+              fileHash: img.fileHash,
+              fileName: img.fileName,
+              fileSize: img.fileSize,
+              sortOrder: index,
+            }))
+          : null
+
+        const created = await tx.collectedPost.create({
+          data: {
+            userId: post.userId,
+            channelId: post.channelId,
+            externalId: post.externalId,
+            title: post.title,
+            content: post.content,
+            author: post.author,
+            ...(imagesToCreate && {
+              images: {
+                create: imagesToCreate,
+              },
+            }),
+          },
+          include: {
+            channel: {
+              select: {
+                id: true,
+                name: true,
+                channelKey: true,
+                kind: true,
+                platform: true,
+              },
+            },
+            images: true,
+          },
+        })
+        createdPosts.push(created)
+      }
+
+      return createdPosts
+    })
+
+    return results
+  }
 }
 
 // 하위 호환성을 위한 별칭 유지 (점진적 마이그레이션)

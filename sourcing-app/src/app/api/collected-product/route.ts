@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
+import { collectedProductService } from '@/modules/catalog/domain/src/collected-product'
 
 // GET: 수집상품 목록 조회
 export async function GET(request: NextRequest) {
@@ -133,7 +134,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: 수집상품 등록
+// POST: 수집상품 등록 (CollectedProductService 사용 - 자동화와 동일한 로직)
 export async function POST(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
@@ -145,9 +146,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { postId, name, description, price, currency, wholesalePrice, rawMetadata } = body
+    const { postId, name, description, currency, rawMetadata } = body
 
-    console.log('[CollectedProduct POST] Request:', { postId, name, price, hasRawMetadata: !!rawMetadata })
+    console.log('[CollectedProduct POST] Request:', { postId, name, hasRawMetadata: !!rawMetadata })
 
     if (!postId) {
       return NextResponse.json(
@@ -156,74 +157,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 해당 게시물이 존재하는지 확인
-    const post = await prisma.collectedPost.findFirst({
-      where: {
-        id: postId,
-        userId: currentUser.userId,
-      },
-    })
-
-    if (!post) {
-      console.log('[CollectedProduct POST] Post not found:', postId)
-      return NextResponse.json(
-        { success: false, error: '게시물을 찾을 수 없습니다.' },
-        { status: 404 }
-      )
-    }
-
-    // 이미 수집상품이 있는지 확인
-    const existingProduct = await prisma.collectedProduct.findFirst({
-      where: {
-        postId,
-        userId: currentUser.userId,
-      },
-    })
-
-    if (existingProduct) {
-      console.log('[CollectedProduct POST] Already exists:', existingProduct.id)
-      return NextResponse.json(
-        { success: false, error: '이미 해당 게시물로 등록된 수집상품이 있습니다.' },
-        { status: 400 }
-      )
-    }
-
-    // 수집상품 생성
-    const collectedProduct = await prisma.collectedProduct.create({
-      data: {
-        userId: currentUser.userId,
-        postId,
-        name: name || null,
-        description: description || null,
-        currency: currency || 'KRW',
-        rawMetadata: rawMetadata ? JSON.stringify(rawMetadata) : null,
-      },
-      include: {
-        post: {
-          include: {
-            channel: {
-              select: {
-                id: true,
-                name: true,
-                coverUrl: true,
-              },
-            },
-            images: {
-              take: 1,
-              orderBy: { sortOrder: 'asc' },
-            },
-          },
-        },
-      },
+    // CollectedProductService를 사용하여 생성 (중복 체크, 게시물 확인 포함)
+    const collectedProduct = await collectedProductService.create({
+      userId: currentUser.userId,
+      postId,
+      name: name || null,
+      description: description || null,
+      currency: currency || 'KRW',
+      rawMetadata: rawMetadata || null,
     })
 
     console.log('[CollectedProduct POST] Created:', collectedProduct.id)
 
     // rawMetadata JSON 문자열을 객체로 파싱하여 반환
-    const parsedProduct = {
-      ...collectedProduct,
-      rawMetadata: collectedProduct.rawMetadata ? JSON.parse(collectedProduct.rawMetadata) : null,
-    }
+    const parsedProduct = collectedProductService.parseRawMetadata(collectedProduct)
 
     return NextResponse.json({
       success: true,
@@ -231,6 +178,21 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('[CollectedProduct POST] Error:', error)
+
+    // 서비스에서 던진 에러 처리
+    if (error.message === '이미 해당 게시물로 등록된 수집상품이 있습니다.') {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      )
+    }
+    if (error.message === '게시물을 찾을 수 없습니다.') {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 404 }
+      )
+    }
+
     return NextResponse.json(
       { success: false, error: '수집상품 등록에 실패했습니다.', details: error.message },
       { status: 500 }

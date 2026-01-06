@@ -153,22 +153,40 @@ export interface PublishResult extends PipelineResult {
   }
 }
 
+/**
+ * 발행 대상 타입
+ * - SHOP: 쇼핑몰 발행
+ * - CHANNEL: Band 채널 발행
+ */
+export type PublishTargetType = 'SHOP' | 'CHANNEL'
+
 export interface PublishedProductResult {
   productId: number
-  channelId: number
+  targetType: PublishTargetType
+  targetId: number  // shopId 또는 channelId
+  targetName?: string
   postKey?: string
   status: 'SUCCESS' | 'FAILED' | 'SKIPPED'
   error?: string
+  /** @deprecated channelId 대신 targetId 사용 */
+  channelId?: number
+  /** @deprecated channelName 대신 targetName 사용 */
+  channelName?: string
 }
 
 export interface ChannelPublishResult {
-  channelId: number
-  channelName: string
+  targetType: PublishTargetType
+  targetId: number  // shopId 또는 channelId
+  targetName: string
   attempted: number
   success: number
   failed: number
   skipped: number
   errors: string[]
+  /** @deprecated channelId 대신 targetId 사용 */
+  channelId?: number
+  /** @deprecated channelName 대신 targetName 사용 */
+  channelName?: string
 }
 
 /** @deprecated use ChannelPublishResult instead */

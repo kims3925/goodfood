@@ -145,7 +145,7 @@ export async function executeCollectionPipeline(
       result.totalItems,
       result.successCount,
       result.failedCount,
-      result.details
+      { collection: result.details }  // 로그 페이지와 일관된 구조로 저장
     )
 
     return result
@@ -202,7 +202,7 @@ export async function executeTransformPipeline(
       result.totalItems,
       result.successCount,
       result.failedCount,
-      result.details
+      { transform: result.details }  // 로그 페이지와 일관된 구조로 저장
     )
 
     return result
@@ -249,7 +249,7 @@ export async function executeProductCreatePipeline(
       result.totalItems,
       result.successCount,
       result.failedCount,
-      result.details
+      { productCreate: result.details }  // 로그 페이지와 일관된 구조로 저장
     )
 
     return result
@@ -308,7 +308,7 @@ export async function executePublishPipeline(
       result.totalItems,
       result.successCount,
       result.failedCount,
-      result.details
+      { publish: result.details }  // 로그 페이지와 일관된 구조로 저장
     )
 
     return result

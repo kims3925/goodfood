@@ -238,3 +238,6 @@ QUICK_REFERENCE.txt
 shop-app/.env.production.example
 sourcing-app/.env.example
 band-session-extension/config.js
+
+# npm checksum file
+npm-checksum.json

@@ -292,8 +292,56 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
   // Publish 단계
   if (visibleStages.includes('publish')) {
     const hasData = !!details.publish
-    const totalSuccess = details.publish?.channelResults?.reduce((sum: number, ch: any) => sum + ch.success, 0) || 0
-    const totalFailed = details.publish?.channelResults?.reduce((sum: number, ch: any) => sum + ch.failed, 0) || 0
+    const publishedProducts = details.publish?.publishedProducts || []
+    const channelResults = details.publish?.channelResults || []
+
+    // channelResults가 있으면 사용, 없으면 publishedProducts에서 계산
+    let totalSuccess = 0
+    let totalFailed = 0
+    let displayItems: { channelName: string; success: number; failed: number; attempted: number }[] = []
+
+    if (channelResults.length > 0) {
+      totalSuccess = channelResults.reduce((sum: number, ch: any) => sum + (ch.success || 0), 0)
+      totalFailed = channelResults.reduce((sum: number, ch: any) => sum + (ch.failed || 0), 0)
+      displayItems = channelResults.map((ch: any) => ({
+        channelName: ch.channelName?.replace(/^Shop:\s*/, '') || `채널 ${ch.channelId}`,
+        success: ch.success || 0,
+        failed: ch.failed || 0,
+        attempted: ch.attempted || (ch.success || 0) + (ch.failed || 0),
+      }))
+    } else if (publishedProducts.length > 0) {
+      // publishedProducts에서 통계 계산
+      const channelMap = new Map<number, { name: string; success: number; failed: number }>()
+      for (const p of publishedProducts) {
+        const channelId = p.channelId
+        if (!channelMap.has(channelId)) {
+          channelMap.set(channelId, { name: p.channelName || '', success: 0, failed: 0 })
+        }
+        const stats = channelMap.get(channelId)!
+        // 채널명이 있으면 업데이트
+        if (p.channelName && !stats.name) {
+          stats.name = p.channelName
+        }
+        if (p.status === 'SUCCESS') {
+          stats.success++
+          totalSuccess++
+        } else if (p.status === 'FAILED') {
+          stats.failed++
+          totalFailed++
+        }
+      }
+
+      // pendingChannel 정보가 있으면 채널명으로 사용
+      const pendingChannel = details.publish?.pendingChannel
+      channelMap.forEach((stats, channelId) => {
+        displayItems.push({
+          channelName: stats.name || (pendingChannel?.id === channelId ? pendingChannel.name : `채널 ${channelId}`),
+          success: stats.success,
+          failed: stats.failed,
+          attempted: stats.success + stats.failed,
+        })
+      })
+    }
 
     stages.push({
       name: '발행',
@@ -307,24 +355,22 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
       ] : undefined,
       details: hasData ? (
         <div className="space-y-2">
-          {details.publish?.channelResults?.length > 0 ? (
-            details.publish.channelResults.map((ch: any, i: number) => {
-              // "Shop: " 접두사 제거
-              const displayName = ch.channelName?.replace(/^Shop:\s*/, '') || ch.channelName
-              return (
-                <div
-                  key={i}
-                  className={`flex items-center gap-3 p-2.5 rounded-lg ${ch.failed === 0 ? 'bg-emerald-50/50' : 'bg-amber-50/50'}`}
-                >
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${ch.failed === 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                  <span className="text-sm font-medium text-slate-700">{displayName}</span>
-                  <span className="text-sm font-semibold text-emerald-600">{ch.success}/{ch.attempted}건</span>
-                  {ch.failed > 0 && (
-                    <span className="text-xs text-red-500">({ch.failed}건 실패)</span>
-                  )}
-                </div>
-              )
-            })
+          {displayItems.length > 0 ? (
+            displayItems.map((ch, i) => (
+              <div
+                key={i}
+                className={`flex items-center gap-3 p-2.5 rounded-lg ${ch.failed === 0 && ch.success > 0 ? 'bg-emerald-50/50' : ch.success === 0 ? 'bg-red-50/50' : 'bg-amber-50/50'}`}
+              >
+                <div className={`w-2 h-2 rounded-full shrink-0 ${ch.failed === 0 && ch.success > 0 ? 'bg-emerald-500' : ch.success === 0 ? 'bg-red-500' : 'bg-amber-500'}`} />
+                <span className="text-sm font-medium text-slate-700">{ch.channelName}</span>
+                <span className={`text-sm font-semibold ${ch.success > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {ch.success}/{ch.attempted}건
+                </span>
+                {ch.failed > 0 && (
+                  <span className="text-xs text-red-500">({ch.failed}건 실패)</span>
+                )}
+              </div>
+            ))
           ) : (
             <div className="text-sm text-slate-400 text-center py-2">발행된 항목이 없습니다</div>
           )}

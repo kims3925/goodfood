@@ -1,6 +1,8 @@
 /**
  * Collection Pipeline
  * 도매채널(도매밴드 등)에서 게시물 수집
+ *
+ * 수동 실행과 동일한 서비스 레이어(PostService) 사용으로 통일
  */
 
 import prisma, { ChannelKind } from '@bandauto/db'
@@ -12,6 +14,7 @@ import {
   ChannelCollectionResult,
   PipelineError,
 } from '../types'
+import { postService } from '@/modules/sourcing/domain/src/post/services/post.service'
 
 // =============================================
 // COLLECTION PIPELINE
@@ -150,99 +153,30 @@ export async function runCollectionPipeline(
 
       channelResult.fetched = bandPosts.length
 
-      // 배치 중복 체크 (개별 쿼리 대신 한 번에 조회)
-      const externalIds = bandPosts.map((p: any) => p.post_key)
-      const existingPosts = await prisma.collectedPost.findMany({
-        where: {
-          channelId: channel.id,
-          externalId: { in: externalIds },
-        },
-        select: { externalId: true },
+      // PostService.createBatch() 사용 (수동과 동일한 로직)
+      // - 중복 체크 (externalId 기준)
+      // - 이미지 로컬 다운로드
+      // - 일괄 생성
+      const batchResult = await postService.createBatch({
+        userId,
+        channelId: channel.id,
+        posts: bandPosts.map((post: any) => ({
+          externalId: post.post_key,
+          title: extractTitle(post.content),
+          content: post.content,
+          author: post.author?.name || undefined,
+          images: post.photos?.map((photo: any) => photo.url) || [],
+        })),
       })
-      const existingSet = new Set(existingPosts.map((p) => p.externalId))
 
-      // 새 게시물만 필터링
-      const newBandPosts = bandPosts.filter((p: any) => !existingSet.has(p.post_key))
-      channelResult.duplicates = bandPosts.length - newBandPosts.length
+      channelResult.newPosts = batchResult.successCount
+      channelResult.duplicates = batchResult.skippedCount
+      channelResult.failed = batchResult.failedCount
 
-      // 새 게시물 일괄 저장 (이미지 제외)
-      if (newBandPosts.length > 0) {
-        try {
-          // createMany로 일괄 생성 (이미지는 별도 처리)
-          await prisma.collectedPost.createMany({
-            data: newBandPosts.map((post: any) => ({
-              userId,
-              channelId: channel.id,
-              externalId: post.post_key,
-              title: extractTitle(post.content),
-              content: post.content,
-              author: post.author?.name || null,
-            })),
-            skipDuplicates: true,
-          })
-
-          // 생성된 게시물 조회하여 이미지 추가
-          const createdPosts = await prisma.collectedPost.findMany({
-            where: {
-              channelId: channel.id,
-              externalId: { in: newBandPosts.map((p: any) => p.post_key) },
-            },
-            select: { id: true, externalId: true },
-          })
-
-          const postIdMap = new Map(createdPosts.map((p) => [p.externalId, p.id]))
-
-          // 이미지 일괄 생성
-          const imageData: { postId: number; url: string; sortOrder: number }[] = []
-          for (const post of newBandPosts) {
-            const postId = postIdMap.get(post.post_key)
-            if (postId && post.photos?.length) {
-              for (let i = 0; i < post.photos.length; i++) {
-                imageData.push({
-                  postId,
-                  url: post.photos[i].url,
-                  sortOrder: i,
-                })
-              }
-            }
-          }
-
-          if (imageData.length > 0) {
-            await prisma.collectedPostImage.createMany({
-              data: imageData,
-              skipDuplicates: true,
-            })
-          }
-
-          channelResult.newPosts = newBandPosts.length
-        } catch (batchError: any) {
-          // 배치 저장 실패 시 개별 저장으로 폴백
-          console.log(`[Collection] Batch save failed, falling back to individual saves: ${batchError.message}`)
-          for (const post of newBandPosts) {
-            try {
-              await prisma.collectedPost.create({
-                data: {
-                  userId,
-                  channelId: channel.id,
-                  externalId: post.post_key,
-                  title: extractTitle(post.content),
-                  content: post.content,
-                  author: post.author?.name || null,
-                  images: {
-                    create: (post.photos || []).map((photo: any, index: number) => ({
-                      url: photo.url,
-                      sortOrder: index,
-                    })),
-                  },
-                },
-              })
-              channelResult.newPosts++
-            } catch (postError: any) {
-              channelResult.failed++
-              const errorMsg = truncateErrorMessage(postError.message, 200)
-              channelResult.errors.push(errorMsg)
-            }
-          }
+      // 실패한 항목의 에러 메시지 수집
+      for (const item of batchResult.results) {
+        if (!item.success && item.error) {
+          channelResult.errors.push(truncateErrorMessage(item.error, 200))
         }
       }
 
@@ -250,7 +184,7 @@ export async function runCollectionPipeline(
       totalDuplicates += channelResult.duplicates
 
       console.log(
-        `[Collection] ${channel.name}: ${channelResult.newPosts} new, ${channelResult.duplicates} duplicates`
+        `[Collection] ${channel.name}: ${channelResult.newPosts} new, ${channelResult.duplicates} duplicates, ${channelResult.failed} failed`
       )
 
       successChannels++

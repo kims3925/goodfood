@@ -195,15 +195,104 @@ export async function runPublishPipeline(
     publishedChannelsMap.set(product.id, new Set<number>(publishedChannelIds))
   }
 
-  // 진행 상황 초기화
-  let totalItems = productIds.length * retailChannels.length
+  // 진행 상황 추적 (초기화 제거 - executor.ts에서 누적 관리)
+  // totalItems는 실제 발행 대상(미발행 상품)만 누적
+  let totalItems = 0
   let currentSuccess = 0
   let currentFailed = 0
 
-  if (workflowLogId) {
-    await updateWorkflowProgress(workflowLogId, totalItems, 0, 0)
+  // =============================================
+  // 1. 쇼핑몰(Shop) 발행 먼저 수행
+  // =============================================
+  if (shopIds && shopIds.length > 0) {
+    console.log(`[Publish Pipeline] Publishing to ${shopIds.length} shop(s) first: ${shopIds.join(', ')}`)
+
+    for (const shopId of shopIds) {
+      // 취소 체크: 각 Shop 발행 전에 확인
+      if (await checkCancellation()) {
+        console.log(`[Publish Pipeline] Cancelled by user before shop ${shopId}`)
+        return {
+          success: false,
+          totalItems,
+          successCount: currentSuccess,
+          failedCount: currentFailed,
+          details: {
+            publishedProducts,
+            channelResults,
+            cancelled: true,
+          },
+          errors: [...errors, { itemId: 'cancelled', message: '사용자에 의해 취소됨', timestamp: new Date() }],
+        }
+      }
+      const shopResult = await publishService.publishShopBatch({
+        userId,
+        productIds,
+        shopId,
+      })
+
+      // Shop 결과를 channelResults에 추가 (명시적 타입 구분)
+      const shopChannelResult: ChannelPublishResult = {
+        targetType: 'SHOP',
+        targetId: shopId,
+        targetName: `Shop: ${shopResult.shopName}`,
+        attempted: shopResult.total,
+        success: shopResult.successCount,
+        failed: shopResult.failedCount,
+        skipped: shopResult.skippedCount,
+        errors: shopResult.errors,
+        // 하위 호환성을 위한 deprecated 필드
+        channelId: shopId,
+        channelName: `Shop: ${shopResult.shopName}`,
+      }
+      channelResults.push(shopChannelResult)
+
+      // 개별 상품 결과 추가
+      for (const productResult of shopResult.results) {
+        publishedProducts.push({
+          productId: productResult.productId,
+          targetType: 'SHOP',
+          targetId: shopId,
+          targetName: shopResult.shopName,
+          status: productResult.success
+            ? productResult.skipped
+              ? 'SKIPPED'
+              : 'SUCCESS'
+            : 'FAILED',
+          error: productResult.error,
+          // 하위 호환성을 위한 deprecated 필드
+          channelId: shopId,
+          channelName: `Shop: ${shopResult.shopName}`,
+        })
+
+        if (!productResult.success && productResult.error) {
+          errors.push({
+            itemId: `${productResult.productId}-shop-${shopId}`,
+            message: productResult.error,
+            timestamp: new Date(),
+          })
+        }
+      }
+
+      currentSuccess += shopResult.successCount
+      currentFailed += shopResult.failedCount
+      // 실제 발행 대상만 카운트 (이미 발행된 skipped 제외)
+      totalItems += shopResult.successCount + shopResult.failedCount
+
+      if (workflowLogId) {
+        await updateWorkflowProgress(workflowLogId, totalItems, currentSuccess, currentFailed, {
+          publish: {
+            channelResults,
+            publishedProducts: publishedProducts.slice(-10),
+            errors: errors.slice(-5),
+          },
+        })
+      }
+    }
   }
 
+  // =============================================
+  // 2. 소매채널(Band) 발행
+  // =============================================
   // PublishService를 사용하여 각 채널에 순차 발행 (실시간 진행 상황 추적)
   // 각 채널을 순차적으로 처리하면서 진행 상황을 업데이트
   for (const channel of retailChannels) {
@@ -229,16 +318,23 @@ export async function runPublishPipeline(
       return !publishedChannels || !publishedChannels.has(channel.id)
     })
 
+    // 실제 발행 대상 수만 totalItems에 누적
+    totalItems += unpublishedProductIds.length
+
     if (unpublishedProductIds.length === 0) {
       console.log(`[Publish Pipeline] All products already published to channel ${channel.id} (${channel.name})`)
       channelResults.push({
-        channelId: channel.id,
-        channelName: channel.name,
+        targetType: 'CHANNEL',
+        targetId: channel.id,
+        targetName: channel.name,
         attempted: 0,
         success: 0,
         failed: 0,
         skipped: productIds.length,
         errors: [],
+        // 하위 호환성을 위한 deprecated 필드
+        channelId: channel.id,
+        channelName: channel.name,
       })
       continue
     }
@@ -258,7 +354,9 @@ export async function runPublishPipeline(
         // 개별 상품 결과 추가
         publishedProducts.push({
           productId: productResult.productId,
-          channelId: productResult.channelId,
+          targetType: 'CHANNEL',
+          targetId: productResult.channelId,
+          targetName: channel.name,
           postKey: productResult.postKey,
           status: productResult.success
             ? productResult.skipped
@@ -266,6 +364,9 @@ export async function runPublishPipeline(
               : 'SUCCESS'
             : 'FAILED',
           error: productResult.error,
+          // 하위 호환성을 위한 deprecated 필드
+          channelId: productResult.channelId,
+          channelName: channel.name,
         })
 
         // 에러 수집
@@ -296,6 +397,22 @@ export async function runPublishPipeline(
       } : undefined,
     })
 
+    // 채널별 결과 변환 (세션 만료 체크 전에 먼저 추가)
+    const channelResult: ChannelPublishResult = {
+      targetType: 'CHANNEL',
+      targetId: result.channelId,
+      targetName: result.channelName,
+      attempted: result.total,
+      success: result.successCount,
+      failed: result.failedCount,
+      skipped: result.skippedCount,
+      errors: result.errors,
+      // 하위 호환성을 위한 deprecated 필드
+      channelId: result.channelId,
+      channelName: result.channelName,
+    }
+    channelResults.push(channelResult)
+
     // 세션 만료 에러 감지 - 파이프라인 일시 중지
     const sessionExpiredError = result.errors.find(e => isSessionExpiredError(e))
     if (sessionExpiredError && workflowLogId) {
@@ -303,7 +420,12 @@ export async function runPublishPipeline(
 
       // 아직 발행되지 않은 상품 ID들
       const remainingProductIds = unpublishedProductIds.filter(
-        id => !publishedProducts.some(p => p.productId === id && p.channelId === channel.id && p.status === 'SUCCESS')
+        id => !publishedProducts.some(p =>
+          p.productId === id &&
+          p.targetType === 'CHANNEL' &&
+          p.targetId === channel.id &&
+          p.status === 'SUCCESS'
+        )
       )
 
       // 세션 대기 상태로 변경
@@ -321,7 +443,7 @@ export async function runPublishPipeline(
         failedCount: currentFailed,
         details: {
           publishedProducts,
-          channelResults,
+          channelResults,  // 이제 현재 채널 결과가 포함됨
           waitingSession: true,
           pendingChannel: { id: channel.id, name: channel.name },
           pendingProductIds: remainingProductIds,
@@ -330,24 +452,14 @@ export async function runPublishPipeline(
       }
     }
 
-    // 채널별 결과 변환
-    const channelResult: ChannelPublishResult = {
-      channelId: result.channelId,
-      channelName: result.channelName,
-      attempted: result.total,
-      success: result.successCount,
-      failed: result.failedCount,
-      skipped: result.skippedCount,
-      errors: result.errors,
-    }
-    channelResults.push(channelResult)
-
     // onProgress가 없는 경우 (workflowLogId가 없는 경우) 여기서 결과 처리
     if (!workflowLogId) {
       for (const productResult of result.results) {
         publishedProducts.push({
           productId: productResult.productId,
-          channelId: productResult.channelId,
+          targetType: 'CHANNEL',
+          targetId: productResult.channelId,
+          targetName: channel.name,
           postKey: productResult.postKey,
           status: productResult.success
             ? productResult.skipped
@@ -355,6 +467,9 @@ export async function runPublishPipeline(
               : 'SUCCESS'
             : 'FAILED',
           error: productResult.error,
+          // 하위 호환성을 위한 deprecated 필드
+          channelId: productResult.channelId,
+          channelName: channel.name,
         })
 
         if (!productResult.success && productResult.error) {
@@ -370,85 +485,9 @@ export async function runPublishPipeline(
     }
   }
 
-  let totalSuccess = channelResults.reduce((sum, r) => sum + r.success, 0)
-  let totalFailed = channelResults.reduce((sum, r) => sum + r.failed, 0)
-
-  // 쇼핑몰에도 발행 (shopIds가 설정된 경우)
-  if (shopIds && shopIds.length > 0) {
-    console.log(`[Publish Pipeline] Also publishing to ${shopIds.length} shop(s): ${shopIds.join(', ')}`)
-
-    for (const shopId of shopIds) {
-      // 취소 체크: 각 Shop 발행 전에 확인
-      if (await checkCancellation()) {
-        console.log(`[Publish Pipeline] Cancelled by user before shop ${shopId}`)
-        return {
-          success: false,
-          totalItems,
-          successCount: totalSuccess,
-          failedCount: totalFailed,
-          details: {
-            publishedProducts,
-            channelResults,
-            cancelled: true,
-          },
-          errors: [...errors, { itemId: 'cancelled', message: '사용자에 의해 취소됨', timestamp: new Date() }],
-        }
-      }
-      const shopResult = await publishService.publishShopBatch({
-        userId,
-        productIds,
-        shopId,
-      })
-
-      // Shop 결과를 channelResults에 추가 (shopId를 음수로 구분)
-      const shopChannelResult: ChannelPublishResult = {
-        channelId: -shopId, // 음수로 표시하여 Shop임을 구분
-        channelName: `Shop: ${shopResult.shopName}`,
-        attempted: shopResult.total,
-        success: shopResult.successCount,
-        failed: shopResult.failedCount,
-        skipped: shopResult.skippedCount,
-        errors: shopResult.errors,
-      }
-      channelResults.push(shopChannelResult)
-
-      // 개별 상품 결과 추가
-      for (const productResult of shopResult.results) {
-        publishedProducts.push({
-          productId: productResult.productId,
-          channelId: -shopId,
-          status: productResult.success
-            ? productResult.skipped
-              ? 'SKIPPED'
-              : 'SUCCESS'
-            : 'FAILED',
-          error: productResult.error,
-        })
-
-        if (!productResult.success && productResult.error) {
-          errors.push({
-            itemId: `${productResult.productId}-shop-${shopId}`,
-            message: productResult.error,
-            timestamp: new Date(),
-          })
-        }
-      }
-
-      totalSuccess += shopResult.successCount
-      totalFailed += shopResult.failedCount
-      totalItems += productIds.length
-
-      if (workflowLogId) {
-        await updateWorkflowProgress(workflowLogId, totalItems, totalSuccess, totalFailed, {
-          publish: {
-            channelResults,
-            publishedProducts: publishedProducts.slice(-10),
-            errors: errors.slice(-5),
-          },
-        })
-      }
-    }
-  }
+  // 최종 결과 집계
+  const totalSuccess = currentSuccess
+  const totalFailed = currentFailed
 
   return {
     success: totalFailed === 0,

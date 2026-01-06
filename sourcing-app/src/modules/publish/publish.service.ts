@@ -294,7 +294,6 @@ export class PublishService {
             channelId,
             bandKey: channel.channelKey,
             bandName: channel.name,
-            bandPostUrl: channel.bandPostUrl || undefined,  // 저장된 URL로 직접 접속
             content: postContent,
             imageUrls,
           })
@@ -305,15 +304,6 @@ export class PublishService {
             imageCount = imageUrls.length
             playwrightSuccess = true
             console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
-
-            // 첫 접속 성공 시 bandPostUrl 저장 (아직 저장되지 않은 경우에만)
-            if (playwrightResult.bandPostUrl && !channel.bandPostUrl) {
-              console.log(`[PublishService] 밴드 URL 저장: ${playwrightResult.bandPostUrl}`)
-              await prisma.channel.update({
-                where: { id: channelId },
-                data: { bandPostUrl: playwrightResult.bandPostUrl },
-              })
-            }
 
             break
           } else {
@@ -974,7 +964,6 @@ export class PublishService {
             channelId,
             bandKey: channel.channelKey,
             bandName: channel.name,
-            bandPostUrl: channel.bandPostUrl || undefined,  // 저장된 URL로 직접 접속
             content: postContent,
             imageUrls,
             signal, // 취소 신호 전달
@@ -994,15 +983,6 @@ export class PublishService {
             imageCount = imageUrls.length
             playwrightSuccess = true
             console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
-
-            // 첫 접속 성공 시 bandPostUrl 저장 (아직 저장되지 않은 경우에만)
-            if (playwrightResult.bandPostUrl && !channel.bandPostUrl) {
-              console.log(`[PublishService] 밴드 URL 저장: ${playwrightResult.bandPostUrl}`)
-              await prisma.channel.update({
-                where: { id: channelId },
-                data: { bandPostUrl: playwrightResult.bandPostUrl },
-              })
-            }
 
             break
           } else {

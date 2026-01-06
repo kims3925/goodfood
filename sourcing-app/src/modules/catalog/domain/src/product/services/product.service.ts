@@ -1,7 +1,9 @@
-import prisma from '@bandauto/db'
+import prisma, { BundleShippingType, Product } from '@bandauto/db'
 import { productRepository } from '../repository/product.repository'
-import { deleteProductImageFiles } from '@/modules/utils/imageUtils'
+import { deleteProductImageFiles, downloadAndSaveProductImages } from '@/modules/utils/imageUtils'
 import type { ProductListParams, ProductCreateInput, ProductUpdateInput, OptionGroupInput, VariantInput } from '../types/product.types'
+import type { BatchResult, ProgressCallback } from '@/types/batch.types'
+import { createEmptyBatchResult } from '@/types/batch.types'
 
 export class ProductService {
   async getList(params: ProductListParams) {
@@ -208,6 +210,211 @@ export class ProductService {
     })
 
     return productRepository.delete(id)
+  }
+
+  /**
+   * CollectedProduct 배열에서 Product 배치 생성 (자동화 파이프라인에서 사용)
+   *
+   * @param params.userId 사용자 ID
+   * @param params.collectedProductIds 수집상품 ID 배열
+   * @param params.onProgress 진행 콜백 (선택)
+   */
+  async createFromCollectedProducts(params: {
+    userId: number
+    collectedProductIds: number[]
+    onProgress?: ProgressCallback<Product>
+  }): Promise<BatchResult<Product>> {
+    const { userId, collectedProductIds, onProgress } = params
+    const result = createEmptyBatchResult<Product>()
+
+    if (collectedProductIds.length === 0) {
+      return result
+    }
+
+    // CollectedProduct 조회
+    const collectedProducts = await prisma.collectedProduct.findMany({
+      where: {
+        id: { in: collectedProductIds },
+        userId,
+        isConverted: false, // 아직 변환되지 않은 수집상품만
+      },
+      include: {
+        post: {
+          include: {
+            images: {
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
+      },
+    })
+
+    result.total = collectedProductIds.length
+    result.skippedCount = collectedProductIds.length - collectedProducts.length
+
+    console.log(`[ProductService.createFromCollectedProducts] Total: ${collectedProductIds.length}, Found: ${collectedProducts.length}, Skipped: ${result.skippedCount}`)
+
+    for (let i = 0; i < collectedProducts.length; i++) {
+      const collectedProduct = collectedProducts[i]
+
+      try {
+        // rawMetadata에서 AI 분석 결과 추출
+        let metadata: any = {}
+        if (collectedProduct.rawMetadata) {
+          try {
+            metadata = typeof collectedProduct.rawMetadata === 'string'
+              ? JSON.parse(collectedProduct.rawMetadata)
+              : collectedProduct.rawMetadata
+          } catch {
+            // 파싱 실패 시 빈 객체 사용
+          }
+        }
+
+        const options = metadata.options || []
+        const variants = metadata.variants || []
+        const wholesalePrice = metadata.wholesalePrice ?? null
+        const price = metadata.price ?? null
+        const shipping = metadata.shipping || {
+          shippingFee: metadata.shippingFee ?? null,
+          shippingInfo: metadata.shippingInfo ?? null,
+        }
+        const bundleMaxQty = metadata.bundleMaxQty ?? metadata.shipping?.bundleMaxQty ?? null
+
+        // 합배송 타입 자동 추론
+        let bundleShippingType: BundleShippingType = BundleShippingType.NONE
+        const shippingInfoStr = String(shipping.shippingInfo || '')
+        const shippingFeeNum = typeof shipping.shippingFee === 'number' ? shipping.shippingFee : 0
+
+        const isShippingIncluded = /배송비\s*포함|택배비\s*포함|무료\s*배송|배송\s*무료/.test(shippingInfoStr)
+
+        if (isShippingIncluded) {
+          bundleShippingType = BundleShippingType.INCLUDED
+        } else if (shippingFeeNum > 0) {
+          bundleShippingType = BundleShippingType.SEPARATE
+        }
+
+        // 게시물 이미지 URL 수집
+        const imageUrls = collectedProduct.post.images.map((img) => img.url)
+
+        // 이미지 다운로드 (트랜잭션 외부에서 수행 - 외부 I/O)
+        let downloadedImages: Awaited<ReturnType<typeof downloadAndSaveProductImages>> = []
+        if (imageUrls.length > 0) {
+          try {
+            downloadedImages = await downloadAndSaveProductImages(imageUrls)
+          } catch (imageError) {
+            // 이미지 실패해도 상품 생성은 계속 진행
+            console.error(`[ProductService.createFromCollectedProducts] Image download failed for collectedProduct ${collectedProduct.id}:`, imageError)
+          }
+        }
+
+        // 트랜잭션으로 다중 테이블 변경 처리
+        const product = await prisma.$transaction(async (tx) => {
+          // 1. Product 생성
+          const newProduct = await tx.product.create({
+            data: {
+              userId,
+              channelId: collectedProduct.post.channelId,
+              name: collectedProduct.name || '상품명 없음',
+              description: collectedProduct.description || null,
+              categoryId: metadata.category || null,
+              currency: collectedProduct.currency || 'KRW',
+              wholesalePrice: typeof wholesalePrice === 'number' ? wholesalePrice : null,
+              price: typeof price === 'number' ? price : null,
+              shippingFee: typeof shipping.shippingFee === 'number' ? shipping.shippingFee : null,
+              shippingInfo: typeof shipping.shippingInfo === 'string' ? shipping.shippingInfo : null,
+              bundleMaxQty: typeof bundleMaxQty === 'number' ? bundleMaxQty : null,
+              bundleShippingType,
+              thumbnailUrl: collectedProduct.post.images[0]?.url || null,
+              options: options.length
+                ? {
+                    create: options.flatMap((opt: any, groupIndex: number) =>
+                      (opt.values || []).map((value: string, valueIndex: number) => ({
+                        groupName: opt.groupName,
+                        value,
+                        sortOrder: groupIndex * 100 + valueIndex,
+                      }))
+                    ),
+                  }
+                : undefined,
+              variants: variants.length
+                ? {
+                    create: variants.map((v: any) => ({
+                      optionSummary: v.optionSummary ?? null,
+                      wholesalePrice: v.wholesalePrice ?? null,
+                      price: v.price ?? 0,
+                    })),
+                  }
+                : undefined,
+            },
+          })
+
+          // 2. ProductImage 저장 및 썸네일 업데이트
+          if (downloadedImages.length > 0) {
+            await tx.productImage.createMany({
+              data: downloadedImages.map((img, index) => ({
+                productId: newProduct.id,
+                url: img.url,
+                fileHash: img.fileHash,
+                fileName: img.fileName,
+                fileSize: img.fileSize,
+                sortOrder: index,
+              })),
+            })
+
+            await tx.product.update({
+              where: { id: newProduct.id },
+              data: { thumbnailUrl: downloadedImages[0].url },
+            })
+          }
+
+          // 3. 수집상품의 isConverted를 true로 업데이트
+          await tx.collectedProduct.update({
+            where: { id: collectedProduct.id },
+            data: { isConverted: true },
+          })
+
+          return newProduct
+        })
+
+        result.successCount++
+        result.results.push({
+          success: true,
+          data: product,
+        })
+
+        if (onProgress) {
+          await onProgress({
+            current: i,
+            total: collectedProducts.length,
+            result: { success: true, data: product },
+            itemId: collectedProduct.id,
+          })
+        }
+
+        console.log(`[ProductService.createFromCollectedProducts] Created product ${product.id} from collectedProduct ${collectedProduct.id}`)
+      } catch (error: any) {
+        result.failedCount++
+        result.results.push({
+          success: false,
+          error: error.message || '상품 생성 실패',
+          errorType: 'PERMANENT',
+        })
+
+        if (onProgress) {
+          await onProgress({
+            current: i,
+            total: collectedProducts.length,
+            result: { success: false, error: error.message },
+            itemId: collectedProduct.id,
+          })
+        }
+
+        console.error(`[ProductService.createFromCollectedProducts] Failed for collectedProduct ${collectedProduct.id}:`, error.message)
+      }
+    }
+
+    console.log(`[ProductService.createFromCollectedProducts] Completed: ${result.successCount} success, ${result.failedCount} failed, ${result.skippedCount} skipped`)
+    return result
   }
 }
 

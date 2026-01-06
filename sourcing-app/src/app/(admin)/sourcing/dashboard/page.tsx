@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   ExternalLink,
   Send,
+  Loader2,
 } from 'lucide-react'
 import {
   LineChart,
@@ -298,7 +299,7 @@ export default function AutomationDashboardPage() {
       if (logsRes.ok) {
         try {
           const logsData = await logsRes.json()
-          if (logsData.success) setRecentLogs(logsData.data || [])
+          if (logsData.success) setRecentLogs(logsData.data?.logs || [])
         } catch (e) {
           console.error('logs 파싱 실패:', e)
         }
@@ -594,38 +595,38 @@ export default function AutomationDashboardPage() {
             const isOtherRunning = runningWorkflow && !isThisRunning
             return (
               <button
-                onClick={() => isThisRunning ? handleCancel() : handleExecute('collect')}
-                disabled={isExecuting || isOtherRunning || isCancelling}
+                onClick={() => handleExecute('collect')}
+                disabled={isExecuting || isOtherRunning || isCancelling || isThisRunning}
                 className={`group relative p-4 rounded-xl border-2 transition-all ${
                   isThisRunning
-                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    ? 'border-green-400 bg-green-50'
                     : 'border-gray-200 bg-white hover:border-green-400 hover:shadow-lg'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {isThisRunning && (
                   <div className="absolute -top-2 -right-2">
                     <span className="flex h-4 w-4">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500" />
                     </span>
                   </div>
                 )}
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
                   isThisRunning
-                    ? 'bg-red-500'
+                    ? 'bg-green-500'
                     : 'bg-green-100 group-hover:bg-green-500'
                 }`}>
                   {isThisRunning ? (
-                    <XCircle size={20} className="text-white" />
+                    <Loader2 size={20} className="text-white animate-spin" />
                   ) : (
                     <Package size={20} className="text-green-600 group-hover:text-white transition-colors" />
                   )}
                 </div>
-                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
-                  {isThisRunning ? '취소하기' : '게시물 수집'}
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-green-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '실행 중' : '게시물 수집'}
                 </p>
-                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
-                  {isThisRunning ? '클릭하여 중단' : '도매채널 게시물 수집'}
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-green-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '잠시만 기다려주세요' : '도매채널 게시물 수집'}
                 </p>
               </button>
             )
@@ -637,38 +638,38 @@ export default function AutomationDashboardPage() {
             const isOtherRunning = runningWorkflow && !isThisRunning
             return (
               <button
-                onClick={() => isThisRunning ? handleCancel() : handleExecute('transform')}
-                disabled={isExecuting || isOtherRunning || isCancelling}
+                onClick={() => handleExecute('transform')}
+                disabled={isExecuting || isOtherRunning || isCancelling || isThisRunning}
                 className={`group relative p-4 rounded-xl border-2 transition-all ${
                   isThisRunning
-                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    ? 'border-yellow-400 bg-yellow-50'
                     : 'border-gray-200 bg-white hover:border-yellow-400 hover:shadow-lg'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {isThisRunning && (
                   <div className="absolute -top-2 -right-2">
                     <span className="flex h-4 w-4">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-yellow-500" />
                     </span>
                   </div>
                 )}
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
                   isThisRunning
-                    ? 'bg-red-500'
+                    ? 'bg-yellow-500'
                     : 'bg-yellow-100 group-hover:bg-yellow-500'
                 }`}>
                   {isThisRunning ? (
-                    <XCircle size={20} className="text-white" />
+                    <Loader2 size={20} className="text-white animate-spin" />
                   ) : (
                     <Zap size={20} className="text-yellow-600 group-hover:text-white transition-colors" />
                   )}
                 </div>
-                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
-                  {isThisRunning ? '취소하기' : 'AI 변환'}
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-yellow-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '실행 중' : 'AI 변환'}
                 </p>
-                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
-                  {isThisRunning ? '클릭하여 중단' : '상품 정보 생성'}
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-yellow-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '잠시만 기다려주세요' : '상품 정보 생성'}
                 </p>
               </button>
             )
@@ -680,38 +681,38 @@ export default function AutomationDashboardPage() {
             const isOtherRunning = runningWorkflow && !isThisRunning
             return (
               <button
-                onClick={() => isThisRunning ? handleCancel() : handleExecute('register')}
-                disabled={isExecuting || isOtherRunning || isCancelling}
+                onClick={() => handleExecute('register')}
+                disabled={isExecuting || isOtherRunning || isCancelling || isThisRunning}
                 className={`group relative p-4 rounded-xl border-2 transition-all ${
                   isThisRunning
-                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    ? 'border-orange-400 bg-orange-50'
                     : 'border-gray-200 bg-white hover:border-orange-400 hover:shadow-lg'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {isThisRunning && (
                   <div className="absolute -top-2 -right-2">
                     <span className="flex h-4 w-4">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-orange-500" />
                     </span>
                   </div>
                 )}
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
                   isThisRunning
-                    ? 'bg-red-500'
+                    ? 'bg-orange-500'
                     : 'bg-orange-100 group-hover:bg-orange-500'
                 }`}>
                   {isThisRunning ? (
-                    <XCircle size={20} className="text-white" />
+                    <Loader2 size={20} className="text-white animate-spin" />
                   ) : (
                     <ShoppingBag size={20} className="text-orange-600 group-hover:text-white transition-colors" />
                   )}
                 </div>
-                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
-                  {isThisRunning ? '취소하기' : '상품 등록'}
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-orange-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '실행 중' : '상품 등록'}
                 </p>
-                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
-                  {isThisRunning ? '클릭하여 중단' : 'Product 생성'}
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-orange-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '잠시만 기다려주세요' : 'Product 생성'}
                 </p>
               </button>
             )
@@ -723,38 +724,38 @@ export default function AutomationDashboardPage() {
             const isOtherRunning = runningWorkflow && !isThisRunning
             return (
               <button
-                onClick={() => isThisRunning ? handleCancel() : handleExecute('publish')}
-                disabled={isExecuting || isOtherRunning || isCancelling}
+                onClick={() => handleExecute('publish')}
+                disabled={isExecuting || isOtherRunning || isCancelling || isThisRunning}
                 className={`group relative p-4 rounded-xl border-2 transition-all ${
                   isThisRunning
-                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    ? 'border-blue-400 bg-blue-50'
                     : 'border-gray-200 bg-white hover:border-blue-400 hover:shadow-lg'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {isThisRunning && (
                   <div className="absolute -top-2 -right-2">
                     <span className="flex h-4 w-4">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-500" />
                     </span>
                   </div>
                 )}
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
                   isThisRunning
-                    ? 'bg-red-500'
+                    ? 'bg-blue-500'
                     : 'bg-blue-100 group-hover:bg-blue-500'
                 }`}>
                   {isThisRunning ? (
-                    <XCircle size={20} className="text-white" />
+                    <Loader2 size={20} className="text-white animate-spin" />
                   ) : (
                     <Upload size={20} className="text-blue-600 group-hover:text-white transition-colors" />
                   )}
                 </div>
-                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
-                  {isThisRunning ? '취소하기' : '발행'}
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-blue-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '실행 중' : '발행'}
                 </p>
-                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
-                  {isThisRunning ? '클릭하여 중단' : '소매밴드 발행'}
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-blue-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '잠시만 기다려주세요' : '소매밴드 발행'}
                 </p>
               </button>
             )
@@ -766,38 +767,38 @@ export default function AutomationDashboardPage() {
             const isOtherRunning = runningWorkflow && !isThisRunning
             return (
               <button
-                onClick={() => isThisRunning ? handleCancel() : handleExecute('full')}
-                disabled={isExecuting || isOtherRunning || isCancelling}
+                onClick={() => handleExecute('full')}
+                disabled={isExecuting || isOtherRunning || isCancelling || isThisRunning}
                 className={`group relative p-4 rounded-xl border-2 transition-all ${
                   isThisRunning
-                    ? 'border-red-400 bg-red-50 hover:border-red-500 hover:bg-red-100'
+                    ? 'border-purple-400 bg-purple-50'
                     : 'border-purple-200 bg-gradient-to-br from-purple-50 to-white hover:border-purple-400 hover:shadow-lg'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {isThisRunning && (
                   <div className="absolute -top-2 -right-2">
                     <span className="flex h-4 w-4">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-purple-500" />
                     </span>
                   </div>
                 )}
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
                   isThisRunning
-                    ? 'bg-red-500'
+                    ? 'bg-purple-500'
                     : 'bg-purple-100 group-hover:bg-purple-500'
                 }`}>
                   {isThisRunning ? (
-                    <XCircle size={20} className="text-white" />
+                    <Loader2 size={20} className="text-white animate-spin" />
                   ) : (
                     <Play size={20} className="text-purple-600 group-hover:text-white transition-colors" />
                   )}
                 </div>
-                <p className={`font-medium text-sm ${isThisRunning ? 'text-red-700' : 'text-gray-900'}`}>
-                  {isThisRunning ? '취소하기' : '전체 실행'}
+                <p className={`font-medium text-sm ${isThisRunning ? 'text-purple-700' : 'text-gray-900'}`}>
+                  {isThisRunning ? '실행 중' : '전체 실행'}
                 </p>
-                <p className={`text-xs mt-1 ${isThisRunning ? 'text-red-500' : 'text-gray-500'}`}>
-                  {isThisRunning ? '클릭하여 중단' : '전체 파이프라인'}
+                <p className={`text-xs mt-1 ${isThisRunning ? 'text-purple-500' : 'text-gray-500'}`}>
+                  {isThisRunning ? '잠시만 기다려주세요' : '전체 파이프라인'}
                 </p>
               </button>
             )
@@ -1077,11 +1078,8 @@ export default function AutomationDashboardPage() {
                     <span className="text-2xl font-bold text-gray-900">
                       {(publishProgress?.success !== undefined
                         ? publishProgress.success
-                        : stats?.todayPublished) ?? 0}
+                        : stats?.todayPublished) ?? '0'}
                     </span>
-                    {isPublishActive && publishProgress?.failed && publishProgress.failed > 0 && (
-                      <span className="text-sm text-red-500">({publishProgress.failed} 실패)</span>
-                    )}
                   </div>
                   {isPublishActive && (
                     <div className="absolute -top-2 -right-2">
@@ -1623,9 +1621,6 @@ export default function AutomationDashboardPage() {
                       <span className="text-gray-600">발행</span>
                       <span className="text-blue-600 font-medium">
                         {runningWorkflow.stageProgress.publish.success}건 성공
-                        {runningWorkflow.stageProgress.publish.failed > 0 && (
-                          <span className="text-red-500 ml-1">({runningWorkflow.stageProgress.publish.failed}건 실패)</span>
-                        )}
                       </span>
                     </div>
                   )}
@@ -1766,19 +1761,6 @@ export default function AutomationDashboardPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-semibold text-gray-900">{getTypeName(log.type)}</span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                        isSuccess ? 'bg-green-100 text-green-700' :
-                        isFailed ? 'bg-red-100 text-red-700' :
-                        'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {isSuccess ? (
-                          <><CheckCircle size={12} /> 성공</>
-                        ) : isFailed ? (
-                          <><AlertCircle size={12} /> 실패</>
-                        ) : (
-                          <><RefreshCw size={12} className="animate-spin" /> 실행중</>
-                        )}
-                      </span>
                     </div>
                     <div className="flex items-center gap-3 text-sm text-gray-500">
                       <span className="flex items-center gap-1">
@@ -1792,26 +1774,19 @@ export default function AutomationDashboardPage() {
                     </div>
                   </div>
 
-                  {/* Item Count Badge */}
-                  <div className={`flex-shrink-0 flex flex-col items-center px-4 py-2 rounded-xl ${
-                    isSuccess ? 'bg-green-100' :
-                    isFailed ? 'bg-red-100' :
-                    'bg-yellow-100'
+                  {/* Status Badge */}
+                  <div className={`flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium ${
+                    isSuccess ? 'bg-green-100 text-green-700' :
+                    isFailed ? 'bg-red-100 text-red-700' :
+                    'bg-yellow-100 text-yellow-700'
                   }`}>
-                    <span className={`text-xl font-bold ${
-                      isSuccess ? 'text-green-700' :
-                      isFailed ? 'text-red-700' :
-                      'text-yellow-700'
-                    }`}>
-                      {log.itemCount}
-                    </span>
-                    <span className={`text-xs ${
-                      isSuccess ? 'text-green-600' :
-                      isFailed ? 'text-red-600' :
-                      'text-yellow-600'
-                    }`}>
-                      처리
-                    </span>
+                    {isRunning ? (
+                      <><RefreshCw size={14} className="animate-spin" /> 실행중</>
+                    ) : isSuccess ? (
+                      <><CheckCircle size={14} /> 성공</>
+                    ) : (
+                      <><AlertCircle size={14} /> 실패</>
+                    )}
                   </div>
                 </div>
               )

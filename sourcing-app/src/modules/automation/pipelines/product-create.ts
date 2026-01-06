@@ -4,12 +4,14 @@
  *
  * Transform 파이프라인 이후, Publish 파이프라인 이전에 실행됨
  * CollectedProduct의 rawMetadata에 저장된 AI 분석 결과를 사용하여 Product 생성
+ *
+ * 수동 실행과 동일한 서비스 레이어(ProductService) 사용으로 통일
  */
 
-import prisma, { BundleShippingType } from '@bandauto/db'
+import prisma from '@bandauto/db'
 import { getBatchContext, checkCancellation } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
-import { downloadAndSaveProductImages } from '@/modules/utils/imageUtils'
+import { productService } from '@/modules/catalog/domain/src/product/services/product.service'
 import {
   ProductCreateConfig,
   ProductCreateResult,
@@ -96,196 +98,95 @@ export async function runProductCreatePipeline(
   const pipelineStartTime = Date.now()
   let consecutiveFailures = 0
 
-  // 각 수집상품 처리
-  for (const collectedProduct of collectedProducts) {
-    // 취소 체크: 각 상품 생성 전에 확인
-    if (await checkCancellation()) {
-      console.log(`[ProductCreate] Cancelled by user`)
-      return {
-        success: false,
-        totalItems: collectedProducts.length,
-        successCount: createdProducts.filter((p) => p.status === 'success').length,
-        failedCount: createdProducts.filter((p) => p.status === 'failed').length,
-        details: {
-          createdProducts,
-          totalCreated,
-          cancelled: true,
-        },
-        errors: [...errors, { itemId: 0, message: '사용자에 의해 취소됨', timestamp: new Date() }],
+  // ProductService.createFromCollectedProducts() 사용 (수동과 동일한 로직)
+  // 진행 콜백을 통해 취소, 타임아웃, 연속실패 체크 및 진행 업데이트
+  const collectedProductIds = collectedProducts.map(cp => cp.id)
+
+  const batchResult = await productService.createFromCollectedProducts({
+    userId,
+    collectedProductIds,
+    onProgress: async ({ current, total, result: itemResult, itemId }) => {
+      // 취소 체크
+      if (await checkCancellation()) {
+        throw new Error('CANCELLED_BY_USER')
       }
-    }
 
-    // 파이프라인 타임아웃 체크
-    if (Date.now() - pipelineStartTime > PIPELINE_TIMEOUT_MS) {
-      console.log(`[ProductCreate] Pipeline timeout reached, stopping...`)
-      errors.push({
-        itemId: 0,
-        message: `파이프라인 실행 시간이 초과되었습니다. 나머지 항목은 다음 실행에서 처리됩니다.`,
-        timestamp: new Date(),
-      })
-      break
-    }
+      // 타임아웃 체크
+      if (Date.now() - pipelineStartTime > PIPELINE_TIMEOUT_MS) {
+        throw new Error('PIPELINE_TIMEOUT')
+      }
 
-    // 연속 실패 체크
-    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-      console.log(`[ProductCreate] Too many consecutive failures, stopping...`)
-      errors.push({
-        itemId: 0,
-        message: `연속 ${MAX_CONSECUTIVE_FAILURES}회 실패로 파이프라인이 중단되었습니다.`,
-        timestamp: new Date(),
-      })
-      break
-    }
-
-    const result: CreatedProductResult = {
-      channelId: collectedProduct.id,
-      status: 'pending' as any,
-    }
-
-    try {
-      // rawMetadata에서 AI 분석 결과 추출
-      let metadata: any = {}
-      if (collectedProduct.rawMetadata) {
-        try {
-          metadata = typeof collectedProduct.rawMetadata === 'string'
-            ? JSON.parse(collectedProduct.rawMetadata)
-            : collectedProduct.rawMetadata
-        } catch {
-          // 파싱 실패 시 빈 객체 사용
+      // 연속 실패 체크
+      if (!itemResult.success) {
+        consecutiveFailures++
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          throw new Error('TOO_MANY_FAILURES')
         }
-      }
-      const options = metadata.options || []
-      const variants = metadata.variants || []
-      const wholesalePrice = metadata.wholesalePrice ?? null
-      const price = metadata.price ?? null
-      const shipping = metadata.shipping || {
-        shippingFee: metadata.shippingFee ?? null,
-        shippingInfo: metadata.shippingInfo ?? null,
-      }
-      const bundleMaxQty = metadata.bundleMaxQty ?? metadata.shipping?.bundleMaxQty ?? null
-
-      // 합배송 타입 자동 추론
-      // 1. shippingInfo에 "배송비 포함", "택배비 포함", "무료배송" 등 명확한 패턴이 있으면 → INCLUDED
-      // 2. shippingFee > 0 이면 → SEPARATE (배송비 별도형)
-      // 3. 그 외 → NONE
-      let bundleShippingType: BundleShippingType = BundleShippingType.NONE
-      const shippingInfoStr = String(shipping.shippingInfo || '')
-      const shippingFeeNum = typeof shipping.shippingFee === 'number' ? shipping.shippingFee : 0
-
-      // "배송비 포함", "택배비 포함", "무료배송" 등 명확한 패턴만 INCLUDED로 판단
-      // 단순히 "포함"만 있으면 "합배송 포함" 같은 오탐 발생
-      const isShippingIncluded = /배송비\s*포함|택배비\s*포함|무료\s*배송|배송\s*무료/.test(shippingInfoStr)
-
-      if (isShippingIncluded) {
-        bundleShippingType = BundleShippingType.INCLUDED
-      } else if (shippingFeeNum > 0) {
-        bundleShippingType = BundleShippingType.SEPARATE
+      } else {
+        consecutiveFailures = 0
       }
 
-      // 게시물 이미지 URL 수집
-      const imageUrls = collectedProduct.post.images.map((img) => img.url)
+      // 결과 수집 (서비스에서 전달된 itemId 사용으로 인덱스 불일치 문제 해결)
+      const collectedProductId = itemId ?? collectedProducts[current]?.id ?? 0
+      const createdResult: CreatedProductResult = {
+        channelId: collectedProductId,
+        status: itemResult.success ? 'success' : 'failed',
+        productId: itemResult.data?.id,
+        productName: itemResult.data?.name,
+        error: itemResult.error,
+      }
+      createdProducts.push(createdResult)
 
-      // Product 생성
-      const product = await prisma.product.create({
-        data: {
-          userId,
-          channelId: collectedProduct.post.channelId,
-          name: collectedProduct.name || '상품명 없음',
-          description: collectedProduct.description || null,
-          categoryId: metadata.category || null,
-          currency: collectedProduct.currency || 'KRW',
-          wholesalePrice: typeof wholesalePrice === 'number' ? wholesalePrice : null,
-          price: typeof price === 'number' ? price : null,
-          shippingFee: typeof shipping.shippingFee === 'number' ? shipping.shippingFee : null,
-          shippingInfo: typeof shipping.shippingInfo === 'string' ? shipping.shippingInfo : null,
-          bundleMaxQty: typeof bundleMaxQty === 'number' ? bundleMaxQty : null,
-          bundleShippingType,
-          thumbnailUrl: collectedProduct.post.images[0]?.url || null,
-          options: options.length
-            ? {
-                create: options.flatMap((opt: any, groupIndex: number) =>
-                  (opt.values || []).map((value: string, valueIndex: number) => ({
-                    groupName: opt.groupName,
-                    value,
-                    sortOrder: groupIndex * 100 + valueIndex,
-                  }))
-                ),
-              }
-            : undefined,
-          variants: variants.length
-            ? {
-                create: variants.map((v: any) => ({
-                  optionSummary: v.optionSummary ?? null,
-                  wholesalePrice: v.wholesalePrice ?? null,  // ?? 사용하여 0도 유지
-                  price: v.price ?? 0,
-                })),
-              }
-            : undefined,
-        },
-      })
-
-      // 이미지 다운로드 및 ProductImage 저장
-      if (imageUrls.length > 0) {
-        try {
-          const downloadedImages = await downloadAndSaveProductImages(imageUrls)
-
-          if (downloadedImages.length > 0) {
-            await prisma.productImage.createMany({
-              data: downloadedImages.map((img, index) => ({
-                productId: product.id,
-                url: img.url,
-                fileHash: img.fileHash,
-                fileName: img.fileName,
-                fileSize: img.fileSize,
-                sortOrder: index,
-              })),
-            })
-
-            await prisma.product.update({
-              where: { id: product.id },
-              data: { thumbnailUrl: downloadedImages[0].url },
-            })
-          }
-        } catch {
-          // 이미지 실패해도 상품 생성은 성공으로 처리
-        }
+      if (itemResult.success) {
+        totalCreated++
+      } else if (itemResult.error) {
+        errors.push({
+          itemId: collectedProductId,
+          message: itemResult.error,
+          timestamp: new Date(),
+        })
       }
 
-      // 수집상품의 isConverted를 true로 업데이트
-      await prisma.collectedProduct.update({
-        where: { id: collectedProduct.id },
-        data: { isConverted: true },
-      })
-
-      result.status = 'success'
-      result.productId = product.id
-      result.productName = product.name
-      totalCreated++
-      consecutiveFailures = 0
-    } catch (error: any) {
-      result.status = 'failed'
-      result.error = error.message
-      consecutiveFailures++
-      errors.push({
-        itemId: collectedProduct.id,
-        message: error.message,
-        timestamp: new Date(),
-      })
+      // 진행 상황 및 details 실시간 업데이트
+      if (workflowLogId) {
+        const currentSuccess = createdProducts.filter((p) => p.status === 'success').length
+        const currentFailed = createdProducts.filter((p) => p.status === 'failed').length
+        await updateWorkflowProgress(workflowLogId, collectedProducts.length, currentSuccess, currentFailed, {
+          productCreate: {
+            createdProducts: createdProducts.slice(-10),
+            totalCreated,
+            errors: errors.slice(-5),
+          },
+        })
+      }
+    },
+  }).catch((error: Error) => {
+    // 조기 종료 처리
+    if (error.message === 'CANCELLED_BY_USER') {
+      errors.push({ itemId: 0, message: '사용자에 의해 취소됨', timestamp: new Date() })
+    } else if (error.message === 'PIPELINE_TIMEOUT') {
+      errors.push({ itemId: 0, message: '파이프라인 실행 시간이 초과되었습니다.', timestamp: new Date() })
+    } else if (error.message === 'TOO_MANY_FAILURES') {
+      errors.push({ itemId: 0, message: `연속 ${MAX_CONSECUTIVE_FAILURES}회 실패로 파이프라인이 중단되었습니다.`, timestamp: new Date() })
+    } else {
+      throw error
     }
+    return null
+  })
 
-    createdProducts.push(result)
-
-    // 진행 상황 및 details 실시간 업데이트
-    if (workflowLogId) {
-      const currentSuccess = createdProducts.filter((p) => p.status === 'success').length
-      const currentFailed = createdProducts.filter((p) => p.status === 'failed').length
-      await updateWorkflowProgress(workflowLogId, collectedProducts.length, currentSuccess, currentFailed, {
-        productCreate: {
-          createdProducts: createdProducts.slice(-10), // 최근 10개만 저장 (메모리 절약)
-          totalCreated,
-          errors: errors.slice(-5), // 최근 5개 에러만
-        },
-      })
+  // 조기 종료된 경우
+  if (!batchResult) {
+    return {
+      success: false,
+      totalItems: collectedProducts.length,
+      successCount: createdProducts.filter((p) => p.status === 'success').length,
+      failedCount: createdProducts.filter((p) => p.status === 'failed').length,
+      details: {
+        createdProducts,
+        totalCreated,
+        cancelled: errors.some(e => e.message.includes('취소')),
+      },
+      errors,
     }
   }
 

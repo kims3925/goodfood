@@ -1,15 +1,10 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'NodeJS-24'
-    }
-
     environment {
         PROJECT_PATH = '/home/ubuntu/bandauto'
-        NEXTAUTH_SECRET = credentials('nextauth-secret')
-        GUEST_TOKEN_SECRET = credentials('guest-secret')
-        JWT_SECRET = credentials('jwt-secret')
+        DEPLOY_SERVER = '43.200.225.91'
+        DEPLOY_USER = 'ubuntu'
     }
 
     options {
@@ -50,9 +45,10 @@ pipeline {
 
             steps {
                 echo 'Deploying application...'
-                // 전체 스크립트를 ubuntu 유저로 실행 (파일 소유권 통일)
-                sh '''
-                    sudo -u ubuntu bash << 'DEPLOY_EOF'
+                // SSH로 운영 서버에 접속하여 배포 스크립트 실행
+                sshagent(['deploy-ssh-key']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_SERVER} 'bash -s' << 'DEPLOY_EOF'
 cd /home/ubuntu/bandauto
 
 echo "=== Starting deployment ==="
@@ -230,7 +226,8 @@ pm2 status
 
 echo "=== Deployment completed! ==="
 DEPLOY_EOF
-                '''
+                    '''
+                }
             }
         }
     }

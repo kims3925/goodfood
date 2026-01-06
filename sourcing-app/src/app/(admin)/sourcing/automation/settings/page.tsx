@@ -768,15 +768,6 @@ export default function AutomationSettingsPage() {
         </div>
       </div>
 
-      {/* 파이프라인 실행 상태 패널 */}
-      {isPipelineRunning && pipelineStatus && (
-        <PipelineStatusPanel
-          workflow={pipelineStatus}
-          onCancel={handleCancelPipeline}
-          isCancelling={isCancelling}
-        />
-      )}
-
       {/* Schedule Settings - 독립 섹션 */}
       <Card className={`overflow-hidden transition-all ${warningSections.includes('schedule') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasScheduleProblem ? 'ring-2 ring-red-300' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
