@@ -31,15 +31,15 @@ import {
 // PROCESSING CONFIGURATION
 // =============================================
 
-// 배치 처리 설정
-const BATCH_SIZE = 10  // 10개 게시물/요청
+// 배치 처리 설정 (유료 API용: 1개씩 순차 처리)
+const BATCH_SIZE = 1  // 1개 게시물/요청 (유료 API는 rate limit 충분)
 
 // 전체 파이프라인 타임아웃 (없음 - 모든 게시물 처리)
 const PIPELINE_TIMEOUT_MS = 0  // 타임아웃 비활성화
 
 // 재시도 설정 (TRANSIENT 에러 대응)
 const MAX_RETRIES = 3
-const RETRY_DELAY_MS = 10000  // 10초 (재시도마다 10s, 20s, 30s)
+const RETRY_DELAY_MS = 5000  // 5초 (재시도마다 5s, 10s, 15s)
 
 // =============================================
 // MODEL-SPECIFIC RATE LIMITS
@@ -83,17 +83,12 @@ function getModelRateLimit(provider: AiProvider, model: string): ModelRateLimit 
 
 /**
  * 모델에 따른 요청 간 대기 시간 계산 (밀리초)
- * RPM 기준으로 계산: 60초 / RPM + 버퍼(1초)
+ * 유료 API는 rate limit이 충분하므로 대기 없이 순차 처리
  */
 function getRequestIntervalMs(provider: AiProvider, model: string): number {
-  const rateLimit = getModelRateLimit(provider, model)
-
-  // 60초 / RPM + 1초 버퍼 (안전 마진)
-  const intervalMs = Math.ceil((60000 / rateLimit.rpm) + 1000)
-
-  console.log(`[Transform] Model ${model} (${provider}): RPM=${rateLimit.rpm}, interval=${intervalMs}ms`)
-
-  return intervalMs
+  // 유료 API: 대기 시간 없음 (응답 오면 바로 다음 요청)
+  console.log(`[Transform] Model ${model} (${provider}): No delay (paid API)`)
+  return 0
 }
 
 /**
@@ -229,11 +224,8 @@ export async function runTransformPipeline(
 
   console.log(`[Transform] Found ${posts.length} posts to transform`)
 
-  // 진행 상황 초기화
+  // workflowLogId 참조만 유지 (초기화 제거 - executor.ts에서 누적 관리)
   const { workflowLogId } = context
-  if (workflowLogId) {
-    await updateWorkflowProgress(workflowLogId, posts.length, 0, 0)
-  }
 
   // 파이프라인 시작 시간 기록
   const pipelineStartTime = Date.now()
@@ -270,13 +262,13 @@ export async function runTransformPipeline(
     fallbackPolicyContent = policy?.content || null
   }
 
-  // 모델에 따른 Rate Limit 정보 조회
+  // 모델에 따른 Rate Limit 정보 조회 (유료 API 모니터링용)
   const rateLimit = getModelRateLimit(config.aiProvider, aiConfig.model)
-  const requestIntervalMs = getRequestIntervalMs(config.aiProvider, aiConfig.model)
+  getRequestIntervalMs(config.aiProvider, aiConfig.model)  // 로그 출력용
 
   // 일일 사용량 체크 및 리셋
   const currentDailyUsage = await checkAndResetDailyUsage(aiConfig.id)
-  console.log(`[Transform] Daily usage: ${currentDailyUsage}/${rateLimit.rpd} RPD`)
+  console.log(`[Transform] Daily usage: ${currentDailyUsage} (paid API - no limit)`)
 
   // 채널별로 게시물 그룹화 (같은 채널은 같은 정책 적용)
   const postsByChannel = new Map<number, typeof posts>()
@@ -308,31 +300,12 @@ export async function runTransformPipeline(
     }
   }
 
-  console.log(`[Transform] Split into ${batches.length} batches across ${postsByChannel.size} channels (interval: ${requestIntervalMs / 1000}s)`)
+  console.log(`[Transform] Processing ${batches.length} posts across ${postsByChannel.size} channels (sequential, no delay)`)
 
-  // 각 배치 처리 (RPD 제한 적용)
+  // 순차 처리 (유료 API: RPD 제한 체크 비활성화)
   let currentRpdUsage = currentDailyUsage
   for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-    // RPD 제한 체크: 처리 전에 확인
-    if (currentRpdUsage >= rateLimit.rpd) {
-      console.log(`[Transform] RPD limit reached (${currentRpdUsage}/${rateLimit.rpd}). Stopping.`)
-      const remainingPosts = batches.slice(batchIndex).flatMap(b => b.posts)
-      errors.push({
-        itemId: 0,
-        message: `일일 API 호출 한도(${rateLimit.rpd}회)에 도달하여 ${remainingPosts.length}개 게시물을 처리하지 못했습니다.`,
-        timestamp: new Date(),
-      })
-      // 남은 게시물들을 retryable로 표시
-      for (const post of remainingPosts) {
-        transformedPosts.push({
-          postId: post.id,
-          status: 'skipped',
-          error: 'RPD 한도 초과',
-          retryable: true,
-        })
-      }
-      break
-    }
+    // 유료 API는 RPD 한도가 충분하므로 체크 생략
 
     // 취소 체크: 각 배치 처리 전에 확인
     if (await checkCancellation()) {
@@ -356,13 +329,8 @@ export async function runTransformPipeline(
     const batch = batches[batchIndex]
     const { posts: batchPosts, channelId: batchChannelId, policyContent: batchPolicyContent } = batch
 
-    // 첫 번째 요청이 아니면 대기 (RPM 제한 대응)
-    if (batchIndex > 0) {
-      console.log(`[Transform] Waiting ${requestIntervalMs / 1000}s before next request...`)
-      await new Promise((resolve) => setTimeout(resolve, requestIntervalMs))
-    }
-
-    console.log(`[Transform] Processing batch ${batchIndex + 1}/${batches.length} (channel: ${batchChannelId}, policy: ${batchPolicyContent ? 'YES' : 'NO'})`)
+    // 유료 API: 대기 없이 순차 처리 (응답 오면 바로 다음 요청)
+    console.log(`[Transform] Processing ${batchIndex + 1}/${batches.length} (channel: ${batchChannelId}, policy: ${batchPolicyContent ? 'YES' : 'NO'})`)
 
     try {
       // 배치 입력 준비

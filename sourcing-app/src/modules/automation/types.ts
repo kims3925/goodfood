@@ -156,6 +156,7 @@ export interface PublishResult extends PipelineResult {
 export interface PublishedProductResult {
   productId: number
   channelId: number
+  channelName?: string
   postKey?: string
   status: 'SUCCESS' | 'FAILED' | 'SKIPPED'
   error?: string

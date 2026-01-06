@@ -21,6 +21,10 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260106-008 | Done | 2026-01-06 | - | 발행 파이프라인 totalItems 실제 발행 대상만 카운트 | Low | Lee |
+| TR-20260106-007 | Done | 2026-01-06 | - | 자동화 실행 로그 발행 단계 상세 로그 표시 수정 | Low | Lee |
+| TR-20260106-006 | Done | 2026-01-06 | - | 자동화 대시보드 및 로그 UI/UX 개선 | Low | Lee |
+| TR-20260106-005 | Done | 2026-01-06 | - | AI 변환 파이프라인 유료 API용 최적화 | Low | Lee |
 | TR-20260106-004 | Done | 2026-01-06 | - | Channel 테이블 bandPostUrl 컬럼 삭제 | Low | Lee |
 | TR-20260106-003 | Done | 2026-01-06 | - | 자동화 로그 API 응답 구조 수정 | Low | Lee |
 | TR-20260106-002 | Done | 2026-01-06 | - | 자동화 파이프라인과 수동 실행 로직 통일 | Medium | Lee |
@@ -105,6 +109,149 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260106-007: 자동화 실행 로그 발행 단계 상세 로그 표시 수정
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-06 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 발행 파이프라인 단독 실행 시 details 구조가 로그 페이지 기대 구조와 불일치하던 버그 수정
+- 세션 만료로 조기 반환될 때 channelResults가 빈 배열로 저장되던 버그 수정
+
+**문제 1: 파이프라인 단독 실행 시 details 구조 불일치**
+- 로그 페이지는 `details.publish.channelResults` 구조 기대
+- PUBLISH 단독 실행 시 `details.channelResults`로 저장 (래핑 없음)
+- 다른 파이프라인(COLLECT, TRANSFORM)도 동일 문제
+
+**문제 2: 세션 만료 시 channelResults 누락**
+- 세션 만료 에러 감지 후 `channelResult`를 배열에 추가하기 전에 반환
+- `channelResults`가 빈 배열 `[]`로 저장되어 상세 로그 미표시
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/modules/automation/executor.ts | Modified | 각 파이프라인 단독 실행 시 details를 `{ collection/transform/productCreate/publish: result.details }` 구조로 래핑 |
+| src/modules/automation/pipelines/publish.ts | Modified | `channelResult` 생성 및 push를 세션 만료 체크 앞으로 이동 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| TypeScript Build | Pass |
+| Manual | Pending |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. executor.ts, publish.ts 이전 버전 복원
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Automation Log View
+
+---
+
+## TR-20260106-006: 자동화 대시보드 및 로그 UI/UX 개선
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-06 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 대시보드 최근 실행 기록이 표시되지 않던 버그 수정 (API 응답 파싱 오류)
+- 파이프라인 진행률이 각 단계 시작 시 0%로 리셋되던 버그 수정
+- 설정 페이지에서 불필요한 PipelineStatusPanel 제거
+- 대시보드 수동실행 버튼에서 '클릭하여 중단' 취소 기능 제거
+  - 실행 중일 때 버튼 disabled + 실행 중 표시로 변경
+  - 취소는 하단 PipelineStatusPanel에서만 가능
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(admin)/sourcing/dashboard/page.tsx | Modified | 1) API 파싱 수정 (`logsData.data?.logs`) 2) 수동실행 버튼 5개 취소 기능 제거, 실행 중 표시로 변경 3) Loader2 아이콘 import 추가 |
+| src/modules/automation/pipelines/publish.ts | Modified | `updateWorkflowProgress(id, n, 0, 0)` 초기화 코드 제거 |
+| src/modules/automation/pipelines/transform.ts | Modified | `updateWorkflowProgress(id, n, 0, 0)` 초기화 코드 제거 |
+| src/app/(admin)/sourcing/automation/settings/page.tsx | Modified | PipelineStatusPanel 렌더링 코드 제거 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+| Manual | Pending |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. 각 파일의 이전 버전 복원
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Dashboard, Automation Settings
+
+---
+
+## TR-20260106-005: AI 변환 파이프라인 유료 API용 최적화
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-06 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 배치 크기 변경: 10개/요청 → 1개/요청 (유료 API는 rate limit 충분)
+- 요청 간 대기 시간 제거: 응답 오면 즉시 다음 요청 (순차 처리)
+- RPD(일일 요청 한도) 체크 비활성화: 유료 API는 한도 충분
+- 재시도 대기 시간 단축: 10초 → 5초
+- AI 설정은 AutomationConfig.aiProvider → AiApiConfig(해당 provider) 순으로 조회
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/modules/automation/pipelines/transform.ts | Modified | BATCH_SIZE=1, 대기 시간 제거, RPD 체크 비활성화 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| TypeScript Build | Pass |
+| Manual | Pending |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. BATCH_SIZE=10, 대기 시간 로직 복원
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Transform (AI 변환)
+
+---
 
 ## TR-20260106-004: Channel 테이블 bandPostUrl 컬럼 삭제
 
