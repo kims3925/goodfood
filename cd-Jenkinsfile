@@ -50,184 +50,187 @@ pipeline {
 
             steps {
                 echo 'Deploying application...'
-                sh """
-                    cd ${PROJECT_PATH}
+                // 전체 스크립트를 ubuntu 유저로 실행 (파일 소유권 통일)
+                sh '''
+                    sudo -u ubuntu bash << 'DEPLOY_EOF'
+cd /home/ubuntu/bandauto
 
-                    echo "=== Starting deployment ==="
+echo "=== Starting deployment ==="
 
-                    # Backup .env files before git reset
-                    # 보안: 프로젝트 디렉토리 내 숨김 폴더 사용 (Jenkins 권한 문제 해결)
-                    ENV_BACKUP_DIR="${PROJECT_PATH}/.env-backup-\$\$"
-                    echo ">>> Creating secure backup directory: \$ENV_BACKUP_DIR"
-                    mkdir -p "\$ENV_BACKUP_DIR"
-                    chmod 700 "\$ENV_BACKUP_DIR"
+# Backup .env files before git reset
+# 보안: 프로젝트 디렉토리 내 숨김 폴더 사용
+ENV_BACKUP_DIR="/home/ubuntu/bandauto/.env-backup-$$"
+echo ">>> Creating secure backup directory: $ENV_BACKUP_DIR"
+mkdir -p "$ENV_BACKUP_DIR"
+chmod 700 "$ENV_BACKUP_DIR"
 
-                    echo ">>> Backing up .env files..."
-                    [ -f .env ] && cp .env "\$ENV_BACKUP_DIR/.env.backup" || true
-                    [ -f db/.env ] && cp db/.env "\$ENV_BACKUP_DIR/.env.db.backup" || true
-                    [ -f shop-app/.env ] && cp shop-app/.env "\$ENV_BACKUP_DIR/.env.shop.backup" || true
-                    [ -f shop-app/.env.local ] && cp shop-app/.env.local "\$ENV_BACKUP_DIR/.env.shop.local.backup" || true
-                    [ -f sourcing-app/.env ] && cp sourcing-app/.env "\$ENV_BACKUP_DIR/.env.sourcing.backup" || true
-                    [ -f sourcing-app/.env.local ] && cp sourcing-app/.env.local "\$ENV_BACKUP_DIR/.env.sourcing.local.backup" || true
+echo ">>> Backing up .env files..."
+[ -f .env ] && cp .env "$ENV_BACKUP_DIR/.env.backup" || true
+[ -f db/.env ] && cp db/.env "$ENV_BACKUP_DIR/.env.db.backup" || true
+[ -f shop-app/.env ] && cp shop-app/.env "$ENV_BACKUP_DIR/.env.shop.backup" || true
+[ -f shop-app/.env.local ] && cp shop-app/.env.local "$ENV_BACKUP_DIR/.env.shop.local.backup" || true
+[ -f sourcing-app/.env ] && cp sourcing-app/.env "$ENV_BACKUP_DIR/.env.sourcing.backup" || true
+[ -f sourcing-app/.env.local ] && cp sourcing-app/.env.local "$ENV_BACKUP_DIR/.env.sourcing.local.backup" || true
 
-                    # 백업 파일에 엄격한 권한 적용 (소유자만 읽기/쓰기)
-                    chmod 600 "\$ENV_BACKUP_DIR"/.env.* 2>/dev/null || true
+# 백업 파일에 엄격한 권한 적용 (소유자만 읽기/쓰기)
+chmod 600 "$ENV_BACKUP_DIR"/.env.* 2>/dev/null || true
 
-                    # Git reset 전에 권한 문제 있는 폴더 정리
-                    # root 권한으로 삭제 (어떤 소유자든 삭제 가능)
-                    echo ">>> Cleaning up problematic directories before git reset..."
-                    sudo rm -rf db/node_modules 2>/dev/null || true
-                    sudo rm -rf .git/index.lock 2>/dev/null || true
+# Git reset 전에 권한 문제 있는 폴더 정리
+# root 권한으로 삭제 (어떤 소유자든 삭제 가능)
+echo ">>> Cleaning up problematic directories before git reset..."
+sudo rm -rf db/node_modules 2>/dev/null || true
+sudo rm -rf .git/index.lock 2>/dev/null || true
 
-                    # Git pull
-                    echo ">>> Pulling latest code..."
-                    git fetch origin main
-                    git reset --hard origin/main
+# Git pull
+echo ">>> Pulling latest code..."
+git fetch origin main
+git reset --hard origin/main
 
-                    # Restore .env files after git reset
-                    echo ">>> Restoring .env files..."
-                    [ -f "\$ENV_BACKUP_DIR/.env.backup" ] && cp "\$ENV_BACKUP_DIR/.env.backup" .env || true
-                    [ -f "\$ENV_BACKUP_DIR/.env.db.backup" ] && cp "\$ENV_BACKUP_DIR/.env.db.backup" db/.env || true
-                    [ -f "\$ENV_BACKUP_DIR/.env.shop.backup" ] && cp "\$ENV_BACKUP_DIR/.env.shop.backup" shop-app/.env || true
-                    [ -f "\$ENV_BACKUP_DIR/.env.shop.local.backup" ] && cp "\$ENV_BACKUP_DIR/.env.shop.local.backup" shop-app/.env.local || true
-                    [ -f "\$ENV_BACKUP_DIR/.env.sourcing.backup" ] && cp "\$ENV_BACKUP_DIR/.env.sourcing.backup" sourcing-app/.env || true
-                    [ -f "\$ENV_BACKUP_DIR/.env.sourcing.local.backup" ] && cp "\$ENV_BACKUP_DIR/.env.sourcing.local.backup" sourcing-app/.env.local || true
+# Restore .env files after git reset
+echo ">>> Restoring .env files..."
+[ -f "$ENV_BACKUP_DIR/.env.backup" ] && cp "$ENV_BACKUP_DIR/.env.backup" .env || true
+[ -f "$ENV_BACKUP_DIR/.env.db.backup" ] && cp "$ENV_BACKUP_DIR/.env.db.backup" db/.env || true
+[ -f "$ENV_BACKUP_DIR/.env.shop.backup" ] && cp "$ENV_BACKUP_DIR/.env.shop.backup" shop-app/.env || true
+[ -f "$ENV_BACKUP_DIR/.env.shop.local.backup" ] && cp "$ENV_BACKUP_DIR/.env.shop.local.backup" shop-app/.env.local || true
+[ -f "$ENV_BACKUP_DIR/.env.sourcing.backup" ] && cp "$ENV_BACKUP_DIR/.env.sourcing.backup" sourcing-app/.env || true
+[ -f "$ENV_BACKUP_DIR/.env.sourcing.local.backup" ] && cp "$ENV_BACKUP_DIR/.env.sourcing.local.backup" sourcing-app/.env.local || true
 
-                    # 복원 후 임시 백업 디렉토리 삭제 (민감 정보 노출 방지)
-                    echo ">>> Cleaning up temporary backup directory..."
-                    rm -rf "\$ENV_BACKUP_DIR"
+# 복원 후 임시 백업 디렉토리 삭제 (민감 정보 노출 방지)
+echo ">>> Cleaning up temporary backup directory..."
+rm -rf "$ENV_BACKUP_DIR"
 
-                    # =============================================
-                    # node_modules 자동 복구 로직
-                    # =============================================
-                    echo ">>> Checking node_modules integrity..."
+# =============================================
+# node_modules 자동 복구 로직
+# =============================================
+echo ">>> Checking node_modules integrity..."
 
-                    NEED_REINSTALL=false
+NEED_REINSTALL=false
 
-                    # 1. node_modules가 없으면 재설치 필요
-                    if [ ! -d "node_modules" ]; then
-                        echo ">>> node_modules not found, will reinstall"
-                        NEED_REINSTALL=true
-                    fi
+# 1. node_modules가 없으면 재설치 필요
+if [ ! -d "node_modules" ]; then
+    echo ">>> node_modules not found, will reinstall"
+    NEED_REINSTALL=true
+fi
 
-                    # 2. package-lock.json이 변경되었으면 재설치 필요
-                    if [ -f ".npm-checksum" ]; then
-                        OLD_CHECKSUM=\$(cat .npm-checksum)
-                        NEW_CHECKSUM=\$(md5sum package-lock.json | cut -d' ' -f1)
-                        if [ "\$OLD_CHECKSUM" != "\$NEW_CHECKSUM" ]; then
-                            echo ">>> package-lock.json changed, will reinstall"
-                            NEED_REINSTALL=true
-                        fi
-                    else
-                        NEED_REINSTALL=true
-                    fi
+# 2. package-lock.json이 변경되었으면 재설치 필요
+if [ -f ".npm-checksum" ]; then
+    OLD_CHECKSUM=$(cat .npm-checksum)
+    NEW_CHECKSUM=$(md5sum package-lock.json | cut -d' ' -f1)
+    if [ "$OLD_CHECKSUM" != "$NEW_CHECKSUM" ]; then
+        echo ">>> package-lock.json changed, will reinstall"
+        NEED_REINSTALL=true
+    fi
+else
+    NEED_REINSTALL=true
+fi
 
-                    # 3. node_modules 손상 체크 (주요 패키지 확인)
-                    if [ "\$NEED_REINSTALL" = "false" ]; then
-                        for pkg in next react prisma; do
-                            if [ ! -d "node_modules/\$pkg" ]; then
-                                echo ">>> Missing package: \$pkg, will reinstall"
-                                NEED_REINSTALL=true
-                                break
-                            fi
-                        done
-                    fi
+# 3. node_modules 손상 체크 (주요 패키지 확인)
+if [ "$NEED_REINSTALL" = "false" ]; then
+    for pkg in next react prisma; do
+        if [ ! -d "node_modules/$pkg" ]; then
+            echo ">>> Missing package: $pkg, will reinstall"
+            NEED_REINSTALL=true
+            break
+        fi
+    done
+fi
 
-                    # 재설치 실행
-                    # 삭제: root 권한 (어떤 소유자든 삭제 가능)
-                    # 설치: ubuntu 유저 (ubuntu 소유로 생성하여 PM2와 권한 일치)
-                    if [ "\$NEED_REINSTALL" = "true" ]; then
-                        echo ">>> Cleaning and reinstalling dependencies..."
-                        sudo rm -rf node_modules || true
-                        sudo -u ubuntu npm ci --legacy-peer-deps
+# 재설치 실행
+# 삭제: root 권한 (어떤 소유자든 삭제 가능)
+# 설치: 현재 ubuntu 유저로 실행 중이므로 ubuntu 소유로 생성됨
+if [ "$NEED_REINSTALL" = "true" ]; then
+    echo ">>> Cleaning and reinstalling dependencies..."
+    sudo rm -rf node_modules || true
+    npm ci --legacy-peer-deps
 
-                        # 체크섬 저장
-                        md5sum package-lock.json | cut -d' ' -f1 > .npm-checksum
-                        echo ">>> Dependencies reinstalled successfully"
-                    else
-                        echo ">>> node_modules is up to date"
-                        # 혹시 모를 문제에 대비해 npm ci 시도
-                        sudo -u ubuntu npm ci --legacy-peer-deps || {
-                            echo ">>> npm ci failed, force reinstalling..."
-                            sudo rm -rf node_modules || true
-                            sudo -u ubuntu npm ci --legacy-peer-deps
-                        }
-                    fi
+    # 체크섬 저장
+    md5sum package-lock.json | cut -d' ' -f1 > .npm-checksum
+    echo ">>> Dependencies reinstalled successfully"
+else
+    echo ">>> node_modules is up to date"
+    # 혹시 모를 문제에 대비해 npm ci 시도
+    npm ci --legacy-peer-deps || {
+        echo ">>> npm ci failed, force reinstalling..."
+        sudo rm -rf node_modules || true
+        npm ci --legacy-peer-deps
+    }
+fi
 
-                    # Generate Prisma client
-                    echo ">>> Generating Prisma client..."
-                    cd db
-                    npx prisma generate --schema prisma
+# Generate Prisma client
+echo ">>> Generating Prisma client..."
+cd db
+npx prisma generate --schema prisma
 
-                    # =============================================
-                    # Prisma 마이그레이션 자동 적용 (안전장치 포함)
-                    # =============================================
-                    echo ">>> Checking for pending migrations..."
+# =============================================
+# Prisma 마이그레이션 자동 적용 (안전장치 포함)
+# =============================================
+echo ">>> Checking for pending migrations..."
 
-                    # 마이그레이션 상태 확인
-                    MIGRATE_STATUS=\$(npx prisma migrate status --schema prisma 2>&1) || true
-                    echo ">>> Current migration status:"
-                    echo "\$MIGRATE_STATUS"
+# 마이그레이션 상태 확인
+MIGRATE_STATUS=$(npx prisma migrate status --schema prisma 2>&1) || true
+echo ">>> Current migration status:"
+echo "$MIGRATE_STATUS"
 
-                    if echo "\$MIGRATE_STATUS" | grep -q "Database schema is up to date"; then
-                        echo ">>> ✅ Database schema is already up to date"
-                    elif echo "\$MIGRATE_STATUS" | grep -q "Following migrations have not yet been applied"; then
-                        echo ">>> ⚠️  Pending migrations found. Applying..."
+if echo "$MIGRATE_STATUS" | grep -q "Database schema is up to date"; then
+    echo ">>> ✅ Database schema is already up to date"
+elif echo "$MIGRATE_STATUS" | grep -q "Following migrations have not yet been applied"; then
+    echo ">>> ⚠️  Pending migrations found. Applying..."
 
-                        # 마이그레이션 적용 (실패 시 배포 중단)
-                        if npx prisma migrate deploy --schema prisma; then
-                            echo ">>> ✅ Migrations applied successfully"
-                        else
-                            echo ">>> ❌ ERROR: Migration failed! Aborting deployment."
-                            echo ">>> Please check the migration files and database state."
-                            exit 1
-                        fi
-                    elif echo "\$MIGRATE_STATUS" | grep -q "drift"; then
-                        echo ">>> ❌ ERROR: Database schema drift detected!"
-                        echo ">>> The database schema differs from the migration history."
-                        echo ">>> Please resolve the drift before deploying."
-                        exit 1
-                    else
-                        echo ">>> Attempting migrate deploy..."
-                        if npx prisma migrate deploy --schema prisma; then
-                            echo ">>> ✅ Migrate deploy completed"
-                        else
-                            echo ">>> ❌ ERROR: Migrate deploy failed! Aborting deployment."
-                            exit 1
-                        fi
-                    fi
+    # 마이그레이션 적용 (실패 시 배포 중단)
+    if npx prisma migrate deploy --schema prisma; then
+        echo ">>> ✅ Migrations applied successfully"
+    else
+        echo ">>> ❌ ERROR: Migration failed! Aborting deployment."
+        echo ">>> Please check the migration files and database state."
+        exit 1
+    fi
+elif echo "$MIGRATE_STATUS" | grep -q "drift"; then
+    echo ">>> ❌ ERROR: Database schema drift detected!"
+    echo ">>> The database schema differs from the migration history."
+    echo ">>> Please resolve the drift before deploying."
+    exit 1
+else
+    echo ">>> Attempting migrate deploy..."
+    if npx prisma migrate deploy --schema prisma; then
+        echo ">>> ✅ Migrate deploy completed"
+    else
+        echo ">>> ❌ ERROR: Migrate deploy failed! Aborting deployment."
+        exit 1
+    fi
+fi
 
-                    cd ..
+cd ..
 
-                    # Stop specific PM2 processes before cleaning (파일 잠금 해제)
-                    echo ">>> Stopping PM2 processes for clean build..."
-                    sudo -u ubuntu pm2 stop shop-app sourcing-app shop sourcing 2>/dev/null || true
+# Stop specific PM2 processes before cleaning (파일 잠금 해제)
+echo ">>> Stopping PM2 processes for clean build..."
+pm2 stop shop-app sourcing-app shop sourcing 2>/dev/null || true
 
-                    # Verify processes are stopped (최대 10초 대기)
-                    for i in 1 2 3 4 5; do
-                        if ! sudo -u ubuntu pm2 list | grep -E 'shop|sourcing' | grep -q 'online'; then
-                            echo ">>> All target processes stopped"
-                            break
-                        fi
-                        echo ">>> Waiting for processes to stop... (\$i/5)"
-                        sleep 2
-                    done
+# Verify processes are stopped (최대 10초 대기)
+for i in 1 2 3 4 5; do
+    if ! pm2 list | grep -E 'shop|sourcing' | grep -q 'online'; then
+        echo ">>> All target processes stopped"
+        break
+    fi
+    echo ">>> Waiting for processes to stop... ($i/5)"
+    sleep 2
+done
 
-                    # Build applications
-                    echo ">>> Building applications..."
-                    npm run build:shop
-                    npm run build:sourcing
+# Build applications
+echo ">>> Building applications..."
+npm run build:shop
+npm run build:sourcing
 
-                    # Restart PM2
-                    echo ">>> Restarting PM2 processes..."
-                    sudo -u ubuntu pm2 reload all --update-env
+# Restart PM2
+echo ">>> Restarting PM2 processes..."
+pm2 reload all --update-env
 
-                    # Verify
-                    echo ">>> Verifying deployment..."
-                    pm2 status
+# Verify
+echo ">>> Verifying deployment..."
+pm2 status
 
-                    echo "=== Deployment completed! ==="
-                """
+echo "=== Deployment completed! ==="
+DEPLOY_EOF
+                '''
             }
         }
     }
