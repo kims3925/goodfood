@@ -1272,19 +1272,36 @@ export default function ProductDetailPage() {
                                 )}
 
                                 {/* 가격 */}
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-500 mb-1">가격</label>
-                                  <Input
-                                    type="number"
-                                    value={variant.price || ''}
-                                    onChange={(e) => {
-                                      const newVariants = [...editingVariants]
-                                      newVariants[idx].price = parseInt(e.target.value) || 0
-                                      setEditingVariants(newVariants)
-                                    }}
-                                    placeholder="0"
-                                    className="!rounded-lg w-40"
-                                  />
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-xs font-medium text-slate-500 mb-1">도매가</label>
+                                    <Input
+                                      type="number"
+                                      value={variant.wholesalePrice ?? ''}
+                                      onChange={(e) => {
+                                        const newVariants = [...editingVariants]
+                                        const value = e.target.value
+                                        newVariants[idx].wholesalePrice = value === '' ? null : parseInt(value) || 0
+                                        setEditingVariants(newVariants)
+                                      }}
+                                      placeholder="0"
+                                      className="!rounded-lg"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-slate-500 mb-1">판매가</label>
+                                    <Input
+                                      type="number"
+                                      value={variant.price || ''}
+                                      onChange={(e) => {
+                                        const newVariants = [...editingVariants]
+                                        newVariants[idx].price = parseInt(e.target.value) || 0
+                                        setEditingVariants(newVariants)
+                                      }}
+                                      placeholder="0"
+                                      className="!rounded-lg"
+                                    />
+                                  </div>
                                 </div>
                               </div>
                               <button

@@ -18,7 +18,30 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
+    // CI 잡 성공 시에만 CD 파이프라인 트리거
+    // 참고: 수동 실행도 가능하지만, CI 실패 시 첫 stage에서 경고 출력
+    triggers {
+        upstream(upstreamProjects: 'bandauto-ci', threshold: hudson.model.Result.SUCCESS)
+    }
+
     stages {
+        // CI 성공 여부 확인 (수동 실행 시 경고)
+        stage('CI Guard') {
+            steps {
+                script {
+                    // upstream trigger로 실행된 경우 자동으로 CI 성공 보장
+                    // 수동 실행 시 경고 메시지 출력
+                    if (!currentBuild.getBuildCauses('hudson.model.Cause$UpstreamCause')) {
+                        echo '⚠️  WARNING: Manual execution detected.'
+                        echo '⚠️  Please ensure CI pipeline passed before deploying.'
+                        echo '⚠️  For safety, this pipeline should be triggered by CI success.'
+                    } else {
+                        echo '✅ Triggered by upstream CI job success.'
+                    }
+                }
+            }
+        }
+
         stage('Checkout') {
             steps {
                 echo 'Checking out source code...'
@@ -42,22 +65,9 @@ pipeline {
             }
         }
 
-        stage('Build Applications') {
-            parallel {
-                stage('Build shop-app') {
-                    steps {
-                        echo 'Building shop-app...'
-                        sh 'npm run build:shop'
-                    }
-                }
-                stage('Build sourcing-app') {
-                    steps {
-                        echo 'Building sourcing-app...'
-                        sh 'npm run build:sourcing'
-                    }
-                }
-            }
-        }
+        // Build Applications 단계 제거
+        // - CI Pipeline에서 이미 빌드 검증 완료
+        // - 실제 빌드는 Deploy 단계에서 운영 서버에서 직접 수행
 
         stage('Deploy') {
 
@@ -69,8 +79,8 @@ pipeline {
                     echo "=== Starting deployment ==="
 
                     # Backup .env files before git reset
-                    # 보안: /tmp 대신 ubuntu 홈 디렉토리의 전용 백업 폴더 사용
-                    ENV_BACKUP_DIR="/home/ubuntu/.env-backup-\$\$"
+                    # 보안: 프로젝트 디렉토리 내 숨김 폴더 사용 (Jenkins 권한 문제 해결)
+                    ENV_BACKUP_DIR="${PROJECT_PATH}/.env-backup-\$\$"
                     echo ">>> Creating secure backup directory: \$ENV_BACKUP_DIR"
                     mkdir -p "\$ENV_BACKUP_DIR"
                     chmod 700 "\$ENV_BACKUP_DIR"

@@ -232,17 +232,17 @@ const user = await prisma.$queryRawUnsafe(
 #### 1. 안전한 백업 디렉토리 생성
 
 ```bash
-# /tmp 대신 프로세스별 고유 디렉토리 사용 (동시 배포 충돌 방지)
-ENV_BACKUP_DIR="/home/ubuntu/.env-backup-$$"
+# 프로젝트 디렉토리 내 전용 백업 폴더 사용 (Jenkins 권한 문제 해결)
+ENV_BACKUP_DIR="${PROJECT_PATH}/.env-backup-$$"
 mkdir -p "$ENV_BACKUP_DIR"
 chmod 700 "$ENV_BACKUP_DIR"  # 소유자만 접근 가능
 ```
 
 | 항목 | 설명 |
 |-----|-----|
-| 경로 | `/home/ubuntu/.env-backup-$$` (프로세스 ID 기반) |
+| 경로 | `${PROJECT_PATH}/.env-backup-$$` (프로젝트 내, 프로세스 ID 기반) |
 | 디렉토리 권한 | `chmod 700` (소유자만 rwx) |
-| `/tmp` 미사용 이유 | 모든 사용자 접근 가능 → 민감 정보 노출 위험 |
+| `/tmp`, `/home/ubuntu` 미사용 이유 | 권한 문제 또는 다른 사용자 접근 가능 |
 
 #### 2. 가드된 복사 (안전한 에러 처리)
 
