@@ -1,6 +1,6 @@
 # API 규칙
 
-> **관련 문서:** [../STRUCTURE.md](../STRUCTURE.md) | [../SECURITY.md](../SECURITY.md) | [../CLAUDE.md](../CLAUDE.md)
+> **관련 문서:** [STRUCTURE.md](./STRUCTURE.md) | [SECURITY.md](./SECURITY.md) | [CLAUDE.md](../CLAUDE.md)
 
 ---
 
@@ -8,21 +8,71 @@
 
 ```text
 app/api/
-├── auth/                    # NextAuth.js 인증
-│   └── [...nextauth]/
-├── sourcing/               # 소싱 도메인
-│   ├── channels/
-│   ├── posts/
-│   └── products/
-├── shop/                   # 쇼핑몰 도메인
-│   ├── products/
-│   ├── orders/
-│   └── cart/
-├── payment/                # 결제
-│   ├── confirm/
-│   └── webhook/
-└── automation/             # 자동화
-    └── pipeline/
+├── auth/                    # 인증
+│   ├── login/               # 로그인
+│   ├── logout/              # 로그아웃
+│   ├── session/             # 세션 조회
+│   └── band/                # Band OAuth
+│       ├── authorize/
+│       └── callback/
+├── channel/                 # 채널 관리
+│   ├── [id]/
+│   │   └── band-session/    # 채널별 Band 세션
+│   └── keys/                # 채널 암호화 키
+├── post/                    # 게시물
+│   ├── available/           # 등록 가능 게시물
+│   └── [id]/
+├── collected-product/       # 수집 상품
+│   └── [id]/
+├── product/                 # 상품
+│   ├── ai-generate/         # AI 상품 생성
+│   ├── publish/             # 상품 발행
+│   ├── validate-pricing/    # 가격 검증
+│   └── [id]/
+├── published-product/       # 발행된 상품
+│   └── [id]/
+├── shop/                    # 쇼핑몰
+│   ├── check-duplicate/     # 중복 체크
+│   ├── publish/             # 쇼핑몰 발행
+│   │   └── stream/          # SSE 스트림
+│   └── [id]/
+├── order/                   # 주문
+│   └── unified/             # 통합 주문
+│       └── [id]/
+├── automation/              # 자동화
+│   ├── config/              # 설정
+│   ├── execute/             # 실행
+│   ├── resume/              # 재개
+│   ├── logs/                # 로그
+│   └── stats/               # 통계
+├── settings/                # 설정
+│   ├── ai/                  # AI 설정
+│   │   └── test/
+│   ├── api/                 # API 설정
+│   │   └── test/
+│   └── prompt/              # 프롬프트 설정
+├── admin/                   # 관리자
+│   ├── notifications/       # 알림
+│   ├── reviews/             # 리뷰 관리
+│   └── wholesale-orders/    # 도매 주문
+├── cs/                      # 고객 서비스
+│   └── inquiry/             # 문의
+│       └── [id]/
+│           └── reply/
+├── coupon/                  # 쿠폰
+│   └── [id]/
+├── settlement/              # 정산
+│   ├── history/
+│   └── [id]/
+├── policy/                  # 정책
+│   ├── privacy/
+│   └── terms/
+├── images/                  # 이미지 처리
+│   ├── channel/
+│   ├── post/
+│   └── product/
+└── user/                    # 사용자
+    └── [id]/
 ```
 
 ---
@@ -34,12 +84,13 @@ app/api/
 ```typescript
 // app/api/products/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { verifyToken, getTokenFromRequest } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) {
+  const token = getTokenFromRequest(request)
+  const user = token ? await verifyToken(token) : null
+
+  if (!user) {
     return NextResponse.json(
       { success: false, error: { code: 'AUTH.UNAUTHORIZED' } },
       { status: 401 }
@@ -68,28 +119,52 @@ export async function GET(
 
 ## 인증
 
-### NextAuth.js 세션
+### JWT 인증
 
 | 항목 | 값 |
 |-----|---|
-| Provider | Credentials |
-| Session Strategy | JWT |
-| Token 저장 | HttpOnly Cookie |
+| 라이브러리 | jose, jsonwebtoken |
+| Token 저장 | HttpOnly Cookie (auth-token) |
 | 만료 | 24시간 |
+| 암호화 | HS256 |
 
 ### 세션 검증 패턴
 
 ```typescript
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { verifyToken, getTokenFromRequest } from '@/lib/auth'
 
 // API Route 내부
-const session = await getServerSession(authOptions)
-if (!session) {
+const token = getTokenFromRequest(request)
+const user = token ? await verifyToken(token) : null
+
+if (!user) {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 }
 
-const userId = session.user.id
+const userId = user.id
+```
+
+### 미들웨어 인증
+
+```typescript
+// src/middleware.ts
+import { NextResponse } from 'next/server'
+import { jwtVerify } from 'jose'
+
+export async function middleware(request: NextRequest) {
+  const token = request.cookies.get('auth-token')?.value
+
+  if (!token) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  try {
+    await jwtVerify(token, secret)
+    return NextResponse.next()
+  } catch {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+}
 ```
 
 ---

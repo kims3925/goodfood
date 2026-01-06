@@ -1,6 +1,6 @@
 # 백엔드 규칙
 
-> **관련 문서:** [../STRUCTURE.md](../STRUCTURE.md) | [API.md](./API.md) | [../DATABASE.md](../DATABASE.md) | [../CLAUDE.md](../CLAUDE.md)
+> **관련 문서:** [STRUCTURE.md](./STRUCTURE.md) | [API.md](./API.md) | [DATABASE.md](./DATABASE.md) | [CLAUDE.md](../CLAUDE.md)
 
 ---
 

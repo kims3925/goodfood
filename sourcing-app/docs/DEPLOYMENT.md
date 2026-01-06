@@ -1,6 +1,6 @@
 # 배포 규칙
 
-> **관련 문서:** [SECURITY.md](./SECURITY.md) | [PROJECT.md](./PROJECT.md) | [CLAUDE.md](./CLAUDE.md)
+> **관련 문서:** [SECURITY.md](./SECURITY.md) | [PROJECT.md](./PROJECT.md) | [CLAUDE.md](../CLAUDE.md)
 
 ---
 

@@ -1,6 +1,6 @@
 # 보안 규칙
 
-> **관련 문서:** [DEPLOYMENT.md](./DEPLOYMENT.md) | [PROJECT.md](./PROJECT.md) | [CLAUDE.md](./CLAUDE.md)
+> **관련 문서:** [DEPLOYMENT.md](./DEPLOYMENT.md) | [PROJECT.md](./PROJECT.md) | [../CLAUDE.md](../CLAUDE.md)
 
 ---
 
@@ -41,9 +41,8 @@
 
 | 역할 | 설명 | 주요 권한 |
 |-----|-----|---------|
-| USER | 일반 사용자 | 상품 소싱, 판매 |
-| MANAGER | 관리자 | 사용자 관리, 설정 |
-| ADMIN | 최고 관리자 | 전체 시스템 관리 |
+| USER (고객) | 쇼핑몰 회원 | 상품 구매, 주문 관리, 리뷰 작성 |
+| GUEST (비회원) | 비로그인 사용자 | 비회원 주문, 주문 조회 |
 
 ### 권한 체크 패턴
 
@@ -58,18 +57,22 @@ export default withAuth({
 })
 
 export const config = {
-  matcher: ['/(admin)/:path*']
+  matcher: ['/mypage/:path*', '/checkout/:path*']
 }
 ```
 
 ### 리소스 접근 규칙
 
-| Resource | USER | MANAGER | ADMIN |
-|----------|------|---------|-------|
-| 자기 데이터 조회 | O | O | O |
-| 자기 데이터 수정 | O | O | O |
-| 전체 데이터 조회 | X | O | O |
-| 시스템 설정 | X | X | O |
+| Resource | GUEST | USER |
+|----------|-------|------|
+| 상품 조회 | O | O |
+| 장바구니 (비회원) | O | O |
+| 장바구니 (회원) | X | O |
+| 비회원 주문 | O | X |
+| 회원 주문 | X | O |
+| 마이페이지 | X | O |
+| 배송지 관리 | X | O |
+| 주문 내역 | X | O |
 
 ---
 

@@ -19,17 +19,17 @@
 
 | 상황 | 참조 문서 |
 |------|----------|
-| 프로젝트 스택 확인 | [PROJECT.md](./PROJECT.md) |
-| 네이밍 규칙 확인 | [STRUCTURE.md](./STRUCTURE.md) |
-| API 규칙 확인 | [tracking/API.md](./tracking/API.md) |
-| 프론트엔드 규칙 | [FRONTEND.md](./FRONTEND.md) |
-| 백엔드 규칙 | [tracking/BACKEND.md](./tracking/BACKEND.md) |
-| DB 규칙 | [DATABASE.md](./DATABASE.md) |
-| 테스트 규칙 | [TESTING.md](./TESTING.md) |
-| 보안 규칙 | [SECURITY.md](./SECURITY.md) |
-| 배포 규칙 | [DEPLOYMENT.md](./DEPLOYMENT.md) |
-| 비즈니스 흐름 | [FLOW.md](./FLOW.md) |
-| 기능 추적 | [tracking/](./tracking/) |
+| 프로젝트 스택 확인 | [docs/PROJECT.md](./docs/PROJECT.md) |
+| 네이밍 규칙 확인 | [docs/STRUCTURE.md](./docs/STRUCTURE.md) |
+| API 규칙 확인 | [docs/API.md](./docs/API.md) |
+| 프론트엔드 규칙 | [docs/FRONTEND.md](./docs/FRONTEND.md) |
+| 백엔드 규칙 | [docs/BACKEND.md](./docs/BACKEND.md) |
+| DB 규칙 | [docs/DATABASE.md](./docs/DATABASE.md) |
+| 테스트 규칙 | [docs/TESTING.md](./docs/TESTING.md) |
+| 보안 규칙 | [docs/SECURITY.md](./docs/SECURITY.md) |
+| 배포 규칙 | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) |
+| 비즈니스 흐름 | [docs/tracking/FLOW.md](./docs/tracking/FLOW.md) |
+| 기능 추적 | [docs/tracking/](./docs/tracking/) |
 
 ---
 
@@ -179,9 +179,9 @@ scope: 변경 대상 (sourcing, shop, db 등)
 
 기능 구현 완료 시:
 
-- [ ] REQUIREMENTS.md에 REQ-ID 존재 확인
-- [ ] tracking/CHANGELOG.md에 TR-ID 기록
-- [ ] FLOW.md 흐름 변경 시 업데이트
-- [ ] API 변경 시 tracking/API.md 업데이트
-- [ ] DB 변경 시 DATABASE.md 스키마 반영
-- [ ] 보안 변경 시 SECURITY.md 검토
+- [ ] docs/tracking/REQUIREMENTS.md에 REQ-ID 존재 확인
+- [ ] docs/tracking/CHANGELOG.md에 TR-ID 기록
+- [ ] docs/tracking/FLOW.md 흐름 변경 시 업데이트
+- [ ] API 변경 시 docs/API.md 업데이트
+- [ ] DB 변경 시 docs/DATABASE.md 스키마 반영
+- [ ] 보안 변경 시 docs/SECURITY.md 검토
