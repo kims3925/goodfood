@@ -223,6 +223,88 @@ const user = await prisma.$queryRawUnsafe(
 *.local
 ```
 
+### 배포 시 .env 백업/복원 보안 절차
+
+> **상세 내용:** [DEPLOYMENT.md](./DEPLOYMENT.md#1-env-파일-보호) 참조
+
+배포 파이프라인(cd-Jenkinsfile)에서 git reset 시 .env 파일 보호를 위한 보안 절차:
+
+#### 1. 안전한 백업 디렉토리 생성
+
+```bash
+# /tmp 대신 프로세스별 고유 디렉토리 사용 (동시 배포 충돌 방지)
+ENV_BACKUP_DIR="/home/ubuntu/.env-backup-$$"
+mkdir -p "$ENV_BACKUP_DIR"
+chmod 700 "$ENV_BACKUP_DIR"  # 소유자만 접근 가능
+```
+
+| 항목 | 설명 |
+|-----|-----|
+| 경로 | `/home/ubuntu/.env-backup-$$` (프로세스 ID 기반) |
+| 디렉토리 권한 | `chmod 700` (소유자만 rwx) |
+| `/tmp` 미사용 이유 | 모든 사용자 접근 가능 → 민감 정보 노출 위험 |
+
+#### 2. 가드된 복사 (안전한 에러 처리)
+
+```bash
+# 파일 존재 시에만 복사, 실패해도 파이프라인 중단 방지
+[ -f .env ] && cp .env "$ENV_BACKUP_DIR/.env.backup" || true
+[ -f db/.env ] && cp db/.env "$ENV_BACKUP_DIR/.env.db.backup" || true
+[ -f shop-app/.env ] && cp shop-app/.env "$ENV_BACKUP_DIR/.env.shop.backup" || true
+[ -f shop-app/.env.local ] && cp shop-app/.env.local "$ENV_BACKUP_DIR/.env.shop.local.backup" || true
+[ -f sourcing-app/.env ] && cp sourcing-app/.env "$ENV_BACKUP_DIR/.env.sourcing.backup" || true
+[ -f sourcing-app/.env.local ] && cp sourcing-app/.env.local "$ENV_BACKUP_DIR/.env.sourcing.local.backup" || true
+
+# 백업 파일 권한 제한
+chmod 600 "$ENV_BACKUP_DIR"/.env.* 2>/dev/null || true
+```
+
+| 보안 조치 | 설명 |
+|---------|-----|
+| `[ -f ] && cp` | 파일 존재 확인 후 복사 |
+| `\|\| true` | 실패 시에도 파이프라인 계속 |
+| `chmod 600` | 소유자만 읽기/쓰기 |
+| `2>/dev/null` | 에러 메시지 숨김 (파일 없는 경우) |
+
+#### 3. 복원 및 정리
+
+```bash
+# git reset 후 복원
+git reset --hard origin/main
+
+[ -f "$ENV_BACKUP_DIR/.env.backup" ] && cp "$ENV_BACKUP_DIR/.env.backup" .env || true
+[ -f "$ENV_BACKUP_DIR/.env.db.backup" ] && cp "$ENV_BACKUP_DIR/.env.db.backup" db/.env || true
+# ... (각 앱별 복원)
+
+# 복원 후 즉시 삭제 (민감 정보 노출 시간 최소화)
+rm -rf "$ENV_BACKUP_DIR"
+```
+
+| 단계 | 보안 목적 |
+|-----|---------|
+| 복원 | 원본 .env 파일 유지 |
+| `rm -rf` | 임시 백업 즉시 삭제 |
+
+#### 4. 로깅 (상세 진행 상황)
+
+```bash
+echo ">>> Creating secure backup directory: $ENV_BACKUP_DIR"
+echo ">>> Backing up .env files..."
+echo ">>> Restoring .env files..."
+echo ">>> Cleaning up temporary backup directory..."
+```
+
+> **주의:** 로그에 .env 파일 내용이나 경로의 민감 정보가 노출되지 않도록 주의
+
+#### 보안 체크리스트
+
+- [ ] `/tmp` 대신 사용자 홈 디렉토리 사용
+- [ ] 백업 디렉토리 `chmod 700` 적용
+- [ ] 백업 파일 `chmod 600` 적용
+- [ ] 복원 후 즉시 `rm -rf`로 삭제
+- [ ] 가드된 복사 (`[ -f ] && cp || true`) 사용
+- [ ] 프로세스 ID 기반 고유 디렉토리 (`$$`) 사용
+
 ---
 
 ## 보안 헤더

@@ -30,25 +30,87 @@
 
 ### CI Pipeline (ci-Jenkinsfile)
 
+> 브랜치 조건: `main`, `release-*`, PR만 빌드 실행
+
 ```text
-Push → Install → Prisma Generate → Build (parallel) → Success
+Branch Check → Setup → Debug → Install → Prisma Generate → Lint → Typecheck → Build → Success
 ```
+
+| 단계 | 설명 | 명령어 |
+|-----|-----|--------|
+| Branch Check | 빌드 대상 브랜치 필터링 | main, release-*, PR |
+| Setup | Node/npm 버전 확인 | `node -v && npm -v` |
+| Debug | Git 커밋, 패키지 정보 확인 | `git log -1`, package.json 검증 |
+| Install | 의존성 설치 | `npm ci` |
+| Prisma Generate | Prisma 클라이언트 생성 | `npx prisma generate --schema prisma` |
+| Lint | ESLint 검사 (조건부) | `npm run lint` |
+| Typecheck | TypeScript 타입 검사 (조건부) | `npm run typecheck` |
+| Build | 앱 순차 빌드 | `npm run build:shop` → `npm run build:sourcing` |
 
 ### CD Pipeline (cd-Jenkinsfile)
 
 ```text
-Checkout → Install → Prisma Generate → Build → Deploy
+Checkout → Install → Prisma Generate → Build (parallel) → Deploy
 ```
 
-### 상세 단계
+| 단계 | 설명 | 실행 방식 |
+|-----|-----|----------|
+| Checkout | 소스 코드 가져오기 | 순차 |
+| Install Dependencies | `npm ci --legacy-peer-deps` | 순차 |
+| Generate Prisma Client | `npx prisma generate --schema prisma` | 순차 |
+| Build Applications | shop-app, sourcing-app | **병렬** |
+| Deploy | 복합 배포 로직 (아래 상세) | 순차 |
 
-| 단계 | 설명 | 실패 시 |
-|-----|-----|--------|
-| Checkout | 소스 코드 가져오기 | 차단 |
-| Install Dependencies | `npm ci --legacy-peer-deps` | 차단 |
-| Generate Prisma Client | `npx prisma generate --schema prisma` | 차단 |
-| Build Applications | shop-app, sourcing-app 병렬 빌드 | 차단 |
-| Deploy | PM2 재시작 | 롤백 |
+### Deploy 단계 상세
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    Deploy Stage Flow                         │
+├─────────────────────────────────────────────────────────────┤
+│  1. .env 백업                                                │
+│     └─ 모든 .env, .env.local 파일을 보안 디렉토리에 백업     │
+│                                                              │
+│  2. Git Pull                                                 │
+│     └─ git fetch origin main && git reset --hard origin/main │
+│                                                              │
+│  3. .env 복원                                                │
+│     └─ 백업한 .env 파일들을 원래 위치로 복원                  │
+│                                                              │
+│  4. node_modules 무결성 체크                                 │
+│     ├─ node_modules 존재 여부 확인                           │
+│     ├─ package-lock.json 변경 여부 (체크섬 비교)             │
+│     ├─ 주요 패키지 존재 확인 (next, react, prisma)           │
+│     └─ 필요시 npm ci --legacy-peer-deps 재설치               │
+│                                                              │
+│  5. Prisma Generate & Migrate                                │
+│     ├─ npx prisma generate --schema prisma                   │
+│     ├─ 마이그레이션 상태 확인 (migrate status)               │
+│     └─ 펜딩 마이그레이션 적용 (migrate deploy)               │
+│                                                              │
+│  6. PM2 프로세스 중지                                        │
+│     └─ 파일 잠금 해제를 위해 빌드 전 중지                    │
+│                                                              │
+│  7. 앱 빌드                                                  │
+│     └─ npm run build:shop && npm run build:sourcing          │
+│                                                              │
+│  8. PM2 재시작                                               │
+│     └─ pm2 reload all --update-env                           │
+│                                                              │
+│  9. 검증                                                     │
+│     └─ pm2 status 확인                                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 실패 시 조치
+
+| 단계 | 실패 시 |
+|-----|--------|
+| Checkout | 차단 |
+| Install Dependencies | 차단 |
+| Generate Prisma Client | 차단 |
+| Build Applications | 차단 |
+| Prisma Migrate | 배포 중단 (스키마 드리프트 시 수동 개입 필요) |
+| Deploy | 롤백 |
 
 ---
 
