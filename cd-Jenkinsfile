@@ -96,6 +96,12 @@ pipeline {
                     # 백업 파일에 엄격한 권한 적용 (소유자만 읽기/쓰기)
                     chmod 600 "\$ENV_BACKUP_DIR"/.env.* 2>/dev/null || true
 
+                    # Git reset 전에 권한 문제 있는 폴더 정리
+                    # db/node_modules는 prisma generate 시 root 권한으로 생성될 수 있음
+                    echo ">>> Cleaning up problematic directories before git reset..."
+                    sudo rm -rf db/node_modules 2>/dev/null || true
+                    sudo rm -rf .git/index.lock 2>/dev/null || true
+
                     # Git pull
                     echo ">>> Pulling latest code..."
                     git fetch origin main
