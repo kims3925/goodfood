@@ -42,32 +42,9 @@ pipeline {
             }
         }
 
-        stage('Checkout') {
-            steps {
-                echo 'Checking out source code...'
-                checkout scm
-            }
-        }
-
-        stage('Install Dependencies') {
-            steps {
-                echo 'Installing dependencies...'
-                sh 'npm ci --legacy-peer-deps'
-            }
-        }
-
-        stage('Generate Prisma Client') {
-            steps {
-                echo 'Generating Prisma client...'
-                dir('db') {
-                    sh 'npx prisma generate --schema prisma'
-                }
-            }
-        }
-
-        // Build Applications 단계 제거
-        // - CI Pipeline에서 이미 빌드 검증 완료
-        // - 실제 빌드는 Deploy 단계에서 운영 서버에서 직접 수행
+        // Checkout, Install, Prisma Generate 단계 제거
+        // - 운영 서버의 Deploy 단계에서 모두 수행하므로 Jenkins 서버에서 중복 실행 불필요
+        // - 배포 시간 ~5분 단축
 
         stage('Deploy') {
 
@@ -233,10 +210,6 @@ pipeline {
                         echo ">>> Waiting for processes to stop... (\$i/5)"
                         sleep 2
                     done
-
-                    # Clean npm cache (skip .next deletion due to permission issues)
-                    echo ">>> Cleaning caches..."
-                    npm cache clean --force || true
 
                     # Build applications
                     echo ">>> Building applications..."
