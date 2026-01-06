@@ -369,16 +369,14 @@ function CheckoutContent() {
         // 합배송 옵션 계산 (상품 상세 페이지와 동일한 로직)
         const shippingFee = product.shippingFee ?? 0
         const bundleMaxQty = product.bundleMaxQty ?? 1
-        const rawVariantPrice = selectedVariant?.price || 0  // DB 원가 (배송비 미포함)
         const bundleUnit = selectedVariant?.bundleUnit || 1
         const bundleShippingType = product.bundleShippingType || 'NONE'
-
-        // bundleShippingType에 따른 가격 계산
-        // INCLUDED: 할인형 - DB 가격에 이미 배송비 포함
-        // SEPARATE/NONE: 배송비형 - DB 가격 + 배송비 추가
         const isBundleDiscount = bundleShippingType === 'INCLUDED'
-        // 상품 상세 페이지 API와 동일하게 배송비 포함 가격으로 변환
-        const variantPrice = isBundleDiscount ? rawVariantPrice : rawVariantPrice + shippingFee
+
+        // API 응답에서 variant.price는 이미 calculateSellingPrice()로 배송비 포함된 가격
+        // originalPrice는 DB 원가 (배송비 미포함)
+        const variantPrice = selectedVariant?.price || 0  // 배송비 포함 가격 (API에서 계산됨)
+        const rawVariantPrice = selectedVariant?.originalPrice || (variantPrice - shippingFee) || 0  // DB 원가
 
         let bundleOptions: any[] = []
         if (bundleMaxQty > 1 && shippingFee > 0) {
@@ -758,38 +756,34 @@ function CheckoutContent() {
       return sum + priceResult.discountAmount
     }, 0)
   } else if (product) {
-    // 상품 상세 페이지와 동일한 가격 계산 로직
+    // 공통 모듈을 사용한 가격 계산
     const shippingFee = product.shippingFee || 0
     const bundleMaxQty = product.bundleMaxQty || 1
     const bundleUnit = product.bundleUnit || 1
     const isBundleDiscount = product.isBundleDiscount || false
+    const variantPrice = product.salePrice || 0
 
-    // salePrice는 loadProduct()에서 배송비 포함 가격으로 설정됨
-    const basePrice = product.salePrice || 0
+    // 공통 모듈에 전달할 basePrice 결정
+    // INCLUDED (할인형): 배송비 포함 가격
+    // SEPARATE (배송비형): 배송비 미포함 원가
+    const basePrice = isBundleDiscount
+      ? variantPrice
+      : (product.originalPrice || (variantPrice - shippingFee) || 0)
 
-    if (bundleMaxQty > 1 && shippingFee > 0) {
-      // 합배송 상품: 상품 상세 페이지와 동일한 직접 계산
-      const totalBundleUnits = quantity * bundleUnit
-      const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
-      const remainder = totalBundleUnits % bundleMaxQty
-      const shippingCount = fullBundles + (remainder > 0 ? 1 : 0)
+    const bundleShippingType = isBundleDiscount ? 'INCLUDED' : (shippingFee > 0 ? 'SEPARATE' : 'NONE')
 
-      if (isBundleDiscount) {
-        // 할인형: (배송비 포함 가격 × 수량) - (배송비 × 할인 개수)
-        const discountCount = Math.max(0, quantity - shippingCount)
-        subtotal = (basePrice * quantity) - (shippingFee * discountCount)
-        bundleDiscount = shippingFee * discountCount
-      } else {
-        // 배송비형: (원가 × 수량) + (배송비 × 배송 횟수)
-        const originalPrice = basePrice - shippingFee
-        subtotal = (originalPrice * quantity) + (shippingFee * shippingCount)
-        bundleDiscount = (shippingFee * quantity) - (shippingFee * shippingCount)
-      }
-    } else {
-      // 합배송 없는 경우: salePrice에 배송비 포함되어 있으므로 그대로 사용
-      subtotal = basePrice * quantity
-    }
+    // 공통 모듈로 가격 계산
+    const priceResult = calcPrice({
+      basePrice,
+      shippingFee,
+      quantity,
+      bundleMaxQty,
+      bundleUnit,
+      bundleShippingType,
+    })
 
+    subtotal = priceResult.itemTotal
+    bundleDiscount = priceResult.discountAmount
     orderItemCount = quantity
     orderName = product.title
   }
@@ -1107,6 +1101,22 @@ function CheckoutContent() {
                   {/* 회원: 배송지 선택 */}
                   {session && addresses.length > 0 && (
                     <div className="space-y-3 mb-4">
+                      {/* 회원 정보 에러 메시지 */}
+                      {(errors.recipientName || errors.recipientPhone) && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-sm text-red-600 flex items-center gap-1">
+                            <AlertCircle className="w-4 h-4" />
+                            {errors.recipientName || errors.recipientPhone}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => router.push(getPath('/mypage/profile'))}
+                            className="mt-2 text-sm text-[#FF6B6B] hover:underline"
+                          >
+                            마이페이지에서 회원정보 수정하기 →
+                          </button>
+                        </div>
+                      )}
                       {addresses.map((address) => (
                         <div
                           key={address.id}
