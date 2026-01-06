@@ -6,6 +6,7 @@
  * - 상품 상세 페이지 (ProductDetailClient.tsx)
  * - 장바구니 페이지 (cart/page.tsx)
  * - 주문 페이지 (checkout/page.tsx)
+ * - 찜하기 페이지 (mypage/wishlist API)
  */
 
 export type BundleShippingType = 'NONE' | 'INCLUDED' | 'SEPARATE'
