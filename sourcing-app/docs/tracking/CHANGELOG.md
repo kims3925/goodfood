@@ -291,6 +291,46 @@ TR-{YYYYMMDD}-{NUMBER}
 
 ---
 
+## TR-20260106-008: 발행 파이프라인 totalItems 실제 발행 대상만 카운트
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-06 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 발행 파이프라인에서 `totalItems`가 전체 상품 수가 아닌 실제 발행 대상 상품 수만 카운트하도록 수정
+- 이미 발행된 상품이나 스킵된 상품은 `totalItems`에서 제외
+- 진행률 표시가 더 정확하게 표시됨
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/modules/automation/pipelines/publish.ts | Modified | totalItems 계산 로직 수정 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| TypeScript Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Publish (소매밴드 발행)
+
+---
+
 ## TR-20260106-007: 자동화 실행 로그 발행 단계 상세 로그 표시 수정
 
 | 항목 | 값 |
