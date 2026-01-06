@@ -9,6 +9,8 @@
  *
  * Note: Product 생성은 이 파이프라인에서 하지 않음
  * Product는 사용자가 수집상품 관리 페이지에서 수동으로 생성함
+ *
+ * 수동 실행과 동일한 서비스 레이어(CollectedProductService) 사용으로 통일
  */
 
 import prisma, { AiProvider } from '@bandauto/db'
@@ -17,6 +19,7 @@ import { updateWorkflowProgress } from '../workflow-service'
 import { transformPostsToProductsBatch, BatchTransformResult } from '@/modules/transformation/product.transformer'
 import { settingsService } from '@/modules/config/domain/src/settings'
 import { ProductTransformationError } from '@/modules/transformation/product.types'
+import { collectedProductService } from '@/modules/catalog/domain/src/collected-product'
 import {
   TransformConfig,
   TransformResult,
@@ -446,30 +449,28 @@ export async function runTransformPipeline(
           }
 
           try {
-            // CollectedProduct 생성
-            const collectedProduct = await prisma.collectedProduct.create({
-              data: {
-                userId,
-                postId: post.id,
-                name: result.draft.name,
-                description: result.draft.description || null,
-                currency: result.draft.currency || 'KRW',
-                rawMetadata: JSON.stringify({
-                  category: result.draft.categoryId,
-                  options: result.draft.options,
-                  variants: result.draft.variants,
-                  wholesalePrice: result.draft.wholesalePrice ?? null,
-                  price: result.draft.price ?? null,
-                  // 배송비 정보 (최상위 레벨 + shipping 객체 둘 다 저장)
+            // CollectedProduct 생성 (CollectedProductService 사용 - 수동과 동일한 로직)
+            const collectedProduct = await collectedProductService.create({
+              userId,
+              postId: post.id,
+              name: result.draft.name,
+              description: result.draft.description || null,
+              currency: result.draft.currency || 'KRW',
+              rawMetadata: {
+                category: result.draft.categoryId,
+                options: result.draft.options,
+                variants: result.draft.variants,
+                wholesalePrice: result.draft.wholesalePrice ?? null,
+                price: result.draft.price ?? null,
+                // 배송비 정보 (최상위 레벨 + shipping 객체 둘 다 저장)
+                shippingFee: result.draft.shippingFee ?? null,
+                shippingInfo: result.draft.shippingInfo ?? null,
+                bundleMaxQty: result.draft.bundleMaxQty ?? 1,
+                shipping: {
                   shippingFee: result.draft.shippingFee ?? null,
                   shippingInfo: result.draft.shippingInfo ?? null,
                   bundleMaxQty: result.draft.bundleMaxQty ?? 1,
-                  shipping: {
-                    shippingFee: result.draft.shippingFee ?? null,
-                    shippingInfo: result.draft.shippingInfo ?? null,
-                    bundleMaxQty: result.draft.bundleMaxQty ?? 1,
-                  },
-                }),
+                },
               },
             })
 
@@ -486,14 +487,14 @@ export async function runTransformPipeline(
             transformedPost = {
               postId: result.postId,
               status: 'failed',
-              error: `DB 저장 실패: ${dbError.message}`,
+              error: `저장 실패: ${dbError.message}`,
               errorType: 'PERMANENT',
               retryable: false,
             }
 
             errors.push({
               itemId: post.id,
-              message: `DB 저장 실패: ${dbError.message}`,
+              message: `저장 실패: ${dbError.message}`,
               timestamp: new Date(),
             })
           }

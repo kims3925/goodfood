@@ -1,7 +1,9 @@
-import prisma from '@bandauto/db'
+import prisma, { BundleShippingType, Product } from '@bandauto/db'
 import { productRepository } from '../repository/product.repository'
-import { deleteProductImageFiles } from '@/modules/utils/imageUtils'
+import { deleteProductImageFiles, downloadAndSaveProductImages } from '@/modules/utils/imageUtils'
 import type { ProductListParams, ProductCreateInput, ProductUpdateInput, OptionGroupInput, VariantInput } from '../types/product.types'
+import type { BatchResult, ProgressCallback } from '@/types/batch.types'
+import { createEmptyBatchResult } from '@/types/batch.types'
 
 export class ProductService {
   async getList(params: ProductListParams) {
@@ -208,6 +210,202 @@ export class ProductService {
     })
 
     return productRepository.delete(id)
+  }
+
+  /**
+   * CollectedProduct 배열에서 Product 배치 생성 (자동화 파이프라인에서 사용)
+   *
+   * @param params.userId 사용자 ID
+   * @param params.collectedProductIds 수집상품 ID 배열
+   * @param params.onProgress 진행 콜백 (선택)
+   */
+  async createFromCollectedProducts(params: {
+    userId: number
+    collectedProductIds: number[]
+    onProgress?: ProgressCallback<Product>
+  }): Promise<BatchResult<Product>> {
+    const { userId, collectedProductIds, onProgress } = params
+    const result = createEmptyBatchResult<Product>()
+
+    if (collectedProductIds.length === 0) {
+      return result
+    }
+
+    // CollectedProduct 조회
+    const collectedProducts = await prisma.collectedProduct.findMany({
+      where: {
+        id: { in: collectedProductIds },
+        userId,
+        isConverted: false, // 아직 변환되지 않은 수집상품만
+      },
+      include: {
+        post: {
+          include: {
+            images: {
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
+      },
+    })
+
+    result.total = collectedProductIds.length
+    result.skippedCount = collectedProductIds.length - collectedProducts.length
+
+    console.log(`[ProductService.createFromCollectedProducts] Total: ${collectedProductIds.length}, Found: ${collectedProducts.length}, Skipped: ${result.skippedCount}`)
+
+    for (let i = 0; i < collectedProducts.length; i++) {
+      const collectedProduct = collectedProducts[i]
+
+      try {
+        // rawMetadata에서 AI 분석 결과 추출
+        let metadata: any = {}
+        if (collectedProduct.rawMetadata) {
+          try {
+            metadata = typeof collectedProduct.rawMetadata === 'string'
+              ? JSON.parse(collectedProduct.rawMetadata)
+              : collectedProduct.rawMetadata
+          } catch {
+            // 파싱 실패 시 빈 객체 사용
+          }
+        }
+
+        const options = metadata.options || []
+        const variants = metadata.variants || []
+        const wholesalePrice = metadata.wholesalePrice ?? null
+        const price = metadata.price ?? null
+        const shipping = metadata.shipping || {
+          shippingFee: metadata.shippingFee ?? null,
+          shippingInfo: metadata.shippingInfo ?? null,
+        }
+        const bundleMaxQty = metadata.bundleMaxQty ?? metadata.shipping?.bundleMaxQty ?? null
+
+        // 합배송 타입 자동 추론
+        let bundleShippingType: BundleShippingType = BundleShippingType.NONE
+        const shippingInfoStr = String(shipping.shippingInfo || '')
+        const shippingFeeNum = typeof shipping.shippingFee === 'number' ? shipping.shippingFee : 0
+
+        const isShippingIncluded = /배송비\s*포함|택배비\s*포함|무료\s*배송|배송\s*무료/.test(shippingInfoStr)
+
+        if (isShippingIncluded) {
+          bundleShippingType = BundleShippingType.INCLUDED
+        } else if (shippingFeeNum > 0) {
+          bundleShippingType = BundleShippingType.SEPARATE
+        }
+
+        // 게시물 이미지 URL 수집
+        const imageUrls = collectedProduct.post.images.map((img) => img.url)
+
+        // Product 생성
+        const product = await prisma.product.create({
+          data: {
+            userId,
+            channelId: collectedProduct.post.channelId,
+            name: collectedProduct.name || '상품명 없음',
+            description: collectedProduct.description || null,
+            categoryId: metadata.category || null,
+            currency: collectedProduct.currency || 'KRW',
+            wholesalePrice: typeof wholesalePrice === 'number' ? wholesalePrice : null,
+            price: typeof price === 'number' ? price : null,
+            shippingFee: typeof shipping.shippingFee === 'number' ? shipping.shippingFee : null,
+            shippingInfo: typeof shipping.shippingInfo === 'string' ? shipping.shippingInfo : null,
+            bundleMaxQty: typeof bundleMaxQty === 'number' ? bundleMaxQty : null,
+            bundleShippingType,
+            thumbnailUrl: collectedProduct.post.images[0]?.url || null,
+            options: options.length
+              ? {
+                  create: options.flatMap((opt: any, groupIndex: number) =>
+                    (opt.values || []).map((value: string, valueIndex: number) => ({
+                      groupName: opt.groupName,
+                      value,
+                      sortOrder: groupIndex * 100 + valueIndex,
+                    }))
+                  ),
+                }
+              : undefined,
+            variants: variants.length
+              ? {
+                  create: variants.map((v: any) => ({
+                    optionSummary: v.optionSummary ?? null,
+                    wholesalePrice: v.wholesalePrice ?? null,
+                    price: v.price ?? 0,
+                  })),
+                }
+              : undefined,
+          },
+        })
+
+        // 이미지 다운로드 및 ProductImage 저장
+        if (imageUrls.length > 0) {
+          try {
+            const downloadedImages = await downloadAndSaveProductImages(imageUrls)
+
+            if (downloadedImages.length > 0) {
+              await prisma.productImage.createMany({
+                data: downloadedImages.map((img, index) => ({
+                  productId: product.id,
+                  url: img.url,
+                  fileHash: img.fileHash,
+                  fileName: img.fileName,
+                  fileSize: img.fileSize,
+                  sortOrder: index,
+                })),
+              })
+
+              await prisma.product.update({
+                where: { id: product.id },
+                data: { thumbnailUrl: downloadedImages[0].url },
+              })
+            }
+          } catch (imageError) {
+            // 이미지 실패해도 상품 생성은 성공으로 처리
+            console.error(`[ProductService.createFromCollectedProducts] Image download failed for product ${product.id}:`, imageError)
+          }
+        }
+
+        // 수집상품의 isConverted를 true로 업데이트
+        await prisma.collectedProduct.update({
+          where: { id: collectedProduct.id },
+          data: { isConverted: true },
+        })
+
+        result.successCount++
+        result.results.push({
+          success: true,
+          data: product,
+        })
+
+        if (onProgress) {
+          await onProgress({
+            current: i,
+            total: collectedProducts.length,
+            result: { success: true, data: product },
+          })
+        }
+
+        console.log(`[ProductService.createFromCollectedProducts] Created product ${product.id} from collectedProduct ${collectedProduct.id}`)
+      } catch (error: any) {
+        result.failedCount++
+        result.results.push({
+          success: false,
+          error: error.message || '상품 생성 실패',
+          errorType: 'PERMANENT',
+        })
+
+        if (onProgress) {
+          await onProgress({
+            current: i,
+            total: collectedProducts.length,
+            result: { success: false, error: error.message },
+          })
+        }
+
+        console.error(`[ProductService.createFromCollectedProducts] Failed for collectedProduct ${collectedProduct.id}:`, error.message)
+      }
+    }
+
+    console.log(`[ProductService.createFromCollectedProducts] Completed: ${result.successCount} success, ${result.failedCount} failed, ${result.skippedCount} skipped`)
+    return result
   }
 }
 
