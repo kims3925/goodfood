@@ -107,6 +107,41 @@ export class BandPostAutomation {
   }
 
   /**
+   * 로그인 화면인지 감지
+   * 발행 과정 중 세션 만료로 로그인 페이지로 리다이렉트되는 경우 감지
+   */
+  private async isLoginPage(page: Page): Promise<boolean> {
+    const currentUrl = page.url()
+
+    // URL 기반 체크
+    if (currentUrl.includes('signin') ||
+        currentUrl.includes('login') ||
+        currentUrl.includes('auth.band.us')) {
+      console.log(`[밴드자동화] 로그인 페이지 감지 (URL): ${currentUrl}`)
+      return true
+    }
+
+    // 로그인 폼 요소 체크
+    const loginFormSelectors = [
+      'input[name="email"]',
+      'input[name="password"]',
+      'button[type="submit"]:has-text("로그인")',
+      '.uLoginForm',
+      '[data-viewname="DLoginView"]',
+    ]
+
+    for (const selector of loginFormSelectors) {
+      const element = await page.$(selector)
+      if (element && await element.isVisible()) {
+        console.log(`[밴드자동화] 로그인 페이지 감지 (요소): ${selector}`)
+        return true
+      }
+    }
+
+    return false
+  }
+
+  /**
    * URL에서 밴드 ID를 추출하여 post URL 형태로 반환
    * @param url 현재 URL (예: https://band.us/band/82426338/tab/posts)
    * @returns 밴드 post URL (예: https://band.us/band/82426338/post)
@@ -466,6 +501,16 @@ export class BandPostAutomation {
       const editorExists = await page.$('[data-viewname="DPostWriteLayerView"] [contenteditable="true"], .cPostWrite [contenteditable="true"].cke_editable')
       if (!editorExists || !(await editorExists.isVisible())) {
         console.error('[밴드자동화] 글쓰기 레이어 열기 실패!')
+
+        // 로그인 화면인지 확인 (세션 만료)
+        if (await this.isLoginPage(page)) {
+          await this.saveDebugScreenshot(page, 'session-expired-login-page')
+          throw new BandPlaywrightError(
+            '세션이 만료되어 로그인 페이지로 이동했습니다. 채널 설정에서 쿠키를 다시 등록해주세요.',
+            BandPlaywrightErrorCode.SESSION_EXPIRED
+          )
+        }
+
         throw new BandPlaywrightError(
           '글쓰기 레이어를 열 수 없습니다.',
           BandPlaywrightErrorCode.POST_FAILED
@@ -2901,15 +2946,29 @@ export class BandPostAutomation {
     } catch (error: any) {
       console.error('[밴드자동화] 배치 발행 실패:', error)
 
-      // 아직 처리되지 않은 항목들을 실패로 처리
+      // 세션 만료로 인한 중단인지 확인
+      const isSessionExpired = error instanceof BandPlaywrightError &&
+        error.code === BandPlaywrightErrorCode.SESSION_EXPIRED
+
+      // 아직 처리되지 않은 항목들을 처리
       const processedCount = results.length
-      for (let i = processedCount; i < items.length; i++) {
-        results.push({
-          productId: items[i].productId,
-          success: false,
-          error: error.message || '배치 발행 중단',
-        })
-        failedCount++
+      const remainingCount = items.length - processedCount
+
+      if (remainingCount > 0) {
+        if (isSessionExpired) {
+          console.log(`[밴드자동화] 세션 만료로 인해 ${remainingCount}개 상품 발행 취소됨`)
+        }
+
+        for (let i = processedCount; i < items.length; i++) {
+          results.push({
+            productId: items[i].productId,
+            success: false,
+            error: isSessionExpired
+              ? '세션 만료로 발행 취소됨 (쿠키 재등록 필요)'
+              : error.message || '배치 발행 중단',
+          })
+          failedCount++
+        }
       }
     }
 
@@ -3183,6 +3242,15 @@ export class BandPostAutomation {
 
     // 디버그 스크린샷
     await this.saveDebugScreenshot(page, 'write-layer-failed')
+
+    // 로그인 화면인지 확인 (세션 만료)
+    if (await this.isLoginPage(page)) {
+      await this.saveDebugScreenshot(page, 'batch-session-expired-login-page')
+      throw new BandPlaywrightError(
+        '세션이 만료되어 로그인 페이지로 이동했습니다. 채널 설정에서 쿠키를 다시 등록해주세요.',
+        BandPlaywrightErrorCode.SESSION_EXPIRED
+      )
+    }
 
     throw new BandPlaywrightError(
       '글쓰기 레이어를 열 수 없습니다.',

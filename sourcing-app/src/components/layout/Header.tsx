@@ -134,8 +134,10 @@ const SessionIndicator = memo(function SessionIndicator() {
     )
   }
 
-  if (!summary || summary.total === 0) {
-    return null // 채널이 없으면 표시 안함
+  // 채널도 없고 Extension도 없으면 표시 안함
+  // Extension이 있으면 채널 없어도 세션 저장 버튼은 표시
+  if (!summary || (summary.total === 0 && !extensionAvailable)) {
+    return null
   }
 
   const isHealthy = summary.allValid
@@ -170,37 +172,39 @@ const SessionIndicator = memo(function SessionIndicator() {
         </button>
       )}
 
-      {/* 세션 상태 표시 버튼 */}
-      <button
-        onClick={checkSession}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-colors ${
-          isHealthy
-            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-            : hasExpired
-            ? 'bg-red-100 text-red-700 hover:bg-red-200'
-            : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-        }`}
-        title="클릭하여 세션 상태 새로고침"
-      >
-        {isHealthy ? (
-          <Wifi size={14} />
-        ) : (
-          <WifiOff size={14} />
-        )}
-        <span className="text-xs font-medium">
-          {isHealthy
-            ? `세션 ${summary.valid}/${summary.total}`
-            : hasExpired
-            ? `만료 ${summary.expired}개`
-            : `미설정 ${summary.none}개`}
-        </span>
-        {isLoading && <RefreshCw size={12} className="animate-spin" />}
-      </button>
+      {/* 세션 상태 표시 버튼 (채널이 있을 때만) */}
+      {summary.total > 0 && (
+        <button
+          onClick={checkSession}
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-colors ${
+            isHealthy
+              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+              : hasExpired
+              ? 'bg-red-100 text-red-700 hover:bg-red-200'
+              : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+          }`}
+          title="클릭하여 세션 상태 새로고침"
+        >
+          {isHealthy ? (
+            <Wifi size={14} />
+          ) : (
+            <WifiOff size={14} />
+          )}
+          <span className="text-xs font-medium">
+            {isHealthy
+              ? `세션 ${summary.valid}/${summary.total}`
+              : hasExpired
+              ? `만료 ${summary.expired}개`
+              : `미설정 ${summary.none}개`}
+          </span>
+          {isLoading && <RefreshCw size={12} className="animate-spin" />}
+        </button>
+      )}
 
-      {/* 툴팁 */}
-      {showTooltip && (
+      {/* 툴팁 (채널이 있을 때만) */}
+      {showTooltip && summary.total > 0 && (
         <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50">
           <div className="text-xs font-medium text-gray-700 mb-2">Band 세션 상태</div>
           <div className="space-y-1.5 max-h-40 overflow-y-auto">
