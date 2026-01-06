@@ -1,6 +1,6 @@
 # 데이터/비즈니스 흐름
 
-> **관련 문서:** [PROJECT.md](./PROJECT.md) | [DATABASE.md](./DATABASE.md) | [CLAUDE.md](./CLAUDE.md)
+> **관련 문서:** [../PROJECT.md](../PROJECT.md) | [../DATABASE.md](../DATABASE.md) | [../../CLAUDE.md](../../CLAUDE.md)
 
 ---
 

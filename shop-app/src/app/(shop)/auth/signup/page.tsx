@@ -115,7 +115,8 @@ export default function SignupPage() {
         return undefined
 
       case 'phone':
-        if (value && !/^01[0-9]{8,9}$/.test(value.replace(/-/g, ''))) {
+        if (!value.trim()) return '휴대폰 번호를 입력해주세요.'
+        if (!/^01[0-9]{8,9}$/.test(value.replace(/-/g, ''))) {
           return '올바른 휴대폰 번호 형식이 아닙니다.'
         }
         return undefined
@@ -646,7 +647,7 @@ export default function SignupPage() {
             {/* Phone */}
             <div>
               <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                휴대폰 번호
+                휴대폰 번호 <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />

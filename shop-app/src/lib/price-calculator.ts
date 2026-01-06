@@ -1,12 +1,23 @@
 /**
  * 가격 계산 공통 모듈
  * 합배송, 배송비 포함/별도 등 모든 가격 계산 로직을 통합
+ *
+ * 사용처:
+ * - 상품 상세 페이지 (ProductDetailClient.tsx)
+ * - 장바구니 페이지 (cart/page.tsx)
+ * - 주문 페이지 (checkout/page.tsx)
  */
 
 export type BundleShippingType = 'NONE' | 'INCLUDED' | 'SEPARATE'
 
 export interface PriceCalculationInput {
-  basePrice: number           // 옵션별 소매가 (배송비 미포함)
+  /**
+   * 옵션별 기준 가격
+   * - INCLUDED (할인형): 배송비가 포함된 판매가 (예: 12,000원 = 상품가 9,000 + 배송비 3,000)
+   * - SEPARATE (배송비형): 배송비 미포함 원가 (예: 9,000원)
+   * - NONE: 그대로 사용
+   */
+  basePrice: number
   shippingFee: number         // 배송비
   quantity: number            // 수량
   bundleMaxQty: number        // 합배송 최대 수량 (1이면 합배송 없음)

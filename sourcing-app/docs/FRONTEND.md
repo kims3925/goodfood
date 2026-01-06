@@ -1,6 +1,6 @@
 # 프론트엔드 규칙
 
-> **관련 문서:** [STRUCTURE.md](./STRUCTURE.md) | [PROJECT.md](./PROJECT.md) | [CLAUDE.md](./CLAUDE.md)
+> **관련 문서:** [STRUCTURE.md](./STRUCTURE.md) | [PROJECT.md](./PROJECT.md) | [CLAUDE.md](../CLAUDE.md)
 
 ---
 

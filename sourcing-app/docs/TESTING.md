@@ -1,6 +1,6 @@
 # 테스트 규칙
 
-> **관련 문서:** [FRONTEND.md](./FRONTEND.md) | [tracking/BACKEND.md](./tracking/BACKEND.md) | [CLAUDE.md](./CLAUDE.md)
+> **관련 문서:** [FRONTEND.md](./FRONTEND.md) | [BACKEND.md](./BACKEND.md) | [CLAUDE.md](../CLAUDE.md)
 
 ---
 

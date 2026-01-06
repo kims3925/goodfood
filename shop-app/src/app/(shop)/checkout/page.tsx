@@ -365,40 +365,53 @@ function CheckoutContent() {
         const selectedVariant = variantId
           ? product.variants?.find((v: any) => v.id === parseInt(variantId))
           : product.variants?.[0]
+          
 
-        // 합배송 옵션 계산 (공통 모듈 사용)
+        // 합배송 옵션 계산 (상품 상세 페이지와 동일한 로직)
         const shippingFee = product.shippingFee ?? 0
         const bundleMaxQty = product.bundleMaxQty ?? 1
-        const variantPrice = selectedVariant?.price || 0
+        // API가 variant.price에 배송비 포함 가격, variant.originalPrice에 원가를 반환
+        // 가격 계산 시 원가(originalPrice)를 사용해야 배송비 중복 방지
         const bundleUnit = selectedVariant?.bundleUnit || 1
         const bundleShippingType = product.bundleShippingType || 'NONE'
-
-        // bundleShippingType에 따른 가격 계산
-        // INCLUDED: 할인형 - 가격에 배송비 포함, 합배송 시 할인
-        // SEPARATE: 배송비형 - 가격 + 배송비, 합배송 시 배송비 절약
         const isBundleDiscount = bundleShippingType === 'INCLUDED'
+
+        // API 응답에서 variant.price는 이미 calculateSellingPrice()로 배송비 포함된 가격
+        // originalPrice는 DB 원가 (배송비 미포함)
+        const variantPrice = selectedVariant?.price || 0  // 배송비 포함 가격 (API에서 계산됨)
+        const rawVariantPrice = selectedVariant?.originalPrice || (variantPrice - shippingFee) || 0  // DB 원가
 
         let bundleOptions: any[] = []
         if (bundleMaxQty > 1 && shippingFee > 0) {
           // 합배송 표시용 최대 수량 (1묶음 완성까지)
           const maxDisplayQty = Math.floor(bundleMaxQty / bundleUnit) || 1
 
+          // 상품 상세 페이지와 동일한 직접 계산 로직
           for (let qty = 1; qty <= maxDisplayQty; qty++) {
-            // 공통 모듈 사용
-            const priceResult = calcPrice({
-              basePrice: variantPrice,
-              shippingFee,
-              quantity: qty,
-              bundleMaxQty,
-              bundleUnit,
-              bundleShippingType,
-            })
+            const totalBundleUnits = qty * bundleUnit
+            const fullBundles = Math.floor(totalBundleUnits / bundleMaxQty)
+            const remainder = totalBundleUnits % bundleMaxQty
+            const shippingCount = fullBundles + (remainder > 0 ? 1 : 0)
+
+            let totalPrice: number
+            let discount: number
+
+            if (isBundleDiscount) {
+              // 할인형: (배송비 포함 가격 × 수량) - (배송비 × 할인 개수)
+              const discountCount = Math.max(0, qty - shippingCount)
+              totalPrice = (variantPrice * qty) - (shippingFee * discountCount)
+              discount = shippingFee * discountCount
+            } else {
+              // 배송비형: (원가 × 수량) + (배송비 × 배송 횟수)
+              totalPrice = (rawVariantPrice * qty) + (shippingFee * shippingCount)
+              discount = (shippingFee * qty) - (shippingFee * shippingCount)
+            }
 
             bundleOptions.push({
               qty,
-              totalPrice: priceResult.itemTotal,
-              discount: priceResult.discountAmount,
-              unitPrice: priceResult.unitPrice,
+              totalPrice,
+              discount,
+              unitPrice: Math.round(totalPrice / qty),
               isBundleDiscount,
               bundleUnit,
             })
@@ -411,8 +424,8 @@ function CheckoutContent() {
           title: product.name,
           description: product.description || '',
           images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
-          originalPrice: variantPrice,
-          salePrice: variantPrice,
+          originalPrice: rawVariantPrice,  // DB 원가 (참조용)
+          salePrice: variantPrice,         // 배송비 포함 가격
           category: product.categoryId || '',
           stock: selectedVariant?.stock || 100,
           bundleOptions,
@@ -746,40 +759,34 @@ function CheckoutContent() {
       return sum + priceResult.discountAmount
     }, 0)
   } else if (product) {
-    // 합배송 옵션이 있으면 공통 모듈로 가격 계산
-    if (product.bundleOptions && product.bundleOptions.length > 0) {
-      const isBundleDiscount = product.isBundleDiscount || false
-      const bundleShippingType = isBundleDiscount ? 'INCLUDED' : (product.shippingFee ? 'SEPARATE' : 'NONE')
+    // 공통 모듈을 사용한 가격 계산
+    const shippingFee = product.shippingFee || 0
+    const bundleMaxQty = product.bundleMaxQty || 1
+    const bundleUnit = product.bundleUnit || 1
+    const isBundleDiscount = product.isBundleDiscount || false
+    const variantPrice = product.salePrice || 0
 
-      // 배송비형(SEPARATE)은 salePrice에 배송비가 포함되어 있으므로 원가로 변환
-      // 할인형(INCLUDED)은 salePrice가 이미 원가
-      const basePrice = isBundleDiscount
-        ? (product.salePrice || 0)
-        : (product.salePrice || 0) - (product.shippingFee || 0)
+    // 공통 모듈에 전달할 basePrice 결정
+    // INCLUDED (할인형): 배송비 포함 가격
+    // SEPARATE (배송비형): 배송비 미포함 원가
+    const basePrice = isBundleDiscount
+      ? variantPrice
+      : (product.originalPrice || (variantPrice - shippingFee) || 0)
 
-      const priceResult = calcPrice({
-        basePrice,
-        shippingFee: product.shippingFee || 0,
-        quantity,
-        bundleMaxQty: product.bundleMaxQty || 1,
-        bundleUnit: product.bundleUnit || 1,
-        bundleShippingType,
-      })
-      subtotal = priceResult.itemTotal
-      bundleDiscount = priceResult.discountAmount
-    } else {
-      // 합배송 옵션 없는 경우
-      const shippingFee = product.shippingFee || 0
-      const isBundleDiscount = product.isBundleDiscount || false
+    const bundleShippingType = isBundleDiscount ? 'INCLUDED' : (shippingFee > 0 ? 'SEPARATE' : 'NONE')
 
-      if (shippingFee > 0 && !isBundleDiscount) {
-        // 배송비 별도형: 원가 + 배송비
-        subtotal = (product.salePrice * quantity) + (shippingFee * quantity)
-      } else {
-        // 배송비 포함형 또는 배송비 없음: salePrice 그대로 사용
-        subtotal = product.salePrice * quantity
-      }
-    }
+    // 공통 모듈로 가격 계산
+    const priceResult = calcPrice({
+      basePrice,
+      shippingFee,
+      quantity,
+      bundleMaxQty,
+      bundleUnit,
+      bundleShippingType,
+    })
+
+    subtotal = priceResult.itemTotal
+    bundleDiscount = priceResult.discountAmount
     orderItemCount = quantity
     orderName = product.title
   }
@@ -1097,6 +1104,22 @@ function CheckoutContent() {
                   {/* 회원: 배송지 선택 */}
                   {session && addresses.length > 0 && (
                     <div className="space-y-3 mb-4">
+                      {/* 회원 정보 에러 메시지 */}
+                      {(errors.recipientName || errors.recipientPhone) && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-sm text-red-600 flex items-center gap-1">
+                            <AlertCircle className="w-4 h-4" />
+                            {errors.recipientName || errors.recipientPhone}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => router.push(getPath('/mypage/profile'))}
+                            className="mt-2 text-sm text-[#FF6B6B] hover:underline"
+                          >
+                            마이페이지에서 회원정보 수정하기 →
+                          </button>
+                        </div>
+                      )}
                       {addresses.map((address) => (
                         <div
                           key={address.id}

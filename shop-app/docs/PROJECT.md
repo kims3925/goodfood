@@ -1,6 +1,6 @@
 # 프로젝트 개요
 
-> **관련 문서:** [STRUCTURE.md](./STRUCTURE.md) | [CLAUDE.md](./CLAUDE.md)
+> **관련 문서:** [STRUCTURE.md](./STRUCTURE.md) | [../CLAUDE.md](../CLAUDE.md)
 
 ---
 
@@ -91,6 +91,49 @@
 |-----|-----|-----|
 | local | 로컬 개발 | localhost:3000, localhost:3001 |
 | prod | 운영 | https://snsauto.abcpharm.net |
+
+---
+
+## shop-app 상세
+
+### 주요 기능
+
+| 기능 | 설명 | 라우트 |
+|-----|-----|-------|
+| 메인 | 쇼핑몰 메인 페이지 | `/main` |
+| 상품 | 상품 목록/상세 보기 | `/product/[id]` |
+| 장바구니 | 상품 담기, 수량 변경 | `/cart` |
+| 결제 | 주문 정보 입력, 결제 | `/checkout` |
+| 주문 조회 | 주문 상태 확인 | `/order/[orderNumber]` |
+| 마이페이지 | 회원 정보, 주문 내역 | `/mypage` |
+| 비회원 주문 | 비회원 주문/조회 | `/order/band` |
+| CS | 문의하기 | `/cs` |
+
+### 주요 의존성
+
+| 패키지 | 버전 | 용도 |
+|--------|------|-----|
+| next | 14.2.3 | 프레임워크 |
+| react | 18.2.0 | UI |
+| typescript | 5.9.2 | 타입 시스템 |
+| next-auth | 4.24.6 | 인증 |
+| @tosspayments/payment-sdk | 1.9.1 | 결제 SDK |
+| @tosspayments/payment-widget-sdk | 0.12.0 | 결제 위젯 |
+| zustand | 4.5.0 | 상태 관리 |
+| react-hook-form | 7.49.0 | 폼 관리 |
+| zod | 3.22.4 | 유효성 검증 |
+| tailwindcss | 3.4.1 | 스타일링 |
+| lucide-react | 0.321.0 | 아이콘 |
+| react-hot-toast | 2.6.0 | 토스트 알림 |
+
+### 결제 연동 (Toss Payments)
+
+| 결제 수단 | 지원 |
+|----------|------|
+| 카드 결제 | ✅ |
+| 가상계좌 | ✅ |
+| 계좌이체 | ✅ |
+| 휴대폰 결제 | ✅ |
 
 ---
 

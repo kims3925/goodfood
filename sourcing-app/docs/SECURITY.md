@@ -1,6 +1,6 @@
 # 보안 규칙
 
-> **관련 문서:** [DEPLOYMENT.md](./DEPLOYMENT.md) | [PROJECT.md](./PROJECT.md) | [CLAUDE.md](./CLAUDE.md)
+> **관련 문서:** [DEPLOYMENT.md](./DEPLOYMENT.md) | [PROJECT.md](./PROJECT.md) | [CLAUDE.md](../CLAUDE.md)
 
 ---
 

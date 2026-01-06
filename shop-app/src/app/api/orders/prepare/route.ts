@@ -271,6 +271,19 @@ export async function POST(req: NextRequest) {
 
         const itemTotal = priceResult.itemTotal
 
+        // 가격 계산 디버그 로그 (개발 환경에서만 출력)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Orders Prepare] 바로구매 가격 계산:', {
+            productName: product?.name,
+            basePrice,
+            shippingFee,
+            bundleShippingType: product?.bundleShippingType,
+            quantity,
+            unitPrice: priceResult.unitPrice,
+            itemTotal,
+          })
+        }
+
         orderItems.push({
           publishedProductId: publishedProduct.id,
           variantId: variant?.id || null,
@@ -349,6 +362,16 @@ export async function POST(req: NextRequest) {
     }
 
     totalAmount = subtotal + shippingFee - discountAmount
+
+    // 최종 결제 금액 로그 (개발 환경에서만 출력)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Orders Prepare] 최종 결제 금액:', {
+        subtotal,
+        shippingFee,
+        discountAmount,
+        totalAmount,
+      })
+    }
 
     // 주문번호 생성
     const orderId = generateOrderNumber()

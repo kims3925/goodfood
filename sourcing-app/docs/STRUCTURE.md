@@ -1,6 +1,6 @@
 # 명명 규칙 및 구조
 
-> **관련 문서:** [PROJECT.md](./PROJECT.md) | [CLAUDE.md](./CLAUDE.md)
+> **관련 문서:** [PROJECT.md](./PROJECT.md) | [CLAUDE.md](../CLAUDE.md)
 
 ---
 
@@ -65,12 +65,20 @@ bandauto/
 │   │   │   ├── layout/           # 레이아웃 (Header, Sidebar)
 │   │   │   ├── ui/               # 공통 UI (Button, Modal)
 │   │   │   ├── product/          # 상품 관련 컴포넌트
-│   │   │   └── shop/             # 쇼핑몰 관련 컴포넌트
+│   │   │   ├── shop/             # 쇼핑몰 관련 컴포넌트
+│   │   │   ├── automation/       # 자동화 대시보드 컴포넌트
+│   │   │   ├── channel/          # 채널 관련 컴포넌트
+│   │   │   ├── settings/         # 설정 페이지 컴포넌트
+│   │   │   └── settlement/       # 정산 관련 컴포넌트
 │   │   ├── modules/              # 도메인 모듈
 │   │   │   ├── sourcing/         # 소싱 도메인
 │   │   │   ├── catalog/          # 카탈로그 도메인
 │   │   │   ├── automation/       # 자동화 도메인
-│   │   │   └── transformation/   # AI 변환 도메인
+│   │   │   ├── transformation/   # AI 변환 도메인
+│   │   │   ├── band-playwright/  # 브라우저 자동화
+│   │   │   ├── publish/          # 발행 도메인
+│   │   │   ├── auth/             # 인증 도메인
+│   │   │   └── utils/            # 공통 유틸리티
 │   │   ├── lib/                  # 유틸리티
 │   │   ├── services/             # 서비스 레이어
 │   │   ├── config/               # 앱 설정
@@ -135,10 +143,13 @@ modules/{feature}/
 |-----|-----|---------|
 | sourcing | 소싱 도메인 | 채널 관리, 게시물 수집, CS |
 | catalog | 카탈로그 도메인 | 상품 관리, 변환 |
-| automation | 자동화 도메인 | 파이프라인, 스케줄링 |
-| transformation | 변환 도메인 | AI 상품 변환 |
+| automation | 자동화 도메인 | 파이프라인, 스케줄링, 로그 |
+| transformation | 변환 도메인 | AI 상품 변환, 프롬프트 관리 |
 | config | 설정 도메인 | 정책, 시스템 설정 |
-| publish | 발행 도메인 | 소매채널 발행 |
+| publish | 발행 도메인 | 소매채널/쇼핑몰 발행 |
+| band-playwright | 브라우저 자동화 | Band 크롤링, 세션 관리 |
+| auth | 인증 도메인 | 로그인, 세션, JWT |
+| utils | 공통 유틸리티 | 헬퍼 함수, 포맷터 |
 
 ---
 
@@ -252,19 +263,28 @@ db/prisma/
 ├── schema.prisma                 # generator, datasource, enum 정의
 └── models/
     ├── user.prisma               # User, SourcingApiConfig, AiApiConfig
-    ├── channel.prisma            # WholesaleBand, RetailBand
-    ├── post.prisma               # CollectedPost
+    ├── channel.prisma            # Channel (도매/소매)
+    ├── post.prisma               # CollectedPost, CollectedPostImage
     ├── collected-product.prisma  # CollectedProduct
     ├── product.prisma            # Product, ProductVariant, ProductOption
-    ├── publish.prisma            # ProductPublish, PublishHistory
+    ├── publish.prisma            # PublishedProduct, PublishHistory
     ├── order.prisma              # Order, OrderItem
+    ├── guest-order.prisma        # GuestOrder (비회원 주문)
     ├── payment.prisma            # Payment
-    ├── cart.prisma               # SessionCart, SessionCartItem, CartItem
+    ├── cart.prisma               # Cart, CartItem
     ├── coupon.prisma             # Coupon, CouponUsage
     ├── review.prisma             # Review
     ├── settlement.prisma         # Settlement
-    ├── automation.prisma         # AutomationPipeline, PipelineLog
-    └── ...
+    ├── automation.prisma         # AutomationConfig, WorkflowLog
+    ├── shop.prisma               # Shop, ShopTheme
+    ├── inquiry.prisma            # CustomerInquiry
+    ├── return.prisma             # ReturnRequest
+    ├── refund-account.prisma     # RefundAccount
+    ├── shipping-address.prisma   # ShippingAddress
+    ├── address.prisma            # Address
+    ├── notification.prisma       # Notification
+    ├── policy.prisma             # Policy (약관)
+    └── wishlist.prisma           # Wishlist
 ```
 
 ### Prisma CLI 사용 시 주의

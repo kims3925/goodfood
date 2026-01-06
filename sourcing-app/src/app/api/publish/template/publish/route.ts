@@ -10,6 +10,7 @@ import { chromium } from 'playwright'
 import prisma, { ChannelKind } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { bandPlaywrightService } from '@/modules/band-playwright/band-playwright.service'
+import { calculateSellingPrice } from '@/lib/price-calculator'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -107,6 +108,7 @@ export async function POST(request: NextRequest) {
         price: true,
         shippingFee: true,
         bundleMaxQty: true,
+        bundleShippingType: true,
         variants: {
           select: {
             id: true,
@@ -239,6 +241,8 @@ function buildPostContent(
   product: {
     name: string
     description: string | null
+    shippingFee: number | null
+    bundleShippingType: string | null
     variants: Array<{ optionSummary: string | null; price: number }>
   },
   options?: { orderLink?: string }
@@ -255,13 +259,17 @@ function buildPostContent(
   lines.push(`📦 ${product.name}`)
   lines.push('')
 
-  // 판매가
+  // 판매가 - 공통 모듈로 배송비 포함된 가격 계산
   if (product.variants && product.variants.length > 0) {
+    const shippingFee = product.shippingFee || 0
+    const bundleShippingType = product.bundleShippingType || null
+
     lines.push('💰 판매가:')
     for (const variant of product.variants.slice(0, 5)) {
       const optionName = variant.optionSummary || '기본'
-      const price = variant.price.toLocaleString()
-      lines.push(`  • ${optionName}: ${price}원`)
+      // 공통 모듈로 판매가 계산 (배송비 타입에 따라 자동 처리)
+      const sellingPrice = calculateSellingPrice(variant.price, shippingFee, bundleShippingType)
+      lines.push(`  • ${optionName}: ${sellingPrice.toLocaleString()}원`)
     }
     if (product.variants.length > 5) {
       lines.push(`  외 ${product.variants.length - 5}개 옵션`)
@@ -294,6 +302,7 @@ interface GenerateHTMLParams {
     price: number | null
     shippingFee: number | null
     bundleMaxQty: number | null
+    bundleShippingType: string | null
     variants: Array<{ id: number; optionSummary: string | null; price: number }>
     images: Array<{ url: string }>
   }
@@ -317,6 +326,10 @@ function generateTemplateHTML(params: GenerateHTMLParams): string {
       ? '#E3F2FD'
       : '#C8E6C9'
 
+  // 공통 모듈로 판매가 계산 (배송비 타입에 따라 자동 처리)
+  const shippingFee = product.shippingFee || 0
+  const bundleShippingType = product.bundleShippingType || null
+
   const priceHTML =
     product.variants.length > 0
       ? `
@@ -326,12 +339,15 @@ function generateTemplateHTML(params: GenerateHTMLParams): string {
           ${product.variants
             .slice(0, 5)
             .map(
-              (v) => `
+              (v) => {
+                const sellingPrice = calculateSellingPrice(v.price, shippingFee, bundleShippingType)
+                return `
             <div style="display: flex; justify-content: space-between; font-size: 14px;">
               <span style="color: #6b7280;">${v.optionSummary || '기본'}</span>
-              <span style="font-weight: 600; color: #1f2937;">${formatPrice(v.price)}</span>
+              <span style="font-weight: 600; color: #1f2937;">${formatPrice(sellingPrice)}</span>
             </div>
           `
+              }
             )
             .join('')}
           ${product.variants.length > 5 ? `<p style="font-size: 12px; color: #9ca3af;">외 ${product.variants.length - 5}개 옵션</p>` : ''}

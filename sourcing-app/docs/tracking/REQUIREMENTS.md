@@ -1,6 +1,6 @@
 # 요구사항 추적
 
-> **관련 문서:** [tracking/CHANGELOG.md](./tracking/CHANGELOG.md) | [FLOW.md](./FLOW.md) | [CLAUDE.md](./CLAUDE.md)
+> **관련 문서:** [CHANGELOG.md](./CHANGELOG.md) | [FLOW.md](./FLOW.md) | [CLAUDE.md](../../CLAUDE.md)
 
 ---
 
