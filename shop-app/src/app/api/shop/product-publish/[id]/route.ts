@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
+import { calculateSellingPrice } from '@/lib/price-calculator'
 
 export async function GET(
   req: NextRequest,
@@ -51,9 +52,37 @@ export async function GET(
       )
     }
 
+    // 공통 모듈로 판매가 계산 (variants에 배송비 포함된 가격 적용)
+    const product = publishedProduct.product
+    if (!product) {
+      return NextResponse.json(
+        { success: false, error: '상품 정보를 찾을 수 없습니다' },
+        { status: 404 }
+      )
+    }
+
+    const shippingFee = product.shippingFee ?? 0
+    const bundleShippingType = product.bundleShippingType || 'NONE'
+
+    const formattedVariants = product.variants.map((variant) => ({
+      ...variant,
+      // 공통 모듈로 판매가 계산 (배송비 타입에 따라 자동 처리)
+      price: calculateSellingPrice(variant.price, shippingFee, bundleShippingType),
+      originalPrice: variant.price, // DB에 저장된 원래 가격
+    }))
+
+    // publishedProduct에 계산된 variants 적용
+    const result = {
+      ...publishedProduct,
+      product: {
+        ...product,
+        variants: formattedVariants,
+      },
+    }
+
     return NextResponse.json({
       success: true,
-      publishedProduct,
+      publishedProduct: result,
     })
   } catch (error: any) {
     console.error('Published product detail error:', error)
