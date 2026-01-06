@@ -406,7 +406,7 @@ if (!result.success) {
 |-------|------|---------|-----|
 | page | number | 1 | - |
 | size | number | 20 | 100 |
-| sort | string | - | field:asc 또는 field:desc 형식 |
+| sort | string | - | field 및 방향(asc/desc) 지정 |
 
 ### 사용 예시
 
