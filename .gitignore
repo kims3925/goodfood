@@ -237,3 +237,4 @@ AGENTS.md
 QUICK_REFERENCE.txt
 shop-app/.env.production.example
 sourcing-app/.env.example
+band-session-extension/config.js
