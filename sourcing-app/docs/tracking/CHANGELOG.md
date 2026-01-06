@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260106-014 | Done | 2026-01-06 | - | 발행 결과 타입 명시적 구분자 추가 (Shop/Channel) | Low | Lee |
 | TR-20260106-013 | Done | 2026-01-06 | - | 발행 파이프라인 순서 변경 (쇼핑몰 먼저) | Low | Lee |
 | TR-20260106-012 | Done | 2026-01-06 | - | PostService.createBatch 진행률 계산 수정 | Low | Lee |
 | TR-20260106-011 | Done | 2026-01-06 | - | ProductService.createFromCollectedProducts 트랜잭션 적용 | Low | Lee |
@@ -114,6 +115,50 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260106-014: 발행 결과 타입 명시적 구분자 추가 (Shop/Channel)
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-06 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 코드 리뷰(CodeRabbit) 지적사항 반영
+- `ChannelPublishResult`와 `PublishedProductResult` 타입에 명시적 타입 구분자 추가
+- 기존: `channelId: -shopId` (음수로 Shop 구분 - 암시적)
+- 변경: `targetType: 'SHOP' | 'CHANNEL'`, `targetId`, `targetName` (명시적)
+- 하위 호환성을 위해 `channelId`, `channelName` 필드를 `@deprecated`로 유지
+- 팀 코딩 컨벤션 "암시적 동작보다 명시적 설계를 우선" 준수
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/modules/automation/types.ts | Modified | `PublishTargetType` 타입 추가, `ChannelPublishResult`/`PublishedProductResult`에 명시적 필드 추가 |
+| src/modules/automation/pipelines/publish.ts | Modified | 음수 ID 제거, 명시적 `targetType`/`targetId`/`targetName` 사용 |
+
+### 영향 분석
+- [x] API Contract 변경 (타입 필드 추가, 하위 호환)
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| TypeScript Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Publish (소매밴드 발행)
+
+---
 
 ## TR-20260106-013: 발행 파이프라인 순서 변경 (쇼핑몰 먼저)
 

@@ -230,15 +230,19 @@ export async function runPublishPipeline(
         shopId,
       })
 
-      // Shop 결과를 channelResults에 추가 (shopId를 음수로 구분)
+      // Shop 결과를 channelResults에 추가 (명시적 타입 구분)
       const shopChannelResult: ChannelPublishResult = {
-        channelId: -shopId, // 음수로 표시하여 Shop임을 구분
-        channelName: `Shop: ${shopResult.shopName}`,
+        targetType: 'SHOP',
+        targetId: shopId,
+        targetName: `Shop: ${shopResult.shopName}`,
         attempted: shopResult.total,
         success: shopResult.successCount,
         failed: shopResult.failedCount,
         skipped: shopResult.skippedCount,
         errors: shopResult.errors,
+        // 하위 호환성을 위한 deprecated 필드
+        channelId: shopId,
+        channelName: `Shop: ${shopResult.shopName}`,
       }
       channelResults.push(shopChannelResult)
 
@@ -246,13 +250,17 @@ export async function runPublishPipeline(
       for (const productResult of shopResult.results) {
         publishedProducts.push({
           productId: productResult.productId,
-          channelId: -shopId,
+          targetType: 'SHOP',
+          targetId: shopId,
+          targetName: shopResult.shopName,
           status: productResult.success
             ? productResult.skipped
               ? 'SKIPPED'
               : 'SUCCESS'
             : 'FAILED',
           error: productResult.error,
+          // 하위 호환성을 위한 deprecated 필드
+          channelId: shopId,
         })
 
         if (!productResult.success && productResult.error) {
@@ -315,13 +323,17 @@ export async function runPublishPipeline(
     if (unpublishedProductIds.length === 0) {
       console.log(`[Publish Pipeline] All products already published to channel ${channel.id} (${channel.name})`)
       channelResults.push({
-        channelId: channel.id,
-        channelName: channel.name,
+        targetType: 'CHANNEL',
+        targetId: channel.id,
+        targetName: channel.name,
         attempted: 0,
         success: 0,
         failed: 0,
         skipped: productIds.length,
         errors: [],
+        // 하위 호환성을 위한 deprecated 필드
+        channelId: channel.id,
+        channelName: channel.name,
       })
       continue
     }
@@ -341,8 +353,9 @@ export async function runPublishPipeline(
         // 개별 상품 결과 추가
         publishedProducts.push({
           productId: productResult.productId,
-          channelId: productResult.channelId,
-          channelName: channel.name,
+          targetType: 'CHANNEL',
+          targetId: productResult.channelId,
+          targetName: channel.name,
           postKey: productResult.postKey,
           status: productResult.success
             ? productResult.skipped
@@ -350,6 +363,9 @@ export async function runPublishPipeline(
               : 'SUCCESS'
             : 'FAILED',
           error: productResult.error,
+          // 하위 호환성을 위한 deprecated 필드
+          channelId: productResult.channelId,
+          channelName: channel.name,
         })
 
         // 에러 수집
@@ -382,13 +398,17 @@ export async function runPublishPipeline(
 
     // 채널별 결과 변환 (세션 만료 체크 전에 먼저 추가)
     const channelResult: ChannelPublishResult = {
-      channelId: result.channelId,
-      channelName: result.channelName,
+      targetType: 'CHANNEL',
+      targetId: result.channelId,
+      targetName: result.channelName,
       attempted: result.total,
       success: result.successCount,
       failed: result.failedCount,
       skipped: result.skippedCount,
       errors: result.errors,
+      // 하위 호환성을 위한 deprecated 필드
+      channelId: result.channelId,
+      channelName: result.channelName,
     }
     channelResults.push(channelResult)
 
@@ -399,7 +419,12 @@ export async function runPublishPipeline(
 
       // 아직 발행되지 않은 상품 ID들
       const remainingProductIds = unpublishedProductIds.filter(
-        id => !publishedProducts.some(p => p.productId === id && p.channelId === channel.id && p.status === 'SUCCESS')
+        id => !publishedProducts.some(p =>
+          p.productId === id &&
+          p.targetType === 'CHANNEL' &&
+          p.targetId === channel.id &&
+          p.status === 'SUCCESS'
+        )
       )
 
       // 세션 대기 상태로 변경
@@ -431,8 +456,9 @@ export async function runPublishPipeline(
       for (const productResult of result.results) {
         publishedProducts.push({
           productId: productResult.productId,
-          channelId: productResult.channelId,
-          channelName: channel.name,
+          targetType: 'CHANNEL',
+          targetId: productResult.channelId,
+          targetName: channel.name,
           postKey: productResult.postKey,
           status: productResult.success
             ? productResult.skipped
@@ -440,6 +466,9 @@ export async function runPublishPipeline(
               : 'SUCCESS'
             : 'FAILED',
           error: productResult.error,
+          // 하위 호환성을 위한 deprecated 필드
+          channelId: productResult.channelId,
+          channelName: channel.name,
         })
 
         if (!productResult.success && productResult.error) {
