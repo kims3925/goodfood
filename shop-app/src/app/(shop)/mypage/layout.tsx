@@ -70,9 +70,6 @@ export default function MypageLayout({
                 <ChevronRight className="w-5 h-5 text-gray-400 hidden lg:block" />
               )}
             </div>
-            <p className="text-sm text-gray-600">
-              안녕하세요, <span className="font-medium" style={{ color: primaryColor }}>{session?.user?.name || '회원'}</span>님
-            </p>
           </div>
         </div>
 
