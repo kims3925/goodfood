@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const limit = parseInt(searchParams.get('limit') || '20')
+    const search = searchParams.get('search')?.trim() || null
 
     // Shop ID 확인 (middleware에서 설정)
     const shopIdHeader = req.headers.get('x-shop-id')
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
 
     // Shop이 지정된 경우: 해당 Shop의 상품만 반환
     if (currentShopId) {
-      return await getShopProducts(currentShopId, limit)
+      return await getShopProducts(currentShopId, limit, search)
     }
 
     // 채널 ID 확인 (하위 호환)
@@ -131,8 +132,9 @@ export async function GET(req: NextRequest) {
 /**
  * 특정 Shop의 상품만 조회
  * shopId 기반으로 발행된 상품 반환
+ * @param search - 검색어 (상품명 검색)
  */
-async function getShopProducts(shopId: number, limit: number) {
+async function getShopProducts(shopId: number, limit: number, search: string | null = null) {
   // Shop 정보 조회
   const shop = await prisma.shop.findUnique({
     where: { id: shopId },
@@ -154,15 +156,28 @@ async function getShopProducts(shopId: number, limit: number) {
       success: true,
       products: [],
       shop: null,
+      search: search,
     })
+  }
+
+  // 검색 조건 구성
+  const whereCondition: any = {
+    shopId: shopId,
+    isActive: true, // 활성 상태인 상품만 노출
+  }
+
+  // 검색어가 있으면 상품명으로 필터링
+  if (search) {
+    whereCondition.product = {
+      name: {
+        contains: search,
+      },
+    }
   }
 
   // 해당 Shop에 발행된 활성 상품만 조회 (비활성 상품은 품절 처리)
   const publishedProducts = await prisma.publishedProduct.findMany({
-    where: {
-      shopId: shopId,
-      isActive: true, // 활성 상태인 상품만 노출
-    },
+    where: whereCondition,
     include: {
       product: {
         include: {
@@ -222,6 +237,9 @@ async function getShopProducts(shopId: number, limit: number) {
       subdomain: shop.subdomain,
       theme: shop.theme,
     },
+    // 검색 정보
+    search: search,
+    totalCount: products.length,
   })
 }
 

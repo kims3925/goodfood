@@ -18,6 +18,7 @@ import {
   PipelineError,
 } from '../types'
 import { isSessionExpiredError } from '../session-utils'
+import { uploadProgressEmitter, UploadProgressInfo } from '@/modules/band-playwright/upload-progress-emitter'
 
 // =============================================
 // PUBLISH PIPELINE
@@ -39,6 +40,27 @@ export async function runPublishPipeline(
   const errors: PipelineError[] = []
   const publishedProducts: PublishedProductResult[] = []
   const channelResults: ChannelPublishResult[] = []
+
+  // 업로드 진행 상황 추적을 위한 상태
+  let currentUploadProgress: UploadProgressInfo | null = null
+
+  // 업로드 진행 이벤트 리스너 등록 (workflowLogId가 있을 때만)
+  const uploadProgressHandler = workflowLogId
+    ? (progress: UploadProgressInfo) => {
+        currentUploadProgress = progress
+      }
+    : null
+
+  if (uploadProgressHandler) {
+    uploadProgressEmitter.on('uploadProgress', uploadProgressHandler)
+  }
+
+  // cleanup 함수
+  const cleanup = () => {
+    if (uploadProgressHandler) {
+      uploadProgressEmitter.off('uploadProgress', uploadProgressHandler)
+    }
+  }
 
   console.log(`[Publish Pipeline] Starting for user ${userId}`)
 
@@ -86,6 +108,7 @@ export async function runPublishPipeline(
 
   if (products.length === 0) {
     console.log('[Publish Pipeline] No products to publish')
+    cleanup()
     return {
       success: true,
       totalItems: 0,
@@ -299,6 +322,7 @@ export async function runPublishPipeline(
     // 취소 체크: 각 채널 발행 전에 확인
     if (await checkCancellation()) {
       console.log(`[Publish Pipeline] Cancelled by user before channel ${channel.id}`)
+      cleanup()
       return {
         success: false,
         totalItems,
@@ -385,11 +409,12 @@ export async function runPublishPipeline(
           currentFailed++
         }
 
-        // 실시간 DB 업데이트
+        // 실시간 DB 업데이트 (업로드 진행 정보 포함)
         await updateWorkflowProgress(workflowLogId, totalItems, currentSuccess, currentFailed, {
           publish: {
             currentChannel: channel.name,
             currentProgress: `${current}/${total}`,
+            uploadProgress: currentUploadProgress,
             publishedProducts: publishedProducts.slice(-10),
             errors: errors.slice(-5),
           },
@@ -436,6 +461,7 @@ export async function runPublishPipeline(
       )
 
       // 결과 반환 (세션 대기 중)
+      cleanup()
       return {
         success: false,
         totalItems,
@@ -488,6 +514,9 @@ export async function runPublishPipeline(
   // 최종 결과 집계
   const totalSuccess = currentSuccess
   const totalFailed = currentFailed
+
+  // 이벤트 리스너 정리
+  cleanup()
 
   return {
     success: totalFailed === 0,

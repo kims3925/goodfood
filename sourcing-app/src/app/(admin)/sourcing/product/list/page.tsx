@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2, Package, Boxes, CheckCircle, Clock, ShoppingCart } from 'lucide-react'
+import { Plus, Search, Trash2, Package, Boxes, CheckCircle, Clock, ShoppingCart, AlertTriangle } from 'lucide-react'
 import Image from 'next/image'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -148,6 +148,10 @@ export default function ProductListPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // 발행된 상품 삭제 차단 모달 states
+  const [showPublishedWarning, setShowPublishedWarning] = useState(false)
+  const [publishedProductNames, setPublishedProductNames] = useState<string[]>([])
 
   // CollectedProduct 등록 모달 states
   const [showCollectedProductModal, setShowCollectedProductModal] = useState(false)
@@ -878,7 +882,18 @@ export default function ProductListPage() {
     }
   }
 
+  // 상품이 소매밴드에 발행된 적이 있는지 확인
+  const hasPublishHistory = (product: Product): boolean => {
+    return product.publishedProducts?.some(pp => pp.channelId !== null) || false
+  }
+
   const handleDeleteProduct = (id: number) => {
+    const product = products.find(p => p.id === id)
+    if (product && hasPublishHistory(product)) {
+      setPublishedProductNames([product.name])
+      setShowPublishedWarning(true)
+      return
+    }
     setDeleteTargetId(id)
     setShowDeleteConfirm(true)
   }
@@ -961,6 +976,18 @@ export default function ProductListPage() {
     if (selectedProductIds.length === 0) {
       return
     }
+
+    // 발행된 상품이 있는지 확인
+    const publishedProducts = products.filter(
+      p => selectedProductIds.includes(p.id) && hasPublishHistory(p)
+    )
+
+    if (publishedProducts.length > 0) {
+      setPublishedProductNames(publishedProducts.map(p => p.name))
+      setShowPublishedWarning(true)
+      return
+    }
+
     setDeleteTargetId(null) // 일괄 삭제 모드
     setShowDeleteConfirm(true)
   }
@@ -1155,7 +1182,7 @@ export default function ProductListPage() {
                   </TableHead>
                   <TableHead className="w-[50%]">상품명</TableHead>
                   <TableHead className="w-[25%]">출처 채널</TableHead>
-                  <TableHead className="w-[21%]">생성일</TableHead>
+                  <TableHead className="w-[21%]">생성일시</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1210,11 +1237,14 @@ export default function ProductListPage() {
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-600 whitespace-nowrap">
-                        {new Date(product.createdAt).toLocaleDateString('ko-KR', {
-                          year: '2-digit',
+                        {new Date(product.createdAt).toLocaleString('ko-KR', {
+                          year: 'numeric',
                           month: '2-digit',
                           day: '2-digit',
-                        }).replace(/\. /g, '.').replace(/\.$/, '')}
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: false,
+                        }).replace(/\. /g, '-').replace(/\.$/, '').replace(/-(\d{2}:\d{2})$/, ' $1')}
                       </span>
                     </TableCell>
                   </TableRow>
@@ -1284,6 +1314,52 @@ export default function ProductListPage() {
         variant="danger"
         isLoading={isDeleting}
       />
+
+      {/* 발행된 상품 삭제 차단 경고 모달 */}
+      <Modal
+        isOpen={showPublishedWarning}
+        onClose={() => {
+          setShowPublishedWarning(false)
+          setPublishedProductNames([])
+        }}
+        title="삭제 불가"
+        size="md"
+      >
+        <div className="flex flex-col items-center py-4">
+          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mb-4">
+            <AlertTriangle size={32} className="text-amber-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            발행된 상품은 삭제할 수 없습니다
+          </h3>
+          <p className="text-sm text-gray-600 text-center mb-4">
+            소매밴드에 발행된 기록이 있는 상품은 주문 관리 및 데이터 무결성을 위해 삭제할 수 없습니다.
+          </p>
+          {publishedProductNames.length > 0 && (
+            <div className="w-full bg-gray-50 rounded-lg p-3 max-h-40 overflow-y-auto">
+              <p className="text-xs text-gray-500 mb-2">발행 기록이 있는 상품:</p>
+              <ul className="space-y-1">
+                {publishedProductNames.map((name, idx) => (
+                  <li key={idx} className="text-sm text-gray-700 truncate">
+                    • {name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+        <ModalFooter>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setShowPublishedWarning(false)
+              setPublishedProductNames([])
+            }}
+          >
+            확인
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       {/* 게시물 선택 모달 */}
       <PostSelectionModal

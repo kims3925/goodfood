@@ -183,6 +183,30 @@ Product (변환된 상품)
 1. **쇼핑몰(Shop) 발행** - 설정된 모든 Shop에 순차 발행
 2. **소매채널(Band) 발행** - 설정된 모든 소매채널에 순차 발행
 
+### 발행 진행 상황 추적
+
+```text
+Band 게시물 작성 (Playwright)
+        │
+        ├── 이미지 다운로드 (preparing → downloading)
+        │
+        ├── 이미지 업로드 (uploading)
+        │     │
+        │     └── uploadProgressEmitter
+        │           ├── fileIndex: "1/10"
+        │           ├── totalPercent: "10%"
+        │           └── currentPercent: "92%"
+        │
+        ├── 내용 입력 (entering)
+        │
+        └── 게시물 등록 (submitting → completed)
+```
+
+| 경로 | 진행 상황 전달 방식 |
+|-----|------------------|
+| 수동 발행 (SSE) | uploadProgressEmitter → onStageProgress → SSE 스트림 → 프론트엔드 |
+| 자동화 발행 | uploadProgressEmitter → publish.ts → DB 저장 (WorkflowLog.details) |
+
 ---
 
 ## 4. 주문 (Order) 흐름

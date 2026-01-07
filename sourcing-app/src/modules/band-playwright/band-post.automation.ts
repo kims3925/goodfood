@@ -16,6 +16,7 @@ import {
   BandPlaywrightErrorCode,
 } from './types'
 import type { PublishStage } from '../publish/types'
+import { uploadProgressEmitter } from './upload-progress-emitter'
 
 // 단계별 라벨 (한국어)
 const STAGE_LABELS: Record<PublishStage, string> = {
@@ -360,10 +361,38 @@ export class BandPostAutomation {
     const { bandKey, bandName, content, imageUrls, onStageProgress, signal } = params
     const tempFiles: string[] = []
 
+    // 업로드 진행 상황을 onStageProgress로 전달하기 위한 이벤트 구독
+    const uploadProgressHandler = onStageProgress
+      ? (progress: { fileIndex: string; totalPercent: string; currentPercent: string }) => {
+          onStageProgress({
+            stage: 'uploading',
+            stageLabel: STAGE_LABELS.uploading,
+            uploadProgress: {
+              fileIndex: progress.fileIndex,
+              totalPercent: progress.totalPercent,
+              currentPercent: progress.currentPercent,
+            },
+            publishMethod: 'playwright',
+          })
+        }
+      : null
+
+    if (uploadProgressHandler) {
+      uploadProgressEmitter.on('uploadProgress', uploadProgressHandler)
+    }
+
+    // 리소스 정리 헬퍼
+    const cleanupProgressListener = () => {
+      if (uploadProgressHandler) {
+        uploadProgressEmitter.off('uploadProgress', uploadProgressHandler)
+      }
+    }
+
     // 취소 확인 헬퍼
     const checkCancelled = () => {
       if (signal?.aborted) {
         console.log('[밴드자동화] 작업 취소됨')
+        cleanupProgressListener()
         throw new BandPlaywrightError(
           '발행이 취소되었습니다.',
           BandPlaywrightErrorCode.POST_FAILED
@@ -626,6 +655,8 @@ export class BandPostAutomation {
     } finally {
       // 임시 파일 정리
       this.cleanupTempFiles(tempFiles)
+      // 업로드 진행 이벤트 리스너 정리
+      cleanupProgressListener()
     }
   }
 
@@ -1495,10 +1526,18 @@ export class BandPostAutomation {
 
           if (progressInfo) {
             const progressInfoStr = `${progressInfo.fileIndex}|${progressInfo.totalWidth}|${progressInfo.currentPercent}`
-            // 변경되었을 때만 로그 출력
+            // 변경되었을 때만 로그 출력 + 이벤트 발행
             if (progressInfoStr !== lastProgressInfo) {
               lastProgressInfo = progressInfoStr
               console.log(`[밴드자동화] 📤 ${progressInfo.fileIndex} | 전체: ${progressInfo.totalWidth} | 현재 파일: ${progressInfo.currentPercent}`)
+
+              // 업로드 진행 이벤트 발행
+              uploadProgressEmitter.emitProgress({
+                fileIndex: progressInfo.fileIndex,
+                totalPercent: progressInfo.totalWidth,
+                currentPercent: progressInfo.currentPercent,
+                timestamp: Date.now(),
+              })
             }
           }
         }
@@ -1511,6 +1550,7 @@ export class BandPostAutomation {
       if (progressBarSeen && !uploadCompletedLogged) {
         console.log('[밴드자동화] ✅ 업로드 완료!')
         uploadCompletedLogged = true
+        uploadProgressEmitter.emitComplete()
         lastActivityTime = now // 완료도 활동!
       }
 

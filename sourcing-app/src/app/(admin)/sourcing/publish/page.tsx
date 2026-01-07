@@ -160,6 +160,11 @@ export default function PublishPage() {
       current: number
       total: number
     }
+    uploadProgress?: {
+      fileIndex: string    // "1/10"
+      totalPercent: string // "10%"
+      currentPercent: string // "92%"
+    }
     publishMethod?: 'playwright' | 'api'
   }
   const [showPublishProgress, setShowPublishProgress] = useState(false)
@@ -876,6 +881,7 @@ export default function PublishPage() {
                             stage: event.data.progress.stage,
                             stageLabel: event.data.progress.stageLabel,
                             imageProgress: event.data.progress.imageProgress,
+                            uploadProgress: event.data.progress.uploadProgress,
                           }
                           return updated
                         })
@@ -896,6 +902,7 @@ export default function PublishPage() {
                             stage: event.data.progress.stage,
                             stageLabel: event.data.progress.stageLabel,
                             imageProgress: event.data.progress.imageProgress,
+                            uploadProgress: event.data.progress.uploadProgress,
                             publishMethod: event.data.progress.publishMethod,
                           }
                           return updated
@@ -1150,6 +1157,7 @@ export default function PublishPage() {
                       stage: event.data.progress.stage,
                       stageLabel: event.data.progress.stageLabel,
                       imageProgress: event.data.progress.imageProgress,
+                      uploadProgress: event.data.progress.uploadProgress,
                       publishMethod: event.data.progress.publishMethod,
                     }
                     return updated
@@ -1323,6 +1331,7 @@ export default function PublishPage() {
                       stage: event.data.progress.stage,
                       stageLabel: event.data.progress.stageLabel,
                       imageProgress: event.data.progress.imageProgress,
+                      uploadProgress: event.data.progress.uploadProgress,
                       publishMethod: event.data.progress.publishMethod,
                     }
                     return updated
@@ -2460,6 +2469,12 @@ export default function PublishPage() {
                                 style={{ width: `${(item.imageProgress.current / item.imageProgress.total) * 100}%` }}
                               />
                             </div>
+                          </div>
+                        )}
+                        {/* 업로드 진행률 표시 (📤 로그 정보) */}
+                        {item.status === 'publishing' && item.uploadProgress && (
+                          <div className="mt-1 text-xs text-blue-500">
+                            <span>📤 {item.uploadProgress.fileIndex} ({item.uploadProgress.totalPercent})</span>
                           </div>
                         )}
                         {/* 발행 방법 표시 */}
