@@ -359,7 +359,7 @@ TR-{YYYYMMDD}-{NUMBER}
 | src/app/api/shop/route.ts | Modified | _count에 guestOrders 포함 |
 
 ### 영향 분석
-- [ ] API Contract 변경
+- [x] API Contract 변경 (`_count.guestOrders` 필드 추가)
 - [ ] DB Schema 변경
 - [x] Domain Logic 변경
 - [ ] Security 변경
@@ -375,6 +375,7 @@ TR-{YYYYMMDD}-{NUMBER}
 ### 관련 항목
 - REQ-ID: -
 - Flow-ID: -
+- API 문서: [docs/API.md](../API.md#get-apishop)
 
 ---
 

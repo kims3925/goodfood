@@ -391,3 +391,83 @@ return NextResponse.json({
 | 민감정보 응답 노출 | 보안 |
 | 하드코딩된 에러 메시지 | 일관성 |
 | 인증 없이 민감 데이터 반환 | 보안 |
+
+---
+
+## 엔드포인트 상세
+
+### GET /api/shop
+
+쇼핑몰 목록을 조회합니다.
+
+**인증:** 필수 (JWT)
+
+**쿼리 파라미터:**
+
+| Param | Type | Default | 설명 |
+|-------|------|---------|------|
+| page | number | 1 | 페이지 번호 |
+| limit | number | 20 | 페이지당 항목 수 |
+
+**응답 스키마:**
+
+```typescript
+interface ShopListResponse {
+  success: true
+  data: Array<{
+    id: number
+    name: string
+    slug: string
+    description: string | null
+    isActive: boolean
+    createdAt: string
+    updatedAt: string
+    theme: ShopTheme | null
+    _count: {
+      publishedProducts: number  // 발행된 상품 수
+      orders: number             // 회원 주문 수
+      guestOrders: number        // 게스트 주문 수 (TR-20260107-005 추가)
+    }
+  }>
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
+}
+```
+
+**응답 예시:**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "마이쇼핑몰",
+      "slug": "my-shop",
+      "description": null,
+      "isActive": true,
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-07T00:00:00.000Z",
+      "theme": null,
+      "_count": {
+        "publishedProducts": 150,
+        "orders": 45,
+        "guestOrders": 23
+      }
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1
+  }
+}
+```
+
+**변경 이력:**
+- TR-20260107-005: `_count.guestOrders` 필드 추가
