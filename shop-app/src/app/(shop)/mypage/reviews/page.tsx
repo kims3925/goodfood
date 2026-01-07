@@ -13,7 +13,7 @@ interface WritableItem {
   orderId: number
   orderNumber: string
   deliveredAt: string | null
-  publishedProductId: number
+  shopProductId: number
   productName: string
   optionSummary: string | null
   thumbnailUrl: string | null

@@ -1,7 +1,7 @@
 /**
  * Cart Service
  * 장바구니 비즈니스 로직 레이어
- * PublishedProduct 기반 스키마 지원
+ * ShopProduct 기반 스키마 지원
  * Shop 기반 장바구니 관리
  */
 
@@ -25,13 +25,11 @@ const USER_CART_EXPIRY_DAYS = 30
 
 export interface CartItemResponse {
   id: number
-  publishedProductId: number
+  shopProductId: number
   productId: number
   variantId: number | null
   shopId: number | null
   shopName: string | null
-  channelId: number | null
-  channelName: string | null
   name: string
   optionSummary: string | null
   image: string
@@ -60,7 +58,7 @@ export interface CartResponse {
 }
 
 export interface AddToCartDTO {
-  publishedProductId: number
+  shopProductId: number
   variantId?: number
   quantity?: number
   isBundleItem?: boolean // 묶음 상품 여부 (true면 기존 아이템과 합치지 않고 새로 추가)
@@ -70,7 +68,7 @@ export interface AddToCartDTO {
 const cartIncludeOptions = {
   items: {
     include: {
-      publishedProduct: {
+      shopProduct: {
         include: {
           product: {
             include: {
@@ -84,7 +82,6 @@ const cartIncludeOptions = {
             },
           },
           shop: true,
-          channel: true,
         },
       },
       variant: true,
@@ -176,7 +173,7 @@ export class CartService {
       if (sessionCart && sessionCart.items.length > 0) {
         for (const item of sessionCart.items) {
           const existingItem = userCart.items.find(
-            (ui: any) => ui.publishedProductId === item.publishedProductId && ui.variantId === item.variantId
+            (ui: any) => ui.shopProductId === item.shopProductId && ui.variantId === item.variantId
           )
           if (existingItem) {
             await prisma.cartItem.update({
@@ -261,8 +258,8 @@ export class CartService {
    */
   formatCart(cart: any): CartResponse {
     const items: CartItemResponse[] = cart.items.map((item: any) => {
-      const publishedProduct = item.publishedProduct
-      const product = publishedProduct.product
+      const shopProduct = item.shopProduct
+      const product = shopProduct.product
       const variant = item.variant
       const mainVariant = product?.variants[0]
       const image = product.images?.[0]?.url || product.thumbnailUrl || '/placeholder.jpg'
@@ -287,14 +284,11 @@ export class CartService {
 
       return {
         id: item.id,
-        publishedProductId: publishedProduct.id,
+        shopProductId: shopProduct.id,
         productId: product.id,
         variantId: variant?.id || null,
-        shopId: publishedProduct.shopId || null,
-        shopName: publishedProduct.shop?.name || null,
-        // 하위 호환성 (채널 정보)
-        channelId: publishedProduct.channelId,
-        channelName: publishedProduct.channel?.name || null,
+        shopId: shopProduct.shopId || null,
+        shopName: shopProduct.shop?.name || null,
         name: product.name,
         optionSummary: variant?.optionSummary || null,
         image,
@@ -341,16 +335,16 @@ export class CartService {
     userId: number | null = null,
     shopId: number | null = null
   ): Promise<{ cart: CartResponse; isExisting: boolean; newSessionId?: string }> {
-    const { publishedProductId, variantId, quantity = 1, isBundleItem = false } = data
+    const { shopProductId, variantId, quantity = 1, isBundleItem = false } = data
 
-    if (!publishedProductId) {
-      throw new ValidationError('publishedProductId는 필수입니다')
+    if (!shopProductId) {
+      throw new ValidationError('shopProductId는 필수입니다')
     }
 
-    // publishedProduct 확인 (존재 여부 및 활성 상태 확인)
-    const publishedProduct = await prisma.publishedProduct.findFirst({
+    // shopProduct 확인 (존재 여부 확인)
+    const shopProduct = await prisma.shopProduct.findFirst({
       where: {
-        id: publishedProductId,
+        id: shopProductId,
       },
       include: {
         product: {
@@ -361,17 +355,12 @@ export class CartService {
       },
     })
 
-    if (!publishedProduct) {
-      throw new NotFoundError('상품', String(publishedProductId))
-    }
-
-    // 비활성(품절) 상품은 장바구니에 추가할 수 없음
-    if (!publishedProduct.isActive) {
-      throw new BusinessLogicError('품절된 상품은 장바구니에 담을 수 없습니다')
+    if (!shopProduct) {
+      throw new NotFoundError('상품', String(shopProductId))
     }
 
     const cart = await this.getOrCreateCart(sessionId, userId, shopId)
-    const price = publishedProduct.product?.variants[0]?.price || 0
+    const price = shopProduct.product?.variants[0]?.price || 0
 
     const newSessionId = (cart as any).__newSessionId
 
@@ -381,7 +370,7 @@ export class CartService {
       const existingItem = await prisma.cartItem.findFirst({
         where: {
           cartId: cart.id,
-          publishedProductId,
+          shopProductId,
           variantId: variantId || null,
         },
       })
@@ -395,7 +384,7 @@ export class CartService {
         await prisma.cartItem.create({
           data: {
             cartId: cart.id,
-            publishedProductId,
+            shopProductId,
             variantId: variantId || null,
             quantity,
             priceAt: price,
@@ -415,7 +404,7 @@ export class CartService {
     const existingItem = await prisma.cartItem.findFirst({
       where: {
         cartId: cart.id,
-        publishedProductId,
+        shopProductId,
         variantId: variantId || null,
       },
     })
@@ -431,7 +420,7 @@ export class CartService {
       await prisma.cartItem.create({
         data: {
           cartId: cart.id,
-          publishedProductId,
+          shopProductId,
           variantId: variantId || null,
           quantity,
           priceAt: price,
@@ -566,7 +555,7 @@ export class CartService {
       include: {
         items: {
           include: {
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   include: { variants: { take: 1 } },
@@ -593,7 +582,7 @@ export class CartService {
       include: {
         items: {
           include: {
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   include: { variants: { take: 1 } },

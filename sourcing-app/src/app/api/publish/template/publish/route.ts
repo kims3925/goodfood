@@ -208,23 +208,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 7. PublishedProduct 레코드 생성
-    const publishedProduct = await prisma.publishedProduct.create({
+    // 7. ChannelProduct 레코드 생성 (채널 발행이므로 channelProduct 사용)
+    const channelProduct = await prisma.channelProduct.create({
       data: {
         userId: user.userId,
         productId,
         channelId,
-        postKey: publishResult.postKey,
         publishedAt: new Date(),
-        productName: product.name,
-        thumbnailUrl: product.thumbnailUrl,
-        imageUrls: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
       },
     })
 
     return NextResponse.json({
       success: true,
-      publishedProductId: publishedProduct.id,
+      channelProductId: channelProduct.id,
       postKey: publishResult.postKey,
     })
   } catch (error: any) {

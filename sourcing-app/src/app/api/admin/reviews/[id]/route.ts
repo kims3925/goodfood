@@ -54,7 +54,7 @@ export async function GET(
                 }
               }
             },
-            publishedProduct: {
+            shopProduct: {
               select: {
                 id: true,
                 product: {
@@ -105,7 +105,7 @@ export async function GET(
           deliveredAt: review.orderItem.order.deliveredAt?.toISOString() || null,
           shop: review.orderItem.order.shop
         } : null,
-        publishedProduct: review.orderItem.publishedProduct
+        shopProduct: review.orderItem.shopProduct
       } : null
     }
 

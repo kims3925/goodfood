@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
         shippingAddress: true,  // 배송지 정보 포함
         items: {
           include: {
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: true
               }
@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
             } : undefined,
             items: {
               create: existingOrder.items.map(item => ({
-                publishedProductId: item.publishedProductId,
+                shopProductId: item.shopProductId,
                 productName: item.productName,
                 thumbnailUrl: item.thumbnailUrl,
                 quantity: item.quantity,

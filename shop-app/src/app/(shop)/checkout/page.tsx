@@ -31,7 +31,7 @@ interface Address {
 
 interface CartItem {
   id: number
-  publishedProductId: number
+  shopProductId: number
   variantId: number | null
   name: string
   optionSummary: string | null
@@ -85,7 +85,7 @@ function CheckoutContent() {
   const { shop } = useShop() // Shop 정보
   const { getPath, getApiPath } = useShopUrl()
   const fromCart = searchParams.get('fromCart') === 'true'
-  const publishedProductId = searchParams.get('publishedProductId') // productId → publishedProductId로 변경
+  const shopProductId = searchParams.get('shopProductId') // productId → shopProductId로 변경
   const variantId = searchParams.get('variantId')
   const quantity = parseInt(searchParams.get('quantity') || '1')
 
@@ -213,7 +213,7 @@ function CheckoutContent() {
     if (status === 'loading') return
     loadCheckoutData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromCart, publishedProductId, session, status])
+  }, [fromCart, shopProductId, session, status])
 
   const loadCheckoutData = async () => {
     try {
@@ -222,7 +222,7 @@ function CheckoutContent() {
       // 장바구니 또는 상품 로드
       if (fromCart) {
         await loadCartItems()
-      } else if (publishedProductId) {
+      } else if (shopProductId) {
         await loadProduct()
       }
 
@@ -352,14 +352,14 @@ function CheckoutContent() {
   const loadProduct = async () => {
     try {
       setIsLoading(true)
-      // publishedProductId를 통해 상품 조회
-      const response = await fetch(getApiPath(`/api/shop/product-publish/${publishedProductId}`))
+      // shopProductId를 통해 상품 조회
+      const response = await fetch(getApiPath(`/api/shop/product-publish/${shopProductId}`))
       const data = await response.json()
 
-      if (data.success && data.publishedProduct) {
-        const pp = data.publishedProduct
+      if (data.success && data.shopProduct) {
+        const pp = data.shopProduct
         const product = pp.product
-        const images = product.post?.images?.map((img: any) => img.url) || []
+        const images = product.images?.map((img: any) => img.url) || []
 
         // URL의 variantId로 해당 variant 찾기 (없으면 첫 번째)
         const selectedVariant = variantId
@@ -420,7 +420,7 @@ function CheckoutContent() {
 
         setProduct({
           id: product.id,
-          publishedProductId: pp.id,
+          shopProductId: pp.id,
           title: product.name,
           description: product.description || '',
           images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
@@ -436,8 +436,8 @@ function CheckoutContent() {
         })
       } else {
         setProduct({
-          id: publishedProductId,
-          publishedProductId: publishedProductId,
+          id: shopProductId,
+          shopProductId: shopProductId,
           title: '상품',
           images: ['/placeholder.jpg'],
           originalPrice: 0,
@@ -448,8 +448,8 @@ function CheckoutContent() {
     } catch (error) {
       console.error('상품 로딩 실패:', error)
       setProduct({
-        id: publishedProductId,
-        publishedProductId: publishedProductId,
+        id: shopProductId,
+        shopProductId: shopProductId,
         title: '상품',
         images: ['/placeholder.jpg'],
         originalPrice: 0,
@@ -656,7 +656,7 @@ function CheckoutContent() {
       } else {
         orderRequestData.fromCart = false
         orderRequestData.items = [{
-          publishedProductId: parseInt(publishedProductId!),
+          shopProductId: parseInt(shopProductId!),
           variantId: variantId ? parseInt(variantId) : undefined,
           quantity
         }]
@@ -944,7 +944,7 @@ function CheckoutContent() {
             {/* Header */}
             <div className="flex items-center gap-4 mb-6">
               <Link
-                href={getPath(fromCart ? '/cart' : `/product/${product?.id || publishedProductId}`)}
+                href={getPath(fromCart ? '/cart' : `/product/${product?.id || shopProductId}`)}
                 className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
               >
                 <ArrowLeft className="w-5 h-5" />

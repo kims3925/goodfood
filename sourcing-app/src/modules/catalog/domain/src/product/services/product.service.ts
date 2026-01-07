@@ -164,17 +164,17 @@ export class ProductService {
       await deleteProductImageFiles(fileNames, id)
     }
 
-    // 관련 PublishedProduct들의 ID 가져오기
-    const publishedProducts = await prisma.publishedProduct.findMany({
+    // 관련 ShopProduct들의 ID 가져오기
+    const shopProducts = await prisma.shopProduct.findMany({
       where: { productId: id },
       select: { id: true },
     })
-    const publishedProductIds = publishedProducts.map((pp) => pp.id)
+    const shopProductIds = shopProducts.map((sp) => sp.id)
 
-    // 관련 CartItem 삭제 (PublishedProduct와 연결된 장바구니 항목)
-    if (publishedProductIds.length > 0) {
+    // 관련 CartItem 삭제 (ShopProduct와 연결된 장바구니 항목)
+    if (shopProductIds.length > 0) {
       await prisma.cartItem.deleteMany({
-        where: { publishedProductId: { in: publishedProductIds } },
+        where: { shopProductId: { in: shopProductIds } },
       })
     }
 
@@ -203,11 +203,17 @@ export class ProductService {
       ])
     }
 
-    // PublishedProduct의 productId를 null로 설정 (연결 해제)
-    await prisma.publishedProduct.updateMany({
-      where: { productId: id },
-      data: { productId: null },
-    })
+    // ShopProduct와 ChannelProduct의 productId를 null로 설정 (연결 해제)
+    await Promise.all([
+      prisma.shopProduct.updateMany({
+        where: { productId: id },
+        data: { productId: null },
+      }),
+      prisma.channelProduct.updateMany({
+        where: { productId: id },
+        data: { productId: null },
+      }),
+    ])
 
     return productRepository.delete(id)
   }

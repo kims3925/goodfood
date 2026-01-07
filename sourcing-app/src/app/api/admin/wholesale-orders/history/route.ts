@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
             status: { in: ['SHIPPED', 'DELIVERED'] },
             paidAt: { not: null },
           },
-          publishedProduct: {
+          shopProduct: {
             userId: user.userId,
             product: {
               channel: {
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
           },
         },
         select: {
-          publishedProduct: {
+          shopProduct: {
             select: {
               product: {
                 select: {
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        distinct: ['publishedProductId'],
+        distinct: ['shopProductId'],
       }),
       prisma.guestOrderItem.findMany({
         where: {
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
             status: { in: ['SHIPPED', 'DELIVERED'] },
             paidAt: { not: null },
           },
-          publishedProduct: {
+          shopProduct: {
             userId: user.userId,
             product: {
               channel: {
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
           },
         },
         select: {
-          publishedProduct: {
+          shopProduct: {
             select: {
               product: {
                 select: {
@@ -82,20 +82,20 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        distinct: ['publishedProductId'],
+        distinct: ['shopProductId'],
       }),
     ])
 
     // 주문이 있는 채널 ID 추출 (회원 + 비회원) - Product.channelId 사용
     const channelIdsWithOrders = new Set<number>()
     for (const item of channelsWithOrders) {
-      const channelId = item.publishedProduct?.product?.channelId
+      const channelId = item.shopProduct?.product?.channelId
       if (channelId) {
         channelIdsWithOrders.add(channelId)
       }
     }
     for (const item of channelsWithGuestOrders) {
-      const channelId = item.publishedProduct?.product?.channelId
+      const channelId = item.shopProduct?.product?.channelId
       if (channelId) {
         channelIdsWithOrders.add(channelId)
       }
@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
               lte: toDate,
             },
           },
-          publishedProduct: {
+          shopProduct: {
             userId: user.userId,
             product: {
               channelId: parseInt(wholesaleChannelId),
@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
               wholesalePrice: true,
             },
           },
-          publishedProduct: {
+          shopProduct: {
             include: {
               product: {
                 include: {
@@ -194,7 +194,7 @@ export async function GET(request: NextRequest) {
               lte: toDate,
             },
           },
-          publishedProduct: {
+          shopProduct: {
             userId: user.userId,
             product: {
               channelId: parseInt(wholesaleChannelId),
@@ -217,7 +217,7 @@ export async function GET(request: NextRequest) {
               wholesalePrice: true,
             },
           },
-          publishedProduct: {
+          shopProduct: {
             include: {
               product: {
                 include: {
@@ -252,9 +252,9 @@ export async function GET(request: NextRequest) {
 
       // 도매가 계산
       let wholesalePrice = item.variant?.wholesalePrice || 0
-      if (!item.variant && item.publishedProduct?.product?.variants?.length) {
+      if (!item.variant && item.shopProduct?.product?.variants?.length) {
         if (item.optionSummary) {
-          const matched = item.publishedProduct.product.variants.find(
+          const matched = item.shopProduct.product.variants.find(
             v => v.optionSummary === item.optionSummary
           )
           if (matched) {
@@ -262,7 +262,7 @@ export async function GET(request: NextRequest) {
           }
         }
         if (Number(wholesalePrice) === 0) {
-          wholesalePrice = item.publishedProduct.product.variants[0].wholesalePrice || 0
+          wholesalePrice = item.shopProduct.product.variants[0].wholesalePrice || 0
         }
       }
 
@@ -293,9 +293,9 @@ export async function GET(request: NextRequest) {
 
       // 도매가 계산
       let wholesalePrice = item.variant?.wholesalePrice || 0
-      if (!item.variant && item.publishedProduct?.product?.variants?.length) {
+      if (!item.variant && item.shopProduct?.product?.variants?.length) {
         if (item.optionSummary) {
-          const matched = item.publishedProduct.product.variants.find(
+          const matched = item.shopProduct.product.variants.find(
             v => v.optionSummary === item.optionSummary
           )
           if (matched) {
@@ -303,7 +303,7 @@ export async function GET(request: NextRequest) {
           }
         }
         if (Number(wholesalePrice) === 0) {
-          wholesalePrice = item.publishedProduct.product.variants[0].wholesalePrice || 0
+          wholesalePrice = item.shopProduct.product.variants[0].wholesalePrice || 0
         }
       }
 

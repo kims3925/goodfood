@@ -1,7 +1,7 @@
 /**
  * Order Service
  * 주문 비즈니스 로직 레이어
- * PublishedProduct 기반 스키마 지원
+ * ShopProduct 기반 스키마 지원
  */
 
 import prisma from '@bandauto/db'
@@ -37,7 +37,7 @@ export interface ShippingAddress {
 }
 
 export interface OrderItem {
-  publishedProductId: number
+  shopProductId: number
   variantId?: number
   quantity: number
 }
@@ -87,9 +87,6 @@ export interface OrderResponse {
     quantity: number
     unitPrice: number
     totalPrice: number
-    channel?: { id: number; name: string } | null
-    // 하위 호환성
-    retailBand?: { id: number; name: string } | null
   }>
   payment: {
     status: string
@@ -162,8 +159,8 @@ export class OrderService {
     // 주문 아이템 데이터 준비
     // cart.items에는 formatCart에서 계산된 itemTotal(할인 반영)이 포함됨
     const orderItems: OrderItemInput[] = cart.items.map((item: any) => {
-      const publishedProduct = item.publishedProduct
-      const product = publishedProduct?.product
+      const shopProduct = item.shopProduct
+      const product = shopProduct?.product
       const variant = item.variant
       const mainVariant = product?.variants?.[0]
 
@@ -182,7 +179,7 @@ export class OrderService {
       const optionSummary = item.optionSummary || variant?.optionSummary || mainVariant?.optionSummary || null
 
       return {
-        publishedProductId: publishedProduct?.id || item.publishedProductId,
+        shopProductId: shopProduct?.id || item.shopProductId,
         variantId: variant?.id || item.variantId || null,
         productName: item.name || product?.name || "",
         optionSummary,
@@ -303,9 +300,9 @@ export class OrderService {
     const orderItems: OrderItemInput[] = []
 
     for (const item of items) {
-      const publishedProduct = await prisma.publishedProduct.findFirst({
+      const shopProduct = await prisma.shopProduct.findFirst({
         where: {
-          id: item.publishedProductId,
+          id: item.shopProductId,
         },
         include: {
           product: {
@@ -319,8 +316,8 @@ export class OrderService {
         },
       })
 
-      if (!publishedProduct) {
-        throw new NotFoundError('상품', String(item.publishedProductId))
+      if (!shopProduct) {
+        throw new NotFoundError('상품', String(item.shopProductId))
       }
 
       let variant = null
@@ -331,7 +328,7 @@ export class OrderService {
         })
       }
 
-      const product = publishedProduct.product
+      const product = shopProduct.product
       const mainVariant = product?.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || 0
       // 도매가 스냅샷 (마진 계산용)
@@ -342,7 +339,7 @@ export class OrderService {
       const optionSummary = variant?.optionSummary || mainVariant?.optionSummary || null
 
       orderItems.push({
-        publishedProductId: publishedProduct.id,
+        shopProductId: shopProduct.id,
         variantId: variant?.id || null,
         productName: product?.name || "",
         optionSummary,
@@ -614,9 +611,6 @@ export class OrderService {
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         totalPrice: Number(item.totalPrice),
-        channel: item.publishedProduct?.channel || null,
-        // 하위 호환성
-        retailBand: item.publishedProduct?.channel || null,
       })),
       payment: order.payment
         ? {

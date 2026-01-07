@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
             variant: {
               select: { bundleUnit: true },
             },
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   select: {
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
             variant: {
               select: { bundleUnit: true },
             },
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   select: {
@@ -179,7 +179,7 @@ export async function GET(request: NextRequest) {
         items: {
           include: {
             variant: { select: { bundleUnit: true } },
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   select: { id: true, shippingFee: true, bundleMaxQty: true, bundleShippingType: true },
@@ -203,7 +203,7 @@ export async function GET(request: NextRequest) {
         items: {
           include: {
             variant: { select: { bundleUnit: true } },
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   select: { id: true, shippingFee: true, bundleMaxQty: true, bundleShippingType: true },
@@ -267,7 +267,7 @@ export async function GET(request: NextRequest) {
       }>()
 
       for (const item of items) {
-        const product = item.publishedProduct?.product
+        const product = item.shopProduct?.product
         if (!product) continue
 
         const productId = product.id

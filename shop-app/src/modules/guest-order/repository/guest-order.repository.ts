@@ -12,7 +12,7 @@ const Decimal = Prisma.Decimal
 // ============================================
 
 export interface GuestOrderItemInput {
-  publishedProductId: number
+  shopProductId: number
   variantId: number | null
   productName: string
   optionSummary: string | null
@@ -53,19 +53,13 @@ const guestOrderIncludeOptions = {
   shippingAddress: true,
   items: {
     include: {
-      publishedProduct: {
+      shopProduct: {
         include: {
           product: {
             select: {
               id: true,
               name: true,
               thumbnailUrl: true,
-            },
-          },
-          channel: {
-            select: {
-              id: true,
-              name: true,
             },
           },
         },
@@ -125,7 +119,7 @@ export class GuestOrderRepository {
         },
         items: {
           create: data.items.map((item) => ({
-            publishedProductId: item.publishedProductId,
+            shopProductId: item.shopProductId,
             variantId: item.variantId,
             productName: item.productName,
             optionSummary: item.optionSummary,

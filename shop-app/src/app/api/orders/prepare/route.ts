@@ -42,7 +42,7 @@ interface OrderPrepareData {
   userId: number
   shopId?: number | null
   fromCart: boolean
-  items?: { publishedProductId: number; variantId?: number; quantity: number }[]
+  items?: { shopProductId: number; variantId?: number; quantity: number }[]
   customerInfo: {
     name: string
     phone: string
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
             include: {
               items: {
                 include: {
-                  publishedProduct: true,
+                  shopProduct: true,
                 },
               },
             },
@@ -175,27 +175,18 @@ export async function POST(req: NextRequest) {
               include: {
                 items: {
                   include: {
-                    publishedProduct: true,
+                    shopProduct: true,
                   },
                 },
               },
             })
           : null
 
-      if (rawCart) {
-        const soldOutItems = rawCart.items.filter((item) => !item.publishedProduct.isActive)
-        if (soldOutItems.length > 0) {
-          const soldOutNames = soldOutItems.map((item) => item.publishedProduct.productName || '알 수 없는 상품').join(', ')
-          return NextResponse.json(
-            { success: false, error: `품절된 상품이 포함되어 있습니다: ${soldOutNames}` },
-            { status: 400 }
-          )
-        }
-      }
+      // 품절 체크는 Product 레벨의 재고 관리로 대체됨 (ShopProduct에서 isActive 필드 제거됨)
 
       // CartService에서 계산된 itemTotal 사용
       orderItems = formattedCart.items.map((item) => ({
-        publishedProductId: item.publishedProductId,
+        shopProductId: item.shopProductId,
         variantId: item.variantId || null,
         productName: item.name,
         optionSummary: item.optionSummary || null,
@@ -217,9 +208,9 @@ export async function POST(req: NextRequest) {
       }
 
       for (const item of items) {
-        const publishedProduct = await prisma.publishedProduct.findFirst({
+        const shopProduct = await prisma.shopProduct.findFirst({
           where: {
-            id: parseInt(item.publishedProductId),
+            id: parseInt(item.shopProductId),
           },
           include: {
             product: {
@@ -228,20 +219,14 @@ export async function POST(req: NextRequest) {
           },
         })
 
-        if (!publishedProduct) {
+        if (!shopProduct) {
           return NextResponse.json(
             { success: false, error: `상품을 찾을 수 없거나 판매 중인 상품이 아닙니다` },
             { status: 404 }
           )
         }
 
-        // 품절(비활성) 상품 체크
-        if (!publishedProduct.isActive) {
-          return NextResponse.json(
-            { success: false, error: `품절된 상품입니다: ${publishedProduct.product?.name || publishedProduct.productName || '알 수 없는 상품'}` },
-            { status: 400 }
-          )
-        }
+        // 품절 체크는 Product 레벨의 재고 관리로 대체됨 (ShopProduct에서 isActive 필드 제거됨)
 
         let variant = null
         if (item.variantId) {
@@ -250,7 +235,7 @@ export async function POST(req: NextRequest) {
           })
         }
 
-        const product = publishedProduct.product
+        const product = shopProduct.product
         const mainVariant = product?.variants[0]
         const basePrice = variant?.price || mainVariant?.price || 0
         const quantity = item.quantity || 1
@@ -285,7 +270,7 @@ export async function POST(req: NextRequest) {
         }
 
         orderItems.push({
-          publishedProductId: publishedProduct.id,
+          shopProductId: shopProduct.id,
           variantId: variant?.id || null,
           productName: product?.name || "",
           optionSummary: variant?.optionSummary || null,

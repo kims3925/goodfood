@@ -6,46 +6,28 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    // 전체 레코드 수
-    const total = await prisma.publishedProduct.count()
+    // ShopProduct 통계
+    const shopProductTotal = await prisma.shopProduct.count()
 
-    // channelId가 null인 레코드 수
-    const nullChannelCount = await prisma.publishedProduct.count({
-      where: { channelId: null }
-    })
+    // ChannelProduct 통계
+    const channelProductTotal = await prisma.channelProduct.count()
 
-    // shopId가 null인 레코드 수
-    const nullShopCount = await prisma.publishedProduct.count({
-      where: { shopId: null }
-    })
-
-    // channelId와 shopId 모두 null인 레코드 수
-    const bothNull = await prisma.publishedProduct.count({
-      where: {
-        channelId: null,
-        shopId: null
-      }
-    })
-
-    // 샘플 데이터 조회 (최근 20개)
-    const samples = await prisma.publishedProduct.findMany({
-      take: 20,
+    // ShopProduct 샘플 데이터 조회 (최근 10개)
+    const shopProductSamples = await prisma.shopProduct.findMany({
+      take: 10,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         userId: true,
         productId: true,
-        channelId: true,
         shopId: true,
-        productName: true,
         publishedAt: true,
         createdAt: true,
       }
     })
 
-    // channelId가 null인 샘플
-    const nullChannelSamples = await prisma.publishedProduct.findMany({
-      where: { channelId: null },
+    // ChannelProduct 샘플 데이터 조회 (최근 10개)
+    const channelProductSamples = await prisma.channelProduct.findMany({
       take: 10,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -53,8 +35,6 @@ export async function GET() {
         userId: true,
         productId: true,
         channelId: true,
-        shopId: true,
-        productName: true,
         publishedAt: true,
         createdAt: true,
       }
@@ -63,13 +43,12 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       stats: {
-        total,
-        nullChannelCount,
-        nullShopCount,
-        bothNull,
+        shopProductTotal,
+        channelProductTotal,
+        total: shopProductTotal + channelProductTotal,
       },
-      samples,
-      nullChannelSamples,
+      shopProductSamples,
+      channelProductSamples,
     })
   } catch (error: any) {
     console.error('Error checking published products:', error)

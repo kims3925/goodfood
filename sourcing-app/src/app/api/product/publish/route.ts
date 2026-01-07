@@ -7,18 +7,18 @@ import { getCurrentUser } from '@/modules/auth/auth.service'
 /**
  * GET /api/product/publish
  *
- * Get published products list with filtering and pagination
+ * Get channel published products list with filtering and pagination
+ * (채널 발행 목록 조회 - RETAIL kind 채널만)
  *
  * Query Parameters:
  * - search?: string (searches in product name, channel name)
- * - status?: 'PENDING' | 'SUCCESS' | 'FAILED'
- * - channelId?: number (하위 호환: channelId도 지원)
+ * - channelId?: number
  * - page?: number (default: 1)
  * - limit?: number (default: 10)
  *
  * Response:
  * - success: boolean
- * - data?: PublishedProduct[]
+ * - data?: ChannelProduct[]
  * - total?: number
  * - page?: number
  * - limit?: number
@@ -36,9 +36,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
-    const status = searchParams.get('status')
-    // 하위 호환성: channelId 또는 channelId 지원
-    const channelId = searchParams.get('channelId') || searchParams.get('channelId')
+    const channelId = searchParams.get('channelId')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
 
@@ -48,10 +46,6 @@ export async function GET(request: NextRequest) {
       channel: {
         kind: ChannelKind.RETAIL,
       },
-    }
-
-    if (status) {
-      where.status = status
     }
 
     if (channelId) {
@@ -66,10 +60,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Get total count
-    const total = await prisma.publishedProduct.count({ where })
+    const total = await prisma.channelProduct.count({ where })
 
-    // Get published products with relations
-    const publishedProducts = await prisma.publishedProduct.findMany({
+    // Get channel products with relations
+    const channelProducts = await prisma.channelProduct.findMany({
       where,
       include: {
         product: {
@@ -103,7 +97,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: publishedProducts,
+      data: channelProducts,
       total,
       page,
       limit,
@@ -120,7 +114,7 @@ export async function GET(request: NextRequest) {
 /**
  * DELETE /api/product/publish
  *
- * Delete published product
+ * Delete channel published product
  *
  * Query Parameters:
  * - id: number
@@ -157,23 +151,23 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Check published product exists and belongs to user
-    const publishedProduct = await prisma.publishedProduct.findFirst({
+    // Check channel product exists and belongs to user
+    const channelProduct = await prisma.channelProduct.findFirst({
       where: {
         id,
         userId,
       },
     })
 
-    if (!publishedProduct) {
+    if (!channelProduct) {
       return NextResponse.json(
         { success: false, error: '발행 상품을 찾을 수 없습니다.' },
         { status: 404 }
       )
     }
 
-    // Delete published product
-    await prisma.publishedProduct.delete({
+    // Delete channel product
+    await prisma.channelProduct.delete({
       where: { id },
     })
 

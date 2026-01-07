@@ -11,7 +11,7 @@ async function checkOrderPrices() {
       items: {
         include: {
           variant: true,
-          publishedProduct: {
+          shopProduct: {
             include: {
               product: {
                 include: {
@@ -34,7 +34,7 @@ async function checkOrderPrices() {
         items: {
           include: {
             variant: true,
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   include: {
@@ -61,7 +61,7 @@ async function checkOrderPrices() {
       console.log('\n=== 주문 아이템 ===')
       for (const item of memberOrder.items) {
         const variant = item.variant
-        const productVariant = item.publishedProduct?.product?.variants?.[0]
+        const productVariant = item.shopProduct?.product?.variants?.[0]
 
         console.log(`\n[${item.productName}]`)
         console.log('  옵션:', item.optionSummary)
@@ -87,9 +87,9 @@ async function checkOrderPrices() {
     console.log('\n=== 주문 아이템 ===')
     for (const item of guestOrder.items) {
       const variant = item.variant
-      const productVariant = item.publishedProduct?.product?.variants?.find(
+      const productVariant = item.shopProduct?.product?.variants?.find(
         v => v.optionSummary === item.optionSummary
-      ) || item.publishedProduct?.product?.variants?.[0]
+      ) || item.shopProduct?.product?.variants?.[0]
 
       console.log(`\n[${item.productName}]`)
       console.log('  옵션:', item.optionSummary)

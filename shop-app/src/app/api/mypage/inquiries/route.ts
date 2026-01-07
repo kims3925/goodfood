@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         userId,
       },
       include: {
-        publishedProduct: {
+        shopProduct: {
           select: {
             id: true,
             product: {
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     const userId = typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
 
-    const { publishedProductId, productId, inquiryType, title, content, isPrivate } =
+    const { shopProductId, productId, inquiryType, title, content, isPrivate } =
       await request.json()
 
     if (!inquiryType || !title || !content) {
@@ -87,8 +87,8 @@ export async function POST(request: NextRequest) {
     const inquiry = await prisma.inquiry.create({
       data: {
         userId,
-        publishedProductId: publishedProductId
-          ? Number(publishedProductId)
+        shopProductId: shopProductId
+          ? Number(shopProductId)
           : productId
             ? Number(productId)
             : null,
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
         isPrivate: isPrivate || false,
       },
       include: {
-        publishedProduct: {
+        shopProduct: {
           select: {
             id: true,
             product: {

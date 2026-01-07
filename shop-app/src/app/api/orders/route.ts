@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
         shopId: shopId || undefined,  // Shop 기반 주문 필터링
         shopSlug: shopSlug || undefined,  // 경로 기반 결제 콜백 URL용
         items: items.map((item: any) => ({
-          publishedProductId: parseInt(item.publishedProductId),
+          shopProductId: parseInt(item.shopProductId),
           variantId: item.variantId ? parseInt(item.variantId) : undefined,
           quantity: item.quantity || 1,
         })),

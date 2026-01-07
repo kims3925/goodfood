@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
           include: {
             items: {
               include: {
-                publishedProduct: {
+                shopProduct: {
                   include: {
                     product: {
                       include: { variants: true },
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
           include: {
             items: {
               include: {
-                publishedProduct: {
+                shopProduct: {
                   include: {
                     product: {
                       include: { variants: true },
@@ -205,8 +205,8 @@ export async function POST(req: NextRequest) {
       }
 
       orderItems = cart.items.map((item) => {
-        const publishedProduct = item.publishedProduct
-        const product = publishedProduct.product
+        const shopProduct = item.shopProduct
+        const product = shopProduct.product
         const variant = item.variant
         const mainVariant = product?.variants[0]
         const basePrice = variant?.price || mainVariant?.price || 0
@@ -227,7 +227,7 @@ export async function POST(req: NextRequest) {
         })
 
         return {
-          publishedProductId: publishedProduct.id,
+          shopProductId: shopProduct.id,
           variantId: variant?.id || null,
           productName: product?.name || "",
           optionSummary: variant?.optionSummary || null,
@@ -250,9 +250,9 @@ export async function POST(req: NextRequest) {
       }
 
       for (const item of items) {
-        const publishedProduct = await prisma.publishedProduct.findFirst({
+        const shopProduct = await prisma.shopProduct.findFirst({
           where: {
-            id: parseInt(item.publishedProductId),
+            id: parseInt(item.shopProductId),
           },
           include: {
             product: {
@@ -261,7 +261,7 @@ export async function POST(req: NextRequest) {
           },
         })
 
-        if (!publishedProduct) {
+        if (!shopProduct) {
           return NextResponse.json(
             { success: false, error: `상품을 찾을 수 없거나 판매 중인 상품이 아닙니다` },
             { status: 404 }
@@ -275,7 +275,7 @@ export async function POST(req: NextRequest) {
           })
         }
 
-        const product = publishedProduct.product
+        const product = shopProduct.product
         const mainVariant = product?.variants[0]
         const basePrice = variant?.price || mainVariant?.price || 0
         const quantity = item.quantity || 1
@@ -295,7 +295,7 @@ export async function POST(req: NextRequest) {
         })
 
         orderItems.push({
-          publishedProductId: publishedProduct.id,
+          shopProductId: shopProduct.id,
           variantId: variant?.id || null,
           productName: product?.name || "",
           optionSummary: variant?.optionSummary || null,
@@ -390,7 +390,7 @@ export async function POST(req: NextRequest) {
           totalAmount: finalTotalAmount,
           items: {
             create: orderItems.map((item) => ({
-              publishedProductId: item.publishedProductId,
+              shopProductId: item.shopProductId,
               variantId: item.variantId,
               productName: item.productName,
               optionSummary: item.optionSummary,

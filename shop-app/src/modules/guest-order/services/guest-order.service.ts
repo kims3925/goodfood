@@ -42,7 +42,7 @@ export interface GuestShippingAddress {
 }
 
 export interface GuestOrderItem {
-  publishedProductId: number
+  shopProductId: number
   variantId?: number
   quantity: number
 }
@@ -147,7 +147,7 @@ export class GuestOrderService {
       include: {
         items: {
           include: {
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   include: {
@@ -164,7 +164,6 @@ export class GuestOrderService {
                   },
                 },
                 shop: true,
-                channel: true,
               },
             },
             variant: {
@@ -188,8 +187,8 @@ export class GuestOrderService {
 
     // 주문 아이템 데이터 준비 (할인 계산 포함)
     const orderItems: GuestOrderItemInput[] = cart.items.map((item: any) => {
-      const publishedProduct = item.publishedProduct
-      const product = publishedProduct?.product
+      const shopProduct = item.shopProduct
+      const product = shopProduct?.product
       const variant = item.variant
       const mainVariant = product?.variants?.[0]
 
@@ -218,7 +217,7 @@ export class GuestOrderService {
       const unitPriceWithDiscount = priceResult.unitPrice
 
       return {
-        publishedProductId: publishedProduct.id,
+        shopProductId: shopProduct.id,
         variantId: variant?.id || null,
         productName: product?.name || "",
         optionSummary: variant?.optionSummary || null,
@@ -294,8 +293,8 @@ export class GuestOrderService {
     const orderItems: GuestOrderItemInput[] = []
 
     for (const item of items) {
-      const publishedProduct = await prisma.publishedProduct.findFirst({
-        where: { id: item.publishedProductId },
+      const shopProduct = await prisma.shopProduct.findFirst({
+        where: { id: item.shopProductId },
         include: {
           product: {
             include: {
@@ -314,8 +313,8 @@ export class GuestOrderService {
         },
       })
 
-      if (!publishedProduct) {
-        throw new NotFoundError('상품', String(item.publishedProductId))
+      if (!shopProduct) {
+        throw new NotFoundError('상품', String(item.shopProductId))
       }
 
       let variant = null
@@ -332,7 +331,7 @@ export class GuestOrderService {
         })
       }
 
-      const product = publishedProduct.product
+      const product = shopProduct.product
       const mainVariant = product?.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || 0
       // 도매가 스냅샷 (마진 계산용)
@@ -340,7 +339,7 @@ export class GuestOrderService {
       const wholesalePriceValue = wholesalePrice ?? null
 
       orderItems.push({
-        publishedProductId: publishedProduct.id,
+        shopProductId: shopProduct.id,
         variantId: variant?.id || null,
         productName: product?.name || "",
         optionSummary: variant?.optionSummary || null,

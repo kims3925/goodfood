@@ -88,7 +88,7 @@ export async function GET(
             lte: toDate,
           },
         },
-        publishedProduct: productCondition,
+        shopProduct: productCondition,
       },
       include: {
         order: {
@@ -113,7 +113,7 @@ export async function GET(
             },
           },
         },
-        publishedProduct: {
+        shopProduct: {
           include: {
             product: {
               select: {
@@ -127,13 +127,13 @@ export async function GET(
                     bundleUnit: true,
                   },
                 },
-              },
-            },
-            channel: {
-              select: {
-                id: true,
-                name: true,
-                kind: true,
+                channel: {
+                  select: {
+                    id: true,
+                    name: true,
+                    kind: true,
+                  },
+                },
               },
             },
           },
@@ -164,7 +164,7 @@ export async function GET(
             lte: toDate,
           },
         },
-        publishedProduct: productCondition,
+        shopProduct: productCondition,
       },
       include: {
         guestOrder: {
@@ -191,7 +191,7 @@ export async function GET(
             },
           },
         },
-        publishedProduct: {
+        shopProduct: {
           include: {
             product: {
               select: {
@@ -205,13 +205,13 @@ export async function GET(
                     bundleUnit: true,
                   },
                 },
-              },
-            },
-            channel: {
-              select: {
-                id: true,
-                name: true,
-                kind: true,
+                channel: {
+                  select: {
+                    id: true,
+                    name: true,
+                    kind: true,
+                  },
+                },
               },
             },
           },
@@ -247,8 +247,8 @@ export async function GET(
         : addr?.address || ''
 
       let optionSummary = item.optionSummary || item.variant?.optionSummary || null
-      if (!optionSummary && item.publishedProduct?.product?.variants?.length) {
-        optionSummary = item.publishedProduct.product.variants[0].optionSummary || null
+      if (!optionSummary && item.shopProduct?.product?.variants?.length) {
+        optionSummary = item.shopProduct.product.variants[0].optionSummary || null
       }
 
       unifiedItems.push({
@@ -257,7 +257,7 @@ export async function GET(
         orderNumber: item.order.orderNumber,
         orderedAt: item.order.orderedAt.toISOString(),
         isMember: true,
-        retailChannelName: item.publishedProduct?.channel?.name || item.order.shop?.name || '-',
+        retailChannelName: item.shopProduct?.product?.channel?.name || item.order.shop?.name || '-',
         productName: item.productName,
         optionSummary: optionSummary || '-',
         quantity: item.quantity,
@@ -284,8 +284,8 @@ export async function GET(
         : addr?.address || ''
 
       let optionSummary = item.optionSummary || item.variant?.optionSummary || null
-      if (!optionSummary && item.publishedProduct?.product?.variants?.length) {
-        optionSummary = item.publishedProduct.product.variants[0].optionSummary || null
+      if (!optionSummary && item.shopProduct?.product?.variants?.length) {
+        optionSummary = item.shopProduct.product.variants[0].optionSummary || null
       }
 
       // 비회원 주문은 shippingAddress가 없을 수 있으므로 guestOrder 정보 사용
@@ -298,7 +298,7 @@ export async function GET(
         orderNumber: item.guestOrder.orderNumber,
         orderedAt: item.guestOrder.orderedAt.toISOString(),
         isMember: false,
-        retailChannelName: item.publishedProduct?.channel?.name || item.guestOrder.shop?.name || '-',
+        retailChannelName: item.shopProduct?.product?.channel?.name || item.guestOrder.shop?.name || '-',
         productName: item.productName,
         optionSummary: optionSummary || '-',
         quantity: item.quantity,
@@ -357,7 +357,7 @@ export async function GET(
 function calculateShippingFee(item: {
   quantity: number
   variant?: { bundleUnit?: number | null } | null
-  publishedProduct?: {
+  shopProduct?: {
     product?: {
       shippingFee?: number | null
       bundleMaxQty?: number | null
@@ -365,7 +365,7 @@ function calculateShippingFee(item: {
     } | null
   } | null
 }): number {
-  const product = item.publishedProduct?.product
+  const product = item.shopProduct?.product
   if (!product) return 0
 
   const shippingFee = product.shippingFee || 0
@@ -387,7 +387,7 @@ function calculateShippingFee(item: {
 function getWholesalePrice(item: {
   variant?: { wholesalePrice: unknown } | null
   optionSummary?: string | null
-  publishedProduct?: {
+  shopProduct?: {
     product?: {
       variants?: { optionSummary: string | null; wholesalePrice: unknown }[]
     } | null
@@ -396,9 +396,9 @@ function getWholesalePrice(item: {
   let wholesalePrice = Number(item.variant?.wholesalePrice || 0)
 
   // variantId가 null인 경우 Product의 variants에서 찾기
-  if (!item.variant && item.publishedProduct?.product?.variants?.length) {
+  if (!item.variant && item.shopProduct?.product?.variants?.length) {
     if (item.optionSummary) {
-      const matchedVariant = item.publishedProduct.product.variants.find(
+      const matchedVariant = item.shopProduct.product.variants.find(
         v => v.optionSummary === item.optionSummary
       )
       if (matchedVariant) {
@@ -406,7 +406,7 @@ function getWholesalePrice(item: {
       }
     }
     if (wholesalePrice === 0) {
-      wholesalePrice = Number(item.publishedProduct.product.variants[0].wholesalePrice || 0)
+      wholesalePrice = Number(item.shopProduct.product.variants[0].wholesalePrice || 0)
     }
   }
 

@@ -49,7 +49,7 @@ interface Shop {
   createdAt: string
   updatedAt: string
   _count: {
-    publishedProducts: number
+    shopProducts: number
     orders: number
     guestOrders: number
   }
@@ -230,7 +230,7 @@ function ShopListContent() {
   // 통계
   const activeCount = shops.filter((s) => s.isActive).length
   const inactiveCount = shops.filter((s) => !s.isActive).length
-  const totalProducts = shops.reduce((sum, s) => sum + s._count.publishedProducts, 0)
+  const totalProducts = shops.reduce((sum, s) => sum + s._count.shopProducts, 0)
   const totalOrders = shops.reduce((sum, s) => sum + s._count.orders + s._count.guestOrders, 0)
 
   return (
@@ -460,7 +460,7 @@ function ShopListContent() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-gray-600">{shop._count.publishedProducts}</span>
+                        <span className="text-gray-600">{shop._count.shopProducts}</span>
                       </TableCell>
                       <TableCell>
                         <span className="text-gray-600">{shop._count.orders + shop._count.guestOrders}</span>

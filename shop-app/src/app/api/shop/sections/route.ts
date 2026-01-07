@@ -49,11 +49,10 @@ export async function GET(req: NextRequest) {
     // 2. 각 소매채널별로 발행된 상품 조회
     const sections = await Promise.all(
       retailChannels.map(async (channel) => {
-        // 해당 채널에 발행된 활성 상품만 조회 (published_product 테이블 사용)
-        const publishedProducts = await prisma.publishedProduct.findMany({
+        // 해당 채널에 발행된 상품 조회 (channel_product 테이블 사용)
+        const channelProducts = await prisma.channelProduct.findMany({
           where: {
             channelId: channel.id,
-            isActive: true, // 활성 상태인 상품만 노출
           },
           include: {
             product: {
@@ -73,10 +72,10 @@ export async function GET(req: NextRequest) {
         })
 
         // 상품 포맷팅
-        const products = publishedProducts
-          .filter((pp) => pp.product)
-          .map((pp) => {
-            const product = pp.product!
+        const products = channelProducts
+          .filter((cp) => cp.product)
+          .map((cp) => {
+            const product = cp.product!
             const mainVariant = product?.variants[0]
             const images = product.images?.map((img) => img.url) || []
 
@@ -90,7 +89,7 @@ export async function GET(req: NextRequest) {
 
             return {
               id: product.id,
-              publishedProductId: pp.id,
+              channelProductId: cp.id,
               title: product.name,
               description: product.description,
               originalPrice,
@@ -163,7 +162,6 @@ async function getShopProducts(shopId: number, limit: number, search: string | n
   // 검색 조건 구성
   const whereCondition: any = {
     shopId: shopId,
-    isActive: true, // 활성 상태인 상품만 노출
   }
 
   // 검색어가 있으면 상품명으로 필터링
@@ -175,8 +173,8 @@ async function getShopProducts(shopId: number, limit: number, search: string | n
     }
   }
 
-  // 해당 Shop에 발행된 활성 상품만 조회 (비활성 상품은 품절 처리)
-  const publishedProducts = await prisma.publishedProduct.findMany({
+  // 해당 Shop에 발행된 상품만 조회
+  const shopProducts = await prisma.shopProduct.findMany({
     where: whereCondition,
     include: {
       product: {
@@ -196,10 +194,10 @@ async function getShopProducts(shopId: number, limit: number, search: string | n
   })
 
   // 상품 포맷팅
-  const products = publishedProducts
-    .filter((pp) => pp.product)
-    .map((pp) => {
-      const product = pp.product!
+  const products = shopProducts
+    .filter((sp) => sp.product)
+    .map((sp) => {
+      const product = sp.product!
       const mainVariant = product?.variants[0]
       const images = product.images?.map((img) => img.url) || []
 
@@ -213,7 +211,7 @@ async function getShopProducts(shopId: number, limit: number, search: string | n
 
       return {
         id: product.id,
-        publishedProductId: pp.id,
+        shopProductId: sp.id,
         title: product.name,
         description: product.description,
         originalPrice,
@@ -261,11 +259,10 @@ async function getChannelProducts(channelId: number, limit: number) {
     })
   }
 
-  // 해당 채널에 발행된 활성 상품만 조회 (비활성 상품은 품절 처리)
-  const publishedProducts = await prisma.publishedProduct.findMany({
+  // 해당 채널에 발행된 상품 조회 (channel_product 테이블 사용)
+  const channelProducts = await prisma.channelProduct.findMany({
     where: {
       channelId: channelId,
-      isActive: true, // 활성 상태인 상품만 노출
     },
     include: {
       product: {
@@ -285,10 +282,10 @@ async function getChannelProducts(channelId: number, limit: number) {
   })
 
   // 상품 포맷팅
-  const products = publishedProducts
-    .filter((pp) => pp.product)
-    .map((pp) => {
-      const product = pp.product!
+  const products = channelProducts
+    .filter((cp) => cp.product)
+    .map((cp) => {
+      const product = cp.product!
       const mainVariant = product?.variants[0]
       const images = product.images?.map((img) => img.url) || []
 
@@ -302,7 +299,7 @@ async function getChannelProducts(channelId: number, limit: number) {
 
       return {
         id: product.id,
-        publishedProductId: pp.id,
+        channelProductId: cp.id,
         title: product.name,
         description: product.description,
         originalPrice,

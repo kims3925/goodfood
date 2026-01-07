@@ -76,7 +76,7 @@ export async function GET(
         theme: true,
         _count: {
           select: {
-            publishedProducts: true,
+            shopProducts: true,
             orders: true,
           },
         },
@@ -260,7 +260,7 @@ export async function PUT(
           theme: true,
           _count: {
             select: {
-              publishedProducts: true,
+              shopProducts: true,
               orders: true,
             },
           },

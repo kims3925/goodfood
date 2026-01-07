@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
                 deliveredAt: true,
               },
             },
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   select: {
@@ -122,17 +122,17 @@ export async function GET(request: NextRequest) {
         orderId: item.orderId,
         orderNumber: item.order.orderNumber,
         deliveredAt: item.order.deliveredAt?.toISOString() || null,
-        publishedProductId: item.publishedProductId,
+        shopProductId: item.shopProductId,
         productName: item.productName,
         optionSummary: item.optionSummary,
-        thumbnailUrl: item.thumbnailUrl || item.publishedProduct?.product?.thumbnailUrl,
+        thumbnailUrl: item.thumbnailUrl || item.shopProduct?.product?.thumbnailUrl,
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         totalPrice: Number(item.totalPrice),
-        product: item.publishedProduct?.product ? {
-          id: item.publishedProduct.product.id,
-          name: item.publishedProduct.product.name,
-          thumbnailUrl: item.publishedProduct.product.thumbnailUrl,
+        product: item.shopProduct?.product ? {
+          id: item.shopProduct.product.id,
+          name: item.shopProduct.product.name,
+          thumbnailUrl: item.shopProduct.product.thumbnailUrl,
         } : null,
       }))
 
@@ -179,7 +179,7 @@ export async function GET(request: NextRequest) {
                     orderNumber: true,
                   },
                 },
-                publishedProduct: {
+                shopProduct: {
                   include: {
                     product: {
                       select: {
@@ -219,7 +219,7 @@ export async function GET(request: NextRequest) {
         content: review.content,
         images: review.images ? JSON.parse(review.images) : null,
         createdAt: review.createdAt.toISOString(),
-        product: review.orderItem?.publishedProduct?.product || null,
+        product: review.orderItem?.shopProduct?.product || null,
         orderItem: review.orderItem ? {
           productName: review.orderItem.productName,
           optionSummary: review.orderItem.optionSummary,
@@ -283,7 +283,7 @@ export async function POST(request: NextRequest) {
       where: { id: orderItemId },
       include: {
         order: true,
-        publishedProduct: {
+        shopProduct: {
           include: {
             product: true,
           },
@@ -346,7 +346,7 @@ export async function POST(request: NextRequest) {
       include: {
         orderItem: {
           include: {
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   select: {
@@ -373,7 +373,7 @@ export async function POST(request: NextRequest) {
         content: review.content,
         images: review.images ? JSON.parse(review.images) : null,
         createdAt: review.createdAt.toISOString(),
-        product: review.orderItem?.publishedProduct?.product || null,
+        product: review.orderItem?.shopProduct?.product || null,
         orderItem: review.orderItem ? {
           productName: review.orderItem.productName,
           optionSummary: review.orderItem.optionSummary,

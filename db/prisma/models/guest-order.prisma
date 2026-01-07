@@ -35,24 +35,24 @@ model GuestOrder {
 }
 
 model GuestOrderItem {
-  id                 Int              @id @default(autoincrement())
-  guestOrderId       Int              @map("guest_order_id")
-  publishedProductId Int              @map("published_product_id")
-  variantId          Int?             @map("variant_id")
-  productName        String           @map("product_name") @db.VarChar(500)
-  optionSummary      String?          @map("option_summary") @db.VarChar(500)
-  thumbnailUrl       String?          @map("thumbnail_url") @db.VarChar(1000)
-  quantity           Int
-  unitPrice          Decimal          @map("unit_price") @db.Decimal(12, 2)
-  wholesalePrice     Decimal?         @map("wholesale_price") @db.Decimal(12, 2) // 주문 시점의 도매가 스냅샷 (마진 계산용)
-  totalPrice         Decimal          @map("total_price") @db.Decimal(12, 2)
-  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
-  guestOrder         GuestOrder       @relation(fields: [guestOrderId], references: [id], onDelete: Cascade)
-  publishedProduct   PublishedProduct @relation(fields: [publishedProductId], references: [id])
-  variant            ProductVariant?  @relation(fields: [variantId], references: [id])
+  id             Int             @id @default(autoincrement())
+  guestOrderId   Int             @map("guest_order_id")
+  shopProductId  Int             @map("shop_product_id")
+  variantId      Int?            @map("variant_id")
+  productName    String          @map("product_name") @db.VarChar(500)
+  optionSummary  String?         @map("option_summary") @db.VarChar(500)
+  thumbnailUrl   String?         @map("thumbnail_url") @db.VarChar(1000)
+  quantity       Int
+  unitPrice      Decimal          @map("unit_price") @db.Decimal(12, 2)
+  wholesalePrice Decimal?         @map("wholesale_price") @db.Decimal(12, 2) // 주문 시점의 도매가 스냅샷 (마진 계산용)
+  totalPrice     Decimal         @map("total_price") @db.Decimal(12, 2)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
+  guestOrder     GuestOrder      @relation(fields: [guestOrderId], references: [id], onDelete: Cascade)
+  shopProduct    ShopProduct     @relation(fields: [shopProductId], references: [id])
+  variant        ProductVariant? @relation(fields: [variantId], references: [id])
 
   @@index([guestOrderId])
-  @@index([publishedProductId])
+  @@index([shopProductId])
   @@index([variantId])
   @@map("guest_order_item")
 }

@@ -75,7 +75,7 @@ export async function GET(
           status: { in: ['PAID', 'PREPARING'] },
           paidAt: { not: null },
         },
-        publishedProduct: productCondition,
+        shopProduct: productCondition,
       },
       include: {
         order: {
@@ -99,7 +99,7 @@ export async function GET(
             },
           },
         },
-        publishedProduct: {
+        shopProduct: {
           include: {
             product: {
               select: {
@@ -138,7 +138,7 @@ export async function GET(
           status: { in: ['PAID', 'PREPARING'] },
           paidAt: { not: null },
         },
-        publishedProduct: productCondition,
+        shopProduct: productCondition,
       },
       include: {
         guestOrder: {
@@ -159,7 +159,7 @@ export async function GET(
             },
           },
         },
-        publishedProduct: {
+        shopProduct: {
           include: {
             product: {
               select: {
@@ -504,7 +504,7 @@ export async function GET(
 function getWholesalePrice(item: {
   variant?: { wholesalePrice: unknown } | null
   optionSummary?: string | null
-  publishedProduct?: {
+  shopProduct?: {
     product?: {
       variants?: { optionSummary: string | null; wholesalePrice: unknown }[]
     } | null
@@ -513,9 +513,9 @@ function getWholesalePrice(item: {
   let wholesalePrice = Number(item.variant?.wholesalePrice || 0)
 
   // variantId가 null인 경우 Product의 variants에서 찾기
-  if (!item.variant && item.publishedProduct?.product?.variants?.length) {
+  if (!item.variant && item.shopProduct?.product?.variants?.length) {
     if (item.optionSummary) {
-      const matchedVariant = item.publishedProduct.product.variants.find(
+      const matchedVariant = item.shopProduct.product.variants.find(
         v => v.optionSummary === item.optionSummary
       )
       if (matchedVariant) {
@@ -523,7 +523,7 @@ function getWholesalePrice(item: {
       }
     }
     if (wholesalePrice === 0) {
-      wholesalePrice = Number(item.publishedProduct.product.variants[0].wholesalePrice || 0)
+      wholesalePrice = Number(item.shopProduct.product.variants[0].wholesalePrice || 0)
     }
   }
 
@@ -535,7 +535,7 @@ function getWholesalePrice(item: {
 function calculateShippingFee(item: {
   quantity: number
   variant?: { bundleUnit?: number | null } | null
-  publishedProduct?: {
+  shopProduct?: {
     product?: {
       shippingFee?: number | null
       bundleMaxQty?: number | null
@@ -543,7 +543,7 @@ function calculateShippingFee(item: {
     } | null
   } | null
 }): number {
-  const product = item.publishedProduct?.product
+  const product = item.shopProduct?.product
   if (!product) return 0
 
   const shippingFee = product.shippingFee || 0

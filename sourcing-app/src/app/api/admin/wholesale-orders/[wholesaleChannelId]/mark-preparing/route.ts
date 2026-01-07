@@ -61,7 +61,7 @@ export async function POST(
             lte: toDate,
           },
         },
-        publishedProduct: productCondition,
+        shopProduct: productCondition,
       },
       select: {
         order: {
@@ -102,7 +102,7 @@ export async function POST(
             lte: toDate,
           },
         },
-        publishedProduct: productCondition,
+        shopProduct: productCondition,
       },
       select: {
         guestOrder: {

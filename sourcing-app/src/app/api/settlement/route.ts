@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
                 bundleUnit: true, // 합배송 단위
               },
             },
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   select: {
@@ -182,7 +182,7 @@ export async function GET(request: NextRequest) {
         return item.variant.wholesalePrice
       }
       // 3. Product의 첫 번째 variant의 wholesalePrice
-      const productVariant = item.publishedProduct?.product?.variants?.[0]
+      const productVariant = item.shopProduct?.product?.variants?.[0]
       if (productVariant?.wholesalePrice) {
         return productVariant.wholesalePrice
       }
@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
       bundleShippingType: string
       bundleUnit: number
     } => {
-      const product = item.publishedProduct?.product
+      const product = item.shopProduct?.product
       const shippingFee = product?.shippingFee || 0
       const bundleMaxQty = product?.bundleMaxQty || 1
       const bundleShippingType = product?.bundleShippingType || 'NONE'
@@ -220,7 +220,7 @@ export async function GET(request: NextRequest) {
       }>()
 
       for (const item of items) {
-        const product = item.publishedProduct?.product
+        const product = item.shopProduct?.product
         if (!product) continue
 
         const productId = product.id
@@ -272,7 +272,7 @@ export async function GET(request: NextRequest) {
       productShippingFees: Map<number, number>,
       orderItems: any[]
     ): number => {
-      const product = item.publishedProduct?.product
+      const product = item.shopProduct?.product
       if (!product) return 0
 
       const productId = product.id
@@ -282,7 +282,7 @@ export async function GET(request: NextRequest) {
 
       // 같은 상품의 아이템들 총 금액
       const sameProductItems = orderItems.filter(
-        i => i.publishedProduct?.product?.id === productId
+        i => i.shopProduct?.product?.id === productId
       )
       const sameProductTotalAmount = sameProductItems.reduce(
         (sum, i) => sum + Number(i.totalPrice), 0
@@ -343,7 +343,7 @@ export async function GET(request: NextRequest) {
                 bundleUnit: true, // 합배송 단위
               },
             },
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   select: {
@@ -436,7 +436,7 @@ export async function GET(request: NextRequest) {
         const { margin, marginRate } = calculateMargin(item, wholesalePrice, allocatedShippingFee)
 
         const thumbnailUrl = item.thumbnailUrl ||
-          item.publishedProduct?.product?.images?.[0]?.url || null
+          item.shopProduct?.product?.images?.[0]?.url || null
 
         shopData.items.push({
           id: item.id,
@@ -533,7 +533,7 @@ export async function GET(request: NextRequest) {
         const { margin, marginRate } = calculateMargin(item, wholesalePrice, allocatedShippingFee)
 
         const thumbnailUrl = item.thumbnailUrl ||
-          item.publishedProduct?.product?.images?.[0]?.url || null
+          item.shopProduct?.product?.images?.[0]?.url || null
 
         shopData.items.push({
           id: item.id,

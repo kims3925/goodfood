@@ -84,7 +84,7 @@ export async function runPublishPipeline(
     whereClause.AND = [
       {
         OR: channelIds.map(channelId => ({
-          publishedProducts: {
+          channelProducts: {
             none: { channelId },
           },
         })),
@@ -99,7 +99,7 @@ export async function runPublishPipeline(
       name: true,
       options: { select: { id: true } },
       variants: { select: { id: true, price: true } },
-      publishedProducts: {
+      channelProducts: {
         where: { channelId: { in: channelIds } },
         select: { channelId: true },
       },
@@ -216,7 +216,7 @@ export async function runPublishPipeline(
   // 이미 발행된 상품 정보 매핑 (productId -> 발행된 channelIds)
   const publishedChannelsMap = new Map<number, Set<number>>()
   for (const product of validProducts) {
-    const publishedChannelIds: number[] = (product as any).publishedProducts?.map((pp: any) => pp.channelId) || []
+    const publishedChannelIds: number[] = (product as any).channelProducts?.map((cp: any) => cp.channelId) || []
     publishedChannelsMap.set(product.id, new Set<number>(publishedChannelIds))
   }
 
