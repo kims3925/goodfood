@@ -221,88 +221,8 @@ export async function runPublishPipeline(
   // 진행 상황 추적 (초기화 제거 - executor.ts에서 누적 관리)
   // totalItems는 실제 발행 대상(미발행 상품)만 누적
   let totalItems = 0
-  // 진행 상황 추적 (초기화 제거 - executor.ts에서 누적 관리)
-  // totalItems는 실제 발행 대상(미발행 상품)만 누적
-  let totalItems = 0
   let currentSuccess = 0
   let currentFailed = 0
-
-  // =============================================
-  // 1. 쇼핑몰(Shop) 발행 먼저 수행
-  // =============================================
-  if (shopIds && shopIds.length > 0) {
-    console.log(`[Publish Pipeline] Publishing to ${shopIds.length} shop(s) first: ${shopIds.join(', ')}`)
-
-    for (const shopId of shopIds) {
-      // 취소 체크: 각 Shop 발행 전에 확인
-      if (await checkCancellation()) {
-        console.log(`[Publish Pipeline] Cancelled by user before shop ${shopId}`)
-        return {
-          success: false,
-          totalItems,
-          successCount: currentSuccess,
-          failedCount: currentFailed,
-          details: {
-            publishedProducts,
-            channelResults,
-            cancelled: true,
-          },
-          errors: [...errors, { itemId: 'cancelled', message: '사용자에 의해 취소됨', timestamp: new Date() }],
-        }
-      }
-      const shopResult = await publishService.publishShopBatch({
-        userId,
-        productIds,
-        shopId,
-      })
-
-      // Shop 결과를 channelResults에 추가 (명시적 타입 구분)
-      const shopChannelResult: ChannelPublishResult = {
-        targetType: 'SHOP',
-        targetId: shopId,
-        targetName: `Shop: ${shopResult.shopName}`,
-        attempted: shopResult.total,
-        success: shopResult.successCount,
-        failed: shopResult.failedCount,
-        skipped: shopResult.skippedCount,
-        errors: shopResult.errors,
-        // 하위 호환성을 위한 deprecated 필드
-        channelId: shopId,
-        channelName: `Shop: ${shopResult.shopName}`,
-      }
-      channelResults.push(shopChannelResult)
-
-      // 개별 상품 결과 추가
-      for (const productResult of shopResult.results) {
-        publishedProducts.push({
-          productId: productResult.productId,
-          targetType: 'SHOP',
-          targetId: shopId,
-          targetName: shopResult.shopName,
-          status: productResult.success
-            ? productResult.skipped
-              ? 'SKIPPED'
-              : 'SUCCESS'
-            : 'FAILED',
-          error: productResult.error,
-          // 하위 호환성을 위한 deprecated 필드
-          channelId: shopId,
-          channelName: `Shop: ${shopResult.shopName}`,
-        })
-
-        if (!productResult.success && productResult.error) {
-          errors.push({
-            itemId: `${productResult.productId}-shop-${shopId}`,
-            message: productResult.error,
-            timestamp: new Date(),
-          })
-        }
-      }
-
-      currentSuccess += shopResult.successCount
-      currentFailed += shopResult.failedCount
-      // 실제 발행 대상만 카운트 (이미 발행된 skipped 제외)
-      totalItems += shopResult.successCount + shopResult.failedCount
 
   // =============================================
   // 1. 쇼핑몰(Shop) 발행 먼저 수행

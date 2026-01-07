@@ -143,41 +143,6 @@ export class BandPostAutomation {
   }
 
   /**
-   * 로그인 화면인지 감지
-   * 발행 과정 중 세션 만료로 로그인 페이지로 리다이렉트되는 경우 감지
-   */
-  private async isLoginPage(page: Page): Promise<boolean> {
-    const currentUrl = page.url()
-
-    // URL 기반 체크
-    if (currentUrl.includes('signin') ||
-        currentUrl.includes('login') ||
-        currentUrl.includes('auth.band.us')) {
-      console.log(`[밴드자동화] 로그인 페이지 감지 (URL): ${currentUrl}`)
-      return true
-    }
-
-    // 로그인 폼 요소 체크
-    const loginFormSelectors = [
-      'input[name="email"]',
-      'input[name="password"]',
-      'button[type="submit"]:has-text("로그인")',
-      '.uLoginForm',
-      '[data-viewname="DLoginView"]',
-    ]
-
-    for (const selector of loginFormSelectors) {
-      const element = await page.$(selector)
-      if (element && await element.isVisible()) {
-        console.log(`[밴드자동화] 로그인 페이지 감지 (요소): ${selector}`)
-        return true
-      }
-    }
-
-    return false
-  }
-
-  /**
    * URL에서 밴드 ID를 추출하여 post URL 형태로 반환
    * @param url 현재 URL (예: https://band.us/band/82426338/tab/posts)
    * @returns 밴드 post URL (예: https://band.us/band/82426338/post)
@@ -393,7 +358,6 @@ export class BandPostAutomation {
     page: Page,
     params: BandPublishParams
   ): Promise<BandPublishResult> {
-    const { bandKey, bandName, content, imageUrls, onStageProgress, signal } = params
     const { bandKey, bandName, content, imageUrls, onStageProgress, signal } = params
     const tempFiles: string[] = []
 
