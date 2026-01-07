@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260107-011 | Done | 2026-01-07 | - | FLOW.md 발행 흐름 다이어그램 중복 블록 제거 | Low | Hong |
 | TR-20260107-010 | Done | 2026-01-07 | - | AWS EC2 MariaDB 일일 자동 백업 설정 | Low | Hong |
 | TR-20260107-009 | Done | 2026-01-07 | - | 밴드 세션 확장 자동 저장 간격 상수 추가 | Low | Hong |
 | TR-20260107-008 | Done | 2026-01-07 | - | 도매주문 엑셀 '보내는사람' 헤더 표현 수정 | Low | Hong |
