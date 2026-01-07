@@ -152,6 +152,11 @@ export interface PublishDetailedProgress {
     current: number            // 현재 업로드된 이미지 수
     total: number              // 전체 이미지 수
   }
+  uploadProgress?: {
+    fileIndex: string          // "1/10" 형식
+    totalPercent: string       // "10%" 형식
+    currentPercent: string     // "92%" 형식
+  }
   error?: string               // 실패 시 에러 메시지
   publishMethod?: 'playwright' | 'api'
 }

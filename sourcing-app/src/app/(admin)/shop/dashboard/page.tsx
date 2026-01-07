@@ -51,7 +51,8 @@ interface DashboardData {
     revenue: { value: number; change: number }
     orders: { value: number; change: number }
     customers: { value: number; change: number }
-    conversionRate: { value: number; change: number }
+    marginRate: { value: number; change: number }
+    totalMargin: { value: number; change: number }
   }
   revenueChart: { date: string; amount: number }[]
   orderStatusChart: { name: string; value: number; color: string }[]
@@ -94,6 +95,7 @@ const StatusBadge = ({ status }: { status: string }) => {
   const config: Record<string, { label: string; className: string }> = {
     PENDING: { label: '결제대기', className: 'bg-yellow-100 text-yellow-700' },
     PAID: { label: '결제완료', className: 'bg-indigo-100 text-indigo-700' },
+    PREPARING: { label: '상품준비중', className: 'bg-purple-100 text-purple-700' },
     SHIPPED: { label: '배송중', className: 'bg-blue-100 text-blue-700' },
     DELIVERED: { label: '배송완료', className: 'bg-emerald-100 text-emerald-700' },
     CANCELLED: { label: '취소', className: 'bg-red-100 text-red-700' },
@@ -309,20 +311,34 @@ export default function ShopDashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KPICard
           title="총 매출"
           value={formatCurrency(stats.revenue.value)}
           change={stats.revenue.change}
           icon={<DollarSign size={24} />}
+          gradient="bg-gradient-to-br from-blue-500 to-cyan-600"
+        />
+        <KPICard
+          title="마진액"
+          value={formatCurrency(stats.totalMargin.value)}
+          change={stats.totalMargin.change}
+          icon={<TrendingUp size={24} />}
           gradient="bg-gradient-to-br from-indigo-500 to-purple-600"
+        />
+        <KPICard
+          title="평균 마진율"
+          value={`${stats.marginRate.value}%`}
+          change={stats.marginRate.change}
+          icon={<Percent size={24} />}
+          gradient="bg-gradient-to-br from-rose-500 to-pink-600"
         />
         <KPICard
           title="주문 수"
           value={`${stats.orders.value}건`}
           change={stats.orders.change}
           icon={<Package size={24} />}
-          gradient="bg-gradient-to-br from-blue-500 to-cyan-600"
+          gradient="bg-gradient-to-br from-orange-500 to-amber-600"
         />
         <KPICard
           title="고객 수"
@@ -330,13 +346,6 @@ export default function ShopDashboardPage() {
           change={stats.customers.change}
           icon={<Users size={24} />}
           gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
-        />
-        <KPICard
-          title="결제 전환율"
-          value={`${stats.conversionRate.value}%`}
-          change={stats.conversionRate.change}
-          icon={<Percent size={24} />}
-          gradient="bg-gradient-to-br from-orange-500 to-pink-600"
         />
       </div>
 

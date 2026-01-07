@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ChevronLeft, ChevronRight, ShoppingCart, Sparkles, Package } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ShoppingCart, Sparkles, Package, Search, X } from 'lucide-react'
 import { useCartNotification } from '@/contexts/CartNotificationContext'
 import { useShop } from '@/contexts/ShopContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
@@ -30,6 +31,9 @@ export default function StorePage() {
   const { showNotification } = useCartNotification()
   const { shop } = useShop()
   const { getApiPath, getPath } = useShopUrl()
+  const searchParams = useSearchParams()
+  const searchQuery = searchParams.get('search') || ''
+
   const [shopProducts, setShopProducts] = useState<Product[]>([])
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([])
   const [currentSlide, setCurrentSlide] = useState(0)
@@ -68,7 +72,11 @@ export default function StorePage() {
   const loadShopProducts = useCallback(async () => {
     try {
       setIsLoading(true)
-      const response = await fetch(getApiPath('/api/shop/sections?limit=50'))
+      // 검색어가 있으면 API에 전달
+      const apiUrl = searchQuery
+        ? getApiPath(`/api/shop/sections?limit=50&search=${encodeURIComponent(searchQuery)}`)
+        : getApiPath('/api/shop/sections?limit=50')
+      const response = await fetch(apiUrl)
       const data = await response.json()
 
       if (data.success) {
@@ -76,16 +84,21 @@ export default function StorePage() {
         const products = data.products || data.channelProducts || []
         setShopProducts(products)
 
-        // 이미지가 있는 상품을 추천 상품으로 사용 (최대 12개)
-        const productsWithImages = products.filter((p: Product) => p.images && p.images.length > 0).slice(0, 12)
-        setFeaturedProducts(productsWithImages.length > 0 ? productsWithImages : products.slice(0, 12))
+        // 검색 모드가 아닐 때만 추천 상품 설정
+        if (!searchQuery) {
+          // 이미지가 있는 상품을 추천 상품으로 사용 (최대 12개)
+          const productsWithImages = products.filter((p: Product) => p.images && p.images.length > 0).slice(0, 12)
+          setFeaturedProducts(productsWithImages.length > 0 ? productsWithImages : products.slice(0, 12))
+        } else {
+          setFeaturedProducts([]) // 검색 모드에서는 추천 상품 숨김
+        }
       }
     } catch (error) {
       console.error('Failed to load shop products:', error)
     } finally {
       setIsLoading(false)
     }
-  }, [getApiPath])
+  }, [getApiPath, searchQuery])
 
   useEffect(() => {
     loadShopProducts()
@@ -276,9 +289,32 @@ export default function StorePage() {
           {/* 섹션 헤더 */}
           <div className="flex items-center justify-between mb-6 md:mb-8">
             <div className="flex items-center gap-2">
-              <Package className="w-5 h-5 md:w-6 md:h-6 text-rose-500" />
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">전체 상품</h2>
+              {searchQuery ? (
+                <>
+                  <Search className="w-5 h-5 md:w-6 md:h-6 text-rose-500" />
+                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+                    &apos;{searchQuery}&apos; 검색 결과
+                  </h2>
+                  <span className="text-sm text-gray-500 ml-2">
+                    ({shopProducts.length}개)
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Package className="w-5 h-5 md:w-6 md:h-6 text-rose-500" />
+                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">전체 상품</h2>
+                </>
+              )}
             </div>
+            {searchQuery && (
+              <Link
+                href={getPath('/main')}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <X className="w-4 h-4" />
+                검색 초기화
+              </Link>
+            )}
           </div>
 
           {isLoading ? (
@@ -355,9 +391,25 @@ export default function StorePage() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-              <Package className="w-12 h-12 md:w-16 md:h-16 mb-4 text-gray-300" />
-              <p className="text-sm md:text-base">등록된 상품이 없습니다</p>
-              <p className="text-xs text-gray-500 mt-1">관리자에게 문의해주세요</p>
+              {searchQuery ? (
+                <>
+                  <Search className="w-12 h-12 md:w-16 md:h-16 mb-4 text-gray-300" />
+                  <p className="text-sm md:text-base">&apos;{searchQuery}&apos;에 대한 검색 결과가 없습니다</p>
+                  <p className="text-xs text-gray-500 mt-1">다른 검색어로 시도해보세요</p>
+                  <Link
+                    href={getPath('/main')}
+                    className="mt-4 px-4 py-2 text-sm text-white bg-rose-500 hover:bg-rose-600 rounded-lg transition-colors"
+                  >
+                    전체 상품 보기
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Package className="w-12 h-12 md:w-16 md:h-16 mb-4 text-gray-300" />
+                  <p className="text-sm md:text-base">등록된 상품이 없습니다</p>
+                  <p className="text-xs text-gray-500 mt-1">관리자에게 문의해주세요</p>
+                </>
+              )}
             </div>
           )}
         </div>

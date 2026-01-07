@@ -19,6 +19,7 @@ export interface GuestOrderItemInput {
   thumbnailUrl: string | null
   quantity: number
   unitPrice: number
+  wholesalePrice?: number | null // 도매가 스냅샷 (마진 계산용)
 }
 
 export interface GuestShippingAddressInput {
@@ -131,6 +132,7 @@ export class GuestOrderRepository {
             thumbnailUrl: item.thumbnailUrl,
             quantity: item.quantity,
             unitPrice: new Decimal(item.unitPrice),
+            wholesalePrice: item.wholesalePrice ?? null, // 도매가 스냅샷
             totalPrice: new Decimal(item.unitPrice * item.quantity),
           })),
         },

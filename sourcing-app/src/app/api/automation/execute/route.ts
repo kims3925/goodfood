@@ -563,8 +563,7 @@ export async function POST(request: NextRequest) {
         }
 
         responseData = buildFullPipelineResponse(result as FullPipelineResult)
-        // 전체 파이프라인 완료 알림 생성
-        await createPipelineNotificationInternal(currentUser.userId, 'full', result as FullPipelineResult, responseData.workflowId)
+        // 전체 파이프라인 알림은 executor.ts의 createPipelineNotification에서 생성됨 (중복 방지)
         break
 
       default:

@@ -164,6 +164,10 @@ export async function GET(
             quantity: item.quantity,
             unitPrice: Number(item.unitPrice),
             totalPrice: Number(item.totalPrice),
+            // 배송비 및 합배송 정보
+            shippingFee: item.publishedProduct?.product?.shippingFee || 0,
+            bundleShippingType: item.publishedProduct?.product?.bundleShippingType || 'NONE',
+            bundleMaxQty: item.publishedProduct?.product?.bundleMaxQty || 1,
           })),
           payment: order.payment ? {
             id: order.payment.id,
@@ -284,6 +288,10 @@ export async function GET(
           quantity: item.quantity,
           unitPrice: Number(item.unitPrice),
           totalPrice: Number(item.totalPrice),
+          // 배송비 및 합배송 정보
+          shippingFee: item.publishedProduct?.product?.shippingFee || 0,
+          bundleShippingType: item.publishedProduct?.product?.bundleShippingType || 'NONE',
+          bundleMaxQty: item.publishedProduct?.product?.bundleMaxQty || 1,
         })),
         payment: guestOrder.payment ? {
           id: guestOrder.payment.id,

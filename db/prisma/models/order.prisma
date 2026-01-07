@@ -44,6 +44,7 @@ model OrderItem {
   thumbnailUrl       String?          @map("thumbnail_url") @db.VarChar(1000)
   quantity           Int
   unitPrice          Decimal          @map("unit_price") @db.Decimal(10, 2)
+  wholesalePrice     Int?             @map("wholesale_price") // 주문 시점의 도매가 스냅샷 (마진 계산용)
   totalPrice         Decimal          @map("total_price") @db.Decimal(12, 2)
   createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
   order              Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)

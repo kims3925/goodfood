@@ -51,6 +51,7 @@ interface Shop {
   _count: {
     publishedProducts: number
     orders: number
+    guestOrders: number
   }
 }
 
@@ -230,7 +231,7 @@ function ShopListContent() {
   const activeCount = shops.filter((s) => s.isActive).length
   const inactiveCount = shops.filter((s) => !s.isActive).length
   const totalProducts = shops.reduce((sum, s) => sum + s._count.publishedProducts, 0)
-  const totalOrders = shops.reduce((sum, s) => sum + s._count.orders, 0)
+  const totalOrders = shops.reduce((sum, s) => sum + s._count.orders + s._count.guestOrders, 0)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -462,7 +463,7 @@ function ShopListContent() {
                         <span className="text-gray-600">{shop._count.publishedProducts}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-gray-600">{shop._count.orders}</span>
+                        <span className="text-gray-600">{shop._count.orders + shop._count.guestOrders}</span>
                       </TableCell>
                       <TableCell>{getStatusBadge(shop.isActive)}</TableCell>
                       <TableCell>

@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma, ChannelKind } from '@bandauto/db'
+import { prisma, ChannelKind, BundleShippingType } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 // GET: 정산 데이터 조회 (Shop별 집계)
@@ -126,17 +126,33 @@ export async function GET(request: NextRequest) {
           select: { recipientName: true },
         },
         items: {
-          include: {
+          select: {
+            id: true,
+            variantId: true,
+            productName: true,
+            optionSummary: true,
+            thumbnailUrl: true,
+            quantity: true,
+            unitPrice: true,
+            wholesalePrice: true, // 스냅샷 도매가
+            totalPrice: true,
             variant: {
-              select: { wholesalePrice: true },
+              select: {
+                wholesalePrice: true,
+                bundleUnit: true, // 합배송 단위
+              },
             },
             publishedProduct: {
               include: {
                 product: {
-                  include: {
+                  select: {
+                    id: true,
+                    shippingFee: true,           // 기본 배송비
+                    bundleMaxQty: true,          // 합배송 최대 수량
+                    bundleShippingType: true,    // 합배송 타입
                     variants: {
                       take: 1,
-                      select: { wholesalePrice: true },
+                      select: { wholesalePrice: true, bundleUnit: true },
                     },
                     images: {
                       take: 1,
@@ -155,24 +171,153 @@ export async function GET(request: NextRequest) {
     // 미분류 주문 (shopId가 없는 경우)
     const unclassifiedItems: any[] = []
 
-    // 마진율 계산 헬퍼 함수
-    const calculateMarginRate = (unitPrice: number, wholesalePrice: number | null): number | null => {
-      if (!wholesalePrice || wholesalePrice <= 0 || unitPrice <= 0) return null
-      return Math.round(((unitPrice - wholesalePrice) / unitPrice) * 100 * 10) / 10  // 소수점 1자리
-    }
-
-    // 도매가 추출 헬퍼 함수 (variant -> product.variants[0] 순으로 시도)
+    // 도매가 추출 헬퍼 함수 (스냅샷 -> variant -> product.variants[0] 순으로 시도)
     const getWholesalePrice = (item: any): number | null => {
-      // 1. OrderItem에 연결된 variant의 wholesalePrice
+      // 1. OrderItem에 저장된 wholesalePrice 스냅샷 (가장 우선)
+      if (item.wholesalePrice != null) {
+        return item.wholesalePrice
+      }
+      // 2. OrderItem에 연결된 variant의 wholesalePrice
       if (item.variant?.wholesalePrice) {
         return item.variant.wholesalePrice
       }
-      // 2. Product의 첫 번째 variant의 wholesalePrice
+      // 3. Product의 첫 번째 variant의 wholesalePrice
       const productVariant = item.publishedProduct?.product?.variants?.[0]
       if (productVariant?.wholesalePrice) {
         return productVariant.wholesalePrice
       }
       return null
+    }
+
+    // Product에서 배송비 정보 추출
+    const getProductShippingInfo = (item: any): {
+      shippingFee: number
+      bundleMaxQty: number
+      bundleShippingType: string
+      bundleUnit: number
+    } => {
+      const product = item.publishedProduct?.product
+      const shippingFee = product?.shippingFee || 0
+      const bundleMaxQty = product?.bundleMaxQty || 1
+      const bundleShippingType = product?.bundleShippingType || 'NONE'
+      // bundleUnit: variant에서 가져오거나 product.variants[0]에서 가져옴
+      const bundleUnit = item.variant?.bundleUnit ||
+        product?.variants?.[0]?.bundleUnit || 1
+
+      return { shippingFee, bundleMaxQty, bundleShippingType, bundleUnit }
+    }
+
+    // 주문의 실제 배송비 계산 (상품별 합배송 로직 적용)
+    // 반환: { productId -> 해당 상품의 총 배송비 }
+    const calculateOrderProductShippingFees = (items: any[]): Map<number, number> => {
+      // 상품별 정보 집계 (같은 상품의 아이템들을 그룹화)
+      const productShippingMap = new Map<number, {
+        shippingFee: number
+        bundleMaxQty: number
+        bundleShippingType: string
+        totalBundleUnits: number
+        itemCount: number
+      }>()
+
+      for (const item of items) {
+        const product = item.publishedProduct?.product
+        if (!product) continue
+
+        const productId = product.id
+        const { shippingFee, bundleMaxQty, bundleShippingType, bundleUnit } = getProductShippingInfo(item)
+
+        if (!productShippingMap.has(productId)) {
+          productShippingMap.set(productId, {
+            shippingFee,
+            bundleMaxQty,
+            bundleShippingType,
+            totalBundleUnits: 0,
+            itemCount: 0,
+          })
+        }
+
+        const productInfo = productShippingMap.get(productId)!
+        // 총 배송 단위 누적 (quantity × bundleUnit)
+        productInfo.totalBundleUnits += item.quantity * bundleUnit
+        productInfo.itemCount++
+      }
+
+      // 상품별 실제 배송비 계산
+      const productShippingFees = new Map<number, number>()
+
+      for (const [productId, info] of productShippingMap) {
+        let actualShippingFee = 0
+
+        if (info.shippingFee > 0) {
+          if (info.bundleShippingType === 'NONE') {
+            // 합배송 없음: 아이템 수 × 배송비
+            actualShippingFee = info.itemCount * info.shippingFee
+          } else {
+            // 합배송 적용 (INCLUDED, SEPARATE)
+            // 배송비 횟수 = ceil(총 배송단위 / 합배송 최대수량)
+            const shippingCount = Math.ceil(info.totalBundleUnits / info.bundleMaxQty)
+            actualShippingFee = shippingCount * info.shippingFee
+          }
+        }
+
+        productShippingFees.set(productId, actualShippingFee)
+      }
+
+      return productShippingFees
+    }
+
+    // 아이템별 배송비 분배 (같은 상품 내에서 금액 비율로 분배)
+    const allocateShippingFeeToItem = (
+      item: any,
+      productShippingFees: Map<number, number>,
+      orderItems: any[]
+    ): number => {
+      const product = item.publishedProduct?.product
+      if (!product) return 0
+
+      const productId = product.id
+      const productTotalShippingFee = productShippingFees.get(productId) || 0
+
+      if (productTotalShippingFee === 0) return 0
+
+      // 같은 상품의 아이템들 총 금액
+      const sameProductItems = orderItems.filter(
+        i => i.publishedProduct?.product?.id === productId
+      )
+      const sameProductTotalAmount = sameProductItems.reduce(
+        (sum, i) => sum + Number(i.totalPrice), 0
+      )
+
+      // 이 아이템의 금액 비율로 배송비 분배
+      const itemTotalPrice = Number(item.totalPrice)
+      const itemRatio = sameProductTotalAmount > 0 ? itemTotalPrice / sameProductTotalAmount : 0
+
+      return Math.round(productTotalShippingFee * itemRatio)
+    }
+
+    // 마진 계산 헬퍼 함수 (Product 배송비 기반)
+    const calculateMargin = (
+      item: any,
+      wholesalePrice: number | null,
+      allocatedShippingFee: number
+    ): { margin: number | null; marginRate: number | null } => {
+      const unitPrice = Number(item.unitPrice)
+      const totalPrice = Number(item.totalPrice)
+
+      if (!wholesalePrice || wholesalePrice <= 0 || unitPrice <= 0) {
+        return { margin: null, marginRate: null }
+      }
+
+      // 마진 = (판매가 - 도매가) × 수량 - 분배된 배송비
+      const productMargin = (unitPrice - wholesalePrice) * item.quantity
+      const margin = productMargin - allocatedShippingFee
+
+      // 마진율 = 마진 / 아이템 총액 × 100%
+      const marginRate = totalPrice > 0
+        ? Math.round((margin / totalPrice) * 100 * 10) / 10
+        : null
+
+      return { margin, marginRate }
     }
 
     // 비회원 주문(GuestOrder) 조회
@@ -193,15 +338,22 @@ export async function GET(request: NextRequest) {
         items: {
           include: {
             variant: {
-              select: { wholesalePrice: true },
+              select: {
+                wholesalePrice: true,
+                bundleUnit: true, // 합배송 단위
+              },
             },
             publishedProduct: {
               include: {
                 product: {
-                  include: {
+                  select: {
+                    id: true,
+                    shippingFee: true,           // 기본 배송비
+                    bundleMaxQty: true,          // 합배송 최대 수량
+                    bundleShippingType: true,    // 합배송 타입
                     variants: {
                       take: 1,
-                      select: { wholesalePrice: true },
+                      select: { wholesalePrice: true, bundleUnit: true },
                     },
                     images: {
                       take: 1,
@@ -220,14 +372,16 @@ export async function GET(request: NextRequest) {
     // 쇼핑몰 주문 아이템 처리
     for (const order of shopOrders) {
       const orderShopId = order.shopId
+      // Product 기반 배송비 계산 (합배송 로직 적용)
+      const productShippingFees = calculateOrderProductShippingFees(order.items)
 
       if (!orderShopId) {
         // shopId가 없는 주문은 미분류
         for (const item of order.items) {
           const isSettled = settledOrderItemIds.has(item.id)
           const wholesalePrice = getWholesalePrice(item)
-          const marginRate = calculateMarginRate(Number(item.unitPrice), wholesalePrice)
-          const margin = wholesalePrice ? Number(item.unitPrice) - wholesalePrice : null
+          const allocatedShippingFee = allocateShippingFeeToItem(item, productShippingFees, order.items)
+          const { margin, marginRate } = calculateMargin(item, wholesalePrice, allocatedShippingFee)
 
           unclassifiedItems.push({
             id: item.id,
@@ -242,6 +396,7 @@ export async function GET(request: NextRequest) {
             wholesalePrice,
             marginRate,
             margin,
+            allocatedShippingFee, // 분배된 배송비 정보 추가
             status: order.status,
             orderedAt: order.orderedAt.toISOString(),
             shopId: null,
@@ -277,8 +432,8 @@ export async function GET(request: NextRequest) {
       for (const item of order.items) {
         const isSettled = settledOrderItemIds.has(item.id)
         const wholesalePrice = getWholesalePrice(item)
-        const marginRate = calculateMarginRate(Number(item.unitPrice), wholesalePrice)
-        const margin = wholesalePrice ? Number(item.unitPrice) - wholesalePrice : null
+        const allocatedShippingFee = allocateShippingFeeToItem(item, productShippingFees, order.items)
+        const { margin, marginRate } = calculateMargin(item, wholesalePrice, allocatedShippingFee)
 
         const thumbnailUrl = item.thumbnailUrl ||
           item.publishedProduct?.product?.images?.[0]?.url || null
@@ -296,6 +451,7 @@ export async function GET(request: NextRequest) {
           wholesalePrice,
           marginRate,
           margin,
+          allocatedShippingFee, // 분배된 배송비 정보 추가
           status: order.status,
           orderedAt: order.orderedAt.toISOString(),
           shopId: orderShopId,
@@ -312,14 +468,16 @@ export async function GET(request: NextRequest) {
     // 비회원 주문(GuestOrder) 아이템 처리
     for (const guestOrder of guestOrders) {
       const orderShopId = guestOrder.shopId
+      // Product 기반 배송비 계산 (합배송 로직 적용)
+      const productShippingFees = calculateOrderProductShippingFees(guestOrder.items)
 
       if (!orderShopId) {
         // shopId가 없는 주문은 미분류
         for (const item of guestOrder.items) {
           const isSettled = settledGuestOrderItemIds.has(item.id)
           const wholesalePrice = getWholesalePrice(item)
-          const marginRate = calculateMarginRate(Number(item.unitPrice), wholesalePrice)
-          const margin = wholesalePrice ? Number(item.unitPrice) - wholesalePrice : null
+          const allocatedShippingFee = allocateShippingFeeToItem(item, productShippingFees, guestOrder.items)
+          const { margin, marginRate } = calculateMargin(item, wholesalePrice, allocatedShippingFee)
 
           unclassifiedItems.push({
             id: item.id,
@@ -334,6 +492,7 @@ export async function GET(request: NextRequest) {
             wholesalePrice,
             marginRate,
             margin,
+            allocatedShippingFee, // 분배된 배송비 정보 추가
             status: guestOrder.status,
             orderedAt: guestOrder.orderedAt.toISOString(),
             shopId: null,
@@ -370,8 +529,8 @@ export async function GET(request: NextRequest) {
       for (const item of guestOrder.items) {
         const isSettled = settledGuestOrderItemIds.has(item.id)
         const wholesalePrice = getWholesalePrice(item)
-        const marginRate = calculateMarginRate(Number(item.unitPrice), wholesalePrice)
-        const margin = wholesalePrice ? Number(item.unitPrice) - wholesalePrice : null
+        const allocatedShippingFee = allocateShippingFeeToItem(item, productShippingFees, guestOrder.items)
+        const { margin, marginRate } = calculateMargin(item, wholesalePrice, allocatedShippingFee)
 
         const thumbnailUrl = item.thumbnailUrl ||
           item.publishedProduct?.product?.images?.[0]?.url || null
@@ -389,6 +548,7 @@ export async function GET(request: NextRequest) {
           wholesalePrice,
           marginRate,
           margin,
+          allocatedShippingFee, // 분배된 배송비 정보 추가
           status: guestOrder.status,
           orderedAt: guestOrder.orderedAt.toISOString(),
           shopId: orderShopId,

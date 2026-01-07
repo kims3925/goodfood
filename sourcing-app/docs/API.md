@@ -228,6 +228,75 @@ export async function middleware(request: NextRequest) {
 
 ---
 
+## SSE (Server-Sent Events)
+
+### 발행 스트림 API
+
+**엔드포인트:** `GET /api/shop/publish/stream`
+
+실시간으로 발행 진행 상황을 클라이언트에 전달합니다.
+
+### 이벤트 타입
+
+| Event | 설명 |
+|-------|-----|
+| `start` | 발행 시작 |
+| `progress` | 진행 상황 업데이트 |
+| `complete` | 발행 완료 |
+| `error` | 오류 발생 |
+
+### progress 이벤트 페이로드
+
+```typescript
+interface PublishProgressEvent {
+  productId: number
+  productName: string
+  current: number           // 현재 처리 중인 상품 순번
+  total: number             // 전체 상품 수
+  stage: 'preparing' | 'downloading' | 'uploading' | 'entering' | 'submitting' | 'completed'
+  stageProgress?: string    // 단계별 진행 메시지
+  uploadProgress?: {        // 이미지 업로드 진행률 (TR-20260107-001)
+    fileIndex: string       // "1/10" (현재/전체 파일)
+    totalPercent: string    // "10%" (전체 진행률)
+    currentPercent: string  // "92%" (현재 파일 업로드 진행률)
+  }
+}
+```
+
+### 예시 응답
+
+```text
+event: progress
+data: {"productId":123,"productName":"상품명","current":1,"total":5,"stage":"uploading","uploadProgress":{"fileIndex":"3/10","totalPercent":"25%","currentPercent":"85%"}}
+
+event: complete
+data: {"success":true,"successCount":5,"failedCount":0}
+```
+
+### 클라이언트 사용 예시
+
+```typescript
+const eventSource = new EventSource('/api/shop/publish/stream?productIds=1,2,3&channelId=1')
+
+eventSource.addEventListener('progress', (event) => {
+  const data = JSON.parse(event.data)
+  console.log(`${data.current}/${data.total}: ${data.productName}`)
+
+  // 업로드 진행률 표시
+  if (data.uploadProgress) {
+    console.log(`📤 ${data.uploadProgress.fileIndex} (${data.uploadProgress.totalPercent})`)
+  }
+})
+
+eventSource.addEventListener('complete', (event) => {
+  const result = JSON.parse(event.data)
+  console.log(`완료: 성공 ${result.successCount}, 실패 ${result.failedCount}`)
+  eventSource.close()
+})
+```
+
+---
+
 ## 에러 코드
 
 ### 공통
@@ -391,3 +460,83 @@ return NextResponse.json({
 | 민감정보 응답 노출 | 보안 |
 | 하드코딩된 에러 메시지 | 일관성 |
 | 인증 없이 민감 데이터 반환 | 보안 |
+
+---
+
+## 엔드포인트 상세
+
+### GET /api/shop
+
+쇼핑몰 목록을 조회합니다.
+
+**인증:** 필수 (JWT)
+
+**쿼리 파라미터:**
+
+| Param | Type | Default | 설명 |
+|-------|------|---------|------|
+| page | number | 1 | 페이지 번호 |
+| limit | number | 20 | 페이지당 항목 수 |
+
+**응답 스키마:**
+
+```typescript
+interface ShopListResponse {
+  success: true
+  data: Array<{
+    id: number
+    name: string
+    slug: string
+    description: string | null
+    isActive: boolean
+    createdAt: string
+    updatedAt: string
+    theme: ShopTheme | null
+    _count: {
+      publishedProducts: number  // 발행된 상품 수
+      orders: number             // 회원 주문 수
+      guestOrders: number        // 게스트 주문 수 (TR-20260107-005 추가)
+    }
+  }>
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
+}
+```
+
+**응답 예시:**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "마이쇼핑몰",
+      "slug": "my-shop",
+      "description": null,
+      "isActive": true,
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-07T00:00:00.000Z",
+      "theme": null,
+      "_count": {
+        "publishedProducts": 150,
+        "orders": 45,
+        "guestOrders": 23
+      }
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1
+  }
+}
+```
+
+**변경 이력:**
+- TR-20260107-005: `_count.guestOrders` 필드 추가
