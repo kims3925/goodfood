@@ -202,6 +202,7 @@ export class GuestOrderService {
 
       // 도매가 스냅샷 (마진 계산용)
       const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
+      const wholesalePriceValue = wholesalePrice == null ? null : Number(wholesalePrice)
 
       // 공통 가격 계산 함수 사용
       const priceResult = calculateItemPrice({
@@ -224,7 +225,7 @@ export class GuestOrderService {
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity,
         unitPrice: unitPriceWithDiscount, // 할인 반영된 단가
-        wholesalePrice, // 도매가 스냅샷 (마진 계산용)
+        wholesalePrice: wholesalePriceValue, // 도매가 스냅샷 (마진 계산용)
         originalUnitPrice, // 할인 전 단가 (참조용)
         itemTotal: itemTotalWithDiscount, // 할인 반영된 아이템 총액
       }
@@ -324,6 +325,7 @@ export class GuestOrderService {
       const unitPrice = variant?.price || mainVariant?.price || 0
       // 도매가 스냅샷 (마진 계산용)
       const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
+      const wholesalePriceValue = wholesalePrice == null ? null : Number(wholesalePrice)
 
       orderItems.push({
         publishedProductId: publishedProduct.id,
@@ -333,7 +335,7 @@ export class GuestOrderService {
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity || 1,
         unitPrice: Number(unitPrice),
-        wholesalePrice, // 도매가 스냅샷 (마진 계산용)
+        wholesalePrice: wholesalePriceValue, // 도매가 스냅샷 (마진 계산용)
       })
     }
 
