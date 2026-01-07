@@ -42,6 +42,7 @@ REQ-{CATEGORY}-{NUMBER}
 
 | REQ-ID | Status | Priority | Title | Owner | TR-ID |
 |--------|--------|----------|-------|-------|-------|
+| REQ-SETTLEMENT-001 | Done | P1 | Product 기반 배송비로 마진 계산 개선 | Hong | TR-20260107-001 |
 | REQ-SHOP-001 | Done | P2 | 모바일 반응형 UI 개선 | Lee | TR-20260106-001 |
 
 ### Status
@@ -98,6 +99,40 @@ REQ-{CATEGORY}-{NUMBER}
 ## 요구사항 상세
 
 <!-- 최신 항목이 위로 -->
+
+## REQ-SETTLEMENT-001: Product 기반 배송비로 마진 계산 개선
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Priority | P1 |
+| Owner | Hong |
+| Created | 2026-01-07 |
+
+### 배경
+- 주문 시 고객에게 무료배송을 제공하더라도 판매자는 실제 배송비를 부담함
+- 기존 마진 계산은 Order.shippingFee(고객 결제 배송비, 무료배송 시 0원)만 사용
+- 실제 마진 = (판매가 - 도매가) - 실제배송비 로 계산해야 정확함
+- Product 테이블에 배송비/합배송 정보가 이미 존재 (shippingFee, bundleMaxQty, bundleShippingType)
+
+### 요구사항
+- 정산/대시보드에서 Product.shippingFee 기반으로 마진 계산
+- 합배송 로직 적용: `ceil(총 배송단위 / bundleMaxQty) × shippingFee`
+- 대시보드에 평균 마진율, 총 마진액 KPI 카드 추가
+- 정산 목록에 분배된 배송비 정보 추가
+
+### 완료 조건
+- [x] 정산 API에서 Product 배송비 정보 조회
+- [x] 합배송 로직을 적용한 배송비 계산 함수 구현
+- [x] 마진 계산에 Product 배송비 반영 (정산, 대시보드)
+- [x] 대시보드 KPI 카드 추가 (평균 마진율, 총 마진액)
+- [x] OrderItem에 wholesalePrice 스냅샷 저장
+
+### 관련 항목
+- TR-ID: TR-20260107-001
+- Flow-ID: 정산 흐름
+
+---
 
 ## REQ-SHOP-001: 모바일 반응형 UI 개선
 

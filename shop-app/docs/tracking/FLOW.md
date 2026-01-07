@@ -33,7 +33,7 @@
 │     고객 → Cart → Checkout → Order → Toss Payments → Payment        │
 │                                                                      │
 │  5. 정산 (Settlement)                                                │
-│     Order (DELIVERED) → Settlement → 정산 완료                       │
+│     Order (DELIVERED) → 마진 계산 → Settlement → 정산 완료           │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -264,6 +264,90 @@ Cart (장바구니)
 | DONE | 결제 완료 |
 | CANCELED | 결제 취소 |
 | EXPIRED | 결제 만료 |
+
+---
+
+## 5.5. 정산 (Settlement) 흐름
+
+### 마진 계산 공식
+
+```text
+마진 = (판매가 - 도매가) × 수량 - 분배된 배송비
+마진율 = 마진 / 아이템 총액 × 100%
+```
+
+### 배송비 계산 (Product 기반)
+
+```text
+OrderItem (주문 상품)
+        │
+        ▼
+┌─────────────────┐
+│ Product 조회    │ ── publishedProduct.product
+├─────────────────┤
+│ - shippingFee   │ ── 기본 배송비
+│ - bundleMaxQty  │ ── 합배송 최대 수량
+│ - bundleType    │ ── NONE/INCLUDED/SEPARATE
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────┐
+│ 합배송 로직                                   │
+├─────────────────────────────────────────────┤
+│ bundleType = NONE:                          │
+│   → 상품 종류 수 × 배송비                    │
+│                                             │
+│ bundleType = INCLUDED/SEPARATE:             │
+│   → ceil(총배송단위 / bundleMaxQty) × 배송비 │
+│   → 총배송단위 = Σ(quantity × bundleUnit)   │
+└────────┬────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│ 배송비 분배     │ ── 아이템 가격 비율로 분배
+├─────────────────┤
+│ itemShare =     │
+│ (itemTotal /    │
+│  orderTotal) ×  │
+│  productShipping│
+└─────────────────┘
+```
+
+### 정산 데이터 흐름
+
+```text
+Order (DELIVERED)
+        │
+        ├── OrderItem[] ─────────────────────┐
+        │   ├── quantity                      │
+        │   ├── unitPrice (판매가)            │
+        │   ├── wholesalePrice (도매가 스냅샷)│
+        │   └── variant.bundleUnit           │
+        │                                     │
+        ├── Product ←─────────────────────────┘
+        │   ├── shippingFee
+        │   ├── bundleMaxQty
+        │   └── bundleShippingType
+        │
+        ▼
+┌─────────────────┐
+│ 마진 계산       │
+├─────────────────┤
+│ 1. 배송비 계산  │ ── Product 기반 합배송 적용
+│ 2. 배송비 분배  │ ── 아이템별 가격 비율
+│ 3. 마진 산출    │ ── (판매가-도매가)×수량-배송비
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Settlement      │
+├─────────────────┤
+│ - margin        │ ── 계산된 마진
+│ - marginRate    │ ── 마진율 (%)
+│ - shippingFee   │ ── 분배된 배송비
+│ - status        │ ── 정산 상태
+└─────────────────┘
+```
 
 ---
 
