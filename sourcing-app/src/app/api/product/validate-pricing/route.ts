@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
 
     // wholesalePrice === price인 것만 필터링
     const filteredVariants = unpricedVariants.filter(
-      v => v.wholesalePrice !== null && v.wholesalePrice === v.price
+      v => v.wholesalePrice !== null && Number(v.wholesalePrice) === v.price
     )
 
     // 상품별로 그룹화
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
       productMap.get(v.productId)!.variants.push({
         id: v.id,
         optionSummary: v.optionSummary,
-        wholesalePrice: v.wholesalePrice,
+        wholesalePrice: Number(v.wholesalePrice),
         price: v.price
       })
     }

@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260107-001 | Done | 2026-01-07 | REQ-SETTLEMENT-001 | Product 기반 배송비로 마진 계산 개선 | Medium | Hong |
 | TR-20260106-002 | Done | 2026-01-06 | - | 찜하기 페이지 가격 계산 공통 모듈 적용 | Low | Lee |
 | TR-20260106-001 | Done | 2026-01-06 | REQ-SHOP-001 | 모바일 반응형 UI 개선 | Low | Lee |
 
@@ -103,6 +104,52 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260107-001: Product 기반 배송비로 마진 계산 개선
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Hong |
+| Date | 2026-01-07 |
+| REQ-ID | REQ-SETTLEMENT-001 |
+| Risk | Medium |
+
+### 변경 사항
+- 정산/대시보드에서 마진 계산 시 Order.shippingFee 대신 Product.shippingFee 사용
+- Product 배송비 + 합배송 로직 적용: `ceil(총 배송단위 / bundleMaxQty) × shippingFee`
+- 상품별 배송비를 주문 아이템에 가격 비율로 분배하여 마진 계산
+- 대시보드 KPI 카드에 평균 마진율, 총 마진액 추가
+- OrderItem에 wholesalePrice 스냅샷 저장 (이력 관리)
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| sourcing-app/src/app/api/settlement/route.ts | Modified | Product 기반 배송비 계산, 합배송 로직 적용 |
+| sourcing-app/src/app/api/dashboard/shop/route.ts | Modified | 동일한 마진 계산 로직 적용 |
+| db/prisma/models/order.prisma | Modified | OrderItem.wholesalePrice 필드 추가 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경 (OrderItem.wholesalePrice 추가)
+- [x] Domain Logic 변경 (마진 계산 로직)
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Unit | N/A |
+| Manual | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. OrderItem.wholesalePrice 필드 제거 (optional이므로 무해)
+
+### 관련 항목
+- REQ-ID: REQ-SETTLEMENT-001
+- Flow-ID: 정산 흐름
+
+---
 
 ## TR-20260106-002: 찜하기 페이지 가격 계산 공통 모듈 적용
 

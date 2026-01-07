@@ -121,6 +121,34 @@ function buildPostContent(
   return lines.join('\n')
 }
 
+function toProductForPublish(product: {
+  id: number
+  name: string
+  description: string | null
+  shippingFee: number | null
+  bundleShippingType: string | null
+  variants: Array<{
+    id: number
+    optionSummary: string | null
+    price: number
+    wholesalePrice: unknown
+  }>
+}): ProductForPublish {
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    shippingFee: product.shippingFee ?? null,
+    bundleShippingType: product.bundleShippingType ?? null,
+    variants: product.variants.map((variant) => ({
+      id: variant.id,
+      optionSummary: variant.optionSummary,
+      price: variant.price,
+      wholesalePrice: variant.wholesalePrice == null ? null : Number(variant.wholesalePrice),
+    })),
+  }
+}
+
 export class PublishService {
   /**
    * 단일 상품을 단일 채널에 발행 (쿼터 에러 시 재시도)
@@ -260,7 +288,7 @@ export class PublishService {
       }
 
       // 5. 게시물 내용 생성 (쇼핑몰URL → 상품내용 → 쇼핑몰URL)
-      const postContent = buildPostContent(product, { orderLink })
+      const postContent = buildPostContent(toProductForPublish(product), { orderLink })
 
       // 이미지 URL 추출 (최대 20개)
       const imageUrls = (product.images?.map(img => img.url) || []).slice(0, 20)
@@ -898,7 +926,7 @@ export class PublishService {
       }
 
       // 5. 게시물 내용 생성
-      const postContent = buildPostContent(product, { orderLink })
+      const postContent = buildPostContent(toProductForPublish(product), { orderLink })
       const imageUrls = (product.images?.map(img => img.url) || []).slice(0, 20)
 
       // 6. 발행 방식 결정 및 실행

@@ -19,7 +19,7 @@ export interface GuestOrderItemInput {
   thumbnailUrl: string | null
   quantity: number
   unitPrice: number
-  wholesalePrice?: number | null // 도매가 스냅샷 (마진 계산용)
+  wholesalePrice?: Prisma.Decimal | number | null // 도매가 스냅샷 (마진 계산용)
 }
 
 export interface GuestShippingAddressInput {

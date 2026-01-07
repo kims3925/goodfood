@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@bandauto/db'
+import prisma, { CustomerOrderStatus } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 // 통합 주문 아이템 타입
@@ -49,6 +49,8 @@ export async function GET(
     const to = searchParams.get('to')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
+    // status 파라미터: pending(발주대기), completed(발주완료), 미지정시 pending
+    const statusFilter = searchParams.get('status') || 'pending'
 
     if (!from || !to) {
       return NextResponse.json(
@@ -62,7 +64,10 @@ export async function GET(
     const toDate = new Date(to)
     toDate.setHours(23, 59, 59, 999)
 
-    // 배송 시작 전 주문만 조회 (PAID, PREPARING = 발주 대상)
+    // status 필터에 따라 조회할 주문 상태 결정
+    const orderStatuses: CustomerOrderStatus[] = statusFilter === 'completed'
+      ? [CustomerOrderStatus.SHIPPED, CustomerOrderStatus.DELIVERED]
+      : [CustomerOrderStatus.PAID, CustomerOrderStatus.PREPARING]
 
     // 공통 쿼리 조건 (Product의 channelId 참조 - 소싱 출처인 도매처)
     const productCondition = {
@@ -72,11 +77,11 @@ export async function GET(
       },
     }
 
-    // 1. 회원 주문 조회 (배송 시작 전)
+    // 1. 회원 주문 조회
     const memberItems = await prisma.orderItem.findMany({
       where: {
         order: {
-          status: { in: ['PAID', 'PREPARING'] },
+          status: { in: orderStatuses },
           paidAt: {
             not: null,
             gte: fromDate,
@@ -148,11 +153,11 @@ export async function GET(
       },
     })
 
-    // 2. 비회원 주문 조회 (배송 시작 전)
+    // 2. 비회원 주문 조회
     const guestItems = await prisma.guestOrderItem.findMany({
       where: {
         guestOrder: {
-          status: { in: ['PAID', 'PREPARING'] },
+          status: { in: orderStatuses },
           paidAt: {
             not: null,
             gte: fromDate,

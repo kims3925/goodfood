@@ -7,7 +7,7 @@ model Product {
   thumbnailUrl       String?           @map("thumbnail_url") @db.VarChar(1000)
   categoryId         String?           @map("category_id") @db.VarChar(100)
   currency           String            @default("KRW") @db.VarChar(10)
-  wholesalePrice     Int?              @map("wholesale_price")
+  wholesalePrice     Decimal?           @map("wholesale_price") @db.Decimal(12, 2)
   price              Int?
   createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamp(0)
@@ -36,7 +36,7 @@ model ProductVariant {
   productId       Int              @map("product_id")
   optionSummary   String?          @map("option_summary") @db.VarChar(500)
   price           Int
-  wholesalePrice  Int?             @map("wholesale_price")
+  wholesalePrice  Decimal?         @map("wholesale_price") @db.Decimal(12, 2)
   bundleUnit      Int              @default(1) @map("bundle_unit") // 합배송 단위 수 (예: 2박스 옵션이면 2)
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamp(0)

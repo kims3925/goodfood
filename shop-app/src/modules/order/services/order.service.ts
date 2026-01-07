@@ -169,6 +169,7 @@ export class OrderService {
 
       // 도매가 스냅샷 (마진 계산용)
       const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
+      const wholesalePriceValue = wholesalePrice == null ? null : Number(wholesalePrice)
 
       // 할인 반영된 총액과 단가
       const itemTotalWithDiscount = Number(item.itemTotal || originalUnitPrice * item.quantity)
@@ -185,7 +186,7 @@ export class OrderService {
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity,
         unitPrice: unitPriceWithDiscount, // 할인 반영된 단가
-        wholesalePrice, // 도매가 스냅샷 (마진 계산용)
+        wholesalePrice: wholesalePriceValue, // 도매가 스냅샷 (마진 계산용)
         originalUnitPrice, // 할인 전 단가 (참조용)
         itemTotal: itemTotalWithDiscount, // 할인 반영된 아이템 총액
       }
@@ -332,6 +333,7 @@ export class OrderService {
       const unitPrice = variant?.price || mainVariant?.price || 0
       // 도매가 스냅샷 (마진 계산용)
       const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
+      const wholesalePriceValue = wholesalePrice == null ? null : Number(wholesalePrice)
 
       // variant가 있으면 해당 옵션 사용, 없으면 첫 번째 variant의 옵션 사용
       const optionSummary = variant?.optionSummary || mainVariant?.optionSummary || null
@@ -344,7 +346,7 @@ export class OrderService {
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity || 1,
         unitPrice: Number(unitPrice),
-        wholesalePrice, // 도매가 스냅샷 (마진 계산용)
+        wholesalePrice: wholesalePriceValue, // 도매가 스냅샷 (마진 계산용)
       })
     }
 
