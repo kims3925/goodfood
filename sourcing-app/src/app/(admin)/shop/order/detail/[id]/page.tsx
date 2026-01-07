@@ -38,6 +38,10 @@ interface OrderItem {
   quantity: number
   unitPrice: number
   totalPrice: number
+  // 배송비 및 합배송 정보
+  shippingFee: number
+  bundleShippingType: 'NONE' | 'INCLUDED' | 'SEPARATE'
+  bundleMaxQty: number
 }
 
 interface ShippingAddress {
@@ -601,6 +605,17 @@ export default function UnifiedOrderDetailPage() {
                       <p className="text-sm text-gray-500">
                         {formatPrice(item.unitPrice)} x {item.quantity}개
                       </p>
+                      {/* 배송비 정보 */}
+                      {item.shippingFee > 0 && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          배송비 {formatPrice(item.shippingFee)}
+                          {item.bundleMaxQty > 1 && (
+                            <span className="ml-1">
+                              ({item.bundleMaxQty}개 합배송)
+                            </span>
+                          )}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
