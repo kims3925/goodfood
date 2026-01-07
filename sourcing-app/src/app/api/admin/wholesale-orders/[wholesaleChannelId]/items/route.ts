@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@bandauto/db'
+import prisma, { CustomerOrderStatus } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 // 통합 주문 아이템 타입
@@ -65,9 +65,9 @@ export async function GET(
     toDate.setHours(23, 59, 59, 999)
 
     // status 필터에 따라 조회할 주문 상태 결정
-    const orderStatuses = statusFilter === 'completed'
-      ? ['SHIPPED', 'DELIVERED']
-      : ['PAID', 'PREPARING']
+    const orderStatuses: CustomerOrderStatus[] = statusFilter === 'completed'
+      ? [CustomerOrderStatus.SHIPPED, CustomerOrderStatus.DELIVERED]
+      : [CustomerOrderStatus.PAID, CustomerOrderStatus.PREPARING]
 
     // 공통 쿼리 조건 (Product의 channelId 참조 - 소싱 출처인 도매처)
     const productCondition = {
