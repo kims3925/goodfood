@@ -52,8 +52,9 @@ interface WholesaleOrderItem {
   productName: string
   optionSummary: string
   quantity: number
-  wholesalePrice: number
-  totalAmount: number
+  productAmount: number  // 상품금액 (도매가 × 수량)
+  shippingFee: number    // 배송비 (합배송 단위 계산)
+  totalAmount: number    // 합산금액 (상품금액 + 배송비)
   customerName: string
   customerPhone: string
   customerAddress: string
@@ -287,7 +288,7 @@ export default function WholesaleOrdersPage() {
     }
   }, [toast])
 
-  // 이력 날짜별 상세 조회
+  // 이력 날짜별 상세 조회 (발주 완료된 주문)
   const fetchHistoryDetail = useCallback(async (channelId: number, date: string) => {
     setHistoryDetailLoading(true)
     try {
@@ -296,6 +297,7 @@ export default function WholesaleOrdersPage() {
         to: date,
         page: '1',
         limit: '100',
+        status: 'completed', // 발주 완료 주문 조회
       })
 
       const res = await fetch(`/api/admin/wholesale-orders/${channelId}/items?${params}`)
@@ -603,12 +605,33 @@ export default function WholesaleOrdersPage() {
                     <>{missedOrders.oldestDate} ~ {missedOrders.newestDate} 기간에 결제되었지만 아직 발주되지 않은 주문이 <span className="font-bold">{missedOrders.count}건</span> 있습니다.</>
                   )}
                 </p>
-                <button
-                  onClick={() => setSelectedDate(missedOrders.oldestDate)}
-                  className="mt-2 text-sm font-medium text-amber-800 hover:text-amber-900 underline"
-                >
-                  {missedOrders.oldestDate} 주문 보기 →
-                </button>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {missedOrders.oldestDate === missedOrders.newestDate ? (
+                    <button
+                      onClick={() => setSelectedDate(missedOrders.oldestDate)}
+                      className="text-sm font-medium text-amber-800 hover:text-amber-900 underline"
+                    >
+                      {missedOrders.oldestDate} 주문 보기 →
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => setSelectedDate(missedOrders.oldestDate)}
+                        className="px-3 py-1 text-sm font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 rounded-lg transition-colors"
+                      >
+                        {missedOrders.oldestDate}
+                      </button>
+                      <span className="text-amber-600">~</span>
+                      <button
+                        onClick={() => setSelectedDate(missedOrders.newestDate)}
+                        className="px-3 py-1 text-sm font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 rounded-lg transition-colors"
+                      >
+                        {missedOrders.newestDate}
+                      </button>
+                      <span className="text-sm text-amber-700">클릭하여 해당 날짜 조회</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -829,7 +852,9 @@ export default function WholesaleOrdersPage() {
                                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600">상품명</th>
                                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600">옵션</th>
                                 <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600">수량</th>
-                                <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600">금액</th>
+                                <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600">상품금액</th>
+                                <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600">배송비</th>
+                                <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600">합계</th>
                                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600">고객</th>
                                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600">연락처</th>
                                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600">주소</th>
@@ -874,6 +899,8 @@ export default function WholesaleOrdersPage() {
                                       </span>
                                     </td>
                                     <td className="py-3 px-4 text-sm text-right font-medium text-gray-900">{item.quantity}</td>
+                                    <td className="py-3 px-4 text-sm text-right text-gray-900">{formatPrice(item.productAmount)}</td>
+                                    <td className="py-3 px-4 text-sm text-right text-orange-600">{item.shippingFee > 0 ? formatPrice(item.shippingFee) : '-'}</td>
                                     <td className="py-3 px-4 text-sm text-right font-semibold text-gray-900">{formatPrice(item.totalAmount)}</td>
                                     <td className="py-3 px-4 text-sm text-gray-900">{item.customerName}</td>
                                     <td className="py-3 px-4 text-sm text-gray-600">{formatPhoneNumber(item.customerPhone)}</td>
@@ -1013,7 +1040,9 @@ export default function WholesaleOrdersPage() {
                                             <th className="text-left py-2 px-3">상품명</th>
                                             <th className="text-left py-2 px-3">옵션</th>
                                             <th className="text-right py-2 px-3">수량</th>
-                                            <th className="text-right py-2 px-3">금액</th>
+                                            <th className="text-right py-2 px-3">상품금액</th>
+                                            <th className="text-right py-2 px-3">배송비</th>
+                                            <th className="text-right py-2 px-3">합계</th>
                                             <th className="text-left py-2 px-3">고객</th>
                                             <th className="text-left py-2 px-3">연락처</th>
                                           </tr>
@@ -1029,6 +1058,8 @@ export default function WholesaleOrdersPage() {
                                               <td className="py-2 px-3 text-gray-900 max-w-[150px] truncate">{item.productName}</td>
                                               <td className="py-2 px-3 text-gray-600">{item.optionSummary || '-'}</td>
                                               <td className="py-2 px-3 text-right font-medium">{item.quantity}</td>
+                                              <td className="py-2 px-3 text-right">{formatPrice(item.productAmount)}</td>
+                                              <td className="py-2 px-3 text-right text-orange-600">{item.shippingFee > 0 ? formatPrice(item.shippingFee) : '-'}</td>
                                               <td className="py-2 px-3 text-right font-medium">{formatPrice(item.totalAmount)}</td>
                                               <td className="py-2 px-3 text-gray-900">{item.customerName}</td>
                                               <td className="py-2 px-3 text-gray-600">{formatPhoneNumber(item.customerPhone)}</td>

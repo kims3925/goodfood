@@ -119,7 +119,14 @@ pipeline {
     }
 
     stage('Build') {
-      when { environment name: 'SHOULD_BUILD', value: 'true' }
+      // main은 빌드 스킵 (CD에서 빌드하므로 중복 제거)
+      // release-* 브랜치에서만 빌드 검증
+      when {
+        allOf {
+          environment name: 'SHOULD_BUILD', value: 'true'
+          not { branch 'main' }
+        }
+      }
       environment {
         // CI 빌드 검증용 더미 환경변수 (실제 값은 운영 서버 .env에서 로드)
         NEXTAUTH_SECRET = 'ci-build-dummy-secret'

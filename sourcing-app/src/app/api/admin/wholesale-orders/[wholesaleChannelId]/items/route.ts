@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@bandauto/db'
+import prisma, { CustomerOrderStatus } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 // 통합 주문 아이템 타입
@@ -15,8 +15,9 @@ interface UnifiedOrderItem {
   productName: string
   optionSummary: string
   quantity: number
-  wholesalePrice: number
-  totalAmount: number
+  productAmount: number  // 상품금액 (도매가 × 수량)
+  shippingFee: number    // 배송비 (합배송 단위로 계산)
+  totalAmount: number    // 합산금액 (상품금액 + 배송비)
   customerName: string
   customerPhone: string
   customerAddress: string
@@ -48,6 +49,8 @@ export async function GET(
     const to = searchParams.get('to')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
+    // status 파라미터: pending(발주대기), completed(발주완료), 미지정시 pending
+    const statusFilter = searchParams.get('status') || 'pending'
 
     if (!from || !to) {
       return NextResponse.json(
@@ -61,7 +64,10 @@ export async function GET(
     const toDate = new Date(to)
     toDate.setHours(23, 59, 59, 999)
 
-    // 배송 시작 전 주문만 조회 (PAID, PREPARING = 발주 대상)
+    // status 필터에 따라 조회할 주문 상태 결정
+    const orderStatuses: CustomerOrderStatus[] = statusFilter === 'completed'
+      ? [CustomerOrderStatus.SHIPPED, CustomerOrderStatus.DELIVERED]
+      : [CustomerOrderStatus.PAID, CustomerOrderStatus.PREPARING]
 
     // 공통 쿼리 조건 (Product의 channelId 참조 - 소싱 출처인 도매처)
     const productCondition = {
@@ -71,11 +77,11 @@ export async function GET(
       },
     }
 
-    // 1. 회원 주문 조회 (배송 시작 전)
+    // 1. 회원 주문 조회
     const memberItems = await prisma.orderItem.findMany({
       where: {
         order: {
-          status: { in: ['PAID', 'PREPARING'] },
+          status: { in: orderStatuses },
           paidAt: {
             not: null,
             gte: fromDate,
@@ -110,12 +116,15 @@ export async function GET(
         publishedProduct: {
           include: {
             product: {
-              include: {
+              select: {
+                shippingFee: true,
+                bundleMaxQty: true,
                 variants: {
                   select: {
                     id: true,
                     optionSummary: true,
                     wholesalePrice: true,
+                    bundleUnit: true,
                   },
                 },
               },
@@ -133,6 +142,7 @@ export async function GET(
           select: {
             wholesalePrice: true,
             optionSummary: true,
+            bundleUnit: true,
           },
         },
       },
@@ -143,11 +153,11 @@ export async function GET(
       },
     })
 
-    // 2. 비회원 주문 조회 (배송 시작 전)
+    // 2. 비회원 주문 조회
     const guestItems = await prisma.guestOrderItem.findMany({
       where: {
         guestOrder: {
-          status: { in: ['PAID', 'PREPARING'] },
+          status: { in: orderStatuses },
           paidAt: {
             not: null,
             gte: fromDate,
@@ -184,12 +194,15 @@ export async function GET(
         publishedProduct: {
           include: {
             product: {
-              include: {
+              select: {
+                shippingFee: true,
+                bundleMaxQty: true,
                 variants: {
                   select: {
                     id: true,
                     optionSummary: true,
                     wholesalePrice: true,
+                    bundleUnit: true,
                   },
                 },
               },
@@ -207,6 +220,7 @@ export async function GET(
           select: {
             wholesalePrice: true,
             optionSummary: true,
+            bundleUnit: true,
           },
         },
       },
@@ -223,6 +237,10 @@ export async function GET(
     // 회원 주문 변환
     for (const item of memberItems) {
       const wholesalePrice = getWholesalePrice(item)
+      const shippingFee = calculateShippingFee(item)
+      const productAmount = Number(wholesalePrice) * item.quantity
+      const totalAmount = productAmount + shippingFee
+
       const addr = item.order.shippingAddress
       const fullAddress = addr?.addressDetail
         ? `${addr.address} ${addr.addressDetail}`
@@ -243,8 +261,9 @@ export async function GET(
         productName: item.productName,
         optionSummary: optionSummary || '-',
         quantity: item.quantity,
-        wholesalePrice: Number(wholesalePrice),
-        totalAmount: Number(wholesalePrice) * item.quantity,
+        productAmount,
+        shippingFee,
+        totalAmount,
         customerName: addr?.recipientName || '',
         customerPhone: maskPhone(addr?.recipientPhone || ''),
         customerAddress: fullAddress,
@@ -255,6 +274,10 @@ export async function GET(
     // 비회원 주문 변환
     for (const item of guestItems) {
       const wholesalePrice = getWholesalePrice(item)
+      const shippingFee = calculateShippingFee(item)
+      const productAmount = Number(wholesalePrice) * item.quantity
+      const totalAmount = productAmount + shippingFee
+
       const addr = item.guestOrder.shippingAddress
       const fullAddress = addr?.addressDetail
         ? `${addr.address} ${addr.addressDetail}`
@@ -279,8 +302,9 @@ export async function GET(
         productName: item.productName,
         optionSummary: optionSummary || '-',
         quantity: item.quantity,
-        wholesalePrice: Number(wholesalePrice),
-        totalAmount: Number(wholesalePrice) * item.quantity,
+        productAmount,
+        shippingFee,
+        totalAmount,
         customerName,
         customerPhone: maskPhone(customerPhone),
         customerAddress: fullAddress,
@@ -326,6 +350,37 @@ export async function GET(
       { status: 500 }
     )
   }
+}
+
+// 합배송 단위 배송비 계산 헬퍼 함수
+// 계산 공식: ceil((수량 * bundleUnit) / bundleMaxQty) * shippingFee
+function calculateShippingFee(item: {
+  quantity: number
+  variant?: { bundleUnit?: number | null } | null
+  publishedProduct?: {
+    product?: {
+      shippingFee?: number | null
+      bundleMaxQty?: number | null
+      variants?: { bundleUnit?: number | null }[]
+    } | null
+  } | null
+}): number {
+  const product = item.publishedProduct?.product
+  if (!product) return 0
+
+  const shippingFee = product.shippingFee || 0
+  if (shippingFee === 0) return 0
+
+  const bundleMaxQty = product.bundleMaxQty || 1
+  const bundleUnit = item.variant?.bundleUnit || product.variants?.[0]?.bundleUnit || 1
+
+  // 실제 묶음 단위 수량 계산 (예: 수량 3, bundleUnit 2 = 6개 단위)
+  const totalUnits = item.quantity * bundleUnit
+
+  // 합배송 묶음 수 계산 (예: 6개 / bundleMaxQty 4 = 2묶음)
+  const bundleCount = Math.ceil(totalUnits / bundleMaxQty)
+
+  return bundleCount * shippingFee
 }
 
 // 도매가 추출 헬퍼 함수

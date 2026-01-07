@@ -170,6 +170,10 @@ export class OrderService {
       // 원래 단가 (할인 전)
       const originalUnitPrice = Number(item.originalPrice || variant?.price || mainVariant?.price || 0)
 
+      // 도매가 스냅샷 (마진 계산용)
+      const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
+      const wholesalePriceValue = wholesalePrice == null ? null : Number(wholesalePrice)
+
       // 할인 반영된 총액과 단가
       const itemTotalWithDiscount = Number(item.itemTotal || originalUnitPrice * item.quantity)
       const unitPriceWithDiscount = Math.round(itemTotalWithDiscount / item.quantity)
@@ -185,6 +189,7 @@ export class OrderService {
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity,
         unitPrice: unitPriceWithDiscount, // 할인 반영된 단가
+        wholesalePrice: wholesalePriceValue, // 도매가 스냅샷 (마진 계산용)
         originalUnitPrice, // 할인 전 단가 (참조용)
         itemTotal: itemTotalWithDiscount, // 할인 반영된 아이템 총액
       }
@@ -305,7 +310,10 @@ export class OrderService {
         include: {
           product: {
             include: {
-              variants: { take: 1 },
+              variants: {
+                take: 1,
+                select: { id: true, price: true, wholesalePrice: true, optionSummary: true },
+              },
             },
           },
         },
@@ -319,12 +327,16 @@ export class OrderService {
       if (item.variantId) {
         variant = await prisma.productVariant.findUnique({
           where: { id: item.variantId },
+          select: { id: true, price: true, wholesalePrice: true, optionSummary: true },
         })
       }
 
       const product = publishedProduct.product
       const mainVariant = product?.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || 0
+      // 도매가 스냅샷 (마진 계산용)
+      const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
+      const wholesalePriceValue = wholesalePrice == null ? null : Number(wholesalePrice)
 
       // variant가 있으면 해당 옵션 사용, 없으면 첫 번째 variant의 옵션 사용
       const optionSummary = variant?.optionSummary || mainVariant?.optionSummary || null
@@ -337,6 +349,7 @@ export class OrderService {
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity || 1,
         unitPrice: Number(unitPrice),
+        wholesalePrice: wholesalePriceValue, // 도매가 스냅샷 (마진 계산용)
       })
     }
 
