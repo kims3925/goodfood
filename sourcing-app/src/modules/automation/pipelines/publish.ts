@@ -207,6 +207,7 @@ export async function runPublishPipeline(
   })
 
   if (retailChannels.length === 0) {
+    cleanup()
     throw new Error('No active retail channels found')
   }
 
