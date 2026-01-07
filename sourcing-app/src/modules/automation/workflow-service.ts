@@ -317,13 +317,13 @@ export async function getAutomationStats(
       -- 발행 준비된 상품 수 (미발행 상품)
       (SELECT COUNT(*) FROM product p
        WHERE p.user_id = ${userId}
-       AND NOT EXISTS (SELECT 1 FROM published_product pp WHERE pp.product_id = p.id)) as readyToPublish,
+       AND NOT EXISTS (SELECT 1 FROM channel_product cp WHERE cp.product_id = p.id)) as readyToPublish,
 
       -- 전체 발행 횟수 (채널별 발행 수)
-      (SELECT COUNT(*) FROM published_product WHERE user_id = ${userId}) as totalPublishedProducts,
+      (SELECT COUNT(*) FROM channel_product WHERE user_id = ${userId}) as totalPublishedProducts,
 
       -- 기간 내 발행 횟수 (채널별 발행 수)
-      (SELECT COUNT(*) FROM published_product
+      (SELECT COUNT(*) FROM channel_product
        WHERE user_id = ${userId}
        AND published_at >= ${periodStart} AND published_at <= ${periodEnd}) as periodPublishedProducts
   `
@@ -680,7 +680,7 @@ export async function getHourlyWorkflowStats(
     ) p_stats ON hours.hour = p_stats.hour
     LEFT JOIN (
       SELECT HOUR(CONVERT_TZ(published_at, '+00:00', '+09:00')) as hour, COUNT(*) as cnt
-      FROM published_product
+      FROM channel_product
       WHERE user_id = ${userId}
         AND published_at >= ${start}
         AND published_at <= ${end}
