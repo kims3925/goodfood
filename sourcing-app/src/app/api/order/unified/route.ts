@@ -78,22 +78,22 @@ export async function GET(request: NextRequest) {
     }
 
     // 1. 쇼핑몰 주문 조회 (source가 ALL 또는 SHOPPING_MALL인 경우)
-    // Order.userId는 고객 ID이므로, PublishedProduct를 통해 관리자의 상품이 포함된 주문을 조회
+    // Order.userId는 고객 ID이므로, ShopProduct를 통해 관리자의 상품이 포함된 주문을 조회
     if (!source || source === 'ALL' || source === 'SHOPPING_MALL') {
       try {
-        // 먼저 현재 사용자의 PublishedProduct ID 목록을 조회
-        const userPublishedProducts = await prisma.publishedProduct.findMany({
+        // 먼저 현재 사용자의 ShopProduct ID 목록을 조회
+        const userShopProducts = await prisma.shopProduct.findMany({
           where: { userId: user.userId },
           select: { id: true },
         })
-        const publishedProductIds = userPublishedProducts.map(pp => pp.id)
+        const shopProductIds = userShopProducts.map(pp => pp.id)
 
-        if (publishedProductIds.length > 0) {
+        if (shopProductIds.length > 0) {
           // 상태별 카운트 조회 (shopId, search 필터 적용, status 필터 제외)
           const countBaseWhere: any = {
             items: {
               some: {
-                publishedProductId: { in: publishedProductIds },
+                shopProductId: { in: shopProductIds },
               },
             },
           }
@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
               // 관리자가 발행한 상품이 포함된 주문 조회
               items: {
                 some: {
-                  publishedProductId: { in: publishedProductIds },
+                  shopProductId: { in: shopProductIds },
                 },
               },
               ...(shopId && { shopId: parseInt(shopId) }),
@@ -206,7 +206,7 @@ export async function GET(request: NextRequest) {
           const guestCountBaseWhere: any = {
             items: {
               some: {
-                publishedProductId: { in: publishedProductIds },
+                shopProductId: { in: shopProductIds },
               },
             },
           }
@@ -248,7 +248,7 @@ export async function GET(request: NextRequest) {
             where: {
               items: {
                 some: {
-                  publishedProductId: { in: publishedProductIds },
+                  shopProductId: { in: shopProductIds },
                 },
               },
               ...(shopId && { shopId: parseInt(shopId) }),

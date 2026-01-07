@@ -110,7 +110,7 @@ export default function CartPage() {
     }
   }, [isMounted, loadCart])
 
-  // URL 파라미터로 자동 장바구니 추가 (?add=publishedProductId)
+  // URL 파라미터로 자동 장바구니 추가 (?add=shopProductId)
   useEffect(() => {
     const addProductId = searchParams.get('add')
 
@@ -126,7 +126,7 @@ export default function CartPage() {
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({
-            publishedProductId: parseInt(addProductId),
+            shopProductId: parseInt(addProductId),
             quantity: 1,
           }),
         })

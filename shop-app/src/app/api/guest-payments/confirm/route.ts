@@ -26,7 +26,7 @@ interface GuestOrderPrepareData {
   orderId: string
   shopId: number | null
   fromCart: boolean
-  items?: { publishedProductId: number; variantId?: number; quantity: number }[]
+  items?: { shopProductId: number; variantId?: number; quantity: number }[]
   customerInfo: {
     name: string
     phone: string
@@ -228,7 +228,7 @@ export async function POST(req: NextRequest) {
           include: {
             items: {
               include: {
-                publishedProduct: {
+                shopProduct: {
                   include: {
                     product: {
                       include: { variants: { take: 1 } },
@@ -250,8 +250,8 @@ export async function POST(req: NextRequest) {
         }
 
         orderItems = cart.items.map((item) => {
-          const publishedProduct = item.publishedProduct
-          const product = publishedProduct.product
+          const shopProduct = item.shopProduct
+          const product = shopProduct.product
           const variant = item.variant
           const mainVariant = product?.variants[0]
           const basePrice = variant?.price || mainVariant?.price || 0
@@ -272,7 +272,7 @@ export async function POST(req: NextRequest) {
           })
 
           return {
-            publishedProductId: publishedProduct.id,
+            shopProductId: shopProduct.id,
             variantId: variant?.id || null,
             productName: product?.name || '',
             optionSummary: variant?.optionSummary || null,
@@ -285,8 +285,8 @@ export async function POST(req: NextRequest) {
         })
       } else if (prepareData.items) {
         for (const item of prepareData.items) {
-          const publishedProduct = await prisma.publishedProduct.findFirst({
-            where: { id: item.publishedProductId },
+          const shopProduct = await prisma.shopProduct.findFirst({
+            where: { id: item.shopProductId },
             include: {
               product: {
                 include: { variants: true },
@@ -294,7 +294,7 @@ export async function POST(req: NextRequest) {
             },
           })
 
-          if (!publishedProduct) {
+          if (!shopProduct) {
             return createErrorResponse(
               TOSS_ERROR_CODES.INVALID_REQUEST,
               '상품을 찾을 수 없습니다',
@@ -309,7 +309,7 @@ export async function POST(req: NextRequest) {
             })
           }
 
-          const product = publishedProduct.product
+          const product = shopProduct.product
           const mainVariant = product?.variants[0]
           const basePrice = variant?.price || mainVariant?.price || 0
           const quantity = item.quantity || 1
@@ -329,7 +329,7 @@ export async function POST(req: NextRequest) {
           })
 
           orderItems.push({
-            publishedProductId: publishedProduct.id,
+            shopProductId: shopProduct.id,
             variantId: variant?.id || null,
             productName: product?.name || '',
             optionSummary: variant?.optionSummary || null,
@@ -400,7 +400,7 @@ export async function POST(req: NextRequest) {
             paidAt: tossResult.status === 'WAITING_FOR_DEPOSIT' ? null : new Date(),
             items: {
               create: orderItems.map((item: any) => ({
-                publishedProductId: item.publishedProductId,
+                shopProductId: item.shopProductId,
                 variantId: item.variantId,
                 productName: item.productName,
                 optionSummary: item.optionSummary,

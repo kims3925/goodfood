@@ -94,12 +94,12 @@ export default function ProductDetailClient() {
 
   // 리뷰 로드 함수
   const loadReviews = useCallback(async () => {
-    if (!product?.publishedProductId) return
+    if (!product?.shopProductId) return
 
     try {
       setReviewsLoading(true)
       const response = await fetch(
-        getApiPath(`/api/shop/products/${product.publishedProductId}/reviews?page=${reviewPage}&limit=5&sortBy=${reviewSortBy}`)
+        getApiPath(`/api/shop/products/${product.shopProductId}/reviews?page=${reviewPage}&limit=5&sortBy=${reviewSortBy}`)
       )
       const data = await response.json()
 
@@ -113,7 +113,7 @@ export default function ProductDetailClient() {
     } finally {
       setReviewsLoading(false)
     }
-  }, [product?.publishedProductId, reviewPage, reviewSortBy, getApiPath])
+  }, [product?.shopProductId, reviewPage, reviewSortBy, getApiPath])
 
   useEffect(() => {
     loadProduct()
@@ -131,8 +131,8 @@ export default function ProductDetailClient() {
     if (activeTab === 'review' && product) {
       loadReviews()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- product?.publishedProductId만 의존성으로 사용하여 불필요한 재실행 방지
-  }, [activeTab, product?.publishedProductId, loadReviews])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- product?.shopProductId만 의존성으로 사용하여 불필요한 재실행 방지
+  }, [activeTab, product?.shopProductId, loadReviews])
 
   // Scroll Spy: 스크롤 위치에 따라 활성 탭 변경
   useEffect(() => {
@@ -322,7 +322,7 @@ export default function ProductDetailClient() {
   }
 
   const handleAddToCart = async () => {
-    if (!product?.publishedProductId || !selectedVariant || product.isSoldOut) {
+    if (!product?.shopProductId || !selectedVariant || product.isSoldOut) {
       return
     }
 
@@ -359,7 +359,7 @@ export default function ProductDetailClient() {
         for (const item of cartItems) {
           const cartData = {
             sessionId,
-            publishedProductId: product.publishedProductId,
+            shopProductId: product.shopProductId,
             variantId: selectedVariant.id,
             quantity: item.quantity,
             isBundleItem: true // 묶음 상품 표시
@@ -392,7 +392,7 @@ export default function ProductDetailClient() {
         // 일반 상품: 기존 로직
         const cartData = {
           sessionId,
-          publishedProductId: product.publishedProductId,
+          shopProductId: product.shopProductId,
           variantId: selectedVariant.id,
           quantity
         }
@@ -423,12 +423,12 @@ export default function ProductDetailClient() {
   }
 
   const handleBuyNow = () => {
-    // publishedProductId와 variantId를 체크아웃 페이지로 전달
-    if (!product?.publishedProductId || !selectedVariant || product.isSoldOut) {
+    // shopProductId와 variantId를 체크아웃 페이지로 전달
+    if (!product?.shopProductId || !selectedVariant || product.isSoldOut) {
       return
     }
     // 비회원도 바로구매 가능 (checkout 페이지에서 비회원 주문 처리)
-    const checkoutUrl = getPath(`/checkout?publishedProductId=${product.publishedProductId}&variantId=${selectedVariant.id}&quantity=${quantity}`)
+    const checkoutUrl = getPath(`/checkout?shopProductId=${product.shopProductId}&variantId=${selectedVariant.id}&quantity=${quantity}`)
     window.location.href = checkoutUrl
   }
 

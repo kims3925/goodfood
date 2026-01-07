@@ -14,18 +14,18 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const publishedProductId = parseInt(params.id)
+    const shopProductId = parseInt(params.id)
 
-    if (isNaN(publishedProductId)) {
+    if (isNaN(shopProductId)) {
       return NextResponse.json(
         { success: false, error: '유효하지 않은 상품 발행 ID' },
         { status: 400 }
       )
     }
 
-    const publishedProduct = await prisma.publishedProduct.findFirst({
+    const shopProduct = await prisma.shopProduct.findFirst({
       where: {
-        id: publishedProductId,
+        id: shopProductId,
       },
       include: {
         product: {
@@ -41,11 +41,11 @@ export async function GET(
             },
           },
         },
-        channel: true,
+        shop: true,
       },
     })
 
-    if (!publishedProduct) {
+    if (!shopProduct) {
       return NextResponse.json(
         { success: false, error: '상품을 찾을 수 없거나 판매 중인 상품이 아닙니다' },
         { status: 404 }
@@ -53,7 +53,7 @@ export async function GET(
     }
 
     // 공통 모듈로 판매가 계산 (variants에 배송비 포함된 가격 적용)
-    const product = publishedProduct.product
+    const product = shopProduct.product
     if (!product) {
       return NextResponse.json(
         { success: false, error: '상품 정보를 찾을 수 없습니다' },
@@ -71,9 +71,9 @@ export async function GET(
       originalPrice: variant.price, // DB에 저장된 원래 가격
     }))
 
-    // publishedProduct에 계산된 variants 적용
+    // shopProduct에 계산된 variants 적용
     const result = {
-      ...publishedProduct,
+      ...shopProduct,
       product: {
         ...product,
         variants: formattedVariants,
@@ -82,7 +82,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      publishedProduct: result,
+      shopProduct: result,
     })
   } catch (error: any) {
     console.error('Published product detail error:', error)

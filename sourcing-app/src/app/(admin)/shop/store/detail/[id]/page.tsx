@@ -60,7 +60,7 @@ interface Shop {
   updatedAt: string
   theme: ShopTheme | null
   _count: {
-    publishedProducts: number
+    shopProducts: number
     orders: number
   }
 }
@@ -667,7 +667,7 @@ export default function ShopDetailPage({
               </div>
               <div>
                 <p className="text-sm text-gray-500">발행 상품</p>
-                <p className="text-xl font-bold text-gray-900">{shop._count.publishedProducts}</p>
+                <p className="text-xl font-bold text-gray-900">{shop._count.shopProducts}</p>
               </div>
             </div>
           </div>

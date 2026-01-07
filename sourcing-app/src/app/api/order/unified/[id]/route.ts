@@ -78,7 +78,7 @@ export async function GET(
           orderNumber: id,
           items: {
             some: {
-              publishedProduct: {
+              shopProduct: {
                 userId: user.userId,
               },
             },
@@ -88,7 +88,7 @@ export async function GET(
           shippingAddress: true,
           items: {
             include: {
-              publishedProduct: {
+              shopProduct: {
                 include: {
                   product: true,
                 },
@@ -160,14 +160,14 @@ export async function GET(
             id: item.id,
             productName: item.productName,
             optionSummary: item.optionSummary,
-            thumbnailUrl: item.thumbnailUrl || item.publishedProduct?.product?.thumbnailUrl || null,
+            thumbnailUrl: item.thumbnailUrl || item.shopProduct?.product?.thumbnailUrl || null,
             quantity: item.quantity,
             unitPrice: Number(item.unitPrice),
             totalPrice: Number(item.totalPrice),
             // 배송비 및 합배송 정보
-            shippingFee: item.publishedProduct?.product?.shippingFee || 0,
-            bundleShippingType: item.publishedProduct?.product?.bundleShippingType || 'NONE',
-            bundleMaxQty: item.publishedProduct?.product?.bundleMaxQty || 1,
+            shippingFee: item.shopProduct?.product?.shippingFee || 0,
+            bundleShippingType: item.shopProduct?.product?.bundleShippingType || 'NONE',
+            bundleMaxQty: item.shopProduct?.product?.bundleMaxQty || 1,
           })),
           payment: order.payment ? {
             id: order.payment.id,
@@ -205,7 +205,7 @@ export async function GET(
           orderNumber: id,
           items: {
             some: {
-              publishedProduct: {
+              shopProduct: {
                 userId: user.userId,
               },
             },
@@ -215,7 +215,7 @@ export async function GET(
           shippingAddress: true,
           items: {
             include: {
-              publishedProduct: {
+              shopProduct: {
                 include: {
                   product: true,
                 },
@@ -284,14 +284,14 @@ export async function GET(
           id: item.id,
           productName: item.productName,
           optionSummary: item.optionSummary,
-          thumbnailUrl: item.thumbnailUrl || item.publishedProduct?.product?.thumbnailUrl || null,
+          thumbnailUrl: item.thumbnailUrl || item.shopProduct?.product?.thumbnailUrl || null,
           quantity: item.quantity,
           unitPrice: Number(item.unitPrice),
           totalPrice: Number(item.totalPrice),
           // 배송비 및 합배송 정보
-          shippingFee: item.publishedProduct?.product?.shippingFee || 0,
-          bundleShippingType: item.publishedProduct?.product?.bundleShippingType || 'NONE',
-          bundleMaxQty: item.publishedProduct?.product?.bundleMaxQty || 1,
+          shippingFee: item.shopProduct?.product?.shippingFee || 0,
+          bundleShippingType: item.shopProduct?.product?.bundleShippingType || 'NONE',
+          bundleMaxQty: item.shopProduct?.product?.bundleMaxQty || 1,
         })),
         payment: guestOrder.payment ? {
           id: guestOrder.payment.id,
@@ -367,7 +367,7 @@ export async function PATCH(
           orderNumber: id,
           items: {
             some: {
-              publishedProduct: {
+              shopProduct: {
                 userId: user.userId,
               },
             },
@@ -516,7 +516,7 @@ export async function PATCH(
           orderNumber: id,
           items: {
             some: {
-              publishedProduct: {
+              shopProduct: {
                 userId: user.userId,
               },
             },

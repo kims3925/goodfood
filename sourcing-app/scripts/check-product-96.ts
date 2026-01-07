@@ -28,18 +28,32 @@ async function checkProduct() {
     console.log(`    - bundleUnit: ${v.bundleUnit}`)
   }
 
-  // PublishedProduct 확인
-  const published = await prisma.publishedProduct.findFirst({
+  // ShopProduct 확인
+  const shopProduct = await prisma.shopProduct.findFirst({
     where: { productId: 96 },
     include: {
       shop: true,
     }
   })
 
-  if (published) {
-    console.log('\n=== 발행 정보 ===')
-    console.log('PublishedProduct ID:', published.id)
-    console.log('Shop:', published.shop?.name)
+  if (shopProduct) {
+    console.log('\n=== Shop 발행 정보 ===')
+    console.log('ShopProduct ID:', shopProduct.id)
+    console.log('Shop:', shopProduct.shop?.name)
+  }
+
+  // ChannelProduct 확인
+  const channelProduct = await prisma.channelProduct.findFirst({
+    where: { productId: 96 },
+    include: {
+      channel: true,
+    }
+  })
+
+  if (channelProduct) {
+    console.log('\n=== Channel 발행 정보 ===')
+    console.log('ChannelProduct ID:', channelProduct.id)
+    console.log('Channel:', channelProduct.channel?.name)
   }
 
   await prisma.$disconnect()

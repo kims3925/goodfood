@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus, Upload, Info, Truck } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus, Upload, Info, Truck, Send } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -53,21 +53,35 @@ interface Product {
     price: number
     wholesalePrice: number | null
   }>
+  shopProducts?: ShopProductItem[]
+  channelProducts?: ChannelProductItem[]
 }
 
-interface PublishedProduct {
+interface ShopProductItem {
   id: number
-  status: 'PENDING' | 'SUCCESS' | 'FAILED'
-  publishType: 'RETAIL_BAND' | 'SHOPPING_MALL'
+  shopId: number
+  publishedAt: string | null
   createdAt: string
-  retailBand?: {
+  shop: {
     id: number
     name: string
-    bandKey: string
+    subdomain: string
   }
 }
 
-type TabType = 'info' | 'publish'
+interface ChannelProductItem {
+  id: number
+  channelId: number
+  publishedAt: string | null
+  createdAt: string
+  channel: {
+    id: number
+    name: string
+    channelKey: string
+    coverUrl: string | null
+    kind: string
+  }
+}
 
 export default function ProductDetailPage() {
   const router = useRouter()
@@ -79,7 +93,6 @@ export default function ProductDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
-  const [activeTab, setActiveTab] = useState<TabType>('info')
 
   // 편집 모드 상태 (카드별 분리)
   const [isEditingInfo, setIsEditingInfo] = useState(false)
@@ -100,9 +113,6 @@ export default function ProductDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // 발행현황 상태
-  const [publishedProducts, setPublishedProducts] = useState<PublishedProduct[]>([])
-  const [isLoadingPublish, setIsLoadingPublish] = useState(false)
 
   // 옵션 편집 상태
   const [isEditingOptions, setIsEditingOptions] = useState(false)
@@ -181,33 +191,11 @@ export default function ProductDetailPage() {
     }
   }, [productId])
 
-  const loadPublishedProducts = useCallback(async () => {
-    try {
-      setIsLoadingPublish(true)
-      const response = await fetch(`/api/product/publish?productId=${productId}`)
-      const data = await response.json()
-
-      if (data.success) {
-        setPublishedProducts(data.data || [])
-      }
-    } catch (err) {
-      console.error('발행현황 로드 실패:', err)
-    } finally {
-      setIsLoadingPublish(false)
-    }
-  }, [productId])
-
   useEffect(() => {
     if (productId) {
       loadProduct()
     }
   }, [productId, loadProduct])
-
-  useEffect(() => {
-    if (activeTab === 'publish' && productId) {
-      loadPublishedProducts()
-    }
-  }, [activeTab, productId, loadPublishedProducts])
 
   const handleSaveInfo = async () => {
     if (!product || !formData.name.trim()) return
@@ -565,30 +553,15 @@ export default function ProductDetailPage() {
     }
   }
 
-  const getPublishStatusBadge = (status: string) => {
-    const statusMap: { [key: string]: { label: string; bgColor: string; textColor: string; dotColor: string } } = {
-      PENDING: { label: '대기중', bgColor: 'bg-amber-50', textColor: 'text-amber-700', dotColor: 'bg-amber-500' },
-      SUCCESS: { label: '성공', bgColor: 'bg-emerald-50', textColor: 'text-emerald-700', dotColor: 'bg-emerald-500' },
-      FAILED: { label: '실패', bgColor: 'bg-red-50', textColor: 'text-red-700', dotColor: 'bg-red-500' },
+  const getChannelKindBadge = (kind: string) => {
+    const kindMap: { [key: string]: { label: string; bgColor: string; textColor: string } } = {
+      RETAIL: { label: '소매밴드', bgColor: 'bg-violet-50', textColor: 'text-violet-700' },
+      WHOLESALE: { label: '도매밴드', bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
     }
-    const statusInfo = statusMap[status] || { label: status, bgColor: 'bg-slate-100', textColor: 'text-slate-700', dotColor: 'bg-slate-500' }
+    const kindInfo = kindMap[kind] || { label: kind, bgColor: 'bg-slate-100', textColor: 'text-slate-700' }
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${statusInfo.bgColor} ${statusInfo.textColor}`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dotColor}`}></span>
-        {statusInfo.label}
-      </span>
-    )
-  }
-
-  const getPublishTypeBadge = (type: string) => {
-    const typeMap: { [key: string]: { label: string; bgColor: string; textColor: string } } = {
-      RETAIL_BAND: { label: '소매밴드', bgColor: 'bg-violet-50', textColor: 'text-violet-700' },
-      SHOPPING_MALL: { label: '쇼핑몰', bgColor: 'bg-blue-50', textColor: 'text-blue-700' },
-    }
-    const typeInfo = typeMap[type] || { label: type, bgColor: 'bg-slate-100', textColor: 'text-slate-700' }
-    return (
-      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${typeInfo.bgColor} ${typeInfo.textColor}`}>
-        {typeInfo.label}
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${kindInfo.bgColor} ${kindInfo.textColor}`}>
+        {kindInfo.label}
       </span>
     )
   }
@@ -683,37 +656,6 @@ export default function ProductDetailPage() {
               </Button>
             </div>
           </div>
-
-          {/* 탭 */}
-          <div className="flex gap-1 -mb-px">
-            <button
-              onClick={() => setActiveTab('info')}
-              className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
-                activeTab === 'info'
-                  ? 'text-blue-600 border-blue-600'
-                  : 'text-slate-500 border-transparent hover:text-slate-700'
-              }`}
-            >
-              상품 정보
-            </button>
-            <button
-              onClick={() => setActiveTab('publish')}
-              className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
-                activeTab === 'publish'
-                  ? 'text-blue-600 border-blue-600'
-                  : 'text-slate-500 border-transparent hover:text-slate-700'
-              }`}
-            >
-              발행현황
-              {publishedProducts.length > 0 && (
-                <span className={`px-1.5 py-0.5 rounded-full text-xs ${
-                  activeTab === 'publish' ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-600'
-                }`}>
-                  {publishedProducts.length}
-                </span>
-              )}
-            </button>
-          </div>
         </div>
       </div>
 
@@ -735,11 +677,10 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        {activeTab === 'info' ? (
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-            {/* 왼쪽: 이미지 갤러리 */}
-            <div className="xl:col-span-5 2xl:col-span-4">
-              <div className="xl:sticky xl:top-32">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          {/* 왼쪽: 이미지 갤러리 */}
+          <div className="xl:col-span-5 2xl:col-span-4">
+            <div className="xl:sticky xl:top-32">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                   {isEditingImages ? (
                     <>
@@ -1562,71 +1503,125 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        ) : (
-          /* 발행현황 탭 */
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <History size={18} className="text-emerald-600" />
-                </div>
-                <span className="font-semibold text-slate-900">발행 이력</span>
-              </div>
-              <p className="text-sm text-slate-500 mt-2">이 상품의 발행 현황을 확인할 수 있습니다.</p>
-            </div>
 
-            <div className="p-6">
-              {isLoadingPublish ? (
-                <div className="flex justify-center py-12">
-                  <Loading />
+              {/* 발행 현황 카드 */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-emerald-50 to-blue-50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-emerald-100 rounded-lg">
+                        <Send size={18} className="text-emerald-600" />
+                      </div>
+                      <span className="font-semibold text-slate-900">발행 현황</span>
+                      {((product.shopProducts?.length || 0) + (product.channelProducts?.length || 0)) > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700 font-medium">
+                          {(product.shopProducts?.length || 0) + (product.channelProducts?.length || 0)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              ) : publishedProducts.length > 0 ? (
-                <div className="space-y-3">
-                  {publishedProducts.map((publish) => (
-                    <div
-                      key={publish.id}
-                      className="group relative bg-gradient-to-r from-slate-50 to-white p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
-                            <Store size={20} className="text-violet-600" />
+
+                <div className="p-5">
+                  {((product.shopProducts?.length || 0) + (product.channelProducts?.length || 0)) > 0 ? (
+                    <div className="space-y-4">
+                      {/* 쇼핑몰 발행 */}
+                      {product.shopProducts && product.shopProducts.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <Store size={14} className="text-blue-500" />
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">쇼핑몰</span>
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              {getPublishTypeBadge(publish.publishType)}
-                              {publish.retailBand && (
-                                <span className="font-medium text-slate-900">
-                                  {publish.retailBand.name}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-slate-500 mt-1">
-                              <Calendar size={14} />
-                              {formatDate(publish.createdAt)}
-                            </div>
+                          <div className="space-y-2">
+                            {product.shopProducts.map((sp) => (
+                              <div
+                                key={sp.id}
+                                className="flex items-center justify-between p-3 bg-blue-50/50 rounded-xl border border-blue-100 hover:bg-blue-50 transition-colors"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                                    <Store size={14} className="text-blue-600" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-slate-900 text-sm">{sp.shop.name}</p>
+                                    <p className="text-xs text-slate-500">{formatDate(sp.publishedAt || sp.createdAt)}</p>
+                                  </div>
+                                </div>
+                                <a
+                                  href={`https://${sp.shop.subdomain}.bandauto.shop`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                >
+                                  <ExternalLink size={14} />
+                                </a>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                        {getPublishStatusBadge(publish.status)}
-                      </div>
+                      )}
+
+                      {/* 밴드 채널 발행 */}
+                      {product.channelProducts && product.channelProducts.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <History size={14} className="text-violet-500" />
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">밴드 채널</span>
+                          </div>
+                          <div className="space-y-2">
+                            {product.channelProducts.map((cp) => (
+                              <div
+                                key={cp.id}
+                                className="flex items-center justify-between p-3 bg-violet-50/50 rounded-xl border border-violet-100 hover:bg-violet-50 transition-colors"
+                              >
+                                <div className="flex items-center gap-3">
+                                  {cp.channel.coverUrl ? (
+                                    <img
+                                      src={cp.channel.coverUrl}
+                                      alt={cp.channel.name}
+                                      className="w-8 h-8 rounded-lg object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center">
+                                      <Store size={14} className="text-violet-600" />
+                                    </div>
+                                  )}
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-medium text-slate-900 text-sm">{cp.channel.name}</p>
+                                      {getChannelKindBadge(cp.channel.kind)}
+                                    </div>
+                                    <p className="text-xs text-slate-500">{formatDate(cp.publishedAt || cp.createdAt)}</p>
+                                  </div>
+                                </div>
+                                <a
+                                  href={`https://band.us/band/${cp.channel.channelKey}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 text-violet-500 hover:text-violet-600 hover:bg-violet-100 rounded-lg transition-colors"
+                                >
+                                  <ExternalLink size={14} />
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="text-center py-6">
+                      <div className="w-12 h-12 mx-auto mb-3 bg-slate-100 rounded-xl flex items-center justify-center">
+                        <Send size={20} className="text-slate-400" />
+                      </div>
+                      <p className="text-slate-500 text-sm font-medium">아직 발행되지 않았습니다</p>
+                      <p className="text-xs text-slate-400 mt-1">가공상품 발행 메뉴에서 발행할 수 있습니다</p>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
-                    <Store size={32} className="text-slate-400" />
-                  </div>
-                  <p className="text-slate-500 font-medium">발행 이력이 없습니다</p>
-                  <p className="text-sm text-slate-400 mt-1">상품을 발행하면 이곳에 표시됩니다</p>
-                </div>
-              )}
+              </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
 
       {/* 삭제 확인 모달 */}
       <ConfirmModal

@@ -234,7 +234,7 @@ export class PublishService {
       }
 
       // 3. 이미 발행 여부 확인
-      const existingPublish = await prisma.publishedProduct.findFirst({
+      const existingPublish = await prisma.channelProduct.findFirst({
         where: {
           productId,
           channelId,
@@ -359,31 +359,25 @@ export class PublishService {
         console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
       }
 
-      // 7. PublishedProduct 레코드 생성 (postKey 및 스냅샷 데이터 포함)
-      const publishedProduct = await prisma.publishedProduct.create({
+      // 7. ChannelProduct 레코드 생성
+      const channelProduct = await prisma.channelProduct.create({
         data: {
           userId,
           productId,
           channelId,
-          postKey, // Band 게시물 키 저장 (발행 취소 시 필요)
           publishedAt: new Date(),
-          // 스냅샷 데이터 (Product 삭제 후에도 유지)
-          productName: product.name,
-          thumbnailUrl: product.thumbnailUrl,
-          imageUrls: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         },
       })
 
       console.log(
-        `[PublishService] Published product ${productId} to channel ${channel.name} -> post_key: ${postKey} (${publishMethod}${orderLink ? ', with order link' : ''})`
+        `[PublishService] Published product ${productId} to channel ${channel.name} (${publishMethod}${orderLink ? ', with order link' : ''})`
       )
 
       return {
         success: true,
         productId,
         channelId,
-        postKey,
-        publishedProductId: publishedProduct.id,
+        publishedProductId: channelProduct.id,
         imageCount,
         publishMethod,
       }
@@ -601,11 +595,8 @@ export class PublishService {
         }
       }
 
-      // 스냅샷용 이미지 URL 배열
-      const imageUrls = product.images?.map(img => img.url) || []
-
       // 3. 이미 발행 여부 확인
-      const existingPublish = await prisma.publishedProduct.findFirst({
+      const existingPublish = await prisma.shopProduct.findFirst({
         where: {
           productId,
           shopId,
@@ -623,17 +614,13 @@ export class PublishService {
         }
       }
 
-      // 4. PublishedProduct 레코드 생성 (스냅샷 데이터 포함)
-      const publishedProduct = await prisma.publishedProduct.create({
+      // 4. ShopProduct 레코드 생성
+      const shopProduct = await prisma.shopProduct.create({
         data: {
           userId,
           productId,
           shopId,
           publishedAt: new Date(),
-          // 스냅샷 데이터 (Product 삭제 후에도 유지)
-          productName: product.name,
-          thumbnailUrl: product.thumbnailUrl,
-          imageUrls: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         },
       })
 
@@ -645,7 +632,7 @@ export class PublishService {
         success: true,
         productId,
         shopId,
-        publishedProductId: publishedProduct.id,
+        publishedProductId: shopProduct.id,
       }
     } catch (error: any) {
       console.error(`[PublishService] Error publishing product ${productId} to shop ${shopId}:`, error)
@@ -876,7 +863,7 @@ export class PublishService {
       }
 
       // 3. 이미 발행 여부 확인
-      const existingPublish = await prisma.publishedProduct.findFirst({
+      const existingPublish = await prisma.channelProduct.findFirst({
         where: {
           productId,
           channelId,
@@ -1082,18 +1069,13 @@ export class PublishService {
         console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
       }
 
-      // 7. PublishedProduct 레코드 생성 (postKey 및 스냅샷 데이터 포함)
-      const publishedProduct = await prisma.publishedProduct.create({
+      // 7. ChannelProduct 레코드 생성
+      const channelProduct = await prisma.channelProduct.create({
         data: {
           userId,
           productId,
           channelId,
-          postKey, // Band 게시물 키 저장 (발행 취소 시 필요)
           publishedAt: new Date(),
-          // 스냅샷 데이터 (Product 삭제 후에도 유지)
-          productName: product.name,
-          thumbnailUrl: product.thumbnailUrl,
-          imageUrls: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         },
       })
 
@@ -1113,8 +1095,7 @@ export class PublishService {
         success: true,
         productId,
         channelId,
-        postKey,
-        publishedProductId: publishedProduct.id,
+        publishedProductId: channelProduct.id,
         imageCount,
         publishMethod,
       }

@@ -306,7 +306,7 @@ export class TossPaymentsWebhookHandler {
           user: true,
           items: {
             include: {
-              publishedProduct: {
+              shopProduct: {
                 include: {
                   product: true
                 }

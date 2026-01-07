@@ -91,7 +91,7 @@ interface Inquiry {
   isPrivate: boolean
   createdAt: string
   repliedAt: string | null
-  publishedProduct: {
+  shopProduct: {
     id: number
     product: {
       name: string
@@ -509,14 +509,14 @@ export default function UserDetailPage() {
                             )}
                           </div>
                           <h4 className="font-medium text-gray-900 mb-1">{inquiry.title}</h4>
-                          {inquiry.publishedProduct && (
+                          {inquiry.shopProduct && (
                             <div className="flex items-center gap-2 text-sm text-gray-500">
-                              {inquiry.publishedProduct.product.thumbnailUrl ? (
-                                <img src={inquiry.publishedProduct.product.thumbnailUrl} alt="" className="w-6 h-6 rounded object-cover" />
+                              {inquiry.shopProduct.product.thumbnailUrl ? (
+                                <img src={inquiry.shopProduct.product.thumbnailUrl} alt="" className="w-6 h-6 rounded object-cover" />
                               ) : (
                                 <Package className="w-4 h-4" />
                               )}
-                              <span>{inquiry.publishedProduct.product.name}</span>
+                              <span>{inquiry.shopProduct.product.name}</span>
                             </div>
                           )}
                         </div>

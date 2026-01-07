@@ -115,38 +115,11 @@ export class ChannelService {
       await channelRepository.update(id, { isActive: false })
     }
 
-    // 채널에 연결된 PublishedProduct 조회
-    const publishedProducts = await prisma.publishedProduct.findMany({
+    // 채널에 연결된 ChannelProduct 삭제 (채널 발행 추적용)
+    // 참고: ShopProduct는 Shop과 연결되어 있으므로 채널 삭제와 무관함
+    await prisma.channelProduct.deleteMany({
       where: { channelId: id },
-      select: { id: true },
     })
-    const publishedProductIds = publishedProducts.map((p) => p.id)
-
-    if (publishedProductIds.length > 0) {
-      // 주문이 있는지 확인 (주문이 있으면 삭제 불가)
-      const orderCount = await prisma.orderItem.count({
-        where: { publishedProductId: { in: publishedProductIds } },
-      })
-      if (orderCount > 0) {
-        throw new Error(`이 채널에 ${orderCount}건의 주문이 있어 삭제할 수 없습니다. 먼저 주문을 처리해주세요.`)
-      }
-
-      // Inquiry의 publishedProductId를 null로 설정
-      await prisma.inquiry.updateMany({
-        where: { publishedProductId: { in: publishedProductIds } },
-        data: { publishedProductId: null },
-      })
-
-      // CartItem 삭제 (또는 cascade로 자동 삭제됨)
-      await prisma.cartItem.deleteMany({
-        where: { publishedProductId: { in: publishedProductIds } },
-      })
-
-      // PublishedProduct 삭제
-      await prisma.publishedProduct.deleteMany({
-        where: { channelId: id },
-      })
-    }
 
     // 자동화 설정에서 삭제되는 채널 ID 제거
     await this.removeChannelFromAutomationConfigs(id, existing.kind)

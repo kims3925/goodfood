@@ -75,19 +75,13 @@ export async function GET(
         shippingAddress: true,
         items: {
           include: {
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   select: {
                     id: true,
                     name: true,
                     thumbnailUrl: true,
-                  },
-                },
-                channel: {
-                  select: {
-                    id: true,
-                    name: true,
                   },
                 },
               },
@@ -161,23 +155,15 @@ export async function GET(
           id: item.id,
           productName: item.productName,
           optionSummary: item.optionSummary,
-          thumbnailUrl: item.thumbnailUrl || item.publishedProduct?.product?.thumbnailUrl,
+          thumbnailUrl: item.thumbnailUrl || item.shopProduct?.product?.thumbnailUrl,
           quantity: item.quantity,
           unitPrice: Number(item.unitPrice),
           totalPrice: Number(item.totalPrice),
           hasReview: !!item.review,
-          product: item.publishedProduct?.product ? {
-            id: item.publishedProduct.product.id,
-            name: item.publishedProduct.product.name,
-            thumbnailUrl: item.publishedProduct.product.thumbnailUrl,
-          } : null,
-          channel: item.publishedProduct?.channel ? {
-            id: item.publishedProduct.channel.id,
-            name: item.publishedProduct.channel.name,
-          } : null,
-          retailBand: item.publishedProduct?.channel ? {
-            id: item.publishedProduct.channel.id,
-            name: item.publishedProduct.channel.name,
+          product: item.shopProduct?.product ? {
+            id: item.shopProduct.product.id,
+            name: item.shopProduct.product.name,
+            thumbnailUrl: item.shopProduct.product.thumbnailUrl,
           } : null,
         })),
         hasWritableReview: order.status === 'DELIVERED' && order.items.some(item => !item.review),
@@ -233,19 +219,13 @@ export async function GET(
         shippingAddress: true,
         items: {
           include: {
-            publishedProduct: {
+            shopProduct: {
               include: {
                 product: {
                   select: {
                     id: true,
                     name: true,
                     thumbnailUrl: true,
-                  },
-                },
-                channel: {
-                  select: {
-                    id: true,
-                    name: true,
                   },
                 },
               },
@@ -323,23 +303,15 @@ export async function GET(
         id: item.id,
         productName: item.productName,
         optionSummary: item.optionSummary,
-        thumbnailUrl: item.thumbnailUrl || item.publishedProduct?.product?.thumbnailUrl,
+        thumbnailUrl: item.thumbnailUrl || item.shopProduct?.product?.thumbnailUrl,
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         totalPrice: Number(item.totalPrice),
         hasReview: false, // 비회원은 리뷰 불가
-        product: item.publishedProduct?.product ? {
-          id: item.publishedProduct.product.id,
-          name: item.publishedProduct.product.name,
-          thumbnailUrl: item.publishedProduct.product.thumbnailUrl,
-        } : null,
-        channel: item.publishedProduct?.channel ? {
-          id: item.publishedProduct.channel.id,
-          name: item.publishedProduct.channel.name,
-        } : null,
-        retailBand: item.publishedProduct?.channel ? {
-          id: item.publishedProduct.channel.id,
-          name: item.publishedProduct.channel.name,
+        product: item.shopProduct?.product ? {
+          id: item.shopProduct.product.id,
+          name: item.shopProduct.product.name,
+          thumbnailUrl: item.shopProduct.product.thumbnailUrl,
         } : null,
       })),
       hasWritableReview: false, // 비회원은 리뷰 작성 불가

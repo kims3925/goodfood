@@ -1,7 +1,7 @@
 /**
  * Payment Service
  * 결제 비즈니스 로직 레이어
- * PublishedProduct 기반 주문과 연동
+ * ShopProduct 기반 주문과 연동
  */
 
 import prisma, { Prisma } from '@bandauto/db'
@@ -34,7 +34,7 @@ export interface OrderPrepareData {
   userId: number
   shopId?: number | null
   fromCart: boolean
-  items?: { publishedProductId: number; variantId?: number; quantity: number }[]
+  items?: { shopProductId: number; variantId?: number; quantity: number }[]
   // 배송지 정보 (수령인)
   shippingAddress: {
     recipientName: string
@@ -343,8 +343,8 @@ export class PaymentService {
       }
 
       orderItems = cart.items.map((item: any) => {
-        const publishedProduct = item.publishedProduct
-        const product = publishedProduct.product
+        const shopProduct = item.shopProduct
+        const product = shopProduct.product
         const variant = item.variant
         const mainVariant = product?.variants[0]
         const basePrice = variant?.price || mainVariant?.price || 0
@@ -365,7 +365,7 @@ export class PaymentService {
         })
 
         return {
-          publishedProductId: publishedProduct.id,
+          shopProductId: shopProduct.id,
           variantId: variant?.id || null,
           productName: product?.name || "",
           optionSummary: variant?.optionSummary || null,
@@ -378,9 +378,9 @@ export class PaymentService {
     } else if (prepareData.items) {
       // 직접 지정 상품
       for (const item of prepareData.items) {
-        const publishedProduct = await prisma.publishedProduct.findFirst({
+        const shopProduct = await prisma.shopProduct.findFirst({
           where: {
-            id: item.publishedProductId,
+            id: item.shopProductId,
           },
           include: {
             product: {
@@ -389,8 +389,8 @@ export class PaymentService {
           },
         })
 
-        if (!publishedProduct) {
-          throw new NotFoundError('상품', String(item.publishedProductId))
+        if (!shopProduct) {
+          throw new NotFoundError('상품', String(item.shopProductId))
         }
 
         let variant = null
@@ -400,7 +400,7 @@ export class PaymentService {
           })
         }
 
-        const product = publishedProduct.product
+        const product = shopProduct.product
         const mainVariant = product?.variants[0]
         const basePrice = variant?.price || mainVariant?.price || 0
         const quantity = item.quantity || 1
@@ -420,7 +420,7 @@ export class PaymentService {
         })
 
         orderItems.push({
-          publishedProductId: publishedProduct.id,
+          shopProductId: shopProduct.id,
           variantId: variant?.id || null,
           productName: product?.name || "",
           optionSummary: variant?.optionSummary || null,
@@ -480,7 +480,7 @@ export class PaymentService {
         totalAmount: new Decimal(totalAmount),
         items: {
           create: orderItems.map((item: any) => ({
-            publishedProductId: item.publishedProductId,
+            shopProductId: item.shopProductId,
             variantId: item.variantId,
             productName: item.productName,
             optionSummary: item.optionSummary,

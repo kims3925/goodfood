@@ -100,7 +100,7 @@ export async function GET(
         isPrivate: true,
         createdAt: true,
         repliedAt: true,
-        publishedProduct: {
+        shopProduct: {
           select: {
             id: true,
             product: {

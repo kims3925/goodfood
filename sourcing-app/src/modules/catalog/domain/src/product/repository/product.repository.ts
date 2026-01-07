@@ -83,7 +83,7 @@ export class ProductRepository {
         variants: {
           orderBy: { id: 'asc' },
         },
-        publishedProducts: {
+        channelProducts: {
           where: {
             channel: {
               kind: ChannelKind.RETAIL,
@@ -108,7 +108,7 @@ export class ProductRepository {
 
     // 발행 상태 계산해서 추가
     const productsWithPublishStatus = products.map((product) => {
-      const channelPublishes = product.publishedProducts
+      const channelPublishes = product.channelProducts
 
       const hasChannelPublish = channelPublishes.length > 0
 

@@ -17,7 +17,7 @@ import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface Product {
   id: number
-  publishedProductId?: number
+  shopProductId?: number
   title: string
   description?: string
   originalPrice: number
@@ -174,7 +174,7 @@ export default function BandProductsPage() {
     e.stopPropagation()
     e.preventDefault()
 
-    if (!product.publishedProductId) {
+    if (!product.shopProductId) {
       return
     }
 
@@ -183,7 +183,7 @@ export default function BandProductsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          publishedProductId: product.publishedProductId,
+          shopProductId: product.shopProductId,
           quantity: 1,
         }),
       })

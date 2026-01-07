@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
             lte: toDate,
           },
         },
-        publishedProduct: {
+        shopProduct: {
           userId: user.userId,
           product: {
             channel: {
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
             orderNumber: true,
           },
         },
-        publishedProduct: {
+        shopProduct: {
           include: {
             product: {
               include: {
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
             lte: toDate,
           },
         },
-        publishedProduct: {
+        shopProduct: {
           userId: user.userId,
           product: {
             channel: {
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
             orderNumber: true,
           },
         },
-        publishedProduct: {
+        shopProduct: {
           include: {
             product: {
               include: {
@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
 
     // 회원 주문 집계
     for (const item of memberOrderItems) {
-      const channel = item.publishedProduct?.product?.channel
+      const channel = item.shopProduct?.product?.channel
       if (!channel || channel.kind !== 'WHOLESALE') continue
 
       const wholesalePrice = getWholesalePrice(item)
@@ -195,7 +195,7 @@ export async function GET(request: NextRequest) {
 
     // 비회원 주문 집계
     for (const item of guestOrderItems) {
-      const channel = item.publishedProduct?.product?.channel
+      const channel = item.shopProduct?.product?.channel
       if (!channel || channel.kind !== 'WHOLESALE') continue
 
       const wholesalePrice = getWholesalePrice(item)
@@ -239,7 +239,7 @@ export async function GET(request: NextRequest) {
           },
           items: {
             some: {
-              publishedProduct: {
+              shopProduct: {
                 userId: user.userId,
                 product: {
                   channel: {
@@ -265,7 +265,7 @@ export async function GET(request: NextRequest) {
           },
           items: {
             some: {
-              publishedProduct: {
+              shopProduct: {
                 userId: user.userId,
                 product: {
                   channel: {
@@ -314,7 +314,7 @@ export async function GET(request: NextRequest) {
 function getWholesalePrice(item: {
   variant?: { wholesalePrice: unknown } | null
   optionSummary?: string | null
-  publishedProduct?: {
+  shopProduct?: {
     product?: {
       variants?: { optionSummary: string | null; wholesalePrice: unknown }[]
     } | null
@@ -323,9 +323,9 @@ function getWholesalePrice(item: {
   let wholesalePrice = Number(item.variant?.wholesalePrice || 0)
 
   // variantId가 null인 경우 Product의 variants에서 찾기
-  if (!item.variant && item.publishedProduct?.product?.variants?.length) {
+  if (!item.variant && item.shopProduct?.product?.variants?.length) {
     if (item.optionSummary) {
-      const matchedVariant = item.publishedProduct.product.variants.find(
+      const matchedVariant = item.shopProduct.product.variants.find(
         v => v.optionSummary === item.optionSummary
       )
       if (matchedVariant) {
@@ -333,7 +333,7 @@ function getWholesalePrice(item: {
       }
     }
     if (wholesalePrice === 0) {
-      wholesalePrice = Number(item.publishedProduct.product.variants[0].wholesalePrice || 0)
+      wholesalePrice = Number(item.shopProduct.product.variants[0].wholesalePrice || 0)
     }
   }
 

@@ -32,12 +32,10 @@ export async function GET(
       )
     }
 
-    // publishedProducts 조회 조건: shopId 우선, channelId 하위 호환
-    const publishedProductsWhere: any = {}
+    // shopProducts 조회 조건: shopId 기반 필터링
+    const shopProductsWhere: any = {}
     if (currentShopId) {
-      publishedProductsWhere.shopId = currentShopId
-    } else if (channelId) {
-      publishedProductsWhere.channelId = parseInt(channelId)
+      shopProductsWhere.shopId = currentShopId
     }
 
     const product = await prisma.product.findUnique({
@@ -52,10 +50,9 @@ export async function GET(
         images: {
           orderBy: { sortOrder: 'asc' },
         },
-        publishedProducts: {
-          where: publishedProductsWhere,
+        shopProducts: {
+          where: shopProductsWhere,
           include: {
-            channel: true,
             shop: true,
           },
           take: 1,
@@ -102,14 +99,11 @@ export async function GET(
     // 참고: 실제 계산은 ProductDetailClient에서 bundleUnit을 고려하여 다시 계산됨
     const bundleOptions: any[] = []
 
-    // 채널 정보 가져오기 (published_product -> channel)
-    const publishedProduct = product.publishedProducts[0]
-    const channel = publishedProduct?.channel
-    const shop = publishedProduct?.shop
-    const channelName = channel?.name || null
-    const publishChannelId = channel?.id || null
-    const publishedProductId = publishedProduct?.id || null
-    const isActive = publishedProduct?.isActive ?? true // 발행 상품의 활성 상태 (비활성이면 품절)
+    // Shop 정보 가져오기 (shop_product -> shop)
+    const shopProduct = product.shopProducts[0]
+    const shop = shopProduct?.shop
+    const shopProductId = shopProduct?.id || null
+    const isActive = true // 품절 체크는 Product 레벨의 재고 관리로 대체됨 (ShopProduct에서 isActive 필드 제거됨)
 
     // 판매자 정보 (추후 별도 필드로 관리)
     const sellerName = null
@@ -127,7 +121,7 @@ export async function GET(
 
     const formattedProduct = {
       id: product.id,
-      publishedProductId: publishedProductId || null, // 추가: 장바구니/주문에 필요
+      shopProductId: shopProductId || null, // 추가: 장바구니/주문에 필요
       title: product.name,
       description: product.description || '',
       images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
@@ -135,11 +129,6 @@ export async function GET(
       category: product.categoryId || '',
       rating: 4.5,
       reviews: 100,
-      channelName,
-      channelId: publishChannelId,
-      // 하위 호환성
-      bandName: channelName,
-      retailBandId: publishChannelId,
       sellerName,
       shippingFee: product.shippingFee,
       shippingInfo: {

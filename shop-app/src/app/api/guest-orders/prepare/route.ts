@@ -36,7 +36,7 @@ interface GuestOrderPrepareData {
   orderId: string
   shopId: number | null
   fromCart: boolean
-  items?: { publishedProductId: number; variantId?: number; quantity: number }[]
+  items?: { shopProductId: number; variantId?: number; quantity: number }[]
   customerInfo: {
     name: string
     phone: string
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
 
       // CartService에서 계산된 itemTotal 사용
       orderItems = formattedCart.items.map((item) => ({
-        publishedProductId: item.publishedProductId,
+        shopProductId: item.shopProductId,
         variantId: item.variantId || null,
         productName: item.name,
         optionSummary: item.optionSummary || null,
@@ -140,9 +140,9 @@ export async function POST(req: NextRequest) {
       }
 
       for (const item of items) {
-        const publishedProduct = await prisma.publishedProduct.findFirst({
+        const shopProduct = await prisma.shopProduct.findFirst({
           where: {
-            id: parseInt(item.publishedProductId),
+            id: parseInt(item.shopProductId),
           },
           include: {
             product: {
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
           },
         })
 
-        if (!publishedProduct) {
+        if (!shopProduct) {
           return NextResponse.json(
             { success: false, error: `상품을 찾을 수 없거나 판매 중인 상품이 아닙니다` },
             { status: 404 }
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
           })
         }
 
-        const product = publishedProduct.product
+        const product = shopProduct.product
         const mainVariant = product?.variants[0]
         const basePrice = variant?.price || mainVariant?.price || 0
         const quantity = item.quantity || 1
@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
         const itemTotal = priceResult.itemTotal
 
         orderItems.push({
-          publishedProductId: publishedProduct.id,
+          shopProductId: shopProduct.id,
           variantId: variant?.id || null,
           productName: product?.name || '',
           optionSummary: variant?.optionSummary || null,

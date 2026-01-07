@@ -24,7 +24,7 @@ interface Inquiry {
   adminReply: string | null
   repliedAt: string | null
   createdAt: string
-  publishedProduct: {
+  shopProduct: {
     id: number
     product: {
       id: number
@@ -140,13 +140,13 @@ export default function InquiriesPage() {
 
               {/* 문의 내용 */}
               <div className="p-4 lg:p-6">
-                {inquiry.publishedProduct?.product && (
+                {inquiry.shopProduct?.product && (
                   <div className="flex gap-3 mb-4 pb-4 border-b border-gray-100">
                     <div className="relative w-10 h-10 lg:w-12 lg:h-12 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
-                      {inquiry.publishedProduct.product.thumbnailUrl ? (
+                      {inquiry.shopProduct.product.thumbnailUrl ? (
                         <Image
-                          src={inquiry.publishedProduct.product.thumbnailUrl}
-                          alt={inquiry.publishedProduct.product.name}
+                          src={inquiry.shopProduct.product.thumbnailUrl}
+                          alt={inquiry.shopProduct.product.name}
                           fill
                           sizes="48px"
                           className="object-cover"
@@ -159,7 +159,7 @@ export default function InquiriesPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">
-                        {inquiry.publishedProduct.product.name}
+                        {inquiry.shopProduct.product.name}
                       </p>
                     </div>
                   </div>

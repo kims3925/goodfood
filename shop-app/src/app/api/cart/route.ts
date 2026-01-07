@@ -103,11 +103,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { publishedProductId, variantId, quantity = 1, sessionId: bodySessionId, isBundleItem = false } = body
+    const { shopProductId, variantId, quantity = 1, sessionId: bodySessionId, isBundleItem = false } = body
 
-    if (!publishedProductId) {
+    if (!shopProductId) {
       return NextResponse.json(
-        { success: false, error: 'publishedProductId는 필수입니다' },
+        { success: false, error: 'shopProductId는 필수입니다' },
         { status: 400 }
       )
     }
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
     const result = await cartService.addItem(
       sessionId,
       {
-        publishedProductId: parseInt(publishedProductId),
+        shopProductId: parseInt(shopProductId),
         variantId: variantId ? parseInt(variantId) : undefined,
         quantity: parseInt(quantity),
         isBundleItem, // 묶음 상품 플래그 전달

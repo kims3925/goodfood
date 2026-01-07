@@ -38,7 +38,7 @@ export async function GET(
             phone: true,
           },
         },
-        publishedProduct: {
+        shopProduct: {
           select: {
             id: true,
             product: {

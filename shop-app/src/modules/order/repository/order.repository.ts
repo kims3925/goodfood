@@ -1,7 +1,7 @@
 /**
  * Order Repository
  * 주문 데이터 접근 레이어
- * PublishedProduct 기반 스키마 지원
+ * ShopProduct 기반 스키마 지원
  */
 
 import prisma, { Prisma } from '@bandauto/db'
@@ -13,7 +13,7 @@ const Decimal = Prisma.Decimal
 // ============================================
 
 export interface OrderItemInput {
-  publishedProductId: number
+  shopProductId: number
   variantId: number | null
   productName: string
   optionSummary: string | null
@@ -94,7 +94,7 @@ export interface OrderWithRelations {
   items: Array<{
     id: number
     orderId: number
-    publishedProductId: number
+    shopProductId: number
     variantId: number | null
     productName: string
     optionSummary: string | null
@@ -102,13 +102,8 @@ export interface OrderWithRelations {
     quantity: number
     unitPrice: any
     totalPrice: any
-    publishedProduct?: {
+    shopProduct?: {
       id: number
-      channelId: number | null
-      channel?: {
-        id: number
-        name: string
-      } | null
     }
   }>
   payment: {
@@ -134,13 +129,7 @@ const orderIncludeOptions = {
   shippingAddress: true,  // 배송지 정보 포함
   items: {
     include: {
-      publishedProduct: {
-        include: {
-          channel: {
-            select: { id: true, name: true },
-          },
-        },
-      },
+      shopProduct: true,
     },
   },
   payment: true,
@@ -178,7 +167,7 @@ export class OrderRepository {
         },
         items: {
           create: data.items.map((item) => ({
-            publishedProductId: item.publishedProductId,
+            shopProductId: item.shopProductId,
             variantId: item.variantId,
             productName: item.productName,
             optionSummary: item.optionSummary,

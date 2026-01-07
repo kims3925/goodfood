@@ -11,7 +11,7 @@ import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface Product {
   id: number
-  publishedProductId?: number
+  shopProductId?: number
   title: string
   description?: string
   originalPrice: number
@@ -121,7 +121,7 @@ export default function StorePage() {
     e.stopPropagation()
     e.preventDefault()
 
-    if (!product.publishedProductId) {
+    if (!product.shopProductId) {
       return
     }
 
@@ -130,7 +130,7 @@ export default function StorePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          publishedProductId: product.publishedProductId,
+          shopProductId: product.shopProductId,
           quantity: 1,
         }),
       })
@@ -335,7 +335,7 @@ export default function StorePage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
               {shopProducts.map((product, index) => (
                 <Link
-                  key={`product-${product.publishedProductId || product.id}`}
+                  key={`product-${product.shopProductId || product.id}`}
                   href={getPath(`/product/${product.id}`)}
                   className="group block"
                 >

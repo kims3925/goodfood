@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
         theme: true,
         _count: {
           select: {
-            publishedProducts: true,
+            shopProducts: true,
             orders: true,
             guestOrders: true,
           },

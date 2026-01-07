@@ -19,7 +19,7 @@ export interface CreateInquiryDTO {
   inquiryType: string
   title: string
   content: string
-  publishedProductId?: number
+  shopProductId?: number
 }
 
 export interface InquiryReply {
@@ -59,7 +59,7 @@ export class InquiryService {
    * 문의 생성
    */
   async createInquiry(data: CreateInquiryDTO): Promise<InquiryResponse> {
-    const { userId, inquiryType, title, content, publishedProductId } = data
+    const { userId, inquiryType, title, content, shopProductId } = data
 
     // 입력 검증
     this.validateInquiryInput(title, content, inquiryType)
@@ -68,7 +68,7 @@ export class InquiryService {
     const inquiry = await prisma.inquiry.create({
       data: {
         userId,
-        publishedProductId: publishedProductId || null,
+        shopProductId: shopProductId || null,
         inquiryType: inquiryType as InquiryType,
         title: title.trim(),
         content: content.trim(),
@@ -81,10 +81,10 @@ export class InquiryService {
       },
     })
 
-    // 알림 생성 (publishedProductId가 있으면 shopId 조회 - 샵 소유자에게 알림)
-    if (publishedProductId) {
-      const publishedProduct = await prisma.publishedProduct.findUnique({
-        where: { id: publishedProductId },
+    // 알림 생성 (shopProductId가 있으면 shopId 조회 - 샵 소유자에게 알림)
+    if (shopProductId) {
+      const shopProduct = await prisma.shopProduct.findUnique({
+        where: { id: shopProductId },
         select: {
           shopId: true,
           shop: {
@@ -92,8 +92,8 @@ export class InquiryService {
           },
         },
       })
-      if (publishedProduct?.shopId && publishedProduct?.shop?.userId) {
-        createInquiryNotification(publishedProduct.shop.userId, publishedProduct.shopId, {
+      if (shopProduct?.shopId && shopProduct?.shop?.userId) {
+        createInquiryNotification(shopProduct.shop.userId, shopProduct.shopId, {
           id: inquiry.id,
           title: inquiry.title,
           type: inquiry.inquiryType,

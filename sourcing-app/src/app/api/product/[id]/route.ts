@@ -42,6 +42,32 @@ export async function GET(
         },
         options: true,
         variants: true,
+        shopProducts: {
+          include: {
+            shop: {
+              select: {
+                id: true,
+                name: true,
+                subdomain: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        channelProducts: {
+          include: {
+            channel: {
+              select: {
+                id: true,
+                name: true,
+                channelKey: true,
+                coverUrl: true,
+                kind: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     })
 

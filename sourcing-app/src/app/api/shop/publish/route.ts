@@ -53,21 +53,26 @@ export async function GET(request: NextRequest) {
       where: { userId },
       select: {
         id: true,
-        publishedProducts: {
+        shopProducts: {
           select: {
             id: true,
-            channelId: true,
             shopId: true,
-            channel: {
-              select: {
-                kind: true,
-                platform: true,
-              },
-            },
             shop: {
               select: {
                 id: true,
                 name: true,
+              },
+            },
+          },
+        },
+        channelProducts: {
+          select: {
+            id: true,
+            channelId: true,
+            channel: {
+              select: {
+                kind: true,
+                platform: true,
               },
             },
           },
@@ -80,14 +85,10 @@ export async function GET(request: NextRequest) {
     let retailBandPublishedCount = 0
 
     for (const product of allProducts) {
-      // Shop 발행: shopId가 있는 경우
-      const hasShopPublish = product.publishedProducts.some(
-        (pp) => pp.shopId !== null
-      )
-      // 채널 발행: channelId가 있는 모든 발행 (채널 삭제되어도 카운트)
-      const hasChannelPublish = product.publishedProducts.some(
-        (pp) => pp.channelId !== null
-      )
+      // Shop 발행: shopProducts가 있는 경우
+      const hasShopPublish = product.shopProducts.length > 0
+      // 채널 발행: channelProducts가 있는 경우
+      const hasChannelPublish = product.channelProducts.length > 0
 
       if (hasShopPublish) shopPublishedCount++
       if (hasChannelPublish) retailBandPublishedCount++
@@ -119,11 +120,24 @@ export async function GET(request: NextRequest) {
           orderBy: { id: 'asc' },
           take: 1,
         },
-        publishedProducts: {
+        shopProducts: {
+          select: {
+            id: true,
+            shopId: true,
+            createdAt: true,
+            shop: {
+              select: {
+                id: true,
+                name: true,
+                subdomain: true,
+              },
+            },
+          },
+        },
+        channelProducts: {
           select: {
             id: true,
             channelId: true,
-            shopId: true,
             createdAt: true,
             channel: {
               select: {
@@ -131,13 +145,6 @@ export async function GET(request: NextRequest) {
                 name: true,
                 kind: true,
                 platform: true,
-              },
-            },
-            shop: {
-              select: {
-                id: true,
-                name: true,
-                subdomain: true,
               },
             },
           },
@@ -154,14 +161,10 @@ export async function GET(request: NextRequest) {
       const mainVariant = product.variants?.[0]
 
       // 발행 유형별 분류:
-      // - channelPublishes: 채널 발행 (매트릭스 UI에서 사용)
-      // - shopPublishes: Shop 발행 (shopId가 있는 경우)
-      const channelPublishes = product.publishedProducts.filter(
-        (pp) => pp.channelId !== null
-      )
-      const shopPublishes = product.publishedProducts.filter(
-        (pp) => pp.shopId !== null
-      )
+      // - channelProducts: 채널 발행 (매트릭스 UI에서 사용)
+      // - shopProducts: Shop 발행
+      const channelPublishes = product.channelProducts
+      const shopPublishes = product.shopProducts
 
       const hasChannelPublish = channelPublishes.length > 0
       const hasShopPublish = shopPublishes.length > 0
@@ -189,21 +192,21 @@ export async function GET(request: NextRequest) {
         },
         publishSummary,
         // 발행된 채널 목록
-        publishedChannels: channelPublishes.map((pp) => ({
-          publishId: pp.id,
-          channelId: pp.channelId,
-          channelName: pp.channel?.name,
+        publishedChannels: channelPublishes.map((cp) => ({
+          publishId: cp.id,
+          channelId: cp.channelId,
+          channelName: cp.channel?.name,
           status: 'SUCCESS',
-          createdAt: pp.createdAt,
+          createdAt: cp.createdAt,
         })),
         // 발행된 Shop 목록
-        publishedShops: shopPublishes.map((pp) => ({
-          publishId: pp.id,
-          shopId: pp.shopId,
-          shopName: pp.shop?.name,
-          subdomain: pp.shop?.subdomain,
+        publishedShops: shopPublishes.map((sp) => ({
+          publishId: sp.id,
+          shopId: sp.shopId,
+          shopName: sp.shop?.name,
+          subdomain: sp.shop?.subdomain,
           status: 'SUCCESS',
-          createdAt: pp.createdAt,
+          createdAt: sp.createdAt,
         })),
         createdAt: product.createdAt,
       }
@@ -395,6 +398,7 @@ export async function DELETE(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const publishIds = searchParams.get('ids')?.split(',').map(Number).filter(Boolean) || []
+    const publishType = searchParams.get('type') as 'shop' | 'channel' | null // 'shop' 또는 'channel'
 
     if (publishIds.length === 0) {
       return NextResponse.json(
@@ -403,8 +407,84 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // 발행 상품 조회 (주문, 문의 카운트 + 채널 정보 포함)
-    const publishedProducts = await prisma.publishedProduct.findMany({
+    // Shop 발행 삭제
+    if (publishType === 'shop') {
+      // ShopProduct 조회 (주문, 문의 카운트 포함)
+      const shopProducts = await prisma.shopProduct.findMany({
+        where: {
+          id: { in: publishIds },
+          userId,
+        },
+        include: {
+          product: {
+            select: { name: true },
+          },
+          _count: {
+            select: {
+              orderItems: true,
+              inquiries: true,
+            },
+          },
+        },
+      })
+
+      // 삭제 불가한 발행 상품 확인
+      const cannotDelete: { id: number; name: string; reason: string }[] = []
+      const canDeleteIds: number[] = []
+
+      for (const sp of shopProducts) {
+        const hasOrders = sp._count.orderItems > 0
+        const hasInquiries = sp._count.inquiries > 0
+
+        if (hasOrders || hasInquiries) {
+          const reasons: string[] = []
+          if (hasOrders) reasons.push(`주문 ${sp._count.orderItems}건`)
+          if (hasInquiries) reasons.push(`문의 ${sp._count.inquiries}건`)
+          cannotDelete.push({
+            id: sp.id,
+            name: sp.product?.name || 'Unknown',
+            reason: reasons.join(', '),
+          })
+        } else {
+          canDeleteIds.push(sp.id)
+        }
+      }
+
+      // 삭제 불가한 상품이 있는 경우
+      if (cannotDelete.length > 0 && canDeleteIds.length === 0) {
+        return NextResponse.json({
+          success: false,
+          error: '발행을 취소할 수 없습니다.',
+          reason: '주문 또는 문의가 존재하는 상품은 발행을 취소할 수 없습니다.',
+          cannotDelete,
+        }, { status: 400 })
+      }
+
+      // Shop 발행 삭제 (DB만)
+      let deletedCount = 0
+      if (canDeleteIds.length > 0) {
+        const deleteResult = await prisma.shopProduct.deleteMany({
+          where: {
+            id: { in: canDeleteIds },
+            userId,
+          },
+        })
+        deletedCount = deleteResult.count
+      }
+
+      return NextResponse.json({
+        success: true,
+        deletedCount,
+        cannotDelete: cannotDelete.length > 0 ? cannotDelete : undefined,
+        message: cannotDelete.length > 0
+          ? `${deletedCount}개 발행 취소 완료, ${cannotDelete.length}개는 주문/문의가 있어 취소 불가`
+          : `${deletedCount}개 발행 취소 완료`,
+      })
+    }
+
+    // Channel 발행 삭제 (기본값 또는 type=channel)
+    // ChannelProduct는 orderItems, inquiries 관계가 없으므로 제약 없이 삭제 가능
+    const channelProducts = await prisma.channelProduct.findMany({
       where: {
         id: { in: publishIds },
         userId,
@@ -420,100 +500,31 @@ export async function DELETE(request: NextRequest) {
             name: true,
           },
         },
-        _count: {
-          select: {
-            orderItems: true,
-            inquiries: true,
-          },
-        },
       },
     })
-
-    // 삭제 불가한 발행 상품 확인
-    const cannotDelete: { id: number; name: string; reason: string }[] = []
-    const canDelete: typeof publishedProducts = []
-
-    for (const pp of publishedProducts) {
-      const hasOrders = pp._count.orderItems > 0
-      const hasInquiries = pp._count.inquiries > 0
-
-      if (hasOrders || hasInquiries) {
-        const reasons: string[] = []
-        if (hasOrders) reasons.push(`주문 ${pp._count.orderItems}건`)
-        if (hasInquiries) reasons.push(`문의 ${pp._count.inquiries}건`)
-        cannotDelete.push({
-          id: pp.id,
-          name: pp.product?.name || 'Unknown',
-          reason: reasons.join(', '),
-        })
-      } else {
-        canDelete.push(pp)
-      }
-    }
-
-    // 삭제 불가한 상품이 있는 경우
-    if (cannotDelete.length > 0 && canDelete.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: '발행을 취소할 수 없습니다.',
-        reason: '주문 또는 문의가 존재하는 상품은 발행을 취소할 수 없습니다.',
-        cannotDelete,
-      }, { status: 400 })
-    }
 
     // 삭제 가능한 상품 처리
     let deletedCount = 0
     const bandDeleteErrors: string[] = []
+    const successfulDeletes: number[] = []
 
-    if (canDelete.length > 0) {
-      // 채널 발행인 경우 Band에서 게시물 삭제 시도 (Playwright 사용)
-      const successfulDeletes: number[] = [] // Band 삭제 성공한 ID 목록
+    for (const cp of channelProducts) {
+      console.log(`[Unpublish] 채널 발행 취소 처리: productId=${cp.productId}, channelId=${cp.channelId}`)
 
-      for (const pp of canDelete) {
-        console.log(`[Unpublish] 발행 취소 처리: productId=${pp.productId}, channelId=${pp.channelId}, postKey=${pp.postKey}`)
+      // ChannelProduct에는 postKey가 없으므로, Band 삭제 로직은 별도 처리가 필요
+      // 현재는 DB만 삭제
+      successfulDeletes.push(cp.id)
+    }
 
-        if (pp.channelId && pp.channel && pp.postKey) {
-          // Playwright로 게시물 삭제 시도
-          try {
-            console.log(`[Unpublish] Playwright 삭제 시도: channelId=${pp.channelId}, bandKey=${pp.channel.channelKey}, postKey=${pp.postKey}`)
-            const deleteResult = await bandPlaywrightService.deletePost({
-              channelId: pp.channelId,
-              bandKey: pp.channel.channelKey,
-              bandName: pp.channel.name,
-              postKey: pp.postKey,
-            })
-
-            if (deleteResult.success) {
-              console.log(`[Unpublish] Band 게시물 삭제 성공: ${pp.channel.name} / postKey: ${pp.postKey}`)
-              successfulDeletes.push(pp.id) // Band 삭제 성공한 경우만 DB 삭제 대상에 추가
-            } else {
-              console.error(`[Unpublish] Band 게시물 삭제 실패: ${deleteResult.error}`)
-              bandDeleteErrors.push(`${pp.product?.name || 'Unknown'}: ${deleteResult.error}`)
-            }
-          } catch (bandError: any) {
-            console.error(`[Unpublish] Band 게시물 삭제 실패: ${bandError.message}`)
-            bandDeleteErrors.push(`${pp.product?.name || 'Unknown'}: ${bandError.message}`)
-          }
-        } else if (pp.shopId) {
-          // Shop 발행인 경우 - DB만 삭제
-          successfulDeletes.push(pp.id)
-        } else {
-          // postKey 없는 채널 발행 - DB만 삭제 (이전 데이터)
-          console.warn(`[Unpublish] postKey 없음 - DB만 삭제: ${pp.product?.name || 'Unknown'} (채널: ${pp.channel?.name || 'N/A'})`)
-          successfulDeletes.push(pp.id)
-        }
-      }
-
-      // Band 삭제 성공한 것만 DB에서 레코드 삭제
-      if (successfulDeletes.length > 0) {
-        const deleteResult = await prisma.publishedProduct.deleteMany({
-          where: {
-            id: { in: successfulDeletes },
-            userId,
-          },
-        })
-        deletedCount = deleteResult.count
-      }
+    // DB에서 레코드 삭제
+    if (successfulDeletes.length > 0) {
+      const deleteResult = await prisma.channelProduct.deleteMany({
+        where: {
+          id: { in: successfulDeletes },
+          userId,
+        },
+      })
+      deletedCount = deleteResult.count
     }
 
     // Band 삭제 실패가 있으면 실패로 처리
@@ -521,16 +532,13 @@ export async function DELETE(request: NextRequest) {
     const allFailed = deletedCount === 0 && hasErrors
 
     return NextResponse.json({
-      success: !allFailed, // 모두 실패하면 false
+      success: !allFailed,
       deletedCount,
-      cannotDelete: cannotDelete.length > 0 ? cannotDelete : undefined,
       bandDeleteErrors: bandDeleteErrors.length > 0 ? bandDeleteErrors : undefined,
       message: allFailed
         ? '발행 취소 실패: 밴드 게시물을 삭제할 수 없습니다.'
         : hasErrors
         ? `${deletedCount}개 발행 취소 완료, ${bandDeleteErrors.length}개 밴드 삭제 실패`
-        : cannotDelete.length > 0
-        ? `${deletedCount}개 발행 취소 완료, ${cannotDelete.length}개는 주문/문의가 있어 취소 불가`
         : `${deletedCount}개 발행 취소 완료`,
     })
   } catch (error) {

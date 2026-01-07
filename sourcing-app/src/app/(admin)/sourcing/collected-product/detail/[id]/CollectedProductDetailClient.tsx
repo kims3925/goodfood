@@ -59,7 +59,7 @@ interface CollectedProductDetail {
       groupName: string
       value: string
     }>
-    publishedProducts: Array<{
+    channelProducts: Array<{
       id: number
       status: string
       channel: {

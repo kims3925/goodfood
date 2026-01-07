@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
         include: {
           items: {
             include: {
-              publishedProduct: {
+              shopProduct: {
                 include: {
                   product: {
                     select: {
@@ -112,15 +112,15 @@ export async function GET(request: NextRequest) {
         id: item.id,
         productName: item.productName,
         optionSummary: item.optionSummary,
-        thumbnailUrl: item.thumbnailUrl || item.publishedProduct?.product?.thumbnailUrl,
+        thumbnailUrl: item.thumbnailUrl || item.shopProduct?.product?.thumbnailUrl,
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         totalPrice: Number(item.totalPrice),
         hasReview: !!item.review,
-        product: item.publishedProduct?.product ? {
-          id: item.publishedProduct.product.id,
-          name: item.publishedProduct.product.name,
-          thumbnailUrl: item.publishedProduct.product.thumbnailUrl,
+        product: item.shopProduct?.product ? {
+          id: item.shopProduct.product.id,
+          name: item.shopProduct.product.name,
+          thumbnailUrl: item.shopProduct.product.thumbnailUrl,
         } : null,
       })),
       hasWritableReview: order.status === 'DELIVERED' && order.items.some(item => !item.review),

@@ -1,23 +1,23 @@
 model Inquiry {
-  id                 Int               @id @default(autoincrement())
-  userId             Int               @map("user_id")
-  inquiryType        InquiryType       @map("inquiry_type")
-  title              String            @db.VarChar(200)
-  content            String            @db.Text
-  isPrivate          Boolean           @default(false) @map("is_private")
-  status             InquiryStatus     @default(PENDING)
-  adminReply         String?           @map("admin_reply") @db.Text
-  repliedAt          DateTime?         @map("replied_at") @db.Timestamp(0)
-  repliedBy          Int?              @map("replied_by")
-  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamp(0)
-  publishedProductId Int?              @map("published_product_id")
-  publishedProduct   PublishedProduct? @relation(fields: [publishedProductId], references: [id])
-  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  replies            InquiryReply[]
+  id            Int            @id @default(autoincrement())
+  userId        Int            @map("user_id")
+  inquiryType   InquiryType    @map("inquiry_type")
+  title         String         @db.VarChar(200)
+  content       String         @db.Text
+  isPrivate     Boolean        @default(false) @map("is_private")
+  status        InquiryStatus  @default(PENDING)
+  adminReply    String?        @map("admin_reply") @db.Text
+  repliedAt     DateTime?      @map("replied_at") @db.Timestamp(0)
+  repliedBy     Int?           @map("replied_by")
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamp(0)
+  shopProductId Int?           @map("shop_product_id")
+  shopProduct   ShopProduct?   @relation(fields: [shopProductId], references: [id])
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies       InquiryReply[]
 
   @@index([userId])
-  @@index([publishedProductId])
+  @@index([shopProductId])
   @@index([status])
   @@index([userId, status])
   @@map("inquiry")
