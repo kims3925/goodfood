@@ -163,6 +163,7 @@ export async function runPublishPipeline(
 
   if (validProducts.length === 0) {
     console.log('[Publish Pipeline] No valid products to publish (all missing options/variants/price)')
+    cleanup()
     return {
       success: true,
       totalItems: products.length,
