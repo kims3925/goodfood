@@ -202,7 +202,7 @@ export class GuestOrderService {
 
       // 도매가 스냅샷 (마진 계산용)
       const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
-      const wholesalePriceValue = wholesalePrice == null ? null : Number(wholesalePrice)
+      const wholesalePriceValue = wholesalePrice ?? null
 
       // 공통 가격 계산 함수 사용
       const priceResult = calculateItemPrice({
@@ -301,7 +301,13 @@ export class GuestOrderService {
             include: {
               variants: {
                 take: 1,
-                select: { id: true, price: true, wholesalePrice: true, optionSummary: true },
+                select: {
+                  id: true,
+                  price: true,
+                  wholesalePrice: true,
+                  optionSummary: true,
+                  bundleUnit: true,
+                },
               },
             },
           },
@@ -316,7 +322,13 @@ export class GuestOrderService {
       if (item.variantId) {
         variant = await prisma.productVariant.findUnique({
           where: { id: item.variantId },
-          select: { id: true, price: true, wholesalePrice: true, optionSummary: true },
+          select: {
+            id: true,
+            price: true,
+            wholesalePrice: true,
+            optionSummary: true,
+            bundleUnit: true,
+          },
         })
       }
 
@@ -325,7 +337,7 @@ export class GuestOrderService {
       const unitPrice = variant?.price || mainVariant?.price || 0
       // 도매가 스냅샷 (마진 계산용)
       const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
-      const wholesalePriceValue = wholesalePrice == null ? null : Number(wholesalePrice)
+      const wholesalePriceValue = wholesalePrice ?? null
 
       orderItems.push({
         publishedProductId: publishedProduct.id,
