@@ -288,7 +288,7 @@ export default function WholesaleOrdersPage() {
     }
   }, [toast])
 
-  // 이력 날짜별 상세 조회
+  // 이력 날짜별 상세 조회 (발주 완료된 주문)
   const fetchHistoryDetail = useCallback(async (channelId: number, date: string) => {
     setHistoryDetailLoading(true)
     try {
@@ -297,6 +297,7 @@ export default function WholesaleOrdersPage() {
         to: date,
         page: '1',
         limit: '100',
+        status: 'completed', // 발주 완료 주문 조회
       })
 
       const res = await fetch(`/api/admin/wholesale-orders/${channelId}/items?${params}`)
