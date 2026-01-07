@@ -372,7 +372,7 @@ export async function GET(
 
       // 테이블 헤더
       const headerRow = sheet.getRow(rowIndex)
-      headerRow.values = ['타임스탬프', '상품및 제품명', '수량', '총금액', '배송받는분 이름', '받는분 연락처', '배송지 주소', '보내는 사람', '현금영수증 신청', '이메일주소']
+      headerRow.values = ['타임스탬프', '상품및 제품명', '수량', '총금액', '배송받는분 이름', '받는분 연락처', '배송지 주소', '보내는사람(받는분과 다른경우만 작성)', '현금영수증 신청', '이메일주소']
       headerRow.eachCell((cell) => {
         Object.assign(cell, { style: headerStyle })
       })

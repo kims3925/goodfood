@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
           select: {
             publishedProducts: true,
             orders: true,
+            guestOrders: true,
           },
         },
       },

@@ -183,6 +183,30 @@ Product (변환된 상품)
 1. **쇼핑몰(Shop) 발행** - 설정된 모든 Shop에 순차 발행
 2. **소매채널(Band) 발행** - 설정된 모든 소매채널에 순차 발행
 
+### 발행 진행 상황 추적
+
+```text
+Band 게시물 작성 (Playwright)
+        │
+        ├── 이미지 다운로드 (preparing → downloading)
+        │
+        ├── 이미지 업로드 (uploading)
+        │     │
+        │     └── uploadProgressEmitter
+        │           ├── fileIndex: "1/10"
+        │           ├── totalPercent: "10%"
+        │           └── currentPercent: "92%"
+        │
+        ├── 내용 입력 (entering)
+        │
+        └── 게시물 등록 (submitting → completed)
+```
+
+| 경로 | 진행 상황 전달 방식 |
+|-----|------------------|
+| 수동 발행 (SSE) | uploadProgressEmitter → onStageProgress → SSE 스트림 → 프론트엔드 |
+| 자동화 발행 | uploadProgressEmitter → publish.ts → DB 저장 (WorkflowLog.details) |
+
 ---
 
 ## 4. 주문 (Order) 흐름
@@ -351,6 +375,29 @@ WorkflowLog
 | TRANSFORM | 변환 완료 | 사용자 |
 | PUBLISH | 발행 완료 | 사용자 |
 | ERROR | 오류 발생 | 사용자 |
+
+### 파이프라인 완료 알림 형식 (TR-20260107-007)
+
+파이프라인 완료 시 알림 메시지는 화살표(→) 형식으로 각 단계 결과를 표시합니다.
+
+```text
+형식: {단계} {성공수} → {단계} {성공수} → ...
+
+예시:
+  성공: "수집 10 → 변환 8 → 상품생성 8 → 발행 8"
+  일부실패: "수집 10 → 변환 8 → 상품생성 8 → 발행 8 (실패 2건)"
+  실패: "수집 실패: API 연결 오류"
+```
+
+| 항목 | 설명 |
+|-----|-----|
+| 생성 위치 | `src/modules/automation/notification-helper.ts` |
+| 호출 시점 | executor.ts의 파이프라인 완료 시 |
+| 중복 방지 | execute/route.ts에서 알림 생성 코드 제거됨 |
+
+**변경 이력:**
+- 기존: `수집 10건, 변환 8건, 발행 8건` (쉼표 구분, '건' 단위)
+- 변경: `수집 10 → 변환 8 → 상품생성 8 → 발행 8` (화살표 구분, 단위 제거)
 
 ### 알림 저장
 

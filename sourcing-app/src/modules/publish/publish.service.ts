@@ -1299,6 +1299,7 @@ export class PublishService {
                 stage: progress.stage,
                 stageLabel: progress.stageLabel,
                 imageProgress: progress.imageProgress,
+                uploadProgress: progress.uploadProgress,
                 publishMethod: progress.publishMethod,
                 error: progress.error,
               },

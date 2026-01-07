@@ -56,27 +56,28 @@ export async function createPipelineNotification(
       type = 'ERROR'
     }
 
-    // 메시지 구성
+    // 메시지 구성 - 플로우 형태로 표시 (수집 → 변환 → 상품생성 → 발행)
     let message = ''
 
     if (isSuccess || isPartialSuccess) {
-      // 성공/일부성공 시 각 단계별 결과 표시
+      // 성공/일부성공 시 각 단계별 결과를 화살표로 연결
       const parts: string[] = []
 
       if (result.collection) {
-        parts.push(`수집 ${result.collection.successCount}건`)
+        parts.push(`수집 ${result.collection.successCount}`)
       }
       if (result.transform) {
-        parts.push(`변환 ${result.transform.successCount}건`)
+        parts.push(`변환 ${result.transform.successCount}`)
       }
       if (result.productCreate) {
-        parts.push(`상품생성 ${result.productCreate.successCount}건`)
+        parts.push(`상품생성 ${result.productCreate.successCount}`)
       }
       if (result.publish) {
-        parts.push(`발행 ${result.publish.successCount}건`)
+        parts.push(`발행 ${result.publish.successCount}`)
       }
 
-      message = parts.join(', ')
+      // 화살표(→)로 연결하여 흐름을 명확히 표시
+      message = parts.join(' → ')
 
       if (totalFailed > 0) {
         message += ` (실패 ${totalFailed}건)`

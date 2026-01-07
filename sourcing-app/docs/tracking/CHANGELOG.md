@@ -21,6 +21,18 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260107-012 | Done | 2026-01-07 | - | API.md SSE 발행 스트림 문서 추가 (uploadProgress 필드 포함) | Low | Hong |
+| TR-20260107-011 | Done | 2026-01-07 | - | FLOW.md 발행 흐름 다이어그램 중복 블록 제거 | Low | Hong |
+| TR-20260107-010 | Done | 2026-01-07 | - | AWS EC2 MariaDB 일일 자동 백업 설정 | Low | Hong |
+| TR-20260107-009 | Done | 2026-01-07 | - | 밴드 세션 확장 자동 저장 간격 상수 추가 | Low | Hong |
+| TR-20260107-008 | Done | 2026-01-07 | - | 도매주문 엑셀 '보내는사람' 헤더 표현 수정 | Low | Hong |
+| TR-20260107-007 | Done | 2026-01-07 | - | 파이프라인 알림 메시지 형식 개선 (화살표 연결) | Low | Hong |
+| TR-20260107-006 | Done | 2026-01-07 | - | 브랜드명 변경 (BandAuto → SNS Auto) | Low | Hong |
+| TR-20260107-005 | Done | 2026-01-07 | - | 쇼핑몰 목록 게스트 주문 카운트 반영 | Low | Hong |
+| TR-20260107-004 | Done | 2026-01-07 | - | 날짜 표시 포맷 24시간제 통일 | Low | Hong |
+| TR-20260107-003 | Done | 2026-01-07 | - | 발행된 상품 삭제 차단 기능 추가 | Low | Hong |
+| TR-20260107-002 | Done | 2026-01-07 | - | 쇼핑몰 상품 검색 기능 추가 | Low | Hong |
+| TR-20260107-001 | Done | 2026-01-07 | - | 발행 UI에 이미지 업로드 진행률 실시간 표시 | Low | Hong |
 | TR-20260106-014 | Done | 2026-01-06 | - | 발행 결과 타입 명시적 구분자 추가 (Shop/Channel) | Low | Lee |
 | TR-20260106-013 | Done | 2026-01-06 | - | 발행 파이프라인 순서 변경 (쇼핑몰 먼저) | Low | Lee |
 | TR-20260106-012 | Done | 2026-01-06 | - | PostService.createBatch 진행률 계산 수정 | Low | Lee |
@@ -115,6 +127,440 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260107-010: AWS EC2 MariaDB 일일 자동 백업 설정
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Hong |
+| Date | 2026-01-07 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- AWS EC2 인스턴스에 설치된 MariaDB 일일 자동 백업 설정
+- cron + mysqldump 방식으로 매일 새벽 3시 자동 백업
+- 7일 이상 된 백업 파일 자동 삭제
+- 백업 로그 기록
+
+### 설정 내용
+| 항목 | 값 |
+|-----|-----|
+| 백업 시간 | 매일 03:00 (KST) |
+| 백업 위치 | /home/ubuntu/backups/ |
+| 백업 대상 | sourcing_db |
+| 보관 기간 | 7일 |
+| 로그 파일 | /home/ubuntu/backups/backup.log |
+
+### 설정 파일
+| 파일 | 설명 |
+|-----|-----|
+| /home/ubuntu/backup-db.sh | 백업 스크립트 |
+| crontab (root) | 스케줄 설정 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Manual | Pass |
+
+### 롤백 계획
+1. `sudo crontab -e`로 cron 항목 삭제
+2. 백업 스크립트 삭제: `rm /home/ubuntu/backup-db.sh`
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+
+---
+
+## TR-20260107-009: 밴드 세션 확장 자동 저장 간격 상수 추가
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Hong |
+| Date | 2026-01-07 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 밴드 세션 확장 프로그램에 `AUTO_SAVE_INTERVAL` 상수 추가 (1시간 = 3600000ms)
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| band-session-extension/config.js | Modified | AUTO_SAVE_INTERVAL 상수 추가 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Manual | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+
+---
+
+## TR-20260107-008: 도매주문 엑셀 '보내는사람' 헤더 표현 수정
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Hong |
+| Date | 2026-01-07 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 도매주문 엑셀 내보내기 헤더에서 '보내는 사람' → '보내는사람(받는분과 다른경우만 작성)'으로 변경
+- 사용자에게 입력 조건을 명확히 안내
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/api/admin/wholesale-orders/[wholesaleChannelId]/export/route.ts | Modified | 엑셀 헤더 텍스트 변경 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Manual | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+
+---
+
+## TR-20260107-007: 파이프라인 알림 메시지 형식 개선 (화살표 연결)
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Hong |
+| Date | 2026-01-07 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 파이프라인 완료 알림 메시지를 쉼표(,)에서 화살표(→)로 변경
+- 기존: `수집 10건, 변환 8건, 발행 8건`
+- 변경: `수집 10 → 변환 8 → 상품생성 8 → 발행 8`
+- 중복 알림 방지: executor.ts에서 생성하므로 execute/route.ts에서 중복 호출 제거
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/modules/automation/notification-helper.ts | Modified | 메시지 형식을 화살표로 변경, '건' 단위 제거 |
+| src/app/api/automation/execute/route.ts | Modified | 중복 알림 생성 코드 제거 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Automation
+
+---
+
+## TR-20260107-006: 브랜드명 변경 (BandAuto → SNS Auto)
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Hong |
+| Date | 2026-01-07 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 헤더 브랜드명을 'BandAuto'에서 'SNS Auto'로 변경
+- 릴리즈 배지(release-1) 제거
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/components/layout/Header.tsx | Modified | 브랜드명 변경, 릴리즈 배지 제거 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+
+---
+
+## TR-20260107-005: 쇼핑몰 목록 게스트 주문 카운트 반영
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Hong |
+| Date | 2026-01-07 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 쇼핑몰 목록에서 주문 수 통계에 게스트 주문(guestOrders)도 포함
+- 기존: `orders` 카운트만 표시
+- 변경: `orders + guestOrders` 합산 표시
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(admin)/shop/store/list/page.tsx | Modified | guestOrders 카운트 합산 |
+| src/app/api/shop/route.ts | Modified | _count에 guestOrders 포함 |
+
+### 영향 분석
+- [x] API Contract 변경 (`_count.guestOrders` 필드 추가)
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+- API 문서: [docs/API.md](../API.md#get-apishop)
+
+---
+
+## TR-20260107-004: 날짜 표시 포맷 24시간제 통일
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Hong |
+| Date | 2026-01-07 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 날짜 표시 형식을 24시간제로 통일
+- 포맷: `YYYY-MM-DD HH:mm` (예: 2026-01-07 14:30)
+- 적용 페이지: 상품 목록, 주문 목록
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(admin)/sourcing/product/list/page.tsx | Modified | 생성일시 포맷 변경 |
+| src/app/(admin)/shop/order/list/page.tsx | Modified | 주문일시 포맷 변경 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+
+---
+
+## TR-20260107-003: 발행된 상품 삭제 차단 기능 추가
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Hong |
+| Date | 2026-01-07 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 소매밴드에 발행된 기록이 있는 상품은 삭제 불가
+- 단일 삭제 및 일괄 삭제 모두 차단
+- 삭제 시도 시 경고 모달 표시 (발행된 상품 목록 표시)
+- 주문 관리 및 데이터 무결성 보장 목적
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(admin)/sourcing/product/list/page.tsx | Modified | hasPublishHistory 체크, 경고 모달 추가 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Product Management
+
+---
+
+## TR-20260107-002: 쇼핑몰 상품 검색 기능 추가
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Hong |
+| Date | 2026-01-07 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 쇼핑몰 메인 페이지에 상품 검색 기능 추가
+- URL 쿼리 파라미터로 검색어 전달 (`?search=검색어`)
+- 검색 모드에서는 추천 상품 섹션 숨김
+- 검색 결과 없을 때 안내 메시지 및 전체 상품 보기 버튼 제공
+- 검색 초기화 버튼 제공
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| shop-app/src/app/(shop)/main/page.tsx | Modified | 검색 UI 및 로직 추가 |
+| shop-app/src/app/api/shop/sections/route.ts | Modified | search 파라미터 처리, 상품명 필터링 |
+
+### 영향 분석
+- [x] API Contract 변경 (search 파라미터 추가)
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Shop
+
+---
+
+## TR-20260107-001: 발행 UI에 이미지 업로드 진행률 실시간 표시
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Hong |
+| Date | 2026-01-07 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 발행 모달에서 이미지 업로드 진행 상황을 실시간으로 표시
+- `📤 1/10 (10%)` 형태로 현재 업로드 중인 파일 번호와 전체 진행률 표시
+- EventEmitter 패턴을 사용하여 자동화 파이프라인과 SSE 스트림 모두에서 업로드 진행 정보 전달
+
+### 구현 구조
+```text
+band-post.automation.ts (업로드 모니터링)
+        │
+        ▼
+uploadProgressEmitter (EventEmitter 싱글톤)
+        │
+        ├─→ publish.ts 파이프라인 (자동화 워크플로우 → DB 저장)
+        │
+        └─→ createPostWithImages (SSE 스트림 → onStageProgress → 프론트엔드)
+```
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/modules/band-playwright/upload-progress-emitter.ts | Added | EventEmitter 싱글톤으로 업로드 진행 이벤트 발행 |
+| src/modules/band-playwright/band-post.automation.ts | Modified | uploadProgressEmitter 구독 → onStageProgress 전달, cleanup 로직 추가 |
+| src/modules/automation/pipelines/publish.ts | Modified | uploadProgressEmitter 구독 → DB 업데이트에 포함, cleanup 로직 추가 |
+| src/modules/publish/types.ts | Modified | PublishDetailedProgress에 uploadProgress 필드 추가 |
+| src/modules/publish/publish.service.ts | Modified | SSE 이벤트에 uploadProgress 포함 |
+| src/app/(admin)/sourcing/publish/page.tsx | Modified | PublishProgressItem 타입에 uploadProgress 추가, UI 표시 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| TypeScript Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Publish (소매밴드 발행)
+
+---
 
 ## TR-20260106-014: 발행 결과 타입 명시적 구분자 추가 (Shop/Channel)
 
