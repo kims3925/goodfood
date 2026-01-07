@@ -137,7 +137,7 @@ export class GuestOrderService {
     this.validateCustomerInfo(customerInfo)
     this.validateShippingAddress(shippingAddress)
 
-    // 세션 장바구니 조회 (합배송 정보 포함)
+    // 세션 장바구니 조회 (합배송 정보 및 도매가 포함)
     const cart = await prisma.cart.findFirst({
       where: {
         sessionId,
@@ -151,7 +151,15 @@ export class GuestOrderService {
               include: {
                 product: {
                   include: {
-                    variants: true,
+                    variants: {
+                      select: {
+                        id: true,
+                        price: true,
+                        wholesalePrice: true,
+                        optionSummary: true,
+                        bundleUnit: true,
+                      },
+                    },
                     images: { take: 1, orderBy: { sortOrder: 'asc' } },
                   },
                 },
@@ -159,7 +167,15 @@ export class GuestOrderService {
                 channel: true,
               },
             },
-            variant: true,
+            variant: {
+              select: {
+                id: true,
+                price: true,
+                wholesalePrice: true,
+                optionSummary: true,
+                bundleUnit: true,
+              },
+            },
           },
           orderBy: { createdAt: 'desc' },
         },
@@ -184,6 +200,9 @@ export class GuestOrderService {
       const variantBundleUnit = variant?.bundleUnit || 1
       const quantity = item.quantity
 
+      // 도매가 스냅샷 (마진 계산용)
+      const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
+
       // 공통 가격 계산 함수 사용
       const priceResult = calculateItemPrice({
         basePrice: originalUnitPrice,
@@ -205,6 +224,7 @@ export class GuestOrderService {
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity,
         unitPrice: unitPriceWithDiscount, // 할인 반영된 단가
+        wholesalePrice, // 도매가 스냅샷 (마진 계산용)
         originalUnitPrice, // 할인 전 단가 (참조용)
         itemTotal: itemTotalWithDiscount, // 할인 반영된 아이템 총액
       }
@@ -277,7 +297,12 @@ export class GuestOrderService {
         where: { id: item.publishedProductId },
         include: {
           product: {
-            include: { variants: { take: 1 } },
+            include: {
+              variants: {
+                take: 1,
+                select: { id: true, price: true, wholesalePrice: true, optionSummary: true },
+              },
+            },
           },
         },
       })
@@ -290,12 +315,15 @@ export class GuestOrderService {
       if (item.variantId) {
         variant = await prisma.productVariant.findUnique({
           where: { id: item.variantId },
+          select: { id: true, price: true, wholesalePrice: true, optionSummary: true },
         })
       }
 
       const product = publishedProduct.product
       const mainVariant = product?.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || 0
+      // 도매가 스냅샷 (마진 계산용)
+      const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
 
       orderItems.push({
         publishedProductId: publishedProduct.id,
@@ -305,6 +333,7 @@ export class GuestOrderService {
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity || 1,
         unitPrice: Number(unitPrice),
+        wholesalePrice, // 도매가 스냅샷 (마진 계산용)
       })
     }
 

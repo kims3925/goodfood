@@ -20,6 +20,7 @@ export interface OrderItemInput {
   thumbnailUrl: string | null
   quantity: number
   unitPrice: number
+  wholesalePrice?: number | null // 도매가 스냅샷 (마진 계산용)
   originalUnitPrice?: number // 할인 전 단가 (참조용)
   itemTotal?: number // 할인 반영된 아이템 총액
 }
@@ -184,6 +185,7 @@ export class OrderRepository {
             thumbnailUrl: item.thumbnailUrl,
             quantity: item.quantity,
             unitPrice: new Decimal(item.unitPrice),
+            wholesalePrice: item.wholesalePrice ?? null, // 도매가 스냅샷
             totalPrice: new Decimal(item.unitPrice * item.quantity),
           })),
         },

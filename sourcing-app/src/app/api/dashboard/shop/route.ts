@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
 
     const { start, end, prevStart, prevEnd, days } = getDateRange(period, startDate, endDate)
 
-    // 현재 기간 회원 주문 조회
+    // 현재 기간 회원 주문 조회 (Product 배송비 정보 포함)
     const currentMemberOrders = await prisma.order.findMany({
       where: {
         shop: { userId: user.userId },
@@ -113,14 +113,28 @@ export async function GET(request: NextRequest) {
         shippingAddress: true,
         items: {
           include: {
-            publishedProduct: true,
+            variant: {
+              select: { bundleUnit: true },
+            },
+            publishedProduct: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    shippingFee: true,
+                    bundleMaxQty: true,
+                    bundleShippingType: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
       orderBy: { orderedAt: 'desc' },
     })
 
-    // 현재 기간 비회원 주문 조회
+    // 현재 기간 비회원 주문 조회 (Product 배송비 정보 포함)
     const currentGuestOrders = await prisma.guestOrder.findMany({
       where: {
         shop: { userId: user.userId },
@@ -130,12 +144,30 @@ export async function GET(request: NextRequest) {
       include: {
         shop: true,
         shippingAddress: true,
-        items: true,
+        items: {
+          include: {
+            variant: {
+              select: { bundleUnit: true },
+            },
+            publishedProduct: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    shippingFee: true,
+                    bundleMaxQty: true,
+                    bundleShippingType: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       orderBy: { orderedAt: 'desc' },
     })
 
-    // 이전 기간 회원 주문 조회 (비교용)
+    // 이전 기간 회원 주문 조회 (비교용 - Product 배송비 정보 포함)
     const previousMemberOrders = await prisma.order.findMany({
       where: {
         shop: { userId: user.userId },
@@ -144,10 +176,22 @@ export async function GET(request: NextRequest) {
       },
       include: {
         shippingAddress: true,
+        items: {
+          include: {
+            variant: { select: { bundleUnit: true } },
+            publishedProduct: {
+              include: {
+                product: {
+                  select: { id: true, shippingFee: true, bundleMaxQty: true, bundleShippingType: true },
+                },
+              },
+            },
+          },
+        },
       },
     })
 
-    // 이전 기간 비회원 주문 조회 (비교용)
+    // 이전 기간 비회원 주문 조회 (비교용 - Product 배송비 정보 포함)
     const previousGuestOrders = await prisma.guestOrder.findMany({
       where: {
         shop: { userId: user.userId },
@@ -156,6 +200,18 @@ export async function GET(request: NextRequest) {
       },
       include: {
         shippingAddress: true,
+        items: {
+          include: {
+            variant: { select: { bundleUnit: true } },
+            publishedProduct: {
+              include: {
+                product: {
+                  select: { id: true, shippingFee: true, bundleMaxQty: true, bundleShippingType: true },
+                },
+              },
+            },
+          },
+        },
       },
     })
 
@@ -196,11 +252,118 @@ export async function GET(request: NextRequest) {
     const previousGuestPhones = previousGuestOrders.map(o => o.guestPhone).filter(Boolean)
     const previousCustomers = new Set([...previousMemberPhones, ...previousGuestPhones]).size
 
-    // 전환율 (임시: 주문 대비 결제 완료 비율 - 회원 + 비회원)
-    const paidMemberOrders = allMemberOrders.filter(o => ['PAID', 'SHIPPED', 'DELIVERED'].includes(o.status)).length
-    const paidGuestOrders = allGuestOrders.filter(o => ['PAID', 'SHIPPED', 'DELIVERED'].includes(o.status)).length
-    const totalOrders = allMemberOrders.length + allGuestOrders.length
-    const conversionRate = totalOrders > 0 ? Math.round(((paidMemberOrders + paidGuestOrders) / totalOrders) * 1000) / 10 : 0
+    // === 마진 계산 (회원 + 비회원) - Product 기반 배송비 사용 ===
+    // 마진 = (판매금액 - 도매금액) - Product 기반 배송비
+
+    // Product 기반 배송비 계산 함수 (합배송 로직 적용)
+    const calculateOrderShippingFee = (items: any[]): number => {
+      // 상품별 배송비 정보 집계
+      const productShippingMap = new Map<number, {
+        shippingFee: number
+        bundleMaxQty: number
+        bundleShippingType: string
+        totalBundleUnits: number
+        itemCount: number
+      }>()
+
+      for (const item of items) {
+        const product = item.publishedProduct?.product
+        if (!product) continue
+
+        const productId = product.id
+        const shippingFee = product.shippingFee || 0
+        const bundleMaxQty = product.bundleMaxQty || 1
+        const bundleShippingType = product.bundleShippingType || 'NONE'
+        const bundleUnit = item.variant?.bundleUnit || 1
+
+        if (!productShippingMap.has(productId)) {
+          productShippingMap.set(productId, {
+            shippingFee,
+            bundleMaxQty,
+            bundleShippingType,
+            totalBundleUnits: 0,
+            itemCount: 0,
+          })
+        }
+
+        const info = productShippingMap.get(productId)!
+        info.totalBundleUnits += item.quantity * bundleUnit
+        info.itemCount++
+      }
+
+      // 상품별 실제 배송비 계산
+      let totalShippingFee = 0
+      for (const [_, info] of productShippingMap) {
+        if (info.shippingFee > 0) {
+          if (info.bundleShippingType === 'NONE') {
+            // 합배송 없음: 아이템 수 × 배송비
+            totalShippingFee += info.itemCount * info.shippingFee
+          } else {
+            // 합배송 적용: ceil(총 배송단위 / 합배송 최대수량) × 배송비
+            const shippingCount = Math.ceil(info.totalBundleUnits / info.bundleMaxQty)
+            totalShippingFee += shippingCount * info.shippingFee
+          }
+        }
+      }
+
+      return totalShippingFee
+    }
+
+    // 회원 주문 마진 계산
+    let memberProductMargin = 0  // 상품 마진 (판매가 - 도매가)
+    let memberShippingFee = 0    // Product 기반 배송비
+    let memberTotalRevenue = 0
+    for (const order of currentMemberOrders) {
+      memberShippingFee += calculateOrderShippingFee(order.items)
+      for (const item of order.items) {
+        const unitPrice = Number(item.unitPrice)
+        const wholesalePrice = (item as unknown as { wholesalePrice?: number }).wholesalePrice || 0
+        memberProductMargin += (unitPrice - wholesalePrice) * item.quantity
+        memberTotalRevenue += unitPrice * item.quantity
+      }
+    }
+
+    // 비회원 주문 마진 계산
+    let guestProductMargin = 0
+    let guestShippingFee = 0
+    let guestTotalRevenue = 0
+    for (const order of currentGuestOrders) {
+      guestShippingFee += calculateOrderShippingFee(order.items)
+      for (const item of order.items) {
+        const unitPrice = Number(item.unitPrice)
+        const wholesalePrice = (item as unknown as { wholesalePrice?: number }).wholesalePrice || 0
+        guestProductMargin += (unitPrice - wholesalePrice) * item.quantity
+        guestTotalRevenue += unitPrice * item.quantity
+      }
+    }
+
+    // 총 마진 = 상품마진 - 배송비
+    const totalProductMargin = memberProductMargin + guestProductMargin
+    const totalShippingFee = memberShippingFee + guestShippingFee
+    const totalMargin = totalProductMargin - totalShippingFee
+    const totalItemRevenue = memberTotalRevenue + guestTotalRevenue
+    const marginRate = totalItemRevenue > 0 ? Math.round((totalMargin / totalItemRevenue) * 1000) / 10 : 0
+
+    // 이전 기간 마진 계산 (비교용)
+    let prevProductMargin = 0
+    let prevShippingFee = 0
+    for (const order of previousMemberOrders) {
+      prevShippingFee += calculateOrderShippingFee(order.items)
+      for (const item of order.items) {
+        const unitPrice = Number(item.unitPrice)
+        const wholesalePrice = (item as unknown as { wholesalePrice?: number }).wholesalePrice || 0
+        prevProductMargin += (unitPrice - wholesalePrice) * item.quantity
+      }
+    }
+    for (const order of previousGuestOrders) {
+      prevShippingFee += calculateOrderShippingFee(order.items)
+      for (const item of order.items) {
+        const unitPrice = Number(item.unitPrice)
+        const wholesalePrice = (item as unknown as { wholesalePrice?: number }).wholesalePrice || 0
+        prevProductMargin += (unitPrice - wholesalePrice) * item.quantity
+      }
+    }
+    const prevTotalMargin = prevProductMargin - prevShippingFee
 
     const stats = {
       revenue: {
@@ -215,9 +378,13 @@ export async function GET(request: NextRequest) {
         value: currentCustomers,
         change: calculateChange(currentCustomers, previousCustomers),
       },
-      conversionRate: {
-        value: conversionRate,
-        change: 0, // 전환율 변화는 복잡하므로 일단 0
+      marginRate: {
+        value: marginRate,
+        change: 0, // 마진율 변화는 복잡하므로 일단 0
+      },
+      totalMargin: {
+        value: totalMargin,
+        change: calculateChange(totalMargin, prevTotalMargin),
       },
     }
 

@@ -10,7 +10,9 @@ interface ExcelRowData {
   timestamp: string          // 타임스탬프(날짜,시간)
   productName: string        // 상품및 제품명
   quantity: number           // 수량
-  totalAmount: number        // 총금액
+  productAmount: number      // 상품금액 (도매가 × 수량)
+  shippingFee: number        // 배송비 (합배송 단위 계산)
+  totalAmount: number        // 합산금액 (상품금액 + 배송비)
   recipientName: string      // 배송받는분 이름
   recipientPhone: string     // 받는분 연락처
   fullAddress: string        // 배송지 주소
@@ -100,11 +102,14 @@ export async function GET(
         publishedProduct: {
           include: {
             product: {
-              include: {
+              select: {
+                shippingFee: true,
+                bundleMaxQty: true,
                 variants: {
                   select: {
                     optionSummary: true,
                     wholesalePrice: true,
+                    bundleUnit: true,
                   },
                 },
               },
@@ -115,6 +120,7 @@ export async function GET(
           select: {
             wholesalePrice: true,
             optionSummary: true,
+            bundleUnit: true,
           },
         },
       },
@@ -156,11 +162,14 @@ export async function GET(
         publishedProduct: {
           include: {
             product: {
-              include: {
+              select: {
+                shippingFee: true,
+                bundleMaxQty: true,
                 variants: {
                   select: {
                     optionSummary: true,
                     wholesalePrice: true,
+                    bundleUnit: true,
                   },
                 },
               },
@@ -171,6 +180,7 @@ export async function GET(
           select: {
             wholesalePrice: true,
             optionSummary: true,
+            bundleUnit: true,
           },
         },
       },
@@ -187,7 +197,9 @@ export async function GET(
     // 회원 주문 변환
     for (const item of memberItems) {
       const wholesalePrice = getWholesalePrice(item)
-      const totalAmount = Number(wholesalePrice) * item.quantity
+      const productAmount = Number(wholesalePrice) * item.quantity
+      const shippingFee = calculateShippingFee(item)
+      const totalAmount = productAmount + shippingFee
 
       const addr = item.order.shippingAddress
       const fullAddress = addr?.addressDetail
@@ -206,6 +218,8 @@ export async function GET(
         timestamp,
         productName: item.productName,
         quantity: item.quantity,
+        productAmount,
+        shippingFee,
         totalAmount,
         recipientName,
         recipientPhone: addr?.recipientPhone || '',
@@ -220,7 +234,9 @@ export async function GET(
     // 비회원 주문 변환
     for (const item of guestItems) {
       const wholesalePrice = getWholesalePrice(item)
-      const totalAmount = Number(wholesalePrice) * item.quantity
+      const productAmount = Number(wholesalePrice) * item.quantity
+      const shippingFee = calculateShippingFee(item)
+      const totalAmount = productAmount + shippingFee
 
       const addr = item.guestOrder.shippingAddress
       const fullAddress = addr?.addressDetail
@@ -239,6 +255,8 @@ export async function GET(
         timestamp,
         productName: item.productName,
         quantity: item.quantity,
+        productAmount,
+        shippingFee,
         totalAmount,
         recipientName,
         recipientPhone: addr?.recipientPhone || item.guestOrder.guestPhone,
@@ -326,19 +344,21 @@ export async function GET(
     }
 
     // 열 너비 설정
-    sheet.getColumn(1).width = 18 // 타임스탬프
-    sheet.getColumn(2).width = 40 // 상품및 제품명
-    sheet.getColumn(3).width = 8  // 수량
-    sheet.getColumn(4).width = 14 // 총금액
-    sheet.getColumn(5).width = 12 // 배송받는분 이름
-    sheet.getColumn(6).width = 15 // 받는분 연락처
-    sheet.getColumn(7).width = 50 // 배송지 주소
-    sheet.getColumn(8).width = 12 // 보내는 사람
-    sheet.getColumn(9).width = 20 // 현금영수증 신청
-    sheet.getColumn(10).width = 25 // 이메일주소
+    sheet.getColumn(1).width = 18  // 타임스탬프
+    sheet.getColumn(2).width = 40  // 상품및 제품명
+    sheet.getColumn(3).width = 8   // 수량
+    sheet.getColumn(4).width = 12  // 상품금액
+    sheet.getColumn(5).width = 10  // 배송비
+    sheet.getColumn(6).width = 12  // 합계
+    sheet.getColumn(7).width = 12  // 배송받는분 이름
+    sheet.getColumn(8).width = 15  // 받는분 연락처
+    sheet.getColumn(9).width = 50  // 배송지 주소
+    sheet.getColumn(10).width = 12 // 보내는 사람
+    sheet.getColumn(11).width = 20 // 현금영수증 신청
+    sheet.getColumn(12).width = 25 // 이메일주소
 
     // 타이틀
-    sheet.mergeCells('A1:J1')
+    sheet.mergeCells('A1:L1')
     const titleCell = sheet.getCell('A1')
     titleCell.value = '도매 발주견적서'
     titleCell.font = { bold: true, size: 16 }
@@ -352,6 +372,8 @@ export async function GET(
 
     let rowIndex = 7
     let grandTotalQty = 0
+    let grandTotalProductAmount = 0
+    let grandTotalShippingFee = 0
     let grandTotalAmount = 0
 
     // 날짜별 그룹 출력
@@ -364,7 +386,7 @@ export async function GET(
       const dayName = dayNames[date.getDay()]
 
       // 날짜 구분선
-      sheet.mergeCells(`A${rowIndex}:J${rowIndex}`)
+      sheet.mergeCells(`A${rowIndex}:L${rowIndex}`)
       const dateCell = sheet.getCell(`A${rowIndex}`)
       dateCell.value = `▼ ${dateKey} (${dayName}) - ${dateRows.length}건`
       Object.assign(dateCell, { style: dateSeparatorStyle })
@@ -372,7 +394,7 @@ export async function GET(
 
       // 테이블 헤더
       const headerRow = sheet.getRow(rowIndex)
-      headerRow.values = ['타임스탬프', '상품및 제품명', '수량', '총금액', '배송받는분 이름', '받는분 연락처', '배송지 주소', '보내는사람(받는분과 다른경우만 작성)', '현금영수증 신청', '이메일주소']
+      headerRow.values = ['타임스탬프', '상품및 제품명', '수량', '상품금액', '배송비', '합계', '배송받는분 이름', '받는분 연락처', '배송지 주소', '보내는사람(받는분과 다른경우만 작성)', '현금영수증 신청', '이메일주소']
       headerRow.eachCell((cell) => {
         Object.assign(cell, { style: headerStyle })
       })
@@ -380,12 +402,18 @@ export async function GET(
 
       // 해당 날짜의 데이터
       let dateTotalQty = 0
+      let dateTotalProductAmount = 0
+      let dateTotalShippingFee = 0
       let dateTotalAmount = 0
 
       for (const rowData of dateRows) {
         dateTotalQty += rowData.quantity
+        dateTotalProductAmount += rowData.productAmount
+        dateTotalShippingFee += rowData.shippingFee
         dateTotalAmount += rowData.totalAmount
         grandTotalQty += rowData.quantity
+        grandTotalProductAmount += rowData.productAmount
+        grandTotalShippingFee += rowData.shippingFee
         grandTotalAmount += rowData.totalAmount
 
         const row = sheet.getRow(rowIndex)
@@ -393,6 +421,8 @@ export async function GET(
           rowData.timestamp,
           rowData.productName,
           rowData.quantity,
+          rowData.productAmount,
+          rowData.shippingFee,
           rowData.totalAmount,
           rowData.recipientName,
           rowData.recipientPhone,
@@ -405,6 +435,8 @@ export async function GET(
         // 숫자 포맷
         row.getCell(3).numFmt = '#,##0'
         row.getCell(4).numFmt = '#,##0'
+        row.getCell(5).numFmt = '#,##0'
+        row.getCell(6).numFmt = '#,##0'
 
         // 테두리
         row.eachCell((cell) => {
@@ -421,12 +453,14 @@ export async function GET(
 
       // 일별 소계
       const subtotalRow = sheet.getRow(rowIndex)
-      subtotalRow.values = [`소계 (${dateKey})`, '', dateTotalQty, dateTotalAmount, '', '', '', '', '', '']
+      subtotalRow.values = [`소계 (${dateKey})`, '', dateTotalQty, dateTotalProductAmount, dateTotalShippingFee, dateTotalAmount, '', '', '', '', '', '']
       subtotalRow.eachCell((cell) => {
         Object.assign(cell, { style: subtotalStyle })
       })
       subtotalRow.getCell(3).numFmt = '#,##0'
       subtotalRow.getCell(4).numFmt = '#,##0'
+      subtotalRow.getCell(5).numFmt = '#,##0'
+      subtotalRow.getCell(6).numFmt = '#,##0'
       rowIndex++
 
       // 빈 줄 추가 (날짜 그룹 사이)
@@ -435,12 +469,14 @@ export async function GET(
 
     // 총합계
     const totalRow = sheet.getRow(rowIndex)
-    totalRow.values = ['총합계', '', grandTotalQty, grandTotalAmount, '', '', '', '', '', '']
+    totalRow.values = ['총합계', '', grandTotalQty, grandTotalProductAmount, grandTotalShippingFee, grandTotalAmount, '', '', '', '', '', '']
     totalRow.eachCell((cell) => {
       Object.assign(cell, { style: totalStyle })
     })
     totalRow.getCell(3).numFmt = '#,##0'
     totalRow.getCell(4).numFmt = '#,##0'
+    totalRow.getCell(5).numFmt = '#,##0'
+    totalRow.getCell(6).numFmt = '#,##0'
 
     // 엑셀 파일 생성
     const buffer = await workbook.xlsx.writeBuffer()
@@ -492,4 +528,35 @@ function getWholesalePrice(item: {
   }
 
   return wholesalePrice
+}
+
+// 합배송 단위 배송비 계산 헬퍼 함수
+// 계산 공식: ceil((수량 * bundleUnit) / bundleMaxQty) * shippingFee
+function calculateShippingFee(item: {
+  quantity: number
+  variant?: { bundleUnit?: number | null } | null
+  publishedProduct?: {
+    product?: {
+      shippingFee?: number | null
+      bundleMaxQty?: number | null
+      variants?: { bundleUnit?: number | null }[]
+    } | null
+  } | null
+}): number {
+  const product = item.publishedProduct?.product
+  if (!product) return 0
+
+  const shippingFee = product.shippingFee || 0
+  if (shippingFee === 0) return 0
+
+  const bundleMaxQty = product.bundleMaxQty || 1
+  const bundleUnit = item.variant?.bundleUnit || product.variants?.[0]?.bundleUnit || 1
+
+  // 실제 묶음 단위 수량 계산 (예: 수량 3, bundleUnit 2 = 6개 단위)
+  const totalUnits = item.quantity * bundleUnit
+
+  // 합배송 묶음 수 계산 (예: 6개 / bundleMaxQty 4 = 2묶음)
+  const bundleCount = Math.ceil(totalUnits / bundleMaxQty)
+
+  return bundleCount * shippingFee
 }
