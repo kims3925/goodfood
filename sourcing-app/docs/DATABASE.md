@@ -39,7 +39,7 @@ npx prisma studio --schema prisma
 
 | Enum | 값 | 설명 |
 |------|---|-----|
-| UserRole | `USER`, `MANAGER`, `ADMIN` | 사용자 권한 |
+| UserRole | `USER`, `MANAGER`, `ADMIN` | 사용자 권한 (회원/매니저/슈퍼관리자) |
 | AiProvider | `GEMINI`, `OPENAI` | AI 서비스 제공자 |
 
 ### 채널 & 플랫폼
@@ -65,6 +65,8 @@ npx prisma studio --schema prisma
 | WorkflowType | `COLLECT`, `TRANSFORM`, `PUBLISH`, `FULL_PIPELINE` | 워크플로우 유형 |
 | WorkflowStatus | `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `PARTIAL_SUCCESS` | 워크플로우 상태 |
 | TriggerType | `MANUAL`, `SCHEDULED` | 실행 트리거 |
+| StepType | `COLLECTION`, `TRANSFORM`, `PRODUCT_CREATE`, `PUBLISH` | 파이프라인 단계 유형 |
+| StepStatus | `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `SKIPPED` | 단계 실행 상태 |
 
 ### CS & 반품
 
@@ -127,7 +129,8 @@ npx prisma studio --schema prisma
 │            ├── ProductOption (옵션 그룹/값)                          │
 │            └── ProductImage (상품 이미지)                            │
 │                                                                      │
-│  Product → PublishedProduct → Channel(RETAIL) / Shop                │
+│  Product → ShopProduct → Shop (쇼핑몰 발행)                          │
+│  Product → ChannelProduct → Channel(RETAIL) (채널 발행)              │
 └─────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -135,7 +138,7 @@ npx prisma studio --schema prisma
 │                          SHOP DOMAIN                                 │
 ├─────────────────────────────────────────────────────────────────────┤
 │  Shop ──┬── ShopTheme (테마 설정)                                    │
-│         ├── PublishedProduct (발행 상품)                             │
+│         ├── ShopProduct (쇼핑몰 발행 상품)                            │
 │         ├── Order (주문)                                             │
 │         └── Settlement (정산)                                        │
 └─────────────────────────────────────────────────────────────────────┘
@@ -149,7 +152,7 @@ npx prisma studio --schema prisma
 │          ├── ShippingAddress                                         │
 │          └── RefundAccount                                           │
 │                                                                      │
-│  Cart ─── CartItem ─── PublishedProduct + ProductVariant            │
+│  Cart ─── CartItem ─── ShopProduct + ProductVariant                  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -206,7 +209,8 @@ npx prisma studio --schema prisma
 - `variants` - 옵션 조합별 가격
 - `options` - 옵션 그룹/값
 - `images` - 상품 이미지
-- `publishedProducts` - 발행 이력
+- `shopProducts` - 쇼핑몰 발행 이력
+- `channelProducts` - 채널 발행 이력
 
 ### Order (주문)
 
@@ -250,7 +254,7 @@ npx prisma studio --schema prisma
 | CollectedPost | `(channelId, externalId)` | 게시물 중복 방지 |
 | Order | `(userId, status)` | 사용자별 주문 조회 |
 | WorkflowLog | `(userId, workflowType, startedAt)` | 워크플로우 이력 |
-| CartItem | `(cartId, publishedProductId, variantId)` | 장바구니 중복 방지 |
+| CartItem | `(cartId, shopProductId, variantId)` | 장바구니 중복 방지 |
 
 ### 단일 인덱스 (필수)
 
@@ -288,7 +292,8 @@ npx prisma studio --schema prisma
 |-----|-----|-----|
 | User → Channel | `Cascade` | 사용자 삭제 시 채널도 삭제 |
 | User → Order | 없음 | 주문 있는 사용자 삭제 불가 |
-| Product → PublishedProduct | `SetNull` | 상품 삭제해도 발행 기록 유지 |
+| Product → ShopProduct | `SetNull` | 상품 삭제해도 발행 기록 유지 |
+| Product → ChannelProduct | `SetNull` | 상품 삭제해도 채널 발행 기록 유지 |
 | Order → OrderItem | `Cascade` | 주문 삭제 시 항목도 삭제 |
 | Channel → CollectedPost | `Cascade` | 채널 삭제 시 게시물도 삭제 |
 
@@ -302,7 +307,7 @@ npx prisma studio --schema prisma
 |-----|-----------|
 | 주문 생성 | Order, OrderItem, Payment, ShippingAddress |
 | 결제 완료 | Order (status), Payment (status) |
-| 상품 발행 | Product, PublishedProduct, ProductImage |
+| 상품 발행 | Product, ShopProduct, ChannelProduct, ProductImage |
 | 워크플로우 | CollectedPost, CollectedProduct, Product, WorkflowLog |
 
 ### 사용 예시

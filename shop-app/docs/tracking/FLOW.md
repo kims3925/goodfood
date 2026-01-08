@@ -20,7 +20,7 @@
 │     CollectedPost → AI (Gemini/OpenAI) → CollectedProduct → Product │
 │                                                                      │
 │  3. 발행 (Publish)                                                   │
-│     Product → Band API → PublishedProduct → 소매밴드/쇼핑몰         │
+│     Product → ShopProduct/ChannelProduct → 쇼핑몰/소매밴드           │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
                                     │
@@ -158,21 +158,20 @@ Product (변환된 상품)
          │                      │
          ▼                      ▼
 ┌─────────────────┐    ┌─────────────────┐
-│ Band API 발행   │    │ Shop 발행       │
-│ (게시물 작성)    │    │ (PublishedProduct)│
+│ Shop 발행       │    │ Band API 발행   │
+│ (ShopProduct)   │    │ (ChannelProduct)│
 └────────┬────────┘    └────────┬────────┘
          │                      │
-         └──────────┬───────────┘
-                    ▼
-           ┌─────────────────┐
-           │ PublishedProduct│
-           ├─────────────────┤
-           │ - productId     │
-           │ - channelId     │
-           │ - shopId        │
-           │ - postKey       │ ── Band 게시물 키 (취소용)
-           │ - publishedAt   │
-           └─────────────────┘
+         ▼                      ▼
+┌──────────────────┐   ┌──────────────────┐
+│ ShopProduct      │   │ ChannelProduct   │
+├──────────────────┤   ├──────────────────┤
+│ - productId      │   │ - productId      │
+│ - shopId         │   │ - channelId      │
+│ - publishedAt    │   │ - postKey        │
+└──────────────────┘   │ - isActive       │
+                       │ - publishedAt    │
+                       └──────────────────┘
 ```
 
 ---
