@@ -45,24 +45,10 @@ export async function GET(
     const channelId = parseInt(wholesaleChannelId)
 
     const { searchParams } = new URL(request.url)
-    const from = searchParams.get('from')
-    const to = searchParams.get('to')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
     // status 파라미터: pending(발주대기), completed(발주완료), 미지정시 pending
     const statusFilter = searchParams.get('status') || 'pending'
-
-    if (!from || !to) {
-      return NextResponse.json(
-        { success: false, error: '기간(from, to)은 필수입니다.' },
-        { status: 400 }
-      )
-    }
-
-    const fromDate = new Date(from)
-    fromDate.setHours(0, 0, 0, 0)
-    const toDate = new Date(to)
-    toDate.setHours(23, 59, 59, 999)
 
     // status 필터에 따라 조회할 주문 상태 결정
     const orderStatuses: CustomerOrderStatus[] = statusFilter === 'completed'
@@ -82,11 +68,7 @@ export async function GET(
       where: {
         order: {
           status: { in: orderStatuses },
-          paidAt: {
-            not: null,
-            gte: fromDate,
-            lte: toDate,
-          },
+          paidAt: { not: null },
         },
         shopProduct: productCondition,
       },
@@ -158,11 +140,7 @@ export async function GET(
       where: {
         guestOrder: {
           status: { in: orderStatuses },
-          paidAt: {
-            not: null,
-            gte: fromDate,
-            lte: toDate,
-          },
+          paidAt: { not: null },
         },
         shopProduct: productCondition,
       },

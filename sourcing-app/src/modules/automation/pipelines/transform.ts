@@ -81,15 +81,6 @@ function getModelRateLimit(provider: AiProvider, model: string): ModelRateLimit 
   return { rpm: 5, tpm: 250000, rpd: 20 }
 }
 
-/**
- * 모델에 따른 요청 간 대기 시간 계산 (밀리초)
- * 유료 API는 rate limit이 충분하므로 대기 없이 순차 처리
- */
-function getRequestIntervalMs(provider: AiProvider, model: string): number {
-  // 유료 API: 대기 시간 없음 (응답 오면 바로 다음 요청)
-  console.log(`[Transform] Model ${model} (${provider}): No delay (paid API)`)
-  return 0
-}
 
 /**
  * 일일 사용량 체크 및 업데이트
@@ -253,18 +244,12 @@ export async function runTransformPipeline(
 
   console.log(`[Transform] Found policies for ${policyByChannel.size}/${channelIds.length} channels`)
 
-  // 기존 config.pricingPolicyId는 폴백으로 사용
-  let fallbackPolicyContent: string | null = null
-  if (config.pricingPolicyId) {
-    const policy = await prisma.pricingPolicy.findUnique({
-      where: { id: config.pricingPolicyId },
-    })
-    fallbackPolicyContent = policy?.content || null
-  }
+  // config.pricingPolicyContent를 폴백으로 사용
+  const fallbackPolicyContent = config.pricingPolicyContent || null
 
   // 모델에 따른 Rate Limit 정보 조회 (유료 API 모니터링용)
   const rateLimit = getModelRateLimit(config.aiProvider, aiConfig.model)
-  getRequestIntervalMs(config.aiProvider, aiConfig.model)  // 로그 출력용
+  console.log(`[Transform] Model ${aiConfig.model} (${config.aiProvider}): No delay (paid API)`)
 
   // 일일 사용량 체크 및 리셋
   const currentDailyUsage = await checkAndResetDailyUsage(aiConfig.id)
@@ -417,29 +402,52 @@ export async function runTransformPipeline(
           }
 
           try {
-            // CollectedProduct 생성 (CollectedProductService 사용 - 수동과 동일한 로직)
-            const collectedProduct = await collectedProductService.create({
-              userId,
-              postId: post.id,
-              name: result.draft.name,
-              description: result.draft.description || null,
-              currency: result.draft.currency || 'KRW',
-              rawMetadata: {
-                category: result.draft.categoryId,
-                options: result.draft.options,
-                variants: result.draft.variants,
-                wholesalePrice: result.draft.wholesalePrice ?? null,
-                price: result.draft.price ?? null,
-                // 배송비 정보 (최상위 레벨 + shipping 객체 둘 다 저장)
-                shippingFee: result.draft.shippingFee ?? null,
-                shippingInfo: result.draft.shippingInfo ?? null,
-                bundleMaxQty: result.draft.bundleMaxQty ?? 1,
-                shipping: {
-                  shippingFee: result.draft.shippingFee ?? null,
-                  shippingInfo: result.draft.shippingInfo ?? null,
-                  bundleMaxQty: result.draft.bundleMaxQty ?? 1,
+            // 트랜잭션으로 CollectedProduct 생성 + AI 사용량 업데이트 (원자적 처리)
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+
+            // TypeScript 타입 안전을 위해 draft를 미리 추출
+            const draft = result.draft!
+
+            const collectedProduct = await prisma.$transaction(async (tx) => {
+              // CollectedProduct 생성 (CollectedProductService 사용 - 수동과 동일한 로직)
+              const created = await collectedProductService.create({
+                userId,
+                postId: post.id,
+                name: draft.name,
+                description: draft.description || null,
+                currency: draft.currency || 'KRW',
+                pricingPolicyContent: batchPolicyContent,  // 적용된 가격 정책 전달
+                rawMetadata: {
+                  category: draft.categoryId,
+                  options: draft.options,
+                  variants: draft.variants,
+                  wholesalePrice: draft.wholesalePrice ?? null,
+                  price: draft.price ?? null,
+                  // 배송비 정보 (최상위 레벨 + shipping 객체 둘 다 저장)
+                  shippingFee: draft.shippingFee ?? null,
+                  shippingInfo: draft.shippingInfo ?? null,
+                  bundleMaxQty: draft.bundleMaxQty ?? 1,
+                  shipping: {
+                    shippingFee: draft.shippingFee ?? null,
+                    shippingInfo: draft.shippingInfo ?? null,
+                    bundleMaxQty: draft.bundleMaxQty ?? 1,
+                  },
                 },
-              },
+              }, { tx })
+
+              // AI 사용량 업데이트 (같은 트랜잭션 내에서)
+              await tx.aiApiConfig.update({
+                where: { id: aiConfig.id },
+                data: {
+                  usageCount: { increment: 1 },
+                  dailyUsageCount: { increment: 1 },
+                  dailyResetDate: today,
+                  lastUsedAt: new Date(),
+                },
+              })
+
+              return created
             })
 
             transformedPost = {
@@ -448,6 +456,7 @@ export async function runTransformPipeline(
               channelId: collectedProduct.id,
             }
             createdProducts++
+            currentRpdUsage++
 
             console.log(`[Transform] Created collectedProduct ${collectedProduct.id} for post ${post.id}`)
           } catch (dbError: any) {
@@ -491,21 +500,7 @@ export async function runTransformPipeline(
       // 배치에서 토큰 사용량 추출 (첫 번째 결과에 포함)
       const tokensUsed = batchResults[0]?.tokensUsed || 0
 
-      // AI 사용량 업데이트 (배치당 1회 + 토큰 누적 + 일일 사용량)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      await prisma.aiApiConfig.update({
-        where: { id: aiConfig.id },
-        data: {
-          usageCount: { increment: 1 },  // 배치 1회 = API 1회
-          dailyUsageCount: { increment: 1 },  // 일일 사용량 증가
-          dailyResetDate: today,
-          lastUsedAt: new Date(),
-        },
-      })
-
-      // 현재 RPD 사용량 증가
-      currentRpdUsage++
+      // AI 사용량은 각 성공적인 create 트랜잭션 내에서 업데이트됨
 
       if (tokensUsed > 0) {
         console.log(`[Transform] Batch ${batchIndex + 1} used ${tokensUsed} tokens`)

@@ -76,7 +76,6 @@ export type BandCollectionResult = ChannelCollectionResult
 
 export interface TransformConfig {
   aiProvider: AiProvider
-  pricingPolicyId?: number | null
   pricingPolicyContent?: string | null
   postIds?: number[]
   transformPendingOnly?: boolean

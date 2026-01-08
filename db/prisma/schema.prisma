@@ -60,6 +60,21 @@ enum TriggerType {
   SCHEDULED
 }
 
+enum StepType {
+  COLLECTION
+  TRANSFORM
+  PRODUCT_CREATE
+  PUBLISH
+}
+
+enum StepStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
 enum CustomerOrderStatus {
   PENDING
   PAID

@@ -21,6 +21,9 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260108-003 | Done | 2026-01-08 | - | 역할명 변경 (회원/매니저) | Low | Claude |
+| TR-20260108-002 | Done | 2026-01-08 | - | published_product → shop_product/channel_product 스키마 마이그레이션 | Medium | Claude |
+| TR-20260108-001 | Done | 2026-01-08 | - | AutomationConfig 테이블에서 pricing_policy_id 컬럼 및 관계 삭제 | Low | Claude |
 | TR-20260107-012 | Done | 2026-01-07 | - | API.md SSE 발행 스트림 문서 추가 (uploadProgress 필드 포함) | Low | Hong |
 | TR-20260107-011 | Done | 2026-01-07 | - | FLOW.md 발행 흐름 다이어그램 중복 블록 제거 | Low | Hong |
 | TR-20260107-010 | Done | 2026-01-07 | - | AWS EC2 MariaDB 일일 자동 백업 설정 | Low | Hong |
@@ -127,6 +130,176 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260108-003: 역할명 변경 (회원/매니저)
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-08 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 사용자 역할 라벨 변경
+  - USER: '일반 사용자' → '회원'
+  - MANAGER: '쇼핑몰 관리자' → '매니저'
+- unauthorized 페이지에서 '관리자' 표현 통일
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(admin)/shop/user/list/page.tsx | Modified | roleLabels 변경 |
+| src/app/(admin)/shop/user/detail/[id]/page.tsx | Modified | roleLabels 변경 |
+| src/app/(auth)/unauthorized/page.tsx | Modified | 역할 표시 텍스트 변경 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+
+---
+
+## TR-20260108-002: published_product → shop_product/channel_product 스키마 마이그레이션
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-08 |
+| REQ-ID | - |
+| Risk | Medium |
+
+### 변경 사항
+
+**1. 테이블 분리 (published_product → shop_product + channel_product)**
+- `shop_product`: 쇼핑몰(Shop)에 발행된 상품 관리
+- `channel_product`: 채널(Band 등)에 발행된 상품 관리
+- 기존 `published_product` 데이터를 양쪽 테이블로 마이그레이션 후 테이블 삭제
+
+**2. 워크플로우 추적 테이블 추가**
+- `workflow_step_log` 테이블 신규 생성 (자동화 파이프라인 단계별 추적)
+- `workflow_log.current_step` 컬럼 추가
+- `StepType` enum 추가: COLLECTION, TRANSFORM, PRODUCT_CREATE, PUBLISH
+- `StepStatus` enum 추가: PENDING, RUNNING, COMPLETED, FAILED, SKIPPED
+
+**3. FK 참조 변경 (published_product 제거에 따른)**
+- `cart_item.published_product_id` FK 삭제 → `cart_item.shop_product_id` FK로 대체
+- `order_item.published_product_id` FK 삭제 → `order_item.shop_product_id` FK로 대체
+- `guest_order_item.published_product_id` FK 삭제 → `guest_order_item.shop_product_id` FK로 대체
+- `inquiry.published_product_id` FK 삭제 → `inquiry.shop_product_id` FK로 대체
+
+### 영향받는 모델
+| 모델 | 변경 내용 |
+|-----|---------|
+| ShopProduct | 신규 (published_product의 shop 발행 데이터 승계) |
+| ChannelProduct | 신규 (published_product의 channel 발행 데이터 승계) |
+| WorkflowStepLog | 신규 (파이프라인 단계별 추적) |
+| WorkflowLog | current_step 컬럼 추가 |
+| CartItem | FK: publishedProductId → shopProductId |
+| OrderItem | FK: publishedProductId → shopProductId |
+| GuestOrderItem | FK: publishedProductId → shopProductId |
+| Inquiry | FK: publishedProductId → shopProductId |
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| db/prisma/models/publish.prisma | Modified | ShopProduct, ChannelProduct 모델로 변경 |
+| db/prisma/models/workflow.prisma | Modified | WorkflowStepLog 모델 추가, WorkflowLog에 currentStep 추가 |
+| db/prisma/models/cart.prisma | Modified | CartItem FK 변경 |
+| db/prisma/models/order.prisma | Modified | OrderItem FK 변경 |
+| db/prisma/models/inquiry.prisma | Modified | Inquiry FK 변경 |
+| db/prisma/schema.prisma | Modified | StepType, StepStatus enum 추가 |
+| db/prisma/migrations/20260108131455_remove_unused_columns/migration.sql | Added | CD 파이프라인용 마이그레이션 (orphaned 컬럼 정리 포함) |
+| db/prisma/migrations/20260108131455_remove_unused_columns/rollback.sql | Added | 마이그레이션 롤백 스크립트 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [x] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 도메인 로직 영향
+- 장바구니(Cart): ShopProduct 참조로 변경
+- 주문(Order): ShopProduct 참조로 변경
+- 문의(Inquiry): ShopProduct 참조로 변경
+- 발행(Publish): Shop/Channel 발행 분리 처리
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Prisma Generate | Pass |
+| DB Push | Pass |
+| Build | Pass |
+
+### 롤백 계획
+1. `rollback.sql` 스크립트 실행: `mysql -u [user] -p [database] < rollback.sql`
+2. git revert로 해당 커밋 롤백
+3. npx prisma db push로 이전 스키마 복원
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Publish
+
+---
+
+## TR-20260108-001: AutomationConfig 테이블에서 pricing_policy_id 컬럼 및 관계 삭제
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-08 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- AutomationConfig 테이블에서 사용하지 않는 `pricing_policy_id` 컬럼 삭제
+- PricingPolicy와의 외래키 관계 제거
+- 자동화 설정에서 가격 정책은 별도로 관리하므로 불필요한 연결 정리
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| db/prisma/models/automation.prisma | Modified | pricingPolicyId 필드 및 pricingPolicy 관계 삭제 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [x] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Prisma Generate | Pass |
+| DB Push | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. npx prisma db push로 컬럼 복원
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+- Flow-ID: Publish, Cart, Order, Inquiry
+- 참조 문서: [docs/DATABASE.md](../DATABASE.md)
+
+---
 
 ## TR-20260107-010: AWS EC2 MariaDB 일일 자동 백업 설정
 

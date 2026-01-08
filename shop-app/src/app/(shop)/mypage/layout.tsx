@@ -75,14 +75,14 @@ export default function MypageLayout({
 
         {/* 상단 네비게이션 탭 */}
         <div className="mb-6 -mx-4 px-4 lg:mx-0 lg:px-0">
-          <nav className="flex gap-1 overflow-x-auto scrollbar-hide pb-2 lg:pb-0">
+          <nav className="grid grid-cols-3 gap-2 md:flex md:flex-wrap md:gap-1">
             {menuItems.map((item) => {
               const isActive = isMenuActive(item.href)
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-full whitespace-nowrap transition-all flex-shrink-0 text-sm font-medium ${
+                  className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-full whitespace-nowrap transition-all text-sm font-medium ${
                     isActive
                       ? 'text-white shadow-md'
                       : 'text-gray-600 bg-gray-100 hover:bg-gray-200'

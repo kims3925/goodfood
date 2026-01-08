@@ -209,7 +209,6 @@ export async function POST(req: NextRequest) {
             status: 'PENDING',
             // 금액 정보
             subtotalAmount: existingOrder.subtotalAmount,
-            shippingFee: existingOrder.shippingFee,
             discountAmount: existingOrder.discountAmount,
             totalAmount: existingOrder.totalAmount,
             // 배송지 정보 (수령인 - 별도 테이블)

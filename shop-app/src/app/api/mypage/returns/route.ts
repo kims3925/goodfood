@@ -80,7 +80,6 @@ export async function GET(request: NextRequest) {
       status: order.status,
       totalAmount: Number(order.totalAmount),
       subtotalAmount: Number(order.subtotalAmount),
-      shippingFee: Number(order.shippingFee),
       discountAmount: Number(order.discountAmount),
       cancelReason: order.cancelReason,
       cancelledBy: order.cancelledBy,

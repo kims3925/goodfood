@@ -3,7 +3,7 @@
  * WorkflowLog 생성/업데이트 및 통계 조회
  */
 
-import prisma, { WorkflowType, WorkflowStatus, TriggerType } from '@bandauto/db'
+import prisma, { WorkflowType, WorkflowStatus, TriggerType, StepType, StepStatus } from '@bandauto/db'
 import { WorkflowLogInput, WorkflowLogUpdate, AutomationStats } from './types'
 
 // =============================================
@@ -238,6 +238,245 @@ export async function updateWorkflowProgress(
     where: { id: logId },
     data: updateData,
   })
+}
+
+// =============================================
+// STEP LOG MANAGEMENT
+// =============================================
+
+/**
+ * 단계 순서 매핑
+ */
+const STEP_ORDER: Record<StepType, number> = {
+  [StepType.COLLECTION]: 1,
+  [StepType.TRANSFORM]: 2,
+  [StepType.PRODUCT_CREATE]: 3,
+  [StepType.PUBLISH]: 4,
+}
+
+/**
+ * 워크플로우 단계 시작
+ * 단계 로그를 생성하고 워크플로우의 현재 단계를 업데이트
+ * 트랜잭션으로 두 작업을 원자적으로 실행
+ */
+export async function startWorkflowStep(
+  workflowId: number,
+  stepType: StepType,
+  totalItems: number = 0
+): Promise<number> {
+  const stepOrder = STEP_ORDER[stepType]
+
+  const step = await prisma.$transaction(async (tx) => {
+    // 1. 단계 로그 생성/업데이트
+    const stepLog = await tx.workflowStepLog.upsert({
+      where: {
+        workflowId_stepType: { workflowId, stepType }
+      },
+      create: {
+        workflowId,
+        stepType,
+        stepOrder,
+        status: StepStatus.RUNNING,
+        startedAt: new Date(),
+        totalItems,
+      },
+      update: {
+        status: StepStatus.RUNNING,
+        startedAt: new Date(),
+        totalItems,
+        processedItems: 0,
+        successCount: 0,
+        failedCount: 0,
+        completedAt: null,
+        errorMessage: null,
+      }
+    })
+
+    // 2. 현재 단계 업데이트
+    await tx.workflowLog.update({
+      where: { id: workflowId },
+      data: { currentStep: stepType }
+    })
+
+    return stepLog
+  })
+
+  console.log(`[WorkflowService] Step ${stepType} started (workflow: ${workflowId}, stepId: ${step.id})`)
+  return step.id
+}
+
+/**
+ * 워크플로우 단계 진행 상황 업데이트
+ */
+export async function updateStepProgress(
+  workflowId: number,
+  stepType: StepType,
+  progress: {
+    processedItems?: number
+    successCount?: number
+    failedCount?: number
+    totalItems?: number
+    details?: Record<string, any>
+  }
+): Promise<void> {
+  const updateData: Record<string, any> = {}
+
+  if (progress.processedItems !== undefined) {
+    updateData.processedItems = progress.processedItems
+  }
+  if (progress.successCount !== undefined) {
+    updateData.successCount = progress.successCount
+  }
+  if (progress.failedCount !== undefined) {
+    updateData.failedCount = progress.failedCount
+  }
+  if (progress.totalItems !== undefined) {
+    updateData.totalItems = progress.totalItems
+  }
+  if (progress.details !== undefined) {
+    updateData.details = JSON.stringify(progress.details)
+  }
+
+  await prisma.workflowStepLog.update({
+    where: {
+      workflowId_stepType: { workflowId, stepType }
+    },
+    data: updateData
+  })
+}
+
+/**
+ * 워크플로우 단계 완료 처리
+ */
+export async function completeWorkflowStep(
+  workflowId: number,
+  stepType: StepType,
+  result: {
+    status: 'COMPLETED' | 'FAILED' | 'SKIPPED'
+    successCount: number
+    failedCount: number
+    processedItems?: number
+    details?: Record<string, any>
+    errorMessage?: string
+  }
+): Promise<void> {
+  const stepStatus = StepStatus[result.status]
+
+  // 에러 메시지 길이 제한
+  const truncatedMessage = result.errorMessage && result.errorMessage.length > 1000
+    ? result.errorMessage.substring(0, 1000) + '...(truncated)'
+    : result.errorMessage
+
+  await prisma.workflowStepLog.update({
+    where: {
+      workflowId_stepType: { workflowId, stepType }
+    },
+    data: {
+      status: stepStatus,
+      completedAt: new Date(),
+      successCount: result.successCount,
+      failedCount: result.failedCount,
+      processedItems: result.processedItems ?? (result.successCount + result.failedCount),
+      details: result.details ? JSON.stringify(result.details) : undefined,
+      errorMessage: truncatedMessage,
+    }
+  })
+
+  console.log(`[WorkflowService] Step ${stepType} completed with status ${result.status} (workflow: ${workflowId})`)
+}
+
+/**
+ * 워크플로우의 모든 단계 조회
+ */
+export async function getWorkflowSteps(workflowId: number) {
+  return prisma.workflowStepLog.findMany({
+    where: { workflowId },
+    orderBy: { stepOrder: 'asc' }
+  })
+}
+
+/**
+ * 워크플로우 상세 조회 (단계 포함)
+ */
+export async function getWorkflowWithSteps(workflowId: number) {
+  return prisma.workflowLog.findUnique({
+    where: { id: workflowId },
+    include: {
+      steps: {
+        orderBy: { stepOrder: 'asc' }
+      }
+    }
+  })
+}
+
+/**
+ * 워크플로우의 현재 진행 중인 단계 조회
+ */
+export async function getCurrentStep(workflowId: number) {
+  return prisma.workflowStepLog.findFirst({
+    where: {
+      workflowId,
+      status: StepStatus.RUNNING
+    }
+  })
+}
+
+/**
+ * 워크플로우 완료 시 현재 단계 초기화
+ */
+export async function clearCurrentStep(workflowId: number): Promise<void> {
+  await prisma.workflowLog.update({
+    where: { id: workflowId },
+    data: { currentStep: null }
+  })
+}
+
+/**
+ * 워크플로우의 RUNNING 상태인 모든 step을 FAILED로 변경
+ * 에러 발생 시 catch 블록에서 호출하여 step 상태 정리
+ *
+ * 트랜잭션으로 두 작업을 원자적으로 수행:
+ * 1. workflowStepLog RUNNING → FAILED
+ * 2. workflowLog.currentStep → null
+ */
+export async function failRunningSteps(
+  workflowId: number,
+  errorMessage?: string
+): Promise<number> {
+  const truncatedMessage = errorMessage && errorMessage.length > 1000
+    ? errorMessage.substring(0, 1000) + '...(truncated)'
+    : errorMessage
+
+  const stepCount = await prisma.$transaction(async (tx) => {
+    // 1. RUNNING 상태인 step들을 FAILED로 변경
+    const result = await tx.workflowStepLog.updateMany({
+      where: {
+        workflowId,
+        status: StepStatus.RUNNING,
+      },
+      data: {
+        status: StepStatus.FAILED,
+        completedAt: new Date(),
+        errorMessage: truncatedMessage || '워크플로우 실행 중 오류 발생',
+      },
+    })
+
+    // 2. 워크플로우의 currentStep 초기화 (step 실패 시 현재 단계도 정리)
+    if (result.count > 0) {
+      await tx.workflowLog.update({
+        where: { id: workflowId },
+        data: { currentStep: null },
+      })
+    }
+
+    return result.count
+  })
+
+  if (stepCount > 0) {
+    console.log(`[WorkflowService] ${stepCount}개의 RUNNING step을 FAILED로 변경 (workflow: ${workflowId})`)
+  }
+
+  return stepCount
 }
 
 // =============================================

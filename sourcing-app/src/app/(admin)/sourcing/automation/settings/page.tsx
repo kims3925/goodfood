@@ -5,7 +5,7 @@ import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLe
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
-import { PipelineStatusPanel, DisableAutomationModal } from '@/components/automation'
+import { PipelineStatusPanel, DisableAutomationModal, SessionMissingModal } from '@/components/automation'
 
 interface ChannelShop {
   id: number
@@ -84,7 +84,6 @@ interface AutomationConfig {
   collectFromAllChannels: boolean
   wholesaleChannelIds: number[]
   aiProvider: string
-  pricingPolicyId: number | null
   retailChannelIds: number[]
   shopIds: number[]
   pipelineSteps: PipelineSteps
@@ -174,7 +173,6 @@ const defaultConfig: AutomationConfig = {
   collectFromAllChannels: true,
   wholesaleChannelIds: [],
   aiProvider: 'GEMINI',
-  pricingPolicyId: null,
   retailChannelIds: [],
   shopIds: [],
   pipelineSteps: {
@@ -214,6 +212,17 @@ export default function AutomationSettingsPage() {
   const [isCancelling, setIsCancelling] = useState(false)
   const [showDisableModal, setShowDisableModal] = useState(false)
 
+  // 밴드 세션 검증 상태
+  const [showSessionMissingModal, setShowSessionMissingModal] = useState(false)
+  const [invalidSessionChannels, setInvalidSessionChannels] = useState<Array<{
+    id: number
+    name: string
+    kind: 'WHOLESALE' | 'RETAIL'
+    hasSession: boolean
+    isExpired: boolean
+  }>>([])
+  const [isValidatingSession, setIsValidatingSession] = useState(false)
+
   const CHANNELS_PER_PAGE = 4
 
   // 섹션별 변경 여부 확인 (isEnabled는 버튼으로 변경하므로 제외)
@@ -223,8 +232,7 @@ export default function AutomationSettingsPage() {
   const hasCollectionChanges = JSON.stringify((config.wholesaleChannelIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.wholesaleChannelIds || []).slice().sort())
 
-  const hasAiChanges = config.aiProvider !== initialConfig.aiProvider ||
-    config.pricingPolicyId !== initialConfig.pricingPolicyId
+  const hasAiChanges = config.aiProvider !== initialConfig.aiProvider
 
   const hasPublishChanges = JSON.stringify((config.retailChannelIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.retailChannelIds || []).slice().sort())
@@ -276,8 +284,54 @@ export default function AutomationSettingsPage() {
     }
   }
 
+  // 밴드 세션 검증 함수 (소매채널만 검증 - 도매채널은 세션 불필요)
+  const validateBandSessions = async (createNotification = false): Promise<boolean> => {
+    setIsValidatingSession(true)
+    try {
+      const response = await fetch('/api/automation/session/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          retailChannelIds: config.retailChannelIds,
+          type: 'publish',
+          createNotification,
+        }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        if (!data.data.isValid) {
+          setInvalidSessionChannels(data.data.invalidChannels)
+          setShowSessionMissingModal(true)
+          return false
+        }
+        return true
+      } else {
+        toast.error('세션 검증에 실패했습니다')
+        return false
+      }
+    } catch (error) {
+      console.error('세션 검증 실패:', error)
+      toast.error('세션 검증 중 오류가 발생했습니다')
+      return false
+    } finally {
+      setIsValidatingSession(false)
+    }
+  }
+
+  // 세션 재검증 핸들러 (모달에서 호출)
+  const handleRetrySessionValidation = async () => {
+    const isValid = await validateBandSessions(false)
+    if (isValid) {
+      setShowSessionMissingModal(false)
+      toast.success('모든 채널의 세션이 유효합니다')
+      // 세션이 유효하면 자동화 시작 진행
+      saveAutomationState(true)
+    }
+  }
+
   // 자동화 시작 핸들러
-  const handleStartAutomation = () => {
+  const handleStartAutomation = async () => {
     // 필수 설정 검증 - 설정이 안 된 섹션 확인
     const missingSections: string[] = []
 
@@ -350,6 +404,12 @@ export default function AutomationSettingsPage() {
     if (channelsWithoutShop.length > 0) {
       setUnconnectedChannels(channelsWithoutShop)
       setShowShopConnectionWarning(true)
+      return
+    }
+
+    // 밴드 세션 유효성 검증 (실패 시 알림도 생성)
+    const isSessionValid = await validateBandSessions(true)
+    if (!isSessionValid) {
       return
     }
 
@@ -574,7 +634,7 @@ export default function AutomationSettingsPage() {
           sectionData = { wholesaleChannelIds: config.wholesaleChannelIds }
           break
         case 'ai':
-          sectionData = { aiProvider: config.aiProvider, pricingPolicyId: config.pricingPolicyId }
+          sectionData = { aiProvider: config.aiProvider }
           break
         case 'publish':
           sectionData = { retailChannelIds: config.retailChannelIds }
@@ -1868,6 +1928,15 @@ export default function AutomationSettingsPage() {
           totalItems: pipelineStatus?.totalItems || 0,
         }}
         isLoading={isCancelling}
+      />
+
+      {/* 밴드 세션 없음 모달 */}
+      <SessionMissingModal
+        isOpen={showSessionMissingModal}
+        onClose={() => setShowSessionMissingModal(false)}
+        invalidChannels={invalidSessionChannels}
+        onRetry={handleRetrySessionValidation}
+        isValidating={isValidatingSession}
       />
     </div>
   )

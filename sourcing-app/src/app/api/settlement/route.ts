@@ -134,7 +134,6 @@ export async function GET(request: NextRequest) {
             thumbnailUrl: true,
             quantity: true,
             unitPrice: true,
-            wholesalePrice: true, // 스냅샷 도매가
             totalPrice: true,
             variant: {
               select: {
@@ -173,15 +172,11 @@ export async function GET(request: NextRequest) {
 
     // 도매가 추출 헬퍼 함수 (스냅샷 -> variant -> product.variants[0] 순으로 시도)
     const getWholesalePrice = (item: any): number | null => {
-      // 1. OrderItem에 저장된 wholesalePrice 스냅샷 (가장 우선)
-      if (item.wholesalePrice != null) {
-        return item.wholesalePrice
-      }
-      // 2. OrderItem에 연결된 variant의 wholesalePrice
+      // 1. OrderItem에 연결된 variant의 wholesalePrice
       if (item.variant?.wholesalePrice) {
         return item.variant.wholesalePrice
       }
-      // 3. Product의 첫 번째 variant의 wholesalePrice
+      // 2. Product의 첫 번째 variant의 wholesalePrice
       const productVariant = item.shopProduct?.product?.variants?.[0]
       if (productVariant?.wholesalePrice) {
         return productVariant.wholesalePrice

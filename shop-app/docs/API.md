@@ -116,9 +116,136 @@ app/api/
 |--------|------|-----|------|
 | POST | `/api/guest-orders/prepare` | 비회원 주문 준비 | - |
 | POST | `/api/guest-orders/bank-transfer` | 비회원 무통장 입금 | - |
-| POST | `/api/guest-orders/lookup` | 비회원 주문 조회 | - |
+| POST | `/api/guest-orders/find-by-phone` | 휴대폰+이름으로 주문 목록 조회 | - |
+| POST | `/api/guest-orders/lookup` | 주문번호로 상세 조회 (토큰 발급) | - |
 | GET | `/api/guest-orders/[id]` | 주문 상세 | - |
 | POST | `/api/guest-orders/[id]/cancel` | 주문 취소 | - |
+
+#### POST `/api/guest-orders/find-by-phone`
+
+휴대폰번호 + 주문자이름으로 비회원 주문 목록을 조회합니다. 주문번호를 모를 때 사용합니다.
+
+**요청:**
+```json
+{
+  "phone": "01012345678",
+  "name": "홍길동"
+}
+```
+
+**응답 (성공):**
+```json
+{
+  "success": true,
+  "orders": [
+    {
+      "id": 123,
+      "orderNumber": "GO-20260108-ABC123",
+      "status": "PAID",
+      "representativeItem": {
+        "name": "상품명",
+        "thumbnailUrl": "/images/product/...",
+        "itemCount": 3
+      },
+      "totalAmount": 35000,
+      "orderedAt": "2026-01-08T10:30:00.000Z",
+      "paymentStatus": "DONE",
+      "paymentMethod": "CARD"
+    }
+  ],
+  "totalCount": 1
+}
+```
+
+**보안 제한:**
+- 최근 90일 이내 주문만 조회 가능
+- 최대 20건까지 반환
+- 휴대폰번호와 이름 모두 일치해야 조회 가능
+
+**에러 응답:**
+
+| Status | 조건 | 메시지 |
+|--------|-----|-------|
+| 400 | phone 누락 | 휴대폰번호를 입력해주세요 |
+| 400 | name 누락 | 주문자 이름을 입력해주세요 |
+| 404 | 주문 없음 | 주문 내역을 찾을 수 없습니다 |
+| 500 | 서버 오류 | 주문 조회 중 오류가 발생했습니다 |
+
+---
+
+#### POST `/api/guest-orders/lookup`
+
+주문번호로 비회원 주문 상세를 조회하고, 주문 상세 페이지 접근용 토큰을 발급합니다.
+
+**요청:**
+```json
+{
+  "orderNumber": "GO-20260108-ABC123"
+}
+```
+
+**응답 (성공):**
+```json
+{
+  "success": true,
+  "order": {
+    "id": 123,
+    "orderNumber": "GO-20260108-ABC123",
+    "status": "PAID",
+    "customer": {
+      "name": "홍길동",
+      "phone": "01012345678",
+      "email": "guest@email.com"
+    },
+    "shippingAddress": {
+      "recipientName": "홍길동",
+      "recipientPhone": "01012345678",
+      "postalCode": "12345",
+      "address": "서울시 강남구 테헤란로",
+      "addressDetail": "123호",
+      "deliveryMemo": "부재시 경비실"
+    },
+    "subtotalAmount": 30000,
+    "discountAmount": 0,
+    "totalAmount": 35000,
+    "orderedAt": "2026-01-08T10:30:00.000Z",
+    "paidAt": "2026-01-08T10:31:00.000Z",
+    "items": [
+      {
+        "id": 1,
+        "productName": "상품명",
+        "optionSummary": "옵션1 / 옵션2",
+        "thumbnailUrl": "/images/...",
+        "quantity": 1,
+        "unitPrice": 30000,
+        "totalPrice": 30000
+      }
+    ],
+    "payment": {
+      "status": "DONE",
+      "method": "CARD",
+      "amount": 35000,
+      "paidAt": "2026-01-08T10:31:00.000Z"
+    },
+    "bankTransferInfo": null
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "expiresIn": 3600
+}
+```
+
+**토큰 정보:**
+- 유효 기간: 1시간 (3600초)
+- 용도: 주문 상세 페이지 접근 권한 부여
+- 발급 조건: 주문번호만 일치하면 발급
+
+**에러 응답:**
+
+| Status | 조건 | 메시지 |
+|--------|-----|-------|
+| 400 | orderNumber 누락 | 주문번호를 입력해주세요 |
+| 404 | 주문 없음 | 주문을 찾을 수 없습니다 |
+| 500 | 서버 오류 | 주문 조회 실패 |
 
 ### 결제
 

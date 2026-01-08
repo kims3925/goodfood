@@ -59,8 +59,8 @@ interface User {
 }
 
 const roleLabels: Record<UserRole, string> = {
-  USER: '일반 사용자',
-  MANAGER: '쇼핑몰 관리자',
+  USER: '회원',
+  MANAGER: '매니저',
   ADMIN: '슈퍼 관리자',
 }
 
@@ -166,7 +166,7 @@ export default function UserListPage() {
                 <UserCheck size={24} className="text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">일반 사용자</p>
+                <p className="text-sm text-gray-500">회원</p>
                 <p className="text-2xl font-bold text-green-600">{stats.USER}</p>
               </div>
             </div>
@@ -177,7 +177,7 @@ export default function UserListPage() {
                 <UserCog size={24} className="text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">쇼핑몰 관리자</p>
+                <p className="text-sm text-gray-500">매니저</p>
                 <p className="text-2xl font-bold text-blue-600">{stats.MANAGER}</p>
               </div>
             </div>

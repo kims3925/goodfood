@@ -11,7 +11,6 @@ import {
   CheckCircle,
   AlertCircle,
   Clock,
-  TrendingUp,
   XCircle,
   ArrowRight,
   Activity,
@@ -41,6 +40,8 @@ import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
 import Link from 'next/link'
+import ChannelStatsTable from '@/components/dashboard/sourcing/ChannelStatsTable'
+import { useChannelStats } from '@/hooks/dashboard/useChannelStats'
 
 interface HourlyStats {
   hour: number
@@ -91,33 +92,50 @@ interface Channel {
   shop?: ChannelShop | null
 }
 
+// WorkflowStepLog 기반 단계 정보
+interface StepInfo {
+  stepType: string
+  stepOrder: number
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED'
+  startedAt: string | null
+  completedAt: string | null
+  totalItems: number
+  processedItems: number
+  successCount: number
+  failedCount: number
+  progress: number  // 0-100
+}
+
+// API에서 반환하는 stageProgress 형태
+interface StageProgressItem {
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED'
+  completed: boolean
+  startedAt: string | null
+  completedAt: string | null
+  duration: number | null
+  totalItems: number
+  processedItems: number
+  successCount: number
+  failedCount: number
+  progress: number  // 0-100
+  errorMessage: string | null
+  // 기존 details 호환 필드
+  totalNewPosts?: number
+  channelResults?: { channelName: string; newPosts: number; failed: number }[]
+  batchProgress?: { current: number; total: number }
+  currentChannel?: string
+  currentProgress?: { current: number; total: number }
+  // 기존 필드명 호환 (deprecated)
+  total?: number
+  success?: number
+  failed?: number
+}
+
 interface StageProgress {
-  collection: {
-    completed: boolean
-    totalNewPosts: number
-    channelResults: { channelName: string; newPosts: number; failed: number }[]
-  } | null
-  transform: {
-    completed: boolean
-    total: number
-    success: number
-    failed: number
-    batchProgress: { current: number; total: number } | null
-  } | null
-  productCreate: {
-    completed: boolean
-    total: number
-    success: number
-    failed: number
-  } | null
-  publish: {
-    completed: boolean
-    total: number
-    success: number
-    failed: number
-    currentChannel: string | null
-    currentProgress: { current: number; total: number } | null
-  } | null
+  collection?: StageProgressItem
+  transform?: StageProgressItem
+  productCreate?: StageProgressItem
+  publish?: StageProgressItem
 }
 
 interface RunningWorkflow {
@@ -130,6 +148,7 @@ interface RunningWorkflow {
   failedCount: number
   currentStage: 'collection' | 'transform' | 'productCreate' | 'publish' | null
   stageProgress: StageProgress | null
+  steps?: StepInfo[]  // WorkflowStepLog 정보
 }
 
 interface RecentLog {
@@ -230,6 +249,26 @@ const calculateNextExecution = (selectedHours: number[] | undefined): { countdow
 
 export default function AutomationDashboardPage() {
   const toast = useToast()
+
+  // 날짜 필터 상태 (가장 먼저 선언)
+  const [period, setPeriod] = useState<PeriodFilter>('today')
+  const [startDate, setStartDate] = useState<string>(formatDateForInput(getToday()))
+  const [endDate, setEndDate] = useState<string>(formatDateForInput(getToday()))
+  const [isCustomDate, setIsCustomDate] = useState(false)
+
+  // 채널 통계 (날짜 필터 적용)
+  const {
+    data: channelData,
+    isLoading: isChannelLoading,
+    error: channelError,
+    refetch: refetchChannels,
+  } = useChannelStats({
+    pollInterval: 30000,
+    period: isCustomDate ? 'custom' : period,
+    startDate: isCustomDate ? startDate : undefined,
+    endDate: isCustomDate ? endDate : undefined,
+  })
+
   const [stats, setStats] = useState<AutomationStats | null>(null)
   const [config, setConfig] = useState<AutomationConfig | null>(null)
   const [runningWorkflow, setRunningWorkflow] = useState<RunningWorkflow | null>(null)
@@ -239,16 +278,10 @@ export default function AutomationDashboardPage() {
   const [isCancelling, setIsCancelling] = useState(false)
   const [countdown, setCountdown] = useState<string>('')
 
-  // 날짜 필터 상태
-  const [period, setPeriod] = useState<PeriodFilter>('today')
-  const [startDate, setStartDate] = useState<string>(formatDateForInput(getToday()))
-  const [endDate, setEndDate] = useState<string>(formatDateForInput(getToday()))
-
   // 소매채널 및 쇼핑몰 미연결 경고 모달
   const [retailChannels, setRetailChannels] = useState<Channel[]>([])
   const [showShopConnectionWarning, setShowShopConnectionWarning] = useState(false)
   const [unconnectedChannels, setUnconnectedChannels] = useState<Channel[]>([])
-  const [isCustomDate, setIsCustomDate] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
@@ -468,9 +501,9 @@ export default function AutomationDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* 날짜 필터 */}
+      {/* 날짜 필터 + 자동화 상태 (상단, 왼쪽 정렬) */}
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-start gap-3">
           <div className="flex rounded-xl bg-gray-100 p-1">
             {[
               { value: 'today', label: '오늘' },
@@ -491,17 +524,8 @@ export default function AutomationDashboardPage() {
               </button>
             ))}
           </div>
-          <button
-            onClick={() => loadData()}
-            className="rounded-xl bg-gray-100 p-2.5 text-gray-600 transition-colors hover:bg-gray-200"
-          >
-            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-          </button>
-        </div>
-
-        {/* 직접선택 시 날짜 선택기 표시 */}
-        {isCustomDate && (
-          <div className="flex justify-center">
+          {/* 직접선택 시 날짜 선택기 표시 */}
+          {isCustomDate && (
             <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
               <Calendar size={16} className="text-gray-400" />
               <input
@@ -518,70 +542,41 @@ export default function AutomationDashboardPage() {
                 className="bg-transparent text-sm text-gray-700 outline-none w-32"
               />
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* Hero Header */}
-      <div className={`relative overflow-hidden rounded-2xl p-6 ${
-        config?.isEnabled
-          ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600'
-          : 'bg-gradient-to-br from-slate-600 via-slate-700 to-slate-800'
-      }`}>
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-40" />
-
-        <div className="relative flex items-center justify-between">
-          <div className="flex items-center gap-5">
-            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
-              config?.isEnabled ? 'bg-white/20' : 'bg-white/10'
-            }`}>
-              {config?.isEnabled ? (
-                <div className="relative">
-                  <Activity className="w-8 h-8 text-white" />
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full animate-ping" />
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full" />
-                </div>
-              ) : (
-                <Pause className="w-8 h-8 text-white/70" />
-              )}
-            </div>
-            <div className="text-white">
-              <h1 className="text-2xl font-bold">자동화 대시보드</h1>
-              <p className={`mt-1 ${config?.isEnabled ? 'text-green-100' : 'text-slate-300'}`}>
-                {config?.isEnabled ? (
-                  <>
-                    <span className="font-medium">실행 중</span>
-                  </>
-                ) : (
-                  '자동화가 비활성화되어 있습니다'
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link href="/automation/logs">
-              <Button
-                variant="secondary"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-              >
-                <History size={18} className="mr-2" />
-                실행 로그
-              </Button>
-            </Link>
-            <Link href="/automation/settings">
-              <Button
-                variant="secondary"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-              >
-                <Settings size={18} className="mr-2" />
-                설정
-              </Button>
-            </Link>
-          </div>
+          )}
         </div>
       </div>
 
+      {/* 채널 현황 섹션 */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">채널 현황</h2>
+            <p className="text-sm text-gray-500">
+              {isCustomDate
+                ? `${startDate} ~ ${endDate} 기간`
+                : period === 'today'
+                ? '오늘'
+                : period === '7days'
+                ? '최근 7일'
+                : '최근 30일'} 도매/소매 채널별 수집 및 발행 현황
+            </p>
+          </div>
+        </div>
+
+        {channelError && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {channelError}
+          </div>
+        )}
+
+        <ChannelStatsTable
+          channels={channelData?.channels ?? []}
+          isLoading={isChannelLoading}
+        />
+      </div>
+
+      {/* 자동화 섹션 */}
+      <div className="space-y-6">
       {/* Quick Actions - 수동 실행 */}
       <Card className="p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -806,298 +801,70 @@ export default function AutomationDashboardPage() {
         </div>
       </Card>
 
+      {/* 자동화 상태 바 */}
+      <div className="flex items-center justify-start">
+        <div className={`inline-flex items-center gap-3 px-4 py-2.5 rounded-xl border ${
+          config?.isEnabled
+            ? 'bg-green-50 border-green-200'
+            : 'bg-gray-50 border-gray-200'
+        }`}>
+          {/* 상태 아이콘 */}
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+            config?.isEnabled
+              ? 'bg-green-500'
+              : 'bg-gray-300'
+          }`}>
+            {config?.isEnabled ? (
+              <Activity size={16} className="text-white" />
+            ) : (
+              <Pause size={16} className="text-white" />
+            )}
+          </div>
+
+          {/* 상태 텍스트 */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-900">자동화</span>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+              config?.isEnabled
+                ? 'bg-green-100 text-green-700'
+                : 'bg-gray-200 text-gray-500'
+            }`}>
+              {config?.isEnabled ? '활성' : '비활성'}
+            </span>
+          </div>
+
+          {/* 다음 실행 정보 (활성화 시) */}
+          {config?.isEnabled && config?.selectedHours && config.selectedHours.length > 0 && (
+            <>
+              <span className="text-gray-300">|</span>
+              <div className="flex items-center gap-1.5 text-sm">
+                <Clock size={14} className="text-green-500" />
+                <span className="text-gray-600">다음</span>
+                <span className="font-semibold text-green-600">{calculateNextExecution(config.selectedHours).nextTime}</span>
+                <span className="text-gray-400 text-xs">({countdown || '계산 중...'})</span>
+              </div>
+              <span className="text-gray-300">|</span>
+              <span className="text-xs text-gray-500">
+                하루 <span className="font-medium text-gray-700">{config.selectedHours.length}</span>회
+              </span>
+            </>
+          )}
+
+          {/* 설정 버튼 */}
+          <Link href="/automation/settings">
+            <button className="p-1.5 rounded-lg hover:bg-gray-200/50 transition-colors">
+              <Settings size={16} className="text-gray-500" />
+            </button>
+          </Link>
+        </div>
+      </div>
+
       {/* 비활성화 시 음영 처리 컨테이너 (수동 실행 제외) */}
       <div className={`relative space-y-6 ${!config?.isEnabled ? 'pointer-events-none' : ''}`}>
         {/* 비활성화 오버레이 */}
         {!config?.isEnabled && (
           <div className="absolute inset-0 -m-3 p-3 bg-gray-400/30 rounded-2xl z-10" />
         )}
-
-      {/* Pipeline Flow Visualization */}
-      <Card className="p-6 bg-gradient-to-r from-slate-50 to-white">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
-          <BarChart3 size={20} className="text-blue-500" />
-          파이프라인 현황
-        </h2>
-
-        {/* 파이프라인 플로우 + 전환율 */}
-        <div className="flex items-center justify-between mb-6">
-          {/* Step 1: 수집 */}
-          {(() => {
-            // 현재 단계 판단: 전체 파이프라인일 때 currentStage 사용, 아니면 type 사용
-            const isCollectActive =
-              runningWorkflow?.currentStage === 'collection' ||
-              (runningWorkflow?.type === 'COLLECT' && !runningWorkflow?.currentStage)
-            const isCollectCompleted =
-              runningWorkflow?.type === 'FULL_PIPELINE' &&
-              runningWorkflow?.stageProgress?.collection?.completed
-            return (
-              <div className="flex-1">
-                <div className={`relative p-4 rounded-xl border-2 transition-all ${
-                  isCollectActive
-                    ? 'border-green-500 bg-green-50 shadow-lg shadow-green-100'
-                    : isCollectCompleted
-                    ? 'border-green-300 bg-green-50/50'
-                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
-                }`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      isCollectActive ? 'bg-green-500' : isCollectCompleted ? 'bg-green-400' : 'bg-green-100'
-                    }`}>
-                      {isCollectCompleted ? (
-                        <CheckCircle size={20} className="text-white" />
-                      ) : (
-                        <Package size={20} className={isCollectActive ? 'text-white' : 'text-green-600'} />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900 text-sm">수집</p>
-                      <p className="text-xs text-gray-500">
-                        {isCollectActive ? (
-                          <span className="text-green-600 font-medium">진행 중...</span>
-                        ) : isCollectCompleted ? (
-                          <span className="text-green-600">완료</span>
-                        ) : (
-                          '도매밴드'
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {(runningWorkflow?.stageProgress?.collection?.totalNewPosts !== undefined
-                      ? runningWorkflow.stageProgress.collection.totalNewPosts
-                      : stats?.todayCollected) ?? 0}
-                  </div>
-                  {isCollectActive && (
-                    <div className="absolute -top-2 -right-2">
-                      <span className="flex h-4 w-4">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500 items-center justify-center">
-                          <RefreshCw size={10} className="text-white animate-spin" />
-                        </span>
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Arrow with Conversion Rate */}
-          <div className="px-2 flex flex-col items-center">
-            <span className="text-xs font-medium text-gray-500 mb-1">
-              {stats?.todayCollected ? ((stats.todayTransformed / stats.todayCollected) * 100).toFixed(1) : 0}%
-            </span>
-            <ArrowRight size={18} className="text-gray-300" />
-          </div>
-
-          {/* Step 2: AI 변환 */}
-          {(() => {
-            const isTransformActive =
-              runningWorkflow?.currentStage === 'transform' ||
-              (runningWorkflow?.type === 'TRANSFORM' && !runningWorkflow?.currentStage)
-            const isTransformCompleted =
-              runningWorkflow?.type === 'FULL_PIPELINE' &&
-              runningWorkflow?.stageProgress?.transform?.completed
-            return (
-              <div className="flex-1">
-                <div className={`relative p-4 rounded-xl border-2 transition-all ${
-                  isTransformActive
-                    ? 'border-yellow-500 bg-yellow-50 shadow-lg shadow-yellow-100'
-                    : isTransformCompleted
-                    ? 'border-yellow-300 bg-yellow-50/50'
-                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
-                }`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      isTransformActive ? 'bg-yellow-500' : isTransformCompleted ? 'bg-yellow-400' : 'bg-yellow-100'
-                    }`}>
-                      {isTransformCompleted ? (
-                        <CheckCircle size={20} className="text-white" />
-                      ) : (
-                        <Zap size={20} className={isTransformActive ? 'text-white' : 'text-yellow-600'} />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900 text-sm">AI 변환</p>
-                      <p className="text-xs text-gray-500">
-                        {isTransformActive ? (
-                          <span className="text-yellow-600 font-medium">진행 중...</span>
-                        ) : isTransformCompleted ? (
-                          <span className="text-yellow-600">완료</span>
-                        ) : (
-                          '상품 정보'
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {(runningWorkflow?.stageProgress?.transform?.success !== undefined
-                      ? runningWorkflow.stageProgress.transform.success
-                      : stats?.todayTransformed) ?? 0}
-                  </div>
-                  {isTransformActive && (
-                    <div className="absolute -top-2 -right-2">
-                      <span className="flex h-4 w-4">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-4 w-4 bg-yellow-500 items-center justify-center">
-                          <RefreshCw size={10} className="text-white animate-spin" />
-                        </span>
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Arrow with Conversion Rate */}
-          <div className="px-2 flex flex-col items-center">
-            <span className="text-xs font-medium text-gray-500 mb-1">
-              {stats?.todayTransformed ? ((stats.todayProducts / stats.todayTransformed) * 100).toFixed(1) : 0}%
-            </span>
-            <ArrowRight size={18} className="text-gray-300" />
-          </div>
-
-          {/* Step 3: 상품 등록 */}
-          {(() => {
-            const isProductCreateActive =
-              runningWorkflow?.currentStage === 'productCreate' ||
-              (runningWorkflow?.type === 'PRODUCT_CREATE' && !runningWorkflow?.currentStage)
-            const isProductCreateCompleted =
-              runningWorkflow?.type === 'FULL_PIPELINE' &&
-              runningWorkflow?.stageProgress?.productCreate?.completed
-            return (
-              <div className="flex-1">
-                <div className={`relative p-4 rounded-xl border-2 transition-all ${
-                  isProductCreateActive
-                    ? 'border-orange-500 bg-orange-50 shadow-lg shadow-orange-100'
-                    : isProductCreateCompleted
-                    ? 'border-orange-300 bg-orange-50/50'
-                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
-                }`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      isProductCreateActive ? 'bg-orange-500' : isProductCreateCompleted ? 'bg-orange-400' : 'bg-orange-100'
-                    }`}>
-                      {isProductCreateCompleted ? (
-                        <CheckCircle size={20} className="text-white" />
-                      ) : (
-                        <ShoppingBag size={20} className={isProductCreateActive ? 'text-white' : 'text-orange-600'} />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900 text-sm">상품 등록</p>
-                      <p className="text-xs text-gray-500">
-                        {isProductCreateActive ? (
-                          <span className="text-orange-600 font-medium">진행 중...</span>
-                        ) : isProductCreateCompleted ? (
-                          <span className="text-orange-600">완료</span>
-                        ) : (
-                          'Product'
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {(runningWorkflow?.stageProgress?.productCreate?.success !== undefined
-                      ? runningWorkflow.stageProgress.productCreate.success
-                      : stats?.todayProducts) ?? 0}
-                  </div>
-                  {isProductCreateActive && (
-                    <div className="absolute -top-2 -right-2">
-                      <span className="flex h-4 w-4">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-4 w-4 bg-orange-500 items-center justify-center">
-                          <RefreshCw size={10} className="text-white animate-spin" />
-                        </span>
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Arrow with Conversion Rate (채널별 평균) */}
-          <div className="px-2 flex flex-col items-center">
-            <span className="text-xs font-medium text-gray-500 mb-1">
-              {(() => {
-                const channelCount = (config?.retailChannelIds?.length || 0) + (config?.shopIds?.length || 0)
-                if (!stats?.todayProducts || !channelCount) return '0'
-                return ((stats.todayPublished / channelCount / stats.todayProducts) * 100).toFixed(1)
-              })()}%
-            </span>
-            <ArrowRight size={18} className="text-gray-300" />
-          </div>
-
-          {/* Step 4: 발행 */}
-          {(() => {
-            const isPublishActive =
-              runningWorkflow?.currentStage === 'publish' ||
-              (runningWorkflow?.type === 'PUBLISH' && !runningWorkflow?.currentStage)
-            const isPublishCompleted =
-              runningWorkflow?.type === 'FULL_PIPELINE' &&
-              runningWorkflow?.stageProgress?.publish?.completed
-            const publishProgress = runningWorkflow?.stageProgress?.publish
-            return (
-              <div className="flex-1">
-                <div className={`relative p-4 rounded-xl border-2 transition-all ${
-                  isPublishActive
-                    ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-100'
-                    : isPublishCompleted
-                    ? 'border-blue-300 bg-blue-50/50'
-                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
-                }`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      isPublishActive ? 'bg-blue-500' : isPublishCompleted ? 'bg-blue-400' : 'bg-blue-100'
-                    }`}>
-                      {isPublishCompleted ? (
-                        <CheckCircle size={20} className="text-white" />
-                      ) : (
-                        <Upload size={20} className={isPublishActive ? 'text-white' : 'text-blue-600'} />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900 text-sm">발행</p>
-                      <p className="text-xs text-gray-500">
-                        {isPublishActive && publishProgress?.currentChannel ? (
-                          <span className="text-blue-600 font-medium">{publishProgress.currentChannel}</span>
-                        ) : isPublishActive ? (
-                          <span className="text-blue-600 font-medium">진행 중...</span>
-                        ) : isPublishCompleted ? (
-                          <span className="text-blue-600">완료</span>
-                        ) : (
-                          '소매밴드'
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-gray-900">
-                      {(publishProgress?.success !== undefined
-                        ? publishProgress.success
-                        : stats?.todayPublished) ?? '0'}
-                    </span>
-                  </div>
-                  {isPublishActive && (
-                    <div className="absolute -top-2 -right-2">
-                      <span className="flex h-4 w-4">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-500 items-center justify-center">
-                          <RefreshCw size={10} className="text-white animate-spin" />
-                        </span>
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })()}
-        </div>
-
-      </Card>
 
       {/* 시간대별 처리량 그래프 + 스케줄 정보 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1284,108 +1051,86 @@ export default function AutomationDashboardPage() {
           </Card>
         )}
 
-        {/* Schedule Info - 그래프 옆에 배치 */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Clock size={20} className="text-blue-500" />
-              스케줄 정보
-            </h2>
-            <Link href="/automation/settings">
-              <button className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1">
-                <Settings size={12} />
-                설정
-              </button>
+        {/* 최근 실행 기록 - 컴팩트 버전 */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+              <History size={16} className="text-indigo-500" />
+              최근 실행 기록
+            </h3>
+            <Link
+              href="/automation/logs"
+              className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+            >
+              전체보기
+              <ArrowRight size={12} />
             </Link>
           </div>
 
-          {/* 다음 실행 시간 - 강조 표시 */}
-          {config?.isEnabled && config?.selectedHours && config.selectedHours.length > 0 ? (
-            <div className="mb-4 p-4 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-xs mb-1">다음 실행</p>
-                  <p className="text-2xl font-bold">
-                    {calculateNextExecution(config.selectedHours).nextTime}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-blue-100 text-xs mb-1">남은 시간</p>
-                  <p className="text-lg font-semibold text-blue-100">
-                    {countdown || '계산 중...'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="mb-4 p-4 bg-gray-100 rounded-xl">
-              <div className="flex items-center gap-3 text-gray-500">
-                <Pause size={20} />
-                <div>
-                  <p className="font-medium text-gray-700">자동 실행 비활성화</p>
-                  <p className="text-xs">설정에서 스케줄을 활성화하세요</p>
-                </div>
-              </div>
-            </div>
-          )}
+          {recentLogs.length > 0 ? (
+            <div className="space-y-2">
+              {recentLogs.slice(0, 5).map((log) => {
+                const isSuccess = log.status === 'SUCCESS'
+                const isFailed = log.status === 'FAILED'
+                const isRunning = log.status === 'RUNNING'
 
-          <div className="space-y-3">
-            {/* 실행 시간대 */}
-            <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-              <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                <Timer size={16} className="text-indigo-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 mb-1">실행 시간대</p>
-                {config?.selectedHours && config.selectedHours.length > 0 ? (
-                  <div>
-                    <p className="font-medium text-gray-900 text-sm">
-                      {config.selectedHours.length === 24
-                        ? '매 시간 실행'
-                        : `하루 ${config.selectedHours.length}회`}
-                    </p>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {[...config.selectedHours].sort((a, b) => a - b).slice(0, 6).map(hour => (
-                        <span
-                          key={hour}
-                          className="px-1.5 py-0.5 text-xs bg-indigo-100 text-indigo-700 rounded font-medium"
-                        >
-                          {hour.toString().padStart(2, '0')}:00
-                        </span>
-                      ))}
-                      {config.selectedHours.length > 6 && (
-                        <span className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 rounded">
-                          +{config.selectedHours.length - 6}
-                        </span>
+                return (
+                  <div
+                    key={log.id}
+                    className={`flex items-center gap-3 p-2.5 rounded-lg border ${
+                      isSuccess ? 'border-green-200 bg-green-50/50' :
+                      isFailed ? 'border-red-200 bg-red-50/50' :
+                      'border-yellow-200 bg-yellow-50/50'
+                    }`}
+                  >
+                    {/* Status Icon */}
+                    <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${
+                      isSuccess ? 'bg-green-500' :
+                      isFailed ? 'bg-red-500' :
+                      'bg-yellow-500'
+                    }`}>
+                      {isRunning ? (
+                        <RefreshCw size={12} className="text-white animate-spin" />
+                      ) : isSuccess ? (
+                        <CheckCircle size={12} className="text-white" />
+                      ) : (
+                        <AlertCircle size={12} className="text-white" />
                       )}
                     </div>
-                  </div>
-                ) : (
-                  <p className="font-medium text-gray-400 text-sm">설정 안됨</p>
-                )}
-              </div>
-            </div>
 
-            {/* 마지막 실행 */}
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
-                <CheckCircle size={16} className="text-green-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-gray-500">마지막 실행</p>
-                <p className="font-medium text-gray-900 text-sm">
-                  {config?.lastRunAt
-                    ? new Date(config.lastRunAt).toLocaleString('ko-KR', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
-                    : '아직 실행 기록 없음'}
-                </p>
-              </div>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-gray-900 truncate">
+                        {getTypeName(log.type)}
+                      </p>
+                      <p className="text-[10px] text-gray-500">
+                        {new Date(log.startedAt).toLocaleString('ko-KR', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+
+                    {/* Status */}
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                      isSuccess ? 'text-green-700 bg-green-100' :
+                      isFailed ? 'text-red-700 bg-red-100' :
+                      'text-yellow-700 bg-yellow-100'
+                    }`}>
+                      {isRunning ? '실행중' : isSuccess ? '성공' : '실패'}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
-          </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <History size={24} className="text-gray-300 mb-2" />
+              <p className="text-xs text-gray-400">실행 기록 없음</p>
+            </div>
+          )}
         </Card>
       </div>
 
@@ -1428,14 +1173,14 @@ export default function AutomationDashboardPage() {
                 {/* 1. 수집 */}
                 <div className={`flex-1 relative ${runningWorkflow.currentStage === 'collection' ? 'z-10' : ''}`}>
                   <div className={`p-3 rounded-lg border-2 transition-all ${
-                    runningWorkflow.stageProgress?.collection
+                    runningWorkflow.stageProgress?.collection?.completed
                       ? 'bg-green-50 border-green-300'
                       : runningWorkflow.currentStage === 'collection'
                       ? 'bg-green-100 border-green-500 shadow-lg animate-pulse'
                       : 'bg-gray-50 border-gray-200'
                   }`}>
                     <div className="flex items-center gap-2 mb-1">
-                      {runningWorkflow.stageProgress?.collection ? (
+                      {runningWorkflow.stageProgress?.collection?.completed ? (
                         <CheckCircle size={16} className="text-green-600" />
                       ) : runningWorkflow.currentStage === 'collection' ? (
                         <RefreshCw size={16} className="text-green-600 animate-spin" />
@@ -1446,7 +1191,10 @@ export default function AutomationDashboardPage() {
                     </div>
                     {runningWorkflow.stageProgress?.collection && (
                       <p className="text-xs text-green-700 font-medium">
-                        {runningWorkflow.stageProgress.collection.totalNewPosts}건
+                        {runningWorkflow.stageProgress.collection.totalNewPosts ?? runningWorkflow.stageProgress.collection.successCount ?? 0}건
+                        {runningWorkflow.currentStage === 'collection' && runningWorkflow.stageProgress.collection.progress !== undefined && (
+                          <span className="text-green-500 ml-1">({runningWorkflow.stageProgress.collection.progress}%)</span>
+                        )}
                       </p>
                     )}
                     {runningWorkflow.currentStage === 'collection' && !runningWorkflow.stageProgress?.collection && (
@@ -1464,7 +1212,7 @@ export default function AutomationDashboardPage() {
                       ? 'bg-yellow-50 border-yellow-300'
                       : runningWorkflow.currentStage === 'transform'
                       ? 'bg-yellow-100 border-yellow-500 shadow-lg animate-pulse'
-                      : runningWorkflow.stageProgress?.collection
+                      : runningWorkflow.stageProgress?.collection?.completed
                       ? 'bg-gray-50 border-gray-200'
                       : 'bg-gray-50 border-gray-100 opacity-50'
                   }`}>
@@ -1480,14 +1228,19 @@ export default function AutomationDashboardPage() {
                     </div>
                     {runningWorkflow.stageProgress?.transform && (
                       <p className="text-xs text-yellow-700 font-medium">
-                        {runningWorkflow.stageProgress.transform.success !== undefined
-                          ? `${runningWorkflow.stageProgress.transform.success}건`
-                          : '처리 중...'}
-                        {runningWorkflow.stageProgress.transform.batchProgress?.current !== undefined &&
-                         runningWorkflow.stageProgress.transform.batchProgress?.total !== undefined &&
-                         runningWorkflow.currentStage === 'transform' && (
+                        {(() => {
+                          const t = runningWorkflow.stageProgress.transform
+                          const success = t.successCount ?? t.success
+                          const processed = t.processedItems ?? 0
+                          const total = t.totalItems ?? t.total ?? 0
+                          if (runningWorkflow.currentStage === 'transform' && total > 0) {
+                            return `${processed}/${total}건`
+                          }
+                          return success !== undefined ? `${success}건` : '처리 중...'
+                        })()}
+                        {runningWorkflow.currentStage === 'transform' && runningWorkflow.stageProgress.transform.progress !== undefined && (
                           <span className="text-yellow-500 ml-1">
-                            ({runningWorkflow.stageProgress.transform.batchProgress.current}/{runningWorkflow.stageProgress.transform.batchProgress.total})
+                            ({runningWorkflow.stageProgress.transform.progress}%)
                           </span>
                         )}
                       </p>
@@ -1503,7 +1256,7 @@ export default function AutomationDashboardPage() {
                 {/* 3. 등록 */}
                 <div className={`flex-1 relative ${runningWorkflow.currentStage === 'productCreate' ? 'z-10' : ''}`}>
                   <div className={`p-3 rounded-lg border-2 transition-all ${
-                    runningWorkflow.stageProgress?.productCreate
+                    runningWorkflow.stageProgress?.productCreate?.completed
                       ? 'bg-orange-50 border-orange-300'
                       : runningWorkflow.currentStage === 'productCreate'
                       ? 'bg-orange-100 border-orange-500 shadow-lg animate-pulse'
@@ -1512,7 +1265,7 @@ export default function AutomationDashboardPage() {
                       : 'bg-gray-50 border-gray-100 opacity-50'
                   }`}>
                     <div className="flex items-center gap-2 mb-1">
-                      {runningWorkflow.stageProgress?.productCreate ? (
+                      {runningWorkflow.stageProgress?.productCreate?.completed ? (
                         <CheckCircle size={16} className="text-orange-600" />
                       ) : runningWorkflow.currentStage === 'productCreate' ? (
                         <RefreshCw size={16} className="text-orange-600 animate-spin" />
@@ -1523,7 +1276,21 @@ export default function AutomationDashboardPage() {
                     </div>
                     {runningWorkflow.stageProgress?.productCreate && (
                       <p className="text-xs text-orange-700 font-medium">
-                        {runningWorkflow.stageProgress.productCreate.success}건
+                        {(() => {
+                          const p = runningWorkflow.stageProgress.productCreate
+                          const success = p.successCount ?? p.success ?? 0
+                          const processed = p.processedItems ?? 0
+                          const total = p.totalItems ?? p.total ?? 0
+                          if (runningWorkflow.currentStage === 'productCreate' && total > 0) {
+                            return `${processed}/${total}건`
+                          }
+                          return `${success}건`
+                        })()}
+                        {runningWorkflow.currentStage === 'productCreate' && runningWorkflow.stageProgress.productCreate.progress !== undefined && (
+                          <span className="text-orange-500 ml-1">
+                            ({runningWorkflow.stageProgress.productCreate.progress}%)
+                          </span>
+                        )}
                       </p>
                     )}
                     {runningWorkflow.currentStage === 'productCreate' && !runningWorkflow.stageProgress?.productCreate && (
@@ -1541,7 +1308,7 @@ export default function AutomationDashboardPage() {
                       ? 'bg-blue-50 border-blue-300'
                       : runningWorkflow.currentStage === 'publish'
                       ? 'bg-blue-100 border-blue-500 shadow-lg animate-pulse'
-                      : runningWorkflow.stageProgress?.productCreate
+                      : runningWorkflow.stageProgress?.productCreate?.completed
                       ? 'bg-gray-50 border-gray-200'
                       : 'bg-gray-50 border-gray-100 opacity-50'
                   }`}>
@@ -1557,13 +1324,31 @@ export default function AutomationDashboardPage() {
                     </div>
                     {runningWorkflow.stageProgress?.publish && (
                       <div className="text-xs text-blue-700 font-medium">
-                        {runningWorkflow.stageProgress.publish.currentProgress ? (
-                          <>
-                            <p>{runningWorkflow.stageProgress.publish.currentChannel}</p>
-                            <p>{runningWorkflow.stageProgress.publish.currentProgress.current}/{runningWorkflow.stageProgress.publish.currentProgress.total}</p>
-                          </>
-                        ) : (
-                          <p>{runningWorkflow.stageProgress.publish.success}건</p>
+                        {(() => {
+                          const pub = runningWorkflow.stageProgress.publish
+                          const success = pub.successCount ?? pub.success ?? 0
+                          const processed = pub.processedItems ?? 0
+                          const total = pub.totalItems ?? pub.total ?? 0
+
+                          if (runningWorkflow.currentStage === 'publish') {
+                            if (pub.currentChannel && pub.currentProgress) {
+                              return (
+                                <>
+                                  <p>{pub.currentChannel}</p>
+                                  <p>{pub.currentProgress.current}/{pub.currentProgress.total}</p>
+                                </>
+                              )
+                            }
+                            if (total > 0) {
+                              return `${processed}/${total}건`
+                            }
+                          }
+                          return `${success}건`
+                        })()}
+                        {runningWorkflow.currentStage === 'publish' && runningWorkflow.stageProgress.publish.progress !== undefined && (
+                          <span className="text-blue-500 ml-1">
+                            ({runningWorkflow.stageProgress.publish.progress}%)
+                          </span>
                         )}
                       </div>
                     )}
@@ -1577,11 +1362,11 @@ export default function AutomationDashboardPage() {
               {/* 단계별 상세 정보 (완료된 단계들) */}
               {runningWorkflow.stageProgress && (
                 <div className="bg-white rounded-lg p-4 border border-gray-100 space-y-2">
-                  {runningWorkflow.stageProgress.collection && (
+                  {runningWorkflow.stageProgress.collection?.completed && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">수집 완료</span>
                       <span className="text-green-600 font-medium">
-                        {runningWorkflow.stageProgress.collection.channelResults.length}개 채널에서 {runningWorkflow.stageProgress.collection.totalNewPosts}건
+                        {runningWorkflow.stageProgress.collection.channelResults?.length ?? 0}개 채널에서 {runningWorkflow.stageProgress.collection.totalNewPosts ?? runningWorkflow.stageProgress.collection.successCount ?? 0}건
                       </span>
                     </div>
                   )}
@@ -1589,19 +1374,30 @@ export default function AutomationDashboardPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">AI 변환</span>
                       <span className={runningWorkflow.stageProgress.transform.completed ? 'text-yellow-600 font-medium' : 'text-gray-500'}>
-                        {runningWorkflow.stageProgress.transform.success !== undefined
-                          ? `${runningWorkflow.stageProgress.transform.success}건 성공`
-                          : '처리 중...'}
-                        {runningWorkflow.stageProgress.transform.batchProgress?.current !== undefined &&
-                         runningWorkflow.stageProgress.transform.batchProgress?.total !== undefined &&
-                         runningWorkflow.currentStage === 'transform' && (
+                        {(() => {
+                          const t = runningWorkflow.stageProgress.transform
+                          const success = t.successCount ?? t.success
+                          const failed = t.failedCount ?? t.failed ?? 0
+                          const processed = t.processedItems ?? 0
+                          const total = t.totalItems ?? t.total ?? 0
+
+                          if (success !== undefined) {
+                            return `${success}건 성공`
+                          }
+                          if (runningWorkflow.currentStage === 'transform' && total > 0) {
+                            return `${processed}/${total}건 처리 중`
+                          }
+                          return '처리 중...'
+                        })()}
+                        {runningWorkflow.currentStage === 'transform' && runningWorkflow.stageProgress.transform.progress !== undefined && (
                           <span className="text-yellow-500 ml-1">
-                            ({runningWorkflow.stageProgress.transform.batchProgress.current}/{runningWorkflow.stageProgress.transform.batchProgress.total} 배치)
+                            ({runningWorkflow.stageProgress.transform.progress}%)
                           </span>
                         )}
-                        {(runningWorkflow.stageProgress.transform.failed ?? 0) > 0 && (
-                          <span className="text-red-500 ml-1">({runningWorkflow.stageProgress.transform.failed}건 실패)</span>
-                        )}
+                        {(() => {
+                          const failed = runningWorkflow.stageProgress.transform?.failedCount ?? runningWorkflow.stageProgress.transform?.failed ?? 0
+                          return failed > 0 ? <span className="text-red-500 ml-1">({failed}건 실패)</span> : null
+                        })()}
                       </span>
                     </div>
                   )}
@@ -1609,10 +1405,11 @@ export default function AutomationDashboardPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">상품 등록</span>
                       <span className="text-orange-600 font-medium">
-                        {runningWorkflow.stageProgress.productCreate.success}건 성공
-                        {runningWorkflow.stageProgress.productCreate.failed > 0 && (
-                          <span className="text-red-500 ml-1">({runningWorkflow.stageProgress.productCreate.failed}건 실패)</span>
-                        )}
+                        {runningWorkflow.stageProgress.productCreate.successCount ?? runningWorkflow.stageProgress.productCreate.success ?? 0}건 성공
+                        {(() => {
+                          const failed = runningWorkflow.stageProgress.productCreate?.failedCount ?? runningWorkflow.stageProgress.productCreate?.failed ?? 0
+                          return failed > 0 ? <span className="text-red-500 ml-1">({failed}건 실패)</span> : null
+                        })()}
                       </span>
                     </div>
                   )}
@@ -1620,7 +1417,11 @@ export default function AutomationDashboardPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">발행</span>
                       <span className="text-blue-600 font-medium">
-                        {runningWorkflow.stageProgress.publish.success}건 성공
+                        {runningWorkflow.stageProgress.publish.successCount ?? runningWorkflow.stageProgress.publish.success ?? 0}건 성공
+                        {(() => {
+                          const failed = runningWorkflow.stageProgress.publish?.failedCount ?? runningWorkflow.stageProgress.publish?.failed ?? 0
+                          return failed > 0 ? <span className="text-red-500 ml-1">({failed}건 실패)</span> : null
+                        })()}
                       </span>
                     </div>
                   )}
@@ -1662,146 +1463,6 @@ export default function AutomationDashboardPage() {
           </div>
         </Card>
       )}
-
-      {/* Recent Logs - Timeline Style */}
-      <Card className="p-6 bg-gradient-to-br from-slate-50 to-white">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200">
-              <History size={20} className="text-white" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-gray-900">최근 실행 기록</h2>
-              <p className="text-sm text-gray-500">최근 5개의 실행 내역</p>
-            </div>
-          </div>
-          <Link
-            href="/automation/logs"
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
-          >
-            전체보기
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-
-        {recentLogs.length > 0 ? (
-          <div className="space-y-3">
-            {recentLogs.map((log, index) => {
-              const isSuccess = log.status === 'SUCCESS'
-              const isFailed = log.status === 'FAILED'
-              const isRunning = log.status === 'RUNNING'
-
-              // 타입별 아이콘 및 색상
-              const typeConfig: Record<string, { icon: JSX.Element; gradient: string; bgLight: string }> = {
-                collect: {
-                  icon: <Package size={16} />,
-                  gradient: 'from-green-500 to-emerald-600',
-                  bgLight: 'bg-green-50'
-                },
-                transform: {
-                  icon: <Zap size={16} />,
-                  gradient: 'from-yellow-500 to-amber-600',
-                  bgLight: 'bg-yellow-50'
-                },
-                register: {
-                  icon: <ShoppingBag size={16} />,
-                  gradient: 'from-orange-500 to-red-600',
-                  bgLight: 'bg-orange-50'
-                },
-                publish: {
-                  icon: <Upload size={16} />,
-                  gradient: 'from-blue-500 to-cyan-600',
-                  bgLight: 'bg-blue-50'
-                },
-                full: {
-                  icon: <Play size={16} />,
-                  gradient: 'from-purple-500 to-pink-600',
-                  bgLight: 'bg-purple-50'
-                },
-              }
-
-              const config = typeConfig[log.type] || typeConfig.full
-
-              // 상대 시간 계산
-              const getRelativeTime = (dateStr: string) => {
-                const date = new Date(dateStr)
-                const now = new Date()
-                const diffMs = now.getTime() - date.getTime()
-                const diffMinutes = Math.floor(diffMs / (1000 * 60))
-                const diffHours = Math.floor(diffMinutes / 60)
-                const diffDays = Math.floor(diffHours / 24)
-
-                if (diffMinutes < 1) return '방금 전'
-                if (diffMinutes < 60) return `${diffMinutes}분 전`
-                if (diffHours < 24) return `${diffHours}시간 전`
-                if (diffDays < 7) return `${diffDays}일 전`
-                return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
-              }
-
-              return (
-                <div
-                  key={log.id}
-                  className={`relative flex items-center gap-4 p-4 rounded-xl border-2 transition-all hover:shadow-md ${
-                    isSuccess ? 'border-green-200 bg-gradient-to-r from-green-50/80 to-white hover:border-green-300' :
-                    isFailed ? 'border-red-200 bg-gradient-to-r from-red-50/80 to-white hover:border-red-300' :
-                    'border-yellow-200 bg-gradient-to-r from-yellow-50/80 to-white hover:border-yellow-300'
-                  }`}
-                >
-                  {/* Timeline connector */}
-                  {index < recentLogs.length - 1 && (
-                    <div className="absolute left-[1.875rem] top-full w-0.5 h-3 bg-gray-200 z-0" />
-                  )}
-
-                  {/* Type Icon */}
-                  <div className={`relative z-10 w-8 h-8 rounded-lg bg-gradient-to-br ${config.gradient} flex items-center justify-center shadow-md flex-shrink-0`}>
-                    <span className="text-white">{config.icon}</span>
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-gray-900">{getTypeName(log.type)}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Clock size={14} />
-                        {getRelativeTime(log.startedAt)}
-                      </span>
-                      <span className="text-gray-300">•</span>
-                      <span className="text-gray-400 text-xs">
-                        {new Date(log.startedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Status Badge */}
-                  <div className={`flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium ${
-                    isSuccess ? 'bg-green-100 text-green-700' :
-                    isFailed ? 'bg-red-100 text-red-700' :
-                    'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {isRunning ? (
-                      <><RefreshCw size={14} className="animate-spin" /> 실행중</>
-                    ) : isSuccess ? (
-                      <><CheckCircle size={14} /> 성공</>
-                    ) : (
-                      <><AlertCircle size={14} /> 실패</>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-              <History size={32} className="text-gray-300" />
-            </div>
-            <p className="text-gray-500 font-medium mb-1">아직 실행 기록이 없습니다</p>
-            <p className="text-sm text-gray-400">자동화를 실행하면 여기에 기록이 표시됩니다</p>
-          </div>
-        )}
-      </Card>
       </div>
 
       {/* 쇼핑몰 미연결 경고 모달 */}
@@ -1885,6 +1546,7 @@ export default function AutomationDashboardPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

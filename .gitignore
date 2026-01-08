@@ -242,3 +242,4 @@ band-session-extension/config.js
 # npm checksum file
 npm-checksum.json
 docs/MSA_ARCHITECTURE.md
+band-session-extension/config.js

@@ -3,7 +3,7 @@
  * 전체 자동화 파이프라인 실행
  */
 
-import prisma, { WorkflowType, WorkflowStatus, TriggerType } from '@bandauto/db'
+import prisma, { WorkflowType, WorkflowStatus, TriggerType, StepType } from '@bandauto/db'
 import { setBatchContext, clearBatchContext, createBatchContextFromUserId, throwIfCancelled, CancellationError } from './context'
 import { runCollectionPipeline } from './pipelines/collection'
 import { runTransformPipeline } from './pipelines/transform'
@@ -15,6 +15,11 @@ import {
   completeWorkflowLog,
   failWorkflowLog,
   updateWorkflowProgress,
+  startWorkflowStep,
+  updateStepProgress,
+  completeWorkflowStep,
+  clearCurrentStep,
+  failRunningSteps,
 } from './workflow-service'
 import {
   FullPipelineConfig,
@@ -181,15 +186,11 @@ export async function executeTransformPipeline(
     // 자동화 설정 조회
     const automationConfig = await prisma.automationConfig.findUnique({
       where: { userId },
-      include: {
-        pricingPolicy: true,
-      },
     })
 
     const transformConfig = {
       aiProvider: config?.aiProvider ?? automationConfig?.aiProvider ?? 'GEMINI',
-      pricingPolicyId: config?.pricingPolicyId ?? automationConfig?.pricingPolicyId,
-      pricingPolicyContent: config?.pricingPolicyContent ?? automationConfig?.pricingPolicy?.content,
+      pricingPolicyContent: config?.pricingPolicyContent,
       postIds: config?.postIds,
       transformPendingOnly: config?.transformPendingOnly ?? true,
     }
@@ -363,9 +364,6 @@ export async function executeFullPipeline(
     // 자동화 설정 조회
     const automationConfig = await prisma.automationConfig.findUnique({
       where: { userId },
-      include: {
-        pricingPolicy: true,
-      },
     })
 
     if (!automationConfig) {
@@ -419,12 +417,10 @@ export async function executeFullPipeline(
     // 2. 변환 단계
     if (!options?.skipTransform) {
       logStageStart('AI변환(Transform)', { ...logCtx, stage: 'TRANSFORM' })
-      log('DEBUG', `AI 제공자: ${automationConfig.aiProvider}, 가격정책ID: ${automationConfig.pricingPolicyId || '미설정'}`, { ...logCtx, stage: 'TRANSFORM' })
+      log('DEBUG', `AI 제공자: ${automationConfig.aiProvider}`, { ...logCtx, stage: 'TRANSFORM' })
 
       transformResult = await runTransformPipeline({
         aiProvider: automationConfig.aiProvider,
-        pricingPolicyId: automationConfig.pricingPolicyId,
-        pricingPolicyContent: automationConfig.pricingPolicy?.content,
         transformPendingOnly: true,
       })
 
@@ -755,9 +751,6 @@ export async function executeFullPipelineWithLock(
     // 자동화 설정 조회
     const automationConfig = await prisma.automationConfig.findUnique({
       where: { userId },
-      include: {
-        pricingPolicy: true,
-      },
     })
 
     if (!automationConfig) {
@@ -779,9 +772,15 @@ export async function executeFullPipelineWithLock(
     if (!options?.skipCollection) {
       await throwIfCancelled()
       logStageStart('수집(Collection)', { ...logCtx, stage: 'COLLECT' })
+      await startWorkflowStep(logId, StepType.COLLECTION, channelIds.length)
 
       if (channelIds.length === 0) {
         log('WARN', '수집할 채널이 설정되지 않았습니다.', { ...logCtx, stage: 'COLLECT' })
+        await completeWorkflowStep(logId, StepType.COLLECTION, {
+          status: 'SKIPPED',
+          successCount: 0,
+          failedCount: 0,
+        })
       } else {
         collectionResult = await runCollectionPipeline({
           channelIds,
@@ -795,6 +794,14 @@ export async function executeFullPipelineWithLock(
           collection: collectionResult.details,
         })
 
+        await completeWorkflowStep(logId, StepType.COLLECTION, {
+          status: collectionResult.failedCount === 0 ? 'COMPLETED' : collectionResult.successCount > 0 ? 'COMPLETED' : 'FAILED',
+          successCount: collectionResult.successCount,
+          failedCount: collectionResult.failedCount,
+          processedItems: collectionResult.totalItems,
+          details: collectionResult.details,
+        })
+
         logStageComplete('수집(Collection)', collectionResult, { ...logCtx, stage: 'COLLECT' })
       }
     } else {
@@ -805,11 +812,10 @@ export async function executeFullPipelineWithLock(
     if (!options?.skipTransform) {
       await throwIfCancelled()
       logStageStart('AI변환(Transform)', { ...logCtx, stage: 'TRANSFORM' })
+      await startWorkflowStep(logId, StepType.TRANSFORM)
 
       transformResult = await runTransformPipeline({
         aiProvider: automationConfig.aiProvider,
-        pricingPolicyId: automationConfig.pricingPolicyId,
-        pricingPolicyContent: automationConfig.pricingPolicy?.content,
         transformPendingOnly: true,
       })
 
@@ -821,6 +827,14 @@ export async function executeFullPipelineWithLock(
         transform: transformResult.details,
       })
 
+      await completeWorkflowStep(logId, StepType.TRANSFORM, {
+        status: transformResult.failedCount === 0 ? 'COMPLETED' : transformResult.successCount > 0 ? 'COMPLETED' : 'FAILED',
+        successCount: transformResult.successCount,
+        failedCount: transformResult.failedCount,
+        processedItems: transformResult.totalItems,
+        details: transformResult.details,
+      })
+
       logStageComplete('AI변환(Transform)', transformResult, { ...logCtx, stage: 'TRANSFORM' })
     } else {
       log('INFO', 'AI변환 단계 건너뜀', logCtx)
@@ -830,6 +844,7 @@ export async function executeFullPipelineWithLock(
     if (!options?.skipProductCreate) {
       await throwIfCancelled()
       logStageStart('상품생성(ProductCreate)', { ...logCtx, stage: 'PRODUCT' })
+      await startWorkflowStep(logId, StepType.PRODUCT_CREATE)
 
       productCreateResult = await runProductCreatePipeline({
         createPendingOnly: true,
@@ -844,6 +859,14 @@ export async function executeFullPipelineWithLock(
         productCreate: productCreateResult.details,
       })
 
+      await completeWorkflowStep(logId, StepType.PRODUCT_CREATE, {
+        status: productCreateResult.failedCount === 0 ? 'COMPLETED' : productCreateResult.successCount > 0 ? 'COMPLETED' : 'FAILED',
+        successCount: productCreateResult.successCount,
+        failedCount: productCreateResult.failedCount,
+        processedItems: productCreateResult.totalItems,
+        details: productCreateResult.details,
+      })
+
       logStageComplete('상품생성(ProductCreate)', productCreateResult, { ...logCtx, stage: 'PRODUCT' })
     } else {
       log('INFO', '상품생성 단계 건너뜀', logCtx)
@@ -852,9 +875,15 @@ export async function executeFullPipelineWithLock(
     // 4. 발행 단계
     if (!options?.skipPublish) {
       await throwIfCancelled()
+      await startWorkflowStep(logId, StepType.PUBLISH, retailChannelIds.length)
 
       if (retailChannelIds.length === 0) {
         log('WARN', '발행할 채널이 설정되지 않았습니다.', logCtx)
+        await completeWorkflowStep(logId, StepType.PUBLISH, {
+          status: 'SKIPPED',
+          successCount: 0,
+          failedCount: 0,
+        })
       } else {
         logStageStart('발행(Publish)', { ...logCtx, stage: 'PUBLISH' })
 
@@ -871,6 +900,14 @@ export async function executeFullPipelineWithLock(
           transform: transformResult?.details,
           productCreate: productCreateResult?.details,
           publish: publishResult.details,
+        })
+
+        await completeWorkflowStep(logId, StepType.PUBLISH, {
+          status: publishResult.failedCount === 0 ? 'COMPLETED' : publishResult.successCount > 0 ? 'COMPLETED' : 'FAILED',
+          successCount: publishResult.successCount,
+          failedCount: publishResult.failedCount,
+          processedItems: publishResult.totalItems,
+          details: publishResult.details,
         })
 
         logStageComplete('발행(Publish)', publishResult, { ...logCtx, stage: 'PUBLISH' })
@@ -900,6 +937,9 @@ export async function executeFullPipelineWithLock(
       productCreate: productCreateResult?.details,
       publish: publishResult?.details,
     })
+
+    // 현재 단계 초기화
+    await clearCurrentStep(logId)
 
     // 다음 실행 시간 업데이트
     if (automationConfig.cronExpression) {
@@ -948,6 +988,9 @@ export async function executeFullPipelineWithLock(
       log('WARN', `파이프라인 취소됨 (사용자 요청)`, logCtx)
       log('WARN', `소요 시간: ${duration}초`, logCtx)
       log('WARN', `═══════════════════════════════════════════════════════════`, logCtx)
+
+      // RUNNING 상태인 step들을 FAILED로 변경
+      await failRunningSteps(logId, '사용자에 의해 작업이 취소되었습니다.')
 
       await prisma.workflowLog.update({
         where: { id: logId },
@@ -1002,6 +1045,10 @@ export async function executeFullPipelineWithLock(
     if (error.stack) {
       log('DEBUG', `Stack: ${error.stack.split('\n').slice(0, 5).join(' | ')}`, logCtx)
     }
+
+    // RUNNING 상태인 step들을 FAILED로 변경
+    await failRunningSteps(logId, error.message)
+
     await failWorkflowLog(logId, error.message, {
       collection: collectionResult?.details,
       transform: transformResult?.details,

@@ -133,7 +133,6 @@ export async function GET(
           }
         : null,
       subtotalAmount: Number(guestOrder.subtotalAmount),
-      shippingFee: Number(guestOrder.shippingFee),
       discountAmount: Number(guestOrder.discountAmount),
       totalAmount: Number(guestOrder.totalAmount),
       orderedAt: guestOrder.orderedAt.toISOString(),

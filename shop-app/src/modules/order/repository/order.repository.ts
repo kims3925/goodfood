@@ -20,7 +20,6 @@ export interface OrderItemInput {
   thumbnailUrl: string | null
   quantity: number
   unitPrice: number
-  wholesalePrice?: number | null // 도매가 스냅샷 (마진 계산용)
   originalUnitPrice?: number // 할인 전 단가 (참조용)
   itemTotal?: number // 할인 반영된 아이템 총액
 }
@@ -42,7 +41,6 @@ export interface CreateOrderInput {
   shippingAddress: ShippingAddressInput
   // 금액 정보
   subtotalAmount: number
-  shippingFee: number
   discountAmount?: number
   totalAmount: number
   items: OrderItemInput[]
@@ -70,7 +68,6 @@ export interface OrderWithRelations {
   status: string
   // 금액 정보
   subtotalAmount: any
-  shippingFee: any
   discountAmount: any
   totalAmount: any
   orderedAt: Date
@@ -151,7 +148,6 @@ export class OrderRepository {
         status: 'PENDING',
         // 금액 정보
         subtotalAmount: new Decimal(data.subtotalAmount),
-        shippingFee: new Decimal(data.shippingFee),
         discountAmount: new Decimal(data.discountAmount || 0),
         totalAmount: new Decimal(data.totalAmount),
         // 배송지 정보 (수령인 정보)
@@ -174,7 +170,6 @@ export class OrderRepository {
             thumbnailUrl: item.thumbnailUrl,
             quantity: item.quantity,
             unitPrice: new Decimal(item.unitPrice),
-            wholesalePrice: item.wholesalePrice ?? null, // 도매가 스냅샷
             totalPrice: new Decimal(item.unitPrice * item.quantity),
           })),
         },

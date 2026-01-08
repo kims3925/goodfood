@@ -20,7 +20,7 @@
 │     CollectedPost → AI (Gemini/OpenAI) → CollectedProduct → Product │
 │                                                                      │
 │  3. 발행 (Publish)                                                   │
-│     Product → Band API → PublishedProduct → 소매밴드/쇼핑몰         │
+│     Product → ShopProduct/ChannelProduct → 쇼핑몰/소매밴드           │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
                                     │
@@ -157,25 +157,33 @@ Product (변환된 상품)
          ▼
 ┌─────────────────┐
 │ 1. Shop 발행    │ ── 쇼핑몰에 먼저 발행
-│ (PublishedProduct)│
+│ (ShopProduct)   │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
 │ 2. Band API 발행│ ── 소매채널에 발행
-│ (게시물 작성)    │
+│ (ChannelProduct)│
 └────────┬────────┘
          │
          ▼
-┌─────────────────┐
-│ PublishedProduct│
-├─────────────────┤
-│ - productId     │
-│ - channelId     │ ── Band 채널 (null if Shop only)
-│ - shopId        │ ── Shop ID (null if Band only)
-│ - postKey       │ ── Band 게시물 키 (취소용)
-│ - publishedAt   │
-└─────────────────┘
+┌──────────────────────────────────────────┐
+│ ShopProduct (쇼핑몰 발행)                  │
+├──────────────────────────────────────────┤
+│ - productId     │ ── 상품 FK             │
+│ - shopId        │ ── 쇼핑몰 FK           │
+│ - publishedAt   │ ── 발행 시각           │
+└──────────────────────────────────────────┘
+
+┌──────────────────────────────────────────┐
+│ ChannelProduct (채널 발행)                 │
+├──────────────────────────────────────────┤
+│ - productId     │ ── 상품 FK             │
+│ - channelId     │ ── 채널 FK             │
+│ - postKey       │ ── Band 게시물 키      │
+│ - isActive      │ ── 활성 상태           │
+│ - publishedAt   │ ── 발행 시각           │
+└──────────────────────────────────────────┘
 ```
 
 ### 발행 순서 (자동화 파이프라인)

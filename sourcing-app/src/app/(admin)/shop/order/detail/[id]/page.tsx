@@ -30,6 +30,13 @@ import { useToast } from '@/components/ui/Toast'
 
 type OrderSource = 'SHOPPING_MALL' | 'GOOGLE_FORM'
 
+interface ChannelInfo {
+  id: number
+  kind: 'WHOLESALE' | 'RETAIL'
+  platform: 'BAND' | 'NAVER_CAFE' | 'ALIEXPRESS' | 'SMARTSTORE' | 'COUPANG' | 'CUSTOM'
+  name: string
+}
+
 interface OrderItem {
   id: number
   productName: string
@@ -42,6 +49,8 @@ interface OrderItem {
   shippingFee: number
   bundleShippingType: 'NONE' | 'INCLUDED' | 'SEPARATE'
   bundleMaxQty: number
+  // 도매처(소싱 출처) 정보
+  channel: ChannelInfo | null
 }
 
 interface ShippingAddress {
@@ -103,6 +112,16 @@ interface UnifiedOrderDetail {
   refundAccount: RefundAccountInfo | null
   cancelReason: string | null
   cancelledBy: string | null
+}
+
+// 채널 플랫폼별 표시 정보
+const CHANNEL_PLATFORM_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
+  BAND: { label: '밴드', color: 'text-green-700', bgColor: 'bg-green-100' },
+  NAVER_CAFE: { label: '네이버카페', color: 'text-green-700', bgColor: 'bg-green-100' },
+  ALIEXPRESS: { label: '알리익스프레스', color: 'text-orange-700', bgColor: 'bg-orange-100' },
+  SMARTSTORE: { label: '스마트스토어', color: 'text-green-700', bgColor: 'bg-green-100' },
+  COUPANG: { label: '쿠팡', color: 'text-red-700', bgColor: 'bg-red-100' },
+  CUSTOM: { label: '기타', color: 'text-gray-700', bgColor: 'bg-gray-100' },
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -594,6 +613,18 @@ export default function UnifiedOrderDetailPage() {
                     {/* 상품 정보 */}
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-gray-900 mb-1">{item.productName}</h3>
+                      {/* 도매처(소싱 출처) 뱃지 */}
+                      {item.channel && (
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${CHANNEL_PLATFORM_CONFIG[item.channel.platform]?.bgColor || 'bg-gray-100'} ${CHANNEL_PLATFORM_CONFIG[item.channel.platform]?.color || 'text-gray-700'}`}>
+                            <Store size={12} />
+                            {item.channel.name}
+                          </span>
+                          {item.channel.kind === 'WHOLESALE' && (
+                            <span className="text-xs text-gray-400">도매</span>
+                          )}
+                        </div>
+                      )}
                       {item.optionSummary && (
                         <p className="text-sm text-gray-500 mb-1">{item.optionSummary}</p>
                       )}
@@ -696,7 +727,11 @@ export default function UnifiedOrderDetailPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">배송비</span>
-                      <span className="font-medium">{order.shippingFee === 0 ? '무료' : formatPrice(order.shippingFee)}</span>
+                      {order.shippingFee > 0 ? (
+                        <span className="font-medium">{formatPrice(order.shippingFee)}</span>
+                      ) : (
+                        <span className="font-medium text-green-600">무료</span>
+                      )}
                     </div>
                     {actualDiscount > 0 && (
                       <div className="flex justify-between text-green-600">

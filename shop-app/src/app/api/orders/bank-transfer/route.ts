@@ -385,7 +385,6 @@ export async function POST(req: NextRequest) {
           status: CustomerOrderStatus.PENDING,
           // 금액 정보
           subtotalAmount: subtotal,
-          shippingFee,
           discountAmount,
           totalAmount: finalTotalAmount,
           items: {
@@ -467,7 +466,6 @@ export async function POST(req: NextRequest) {
         orderNumber: result.order.orderNumber,
         totalAmount: Number(result.order.totalAmount),
         subtotal: Number(result.order.subtotalAmount),
-        shippingFee: Number(result.order.shippingFee),
         discountAmount: Number(result.order.discountAmount),
         itemCount: orderItems.reduce((sum, item) => sum + item.quantity, 0),
         items: orderItems.map((item) => ({
