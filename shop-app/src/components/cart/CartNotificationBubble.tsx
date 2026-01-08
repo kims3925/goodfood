@@ -16,10 +16,10 @@ export default function CartNotificationBubble({ position = 'top' }: CartNotific
   const isBottom = position === 'bottom'
 
   return (
-    <div className={`absolute z-50 animate-in fade-in duration-200 ${
+    <div className={`absolute z-50 animate-fade-in ${
       isBottom
-        ? 'bottom-full left-1/2 -translate-x-1/2 mb-3 slide-in-from-bottom-2'
-        : 'top-full right-0 mt-2 slide-in-from-top-2'
+        ? 'bottom-full left-1/2 -translate-x-1/2 mb-3 animate-slide-in-from-bottom-2'
+        : 'top-full right-0 mt-2 animate-slide-in-from-top-2'
     }`}>
       {/* 말풍선 꼬리 */}
       <div className={`absolute w-4 h-4 bg-white transform rotate-45 ${

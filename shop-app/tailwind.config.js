@@ -95,6 +95,25 @@ module.exports = {
       maxWidth: {
         'container': '1320px',
       },
+      keyframes: {
+        'fade-in': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        'slide-in-from-top': {
+          from: { transform: 'translateY(-8px)' },
+          to: { transform: 'translateY(0)' },
+        },
+        'slide-in-from-bottom': {
+          from: { transform: 'translateY(8px)' },
+          to: { transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'fade-in': 'fade-in 0.2s ease-out',
+        'slide-in-from-top-2': 'slide-in-from-top 0.2s ease-out',
+        'slide-in-from-bottom-2': 'slide-in-from-bottom 0.2s ease-out',
+      },
     },
   },
   plugins: [],
