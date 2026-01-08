@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -42,6 +42,29 @@ interface OrderItem {
   paymentMethod: string | null
 }
 
+// 휴대폰 번호 포맷팅 (컴포넌트 외부에 정의하여 안정적인 참조 유지)
+const formatPhone = (value: string) => {
+  const numbers = value.replace(/[^0-9]/g, '')
+  if (numbers.length <= 3) return numbers
+  if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`
+  return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`
+}
+
+// 날짜 포맷팅
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+// 가격 포맷팅
+const formatPrice = (price: number) => {
+  return price.toLocaleString('ko-KR') + '원'
+}
+
 export default function FindOrdersPage() {
   const router = useRouter()
   const { getPath, getApiPath } = useShopUrl()
@@ -52,19 +75,12 @@ export default function FindOrdersPage() {
   const [orders, setOrders] = useState<OrderItem[] | null>(null)
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
 
-  const formatPhone = (value: string) => {
-    const numbers = value.replace(/[^0-9]/g, '')
-    if (numbers.length <= 3) return numbers
-    if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`
-    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`
-  }
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhoneChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhone(e.target.value)
     setPhone(formatted)
-  }
+  }, [])
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setOrders(null)
@@ -106,13 +122,13 @@ export default function FindOrdersPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [phone, name, getApiPath])
 
-  const handleOrderClick = async (order: OrderItem) => {
+  const handleOrderClick = useCallback(async (order: OrderItem) => {
     try {
       setSelectedOrderId(order.id)
 
-      // lookup API로 토큰 발급
+      // lookup API로 토큰 발급 (주문번호만으로 조회)
       const response = await fetch(getApiPath('/api/guest-orders/lookup'), {
         method: 'POST',
         headers: {
@@ -120,7 +136,6 @@ export default function FindOrdersPage() {
         },
         body: JSON.stringify({
           orderNumber: order.orderNumber,
-          phone: phone.replace(/-/g, ''),
         }),
       })
 
@@ -137,20 +152,7 @@ export default function FindOrdersPage() {
       setError('주문 상세 조회 중 오류가 발생했습니다')
       setSelectedOrderId(null)
     }
-  }
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
-  }
-
-  const formatPrice = (price: number) => {
-    return price.toLocaleString('ko-KR') + '원'
-  }
+  }, [getApiPath, getPath, router])
 
   return (
     <div className="min-h-screen bg-gray-50">

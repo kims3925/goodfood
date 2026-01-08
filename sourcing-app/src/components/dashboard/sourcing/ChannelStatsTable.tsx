@@ -184,6 +184,10 @@ function RetailTable({ channels, isLoading }: { channels: ChannelStat[]; isLoadi
   // 쇼핑몰 URL 생성
   const getShopUrl = (subdomain: string) => {
     const shopBaseUrl = process.env.NEXT_PUBLIC_SHOP_BASE_URL
+    if (!shopBaseUrl) {
+      console.warn('NEXT_PUBLIC_SHOP_BASE_URL is not configured')
+      return `/${subdomain}`
+    }
     return `${shopBaseUrl}/${subdomain}`
   }
 
