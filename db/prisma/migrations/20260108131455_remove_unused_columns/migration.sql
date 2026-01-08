@@ -2,6 +2,9 @@
 -- 전체 스키마 마이그레이션
 -- published_product -> shop_product/channel_product 전환
 --
+-- !중요!: 실행 전 데이터 백업을 권장합니다.
+-- 롤백 스크립트: rollback_20260108131455.sql (별도 제공)
+--
 -- 이 마이그레이션은 다음 변경사항을 포함합니다:
 -- 1. shop_product 테이블 생성 (published_product 대체)
 -- 2. channel_product 테이블 생성 (채널별 상품 발행 관리)
@@ -151,7 +154,10 @@ ON DUPLICATE KEY UPDATE
   `updated_at` = VALUES(`updated_at`),
   `legacy_published_product_id` = VALUES(`legacy_published_product_id`);
 
--- FK 체크 다시 활성화
+-- 데이터 마이그레이션 명시적 커밋 (DDL 실행 전 저장)
+COMMIT;
+
+-- FK 체크 다시 활성화 (안전장치)
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- =============================================
@@ -167,7 +173,11 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- =============================================
 -- PART 3: 레거시 테이블 삭제
 -- published_product 참조하는 FK 먼저 삭제 후 테이블 삭제
+-- 주의: DDL은 암시적으로 커밋을 수행합니다.
 -- =============================================
+
+-- FK 체크 일시 비활성화 (DDL 실행용)
+SET FOREIGN_KEY_CHECKS = 0;
 
 -- cart_item FK 삭제 (존재하는 경우에만)
 SET @fk_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
@@ -252,5 +262,4 @@ DEALLOCATE PREPARE stmt;
 -- FK 체크 다시 활성화
 SET FOREIGN_KEY_CHECKS = 1;
 
--- 트랜잭션 커밋
-COMMIT;
+-- DDL은 암시적 커밋을 수행하므로 별도의 COMMIT 문이 필요하지 않음
