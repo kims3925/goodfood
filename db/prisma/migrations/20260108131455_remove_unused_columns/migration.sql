@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS `shop_product` (
   INDEX `idx_deleted_at` (`deleted_at`),
   UNIQUE KEY `uk_product_shop` (`product_id`, `shop_id`),
   CONSTRAINT `fk_shop_product_product_id` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `fk_shop_product_shop_id` FOREIGN KEY (`shop_id`) REFERENCES `shop` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `fk_shop_product_shop_id` FOREIGN KEY (`shop_id`) REFERENCES `shop` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_shop_product_user_id` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- channel_product 테이블 생성
@@ -57,7 +58,8 @@ CREATE TABLE IF NOT EXISTS `channel_product` (
   INDEX `idx_legacy_id` (`legacy_published_product_id`),
   UNIQUE KEY `uk_product_channel` (`product_id`, `channel_id`),
   CONSTRAINT `fk_channel_product_product_id` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `fk_channel_product_channel_id` FOREIGN KEY (`channel_id`) REFERENCES `channel` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `fk_channel_product_channel_id` FOREIGN KEY (`channel_id`) REFERENCES `channel` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_channel_product_user_id` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- workflow_step_log 테이블 생성 (자동화 파이프라인 단계별 추적)
