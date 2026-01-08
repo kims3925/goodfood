@@ -4,7 +4,7 @@
  * 채널별 통계 데이터 훅
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ChannelKind, ChannelStat, ChannelStatsSummary } from '@/types/dashboard'
 
 interface ChannelStatsData {
@@ -50,7 +50,10 @@ export function useChannelStats(options: UseChannelStatsOptions = {}): UseChanne
   const [isLoading, setIsLoading] = useState(!skipInitialFetch)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchStats = useCallback(async () => {
+  // AbortController 참조를 저장하여 cleanup 시 취소 가능하도록 함
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  const fetchStats = useCallback(async (signal?: AbortSignal) => {
     try {
       setIsLoading(true)
       setError(null)
@@ -66,7 +69,9 @@ export function useChannelStats(options: UseChannelStatsOptions = {}): UseChanne
         params.set('endDate', endDate)
       }
 
-      const response = await fetch(`/api/channel/stats?${params.toString()}`)
+      const response = await fetch(`/api/channel/stats?${params.toString()}`, {
+        signal,
+      })
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -78,6 +83,10 @@ export function useChannelStats(options: UseChannelStatsOptions = {}): UseChanne
         setError(result.error || '데이터를 불러오는데 실패했습니다.')
       }
     } catch (err) {
+      // AbortError는 정상적인 취소이므로 에러로 처리하지 않음
+      if (err instanceof Error && err.name === 'AbortError') {
+        return
+      }
       setError('네트워크 오류가 발생했습니다.')
       console.error('채널 통계 조회 실패:', err)
     } finally {
@@ -85,10 +94,22 @@ export function useChannelStats(options: UseChannelStatsOptions = {}): UseChanne
     }
   }, [kind, period, startDate, endDate])
 
-  // 초기 로딩
+  // 초기 로딩 및 의존성 변경 시 fetch
   useEffect(() => {
-    if (!skipInitialFetch) {
-      fetchStats()
+    if (skipInitialFetch) return
+
+    // 이전 요청 취소
+    abortControllerRef.current?.abort()
+
+    // 새 AbortController 생성
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
+    fetchStats(controller.signal)
+
+    // cleanup: 언마운트 또는 의존성 변경 시 요청 취소
+    return () => {
+      controller.abort()
     }
   }, [fetchStats, skipInitialFetch])
 
@@ -96,14 +117,29 @@ export function useChannelStats(options: UseChannelStatsOptions = {}): UseChanne
   useEffect(() => {
     if (pollInterval <= 0) return
 
-    const intervalId = setInterval(fetchStats, pollInterval)
-    return () => clearInterval(intervalId)
+    const intervalId = setInterval(() => {
+      // 폴링 요청은 별도 controller 사용 (이전 폴링 취소 불필요)
+      const controller = new AbortController()
+      fetchStats(controller.signal)
+    }, pollInterval)
+
+    return () => {
+      clearInterval(intervalId)
+    }
   }, [fetchStats, pollInterval])
+
+  // 수동 refetch 함수 (외부에서 호출 시 사용)
+  const refetch = useCallback(async () => {
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    await fetchStats(controller.signal)
+  }, [fetchStats])
 
   return {
     data,
     isLoading,
     error,
-    refetch: fetchStats,
+    refetch,
   }
 }

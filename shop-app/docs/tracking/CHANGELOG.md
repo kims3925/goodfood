@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260108-005 | Done | 2026-01-08 | REQ-ORDER-001 | 비회원 주문 조회 플로우 개선 | Low | Claude |
 | TR-20260108-004 | Done | 2026-01-08 | - | published_product → shop_product/channel_product 스키마 마이그레이션 | Medium | Claude |
 | TR-20260108-003 | Done | 2026-01-08 | - | 역할명 변경 (회원/매니저) | Low | Claude |
 | TR-20260108-002 | Done | 2026-01-08 | REQ-SHOP-002 | 인기상품 페이지 신규 개발 | Medium | Lee |
@@ -108,6 +109,71 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260108-005: 비회원 주문 조회 플로우 개선
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-08 |
+| REQ-ID | REQ-ORDER-001 |
+| Risk | Low |
+
+### 변경 사항
+- 비회원 주문 조회 UX 개선: 주문번호 조회와 휴대폰 조회 페이지 분리
+- `/order/lookup` 페이지: 주문번호만으로 조회 (휴대폰 입력 필드 제거)
+- `/order/find-orders` 페이지: 휴대폰 + 이름으로 최근 90일 내 주문 목록 조회
+- `/api/guest-orders/lookup` API: phone 파라미터 제거 (API 계약 변경)
+- `/api/guest-orders/find-by-phone` API: 휴대폰 + 이름으로 주문 목록 반환
+- 에러 응답에서 내부 정보 노출 방지 (error.message → 일반화된 메시지)
+- 이벤트 핸들러에 useCallback 적용 (성능 최적화)
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(shop)/order/lookup/page.tsx | Modified | 휴대폰 입력 필드 제거, 주문번호만으로 조회 |
+| src/app/(shop)/order/find-orders/page.tsx | Modified | useCallback 적용, formatPhone 외부로 이동 |
+| src/app/api/guest-orders/lookup/route.ts | Modified | phone 파라미터 제거 (API 계약 변경) |
+| src/app/api/guest-orders/find-by-phone/route.ts | Modified | 에러 응답 일반화 (보안 개선) |
+
+### 영향 분석
+- [x] API Contract 변경 (`/api/guest-orders/lookup` phone 파라미터 제거)
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경 (에러 메시지 일반화)
+
+### API 계약 변경 상세
+
+#### `/api/guest-orders/lookup` (POST)
+| 항목 | 변경 전 | 변경 후 |
+|-----|--------|--------|
+| Request Body | `{ orderNumber, phone }` | `{ orderNumber }` |
+| 인증 방식 | 주문번호 + 휴대폰 검증 | 주문번호만 검증 |
+
+#### `/api/guest-orders/find-by-phone` (POST)
+| 항목 | 값 |
+|-----|---|
+| Request Body | `{ phone, name }` |
+| Response | `{ success, orders: OrderItem[], totalCount }` |
+| 조회 범위 | 최근 90일, 최대 20건 |
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Unit | N/A |
+| Manual | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. `/api/guest-orders/lookup`에 phone 파라미터 복원
+3. `/order/lookup` 페이지에 휴대폰 입력 필드 복원
+
+### 관련 항목
+- REQ-ID: REQ-ORDER-001
+- Flow-ID: 비회원 주문 조회
+
+---
 
 ## TR-20260108-004: published_product → shop_product/channel_product 스키마 마이그레이션
 

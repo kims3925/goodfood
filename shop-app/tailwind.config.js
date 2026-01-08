@@ -101,12 +101,12 @@ module.exports = {
           to: { opacity: '1' },
         },
         'slide-in-from-top': {
-          from: { transform: 'translateY(-8px)' },
-          to: { transform: 'translateY(0)' },
+          from: { transform: 'translateY(-8px)', opacity: '0' },
+          to: { transform: 'translateY(0)', opacity: '1' },
         },
         'slide-in-from-bottom': {
-          from: { transform: 'translateY(8px)' },
-          to: { transform: 'translateY(0)' },
+          from: { transform: 'translateY(8px)', opacity: '0' },
+          to: { transform: 'translateY(0)', opacity: '1' },
         },
       },
       animation: {
