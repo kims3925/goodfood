@@ -279,15 +279,19 @@ function StoreLayoutContent({
           <Home />
           <span>홈</span>
         </Link>
-        <Link href={getPath('/cart')} className="mobile-nav-item relative">
-          <ShoppingCart />
-          {cartCount > 0 && (
-            <span className="absolute -top-1 left-1/2 ml-2 w-5 h-5 bg-abc-coral text-white text-[10px] rounded-full flex items-center justify-center">
-              {cartCount > 99 ? '99+' : cartCount}
-            </span>
-          )}
-          <span>장바구니</span>
-        </Link>
+        <div className="relative">
+          <Link href={getPath('/cart')} className="mobile-nav-item relative">
+            <ShoppingCart />
+            {cartCount > 0 && (
+              <span className="absolute -top-1 left-1/2 ml-2 w-5 h-5 bg-abc-coral text-white text-[10px] rounded-full flex items-center justify-center">
+                {cartCount > 99 ? '99+' : cartCount}
+              </span>
+            )}
+            <span>장바구니</span>
+          </Link>
+          {/* 모바일 장바구니 알림 버블 - 하단에서 위로 표시 */}
+          <CartNotificationBubble position="bottom" />
+        </div>
 
         {/* 중앙 플로팅 인기상품 버튼 */}
         <Link href={getPath('/popular')} className="mobile-nav-center">

@@ -137,13 +137,16 @@ export default function ProductDetailClient() {
   // Scroll Spy: 스크롤 위치에 따라 활성 탭 변경
   useEffect(() => {
     const handleScroll = () => {
-      // StoreLayout 헤더 높이 계산 (유틸리티 바 32px 포함)
+      // StoreLayout 헤더 높이 계산
+      // 모바일: Mobile Top Bar(56px) + Main Header(64px) = 120px
+      // md: Utility Bar(32px) + Main Header(80px) = 112px
+      // lg: Utility Bar(32px) + Main Header(100px) = 132px
       const windowWidth = window.innerWidth
-      let storeHeaderHeight = 96 // 64 + 32 (유틸리티 바)
+      let storeHeaderHeight = 120 // 모바일: 56 + 64
       if (windowWidth >= 1024) {
-        storeHeaderHeight = 132 // 100 + 32
+        storeHeaderHeight = 132 // lg: 100 + 32
       } else if (windowWidth >= 768) {
-        storeHeaderHeight = 112 // 80 + 32
+        storeHeaderHeight = 112 // md: 80 + 32
       }
       const tabsHeight = 56
       const scrollPosition = window.scrollY + storeHeaderHeight + tabsHeight + 50
@@ -181,13 +184,16 @@ export default function ProductDetailClient() {
 
     const targetRef = sectionRefs[sectionId]
     if (targetRef?.current) {
-      // StoreLayout 헤더 높이 (유틸리티 바 32px 포함): 모바일 96px, md 112px, lg 132px
+      // StoreLayout 헤더 높이 계산
+      // 모바일: Mobile Top Bar(56px) + Main Header(64px) = 120px
+      // md: Utility Bar(32px) + Main Header(80px) = 112px
+      // lg: Utility Bar(32px) + Main Header(100px) = 132px
       const windowWidth = window.innerWidth
-      let storeHeaderHeight = 96 // 64 + 32 (유틸리티 바)
+      let storeHeaderHeight = 120 // 모바일: 56 + 64
       if (windowWidth >= 1024) {
-        storeHeaderHeight = 132 // 100 + 32
+        storeHeaderHeight = 132 // lg: 100 + 32
       } else if (windowWidth >= 768) {
-        storeHeaderHeight = 112 // 80 + 32
+        storeHeaderHeight = 112 // md: 80 + 32
       }
       const tabsHeight = 56 // 탭 높이
       const headerOffset = storeHeaderHeight + tabsHeight + 16 // 여유 공간
@@ -942,7 +948,7 @@ export default function ProductDetailClient() {
         {/* Sticky Tabs - StoreLayout 헤더 아래에 고정 */}
         <div
           ref={tabsRef}
-          className="mt-8 bg-white sticky top-24 md:top-28 lg:top-[132px] z-40 shadow-sm"
+          className="mt-8 bg-white sticky top-[120px] md:top-28 lg:top-[132px] z-40 shadow-sm"
         >
           <div className="flex border-b max-w-[1050px] mx-auto">
             <button

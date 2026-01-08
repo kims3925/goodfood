@@ -4,8 +4,21 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Download, Sparkles, ShoppingBag, Upload, X, Check, Loader2, AlertCircle, Clock, RefreshCw } from 'lucide-react'
 import { checkExtensionInstalled, saveSessionViaExtension } from '@/lib/band-extension'
 
+// WorkflowStepLog 기반 단계 진행 정보
 interface StageProgress {
+  // WorkflowStepLog 기반 필드
+  status?: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED'
   completed: boolean
+  startedAt?: string | null
+  completedAt?: string | null
+  duration?: number | null
+  totalItems?: number
+  processedItems?: number
+  successCount?: number
+  failedCount?: number
+  progress?: number  // 0-100 퍼센트
+  errorMessage?: string | null
+  // 기존 호환 필드
   total?: number
   success?: number
   failed?: number
@@ -151,13 +164,28 @@ export default function PipelineStatusPanel({ workflow, onCancel, onResume, isCa
     return () => clearInterval(interval)
   }, [workflow.startedAt])
 
-  // 단계 상태 결정
-  const getStageStatus = (stageKey: StageKey): 'pending' | 'running' | 'completed' | 'failed' => {
+  // 단계 상태 결정 (WorkflowStepLog의 status 활용)
+  const getStageStatus = (stageKey: StageKey): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' => {
     const stageProgress = workflow.stageProgress[stageKey]
 
+    // WorkflowStepLog의 status 필드가 있으면 우선 사용
+    if (stageProgress?.status) {
+      const statusMap: Record<string, 'pending' | 'running' | 'completed' | 'failed' | 'skipped'> = {
+        'PENDING': 'pending',
+        'RUNNING': 'running',
+        'COMPLETED': 'completed',
+        'FAILED': 'failed',
+        'SKIPPED': 'skipped',
+      }
+      return statusMap[stageProgress.status] || 'pending'
+    }
+
+    // 기존 로직 (하위 호환)
     if (stageProgress?.completed) {
       // 실패 건수가 있으면서 성공이 0이면 실패
-      if (stageProgress.failed && stageProgress.failed > 0 && (!stageProgress.success || stageProgress.success === 0)) {
+      const failed = stageProgress.failedCount ?? stageProgress.failed ?? 0
+      const success = stageProgress.successCount ?? stageProgress.success ?? 0
+      if (failed > 0 && success === 0) {
         return 'failed'
       }
       return 'completed'
@@ -178,18 +206,45 @@ export default function PipelineStatusPanel({ workflow, onCancel, onResume, isCa
     return 'pending'
   }
 
-  // 단계 진행 텍스트
+  // 단계 진행 텍스트 (WorkflowStepLog 정보 활용)
   const getStageProgressText = (stageKey: StageKey): string => {
     const progress = workflow.stageProgress[stageKey]
     if (!progress) return ''
 
+    const status = getStageStatus(stageKey)
+
+    // 수집 단계는 totalNewPosts 표시
     if (stageKey === 'collection') {
       if (progress.totalNewPosts !== undefined) {
         return `${progress.totalNewPosts}건`
       }
+      // WorkflowStepLog 기반 정보
+      if (status === 'completed' || status === 'running') {
+        const success = progress.successCount ?? progress.success ?? 0
+        return success > 0 ? `${success}건` : ''
+      }
       return ''
     }
 
+    // WorkflowStepLog의 processedItems/totalItems 활용 (실시간 진행률)
+    if (progress.totalItems && progress.totalItems > 0) {
+      const processed = progress.processedItems ?? 0
+      const success = progress.successCount ?? progress.success ?? 0
+      const failed = progress.failedCount ?? progress.failed ?? 0
+
+      if (status === 'running') {
+        // 진행 중: processedItems/totalItems 표시
+        return `${processed}/${progress.totalItems}건`
+      } else if (status === 'completed' || status === 'failed') {
+        // 완료: 성공/실패 건수 표시
+        if (failed > 0) {
+          return `${success}건 (실패 ${failed})`
+        }
+        return `${success}건`
+      }
+    }
+
+    // 기존 로직 (하위 호환)
     if (progress.total && progress.total > 0) {
       const current = (progress.success || 0) + (progress.failed || 0)
       return `${current}/${progress.total}건`
@@ -202,24 +257,36 @@ export default function PipelineStatusPanel({ workflow, onCancel, onResume, isCa
     return ''
   }
 
-  // 전체 진행률 계산
+  // 전체 진행률 계산 (WorkflowStepLog의 progress 활용)
   const calculateOverallProgress = (): number => {
-    const completedStages = STAGES.filter(s => getStageStatus(s.key) === 'completed').length
-    const currentStage = STAGES.findIndex(s => s.key === workflow.currentStage)
+    let totalProgress = 0
 
-    if (currentStage === -1) return 0
+    for (const stage of STAGES) {
+      const status = getStageStatus(stage.key)
+      const stageData = workflow.stageProgress[stage.key]
 
-    const currentProgress = workflow.stageProgress[workflow.currentStage || 'collection']
-    let stageProgress = 0
-
-    if (currentProgress?.total && currentProgress.total > 0) {
-      const processed = (currentProgress.success || 0) + (currentProgress.failed || 0)
-      stageProgress = processed / currentProgress.total
-    } else if (currentProgress?.batchProgress?.total) {
-      stageProgress = currentProgress.batchProgress.current / currentProgress.batchProgress.total
+      if (status === 'completed' || status === 'skipped') {
+        totalProgress += 100
+      } else if (status === 'running' && stageData) {
+        // WorkflowStepLog의 progress 필드 우선 사용
+        if (stageData.progress !== undefined && stageData.progress > 0) {
+          totalProgress += stageData.progress
+        } else if (stageData.totalItems && stageData.totalItems > 0) {
+          // processedItems/totalItems 기반 계산
+          const processed = stageData.processedItems ?? 0
+          totalProgress += Math.round((processed / stageData.totalItems) * 100)
+        } else if (stageData.total && stageData.total > 0) {
+          // 기존 로직 (하위 호환)
+          const processed = (stageData.success ?? 0) + (stageData.failed ?? 0)
+          totalProgress += Math.round((processed / stageData.total) * 100)
+        } else if (stageData.batchProgress?.total) {
+          totalProgress += Math.round((stageData.batchProgress.current / stageData.batchProgress.total) * 100)
+        }
+      }
+      // pending, failed 상태는 0 기여
     }
 
-    return Math.round((completedStages + stageProgress) / STAGES.length * 100)
+    return Math.round(totalProgress / STAGES.length)
   }
 
   const startTime = new Date(workflow.startedAt).toLocaleTimeString('ko-KR', {
@@ -367,7 +434,9 @@ export default function PipelineStatusPanel({ workflow, onCancel, onResume, isCa
                           ? 'bg-white text-blue-600 animate-pulse'
                           : status === 'failed'
                             ? 'bg-red-400 text-white'
-                            : 'bg-white/20 text-white/60'
+                            : status === 'skipped'
+                              ? 'bg-gray-400 text-white'
+                              : 'bg-white/20 text-white/60'
                     }`}
                   >
                     {status === 'completed' ? (
@@ -376,6 +445,8 @@ export default function PipelineStatusPanel({ workflow, onCancel, onResume, isCa
                       <Loader2 className="w-5 h-5 animate-spin" />
                     ) : status === 'failed' ? (
                       <AlertCircle className="w-5 h-5" />
+                    ) : status === 'skipped' ? (
+                      <Check className="w-5 h-5 opacity-70" />
                     ) : (
                       <Icon className="w-5 h-5" />
                     )}
@@ -392,8 +463,8 @@ export default function PipelineStatusPanel({ workflow, onCancel, onResume, isCa
                 {index < STAGES.length - 1 && (
                   <div
                     className={`w-12 h-0.5 mx-2 ${
-                      getStageStatus(STAGES[index + 1].key) !== 'pending' || status === 'completed'
-                        ? 'bg-green-400'
+                      getStageStatus(STAGES[index + 1].key) !== 'pending' || status === 'completed' || status === 'skipped'
+                        ? status === 'skipped' ? 'bg-gray-400' : 'bg-green-400'
                         : 'bg-white/20'
                     }`}
                   />

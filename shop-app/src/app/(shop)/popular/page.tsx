@@ -142,8 +142,8 @@ export default function PopularProductsPage() {
       )
     }
     return (
-      <div className="absolute top-2 left-2 z-10 flex items-center justify-center w-7 h-7 bg-gray-800/80 rounded-full shadow">
-        <span className="text-xs font-bold text-white">{rank}</span>
+      <div className="absolute top-2 left-2 z-10 flex items-center justify-center px-2 py-1 bg-gray-800/80 rounded-full shadow">
+        <span className="text-xs font-bold text-white">{rank}위</span>
       </div>
     )
   }

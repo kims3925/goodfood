@@ -92,33 +92,50 @@ interface Channel {
   shop?: ChannelShop | null
 }
 
+// WorkflowStepLog 기반 단계 정보
+interface StepInfo {
+  stepType: string
+  stepOrder: number
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED'
+  startedAt: string | null
+  completedAt: string | null
+  totalItems: number
+  processedItems: number
+  successCount: number
+  failedCount: number
+  progress: number  // 0-100
+}
+
+// API에서 반환하는 stageProgress 형태
+interface StageProgressItem {
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED'
+  completed: boolean
+  startedAt: string | null
+  completedAt: string | null
+  duration: number | null
+  totalItems: number
+  processedItems: number
+  successCount: number
+  failedCount: number
+  progress: number  // 0-100
+  errorMessage: string | null
+  // 기존 details 호환 필드
+  totalNewPosts?: number
+  channelResults?: { channelName: string; newPosts: number; failed: number }[]
+  batchProgress?: { current: number; total: number }
+  currentChannel?: string
+  currentProgress?: { current: number; total: number }
+  // 기존 필드명 호환 (deprecated)
+  total?: number
+  success?: number
+  failed?: number
+}
+
 interface StageProgress {
-  collection: {
-    completed: boolean
-    totalNewPosts: number
-    channelResults: { channelName: string; newPosts: number; failed: number }[]
-  } | null
-  transform: {
-    completed: boolean
-    total: number
-    success: number
-    failed: number
-    batchProgress: { current: number; total: number } | null
-  } | null
-  productCreate: {
-    completed: boolean
-    total: number
-    success: number
-    failed: number
-  } | null
-  publish: {
-    completed: boolean
-    total: number
-    success: number
-    failed: number
-    currentChannel: string | null
-    currentProgress: { current: number; total: number } | null
-  } | null
+  collection?: StageProgressItem
+  transform?: StageProgressItem
+  productCreate?: StageProgressItem
+  publish?: StageProgressItem
 }
 
 interface RunningWorkflow {
@@ -131,6 +148,7 @@ interface RunningWorkflow {
   failedCount: number
   currentStage: 'collection' | 'transform' | 'productCreate' | 'publish' | null
   stageProgress: StageProgress | null
+  steps?: StepInfo[]  // WorkflowStepLog 정보
 }
 
 interface RecentLog {
@@ -1155,14 +1173,14 @@ export default function AutomationDashboardPage() {
                 {/* 1. 수집 */}
                 <div className={`flex-1 relative ${runningWorkflow.currentStage === 'collection' ? 'z-10' : ''}`}>
                   <div className={`p-3 rounded-lg border-2 transition-all ${
-                    runningWorkflow.stageProgress?.collection
+                    runningWorkflow.stageProgress?.collection?.completed
                       ? 'bg-green-50 border-green-300'
                       : runningWorkflow.currentStage === 'collection'
                       ? 'bg-green-100 border-green-500 shadow-lg animate-pulse'
                       : 'bg-gray-50 border-gray-200'
                   }`}>
                     <div className="flex items-center gap-2 mb-1">
-                      {runningWorkflow.stageProgress?.collection ? (
+                      {runningWorkflow.stageProgress?.collection?.completed ? (
                         <CheckCircle size={16} className="text-green-600" />
                       ) : runningWorkflow.currentStage === 'collection' ? (
                         <RefreshCw size={16} className="text-green-600 animate-spin" />
@@ -1173,7 +1191,10 @@ export default function AutomationDashboardPage() {
                     </div>
                     {runningWorkflow.stageProgress?.collection && (
                       <p className="text-xs text-green-700 font-medium">
-                        {runningWorkflow.stageProgress.collection.totalNewPosts}건
+                        {runningWorkflow.stageProgress.collection.totalNewPosts ?? runningWorkflow.stageProgress.collection.successCount ?? 0}건
+                        {runningWorkflow.currentStage === 'collection' && runningWorkflow.stageProgress.collection.progress !== undefined && (
+                          <span className="text-green-500 ml-1">({runningWorkflow.stageProgress.collection.progress}%)</span>
+                        )}
                       </p>
                     )}
                     {runningWorkflow.currentStage === 'collection' && !runningWorkflow.stageProgress?.collection && (
@@ -1191,7 +1212,7 @@ export default function AutomationDashboardPage() {
                       ? 'bg-yellow-50 border-yellow-300'
                       : runningWorkflow.currentStage === 'transform'
                       ? 'bg-yellow-100 border-yellow-500 shadow-lg animate-pulse'
-                      : runningWorkflow.stageProgress?.collection
+                      : runningWorkflow.stageProgress?.collection?.completed
                       ? 'bg-gray-50 border-gray-200'
                       : 'bg-gray-50 border-gray-100 opacity-50'
                   }`}>
@@ -1207,14 +1228,19 @@ export default function AutomationDashboardPage() {
                     </div>
                     {runningWorkflow.stageProgress?.transform && (
                       <p className="text-xs text-yellow-700 font-medium">
-                        {runningWorkflow.stageProgress.transform.success !== undefined
-                          ? `${runningWorkflow.stageProgress.transform.success}건`
-                          : '처리 중...'}
-                        {runningWorkflow.stageProgress.transform.batchProgress?.current !== undefined &&
-                         runningWorkflow.stageProgress.transform.batchProgress?.total !== undefined &&
-                         runningWorkflow.currentStage === 'transform' && (
+                        {(() => {
+                          const t = runningWorkflow.stageProgress.transform
+                          const success = t.successCount ?? t.success
+                          const processed = t.processedItems ?? 0
+                          const total = t.totalItems ?? t.total ?? 0
+                          if (runningWorkflow.currentStage === 'transform' && total > 0) {
+                            return `${processed}/${total}건`
+                          }
+                          return success !== undefined ? `${success}건` : '처리 중...'
+                        })()}
+                        {runningWorkflow.currentStage === 'transform' && runningWorkflow.stageProgress.transform.progress !== undefined && (
                           <span className="text-yellow-500 ml-1">
-                            ({runningWorkflow.stageProgress.transform.batchProgress.current}/{runningWorkflow.stageProgress.transform.batchProgress.total})
+                            ({runningWorkflow.stageProgress.transform.progress}%)
                           </span>
                         )}
                       </p>
@@ -1230,7 +1256,7 @@ export default function AutomationDashboardPage() {
                 {/* 3. 등록 */}
                 <div className={`flex-1 relative ${runningWorkflow.currentStage === 'productCreate' ? 'z-10' : ''}`}>
                   <div className={`p-3 rounded-lg border-2 transition-all ${
-                    runningWorkflow.stageProgress?.productCreate
+                    runningWorkflow.stageProgress?.productCreate?.completed
                       ? 'bg-orange-50 border-orange-300'
                       : runningWorkflow.currentStage === 'productCreate'
                       ? 'bg-orange-100 border-orange-500 shadow-lg animate-pulse'
@@ -1239,7 +1265,7 @@ export default function AutomationDashboardPage() {
                       : 'bg-gray-50 border-gray-100 opacity-50'
                   }`}>
                     <div className="flex items-center gap-2 mb-1">
-                      {runningWorkflow.stageProgress?.productCreate ? (
+                      {runningWorkflow.stageProgress?.productCreate?.completed ? (
                         <CheckCircle size={16} className="text-orange-600" />
                       ) : runningWorkflow.currentStage === 'productCreate' ? (
                         <RefreshCw size={16} className="text-orange-600 animate-spin" />
@@ -1250,7 +1276,21 @@ export default function AutomationDashboardPage() {
                     </div>
                     {runningWorkflow.stageProgress?.productCreate && (
                       <p className="text-xs text-orange-700 font-medium">
-                        {runningWorkflow.stageProgress.productCreate.success}건
+                        {(() => {
+                          const p = runningWorkflow.stageProgress.productCreate
+                          const success = p.successCount ?? p.success ?? 0
+                          const processed = p.processedItems ?? 0
+                          const total = p.totalItems ?? p.total ?? 0
+                          if (runningWorkflow.currentStage === 'productCreate' && total > 0) {
+                            return `${processed}/${total}건`
+                          }
+                          return `${success}건`
+                        })()}
+                        {runningWorkflow.currentStage === 'productCreate' && runningWorkflow.stageProgress.productCreate.progress !== undefined && (
+                          <span className="text-orange-500 ml-1">
+                            ({runningWorkflow.stageProgress.productCreate.progress}%)
+                          </span>
+                        )}
                       </p>
                     )}
                     {runningWorkflow.currentStage === 'productCreate' && !runningWorkflow.stageProgress?.productCreate && (
@@ -1268,7 +1308,7 @@ export default function AutomationDashboardPage() {
                       ? 'bg-blue-50 border-blue-300'
                       : runningWorkflow.currentStage === 'publish'
                       ? 'bg-blue-100 border-blue-500 shadow-lg animate-pulse'
-                      : runningWorkflow.stageProgress?.productCreate
+                      : runningWorkflow.stageProgress?.productCreate?.completed
                       ? 'bg-gray-50 border-gray-200'
                       : 'bg-gray-50 border-gray-100 opacity-50'
                   }`}>
@@ -1284,13 +1324,31 @@ export default function AutomationDashboardPage() {
                     </div>
                     {runningWorkflow.stageProgress?.publish && (
                       <div className="text-xs text-blue-700 font-medium">
-                        {runningWorkflow.stageProgress.publish.currentProgress ? (
-                          <>
-                            <p>{runningWorkflow.stageProgress.publish.currentChannel}</p>
-                            <p>{runningWorkflow.stageProgress.publish.currentProgress.current}/{runningWorkflow.stageProgress.publish.currentProgress.total}</p>
-                          </>
-                        ) : (
-                          <p>{runningWorkflow.stageProgress.publish.success}건</p>
+                        {(() => {
+                          const pub = runningWorkflow.stageProgress.publish
+                          const success = pub.successCount ?? pub.success ?? 0
+                          const processed = pub.processedItems ?? 0
+                          const total = pub.totalItems ?? pub.total ?? 0
+
+                          if (runningWorkflow.currentStage === 'publish') {
+                            if (pub.currentChannel && pub.currentProgress) {
+                              return (
+                                <>
+                                  <p>{pub.currentChannel}</p>
+                                  <p>{pub.currentProgress.current}/{pub.currentProgress.total}</p>
+                                </>
+                              )
+                            }
+                            if (total > 0) {
+                              return `${processed}/${total}건`
+                            }
+                          }
+                          return `${success}건`
+                        })()}
+                        {runningWorkflow.currentStage === 'publish' && runningWorkflow.stageProgress.publish.progress !== undefined && (
+                          <span className="text-blue-500 ml-1">
+                            ({runningWorkflow.stageProgress.publish.progress}%)
+                          </span>
                         )}
                       </div>
                     )}
@@ -1304,11 +1362,11 @@ export default function AutomationDashboardPage() {
               {/* 단계별 상세 정보 (완료된 단계들) */}
               {runningWorkflow.stageProgress && (
                 <div className="bg-white rounded-lg p-4 border border-gray-100 space-y-2">
-                  {runningWorkflow.stageProgress.collection && (
+                  {runningWorkflow.stageProgress.collection?.completed && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">수집 완료</span>
                       <span className="text-green-600 font-medium">
-                        {runningWorkflow.stageProgress.collection.channelResults?.length ?? 0}개 채널에서 {runningWorkflow.stageProgress.collection.totalNewPosts ?? 0}건
+                        {runningWorkflow.stageProgress.collection.channelResults?.length ?? 0}개 채널에서 {runningWorkflow.stageProgress.collection.totalNewPosts ?? runningWorkflow.stageProgress.collection.successCount ?? 0}건
                       </span>
                     </div>
                   )}
@@ -1316,19 +1374,30 @@ export default function AutomationDashboardPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">AI 변환</span>
                       <span className={runningWorkflow.stageProgress.transform.completed ? 'text-yellow-600 font-medium' : 'text-gray-500'}>
-                        {runningWorkflow.stageProgress.transform.success !== undefined
-                          ? `${runningWorkflow.stageProgress.transform.success}건 성공`
-                          : '처리 중...'}
-                        {runningWorkflow.stageProgress.transform.batchProgress?.current !== undefined &&
-                         runningWorkflow.stageProgress.transform.batchProgress?.total !== undefined &&
-                         runningWorkflow.currentStage === 'transform' && (
+                        {(() => {
+                          const t = runningWorkflow.stageProgress.transform
+                          const success = t.successCount ?? t.success
+                          const failed = t.failedCount ?? t.failed ?? 0
+                          const processed = t.processedItems ?? 0
+                          const total = t.totalItems ?? t.total ?? 0
+
+                          if (success !== undefined) {
+                            return `${success}건 성공`
+                          }
+                          if (runningWorkflow.currentStage === 'transform' && total > 0) {
+                            return `${processed}/${total}건 처리 중`
+                          }
+                          return '처리 중...'
+                        })()}
+                        {runningWorkflow.currentStage === 'transform' && runningWorkflow.stageProgress.transform.progress !== undefined && (
                           <span className="text-yellow-500 ml-1">
-                            ({runningWorkflow.stageProgress.transform.batchProgress.current}/{runningWorkflow.stageProgress.transform.batchProgress.total} 배치)
+                            ({runningWorkflow.stageProgress.transform.progress}%)
                           </span>
                         )}
-                        {(runningWorkflow.stageProgress.transform.failed ?? 0) > 0 && (
-                          <span className="text-red-500 ml-1">({runningWorkflow.stageProgress.transform.failed}건 실패)</span>
-                        )}
+                        {(() => {
+                          const failed = runningWorkflow.stageProgress.transform?.failedCount ?? runningWorkflow.stageProgress.transform?.failed ?? 0
+                          return failed > 0 ? <span className="text-red-500 ml-1">({failed}건 실패)</span> : null
+                        })()}
                       </span>
                     </div>
                   )}
@@ -1336,10 +1405,11 @@ export default function AutomationDashboardPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">상품 등록</span>
                       <span className="text-orange-600 font-medium">
-                        {runningWorkflow.stageProgress.productCreate.success}건 성공
-                        {runningWorkflow.stageProgress.productCreate.failed > 0 && (
-                          <span className="text-red-500 ml-1">({runningWorkflow.stageProgress.productCreate.failed}건 실패)</span>
-                        )}
+                        {runningWorkflow.stageProgress.productCreate.successCount ?? runningWorkflow.stageProgress.productCreate.success ?? 0}건 성공
+                        {(() => {
+                          const failed = runningWorkflow.stageProgress.productCreate?.failedCount ?? runningWorkflow.stageProgress.productCreate?.failed ?? 0
+                          return failed > 0 ? <span className="text-red-500 ml-1">({failed}건 실패)</span> : null
+                        })()}
                       </span>
                     </div>
                   )}
@@ -1347,7 +1417,11 @@ export default function AutomationDashboardPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">발행</span>
                       <span className="text-blue-600 font-medium">
-                        {runningWorkflow.stageProgress.publish.success}건 성공
+                        {runningWorkflow.stageProgress.publish.successCount ?? runningWorkflow.stageProgress.publish.success ?? 0}건 성공
+                        {(() => {
+                          const failed = runningWorkflow.stageProgress.publish?.failedCount ?? runningWorkflow.stageProgress.publish?.failed ?? 0
+                          return failed > 0 ? <span className="text-red-500 ml-1">({failed}건 실패)</span> : null
+                        })()}
                       </span>
                     </div>
                   )}
