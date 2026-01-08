@@ -55,13 +55,33 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
--- channel_product 데이터 복원 (테이블이 존재하는 경우에만, shop_product와 중복되지 않는 새 ID로)
+-- channel_product 데이터 복원 (legacy_published_product_id로 원본 ID 복원)
 SET @tbl_exists = (SELECT COUNT(*) FROM information_schema.tables
   WHERE table_schema = DATABASE() AND table_name = 'channel_product');
+
+-- legacy_published_product_id가 있는 경우 원본 ID 사용
+SET @sql = IF(@tbl_exists > 0,
+  "INSERT INTO `published_product` (`id`, `user_id`, `product_id`, `channel_id`, `post_key`, `is_active`, `published_at`, `created_at`, `updated_at`)
+   SELECT `legacy_published_product_id`, `user_id`, `product_id`, `channel_id`, `post_key`, `is_active`, `published_at`, `created_at`, `updated_at`
+   FROM `channel_product`
+   WHERE `legacy_published_product_id` IS NOT NULL
+   ON DUPLICATE KEY UPDATE
+     `channel_id` = VALUES(`channel_id`),
+     `post_key` = VALUES(`post_key`),
+     `is_active` = VALUES(`is_active`),
+     `published_at` = VALUES(`published_at`),
+     `updated_at` = VALUES(`updated_at`)",
+  'SELECT "SKIPPED: channel_product table does not exist" AS rollback_info');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- legacy_published_product_id가 없는 channel_product는 새 ID로 생성 (마이그레이션 이후 생성된 데이터)
 SET @sql = IF(@tbl_exists > 0,
   "INSERT INTO `published_product` (`user_id`, `product_id`, `channel_id`, `post_key`, `is_active`, `published_at`, `created_at`, `updated_at`)
    SELECT `user_id`, `product_id`, `channel_id`, `post_key`, `is_active`, `published_at`, `created_at`, `updated_at`
-   FROM `channel_product`",
+   FROM `channel_product`
+   WHERE `legacy_published_product_id` IS NULL",
   'SELECT "SKIPPED: channel_product table does not exist" AS rollback_info');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;

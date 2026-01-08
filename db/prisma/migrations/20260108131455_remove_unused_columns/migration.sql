@@ -46,10 +46,12 @@ CREATE TABLE IF NOT EXISTS `channel_product` (
   `deleted_at` TIMESTAMP NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `legacy_published_product_id` INT NULL COMMENT '롤백용 원본 published_product ID',
   INDEX `idx_user_id` (`user_id`),
   INDEX `idx_product_id` (`product_id`),
   INDEX `idx_channel_id` (`channel_id`),
   INDEX `idx_deleted_at` (`deleted_at`),
+  INDEX `idx_legacy_id` (`legacy_published_product_id`),
   UNIQUE KEY `uk_product_channel` (`product_id`, `channel_id`),
   CONSTRAINT `fk_channel_product_product_id` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_channel_product_channel_id` FOREIGN KEY (`channel_id`) REFERENCES `channel` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
@@ -121,8 +123,9 @@ ON DUPLICATE KEY UPDATE
   `updated_at` = VALUES(`updated_at`);
 
 -- channel_product로 데이터 이전 (channel_id가 있는 레코드)
+-- legacy_published_product_id에 원본 ID 보존 (롤백용)
 -- ON DUPLICATE KEY UPDATE로 이미 존재하는 경우 모든 관련 필드 갱신
-INSERT INTO `channel_product` (`user_id`, `product_id`, `channel_id`, `post_key`, `is_active`, `published_at`, `created_at`, `updated_at`)
+INSERT INTO `channel_product` (`user_id`, `product_id`, `channel_id`, `post_key`, `is_active`, `published_at`, `created_at`, `updated_at`, `legacy_published_product_id`)
 SELECT
   `user_id`,
   `product_id`,
@@ -131,14 +134,16 @@ SELECT
   `is_active`,
   `published_at`,
   `created_at`,
-  `updated_at`
+  `updated_at`,
+  `id` as `legacy_published_product_id`
 FROM `published_product`
 WHERE `channel_id` IS NOT NULL
 ON DUPLICATE KEY UPDATE
   `post_key` = VALUES(`post_key`),
   `is_active` = VALUES(`is_active`),
   `published_at` = VALUES(`published_at`),
-  `updated_at` = VALUES(`updated_at`);
+  `updated_at` = VALUES(`updated_at`),
+  `legacy_published_product_id` = VALUES(`legacy_published_product_id`);
 
 -- FK 체크 다시 활성화
 SET FOREIGN_KEY_CHECKS = 1;
