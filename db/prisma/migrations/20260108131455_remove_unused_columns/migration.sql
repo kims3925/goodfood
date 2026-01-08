@@ -96,6 +96,9 @@ DEALLOCATE PREPARE stmt;
 -- shop_product 및 channel_product로 데이터 이전
 -- =============================================
 
+-- 트랜잭션 시작
+START TRANSACTION;
+
 -- FK 체크 일시 비활성화 (데이터 마이그레이션 중 참조 무결성 문제 방지)
 SET FOREIGN_KEY_CHECKS = 0;
 
@@ -242,3 +245,9 @@ SET @sql = IF(@col_exists > 0, 'ALTER TABLE `inquiry` DROP COLUMN `published_pro
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+
+-- FK 체크 다시 활성화
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- 트랜잭션 커밋
+COMMIT;

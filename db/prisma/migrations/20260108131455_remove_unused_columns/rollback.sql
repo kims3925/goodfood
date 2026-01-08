@@ -6,6 +6,8 @@
 -- 백업 명령어 예시:
 -- mysqldump -u [user] -p [database] shop_product channel_product > backup_20260108.sql
 -- =============================================
+-- 트랜잭션 시작
+START TRANSACTION;
 
 -- =============================================
 -- PART 1: FK 체크 일시 비활성화
@@ -27,12 +29,14 @@ CREATE TABLE IF NOT EXISTS `published_product` (
   `post_key` VARCHAR(255),
   `is_active` BOOLEAN DEFAULT TRUE,
   `published_at` TIMESTAMP NULL,
+  `deleted_at` TIMESTAMP NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_user_id` (`user_id`),
   INDEX `idx_product_id` (`product_id`),
   INDEX `idx_shop_id` (`shop_id`),
-  INDEX `idx_channel_id` (`channel_id`)
+  INDEX `idx_channel_id` (`channel_id`),
+  INDEX `idx_deleted_at` (`deleted_at`)
 );
 
 -- =============================================
@@ -44,8 +48,8 @@ CREATE TABLE IF NOT EXISTS `published_product` (
 SET @tbl_exists = (SELECT COUNT(*) FROM information_schema.tables
   WHERE table_schema = DATABASE() AND table_name = 'shop_product');
 SET @sql = IF(@tbl_exists > 0,
-  "INSERT INTO `published_product` (`id`, `user_id`, `product_id`, `shop_id`, `published_at`, `created_at`, `updated_at`)
-   SELECT `id`, `user_id`, `product_id`, `shop_id`, `published_at`, `created_at`, `updated_at`
+  "INSERT INTO `published_product` (`id`, `user_id`, `product_id`, `shop_id`, `deleted_at`, `published_at`, `created_at`, `updated_at`)
+   SELECT `id`, `user_id`, `product_id`, `shop_id`, `deleted_at`, `published_at`, `created_at`, `updated_at`
    FROM `shop_product`
    ON DUPLICATE KEY UPDATE
      `published_at` = VALUES(`published_at`),
@@ -202,6 +206,10 @@ DEALLOCATE PREPARE stmt;
 -- PART 8: FK 체크 재활성화
 -- =============================================
 SET FOREIGN_KEY_CHECKS = 1;
+-- =============================================
+-- 트랜잭션 커밋
+-- =============================================
+COMMIT;
 
 -- =============================================
 -- 롤백 완료
