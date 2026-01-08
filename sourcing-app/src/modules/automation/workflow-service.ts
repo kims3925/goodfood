@@ -257,6 +257,7 @@ const STEP_ORDER: Record<StepType, number> = {
 /**
  * 워크플로우 단계 시작
  * 단계 로그를 생성하고 워크플로우의 현재 단계를 업데이트
+ * 트랜잭션으로 두 작업을 원자적으로 실행
  */
 export async function startWorkflowStep(
   workflowId: number,
@@ -265,34 +266,39 @@ export async function startWorkflowStep(
 ): Promise<number> {
   const stepOrder = STEP_ORDER[stepType]
 
-  const step = await prisma.workflowStepLog.upsert({
-    where: {
-      workflowId_stepType: { workflowId, stepType }
-    },
-    create: {
-      workflowId,
-      stepType,
-      stepOrder,
-      status: StepStatus.RUNNING,
-      startedAt: new Date(),
-      totalItems,
-    },
-    update: {
-      status: StepStatus.RUNNING,
-      startedAt: new Date(),
-      totalItems,
-      processedItems: 0,
-      successCount: 0,
-      failedCount: 0,
-      completedAt: null,
-      errorMessage: null,
-    }
-  })
+  const step = await prisma.$transaction(async (tx) => {
+    // 1. 단계 로그 생성/업데이트
+    const stepLog = await tx.workflowStepLog.upsert({
+      where: {
+        workflowId_stepType: { workflowId, stepType }
+      },
+      create: {
+        workflowId,
+        stepType,
+        stepOrder,
+        status: StepStatus.RUNNING,
+        startedAt: new Date(),
+        totalItems,
+      },
+      update: {
+        status: StepStatus.RUNNING,
+        startedAt: new Date(),
+        totalItems,
+        processedItems: 0,
+        successCount: 0,
+        failedCount: 0,
+        completedAt: null,
+        errorMessage: null,
+      }
+    })
 
-  // 현재 단계 업데이트
-  await prisma.workflowLog.update({
-    where: { id: workflowId },
-    data: { currentStep: stepType }
+    // 2. 현재 단계 업데이트
+    await tx.workflowLog.update({
+      where: { id: workflowId },
+      data: { currentStep: stepType }
+    })
+
+    return stepLog
   })
 
   console.log(`[WorkflowService] Step ${stepType} started (workflow: ${workflowId}, stepId: ${step.id})`)
