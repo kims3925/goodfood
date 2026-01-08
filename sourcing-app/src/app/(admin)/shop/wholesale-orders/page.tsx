@@ -915,10 +915,12 @@ export default function WholesaleOrdersPage() {
                               {/* 상세 내역 테이블 */}
                               <div className="p-4">
                                 {historyDetailLoading ? (
+                                  // 1. 로딩 중
                                   <div className="flex justify-center py-4">
                                     <Loading />
                                   </div>
                                 ) : dayItems.length > 0 ? (
+                                  // 2. 데이터 있음 → 테이블 표시
                                   <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                       <thead>
@@ -956,7 +958,8 @@ export default function WholesaleOrdersPage() {
                                     </table>
                                   </div>
                                 ) : (
-                                  <p className="text-center text-gray-500 py-2 text-sm">상세 내역 로딩 중...</p>
+                                  // 3. 로딩 완료 + 데이터 없음 → 빈 상태
+                                  <p className="text-center text-gray-400 py-2 text-sm">해당 날짜에 상세 내역이 없습니다.</p>
                                 )}
                               </div>
                             </div>

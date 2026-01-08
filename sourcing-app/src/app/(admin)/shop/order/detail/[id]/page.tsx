@@ -727,7 +727,11 @@ export default function UnifiedOrderDetailPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">배송비</span>
-                      <span className="font-medium text-green-600">무료</span>
+                      {order.shippingFee > 0 ? (
+                        <span className="font-medium">{formatPrice(order.shippingFee)}</span>
+                      ) : (
+                        <span className="font-medium text-green-600">무료</span>
+                      )}
                     </div>
                     {actualDiscount > 0 && (
                       <div className="flex justify-between text-green-600">

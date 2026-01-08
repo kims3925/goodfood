@@ -242,6 +242,73 @@ npx prisma studio --schema prisma
 | amount | Decimal | 결제 금액 |
 | rawResponse | String? | Toss API 원본 응답 |
 
+### ShopProduct (쇼핑몰 발행 상품)
+
+| 필드 | 타입 | 설명 |
+|-----|-----|-----|
+| id | Int | PK |
+| userId | Int | 소유자 FK |
+| productId | Int? | 상품 FK (삭제 시 NULL) |
+| shopId | Int | 쇼핑몰 FK |
+| publishedAt | DateTime? | 발행일시 |
+| deletedAt | DateTime? | Soft Delete 시각 |
+| createdAt | DateTime | 생성일시 |
+| updatedAt | DateTime | 수정일시 |
+
+**Relations:**
+- `product` - 원본 상품 (onDelete: SetNull)
+- `shop` - 발행된 쇼핑몰 (onDelete: Cascade)
+- `user` - 소유자 (onDelete: Cascade)
+- `cartItems`, `orderItems`, `guestOrderItems`, `inquiries` - 연관 데이터
+
+**Unique Index:** `(productId, shopId)` - 같은 상품은 같은 쇼핑몰에 한 번만 발행
+
+### ChannelProduct (채널 발행 상품)
+
+| 필드 | 타입 | 설명 |
+|-----|-----|-----|
+| id | Int | PK |
+| userId | Int | 소유자 FK |
+| productId | Int? | 상품 FK (삭제 시 NULL) |
+| channelId | Int | 채널 FK (소매 밴드 등) |
+| postKey | String? | 밴드 게시물 키 |
+| isActive | Boolean | 활성 상태 (기본: true) |
+| publishedAt | DateTime? | 발행일시 |
+| deletedAt | DateTime? | Soft Delete 시각 |
+| createdAt | DateTime | 생성일시 |
+| updatedAt | DateTime | 수정일시 |
+
+**Relations:**
+- `product` - 원본 상품 (onDelete: SetNull)
+- `channel` - 발행된 채널 (onDelete: Cascade)
+- `user` - 소유자 (onDelete: Cascade)
+
+**Unique Index:** `(productId, channelId)` - 같은 상품은 같은 채널에 한 번만 발행
+
+### WorkflowStepLog (워크플로우 단계 로그)
+
+| 필드 | 타입 | 설명 |
+|-----|-----|-----|
+| id | Int | PK |
+| workflowId | Int | WorkflowLog FK |
+| stepType | StepType | 단계 유형 (COLLECTION/TRANSFORM/PRODUCT_CREATE/PUBLISH) |
+| stepOrder | Int | 단계 순서 |
+| status | StepStatus | 상태 (PENDING/RUNNING/COMPLETED/FAILED/SKIPPED) |
+| startedAt | DateTime? | 시작 시각 |
+| completedAt | DateTime? | 완료 시각 |
+| totalItems | Int | 전체 항목 수 |
+| processedItems | Int | 처리된 항목 수 |
+| successCount | Int | 성공 수 |
+| failedCount | Int | 실패 수 |
+| details | String? | 상세 JSON (LongText) |
+| errorMessage | String? | 에러 메시지 |
+| deletedAt | DateTime? | Soft Delete 시각 |
+
+**Relations:**
+- `workflow` - 부모 WorkflowLog (onDelete: Cascade)
+
+**Unique Index:** `(workflowId, stepType)` - 워크플로우당 단계 유형은 하나씩
+
 ---
 
 ## 인덱스 전략
@@ -365,3 +432,87 @@ npx prisma migrate deploy --schema prisma
 | SELECT * 사용 | 불필요한 데이터 로드 |
 | N+1 쿼리 | 성능 저하 |
 | 트랜잭션 없이 다중 테이블 변경 | 정합성 파괴 |
+
+---
+
+## 최근 스키마 변경사항
+
+### 2026-01-08: published_product → shop_product/channel_product 전환
+
+#### 변경 내용
+
+| 변경 | 설명 |
+|-----|-----|
+| `published_product` 테이블 삭제 | `shop_product`, `channel_product`로 분리 |
+| `shop_product` 테이블 생성 | 쇼핑몰별 상품 발행 관리 |
+| `channel_product` 테이블 생성 | 채널별 상품 발행 관리 (Band 등) |
+| `workflow_step_log` 테이블 생성 | 자동화 파이프라인 단계별 추적 |
+| `workflow_log.current_step` 컬럼 추가 | 현재 실행 중인 단계 추적 |
+
+#### 삭제된 컬럼
+
+| 테이블 | 컬럼 | 이유 |
+|-------|-----|-----|
+| `automation_config` | `pricing_policy_id` | 가격 정책 기능 제거 (채널별 정책으로 대체) |
+| `cart_item` | `published_product_id` | `shop_product_id`로 대체 (orphaned FK 정리) |
+| `order_item` | `published_product_id` | `shop_product_id`로 대체 (orphaned FK 정리) |
+| `guest_order_item` | `published_product_id` | `shop_product_id`로 대체 (orphaned FK 정리) |
+| `inquiry` | `published_product_id` | `shop_product_id`로 대체 (orphaned FK 정리) |
+
+#### 가격 정책 처리 방식 변경
+
+**이전**: `AutomationConfig.pricingPolicyId` FK로 참조
+
+**현재**: `CollectedProduct.rawMetadata.pricingPolicyContent`에 적용된 정책 내용 저장
+
+```typescript
+// CollectedProduct 생성 시 가격 정책 전달
+await collectedProductService.create({
+  userId,
+  postId,
+  name,
+  rawMetadata: { ... },
+  pricingPolicyContent: batchPolicyContent,  // 적용된 가격 정책 내용
+})
+
+// rawMetadata에 저장되는 구조
+{
+  "category": "...",
+  "variants": [...],
+  "pricingPolicyContent": "가격 정책 내용..."  // 적용된 정책 저장
+}
+```
+
+#### 마이그레이션 파일
+
+- **마이그레이션**: `db/prisma/migrations/20260108131455_remove_unused_columns/migration.sql`
+- **롤백 스크립트**: `db/prisma/migrations/20260108131455_remove_unused_columns/rollback.sql`
+
+**주요 작업**:
+1. 새 테이블 생성 (`shop_product`, `channel_product`, `workflow_step_log`)
+2. `workflow_log.current_step` 컬럼 추가
+3. `published_product` 데이터를 `shop_product`/`channel_product`로 마이그레이션
+4. FK 삭제 후 `published_product` 테이블 삭제
+5. Orphaned 컬럼 정리 (`cart_item`, `order_item`, `guest_order_item`, `inquiry`의 `published_product_id` 삭제)
+
+**롤백 방법**:
+```bash
+# 백업 후 롤백 실행
+mysqldump -u [user] -p [database] shop_product channel_product > backup.sql
+mysql -u [user] -p [database] < db/prisma/migrations/20260108131455_remove_unused_columns/rollback.sql
+```
+
+#### 트랜잭션 적용
+
+자동화 파이프라인에서 `CollectedProduct` 생성과 `AiApiConfig` 사용량 업데이트는 트랜잭션으로 묶어 원자성 보장:
+
+```typescript
+await prisma.$transaction(async (tx) => {
+  // CollectedProduct 생성
+  const created = await collectedProductService.create({...}, { tx })
+
+  // AI 사용량 업데이트
+  await tx.aiApiConfig.update({...})
+
+  return created
+})

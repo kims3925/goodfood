@@ -167,7 +167,7 @@ export default function PopularProductsPage() {
         {showRank && 'rank' in product && <RankBadge rank={product.rank} />}
 
         <Image
-          src={product.images[0] || '/placeholder.jpg'}
+          src={product.images[0] || '/images/placeholder.png'}
           alt={product.title}
           fill
           sizes="(max-width: 640px) 33vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"

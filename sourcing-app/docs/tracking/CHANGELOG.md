@@ -193,6 +193,8 @@ TR-{YYYYMMDD}-{NUMBER}
 - `StepType` enum 추가: COLLECTION, TRANSFORM, PRODUCT_CREATE, PUBLISH
 - `StepStatus` enum 추가: PENDING, RUNNING, COMPLETED, FAILED, SKIPPED
 - `CartItem` 인덱스 변경: `publishedProductId` → `shopProductId`
+- Orphaned 컬럼 정리: `cart_item`, `order_item`, `guest_order_item`, `inquiry` 테이블의 `published_product_id` 컬럼 삭제
+- 롤백 스크립트 추가: 마이그레이션 복구용 rollback.sql 파일 생성
 
 ### 변경 파일
 | 파일 | 유형 | 설명 |
@@ -200,7 +202,8 @@ TR-{YYYYMMDD}-{NUMBER}
 | db/prisma/models/publish.prisma | Modified | ShopProduct, ChannelProduct 모델로 변경 |
 | db/prisma/models/workflow.prisma | Modified | WorkflowStepLog 모델 추가 |
 | db/prisma/schema.prisma | Modified | StepType, StepStatus enum 추가 |
-| db/prisma/migrations/20260108131455_remove_unused_columns/migration.sql | Added | CD 파이프라인용 마이그레이션 |
+| db/prisma/migrations/20260108131455_remove_unused_columns/migration.sql | Added | CD 파이프라인용 마이그레이션 (orphaned 컬럼 정리 포함) |
+| db/prisma/migrations/20260108131455_remove_unused_columns/rollback.sql | Added | 마이그레이션 롤백 스크립트 |
 
 ### 영향 분석
 - [ ] API Contract 변경
@@ -216,13 +219,55 @@ TR-{YYYYMMDD}-{NUMBER}
 | Build | Pass |
 
 ### 롤백 계획
-1. 마이그레이션 롤백 스크립트 실행
+1. `rollback.sql` 스크립트 실행: `mysql -u [user] -p [database] < rollback.sql`
 2. git revert로 해당 커밋 롤백
 3. npx prisma db push로 이전 스키마 복원
 
 ### 관련 항목
 - REQ-ID: -
 - Flow-ID: Publish
+
+---
+
+## TR-20260108-001: AutomationConfig 테이블에서 pricing_policy_id 컬럼 및 관계 삭제
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-08 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- AutomationConfig 테이블에서 사용하지 않는 `pricing_policy_id` 컬럼 삭제
+- PricingPolicy와의 외래키 관계 제거
+- 자동화 설정에서 가격 정책은 별도로 관리하므로 불필요한 연결 정리
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| db/prisma/models/automation.prisma | Modified | pricingPolicyId 필드 및 pricingPolicy 관계 삭제 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [x] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Prisma Generate | Pass |
+| DB Push | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. npx prisma db push로 컬럼 복원
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
 
 ---
 

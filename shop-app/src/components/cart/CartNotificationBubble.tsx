@@ -10,7 +10,7 @@ export default function CartNotificationBubble() {
   if (!isVisible || !product) return null
 
   return (
-    <div className="absolute top-full right-0 mt-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+    <div className="absolute top-full right-0 mt-2 z-50 animate-slide-in-from-top-2">
       {/* 말풍선 꼬리 */}
       <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-l border-t border-gray-200 transform rotate-45"></div>
 

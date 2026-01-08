@@ -4,6 +4,7 @@ model ShopProduct {
   productId   Int?      @map("product_id")
   shopId      Int       @map("shop_id")
   publishedAt DateTime? @map("published_at") @db.Timestamp(0)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(0)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
 
@@ -19,5 +20,6 @@ model ShopProduct {
   @@index([userId])
   @@index([productId])
   @@index([shopId])
+  @@index([deletedAt])
   @@map("shop_product")
 }

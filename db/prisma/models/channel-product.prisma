@@ -3,7 +3,10 @@ model ChannelProduct {
   userId      Int       @map("user_id")
   productId   Int?      @map("product_id")
   channelId   Int       @map("channel_id")
+  postKey     String?   @map("post_key") @db.VarChar(255)
+  isActive    Boolean   @default(true) @map("is_active")
   publishedAt DateTime? @map("published_at") @db.Timestamp(0)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(0)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
 
@@ -15,5 +18,6 @@ model ChannelProduct {
   @@index([userId])
   @@index([productId])
   @@index([channelId])
+  @@index([deletedAt])
   @@map("channel_product")
 }

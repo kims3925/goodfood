@@ -22,11 +22,13 @@ CREATE TABLE IF NOT EXISTS `shop_product` (
   `product_id` INT,
   `shop_id` INT NOT NULL,
   `published_at` TIMESTAMP NULL,
+  `deleted_at` TIMESTAMP NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_user_id` (`user_id`),
   INDEX `idx_product_id` (`product_id`),
   INDEX `idx_shop_id` (`shop_id`),
+  INDEX `idx_deleted_at` (`deleted_at`),
   UNIQUE KEY `uk_product_shop` (`product_id`, `shop_id`),
   CONSTRAINT `fk_shop_product_product_id` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_shop_product_shop_id` FOREIGN KEY (`shop_id`) REFERENCES `shop` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
@@ -41,11 +43,13 @@ CREATE TABLE IF NOT EXISTS `channel_product` (
   `post_key` VARCHAR(255),
   `is_active` BOOLEAN DEFAULT TRUE,
   `published_at` TIMESTAMP NULL,
+  `deleted_at` TIMESTAMP NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_user_id` (`user_id`),
   INDEX `idx_product_id` (`product_id`),
   INDEX `idx_channel_id` (`channel_id`),
+  INDEX `idx_deleted_at` (`deleted_at`),
   UNIQUE KEY `uk_product_channel` (`product_id`, `channel_id`),
   CONSTRAINT `fk_channel_product_product_id` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_channel_product_channel_id` FOREIGN KEY (`channel_id`) REFERENCES `channel` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
@@ -66,8 +70,10 @@ CREATE TABLE IF NOT EXISTS `workflow_step_log` (
   `failed_count` INT NOT NULL DEFAULT 0,
   `details` LONGTEXT,
   `error_message` TEXT,
+  `deleted_at` TIMESTAMP NULL,
   INDEX `idx_workflow_id` (`workflow_id`),
   INDEX `idx_status` (`status`),
+  INDEX `idx_deleted_at` (`deleted_at`),
   UNIQUE KEY `uk_workflow_step` (`workflow_id`, `step_type`),
   CONSTRAINT `workflow_step_log_workflow_id_fkey` FOREIGN KEY (`workflow_id`) REFERENCES `workflow_log` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -91,8 +97,14 @@ DEALLOCATE PREPARE stmt;
 -- FK 체크 일시 비활성화 (데이터 마이그레이션 중 참조 무결성 문제 방지)
 SET FOREIGN_KEY_CHECKS = 0;
 
+-- =============================================
+-- 마이그레이션 전 데이터 검증 (경고용)
+-- 주의: shop_id와 channel_id가 모두 NULL인 레코드는 마이그레이션되지 않음
+-- 비즈니스 로직상 발행된 상품은 반드시 shop_id 또는 channel_id가 있어야 함
+-- =============================================
+
 -- shop_product로 데이터 이전 (shop_id가 있는 레코드)
--- ON DUPLICATE KEY UPDATE로 이미 존재하는 경우 updated_at 갱신
+-- ON DUPLICATE KEY UPDATE로 이미 존재하는 경우 모든 관련 필드 갱신
 INSERT INTO `shop_product` (`id`, `user_id`, `product_id`, `shop_id`, `published_at`, `created_at`, `updated_at`)
 SELECT
   `id`,
@@ -105,10 +117,11 @@ SELECT
 FROM `published_product`
 WHERE `shop_id` IS NOT NULL
 ON DUPLICATE KEY UPDATE
+  `published_at` = VALUES(`published_at`),
   `updated_at` = VALUES(`updated_at`);
 
 -- channel_product로 데이터 이전 (channel_id가 있는 레코드)
--- ON DUPLICATE KEY UPDATE로 이미 존재하는 경우 updated_at 갱신
+-- ON DUPLICATE KEY UPDATE로 이미 존재하는 경우 모든 관련 필드 갱신
 INSERT INTO `channel_product` (`user_id`, `product_id`, `channel_id`, `post_key`, `is_active`, `published_at`, `created_at`, `updated_at`)
 SELECT
   `user_id`,
@@ -129,6 +142,16 @@ ON DUPLICATE KEY UPDATE
 
 -- FK 체크 다시 활성화
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- =============================================
+-- 마이그레이션 검증 쿼리 (수동 실행용)
+-- 마이그레이션 후 아래 쿼리로 데이터 무결성 확인 권장
+-- =============================================
+-- SELECT COUNT(*) as shop_only FROM published_product WHERE shop_id IS NOT NULL AND channel_id IS NULL;
+-- SELECT COUNT(*) as channel_only FROM published_product WHERE channel_id IS NOT NULL AND shop_id IS NULL;
+-- SELECT COUNT(*) as both_fields FROM published_product WHERE shop_id IS NOT NULL AND channel_id IS NOT NULL;
+-- SELECT COUNT(*) as orphaned FROM published_product WHERE shop_id IS NULL AND channel_id IS NULL;
+-- SELECT (SELECT COUNT(*) FROM shop_product) as shop_product_count, (SELECT COUNT(*) FROM channel_product) as channel_product_count;
 
 -- =============================================
 -- PART 3: 레거시 테이블 삭제
@@ -177,3 +200,40 @@ DEALLOCATE PREPARE stmt;
 
 -- published_product 테이블 삭제
 DROP TABLE IF EXISTS `published_product`;
+
+-- =============================================
+-- PART 4: Orphaned 컬럼 정리
+-- published_product 삭제 후 더 이상 필요 없는 FK 컬럼들 제거
+-- =============================================
+
+-- cart_item.published_product_id 컬럼 삭제 (존재하는 경우에만)
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'cart_item' AND column_name = 'published_product_id');
+SET @sql = IF(@col_exists > 0, 'ALTER TABLE `cart_item` DROP COLUMN `published_product_id`', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- order_item.published_product_id 컬럼 삭제 (존재하는 경우에만)
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'order_item' AND column_name = 'published_product_id');
+SET @sql = IF(@col_exists > 0, 'ALTER TABLE `order_item` DROP COLUMN `published_product_id`', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- guest_order_item.published_product_id 컬럼 삭제 (존재하는 경우에만)
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'guest_order_item' AND column_name = 'published_product_id');
+SET @sql = IF(@col_exists > 0, 'ALTER TABLE `guest_order_item` DROP COLUMN `published_product_id`', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- inquiry.published_product_id 컬럼 삭제 (존재하는 경우에만)
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'inquiry' AND column_name = 'published_product_id');
+SET @sql = IF(@col_exists > 0, 'ALTER TABLE `inquiry` DROP COLUMN `published_product_id`', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

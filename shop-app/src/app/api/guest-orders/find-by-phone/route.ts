@@ -118,10 +118,13 @@ export async function POST(req: NextRequest) {
       orders,
       totalCount: orders.length,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // 서버 측에서만 상세 에러 로깅 (디버깅용)
     console.error('Guest order find-by-phone error:', error)
+
+    // 클라이언트에는 일반화된 메시지만 반환 (보안상 내부 정보 노출 방지)
     return NextResponse.json(
-      { success: false, error: error.message || '주문 조회 실패' },
+      { success: false, error: '주문 조회 중 오류가 발생했습니다' },
       { status: 500 }
     )
   }

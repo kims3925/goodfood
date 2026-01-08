@@ -5,9 +5,15 @@
  * 수동 실행(API)과 자동화 파이프라인에서 동일하게 사용
  */
 
-import prisma, { CollectedProduct } from '@bandauto/db'
+import prisma, { CollectedProduct, Prisma } from '@bandauto/db'
 import type { BatchResult, ProgressCallback } from '@/types/batch.types'
 import { createEmptyBatchResult } from '@/types/batch.types'
+
+// Prisma 트랜잭션 클라이언트 타입
+type PrismaTransactionClient = Omit<
+  typeof prisma,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>
 
 /**
  * 수집상품 생성 입력 타입
@@ -19,6 +25,14 @@ export interface CollectedProductCreateInput {
   description?: string | null
   currency?: string
   rawMetadata?: Record<string, unknown> | null
+  pricingPolicyContent?: string | null
+}
+
+/**
+ * 수집상품 생성 옵션 타입
+ */
+export interface CollectedProductCreateOptions {
+  tx?: PrismaTransactionClient
 }
 
 /**
@@ -27,12 +41,18 @@ export interface CollectedProductCreateInput {
 export class CollectedProductService {
   /**
    * 수집상품 단건 생성 (수동 API에서 사용)
+   * @param data 수집상품 생성 입력
+   * @param options 옵션 (트랜잭션 클라이언트 등)
    */
-  async create(data: CollectedProductCreateInput): Promise<CollectedProduct> {
-    const { userId, postId, name, description, currency, rawMetadata } = data
+  async create(
+    data: CollectedProductCreateInput,
+    options?: CollectedProductCreateOptions
+  ): Promise<CollectedProduct> {
+    const { userId, postId, name, description, currency, rawMetadata, pricingPolicyContent } = data
+    const db = options?.tx || prisma
 
     // 중복 체크: 같은 postId로 이미 생성된 수집상품이 있는지 확인
-    const existing = await prisma.collectedProduct.findFirst({
+    const existing = await db.collectedProduct.findFirst({
       where: { postId, userId },
     })
 
@@ -41,7 +61,7 @@ export class CollectedProductService {
     }
 
     // 게시물 존재 여부 확인
-    const post = await prisma.collectedPost.findFirst({
+    const post = await db.collectedPost.findFirst({
       where: { id: postId, userId },
     })
 
@@ -49,15 +69,21 @@ export class CollectedProductService {
       throw new Error('게시물을 찾을 수 없습니다.')
     }
 
+    // rawMetadata에 pricingPolicyContent 포함
+    const metadata = rawMetadata ? { ...rawMetadata } : {}
+    if (pricingPolicyContent) {
+      metadata.pricingPolicyContent = pricingPolicyContent
+    }
+
     // 수집상품 생성
-    const collectedProduct = await prisma.collectedProduct.create({
+    const collectedProduct = await db.collectedProduct.create({
       data: {
         userId,
         postId,
         name: name || null,
         description: description || null,
         currency: currency || 'KRW',
-        rawMetadata: rawMetadata ? JSON.stringify(rawMetadata) : null,
+        rawMetadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,
       },
       include: {
         post: {

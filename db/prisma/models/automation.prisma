@@ -73,10 +73,12 @@ model WorkflowStepLog {
   failedCount    Int         @default(0) @map("failed_count")
   details        String?     @db.LongText
   errorMessage   String?     @map("error_message") @db.Text
+  deletedAt      DateTime?   @map("deleted_at") @db.Timestamp(0)
   workflow       WorkflowLog @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   @@unique([workflowId, stepType])
   @@index([workflowId])
   @@index([status])
+  @@index([deletedAt])
   @@map("workflow_step_log")
 }

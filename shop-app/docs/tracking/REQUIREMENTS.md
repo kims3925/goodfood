@@ -42,6 +42,7 @@ REQ-{CATEGORY}-{NUMBER}
 
 | REQ-ID | Status | Priority | Title | Owner | TR-ID |
 |--------|--------|----------|-------|-------|-------|
+| REQ-ORDER-001 | Done | P2 | 비회원 주문 조회 플로우 개선 | Claude | TR-20260108-005 |
 | REQ-SHOP-002 | Done | P2 | 인기상품 페이지 개발 | Lee | TR-20260108-002 |
 | REQ-SETTLEMENT-001 | Done | P1 | Product 기반 배송비로 마진 계산 개선 | Hong | TR-20260107-001 |
 | REQ-SHOP-001 | Done | P2 | 모바일 반응형 UI 개선 | Lee | TR-20260106-001, TR-20260108-001 |
@@ -100,6 +101,39 @@ REQ-{CATEGORY}-{NUMBER}
 ## 요구사항 상세
 
 <!-- 최신 항목이 위로 -->
+
+## REQ-ORDER-001: 비회원 주문 조회 플로우 개선
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Priority | P2 |
+| Owner | Claude |
+| Created | 2026-01-08 |
+
+### 배경
+- 기존 비회원 주문 조회 시 주문번호 + 휴대폰 번호를 함께 입력해야 함
+- 주문번호를 모르는 고객이 휴대폰 + 이름으로 주문을 찾을 수 있는 별도 경로 필요
+- UX 개선을 위해 주문번호 조회와 휴대폰 조회 페이지 분리
+
+### 요구사항
+- `/order/lookup` 페이지: 주문번호만으로 조회 (휴대폰 입력 제거)
+- `/order/find-orders` 페이지: 휴대폰 + 이름으로 최근 90일 주문 목록 조회
+- `/api/guest-orders/lookup` API: 주문번호만으로 조회하도록 계약 변경
+- `/api/guest-orders/find-by-phone` API: 휴대폰 + 이름으로 주문 목록 반환
+
+### 완료 조건
+- [x] `/order/lookup` 페이지에서 휴대폰 입력 필드 제거
+- [x] `/order/find-orders` 페이지에서 휴대폰 + 이름 검색 구현
+- [x] `/api/guest-orders/lookup` API에서 phone 파라미터 제거
+- [x] `/api/guest-orders/find-by-phone` API 구현
+- [x] 검색 결과 클릭 시 주문 상세 페이지로 토큰 발급 및 이동
+
+### 관련 항목
+- TR-ID: TR-20260108-005
+- Flow-ID: 비회원 주문 조회
+
+---
 
 ## REQ-SHOP-002: 인기상품 페이지 개발
 
