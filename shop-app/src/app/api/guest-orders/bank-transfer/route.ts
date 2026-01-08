@@ -281,7 +281,6 @@ export async function POST(req: NextRequest) {
           guestEmail: customerInfo.email || null,
           // 금액 정보
           subtotalAmount: new Decimal(subtotal),
-          shippingFee: new Decimal(shippingFee),
           discountAmount: new Decimal(0),
           totalAmount: new Decimal(totalAmount),
           items: {
@@ -350,7 +349,6 @@ export async function POST(req: NextRequest) {
         orderNumber: result.guestOrder.orderNumber,
         totalAmount: Number(result.guestOrder.totalAmount),
         subtotal: Number(result.guestOrder.subtotalAmount),
-        shippingFee: Number(result.guestOrder.shippingFee),
         itemCount: orderItems.reduce((sum, item) => sum + item.quantity, 0),
         items: orderItems.map((item) => ({
           productName: item.productName,

@@ -347,10 +347,7 @@ export async function POST(req: NextRequest) {
         0
       )
 
-      // 배송비는 이미 상품 가격에 포함됨
-      const shippingFee = 0
-
-      const totalAmount = subtotal + shippingFee
+      const totalAmount = subtotal
 
       if (totalAmount !== amount) {
         console.error('금액 불일치:', { calculatedAmount: totalAmount, requestAmount: amount })
@@ -394,7 +391,6 @@ export async function POST(req: NextRequest) {
             guestEmail: prepareData!.customerInfo.email || null,
             // 금액 정보
             subtotalAmount: new Decimal(subtotal),
-            shippingFee: new Decimal(shippingFee),
             discountAmount: new Decimal(0),
             totalAmount: new Decimal(totalAmount),
             paidAt: tossResult.status === 'WAITING_FOR_DEPOSIT' ? null : new Date(),
@@ -508,7 +504,6 @@ export async function POST(req: NextRequest) {
           },
           quantity: orderItems.reduce((sum, item) => sum + item.quantity, 0),
           subtotal: Number(result.guestOrder.subtotalAmount),
-          shippingFee: Number(result.guestOrder.shippingFee),
           discountAmount: Number(result.guestOrder.discountAmount),
           totalAmount: Number(result.guestOrder.totalAmount),
         },

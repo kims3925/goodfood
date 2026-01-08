@@ -101,7 +101,6 @@ export async function GET(request: NextRequest) {
       status: order.status,
       totalAmount: Number(order.totalAmount),
       subtotalAmount: Number(order.subtotalAmount),
-      shippingFee: Number(order.shippingFee),
       discountAmount: Number(order.discountAmount),
       orderedAt: order.orderedAt.toISOString(),
       paidAt: order.paidAt?.toISOString() || null,

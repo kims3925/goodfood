@@ -128,7 +128,6 @@ export async function POST(req: NextRequest) {
         : null,
       // 금액 정보
       subtotalAmount: Number(guestOrder.subtotalAmount),
-      shippingFee: Number(guestOrder.shippingFee),
       discountAmount: Number(guestOrder.discountAmount),
       totalAmount: Number(guestOrder.totalAmount),
       // 일시 정보

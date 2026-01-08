@@ -204,8 +204,6 @@ export async function POST(req: NextRequest) {
 
     // 금액 계산 (subtotal은 totalAmount를 사용)
     const subtotal = totalAmount
-    // 배송비는 상품별 설정 또는 0원 처리
-    const shippingFee = 0
 
     // 비회원 주문번호 생성
     const orderId = generateGuestOrderNumber()
@@ -241,7 +239,6 @@ export async function POST(req: NextRequest) {
         orderNumber: orderId,
         totalAmount,
         subtotal,
-        shippingFee,
         itemCount: orderItems.reduce((sum, item) => sum + item.quantity, 0),
         items: orderItems.map((item) => ({
           productName: item.productName,

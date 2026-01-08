@@ -53,7 +53,6 @@ interface OrderData {
   quantity: number
   unitPrice: number
   subtotal: number
-  shippingFee: number
   totalAmount: number
   thumbnailUrl: string | null
   retailBandName: string
@@ -928,7 +927,7 @@ export default function BandOrderPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">배송비</span>
-                      <span>{orderData.shippingFee === 0 ? '무료' : `${orderData.shippingFee.toLocaleString()}원`}</span>
+                      <span className="text-green-600">무료</span>
                     </div>
                     <div className="flex justify-between font-bold pt-2 border-t border-gray-200 mt-2">
                       <span>총 결제금액</span>

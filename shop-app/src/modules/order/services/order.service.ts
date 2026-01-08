@@ -77,7 +77,6 @@ export interface OrderResponse {
     deliveryMemo: string | null
   } | null
   subtotalAmount: number
-  shippingFee: number
   discountAmount: number
   totalAmount: number
   items: Array<{
@@ -167,10 +166,6 @@ export class OrderService {
       // 원래 단가 (할인 전)
       const originalUnitPrice = Number(item.originalPrice || variant?.price || mainVariant?.price || 0)
 
-      // 도매가 스냅샷 (마진 계산용)
-      const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
-      const wholesalePriceValue = wholesalePrice == null ? null : Number(wholesalePrice)
-
       // 할인 반영된 총액과 단가
       const itemTotalWithDiscount = Number(item.itemTotal || originalUnitPrice * item.quantity)
       const unitPriceWithDiscount = Math.round(itemTotalWithDiscount / item.quantity)
@@ -186,7 +181,6 @@ export class OrderService {
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity,
         unitPrice: unitPriceWithDiscount, // 할인 반영된 단가
-        wholesalePrice: wholesalePriceValue, // 도매가 스냅샷 (마진 계산용)
         originalUnitPrice, // 할인 전 단가 (참조용)
         itemTotal: itemTotalWithDiscount, // 할인 반영된 아이템 총액
       }
@@ -203,7 +197,6 @@ export class OrderService {
       (sum, item) => sum + (item.itemTotal || item.unitPrice * item.quantity),
       0
     )
-    const shippingFee = 0 // 배송비는 판매가에 포함
     const discountAmount = subtotalBeforeDiscount - subtotal // 할인 금액 계산
     const totalAmount = subtotal // 할인 반영된 총액
 
@@ -222,7 +215,6 @@ export class OrderService {
         deliveryMemo: shippingAddress.deliveryMemo,
       },
       subtotalAmount: subtotalBeforeDiscount, // 할인 전 상품 총액
-      shippingFee,
       discountAmount, // 합배송 할인 금액
       totalAmount, // 실제 결제 금액 (할인 후)
       items: orderItems,
@@ -309,7 +301,7 @@ export class OrderService {
             include: {
               variants: {
                 take: 1,
-                select: { id: true, price: true, wholesalePrice: true, optionSummary: true },
+                select: { id: true, price: true, optionSummary: true },
               },
             },
           },
@@ -324,16 +316,13 @@ export class OrderService {
       if (item.variantId) {
         variant = await prisma.productVariant.findUnique({
           where: { id: item.variantId },
-          select: { id: true, price: true, wholesalePrice: true, optionSummary: true },
+          select: { id: true, price: true, optionSummary: true },
         })
       }
 
       const product = shopProduct.product
       const mainVariant = product?.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || 0
-      // 도매가 스냅샷 (마진 계산용)
-      const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
-      const wholesalePriceValue = wholesalePrice == null ? null : Number(wholesalePrice)
 
       // variant가 있으면 해당 옵션 사용, 없으면 첫 번째 variant의 옵션 사용
       const optionSummary = variant?.optionSummary || mainVariant?.optionSummary || null
@@ -346,7 +335,6 @@ export class OrderService {
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity || 1,
         unitPrice: Number(unitPrice),
-        wholesalePrice: wholesalePriceValue, // 도매가 스냅샷 (마진 계산용)
       })
     }
 
@@ -355,9 +343,8 @@ export class OrderService {
       (sum, item) => sum + item.unitPrice * item.quantity,
       0
     )
-    const shippingFee = 0 // 배송비는 판매가에 포함
     const discountAmount = 0
-    const totalAmount = subtotal + shippingFee - discountAmount
+    const totalAmount = subtotal - discountAmount
 
     // 주문 생성 (주문자 정보는 user 테이블에서)
     const orderInput: CreateOrderInput = {
@@ -374,7 +361,6 @@ export class OrderService {
         deliveryMemo: shippingAddress.deliveryMemo,
       },
       subtotalAmount: subtotal,
-      shippingFee,
       discountAmount,
       totalAmount,
       items: orderItems,
@@ -601,7 +587,6 @@ export class OrderService {
           }
         : null,
       subtotalAmount: Number(order.subtotalAmount),
-      shippingFee: Number(order.shippingFee),
       discountAmount: Number(order.discountAmount),
       totalAmount: Number(order.totalAmount),
       items: order.items.map((item) => ({

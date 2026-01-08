@@ -81,7 +81,6 @@ export interface GuestOrderResponse {
     deliveryMemo: string | null
   } | null
   subtotalAmount: number
-  shippingFee: number
   discountAmount: number
   totalAmount: number
   items: Array<{
@@ -155,7 +154,6 @@ export class GuestOrderService {
                       select: {
                         id: true,
                         price: true,
-                        wholesalePrice: true,
                         optionSummary: true,
                         bundleUnit: true,
                       },
@@ -170,7 +168,6 @@ export class GuestOrderService {
               select: {
                 id: true,
                 price: true,
-                wholesalePrice: true,
                 optionSummary: true,
                 bundleUnit: true,
               },
@@ -199,10 +196,6 @@ export class GuestOrderService {
       const variantBundleUnit = variant?.bundleUnit || 1
       const quantity = item.quantity
 
-      // 도매가 스냅샷 (마진 계산용)
-      const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
-      const wholesalePriceValue = wholesalePrice ?? null
-
       // 공통 가격 계산 함수 사용
       const priceResult = calculateItemPrice({
         basePrice: originalUnitPrice,
@@ -224,9 +217,6 @@ export class GuestOrderService {
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity,
         unitPrice: unitPriceWithDiscount, // 할인 반영된 단가
-        wholesalePrice: wholesalePriceValue, // 도매가 스냅샷 (마진 계산용)
-        originalUnitPrice, // 할인 전 단가 (참조용)
-        itemTotal: itemTotalWithDiscount, // 할인 반영된 아이템 총액
       }
     })
 
@@ -239,7 +229,6 @@ export class GuestOrderService {
       (sum, item: any) => sum + (item.itemTotal || item.unitPrice * item.quantity),
       0
     )
-    const shippingFee = 0 // 배송비는 판매가에 포함
     const discountAmount = subtotalBeforeDiscount - subtotal // 할인 금액
     const totalAmount = subtotal // 실제 결제 금액
 
@@ -259,7 +248,6 @@ export class GuestOrderService {
         deliveryMemo: shippingAddress.deliveryMemo,
       },
       subtotalAmount: subtotalBeforeDiscount, // 할인 전 상품 총액
-      shippingFee,
       discountAmount, // 합배송 할인 금액
       totalAmount, // 실제 결제 금액 (할인 후)
       items: orderItems,
@@ -303,7 +291,6 @@ export class GuestOrderService {
                 select: {
                   id: true,
                   price: true,
-                  wholesalePrice: true,
                   optionSummary: true,
                   bundleUnit: true,
                 },
@@ -324,7 +311,6 @@ export class GuestOrderService {
           select: {
             id: true,
             price: true,
-            wholesalePrice: true,
             optionSummary: true,
             bundleUnit: true,
           },
@@ -334,9 +320,6 @@ export class GuestOrderService {
       const product = shopProduct.product
       const mainVariant = product?.variants[0]
       const unitPrice = variant?.price || mainVariant?.price || 0
-      // 도매가 스냅샷 (마진 계산용)
-      const wholesalePrice = variant?.wholesalePrice ?? mainVariant?.wholesalePrice ?? null
-      const wholesalePriceValue = wholesalePrice ?? null
 
       orderItems.push({
         shopProductId: shopProduct.id,
@@ -346,7 +329,6 @@ export class GuestOrderService {
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity || 1,
         unitPrice: Number(unitPrice),
-        wholesalePrice: wholesalePriceValue, // 도매가 스냅샷 (마진 계산용)
       })
     }
 
@@ -355,9 +337,8 @@ export class GuestOrderService {
       (sum, item) => sum + item.unitPrice * item.quantity,
       0
     )
-    const shippingFee = 0 // 배송비는 판매가에 포함
     const discountAmount = 0
-    const totalAmount = subtotal + shippingFee - discountAmount
+    const totalAmount = subtotal - discountAmount
 
     // 비회원 주문 생성
     const orderInput: CreateGuestOrderInput = {
@@ -375,7 +356,6 @@ export class GuestOrderService {
         deliveryMemo: shippingAddress.deliveryMemo,
       },
       subtotalAmount: subtotal,
-      shippingFee,
       discountAmount,
       totalAmount,
       items: orderItems,
@@ -517,7 +497,6 @@ export class GuestOrderService {
           }
         : null,
       subtotalAmount: Number(order.subtotalAmount),
-      shippingFee: Number(order.shippingFee),
       discountAmount: Number(order.discountAmount),
       totalAmount: Number(order.totalAmount),
       items: order.items.map((item: any) => ({
