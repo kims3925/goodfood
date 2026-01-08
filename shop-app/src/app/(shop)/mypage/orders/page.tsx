@@ -154,10 +154,10 @@ export default function OrdersPage() {
       </div>
 
       {/* 필터 */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+      <div className="grid grid-cols-3 gap-2 mb-6 md:flex md:flex-wrap">
         <button
           onClick={() => handleStatusFilter(null)}
-          className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors ${
+          className={`px-3 py-2 rounded-full text-sm whitespace-nowrap transition-colors ${
             selectedStatus === null
               ? 'text-white'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -170,7 +170,7 @@ export default function OrdersPage() {
           <button
             key={status}
             onClick={() => handleStatusFilter(status)}
-            className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors ${
+            className={`px-3 py-2 rounded-full text-sm whitespace-nowrap transition-colors ${
               selectedStatus === status
                 ? 'text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
