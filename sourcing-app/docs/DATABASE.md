@@ -453,6 +453,21 @@ npx prisma migrate deploy --schema prisma
 
 ### 2026-01-08: published_product → shop_product/channel_product 전환
 
+**TR-ID**: [TR-20260108-002](./tracking/CHANGELOG.md#tr-20260108-002-published_product--shop_productchannel_product-스키마-마이그레이션)
+
+#### 변경 영향도 요약
+
+| 구분 | 내용 |
+|-----|-----|
+| **생성된 테이블** | `shop_product`, `channel_product`, `workflow_step_log` |
+| **삭제된 테이블** | `published_product` |
+| **추가된 컬럼** | `workflow_log.current_step` |
+| **삭제된 컬럼** | `automation_config.pricing_policy_id`, `cart_item.published_product_id`, `order_item.published_product_id`, `guest_order_item.published_product_id`, `inquiry.published_product_id` |
+| **변경된 FK** | CartItem, OrderItem, GuestOrderItem, Inquiry → `shop_product_id` 참조로 변경 |
+| **추가된 Enum** | `StepType` (COLLECTION, TRANSFORM, PRODUCT_CREATE, PUBLISH), `StepStatus` (PENDING, RUNNING, COMPLETED, FAILED, SKIPPED) |
+| **API 영향** | 없음 (내부 스키마 변경, API 계약 유지) |
+| **Risk Level** | Medium |
+
 #### 변경 내용
 
 | 변경 | 설명 |
