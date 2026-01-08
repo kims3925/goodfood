@@ -43,7 +43,7 @@ REQ-{CATEGORY}-{NUMBER}
 | REQ-ID | Status | Priority | Title | Owner | TR-ID |
 |--------|--------|----------|-------|-------|-------|
 | REQ-SETTLEMENT-001 | Done | P1 | Product 기반 배송비로 마진 계산 개선 | Hong | TR-20260107-001 |
-| REQ-SHOP-001 | Done | P2 | 모바일 반응형 UI 개선 | Lee | TR-20260106-001 |
+| REQ-SHOP-001 | Done | P2 | 모바일 반응형 UI 개선 | Lee | TR-20260106-001, TR-20260108-001 |
 
 ### Status
 
@@ -160,7 +160,8 @@ REQ-{CATEGORY}-{NUMBER}
 - [x] 모바일 푸터 레이아웃 개선
 - [x] 검색창 반응형 크기 조정
 - [x] 데스크탑 레이아웃 기존 유지
+- [x] 모바일 메인페이지 전체 상품 3열 그리드 적용
 
 ### 관련 항목
-- TR-ID: TR-20260106-001
+- TR-ID: TR-20260106-001, TR-20260108-001
 - Flow-ID: -

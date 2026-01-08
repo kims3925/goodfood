@@ -319,8 +319,8 @@ export default function StorePage() {
 
           {isLoading ? (
             /* 스켈레톤 UI - 실제 상품 그리드와 동일한 레이아웃 */
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-              {Array.from({ length: 10 }).map((_, i) => (
+            <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-4">
+              {Array.from({ length: 12 }).map((_, i) => (
                 <div key={i} className="animate-pulse">
                   <div className="aspect-square rounded-xl bg-gray-200" />
                   <div className="mt-2 md:mt-3 space-y-2">
@@ -332,7 +332,7 @@ export default function StorePage() {
               ))}
             </div>
           ) : shopProducts.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+            <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-4">
               {shopProducts.map((product, index) => (
                 <Link
                   key={`product-${product.shopProductId || product.id}`}

@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260108-001 | Done | 2026-01-08 | REQ-SHOP-001 | 모바일 메인페이지 상품 그리드 3열 변경 | Low | Lee |
 | TR-20260107-001 | Done | 2026-01-07 | REQ-SETTLEMENT-001 | Product 기반 배송비로 마진 계산 개선 | Medium | Hong |
 | TR-20260106-002 | Done | 2026-01-06 | - | 찜하기 페이지 가격 계산 공통 모듈 적용 | Low | Lee |
 | TR-20260106-001 | Done | 2026-01-06 | REQ-SHOP-001 | 모바일 반응형 UI 개선 | Low | Lee |
@@ -104,6 +105,49 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260108-001: 모바일 메인페이지 상품 그리드 3열 변경
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-08 |
+| REQ-ID | REQ-SHOP-001 |
+| Risk | Low |
+
+### 변경 사항
+- 모바일 화면에서 전체 상품 그리드를 2열에서 3열로 변경
+- 스켈레톤 UI도 동일하게 3열 적용
+- 3열 레이아웃에 맞게 간격(gap) 축소 (gap-3 → gap-2)
+- 스켈레톤 개수 3의 배수로 조정 (10개 → 12개)
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(shop)/main/page.tsx | Modified | grid-cols-2 → grid-cols-3, gap 조정 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Unit | N/A (UI 변경) |
+| Manual | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. grid-cols-3 → grid-cols-2 복원
+
+### 관련 항목
+- REQ-ID: REQ-SHOP-001
+- Flow-ID: -
+
+---
 
 ## TR-20260107-001: Product 기반 배송비로 마진 계산 개선
 
