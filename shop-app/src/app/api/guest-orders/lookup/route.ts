@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 /**
  * 비회원 주문 조회 API
- * 주문번호 + 휴대폰번호로 조회
+ * 주문번호로 조회
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -41,12 +41,12 @@ const guestOrderIncludeOptions = {
 
 /**
  * POST /api/guest-orders/lookup
- * 비회원 주문 조회 (주문번호 + 휴대폰번호)
+ * 비회원 주문 조회 (주문번호만으로 조회)
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { orderNumber, phone } = body
+    const { orderNumber } = body
 
     // 입력 검증
     if (!orderNumber) {
@@ -56,36 +56,25 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (!phone) {
-      return NextResponse.json(
-        { success: false, error: '휴대폰번호를 입력해주세요' },
-        { status: 400 }
-      )
-    }
-
-    // 휴대폰번호 정규화 (하이픈 제거)
-    const normalizedPhone = phone.replace(/-/g, '')
-
-    // 비회원 주문 조회
+    // 비회원 주문 조회 (주문번호만으로)
     const guestOrder = await prisma.guestOrder.findFirst({
       where: {
         orderNumber,
-        guestPhone: normalizedPhone,
       },
       include: guestOrderIncludeOptions,
     })
 
     if (!guestOrder) {
       return NextResponse.json(
-        { success: false, error: '주문을 찾을 수 없습니다. 주문번호와 휴대폰번호를 확인해주세요.' },
+        { success: false, error: '주문을 찾을 수 없습니다. 주문번호를 확인해주세요.' },
         { status: 404 }
       )
     }
 
-    // 접근 토큰 발급 (1시간 유효)
+    // 접근 토큰 발급 (1시간 유효) - DB에서 가져온 휴대폰 번호 사용
     const accessToken = generateGuestAccessToken(
       guestOrder.id,
-      normalizedPhone,
+      guestOrder.guestPhone,
       orderNumber
     )
 

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useRouter } from 'next/navigation'
 import { ShieldX, ArrowLeft, LogOut } from 'lucide-react'
@@ -33,7 +33,7 @@ export default function UnauthorizedPage() {
         {/* 안내 박스 */}
         <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
           <p className="text-sm text-gray-600">
-            <span className="font-semibold">현재 계정 역할:</span> 일반 사용자
+            <span className="font-semibold">현재 계정 역할:</span> 회원
           </p>
           <p className="text-sm text-gray-500 mt-1">
             관리자 권한 요청은 시스템 관리자에게 문의하세요.
