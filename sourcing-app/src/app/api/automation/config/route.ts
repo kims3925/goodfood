@@ -26,11 +26,6 @@ export async function GET() {
 
     const config = await prisma.automationConfig.findUnique({
       where: { userId: currentUser.userId },
-      include: {
-        pricingPolicy: {
-          select: { id: true, name: true, content: true },
-        },
-      },
     })
 
     // 설정이 없으면 기본값 반환
@@ -52,7 +47,6 @@ export async function GET() {
           wholesaleChannelIds: [],
           retailChannelIds: [],
           aiProvider: defaultAiProvider,
-          pricingPolicyId: null,
           lastRunAt: null,
           nextRunAt: null,
           shopIds: [],
@@ -139,7 +133,6 @@ export async function POST(request: NextRequest) {
       channelIds,
       wholesaleChannelIds,
       aiProvider,
-      pricingPolicyId,
       retailChannelIds,
       shopIds,
       pipelineSteps,
@@ -178,7 +171,6 @@ export async function POST(request: NextRequest) {
         cronExpression,
         channelIds: JSON.stringify(finalChannelIds),
         aiProvider: aiProvider || 'GEMINI',
-        pricingPolicyId: pricingPolicyId || null,
         retailChannelIds: JSON.stringify(finalRetailChannelIds),
         shopIds: JSON.stringify(finalShopIds),
         pipelineSteps: JSON.stringify(finalPipelineSteps),
@@ -189,7 +181,6 @@ export async function POST(request: NextRequest) {
         cronExpression,
         channelIds: JSON.stringify(finalChannelIds),
         aiProvider: aiProvider || 'GEMINI',
-        pricingPolicyId: pricingPolicyId || null,
         retailChannelIds: JSON.stringify(finalRetailChannelIds),
         shopIds: JSON.stringify(finalShopIds),
         pipelineSteps: JSON.stringify(finalPipelineSteps),

@@ -21,6 +21,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260108-002 | Done | 2026-01-08 | REQ-SHOP-002 | 인기상품 페이지 신규 개발 | Medium | Lee |
+| TR-20260108-001 | Done | 2026-01-08 | REQ-SHOP-001 | 모바일 메인페이지 상품 그리드 3열 변경 | Low | Lee |
 | TR-20260107-001 | Done | 2026-01-07 | REQ-SETTLEMENT-001 | Product 기반 배송비로 마진 계산 개선 | Medium | Hong |
 | TR-20260106-002 | Done | 2026-01-06 | - | 찜하기 페이지 가격 계산 공통 모듈 적용 | Low | Lee |
 | TR-20260106-001 | Done | 2026-01-06 | REQ-SHOP-001 | 모바일 반응형 UI 개선 | Low | Lee |
@@ -104,6 +106,102 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260108-002: 인기상품 페이지 신규 개발
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-08 |
+| REQ-ID | REQ-SHOP-002 |
+| Risk | Medium |
+
+### 변경 사항
+- 인기상품 API 신규 개발 (/api/shop/popular)
+  - OrderItem 테이블에서 shopProductId별 주문 수량 집계
+  - 취소/환불 제외한 유효 주문만 카운트
+  - 주문량 순 정렬 및 순위 부여
+- 인기상품 페이지 신규 개발 (/popular)
+  - TOP 10 인기상품 표시 (1~3위 메달 뱃지)
+  - "이런 상품은 어때요?" 섹션에 일반상품 표시
+  - 인기상품과 일반상품 중복 제거
+- 모바일 하단 네비게이션에 인기 버튼 추가
+  - 중앙 플로팅 버튼 스타일 (그라데이션, 글로우 애니메이션)
+  - 트로피 아이콘 적용
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/api/shop/popular/route.ts | Added | 인기상품 API |
+| src/app/(shop)/popular/page.tsx | Added | 인기상품 페이지 |
+| src/app/(shop)/StoreLayout.tsx | Modified | 모바일 네비에 인기 버튼 추가 |
+| src/app/globals.css | Modified | 플로팅 버튼 스타일 추가 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Unit | N/A |
+| Manual | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. 추가된 파일 삭제
+
+### 관련 항목
+- REQ-ID: REQ-SHOP-002
+- Flow-ID: -
+
+---
+
+## TR-20260108-001: 모바일 메인페이지 상품 그리드 3열 변경
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Lee |
+| Date | 2026-01-08 |
+| REQ-ID | REQ-SHOP-001 |
+| Risk | Low |
+
+### 변경 사항
+- 모바일 화면에서 전체 상품 그리드를 2열에서 3열로 변경
+- 스켈레톤 UI도 동일하게 3열 적용
+- 3열 레이아웃에 맞게 간격(gap) 축소 (gap-3 → gap-2)
+- 스켈레톤 개수 3의 배수로 조정 (10개 → 12개)
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(shop)/main/page.tsx | Modified | grid-cols-2 → grid-cols-3, gap 조정 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Unit | N/A (UI 변경) |
+| Manual | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. grid-cols-3 → grid-cols-2 복원
+
+### 관련 항목
+- REQ-ID: REQ-SHOP-001
+- Flow-ID: -
+
+---
 
 ## TR-20260107-001: Product 기반 배송비로 마진 계산 개선
 
