@@ -282,7 +282,7 @@ OrderItem (주문 상품)
         │
         ▼
 ┌─────────────────┐
-│ Product 조회    │ ── publishedProduct.product
+│ Product 조회    │ ── shopProduct.product
 ├─────────────────┤
 │ - shippingFee   │ ── 기본 배송비
 │ - bundleMaxQty  │ ── 합배송 최대 수량

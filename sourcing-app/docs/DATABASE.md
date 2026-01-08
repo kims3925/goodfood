@@ -199,18 +199,31 @@ npx prisma studio --schema prisma
 | userId | Int | 소유자 FK |
 | channelId | Int? | 원본 도매채널 FK |
 | name | String | 상품명 |
-| wholesalePrice | Int? | 도매가 |
+| wholesalePrice | Decimal? | 도매가 (옵션 없는 상품의 기본 도매가) |
 | price | Int? | 소매가 |
-| shippingFee | Int? | 배송비 |
+| shippingFee | Int? | 배송비 (Order가 아닌 Product에서 관리) |
 | bundleShippingType | BundleShippingType | 합배송 유형 |
 | bundleMaxQty | Int? | 합배송 최대 수량 |
 
 **Relations:**
-- `variants` - 옵션 조합별 가격
+- `variants` - 옵션 조합별 가격 (각 variant에 도매가 포함)
 - `options` - 옵션 그룹/값
 - `images` - 상품 이미지
 - `shopProducts` - 쇼핑몰 발행 이력
 - `channelProducts` - 채널 발행 이력
+
+### ProductVariant (상품 옵션 조합)
+
+| 필드 | 타입 | 설명 |
+|-----|-----|-----|
+| id | Int | PK |
+| productId | Int | 상품 FK |
+| optionSummary | String? | 옵션 조합 요약 (예: "빨강/XL") |
+| price | Int | 소매가 |
+| wholesalePrice | Decimal? | 도매가 (정산 시 사용) |
+| bundleUnit | Int | 합배송 단위 수 (기본 1) |
+
+> **참고:** 정산(settlement) 및 발행(publish) 시 도매가는 ProductVariant.wholesalePrice에서 조회합니다.
 
 ### Order (주문)
 
@@ -221,10 +234,11 @@ npx prisma studio --schema prisma
 | orderNumber | String | 주문번호 (ORD-YYYYMMDD-XXXX) |
 | status | CustomerOrderStatus | 주문 상태 |
 | subtotalAmount | Decimal | 상품 금액 |
-| shippingFee | Decimal | 배송비 |
 | discountAmount | Decimal | 할인 금액 |
 | totalAmount | Decimal | 총 결제 금액 |
 | shopId | Int? | 쇼핑몰 FK |
+
+> **참고:** 배송비는 주문 시점에 Order에 저장하지 않고, Product.shippingFee에서 조회합니다.
 
 **상태 이력 타임스탬프:**
 - `orderedAt`, `paidAt`, `preparingAt`, `shippedAt`, `deliveredAt`, `cancelledAt`

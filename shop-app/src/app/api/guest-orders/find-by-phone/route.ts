@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 휴대폰번호 정규화 (하이픈 제거)
-    const normalizedPhone = phone.replace(/-/g, '')
+    // 휴대폰번호 정규화 (숫자만 추출)
+    const normalizedPhone = phone.replace(/\D/g, '')
     const trimmedName = name.trim()
 
     // 최근 90일 이내 주문만 조회 (보안상 제한)

@@ -185,28 +185,58 @@ TR-{YYYYMMDD}-{NUMBER}
 | Risk | Medium |
 
 ### 변경 사항
-- `published_product` 테이블을 `shop_product`와 `channel_product`로 분리
-  - `shop_product`: 쇼핑몰(Shop)에 발행된 상품 관리
-  - `channel_product`: 채널(Band 등)에 발행된 상품 관리
+
+**1. 테이블 분리 (published_product → shop_product + channel_product)**
+- `shop_product`: 쇼핑몰(Shop)에 발행된 상품 관리
+- `channel_product`: 채널(Band 등)에 발행된 상품 관리
+- 기존 `published_product` 데이터를 양쪽 테이블로 마이그레이션 후 테이블 삭제
+
+**2. 워크플로우 추적 테이블 추가**
 - `workflow_step_log` 테이블 신규 생성 (자동화 파이프라인 단계별 추적)
 - `workflow_log.current_step` 컬럼 추가
 - `StepType` enum 추가: COLLECTION, TRANSFORM, PRODUCT_CREATE, PUBLISH
 - `StepStatus` enum 추가: PENDING, RUNNING, COMPLETED, FAILED, SKIPPED
-- `CartItem` 인덱스 변경: `publishedProductId` → `shopProductId`
+
+**3. FK 참조 변경 (published_product 제거에 따른)**
+- `cart_item.published_product_id` FK 삭제 → `cart_item.shop_product_id` FK로 대체
+- `order_item.published_product_id` FK 삭제 → `order_item.shop_product_id` FK로 대체
+- `guest_order_item.published_product_id` FK 삭제 → `guest_order_item.shop_product_id` FK로 대체
+- `inquiry.published_product_id` FK 삭제 → `inquiry.shop_product_id` FK로 대체
+
+### 영향받는 모델
+| 모델 | 변경 내용 |
+|-----|---------|
+| ShopProduct | 신규 (published_product의 shop 발행 데이터 승계) |
+| ChannelProduct | 신규 (published_product의 channel 발행 데이터 승계) |
+| WorkflowStepLog | 신규 (파이프라인 단계별 추적) |
+| WorkflowLog | current_step 컬럼 추가 |
+| CartItem | FK: publishedProductId → shopProductId |
+| OrderItem | FK: publishedProductId → shopProductId |
+| GuestOrderItem | FK: publishedProductId → shopProductId |
+| Inquiry | FK: publishedProductId → shopProductId |
 
 ### 변경 파일
 | 파일 | 유형 | 설명 |
 |-----|-----|-----|
 | db/prisma/models/publish.prisma | Modified | ShopProduct, ChannelProduct 모델로 변경 |
-| db/prisma/models/workflow.prisma | Modified | WorkflowStepLog 모델 추가 |
+| db/prisma/models/workflow.prisma | Modified | WorkflowStepLog 모델 추가, WorkflowLog에 currentStep 추가 |
+| db/prisma/models/cart.prisma | Modified | CartItem FK 변경 |
+| db/prisma/models/order.prisma | Modified | OrderItem FK 변경 |
+| db/prisma/models/inquiry.prisma | Modified | Inquiry FK 변경 |
 | db/prisma/schema.prisma | Modified | StepType, StepStatus enum 추가 |
-| db/prisma/migrations/20260108131455_remove_unused_columns/migration.sql | Added | CD 파이프라인용 마이그레이션 |
+| db/prisma/migrations/20260108131455_remove_unused_columns/migration.sql | Added | 전체 마이그레이션 SQL |
 
 ### 영향 분석
 - [ ] API Contract 변경
 - [x] DB Schema 변경
 - [x] Domain Logic 변경
 - [ ] Security 변경
+
+### 도메인 로직 영향
+- 장바구니(Cart): ShopProduct 참조로 변경
+- 주문(Order): ShopProduct 참조로 변경
+- 문의(Inquiry): ShopProduct 참조로 변경
+- 발행(Publish): Shop/Channel 발행 분리 처리
 
 ### 테스트
 | 유형 | 상태 |
@@ -222,7 +252,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 ### 관련 항목
 - REQ-ID: -
-- Flow-ID: Publish
+- Flow-ID: Publish, Cart, Order, Inquiry
+- 참조 문서: [docs/DATABASE.md](../DATABASE.md)
 
 ---
 

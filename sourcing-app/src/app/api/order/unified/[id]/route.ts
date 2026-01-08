@@ -485,6 +485,7 @@ export async function PATCH(
           // 카드 결제인 경우만 토스페이먼츠 결제 취소 API 호출
           // 무통장입금/가상계좌는 토스 API 호출하지 않음 (환불 계좌로 수동 환불)
           const isCardPayment = order.payment?.method === 'CARD'
+          const isVirtualAccountPayment = order.payment?.method === 'VIRTUAL_ACCOUNT' || order.payment?.method === 'BANK_TRANSFER'
 
           if (order.payment && order.payment.paymentKey && ['DONE', 'PARTIAL_CANCELED'].includes(order.payment.status) && isCardPayment) {
             const paymentAmount = Number(order.payment.amount)
@@ -505,29 +506,52 @@ export async function PATCH(
                 )
               }
 
-              // 결제 정보도 업데이트
-              await prisma.payment.update({
-                where: { id: order.payment.id },
-                data: {
-                  status: 'CANCELED',
-                  cancelReason: body.cancelReason || '관리자에 의한 주문 취소',
-                  cancelledAmount: new Decimal(paymentAmount),
-                  cancelledAt: now,
-                }
+              // 트랜잭션으로 payment와 order 동시 업데이트
+              await prisma.$transaction(async (tx) => {
+                await tx.payment.update({
+                  where: { id: order.payment!.id },
+                  data: {
+                    status: 'CANCELED',
+                    cancelReason: body.cancelReason || '관리자에 의한 주문 취소',
+                    cancelledAmount: new Decimal(paymentAmount),
+                    cancelledAt: now,
+                  }
+                })
+
+                await tx.order.update({
+                  where: { orderNumber: id },
+                  data: updateData,
+                })
+              })
+
+              return NextResponse.json({
+                success: true,
+                message: '주문 상태가 변경되었습니다.',
               })
             }
           }
 
-          // 무통장입금/가상계좌의 경우 Payment 상태만 업데이트
-          const isVirtualAccountPayment = order.payment?.method === 'VIRTUAL_ACCOUNT' || order.payment?.method === 'BANK_TRANSFER'
+          // 무통장입금/가상계좌의 경우 트랜잭션으로 Payment와 Order 동시 업데이트
           if (order.payment && isVirtualAccountPayment) {
-            await prisma.payment.update({
-              where: { id: order.payment.id },
-              data: {
-                status: 'CANCELED',
-                cancelReason: body.cancelReason || '관리자에 의한 주문 취소',
-                cancelledAt: now,
-              }
+            await prisma.$transaction(async (tx) => {
+              await tx.payment.update({
+                where: { id: order.payment!.id },
+                data: {
+                  status: 'CANCELED',
+                  cancelReason: body.cancelReason || '관리자에 의한 주문 취소',
+                  cancelledAt: now,
+                }
+              })
+
+              await tx.order.update({
+                where: { orderNumber: id },
+                data: updateData,
+              })
+            })
+
+            return NextResponse.json({
+              success: true,
+              message: '주문 상태가 변경되었습니다.',
             })
           }
           break
@@ -627,6 +651,7 @@ export async function PATCH(
           // 카드 결제인 경우만 토스페이먼츠 결제 취소 API 호출
           // 무통장입금/가상계좌는 토스 API 호출하지 않음 (환불 계좌로 수동 환불)
           const isGuestCardPayment = guestOrder.payment?.method === 'CARD'
+          const isGuestVirtualAccountPayment = guestOrder.payment?.method === 'VIRTUAL_ACCOUNT' || guestOrder.payment?.method === 'BANK_TRANSFER'
 
           if (guestOrder.payment && guestOrder.payment.paymentKey && ['DONE', 'PARTIAL_CANCELED'].includes(guestOrder.payment.status) && isGuestCardPayment) {
             const paymentAmount = Number(guestOrder.payment.amount)
@@ -647,29 +672,52 @@ export async function PATCH(
                 )
               }
 
-              // 결제 정보도 업데이트
-              await prisma.guestPayment.update({
-                where: { id: guestOrder.payment.id },
-                data: {
-                  status: 'CANCELED',
-                  cancelReason: body.cancelReason || '관리자에 의한 주문 취소',
-                  cancelledAmount: new Decimal(paymentAmount),
-                  cancelledAt: now,
-                }
+              // 트랜잭션으로 guestPayment와 guestOrder 동시 업데이트
+              await prisma.$transaction(async (tx) => {
+                await tx.guestPayment.update({
+                  where: { id: guestOrder.payment!.id },
+                  data: {
+                    status: 'CANCELED',
+                    cancelReason: body.cancelReason || '관리자에 의한 주문 취소',
+                    cancelledAmount: new Decimal(paymentAmount),
+                    cancelledAt: now,
+                  }
+                })
+
+                await tx.guestOrder.update({
+                  where: { orderNumber: id },
+                  data: updateData,
+                })
+              })
+
+              return NextResponse.json({
+                success: true,
+                message: '주문 상태가 변경되었습니다.',
               })
             }
           }
 
-          // 무통장입금/가상계좌의 경우 Payment 상태만 업데이트
-          const isGuestVirtualAccountPayment = guestOrder.payment?.method === 'VIRTUAL_ACCOUNT' || guestOrder.payment?.method === 'BANK_TRANSFER'
+          // 무통장입금/가상계좌의 경우 트랜잭션으로 Payment와 Order 동시 업데이트
           if (guestOrder.payment && isGuestVirtualAccountPayment) {
-            await prisma.guestPayment.update({
-              where: { id: guestOrder.payment.id },
-              data: {
-                status: 'CANCELED',
-                cancelReason: body.cancelReason || '관리자에 의한 주문 취소',
-                cancelledAt: now,
-              }
+            await prisma.$transaction(async (tx) => {
+              await tx.guestPayment.update({
+                where: { id: guestOrder.payment!.id },
+                data: {
+                  status: 'CANCELED',
+                  cancelReason: body.cancelReason || '관리자에 의한 주문 취소',
+                  cancelledAt: now,
+                }
+              })
+
+              await tx.guestOrder.update({
+                where: { orderNumber: id },
+                data: updateData,
+              })
+            })
+
+            return NextResponse.json({
+              success: true,
+              message: '주문 상태가 변경되었습니다.',
             })
           }
           break

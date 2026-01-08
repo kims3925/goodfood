@@ -45,8 +45,9 @@ export function useShopUrl() {
 
   /**
    * API 경로 반환 (Shop slug 포함)
+   * 미들웨어가 slug를 추출하여 x-shop-id 헤더를 설정함
    * @param apiPath API 경로 (예: '/api/cart')
-   * @returns slug가 포함된 API 경로
+   * @returns slug가 포함된 API 경로 (예: '/shop1/api/cart')
    */
   const getApiPath = useCallback((apiPath: string) => {
     if (!slug) return apiPath
