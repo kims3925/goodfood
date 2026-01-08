@@ -19,7 +19,6 @@ export interface GuestOrderItemInput {
   thumbnailUrl: string | null
   quantity: number
   unitPrice: number
-  wholesalePrice?: Prisma.Decimal | number | null // 도매가 스냅샷 (마진 계산용)
 }
 
 export interface GuestShippingAddressInput {
@@ -42,7 +41,6 @@ export interface CreateGuestOrderInput {
   shippingAddress: GuestShippingAddressInput
   // 금액 정보
   subtotalAmount: number
-  shippingFee: number
   discountAmount?: number
   totalAmount: number
   items: GuestOrderItemInput[]
@@ -103,7 +101,6 @@ export class GuestOrderRepository {
         guestEmail: data.guestEmail || null,
         // 금액 정보
         subtotalAmount: new Decimal(data.subtotalAmount),
-        shippingFee: new Decimal(data.shippingFee),
         discountAmount: new Decimal(data.discountAmount || 0),
         totalAmount: new Decimal(data.totalAmount),
         // 배송지 정보 (별도 테이블)
@@ -126,7 +123,6 @@ export class GuestOrderRepository {
             thumbnailUrl: item.thumbnailUrl,
             quantity: item.quantity,
             unitPrice: new Decimal(item.unitPrice),
-            wholesalePrice: item.wholesalePrice ?? null, // 도매가 스냅샷
             totalPrice: new Decimal(item.unitPrice * item.quantity),
           })),
         },

@@ -4,7 +4,6 @@ model Order {
   orderNumber     String              @unique @map("order_number") @db.VarChar(50)
   status          CustomerOrderStatus @default(PENDING)
   subtotalAmount  Decimal             @map("subtotal_amount") @db.Decimal(12, 2)
-  shippingFee     Decimal             @default(0.00) @map("shipping_fee") @db.Decimal(10, 2)
   discountAmount  Decimal             @default(0.00) @map("discount_amount") @db.Decimal(10, 2)
   totalAmount     Decimal             @map("total_amount") @db.Decimal(12, 2)
   orderedAt       DateTime            @default(now()) @map("ordered_at") @db.Timestamp(0)
@@ -43,8 +42,7 @@ model OrderItem {
   optionSummary  String?         @map("option_summary") @db.VarChar(500)
   thumbnailUrl   String?         @map("thumbnail_url") @db.VarChar(1000)
   quantity       Int
-  unitPrice          Decimal          @map("unit_price") @db.Decimal(12, 2)
-  wholesalePrice     Decimal?         @map("wholesale_price") @db.Decimal(12, 2) // 주문 시점의 도매가 스냅샷 (마진 계산용)
+  unitPrice      Decimal         @map("unit_price") @db.Decimal(12, 2)
   totalPrice     Decimal         @map("total_price") @db.Decimal(12, 2)
   createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
   order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)

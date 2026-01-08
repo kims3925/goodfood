@@ -64,7 +64,6 @@ interface OrderPrepareData {
   // 금액 정보 (prepare 단계에서 계산된 값 - confirm 시 재계산 방지)
   amounts: {
     subtotal: number
-    shippingFee: number
     discountAmount: number
     totalAmount: number
   }
@@ -385,7 +384,6 @@ export async function POST(req: NextRequest) {
       // 금액 정보 (confirm 시 재계산 방지를 위해 저장)
       amounts: {
         subtotal,
-        shippingFee,
         discountAmount,
         totalAmount,
       },
@@ -401,7 +399,6 @@ export async function POST(req: NextRequest) {
         orderNumber: orderId,
         totalAmount,
         subtotal,
-        shippingFee,
         discountAmount,
         itemCount: orderItems.reduce((sum, item) => sum + item.quantity, 0),
         items: orderItems.map((item) => ({
