@@ -181,15 +181,11 @@ export async function executeTransformPipeline(
     // 자동화 설정 조회
     const automationConfig = await prisma.automationConfig.findUnique({
       where: { userId },
-      include: {
-        pricingPolicy: true,
-      },
     })
 
     const transformConfig = {
       aiProvider: config?.aiProvider ?? automationConfig?.aiProvider ?? 'GEMINI',
-      pricingPolicyId: config?.pricingPolicyId ?? automationConfig?.pricingPolicyId,
-      pricingPolicyContent: config?.pricingPolicyContent ?? automationConfig?.pricingPolicy?.content,
+      pricingPolicyContent: config?.pricingPolicyContent,
       postIds: config?.postIds,
       transformPendingOnly: config?.transformPendingOnly ?? true,
     }
@@ -363,9 +359,6 @@ export async function executeFullPipeline(
     // 자동화 설정 조회
     const automationConfig = await prisma.automationConfig.findUnique({
       where: { userId },
-      include: {
-        pricingPolicy: true,
-      },
     })
 
     if (!automationConfig) {
@@ -419,12 +412,10 @@ export async function executeFullPipeline(
     // 2. 변환 단계
     if (!options?.skipTransform) {
       logStageStart('AI변환(Transform)', { ...logCtx, stage: 'TRANSFORM' })
-      log('DEBUG', `AI 제공자: ${automationConfig.aiProvider}, 가격정책ID: ${automationConfig.pricingPolicyId || '미설정'}`, { ...logCtx, stage: 'TRANSFORM' })
+      log('DEBUG', `AI 제공자: ${automationConfig.aiProvider}`, { ...logCtx, stage: 'TRANSFORM' })
 
       transformResult = await runTransformPipeline({
         aiProvider: automationConfig.aiProvider,
-        pricingPolicyId: automationConfig.pricingPolicyId,
-        pricingPolicyContent: automationConfig.pricingPolicy?.content,
         transformPendingOnly: true,
       })
 
@@ -755,9 +746,6 @@ export async function executeFullPipelineWithLock(
     // 자동화 설정 조회
     const automationConfig = await prisma.automationConfig.findUnique({
       where: { userId },
-      include: {
-        pricingPolicy: true,
-      },
     })
 
     if (!automationConfig) {
@@ -808,8 +796,6 @@ export async function executeFullPipelineWithLock(
 
       transformResult = await runTransformPipeline({
         aiProvider: automationConfig.aiProvider,
-        pricingPolicyId: automationConfig.pricingPolicyId,
-        pricingPolicyContent: automationConfig.pricingPolicy?.content,
         transformPendingOnly: true,
       })
 

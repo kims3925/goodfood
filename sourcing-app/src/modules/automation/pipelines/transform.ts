@@ -253,14 +253,8 @@ export async function runTransformPipeline(
 
   console.log(`[Transform] Found policies for ${policyByChannel.size}/${channelIds.length} channels`)
 
-  // 기존 config.pricingPolicyId는 폴백으로 사용
-  let fallbackPolicyContent: string | null = null
-  if (config.pricingPolicyId) {
-    const policy = await prisma.pricingPolicy.findUnique({
-      where: { id: config.pricingPolicyId },
-    })
-    fallbackPolicyContent = policy?.content || null
-  }
+  // config.pricingPolicyContent를 폴백으로 사용
+  const fallbackPolicyContent = config.pricingPolicyContent || null
 
   // 모델에 따른 Rate Limit 정보 조회 (유료 API 모니터링용)
   const rateLimit = getModelRateLimit(config.aiProvider, aiConfig.model)

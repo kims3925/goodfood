@@ -84,7 +84,6 @@ interface AutomationConfig {
   collectFromAllChannels: boolean
   wholesaleChannelIds: number[]
   aiProvider: string
-  pricingPolicyId: number | null
   retailChannelIds: number[]
   shopIds: number[]
   pipelineSteps: PipelineSteps
@@ -174,7 +173,6 @@ const defaultConfig: AutomationConfig = {
   collectFromAllChannels: true,
   wholesaleChannelIds: [],
   aiProvider: 'GEMINI',
-  pricingPolicyId: null,
   retailChannelIds: [],
   shopIds: [],
   pipelineSteps: {
@@ -223,8 +221,7 @@ export default function AutomationSettingsPage() {
   const hasCollectionChanges = JSON.stringify((config.wholesaleChannelIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.wholesaleChannelIds || []).slice().sort())
 
-  const hasAiChanges = config.aiProvider !== initialConfig.aiProvider ||
-    config.pricingPolicyId !== initialConfig.pricingPolicyId
+  const hasAiChanges = config.aiProvider !== initialConfig.aiProvider
 
   const hasPublishChanges = JSON.stringify((config.retailChannelIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.retailChannelIds || []).slice().sort())
@@ -574,7 +571,7 @@ export default function AutomationSettingsPage() {
           sectionData = { wholesaleChannelIds: config.wholesaleChannelIds }
           break
         case 'ai':
-          sectionData = { aiProvider: config.aiProvider, pricingPolicyId: config.pricingPolicyId }
+          sectionData = { aiProvider: config.aiProvider }
           break
         case 'publish':
           sectionData = { retailChannelIds: config.retailChannelIds }
