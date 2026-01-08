@@ -4,10 +4,26 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   RefreshCw, ChevronLeft, ChevronRight, CheckCircle, XCircle,
   AlertCircle, Clock, ChevronDown, ChevronUp, Download, Zap,
-  Package, Send, Bot, Activity, Timer, TrendingUp, Filter
+  Package, Send, Bot, Activity, Timer, TrendingUp
 } from 'lucide-react'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+
+interface WorkflowStepLog {
+  stepType: string
+  stepOrder: number
+  status: string
+  startedAt: string | null
+  completedAt: string | null
+  duration: number | null
+  totalItems: number
+  processedItems: number
+  successCount: number
+  failedCount: number
+  progress: number
+  errorMessage: string | null
+  details: Record<string, any> | null
+}
 
 interface WorkflowLog {
   id: number
@@ -20,6 +36,8 @@ interface WorkflowLog {
   failedCount: number
   errorMessage: string | null
   details: Record<string, any> | null
+  currentStep: string | null
+  steps: WorkflowStepLog[]
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -82,8 +100,30 @@ const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; bgCo
   },
 }
 
+// 소요시간 포맷
+const formatStepDuration = (durationMs: number | null) => {
+  if (!durationMs) return '-'
+  const seconds = Math.floor(durationMs / 1000)
+  if (seconds < 60) return `${seconds}초`
+  const minutes = Math.floor(seconds / 60)
+  const remainingSecs = seconds % 60
+  if (minutes < 60) return `${minutes}분 ${remainingSecs}초`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}시간 ${minutes % 60}분`
+}
+
 // 타임라인 스타일 단계별 섹션 컴포넌트
-const TimelineLogSection = ({ details, workflowType }: { details: Record<string, any>; workflowType: string }) => {
+const TimelineLogSection = ({
+  details,
+  workflowType,
+  steps = [],
+  currentStep
+}: {
+  details: Record<string, any>
+  workflowType: string
+  steps?: WorkflowStepLog[]
+  currentStep?: string | null
+}) => {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
 
   const toggleSection = (name: string) => {
@@ -106,6 +146,12 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
     stats?: { label: string; value: number | string; color?: string }[]
     details: React.ReactNode
     hasData: boolean
+    duration?: number | null
+    progress?: number
+    isCurrentStep?: boolean
+    errorMessage?: string | null
+    startedAt?: string | null
+    completedAt?: string | null
   }
 
   // 워크플로우 타입에 따라 표시할 단계 결정
@@ -123,52 +169,115 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
     }
   }
 
+  // steps 배열에서 해당 stepType 찾기 (step 데이터 우선)
+  const getStepByType = (stepType: string): WorkflowStepLog | undefined => {
+    return steps.find(s => s.stepType === stepType)
+  }
+
+  // step status를 StageData status로 변환
+  const mapStepStatus = (step: WorkflowStepLog | undefined, hasData: boolean): StageData['status'] => {
+    if (step) {
+      switch (step.status) {
+        case 'RUNNING': return 'running'
+        case 'COMPLETED': return step.failedCount > 0 ? 'warning' : 'success'
+        case 'FAILED': return 'failed'
+        case 'SKIPPED': return 'skipped'
+        case 'PENDING': return 'pending'
+        default: return 'pending'
+      }
+    }
+    // step 데이터가 없으면 details 기반으로 판단
+    return hasData ? 'success' : 'pending'
+  }
+
+  // step 시간 포맷
+  const formatStepTime = (dateStr: string | null) => {
+    if (!dateStr) return '-'
+    const date = new Date(dateStr)
+    return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }
+
   const visibleStages = getVisibleStages()
   const stages: StageData[] = []
 
   // Collection 단계
   if (visibleStages.includes('collection')) {
-    const hasData = !!details.collection
-    const totalNew = details.collection?.totalNewPosts || 0
-    const totalDup = details.collection?.totalDuplicates || 0
-    const totalFetched = details.collection?.channelResults?.reduce((sum: number, ch: any) => sum + (ch.fetched || ch.newPosts + ch.duplicates || 0), 0) || totalNew + totalDup
+    const step = getStepByType('collection')
+    const stepDetails = step?.details as Record<string, any> | null
+    const hasData = !!step || !!details.collection
+    const isCurrentStep = currentStep === 'collection'
+
+    // step 데이터 우선, 없으면 details에서
+    const totalNew = step?.successCount ?? details.collection?.totalNewPosts ?? 0
+    const totalDup = stepDetails?.totalDuplicates ?? details.collection?.totalDuplicates ?? 0
+    const channelResults = stepDetails?.channelResults ?? details.collection?.channelResults ?? []
+    const totalFetched = channelResults.reduce((sum: number, ch: any) => sum + (ch.fetched || ch.newPosts + (ch.duplicates || 0)), 0) || (totalNew + totalDup)
 
     stages.push({
       name: '수집',
       icon: <Download size={18} />,
-      status: hasData ? (totalNew > 0 ? 'success' : 'skipped') : 'pending',
-      summary: hasData ? `${totalNew}/${totalFetched}건` : '로그 없음',
+      status: mapStepStatus(step, hasData),
+      summary: step?.status === 'RUNNING'
+        ? `진행 중 ${step.processedItems}/${step.totalItems}건`
+        : hasData ? `${totalNew}/${totalFetched}건` : '대기 중',
       hasData,
+      duration: step?.duration,
+      progress: step?.progress,
+      isCurrentStep,
+      errorMessage: step?.errorMessage,
+      startedAt: step?.startedAt,
+      completedAt: step?.completedAt,
       stats: hasData ? [
         { label: '신규', value: totalNew, color: 'text-emerald-600' },
         { label: '중복', value: totalDup, color: 'text-slate-400' },
         { label: '전체', value: totalFetched, color: 'text-slate-500' },
       ] : undefined,
       details: hasData ? (
-        <div className="space-y-2">
-          {details.collection?.channelResults?.length > 0 ? (
-            details.collection.channelResults.map((ch: any, i: number) => {
-              const fetched = ch.fetched || ch.newPosts + (ch.duplicates || 0)
-              return (
-                <div
-                  key={i}
-                  className={`flex items-center gap-3 p-2.5 rounded-lg transition-colors ${
-                    ch.newPosts > 0 ? 'bg-emerald-50/50' : 'bg-slate-50'
-                  }`}
-                >
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${ch.newPosts > 0 ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                  <span className="text-sm font-medium text-slate-700">{ch.channelName}</span>
-                  <span className={`text-sm font-semibold ${ch.newPosts > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                    {ch.newPosts}/{fetched}건
-                  </span>
-                  {ch.duplicates > 0 && (
-                    <span className="text-slate-400 text-xs">(중복 {ch.duplicates})</span>
-                  )}
-                </div>
-              )
-            })
+        <div className="space-y-3">
+          {/* 에러 메시지 */}
+          {step?.errorMessage && (
+            <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <XCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-red-700">{step.errorMessage}</p>
+              </div>
+            </div>
+          )}
+
+          {/* 채널별 결과 */}
+          {channelResults.length > 0 ? (
+            <div className="space-y-2">
+              {channelResults.map((ch: any, i: number) => {
+                const fetched = ch.fetched || ch.newPosts + (ch.duplicates || 0)
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center gap-3 p-2.5 rounded-lg transition-colors ${
+                      ch.newPosts > 0 ? 'bg-emerald-50/50' : 'bg-slate-50'
+                    }`}
+                  >
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${ch.newPosts > 0 ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                    <span className="text-sm font-medium text-slate-700">{ch.channelName}</span>
+                    <span className={`text-sm font-semibold ${ch.newPosts > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                      {ch.newPosts}/{fetched}건
+                    </span>
+                    {ch.duplicates > 0 && (
+                      <span className="text-slate-400 text-xs">(중복 {ch.duplicates})</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           ) : (
             <div className="text-sm text-slate-400 text-center py-2">채널별 상세 정보 없음</div>
+          )}
+
+          {/* 실행 시간 정보 */}
+          {step?.startedAt && (
+            <div className="flex items-center gap-4 text-xs text-slate-400 pt-2 border-t border-slate-100">
+              <span>시작: {formatStepTime(step.startedAt)}</span>
+              {step.completedAt && <span>종료: {formatStepTime(step.completedAt)}</span>}
+            </div>
           )}
         </div>
       ) : (
@@ -179,18 +288,32 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
 
   // Transform 단계
   if (visibleStages.includes('transform')) {
-    const hasData = !!details.transform
-    const successCount = details.transform?.createdProducts || 0
-    const failedCount = details.transform?.retryablePostIds?.length || 0
-    const total = successCount + failedCount
+    const step = getStepByType('transform')
+    const stepDetails = step?.details as Record<string, any> | null
+    const hasData = !!step || !!details.transform
+    const isCurrentStep = currentStep === 'transform'
+
+    // step 데이터 우선
+    const successCount = step?.successCount ?? details.transform?.createdProducts ?? 0
+    const failedCount = step?.failedCount ?? details.transform?.retryablePostIds?.length ?? 0
+    const total = step?.totalItems || step?.processedItems || (successCount + failedCount)
     const successRate = total > 0 ? Math.round((successCount / total) * 100) : 0
+    const transformedPosts = stepDetails?.transformedPosts ?? details.transform?.transformedPosts ?? []
 
     stages.push({
       name: 'AI 변환',
       icon: <Bot size={18} />,
-      status: hasData ? (failedCount === 0 ? 'success' : failedCount === total ? 'failed' : 'warning') : 'pending',
-      summary: hasData ? `${successCount}/${total}건 (${successRate}%)` : '로그 없음',
+      status: mapStepStatus(step, hasData),
+      summary: step?.status === 'RUNNING'
+        ? `진행 중 ${step.processedItems}/${step.totalItems}건`
+        : hasData ? `${successCount}/${total}건 (${successRate}%)` : '대기 중',
       hasData,
+      duration: step?.duration,
+      progress: step?.progress,
+      isCurrentStep,
+      errorMessage: step?.errorMessage,
+      startedAt: step?.startedAt,
+      completedAt: step?.completedAt,
       stats: hasData ? [
         { label: '성공', value: successCount, color: 'text-emerald-600' },
         { label: '실패', value: failedCount, color: failedCount > 0 ? 'text-red-500' : 'text-slate-400' },
@@ -198,6 +321,16 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
       ] : undefined,
       details: hasData ? (
         <div className="space-y-3">
+          {/* step 에러 메시지 */}
+          {step?.errorMessage && (
+            <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <XCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-red-700">{step.errorMessage}</p>
+              </div>
+            </div>
+          )}
+
           {/* 성공률 프로그레스 바 */}
           {total > 0 && (
             <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -211,11 +344,11 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
           )}
 
           {/* 실패 목록 */}
-          {failedCount > 0 && details.transform?.transformedPosts && (
+          {failedCount > 0 && transformedPosts.length > 0 && (
             <div className="mt-3">
               <p className="text-xs font-medium text-red-600 mb-2">실패 항목:</p>
               <div className="max-h-32 overflow-y-auto space-y-1 pr-2">
-                {details.transform.transformedPosts
+                {transformedPosts
                   .filter((p: any) => p.status === 'failed')
                   .slice(0, 10)
                   .map((p: any, i: number) => (
@@ -228,16 +361,24 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
                       <span>{p.error}</span>
                     </div>
                   ))}
-                {details.transform.transformedPosts.filter((p: any) => p.status === 'failed').length > 10 && (
+                {transformedPosts.filter((p: any) => p.status === 'failed').length > 10 && (
                   <div className="text-xs text-slate-500 py-1">
-                    ... 외 {details.transform.transformedPosts.filter((p: any) => p.status === 'failed').length - 10}건
+                    ... 외 {transformedPosts.filter((p: any) => p.status === 'failed').length - 10}건
                   </div>
                 )}
               </div>
             </div>
           )}
-          {total === 0 && (
+          {total === 0 && !step?.errorMessage && (
             <div className="text-sm text-slate-400 text-center py-2">변환할 항목이 없었습니다</div>
+          )}
+
+          {/* 실행 시간 정보 */}
+          {step?.startedAt && (
+            <div className="flex items-center gap-4 text-xs text-slate-400 pt-2 border-t border-slate-100">
+              <span>시작: {formatStepTime(step.startedAt)}</span>
+              {step.completedAt && <span>종료: {formatStepTime(step.completedAt)}</span>}
+            </div>
           )}
         </div>
       ) : (
@@ -248,23 +389,50 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
 
   // ProductCreate 단계
   if (visibleStages.includes('productCreate')) {
-    const hasData = !!details.productCreate
-    const total = details.productCreate?.totalCreated || 0
+    const step = getStepByType('productCreate')
+    const stepDetails = step?.details as Record<string, any> | null
+    const hasData = !!step || !!details.productCreate
+    const isCurrentStep = currentStep === 'productCreate'
+
+    // step 데이터 우선
+    const successCount = step?.successCount ?? details.productCreate?.totalCreated ?? 0
+    const failedCount = step?.failedCount ?? 0
+    const createdProducts = stepDetails?.createdProducts ?? details.productCreate?.createdProducts ?? []
 
     stages.push({
       name: '상품 생성',
       icon: <Package size={18} />,
-      status: hasData ? (total > 0 ? 'success' : 'skipped') : 'pending',
-      summary: hasData ? `${total}개 생성` : '로그 없음',
+      status: mapStepStatus(step, hasData),
+      summary: step?.status === 'RUNNING'
+        ? `진행 중 ${step.processedItems}/${step.totalItems}건`
+        : hasData ? `${successCount}개 생성` : '대기 중',
       hasData,
+      duration: step?.duration,
+      progress: step?.progress,
+      isCurrentStep,
+      errorMessage: step?.errorMessage,
+      startedAt: step?.startedAt,
+      completedAt: step?.completedAt,
       stats: hasData ? [
-        { label: '생성', value: total, color: 'text-emerald-600' },
+        { label: '생성', value: successCount, color: 'text-emerald-600' },
+        { label: '실패', value: failedCount, color: failedCount > 0 ? 'text-red-500' : 'text-slate-400' },
       ] : undefined,
       details: hasData ? (
-        <div className="space-y-1.5">
-          {details.productCreate?.createdProducts?.length > 0 ? (
-            <>
-              {details.productCreate.createdProducts.slice(0, 10).map((p: any, i: number) => (
+        <div className="space-y-3">
+          {/* step 에러 메시지 */}
+          {step?.errorMessage && (
+            <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <XCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-red-700">{step.errorMessage}</p>
+              </div>
+            </div>
+          )}
+
+          {/* 생성된 상품 목록 */}
+          {createdProducts.length > 0 ? (
+            <div className="space-y-1.5">
+              {createdProducts.slice(0, 10).map((p: any, i: number) => (
                 <div key={i} className="flex items-center gap-2 text-sm py-1.5 px-2 bg-slate-50 rounded-lg">
                   <span className="text-emerald-500 font-bold">+</span>
                   <span className="flex-1 text-slate-700 font-medium truncate">
@@ -273,14 +441,22 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
                   <span className="text-xs text-slate-400 font-mono">#{p.productId}</span>
                 </div>
               ))}
-              {details.productCreate.createdProducts.length > 10 && (
+              {createdProducts.length > 10 && (
                 <div className="text-xs text-slate-400 pt-1 text-center">
-                  ... 외 {details.productCreate.createdProducts.length - 10}개
+                  ... 외 {createdProducts.length - 10}개
                 </div>
               )}
-            </>
-          ) : (
+            </div>
+          ) : !step?.errorMessage && (
             <div className="text-sm text-slate-400 text-center py-2">생성된 상품이 없습니다</div>
+          )}
+
+          {/* 실행 시간 정보 */}
+          {step?.startedAt && (
+            <div className="flex items-center gap-4 text-xs text-slate-400 pt-2 border-t border-slate-100">
+              <span>시작: {formatStepTime(step.startedAt)}</span>
+              {step.completedAt && <span>종료: {formatStepTime(step.completedAt)}</span>}
+            </div>
           )}
         </div>
       ) : (
@@ -291,13 +467,18 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
 
   // Publish 단계
   if (visibleStages.includes('publish')) {
-    const hasData = !!details.publish
-    const publishedProducts = details.publish?.publishedProducts || []
-    const channelResults = details.publish?.channelResults || []
+    const step = getStepByType('publish')
+    const stepDetails = step?.details as Record<string, any> | null
+    const hasData = !!step || !!details.publish
+    const isCurrentStep = currentStep === 'publish'
+
+    // step 데이터 우선
+    const publishedProducts = stepDetails?.publishedProducts ?? details.publish?.publishedProducts ?? []
+    const channelResults = stepDetails?.channelResults ?? details.publish?.channelResults ?? []
 
     // channelResults가 있으면 사용, 없으면 publishedProducts에서 계산
-    let totalSuccess = 0
-    let totalFailed = 0
+    let totalSuccess = step?.successCount ?? 0
+    let totalFailed = step?.failedCount ?? 0
     let displayItems: { channelName: string; success: number; failed: number; attempted: number }[] = []
 
     if (channelResults.length > 0) {
@@ -318,21 +499,19 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
           channelMap.set(channelId, { name: p.channelName || '', success: 0, failed: 0 })
         }
         const stats = channelMap.get(channelId)!
-        // 채널명이 있으면 업데이트
         if (p.channelName && !stats.name) {
           stats.name = p.channelName
         }
         if (p.status === 'SUCCESS') {
           stats.success++
-          totalSuccess++
+          if (!step) totalSuccess++
         } else if (p.status === 'FAILED') {
           stats.failed++
-          totalFailed++
+          if (!step) totalFailed++
         }
       }
 
-      // pendingChannel 정보가 있으면 채널명으로 사용
-      const pendingChannel = details.publish?.pendingChannel
+      const pendingChannel = stepDetails?.pendingChannel ?? details.publish?.pendingChannel
       channelMap.forEach((stats, channelId) => {
         displayItems.push({
           channelName: stats.name || (pendingChannel?.id === channelId ? pendingChannel.name : `채널 ${channelId}`),
@@ -346,33 +525,62 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
     stages.push({
       name: '발행',
       icon: <Send size={18} />,
-      status: hasData ? (totalFailed === 0 && totalSuccess > 0 ? 'success' : totalSuccess === 0 && totalFailed === 0 ? 'skipped' : totalSuccess === 0 ? 'failed' : 'warning') : 'pending',
-      summary: hasData ? `${totalSuccess}건 발행` : '로그 없음',
+      status: mapStepStatus(step, hasData),
+      summary: step?.status === 'RUNNING'
+        ? `진행 중 ${step.processedItems}/${step.totalItems}건`
+        : hasData ? `${totalSuccess}건 발행` : '대기 중',
       hasData,
+      duration: step?.duration,
+      progress: step?.progress,
+      isCurrentStep,
+      errorMessage: step?.errorMessage,
+      startedAt: step?.startedAt,
+      completedAt: step?.completedAt,
       stats: hasData ? [
         { label: '성공', value: totalSuccess, color: 'text-emerald-600' },
         { label: '실패', value: totalFailed, color: totalFailed > 0 ? 'text-red-500' : 'text-slate-400' },
       ] : undefined,
       details: hasData ? (
-        <div className="space-y-2">
-          {displayItems.length > 0 ? (
-            displayItems.map((ch, i) => (
-              <div
-                key={i}
-                className={`flex items-center gap-3 p-2.5 rounded-lg ${ch.failed === 0 && ch.success > 0 ? 'bg-emerald-50/50' : ch.success === 0 ? 'bg-red-50/50' : 'bg-amber-50/50'}`}
-              >
-                <div className={`w-2 h-2 rounded-full shrink-0 ${ch.failed === 0 && ch.success > 0 ? 'bg-emerald-500' : ch.success === 0 ? 'bg-red-500' : 'bg-amber-500'}`} />
-                <span className="text-sm font-medium text-slate-700">{ch.channelName}</span>
-                <span className={`text-sm font-semibold ${ch.success > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {ch.success}/{ch.attempted}건
-                </span>
-                {ch.failed > 0 && (
-                  <span className="text-xs text-red-500">({ch.failed}건 실패)</span>
-                )}
+        <div className="space-y-3">
+          {/* step 에러 메시지 */}
+          {step?.errorMessage && (
+            <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <XCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-red-700">{step.errorMessage}</p>
               </div>
-            ))
-          ) : (
+            </div>
+          )}
+
+          {/* 채널별 결과 */}
+          {displayItems.length > 0 ? (
+            <div className="space-y-2">
+              {displayItems.map((ch, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center gap-3 p-2.5 rounded-lg ${ch.failed === 0 && ch.success > 0 ? 'bg-emerald-50/50' : ch.success === 0 ? 'bg-red-50/50' : 'bg-amber-50/50'}`}
+                >
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${ch.failed === 0 && ch.success > 0 ? 'bg-emerald-500' : ch.success === 0 ? 'bg-red-500' : 'bg-amber-500'}`} />
+                  <span className="text-sm font-medium text-slate-700">{ch.channelName}</span>
+                  <span className={`text-sm font-semibold ${ch.success > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {ch.success}/{ch.attempted}건
+                  </span>
+                  {ch.failed > 0 && (
+                    <span className="text-xs text-red-500">({ch.failed}건 실패)</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : !step?.errorMessage && (
             <div className="text-sm text-slate-400 text-center py-2">발행된 항목이 없습니다</div>
+          )}
+
+          {/* 실행 시간 정보 */}
+          {step?.startedAt && (
+            <div className="flex items-center gap-4 text-xs text-slate-400 pt-2 border-t border-slate-100">
+              <span>시작: {formatStepTime(step.startedAt)}</span>
+              {step.completedAt && <span>종료: {formatStepTime(step.completedAt)}</span>}
+            </div>
           )}
         </div>
       ) : (
@@ -399,40 +607,64 @@ const TimelineLogSection = ({ details, workflowType }: { details: Record<string,
         {stages.map((stage, index) => {
           const isExpanded = expandedSections.has(stage.name)
           const styles = statusStyles[stage.status]
+          const isRunning = stage.status === 'running'
 
           return (
-            <div key={stage.name} className="relative">
+            <div key={stage.name} className={`relative ${stage.isCurrentStep ? 'z-10' : ''}`}>
               {/* 타임라인 노드 */}
-              <div className={`absolute left-2 top-4 w-3 h-3 rounded-full ${styles.bg} ring-4 ${styles.ring} z-10`} />
+              <div className={`absolute left-2 top-4 w-3 h-3 rounded-full ${styles.bg} ring-4 ${styles.ring} z-10 ${isRunning ? 'animate-pulse' : ''}`} />
 
               <div className="ml-10">
                 <button
                   onClick={() => toggleSection(stage.name)}
                   className={`w-full text-left rounded-xl transition-all duration-200 ${
-                    isExpanded
-                      ? 'bg-white shadow-sm ring-1 ring-slate-200'
-                      : 'hover:bg-slate-50'
-                  } ${!stage.hasData ? 'opacity-60' : ''}`}
+                    stage.isCurrentStep
+                      ? 'bg-blue-50 shadow-md ring-2 ring-blue-300'
+                      : isExpanded
+                        ? 'bg-white shadow-sm ring-1 ring-slate-200'
+                        : 'hover:bg-slate-50'
+                  } ${!stage.hasData && !stage.isCurrentStep ? 'opacity-60' : ''}`}
                 >
                   <div className="p-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`p-1.5 rounded-lg ${
+                        isRunning ? 'bg-blue-100 text-blue-600' :
                         stage.status === 'success' ? 'bg-emerald-100 text-emerald-600' :
                         stage.status === 'failed' ? 'bg-red-100 text-red-600' :
                         stage.status === 'warning' ? 'bg-amber-100 text-amber-600' :
                         'bg-slate-100 text-slate-400'
                       }`}>
-                        {stage.icon}
+                        {isRunning ? <RefreshCw size={18} className="animate-spin" /> : stage.icon}
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-slate-800">{stage.name}</span>
-                          <span className={`text-sm ${styles.text}`}>{stage.summary}</span>
-                          {!stage.hasData && (
+                          <span className={`font-semibold ${stage.isCurrentStep ? 'text-blue-800' : 'text-slate-800'}`}>{stage.name}</span>
+                          <span className={`text-sm ${isRunning ? 'text-blue-600 font-medium' : styles.text}`}>{stage.summary}</span>
+                          {stage.isCurrentStep && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium animate-pulse">진행 중</span>
+                          )}
+                          {!stage.hasData && !stage.isCurrentStep && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">미실행</span>
                           )}
+                          {stage.duration && stage.status !== 'running' && (
+                            <span className="text-xs text-slate-400 flex items-center gap-1">
+                              <Timer size={12} />
+                              {formatStepDuration(stage.duration)}
+                            </span>
+                          )}
                         </div>
-                        {stage.stats && (
+                        {/* 진행률 바 (실행 중인 단계) */}
+                        {isRunning && typeof stage.progress === 'number' && stage.progress > 0 && (
+                          <div className="mt-1.5 w-full max-w-xs">
+                            <div className="h-1.5 bg-blue-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                                style={{ width: `${stage.progress}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {stage.stats && !isRunning && (
                           <div className="flex items-center gap-3 mt-0.5">
                             {stage.stats.map((stat, i) => (
                               <span key={i} className="text-xs">
@@ -579,20 +811,18 @@ export default function AutomationLogsPage() {
   const [logs, setLogs] = useState<WorkflowLog[]>([])
   const [totalPages, setTotalPages] = useState(1)
   const [currentPage, setCurrentPage] = useState(1)
-  const [selectedType, setSelectedType] = useState<string>('')
   const [isLoading, setIsLoading] = useState(true)
   const [expandedLogId, setExpandedLogId] = useState<number | null>(null)
+  const [hasRunningWorkflow, setHasRunningWorkflow] = useState(false)
 
-  const loadLogs = useCallback(async () => {
-    setIsLoading(true)
+  // 실행 중인 워크플로우가 있으면 자동 새로고침
+  const loadLogs = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true)
     try {
       const params = new URLSearchParams({
         page: String(currentPage),
         limit: '10',
       })
-      if (selectedType) {
-        params.set('workflowType', selectedType)
-      }
 
       const response = await fetch(`/api/automation/logs?${params}`)
       const data = await response.json()
@@ -600,17 +830,33 @@ export default function AutomationLogsPage() {
       if (data.success) {
         setLogs(data.data.logs || [])
         setTotalPages(data.data.pagination?.totalPages || 1)
+        // RUNNING 상태 워크플로우 확인
+        const running = (data.data.logs || []).some(
+          (log: WorkflowLog) => log.status === 'RUNNING'
+        )
+        setHasRunningWorkflow(running)
       }
     } catch (error) {
       console.error('로그 로드 실패:', error)
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
-  }, [currentPage, selectedType])
+  }, [currentPage])
 
   useEffect(() => {
     loadLogs()
   }, [loadLogs])
+
+  // 실행 중인 워크플로우가 있으면 5초마다 자동 새로고침
+  useEffect(() => {
+    if (!hasRunningWorkflow) return
+
+    const intervalId = setInterval(() => {
+      loadLogs(true) // silent refresh
+    }, 5000)
+
+    return () => clearInterval(intervalId)
+  }, [hasRunningWorkflow, loadLogs])
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -765,53 +1011,27 @@ export default function AutomationLogsPage() {
           <h1 className="text-2xl font-bold text-slate-900">실행 로그</h1>
           <p className="text-slate-500 mt-1">자동화 워크플로우 실행 기록을 확인합니다</p>
         </div>
-        <Button
-          variant="secondary"
-          onClick={loadLogs}
-          disabled={isLoading}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-          새로고침
-        </Button>
+        <div className="flex items-center gap-3">
+          {hasRunningWorkflow && (
+            <span className="text-xs text-blue-600 flex items-center gap-1.5 animate-pulse">
+              <RefreshCw size={12} className="animate-spin" />
+              자동 새로고침 중
+            </span>
+          )}
+          <Button
+            variant="secondary"
+            onClick={() => loadLogs()}
+            disabled={isLoading}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+            새로고침
+          </Button>
+        </div>
       </div>
 
       {/* Summary Stats */}
       {!isLoading && logs.length > 0 && <SummaryStats logs={logs} />}
-
-      {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 text-sm text-slate-500">
-          <Filter size={16} />
-          <span>필터</span>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => { setSelectedType(''); setCurrentPage(1); }}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              !selectedType
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
-            }`}
-          >
-            전체
-          </button>
-          {Object.entries(TYPE_LABELS).map(([type, label]) => (
-            <button
-              key={type}
-              onClick={() => { setSelectedType(type); setCurrentPage(1); }}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
-                selectedType === type
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
-              }`}
-            >
-              {TYPE_ICONS[type]}
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* Logs List */}
       {isLoading ? (
@@ -936,7 +1156,12 @@ export default function AutomationLogsPage() {
 
                     {/* 상세 로그 (타임라인) */}
                     <div className="p-4">
-                      <TimelineLogSection details={log.details || {}} workflowType={log.workflowType} />
+                      <TimelineLogSection
+                        details={log.details || {}}
+                        workflowType={log.workflowType}
+                        steps={log.steps || []}
+                        currentStep={log.currentStep}
+                      />
                     </div>
                   </div>
                 )}

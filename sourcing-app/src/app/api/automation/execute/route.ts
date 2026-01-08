@@ -446,6 +446,84 @@ async function validateAutomationConfig(
 }
 
 /**
+ * 세션 검증 결과
+ */
+interface SessionValidationResult {
+  isValid: boolean
+  invalidChannels: Array<{
+    id: number
+    name: string
+    kind: 'WHOLESALE' | 'RETAIL'
+  }>
+}
+
+/**
+ * 밴드 세션 유효성 검증
+ */
+async function validateBandSessions(
+  userId: number,
+  type: 'collect' | 'transform' | 'register' | 'publish' | 'full'
+): Promise<SessionValidationResult> {
+  const automationConfig = await prisma.automationConfig.findUnique({
+    where: { userId },
+  })
+
+  if (!automationConfig) {
+    return { isValid: true, invalidChannels: [] }
+  }
+
+  const channelIdsToCheck: number[] = []
+
+  // 소매채널(발행용)만 세션 검증 필요 (도매채널은 세션 불필요)
+  if (type === 'publish' || type === 'full') {
+    if (automationConfig.retailChannelIds) {
+      try {
+        const ids = JSON.parse(automationConfig.retailChannelIds)
+        channelIdsToCheck.push(...ids)
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  if (channelIdsToCheck.length === 0) {
+    return { isValid: true, invalidChannels: [] }
+  }
+
+  // 채널 세션 정보 조회
+  const channels = await prisma.channel.findMany({
+    where: { id: { in: channelIdsToCheck } },
+    select: {
+      id: true,
+      name: true,
+      kind: true,
+      bandSessionCookie: true,
+      sessionExpiresAt: true,
+    },
+  })
+
+  const now = new Date()
+  const invalidChannels = channels
+    .filter((channel) => {
+      const hasSession = !!channel.bandSessionCookie
+      const isExpired = channel.sessionExpiresAt
+        ? new Date(channel.sessionExpiresAt) <= now
+        : true
+      return !hasSession || isExpired
+    })
+    .map((channel) => ({
+      id: channel.id,
+      name: channel.name,
+      kind: channel.kind as 'WHOLESALE' | 'RETAIL',
+    }))
+
+  return {
+    isValid: invalidChannels.length === 0,
+    invalidChannels,
+  }
+}
+
+/**
  * POST /api/automation/execute
  * 파이프라인 수동 실행
  *
@@ -503,6 +581,29 @@ export async function POST(request: NextRequest) {
             success: false,
             error: validation.error,
             missingItems: validation.missingItems,
+          },
+          { status: 400 }
+        )
+      }
+    }
+
+    // 밴드 세션 유효성 검증 (발행 시 필요 - 소매채널만)
+    if (type === 'publish' || type === 'full') {
+      const sessionValidation = await validateBandSessions(currentUser.userId, type)
+      if (!sessionValidation.isValid) {
+        // 세션 없음 알림 생성
+        const channelNames = sessionValidation.invalidChannels.map((ch) => ch.name).join(', ')
+        await createErrorNotification(currentUser.userId, {
+          errorType: '밴드 세션',
+          errorMessage: `${sessionValidation.invalidChannels.length}개 채널(${channelNames})의 밴드 세션이 없거나 만료되었습니다. Band Session Helper 확장을 사용하여 세션을 저장해주세요.`,
+        })
+
+        return NextResponse.json(
+          {
+            success: false,
+            error: `밴드 세션이 없거나 만료된 채널이 있습니다: ${channelNames}`,
+            invalidChannels: sessionValidation.invalidChannels,
+            errorType: 'SESSION_MISSING',
           },
           { status: 400 }
         )
@@ -618,105 +719,91 @@ export async function GET() {
 
     const running = await getRunningWorkflow(currentUser.userId)
 
-    // details 파싱하여 단계별 진행 상태 추출
-    let stageProgress = null
-    let currentStage = null
-    if (running?.details) {
-      try {
-        const details = typeof running.details === 'string'
-          ? JSON.parse(running.details)
-          : running.details
+    if (!running) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          isRunning: false,
+          workflow: null,
+        },
+      })
+    }
 
-        // 현재 단계 판단 - 가장 마지막으로 시작된 단계가 현재 진행 중인 단계
-        // 각 단계가 존재하면 해당 단계가 시작된 것이므로, 가장 마지막 단계를 현재 단계로 설정
-        if (details.publish) {
-          // publish 단계가 있으면 publish 진행 중 (또는 완료)
-          currentStage = running.status === 'RUNNING' ? 'publish' : null
-        } else if (details.productCreate) {
-          // productCreate 단계가 있으면 productCreate 진행 중
-          currentStage = 'productCreate'
-        } else if (details.transform) {
-          // transform 단계가 있으면 transform 진행 중
-          currentStage = 'transform'
-        } else if (details.collection) {
-          // collection만 있으면 collection 진행 중 (거의 즉시 완료되므로 드묾)
-          currentStage = 'collection'
-        } else {
-          // 아무 단계도 없으면 collection 대기 중
-          currentStage = 'collection'
-        }
+    // 단계별 로그 조회
+    const steps = await prisma.workflowStepLog.findMany({
+      where: { workflowId: running.id },
+      orderBy: { stepOrder: 'asc' },
+    })
 
-        // 단계별 진행 상태 (completed는 다음 단계가 시작했거나 전체 완료 여부로 판단)
-        const hasNextStageStarted = (stage: string) => {
-          switch (stage) {
-            case 'collection': return !!details.transform
-            case 'transform': return !!details.productCreate
-            case 'productCreate': return !!details.publish
-            case 'publish': return running.status !== 'RUNNING' // 워크플로우 완료 여부
-            default: return false
-          }
-        }
+    // 현재 단계 - WorkflowLog.currentStep 또는 RUNNING 상태인 단계
+    const currentStage = running.currentStep ||
+      steps.find(s => s.status === 'RUNNING')?.stepType ||
+      null
 
-        stageProgress = {
-          collection: details.collection ? {
-            completed: hasNextStageStarted('collection'),
-            totalNewPosts: details.collection.totalNewPosts || 0,
-            channelResults: details.collection.channelResults?.map((ch: any) => ({
-              channelName: ch.channelName,
-              newPosts: ch.newPosts || 0,
-              failed: ch.failed || 0,
-            })) || [],
-          } : null,
-          transform: details.transform ? {
-            completed: hasNextStageStarted('transform'),
-            total: details.transform.totalSuccess !== undefined
-              ? (details.transform.totalSuccess + (details.transform.totalFailed || 0))
-              : (details.transform.transformedPosts?.length || 0),
-            success: details.transform.totalSuccess !== undefined
-              ? details.transform.totalSuccess
-              : (details.transform.transformedPosts?.filter((p: any) => p.status === 'success').length || 0),
-            failed: details.transform.totalFailed !== undefined
-              ? details.transform.totalFailed
-              : (details.transform.transformedPosts?.filter((p: any) => p.status !== 'success').length || 0),
-            batchProgress: details.transform.batchProgress || null,
-          } : null,
-          productCreate: details.productCreate ? {
-            completed: hasNextStageStarted('productCreate'),
-            total: details.productCreate.createdProducts?.length || 0,
-            success: details.productCreate.createdProducts?.filter((p: any) => p.status === 'success').length || 0,
-            failed: details.productCreate.createdProducts?.filter((p: any) => p.status !== 'success').length || 0,
-          } : null,
-          publish: details.publish ? {
-            completed: hasNextStageStarted('publish'),
-            total: details.publish.publishedProducts?.length || 0,
-            success: details.publish.publishedProducts?.filter((p: any) => p.status?.toUpperCase() === 'SUCCESS').length || 0,
-            failed: details.publish.publishedProducts?.filter((p: any) => p.status?.toUpperCase() === 'FAILED').length || 0,
-            currentChannel: details.publish.currentChannel || null,
-            currentProgress: details.publish.currentProgress || null,
-          } : null,
-        }
-      } catch (e) {
-        console.error('Failed to parse workflow details:', e)
+    // StepType을 camelCase 키로 변환
+    const stepTypeToKey: Record<string, string> = {
+      'COLLECTION': 'collection',
+      'TRANSFORM': 'transform',
+      'PRODUCT_CREATE': 'productCreate',
+      'PUBLISH': 'publish',
+    }
+
+    // 단계별 진행 상태
+    const stageProgress: Record<string, any> = {}
+    for (const step of steps) {
+      const key = stepTypeToKey[step.stepType] || step.stepType.toLowerCase()
+      const stepDetails = step.details ? JSON.parse(step.details as string) : null
+
+      stageProgress[key] = {
+        status: step.status,
+        completed: step.status === 'COMPLETED' || step.status === 'SKIPPED',
+        startedAt: step.startedAt,
+        completedAt: step.completedAt,
+        duration: step.startedAt && step.completedAt
+          ? step.completedAt.getTime() - step.startedAt.getTime()
+          : null,
+        totalItems: step.totalItems,
+        processedItems: step.processedItems,
+        successCount: step.successCount,
+        failedCount: step.failedCount,
+        progress: step.totalItems > 0
+          ? Math.round((step.processedItems / step.totalItems) * 100)
+          : 0,
+        errorMessage: step.errorMessage,
+        // 기존 details 호환성을 위한 추가 정보
+        ...(stepDetails || {}),
       }
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        isRunning: !!running,
-        workflow: running
-          ? {
-              id: running.id,
-              type: running.workflowType,
-              status: running.status,
-              startedAt: running.startedAt,
-              totalItems: running.totalItems,
-              successCount: running.successCount,
-              failedCount: running.failedCount,
-              currentStage,
-              stageProgress,
-            }
-          : null,
+        isRunning: true,
+        workflow: {
+          id: running.id,
+          type: running.workflowType,
+          status: running.status,
+          startedAt: running.startedAt,
+          totalItems: running.totalItems,
+          successCount: running.successCount,
+          failedCount: running.failedCount,
+          currentStage: currentStage ? stepTypeToKey[currentStage] || currentStage.toLowerCase() : null,
+          stageProgress,
+          steps: steps.map(s => ({
+            stepType: stepTypeToKey[s.stepType] || s.stepType.toLowerCase(),
+            stepOrder: s.stepOrder,
+            status: s.status,
+            startedAt: s.startedAt,
+            completedAt: s.completedAt,
+            totalItems: s.totalItems,
+            processedItems: s.processedItems,
+            successCount: s.successCount,
+            failedCount: s.failedCount,
+            progress: s.totalItems > 0
+              ? Math.round((s.processedItems / s.totalItems) * 100)
+              : 0,
+          })),
+        },
       },
     })
   } catch (error) {
