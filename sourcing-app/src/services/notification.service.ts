@@ -214,6 +214,11 @@ interface ErrorInfo {
   workflowRunId?: number
 }
 
+interface SessionMissingInfo {
+  channelNames: string
+  channelCount: number
+}
+
 /**
  * 수집 완료 알림 생성
  */
@@ -309,6 +314,29 @@ export async function createErrorNotification(
     })
   } catch (error) {
     console.error('[Notification] 오류 알림 생성 실패:', error)
+  }
+}
+
+/**
+ * 밴드 세션 없음 알림 생성
+ */
+export async function createSessionMissingNotification(
+  userId: number,
+  info: SessionMissingInfo
+): Promise<void> {
+  try {
+    await prisma.notification.create({
+      data: {
+        userId,
+        section: 'sourcing',
+        type: 'ERROR',
+        title: '밴드 세션이 필요합니다',
+        message: `${info.channelCount}개 채널(${info.channelNames})의 밴드 세션이 없거나 만료되었습니다. Band Session Helper 확장을 사용하여 세션을 저장해주세요.`,
+        link: '/sourcing/channel',
+      },
+    })
+  } catch (error) {
+    console.error('[Notification] 세션 없음 알림 생성 실패:', error)
   }
 }
 

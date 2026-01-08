@@ -486,7 +486,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
             </button>
 
             <a href={getDefaultPathBySection(currentSection)} className="flex items-center ml-2 lg:ml-0 cursor-pointer hover:opacity-80 transition-opacity">
-              <h1 className="text-2xl font-bold text-primary-color">SNS Auto</h1>
+              <h1 className="text-2xl font-bold text-primary-color">SNS AUTO</h1>
             </a>
 
           </div>
@@ -589,14 +589,6 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
                 </div>
               )}
             </div>
-
-            {/* Quick Actions */}
-            <button
-              className="px-4 py-2 bg-primary-color text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors"
-              onClick={() => window.location.href = '/sourcing/automation/settings'}
-            >
-              전체 실행
-            </button>
 
             {/* User Menu */}
             {isLoading ? (

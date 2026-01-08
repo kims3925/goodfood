@@ -42,6 +42,7 @@ model WorkflowLog {
   workflowType WorkflowType   @map("workflow_type")
   triggerType  TriggerType    @default(MANUAL) @map("trigger_type")
   status       WorkflowStatus @default(PENDING)
+  currentStep  StepType?      @map("current_step")
   startedAt    DateTime       @default(now()) @map("started_at") @db.Timestamp(0)
   completedAt  DateTime?      @map("completed_at") @db.Timestamp(0)
   totalItems   Int            @default(0) @map("total_items")
@@ -50,9 +51,32 @@ model WorkflowLog {
   details      String?        @db.LongText
   errorMessage String?        @map("error_message") @db.Text
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps        WorkflowStepLog[]
 
   @@index([userId, workflowType, startedAt])
   @@index([status])
   @@index([triggerType])
   @@map("workflow_log")
+}
+
+model WorkflowStepLog {
+  id             Int         @id @default(autoincrement())
+  workflowId     Int         @map("workflow_id")
+  stepType       StepType    @map("step_type")
+  stepOrder      Int         @map("step_order")
+  status         StepStatus  @default(PENDING)
+  startedAt      DateTime?   @map("started_at") @db.Timestamp(0)
+  completedAt    DateTime?   @map("completed_at") @db.Timestamp(0)
+  totalItems     Int         @default(0) @map("total_items")
+  processedItems Int         @default(0) @map("processed_items")
+  successCount   Int         @default(0) @map("success_count")
+  failedCount    Int         @default(0) @map("failed_count")
+  details        String?     @db.LongText
+  errorMessage   String?     @map("error_message") @db.Text
+  workflow       WorkflowLog @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, stepType])
+  @@index([workflowId])
+  @@index([status])
+  @@map("workflow_step_log")
 }
