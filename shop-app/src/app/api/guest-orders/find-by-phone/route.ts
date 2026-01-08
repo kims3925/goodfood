@@ -65,6 +65,9 @@ export async function POST(req: NextRequest) {
             },
           },
         },
+        _count: {
+          select: { items: true }
+        },
         payment: {
           select: {
             status: true,
@@ -91,7 +94,7 @@ export async function POST(req: NextRequest) {
     // 응답 형식 변환 (주문번호 일부 마스킹 없이 전체 표시)
     const orders = guestOrders.map((order) => {
       const firstItem = order.items[0]
-      const itemCount = order.items.length
+      const itemCount = order._count.items
 
       return {
         id: order.id,

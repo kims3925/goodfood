@@ -53,7 +53,53 @@ SELECT `user_id`, `product_id`, `channel_id`, `post_key`, `is_active`, `publishe
 FROM `channel_product`;
 
 -- =============================================
--- PART 4: FK 재생성
+-- PART 4: published_product_id 컬럼 복원
+-- FK 재생성 전에 컬럼이 먼저 존재해야 함
+-- =============================================
+
+-- cart_item.published_product_id 컬럼 복원 (존재하지 않는 경우에만)
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'cart_item' AND column_name = 'published_product_id');
+SET @sql = IF(@col_exists = 0,
+  "ALTER TABLE `cart_item` ADD COLUMN `published_product_id` INT NULL",
+  'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- order_item.published_product_id 컬럼 복원 (존재하지 않는 경우에만)
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'order_item' AND column_name = 'published_product_id');
+SET @sql = IF(@col_exists = 0,
+  "ALTER TABLE `order_item` ADD COLUMN `published_product_id` INT NULL",
+  'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- guest_order_item.published_product_id 컬럼 복원 (존재하지 않는 경우에만)
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'guest_order_item' AND column_name = 'published_product_id');
+SET @sql = IF(@col_exists = 0,
+  "ALTER TABLE `guest_order_item` ADD COLUMN `published_product_id` INT NULL",
+  'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- inquiry.published_product_id 컬럼 복원 (존재하지 않는 경우에만)
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'inquiry' AND column_name = 'published_product_id');
+SET @sql = IF(@col_exists = 0,
+  "ALTER TABLE `inquiry` ADD COLUMN `published_product_id` INT NULL",
+  'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- =============================================
+-- PART 5: FK 재생성
+-- 컬럼 복원 후 FK 제약조건 추가
 -- =============================================
 
 -- cart_item FK 재생성 (컬럼이 존재하는 경우)
@@ -97,7 +143,7 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 -- =============================================
--- PART 5: 신규 테이블 삭제
+-- PART 6: 신규 테이블 삭제
 -- =============================================
 
 DROP TABLE IF EXISTS `workflow_step_log`;
@@ -105,58 +151,13 @@ DROP TABLE IF EXISTS `channel_product`;
 DROP TABLE IF EXISTS `shop_product`;
 
 -- =============================================
--- PART 6: workflow_log.current_step 컬럼 제거
+-- PART 7: workflow_log.current_step 컬럼 제거
 -- =============================================
 
 SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
   WHERE table_schema = DATABASE() AND table_name = 'workflow_log' AND column_name = 'current_step');
 SET @sql = IF(@col_exists > 0,
   "ALTER TABLE `workflow_log` DROP COLUMN `current_step`",
-  'SELECT 1');
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
--- =============================================
--- PART 7: Orphaned 컬럼 복원
--- published_product_id 컬럼들을 다시 추가
--- =============================================
-
--- cart_item.published_product_id 컬럼 복원 (존재하지 않는 경우에만)
-SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
-  WHERE table_schema = DATABASE() AND table_name = 'cart_item' AND column_name = 'published_product_id');
-SET @sql = IF(@col_exists = 0,
-  "ALTER TABLE `cart_item` ADD COLUMN `published_product_id` INT NULL",
-  'SELECT 1');
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
--- order_item.published_product_id 컬럼 복원 (존재하지 않는 경우에만)
-SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
-  WHERE table_schema = DATABASE() AND table_name = 'order_item' AND column_name = 'published_product_id');
-SET @sql = IF(@col_exists = 0,
-  "ALTER TABLE `order_item` ADD COLUMN `published_product_id` INT NULL",
-  'SELECT 1');
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
--- guest_order_item.published_product_id 컬럼 복원 (존재하지 않는 경우에만)
-SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
-  WHERE table_schema = DATABASE() AND table_name = 'guest_order_item' AND column_name = 'published_product_id');
-SET @sql = IF(@col_exists = 0,
-  "ALTER TABLE `guest_order_item` ADD COLUMN `published_product_id` INT NULL",
-  'SELECT 1');
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
--- inquiry.published_product_id 컬럼 복원 (존재하지 않는 경우에만)
-SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns
-  WHERE table_schema = DATABASE() AND table_name = 'inquiry' AND column_name = 'published_product_id');
-SET @sql = IF(@col_exists = 0,
-  "ALTER TABLE `inquiry` ADD COLUMN `published_product_id` INT NULL",
   'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
