@@ -21,6 +21,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260108-004 | Done | 2026-01-08 | - | published_product → shop_product/channel_product 스키마 마이그레이션 | Medium | Claude |
+| TR-20260108-003 | Done | 2026-01-08 | - | 역할명 변경 (회원/매니저) | Low | Claude |
 | TR-20260108-002 | Done | 2026-01-08 | REQ-SHOP-002 | 인기상품 페이지 신규 개발 | Medium | Lee |
 | TR-20260108-001 | Done | 2026-01-08 | REQ-SHOP-001 | 모바일 메인페이지 상품 그리드 3열 변경 | Low | Lee |
 | TR-20260107-001 | Done | 2026-01-07 | REQ-SETTLEMENT-001 | Product 기반 배송비로 마진 계산 개선 | Medium | Hong |
@@ -106,6 +108,95 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260108-004: published_product → shop_product/channel_product 스키마 마이그레이션
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-08 |
+| REQ-ID | - |
+| Risk | Medium |
+
+### 변경 사항
+- 공유 DB 스키마 변경 (sourcing-app과 동일)
+- `published_product` 테이블을 `shop_product`와 `channel_product`로 분리
+  - `shop_product`: 쇼핑몰(Shop)에 발행된 상품 관리
+  - `channel_product`: 채널(Band 등)에 발행된 상품 관리
+- `workflow_step_log` 테이블 신규 생성
+- `StepType`, `StepStatus` enum 추가
+- `CartItem` 인덱스 변경: `publishedProductId` → `shopProductId`
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| db/prisma/models/publish.prisma | Modified | ShopProduct, ChannelProduct 모델로 변경 |
+| db/prisma/migrations/20260108131455_remove_unused_columns/migration.sql | Added | CD 파이프라인용 마이그레이션 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [x] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+1. 마이그레이션 롤백 스크립트 실행
+2. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Publish
+- 참조: sourcing-app TR-20260108-002
+
+---
+
+## TR-20260108-003: 역할명 변경 (회원/매니저)
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-08 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 사용자 역할 라벨 변경 (공유 DB)
+  - USER: '일반 사용자' → '회원'
+  - MANAGER: '쇼핑몰 관리자' → '매니저'
+- 참조: sourcing-app에서 UI 변경
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| (sourcing-app 파일) | Modified | 역할 라벨 변경 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+- 참조: sourcing-app TR-20260108-003
+
+---
 
 ## TR-20260108-002: 인기상품 페이지 신규 개발
 

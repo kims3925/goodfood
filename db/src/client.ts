@@ -53,6 +53,8 @@ export {
   WorkflowType,
   WorkflowStatus,
   TriggerType,
+  StepType,
+  StepStatus,
 } from './generated'
 
 // Default export for backwards compatibility

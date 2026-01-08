@@ -52,6 +52,7 @@ export function useChannelStats(options: UseChannelStatsOptions = {}): UseChanne
 
   const fetchStats = useCallback(async () => {
     try {
+      setIsLoading(true)
       setError(null)
       const params = new URLSearchParams()
       if (kind !== 'all') {
@@ -66,6 +67,9 @@ export function useChannelStats(options: UseChannelStatsOptions = {}): UseChanne
       }
 
       const response = await fetch(`/api/channel/stats?${params.toString()}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
       const result = await response.json()
 
       if (result.success) {

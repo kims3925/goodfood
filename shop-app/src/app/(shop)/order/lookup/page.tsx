@@ -3,30 +3,15 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Search, Package, AlertCircle, Phone, Hash } from 'lucide-react'
+import { ArrowLeft, Search, Package, AlertCircle, Hash } from 'lucide-react'
 import { useShopUrl } from '@/hooks/useShopUrl'
 
 export default function GuestOrderLookupPage() {
   const router = useRouter()
   const { getPath, getApiPath } = useShopUrl()
   const [orderNumber, setOrderNumber] = useState('')
-  const [phone, setPhone] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-
-  const formatPhone = (value: string) => {
-    // 숫자만 추출
-    const numbers = value.replace(/[^0-9]/g, '')
-    // 자동 하이픈 포맷팅
-    if (numbers.length <= 3) return numbers
-    if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`
-    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`
-  }
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatPhone(e.target.value)
-    setPhone(formatted)
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,11 +19,6 @@ export default function GuestOrderLookupPage() {
 
     if (!orderNumber.trim()) {
       setError('주문번호를 입력해주세요')
-      return
-    }
-
-    if (!phone.trim()) {
-      setError('휴대폰 번호를 입력해주세요')
       return
     }
 
@@ -52,7 +32,6 @@ export default function GuestOrderLookupPage() {
         },
         body: JSON.stringify({
           orderNumber: orderNumber.trim(),
-          phone: phone.replace(/-/g, ''), // 하이픈 제거
         }),
       })
 
@@ -94,7 +73,7 @@ export default function GuestOrderLookupPage() {
               <div>
                 <h2 className="font-semibold text-gray-900 mb-1">주문 조회</h2>
                 <p className="text-sm text-gray-600">
-                  주문 시 입력하신 주문번호와 휴대폰 번호로 주문 내역을 확인하실 수 있습니다.
+                  주문번호를 입력하여 주문 내역을 확인하실 수 있습니다.
                 </p>
               </div>
             </div>
@@ -120,21 +99,6 @@ export default function GuestOrderLookupPage() {
                   onChange={(e) => setOrderNumber(e.target.value.toUpperCase())}
                   placeholder="GORD-20241201-XXXXXX"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Phone className="w-4 h-4 inline mr-1" />
-                  휴대폰 번호
-                </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={handlePhoneChange}
-                  placeholder="010-1234-5678"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent"
-                  maxLength={13}
                 />
               </div>
 

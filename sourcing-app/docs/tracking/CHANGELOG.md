@@ -21,6 +21,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260108-003 | Done | 2026-01-08 | - | 역할명 변경 (회원/매니저) | Low | Claude |
+| TR-20260108-002 | Done | 2026-01-08 | - | published_product → shop_product/channel_product 스키마 마이그레이션 | Medium | Claude |
 | TR-20260108-001 | Done | 2026-01-08 | - | AutomationConfig 테이블에서 pricing_policy_id 컬럼 및 관계 삭제 | Low | Claude |
 | TR-20260107-012 | Done | 2026-01-07 | - | API.md SSE 발행 스트림 문서 추가 (uploadProgress 필드 포함) | Low | Hong |
 | TR-20260107-011 | Done | 2026-01-07 | - | FLOW.md 발행 흐름 다이어그램 중복 블록 제거 | Low | Hong |
@@ -128,6 +130,101 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260108-003: 역할명 변경 (회원/매니저)
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-08 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 사용자 역할 라벨 변경
+  - USER: '일반 사용자' → '회원'
+  - MANAGER: '쇼핑몰 관리자' → '매니저'
+- unauthorized 페이지에서 '관리자' 표현 통일
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(admin)/shop/user/list/page.tsx | Modified | roleLabels 변경 |
+| src/app/(admin)/shop/user/detail/[id]/page.tsx | Modified | roleLabels 변경 |
+| src/app/(auth)/unauthorized/page.tsx | Modified | 역할 표시 텍스트 변경 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+
+---
+
+## TR-20260108-002: published_product → shop_product/channel_product 스키마 마이그레이션
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-08 |
+| REQ-ID | - |
+| Risk | Medium |
+
+### 변경 사항
+- `published_product` 테이블을 `shop_product`와 `channel_product`로 분리
+  - `shop_product`: 쇼핑몰(Shop)에 발행된 상품 관리
+  - `channel_product`: 채널(Band 등)에 발행된 상품 관리
+- `workflow_step_log` 테이블 신규 생성 (자동화 파이프라인 단계별 추적)
+- `workflow_log.current_step` 컬럼 추가
+- `StepType` enum 추가: COLLECTION, TRANSFORM, PRODUCT_CREATE, PUBLISH
+- `StepStatus` enum 추가: PENDING, RUNNING, COMPLETED, FAILED, SKIPPED
+- `CartItem` 인덱스 변경: `publishedProductId` → `shopProductId`
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| db/prisma/models/publish.prisma | Modified | ShopProduct, ChannelProduct 모델로 변경 |
+| db/prisma/models/workflow.prisma | Modified | WorkflowStepLog 모델 추가 |
+| db/prisma/schema.prisma | Modified | StepType, StepStatus enum 추가 |
+| db/prisma/migrations/20260108131455_remove_unused_columns/migration.sql | Added | CD 파이프라인용 마이그레이션 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [x] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Prisma Generate | Pass |
+| DB Push | Pass |
+| Build | Pass |
+
+### 롤백 계획
+1. 마이그레이션 롤백 스크립트 실행
+2. git revert로 해당 커밋 롤백
+3. npx prisma db push로 이전 스키마 복원
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: Publish
+
+---
 
 ## TR-20260107-010: AWS EC2 MariaDB 일일 자동 백업 설정
 

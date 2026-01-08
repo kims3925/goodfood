@@ -90,7 +90,18 @@ export async function GET(
             include: {
               shopProduct: {
                 include: {
-                  product: true,
+                  product: {
+                    include: {
+                      channel: {
+                        select: {
+                          id: true,
+                          kind: true,
+                          platform: true,
+                          name: true,
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -167,6 +178,13 @@ export async function GET(
             shippingFee: item.shopProduct?.product?.shippingFee || 0,
             bundleShippingType: item.shopProduct?.product?.bundleShippingType || 'NONE',
             bundleMaxQty: item.shopProduct?.product?.bundleMaxQty || 1,
+            // 도매처(소싱 출처) 정보
+            channel: item.shopProduct?.product?.channel ? {
+              id: item.shopProduct.product.channel.id,
+              kind: item.shopProduct.product.channel.kind,
+              platform: item.shopProduct.product.channel.platform,
+              name: item.shopProduct.product.channel.name,
+            } : null,
           })),
           payment: order.payment ? {
             id: order.payment.id,
@@ -216,7 +234,18 @@ export async function GET(
             include: {
               shopProduct: {
                 include: {
-                  product: true,
+                  product: {
+                    include: {
+                      channel: {
+                        select: {
+                          id: true,
+                          kind: true,
+                          platform: true,
+                          name: true,
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -290,6 +319,13 @@ export async function GET(
           shippingFee: item.shopProduct?.product?.shippingFee || 0,
           bundleShippingType: item.shopProduct?.product?.bundleShippingType || 'NONE',
           bundleMaxQty: item.shopProduct?.product?.bundleMaxQty || 1,
+          // 도매처(소싱 출처) 정보
+          channel: item.shopProduct?.product?.channel ? {
+            id: item.shopProduct.product.channel.id,
+            kind: item.shopProduct.product.channel.kind,
+            platform: item.shopProduct.product.channel.platform,
+            name: item.shopProduct.product.channel.name,
+          } : null,
         })),
         payment: guestOrder.payment ? {
           id: guestOrder.payment.id,

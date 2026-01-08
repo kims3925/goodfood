@@ -140,9 +140,9 @@ interface Stats {
 }
 
 const roleLabels: Record<UserRole, string> = {
-  USER: '일반 사용자',
-  MANAGER: '쇼핑몰 관리자',
-  ADMIN: '슈퍼 관리자',
+  USER: '회원',
+  MANAGER: '매니저',
+  ADMIN: '어드민',
 }
 
 const roleColors: Record<UserRole, string> = {
