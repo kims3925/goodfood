@@ -155,9 +155,26 @@ export default function GuestOrderLookupPage() {
             </form>
           </div>
 
+          {/* 주문번호 모를 때 */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="text-sm font-medium text-blue-800 mb-2">주문번호를 모르시나요?</h3>
+            <p className="text-xs text-blue-700 mb-3">
+              휴대폰 번호와 이름으로 주문 내역을 찾을 수 있습니다.
+            </p>
+            <Link
+              href={getPath('/order/find-orders')}
+              className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"
+            >
+              주문 내역 찾기
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+
           {/* 도움말 */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-amber-800 mb-2">주문번호를 찾을 수 없나요?</h3>
+          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <h3 className="text-sm font-medium text-amber-800 mb-2">주문번호 확인 방법</h3>
             <ul className="text-xs text-amber-700 space-y-1">
               <li className="flex items-start gap-1.5">
                 <span className="mt-1.5 w-1 h-1 bg-amber-500 rounded-full flex-shrink-0" />

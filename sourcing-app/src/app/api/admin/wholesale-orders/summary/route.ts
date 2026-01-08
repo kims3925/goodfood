@@ -19,21 +19,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const from = searchParams.get('from') // YYYY-MM-DD
-    const to = searchParams.get('to') // YYYY-MM-DD
     const wholesaleChannelId = searchParams.get('wholesaleChannelId')
 
-    if (!from || !to) {
-      return NextResponse.json(
-        { success: false, error: '기간(from, to)은 필수입니다.' },
-        { status: 400 }
-      )
-    }
-
-    const fromDate = new Date(from)
-    fromDate.setHours(0, 0, 0, 0)
-    const toDate = new Date(to)
-    toDate.setHours(23, 59, 59, 999)
+    // 날짜 필터 없이 발주 대기(PAID, PREPARING) 상태의 모든 주문 조회
 
     // 도매처별 집계 맵
     const wholesaleSummaryMap = new Map<number, {
@@ -49,15 +37,12 @@ export async function GET(request: NextRequest) {
     const channelFilter = wholesaleChannelId ? { id: parseInt(wholesaleChannelId) } : undefined
 
     // 1. 회원 주문 (Order + OrderItem) 조회 - Product.channelId 사용 (소싱 출처)
-    // 결제 완료된 모든 주문 조회 (이력 확인용)
+    // 발주 대기(PAID, PREPARING) 상태의 주문만 조회
     const memberOrderItems = await prisma.orderItem.findMany({
       where: {
         order: {
-          paidAt: {
-            not: null,
-            gte: fromDate,
-            lte: toDate,
-          },
+          status: { in: ['PAID', 'PREPARING'] },
+          paidAt: { not: null },
         },
         shopProduct: {
           userId: user.userId,
@@ -109,15 +94,12 @@ export async function GET(request: NextRequest) {
     })
 
     // 2. 비회원 주문 (GuestOrder + GuestOrderItem) 조회 - Product.channelId 사용 (소싱 출처)
-    // 결제 완료된 모든 주문 조회 (이력 확인용)
+    // 발주 대기(PAID, PREPARING) 상태의 주문만 조회
     const guestOrderItems = await prisma.guestOrderItem.findMany({
       where: {
         guestOrder: {
-          paidAt: {
-            not: null,
-            gte: fromDate,
-            lte: toDate,
-          },
+          status: { in: ['PAID', 'PREPARING'] },
+          paidAt: { not: null },
         },
         shopProduct: {
           userId: user.userId,
@@ -228,78 +210,11 @@ export async function GET(request: NextRequest) {
       totalAmount: s.totalAmount,
     })).sort((a, b) => b.totalAmount - a.totalAmount)
 
-    // 발주 누락 주문 조회 (선택된 날짜 이전의 PAID/PREPARING 상태 주문)
-    const [missedMemberOrders, missedGuestOrders] = await Promise.all([
-      prisma.order.findMany({
-        where: {
-          status: { in: ['PAID', 'PREPARING'] },
-          paidAt: {
-            not: null,
-            lt: fromDate, // 선택된 날짜 이전
-          },
-          items: {
-            some: {
-              shopProduct: {
-                userId: user.userId,
-                product: {
-                  channel: {
-                    kind: 'WHOLESALE',
-                  },
-                },
-              },
-            },
-          },
-        },
-        select: {
-          id: true,
-          orderNumber: true,
-          paidAt: true,
-        },
-      }),
-      prisma.guestOrder.findMany({
-        where: {
-          status: { in: ['PAID', 'PREPARING'] },
-          paidAt: {
-            not: null,
-            lt: fromDate, // 선택된 날짜 이전
-          },
-          items: {
-            some: {
-              shopProduct: {
-                userId: user.userId,
-                product: {
-                  channel: {
-                    kind: 'WHOLESALE',
-                  },
-                },
-              },
-            },
-          },
-        },
-        select: {
-          id: true,
-          orderNumber: true,
-          paidAt: true,
-        },
-      }),
-    ])
-
-    // 누락 주문 정보 (가장 오래된 날짜 기준)
-    const allMissedOrders = [
-      ...missedMemberOrders.map(o => ({ ...o, isMember: true })),
-      ...missedGuestOrders.map(o => ({ ...o, isMember: false })),
-    ].sort((a, b) => new Date(a.paidAt!).getTime() - new Date(b.paidAt!).getTime())
-
-    const missedOrdersInfo = allMissedOrders.length > 0 ? {
-      count: allMissedOrders.length,
-      oldestDate: allMissedOrders[0].paidAt?.toISOString().split('T')[0],
-      newestDate: allMissedOrders[allMissedOrders.length - 1].paidAt?.toISOString().split('T')[0],
-    } : null
+    // 이제 모든 발주 대기 주문을 표시하므로 누락 경고 불필요
 
     return NextResponse.json({
       success: true,
       data: summaries,
-      missedOrders: missedOrdersInfo,
     })
   } catch (error) {
     console.error('도매처 발주 집계 조회 실패:', error)

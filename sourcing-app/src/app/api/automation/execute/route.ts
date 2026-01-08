@@ -377,7 +377,6 @@ async function validateAutomationConfig(
 ): Promise<ConfigValidationResult> {
   const automationConfig = await prisma.automationConfig.findUnique({
     where: { userId },
-    include: { pricingPolicy: true },
   })
 
   const missingItems: string[] = []

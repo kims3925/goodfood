@@ -20,6 +20,7 @@ interface ExcelRowData {
   cashReceipt: string        // 현금영수증 신청
   email: string              // 이메일주소
   dateKey: string            // YYYY-MM-DD 형식의 날짜 키 (그룹화용)
+  isShipped: boolean         // 발주 완료 여부 (SHIPPED 이후 상태)
 }
 
 /**
@@ -57,8 +58,7 @@ export async function GET(
       )
     }
 
-    // 배송 시작 전 주문만 조회 (발주 대상)
-    // PAID, PREPARING 상태만 포함 (SHIPPED 이후는 발주 완료)
+    // 결제 완료된 모든 주문 조회 (발주 완료 여부 무관)
 
     // 공통 쿼리 조건 (Product의 channelId 참조 - 소싱 출처인 도매처)
     const productCondition = {
@@ -68,11 +68,10 @@ export async function GET(
       },
     }
 
-    // 1. 회원 주문 조회 (배송 시작 전)
+    // 1. 회원 주문 조회 (결제 완료된 모든 주문)
     const memberItems = await prisma.orderItem.findMany({
       where: {
         order: {
-          status: { in: ['PAID', 'PREPARING'] },
           paidAt: { not: null },
         },
         shopProduct: productCondition,
@@ -82,6 +81,7 @@ export async function GET(
           select: {
             orderNumber: true,
             orderedAt: true,
+            status: true,
             user: {
               select: {
                 name: true,
@@ -131,11 +131,10 @@ export async function GET(
       },
     })
 
-    // 2. 비회원 주문 조회 (배송 시작 전)
+    // 2. 비회원 주문 조회 (결제 완료된 모든 주문)
     const guestItems = await prisma.guestOrderItem.findMany({
       where: {
         guestOrder: {
-          status: { in: ['PAID', 'PREPARING'] },
           paidAt: { not: null },
         },
         shopProduct: productCondition,
@@ -145,6 +144,7 @@ export async function GET(
           select: {
             orderNumber: true,
             orderedAt: true,
+            status: true,
             guestName: true,
             guestPhone: true,
             guestEmail: true,
@@ -214,6 +214,10 @@ export async function GET(
       const orderUserName = (item.order as any).user?.name || ''
       const senderName = recipientName !== orderUserName && orderUserName ? orderUserName : ''
 
+      // 발주 완료 여부 (SHIPPED 이후 상태)
+      const shippedStatuses = ['SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURNED', 'REFUNDED']
+      const isShipped = shippedStatuses.includes(item.order.status)
+
       excelRows.push({
         timestamp,
         productName: item.productName,
@@ -228,6 +232,7 @@ export async function GET(
         cashReceipt: '',
         email: (item.order as any).user?.email || '',
         dateKey,
+        isShipped,
       })
     }
 
@@ -251,6 +256,10 @@ export async function GET(
       const guestName = item.guestOrder.guestName
       const senderName = recipientName !== guestName ? guestName : ''
 
+      // 발주 완료 여부 (SHIPPED 이후 상태)
+      const shippedStatuses = ['SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURNED', 'REFUNDED']
+      const isShipped = shippedStatuses.includes(item.guestOrder.status)
+
       excelRows.push({
         timestamp,
         productName: item.productName,
@@ -265,6 +274,7 @@ export async function GET(
         cashReceipt: '',
         email: item.guestOrder.guestEmail || '',
         dateKey,
+        isShipped,
       })
     }
 
@@ -438,13 +448,21 @@ export async function GET(
         row.getCell(5).numFmt = '#,##0'
         row.getCell(6).numFmt = '#,##0'
 
-        // 테두리
+        // 테두리 및 발주 완료 음영 처리
         row.eachCell((cell) => {
           cell.border = {
             top: { style: 'thin' },
             left: { style: 'thin' },
             bottom: { style: 'thin' },
             right: { style: 'thin' },
+          }
+          // 발주 완료된 행은 회색 음영 처리
+          if (rowData.isShipped) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFE8E8E8' },  // 연한 회색
+            }
           }
         })
 
