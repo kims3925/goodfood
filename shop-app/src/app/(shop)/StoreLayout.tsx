@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
-import { Search, ShoppingCart, User, MapPin, ChevronDown, Phone, MessageSquare, LogOut, Home, Headphones } from 'lucide-react'
+import { Search, ShoppingCart, User, MapPin, ChevronDown, Phone, MessageSquare, LogOut, Home, Headphones, Trophy } from 'lucide-react'
 import { CartNotificationProvider, useCartNotification } from '@/contexts/CartNotificationContext'
 import CartNotificationBubble from '@/components/cart/CartNotificationBubble'
 import { useShop } from '@/contexts/ShopContext'
@@ -276,11 +276,11 @@ function StoreLayoutContent({
       {/* Mobile Bottom Navigation - 모바일에서만 표시 */}
       <nav className="mobile-bottom-nav md:hidden">
         <Link href={getPath('/main')} className="mobile-nav-item">
-          <Home className="w-6 h-6" />
+          <Home />
           <span>홈</span>
         </Link>
         <Link href={getPath('/cart')} className="mobile-nav-item relative">
-          <ShoppingCart className="w-6 h-6" />
+          <ShoppingCart />
           {cartCount > 0 && (
             <span className="absolute -top-1 left-1/2 ml-2 w-5 h-5 bg-abc-coral text-white text-[10px] rounded-full flex items-center justify-center">
               {cartCount > 99 ? '99+' : cartCount}
@@ -288,12 +288,21 @@ function StoreLayoutContent({
           )}
           <span>장바구니</span>
         </Link>
+
+        {/* 중앙 플로팅 인기상품 버튼 */}
+        <Link href={getPath('/popular')} className="mobile-nav-center">
+          <div className="mobile-nav-center-btn">
+            <Trophy />
+          </div>
+          <span className="mobile-nav-center-label">인기</span>
+        </Link>
+
         <Link href={getPath('/mypage')} className="mobile-nav-item">
-          <User className="w-6 h-6" />
-          <span>마이페이지</span>
+          <User />
+          <span>MY</span>
         </Link>
         <Link href={getPath('/cs')} className="mobile-nav-item">
-          <Headphones className="w-6 h-6" />
+          <Headphones />
           <span>고객센터</span>
         </Link>
       </nav>
