@@ -37,20 +37,35 @@ CREATE TABLE IF NOT EXISTS `published_product` (
 
 -- =============================================
 -- PART 3: shop_product, channel_product 데이터를 published_product로 복원
+-- 각 테이블 존재 여부를 확인 후 데이터 복원 (테이블이 없으면 스킵)
 -- =============================================
 
--- shop_product 데이터 복원
-INSERT INTO `published_product` (`id`, `user_id`, `product_id`, `shop_id`, `published_at`, `created_at`, `updated_at`)
-SELECT `id`, `user_id`, `product_id`, `shop_id`, `published_at`, `created_at`, `updated_at`
-FROM `shop_product`
-ON DUPLICATE KEY UPDATE
-  `published_at` = VALUES(`published_at`),
-  `updated_at` = VALUES(`updated_at`);
+-- shop_product 데이터 복원 (테이블이 존재하는 경우에만)
+SET @tbl_exists = (SELECT COUNT(*) FROM information_schema.tables
+  WHERE table_schema = DATABASE() AND table_name = 'shop_product');
+SET @sql = IF(@tbl_exists > 0,
+  "INSERT INTO `published_product` (`id`, `user_id`, `product_id`, `shop_id`, `published_at`, `created_at`, `updated_at`)
+   SELECT `id`, `user_id`, `product_id`, `shop_id`, `published_at`, `created_at`, `updated_at`
+   FROM `shop_product`
+   ON DUPLICATE KEY UPDATE
+     `published_at` = VALUES(`published_at`),
+     `updated_at` = VALUES(`updated_at`)",
+  'SELECT "SKIPPED: shop_product table does not exist" AS rollback_info');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
--- channel_product 데이터 복원 (shop_product와 중복되지 않는 새 ID로)
-INSERT INTO `published_product` (`user_id`, `product_id`, `channel_id`, `post_key`, `is_active`, `published_at`, `created_at`, `updated_at`)
-SELECT `user_id`, `product_id`, `channel_id`, `post_key`, `is_active`, `published_at`, `created_at`, `updated_at`
-FROM `channel_product`;
+-- channel_product 데이터 복원 (테이블이 존재하는 경우에만, shop_product와 중복되지 않는 새 ID로)
+SET @tbl_exists = (SELECT COUNT(*) FROM information_schema.tables
+  WHERE table_schema = DATABASE() AND table_name = 'channel_product');
+SET @sql = IF(@tbl_exists > 0,
+  "INSERT INTO `published_product` (`user_id`, `product_id`, `channel_id`, `post_key`, `is_active`, `published_at`, `created_at`, `updated_at`)
+   SELECT `user_id`, `product_id`, `channel_id`, `post_key`, `is_active`, `published_at`, `created_at`, `updated_at`
+   FROM `channel_product`",
+  'SELECT "SKIPPED: channel_product table does not exist" AS rollback_info');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- =============================================
 -- PART 4: published_product_id 컬럼 복원
