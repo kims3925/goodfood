@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import prisma, { Prisma } from '@bandauto/db'
 
 const Decimal = Prisma.Decimal
@@ -21,16 +22,19 @@ interface CreateExternalOrderParams {
     variantId?: number
     quantity: number
   }>
-  memo?: string
+  memo?: string // 외부 주문 메모
 }
 
 /**
  * 외부 주문번호 생성
- * 형식: XORD-YYYYMMDD-XXXXXX (eXternal ORDer)
+ * 형식: XORD-YYYYMMDD-XXXXXXXXXXXX (eXternal ORDer, 12자리 랜덤 HEX)
+ * 날짜는 KST (한국 표준시, UTC+9) 기준
  */
 function generateExternalOrderNumber(): string {
-  const date = new Date()
-  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '')
+  // KST = UTC + 9시간
+  const KST_OFFSET_MS = 9 * 60 * 60 * 1000
+  const kstDate = new Date(Date.now() + KST_OFFSET_MS)
+  const dateStr = kstDate.toISOString().slice(0, 10).replace(/-/g, '')
   const random = crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()
   return `XORD-${dateStr}-${random}`
 }
@@ -56,7 +60,7 @@ export const orderService = {
         }
       }
 
-      // 2. Fetch all ShopProducts in one query
+      // 2. Fetch ShopProducts (without product include)
       const shopProductIds = items.map(i => i.shopProductId)
       const shopProducts = await tx.shopProduct.findMany({
         where: {
@@ -64,18 +68,34 @@ export const orderService = {
           userId,
           deletedAt: null,
         },
+      })
+
+      // 3. Fetch Products with soft-delete filter
+      const productIds = shopProducts
+        .map(sp => sp.productId)
+        .filter((id): id is number => id != null)
+
+      const products = await tx.product.findMany({
+        where: {
+          id: { in: productIds },
+        },
         include: {
-          product: {
-            include: {
-              variants: true,
-            },
-          },
+          variants: true,
         },
       })
 
-      const shopProductMap = new Map(shopProducts.map(sp => [sp.id, sp]))
+      // 4. Build productMap for quick lookup
+      const productMap = new Map(products.map(p => [p.id, p]))
 
-      // 3. Process Items & Calculate Totals
+      // 5. Build shopProductMap with filtered product attached
+      const shopProductMap = new Map(
+        shopProducts.map(sp => {
+          const product = sp.productId ? productMap.get(sp.productId) : null
+          return [sp.id, { ...sp, product: product ?? null }]
+        })
+      )
+
+      // 6. Process Items & Calculate Totals
       const orderItemsData = []
       let subtotal = new Decimal(0)
 
@@ -135,7 +155,7 @@ export const orderService = {
         })
       }
 
-      // 4. Create Order
+      // 7. Create Order
       const order = await tx.guestOrder.create({
         data: {
           shopId: shopId || null,
@@ -148,8 +168,6 @@ export const orderService = {
           discountAmount: new Decimal(0),
           totalAmount: subtotal,
           orderedAt: new Date(),
-          // 메모가 있으면 cancelReason 필드에 임시 저장
-          cancelReason: memo ? `[외부주문 메모] ${memo}` : null,
           shippingAddress: {
             create: {
               recipientName: shippingAddress.recipientName,
@@ -170,7 +188,7 @@ export const orderService = {
         },
       })
 
-      console.log(`[External Order] 외부 주문 생성 완료: ${order.orderNumber} (${orderItemsData.length}개 상품, 총 ${subtotal}원)`)
+      console.log(`[External Order] 외부 주문 생성 완료: ${order.orderNumber} (${orderItemsData.length}개 상품, 총 ${subtotal.toString()}원)`)
 
       return {
         id: order.id,

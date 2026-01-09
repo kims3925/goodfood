@@ -27,6 +27,7 @@ interface Product {
   wholesalePrice: number | null
   price: number | null
   currency: string
+  isActive: boolean // 쇼핑몰 노출 여부
   shippingFee: number | null
   shippingInfo: string | null
   bundleMaxQty: number | null
@@ -60,7 +61,6 @@ interface Product {
 interface ShopProductItem {
   id: number
   shopId: number
-  isActive: boolean
   publishedAt: string | null
   createdAt: string
   shop: {
@@ -114,8 +114,8 @@ export default function ProductDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // ShopProduct 활성화 상태 토글
-  const [togglingShopProductId, setTogglingShopProductId] = useState<number | null>(null)
+  // Product 활성화 상태 토글
+  const [isTogglingActive, setIsTogglingActive] = useState(false)
 
 
   // 옵션 편집 상태
@@ -437,16 +437,16 @@ export default function ProductDetailPage() {
     }
   }
 
-  // ShopProduct 활성화 상태 토글 핸들러
-  const handleToggleShopProductActive = async (shopProductId: number, currentIsActive: boolean) => {
-    setTogglingShopProductId(shopProductId)
+  // Product 활성화 상태 토글 핸들러
+  const handleToggleProductActive = async () => {
+    if (!product) return
+    setIsTogglingActive(true)
     try {
-      const response = await fetch('/api/shop-product', {
+      const response = await fetch(`/api/product/${product.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: shopProductId,
-          isActive: !currentIsActive,
+          isActive: !product.isActive,
         }),
       })
 
@@ -458,10 +458,10 @@ export default function ProductDetailPage() {
         toast.error(data.error || '상태 변경에 실패했습니다.')
       }
     } catch (error) {
-      console.error('ShopProduct 상태 변경 실패:', error)
+      console.error('Product 상태 변경 실패:', error)
       toast.error('상태 변경에 실패했습니다.')
     } finally {
-      setTogglingShopProductId(null)
+      setIsTogglingActive(false)
     }
   }
 
@@ -889,6 +889,59 @@ export default function ProductDetailPage() {
 
             {/* 오른쪽: 상품 정보 */}
             <div className="xl:col-span-7 2xl:col-span-8 space-y-6">
+              {/* 쇼핑몰 노출 상태 카드 */}
+              <div className={`rounded-2xl shadow-sm border overflow-hidden transition-colors ${
+                product.isActive
+                  ? 'bg-green-50 border-green-200'
+                  : 'bg-amber-50 border-amber-200'
+              }`}>
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${product.isActive ? 'bg-green-100' : 'bg-amber-100'}`}>
+                        {product.isActive ? (
+                          <ToggleRight size={20} className="text-green-600" />
+                        ) : (
+                          <ToggleLeft size={20} className="text-amber-600" />
+                        )}
+                      </div>
+                      <div>
+                        <p className={`font-semibold ${product.isActive ? 'text-green-800' : 'text-amber-800'}`}>
+                          {product.isActive ? '쇼핑몰 노출 중' : '쇼핑몰 숨김'}
+                        </p>
+                        <p className={`text-sm ${product.isActive ? 'text-green-600' : 'text-amber-600'}`}>
+                          {product.isActive
+                            ? '모든 쇼핑몰에서 이 상품이 노출됩니다'
+                            : '모든 쇼핑몰에서 이 상품이 숨겨집니다'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleToggleProductActive}
+                      disabled={isTogglingActive}
+                      className={`px-4 py-2 rounded-xl font-medium text-sm transition-colors ${
+                        isTogglingActive
+                          ? 'opacity-50 cursor-not-allowed'
+                          : product.isActive
+                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                      }`}
+                    >
+                      {isTogglingActive ? (
+                        <span className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          변경 중...
+                        </span>
+                      ) : product.isActive ? (
+                        '숨기기'
+                      ) : (
+                        '노출하기'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* 기본 정보 카드 */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50">
@@ -1568,63 +1621,25 @@ export default function ProductDetailPage() {
                             {product.shopProducts.map((sp) => (
                               <div
                                 key={sp.id}
-                                className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${
-                                  sp.isActive
-                                    ? 'bg-blue-50/50 border-blue-100 hover:bg-blue-50'
-                                    : 'bg-slate-50/50 border-slate-200 hover:bg-slate-100'
-                                }`}
+                                className="flex items-center justify-between p-3 bg-blue-50/50 rounded-xl border border-blue-100 hover:bg-blue-50 transition-colors"
                               >
                                 <div className="flex items-center gap-3">
-                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                                    sp.isActive ? 'bg-blue-100' : 'bg-slate-200'
-                                  }`}>
-                                    <Store size={14} className={sp.isActive ? 'text-blue-600' : 'text-slate-400'} />
+                                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                                    <Store size={14} className="text-blue-600" />
                                   </div>
                                   <div>
-                                    <div className="flex items-center gap-2">
-                                      <p className={`font-medium text-sm ${sp.isActive ? 'text-slate-900' : 'text-slate-500'}`}>
-                                        {sp.shop.name}
-                                      </p>
-                                      {!sp.isActive && (
-                                        <span className="px-1.5 py-0.5 text-xs font-medium bg-slate-200 text-slate-600 rounded">
-                                          비활성
-                                        </span>
-                                      )}
-                                    </div>
+                                    <p className="font-medium text-slate-900 text-sm">{sp.shop.name}</p>
                                     <p className="text-xs text-slate-500">{formatDate(sp.publishedAt || sp.createdAt)}</p>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  {/* 활성화/비활성화 토글 버튼 */}
-                                  <button
-                                    onClick={() => handleToggleShopProductActive(sp.id, sp.isActive)}
-                                    disabled={togglingShopProductId === sp.id}
-                                    className={`p-1.5 rounded-lg transition-colors ${
-                                      togglingShopProductId === sp.id
-                                        ? 'opacity-50 cursor-not-allowed'
-                                        : sp.isActive
-                                          ? 'text-green-500 hover:text-green-600 hover:bg-green-50'
-                                          : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-                                    }`}
-                                    title={sp.isActive ? '쇼핑몰 노출 중 (클릭하여 숨김)' : '쇼핑몰 숨김 (클릭하여 노출)'}
-                                  >
-                                    {togglingShopProductId === sp.id ? (
-                                      <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                    ) : sp.isActive ? (
-                                      <ToggleRight size={20} />
-                                    ) : (
-                                      <ToggleLeft size={20} />
-                                    )}
-                                  </button>
-                                  <a
-                                    href={`https://${sp.shop.subdomain}.bandauto.shop`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                                  >
-                                    <ExternalLink size={14} />
-                                  </a>
-                                </div>
+                                <a
+                                  href={`https://${sp.shop.subdomain}.bandauto.shop`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                >
+                                  <ExternalLink size={14} />
+                                </a>
                               </div>
                             ))}
                           </div>

@@ -105,8 +105,8 @@ export async function GET(
     const shopProduct = product.shopProducts[0]
     const shop = shopProduct?.shop
     const shopProductId = shopProduct?.id || null
-    // 비활성화된 상품은 숨김 처리
-    const isActive = shopProduct?.isActive ?? true
+    // Product 레벨에서 비활성화된 상품은 숨김 처리
+    const isActive = (product as any).isActive ?? true
 
     // 비활성화된 상품 접근 시 404 반환 (쇼핑몰에서 노출되지 않아야 함)
     if (!isActive) {

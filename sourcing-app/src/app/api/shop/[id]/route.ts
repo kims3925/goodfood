@@ -71,6 +71,7 @@ export async function GET(
       where: {
         id,
         userId: currentUser.userId,
+        deletedAt: null,
       },
       include: {
         theme: true,
@@ -132,6 +133,7 @@ export async function PUT(
       where: {
         id,
         userId: currentUser.userId,
+        deletedAt: null,
       },
       include: {
         theme: true,

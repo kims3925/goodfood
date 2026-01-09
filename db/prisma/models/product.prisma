@@ -9,6 +9,7 @@ model Product {
   currency           String            @default("KRW") @db.VarChar(10)
   wholesalePrice     Decimal?           @map("wholesale_price") @db.Decimal(12, 2)
   price              Int?
+  isActive           Boolean           @default(true) @map("is_active") // 쇼핑몰 노출 여부
   createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamp(0)
   shippingFee        Int?              @map("shipping_fee")

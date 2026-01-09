@@ -162,13 +162,16 @@ async function getShopProducts(shopId: number, limit: number, search: string | n
   // 검색 조건 구성: 활성화된 상품만 표시
   const whereCondition: any = {
     shopId: shopId,
-    isActive: true, // 비활성화된 상품 제외
     deletedAt: null, // Soft Delete 제외
+    product: {
+      isActive: true, // Product 레벨에서 비활성화된 상품 제외
+    },
   }
 
   // 검색어가 있으면 상품명으로 필터링
   if (search) {
     whereCondition.product = {
+      ...whereCondition.product,
       name: {
         contains: search,
       },
