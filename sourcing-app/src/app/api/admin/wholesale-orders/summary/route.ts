@@ -37,11 +37,11 @@ export async function GET(request: NextRequest) {
     const channelFilter = wholesaleChannelId ? { id: parseInt(wholesaleChannelId) } : undefined
 
     // 1. 회원 주문 (Order + OrderItem) 조회 - Product.channelId 사용 (소싱 출처)
-    // 발주 대기(PAID, PREPARING) 상태의 주문만 조회
+    // 결제 완료된 모든 주문 조회 (PAID, PREPARING, SHIPPED, DELIVERED)
     const memberOrderItems = await prisma.orderItem.findMany({
       where: {
         order: {
-          status: { in: ['PAID', 'PREPARING'] },
+          status: { in: ['PAID', 'PREPARING', 'SHIPPED', 'DELIVERED'] },
           paidAt: { not: null },
         },
         shopProduct: {
@@ -94,11 +94,11 @@ export async function GET(request: NextRequest) {
     })
 
     // 2. 비회원 주문 (GuestOrder + GuestOrderItem) 조회 - Product.channelId 사용 (소싱 출처)
-    // 발주 대기(PAID, PREPARING) 상태의 주문만 조회
+    // 결제 완료된 모든 주문 조회 (PAID, PREPARING, SHIPPED, DELIVERED)
     const guestOrderItems = await prisma.guestOrderItem.findMany({
       where: {
         guestOrder: {
-          status: { in: ['PAID', 'PREPARING'] },
+          status: { in: ['PAID', 'PREPARING', 'SHIPPED', 'DELIVERED'] },
           paidAt: { not: null },
         },
         shopProduct: {
