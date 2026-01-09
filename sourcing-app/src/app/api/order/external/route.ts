@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    const { guestName, guestPhone, shippingAddress, items } = body
+    const { shopId, guestName, guestPhone, shippingAddress, items } = body
 
     // 입력 검증
     // shopId 검증: 유효한 양의 정수인지 확인
