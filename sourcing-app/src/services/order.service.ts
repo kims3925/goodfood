@@ -144,9 +144,9 @@ export const orderService = {
           guestName: guestName.trim(),
           guestPhone: guestPhone.trim(),
           guestEmail: guestEmail?.trim() || null,
-          subtotalAmount: new Decimal(subtotal),
+          subtotalAmount: subtotal,
           discountAmount: new Decimal(0),
-          totalAmount: new Decimal(subtotal),
+          totalAmount: subtotal,
           orderedAt: new Date(),
           // 메모가 있으면 cancelReason 필드에 임시 저장
           cancelReason: memo ? `[외부주문 메모] ${memo}` : null,
