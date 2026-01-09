@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const platformParam = searchParams.get('platform') as ChannelPlatform | null
     const platform = platformParam || ChannelPlatform.BAND
+    const todayOnly = searchParams.get('todayOnly') === 'true'
 
     // 현재 BAND만 지원
     if (platform !== ChannelPlatform.BAND) {
@@ -149,13 +150,50 @@ export async function GET(request: NextRequest) {
     }
 
     // 이미 등록된 게시물 제외
-    const filteredPosts = allPosts.filter(
+    let filteredPosts = allPosts.filter(
       (post) => !existingPostKeys.has(post.post_key)
     )
+
+    const totalAvailable = filteredPosts.length
+
+    // 오늘 게시물만 필터링 (todayOnly=true인 경우)
+    if (todayOnly) {
+      // KST(UTC+9) 기준으로 오늘 날짜 계산
+      const now = new Date()
+      const kstOffset = 9 * 60 * 60 * 1000 // UTC+9
+      const kstNow = new Date(now.getTime() + kstOffset)
+
+      // KST 기준 오늘 00:00:00 ~ 23:59:59
+      const todayStart = Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate())
+      const todayEnd = todayStart + 24 * 60 * 60 * 1000
+
+      console.log(`[Post Available] KST 기준 오늘: ${new Date(todayStart).toISOString()} ~ ${new Date(todayEnd).toISOString()}`)
+
+      filteredPosts = filteredPosts.filter((post) => {
+        if (!post.created_at) return false
+
+        // Band API created_at 값 확인 - 초 단위인지 밀리초 단위인지 자동 판단
+        // 초 단위: 10자리 (1700000000), 밀리초 단위: 13자리 (1700000000000)
+        const postTime = post.created_at
+        const postTimeMs = postTime > 9999999999999 ? postTime : (postTime > 9999999999 ? postTime : postTime * 1000)
+
+        const isToday = postTimeMs >= todayStart && postTimeMs < todayEnd
+
+        // 디버깅: 원본 값과 변환된 시간 출력
+        console.log(`[Post] ${post.post_key}: 원본=${postTime}, 변환=${new Date(postTimeMs).toISOString()} -> ${isToday ? '오늘' : '오늘 아님'}`)
+
+        return isToday
+      })
+
+      console.log(`[Post Available] 전체: ${totalAvailable}개, 오늘(KST): ${filteredPosts.length}개`)
+    }
 
     return NextResponse.json({
       success: true,
       data: filteredPosts,
+      todayOnly,
+      totalAvailable, // 오늘 필터 전 전체 개수
+      todayCount: filteredPosts.length, // 오늘 게시물 개수
     })
   } catch (error) {
     console.error('게시물 조회 실패:', error)

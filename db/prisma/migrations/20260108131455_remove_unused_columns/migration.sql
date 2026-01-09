@@ -185,15 +185,17 @@ ON DUPLICATE KEY UPDATE
 -- 데이터 마이그레이션 명시적 커밋 (DDL 실행 전 저장)
 COMMIT;
 
+-- FK 체크 다시 활성화 (데이터 마이그레이션 완료 즉시)
+-- 중요: 후속 AUTO_INCREMENT 로직 실패 시에도 FK 체크가 활성화된 상태 보장
+SET FOREIGN_KEY_CHECKS = 1;
+
 -- (선택) AUTO_INCREMENT 시퀀스 재설정
+-- 주의: 이 블록이 실패해도 FK 체크는 이미 활성화됨
 SET @max_id = (SELECT IFNULL(MAX(id), 0) + 1 FROM `shop_product`);
 SET @sql = CONCAT('ALTER TABLE `shop_product` AUTO_INCREMENT = ', @max_id);
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
-
--- FK 체크 다시 활성화 (안전장치)
-SET FOREIGN_KEY_CHECKS = 1;
 
 -- =============================================
 -- 마이그레이션 검증 쿼리 (수동 실행용)

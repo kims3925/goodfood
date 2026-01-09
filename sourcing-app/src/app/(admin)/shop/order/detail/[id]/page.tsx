@@ -18,7 +18,6 @@ import {
   Store,
   AlertCircle,
   ImageOff,
-  FileSpreadsheet,
   Building2,
   Banknote,
 } from 'lucide-react'
@@ -342,16 +341,19 @@ export default function UnifiedOrderDetailPage() {
           </div>
           <div className="p-4">
             <div className="flex flex-wrap items-center gap-3 mb-4">
-              {/* 출처 배지 - 쇼핑몰명이 있으면 쇼핑몰명만 표시 */}
-              {isShoppingMall ? (
-                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
-                  <Store size={16} />
-                  {order.shopName || '쇼핑몰 주문'}
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-700">
-                  <FileSpreadsheet size={16} />
-                  밴드 주문
+              {/* 1줄: 소매처 배지 (Shop) */}
+              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
+                <Store size={16} />
+                {order.shopName || '쇼핑몰 주문'}
+              </span>
+              {/* 2줄: 도매처 배지 (Channel, WHOLESALE) - 첫 번째 상품 기준 */}
+              {order.items[0]?.channel?.kind === 'WHOLESALE' && (
+                <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium ${
+                  CHANNEL_PLATFORM_CONFIG[order.items[0].channel.platform]?.bgColor || 'bg-gray-100'
+                } ${CHANNEL_PLATFORM_CONFIG[order.items[0].channel.platform]?.color || 'text-gray-700'}`}>
+                  <Package size={16} />
+                  {order.items[0].channel.name}
+                  <span className="text-xs opacity-75">(도매)</span>
                 </span>
               )}
               {/* 상태 배지 */}

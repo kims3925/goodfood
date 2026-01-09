@@ -25,10 +25,16 @@ export interface UnifiedOrder {
   deliveryMemo?: string
   // 결제 정보
   paymentMethod?: string
-  // Shop 정보
+  // Shop 정보 (소매처)
   shopId?: number | null
   shopName?: string | null
   shopSubdomain?: string | null
+  // Channel 정보 (도매처)
+  wholesaleChannel?: {
+    id: number
+    name: string
+    platform: string
+  } | null
 }
 
 // 상태 라벨 매핑
@@ -161,6 +167,22 @@ export async function GET(request: NextRequest) {
               items: {
                 select: {
                   productName: true,
+                  shopProduct: {
+                    select: {
+                      product: {
+                        select: {
+                          channel: {
+                            select: {
+                              id: true,
+                              kind: true,
+                              platform: true,
+                              name: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
                 },
               },
               payment: {
@@ -177,6 +199,14 @@ export async function GET(request: NextRequest) {
             const productSummary = productNames.length > 1
               ? `${productNames[0]} 외 ${productNames.length - 1}개`
               : productNames[0] || '상품 없음'
+
+            // 첫 번째 상품의 도매처 정보 추출
+            const firstChannel = order.items[0]?.shopProduct?.product?.channel
+            const wholesaleChannel = firstChannel?.kind === 'WHOLESALE' ? {
+              id: firstChannel.id,
+              name: firstChannel.name,
+              platform: firstChannel.platform,
+            } : null
 
             const addr = order.shippingAddress
             unifiedOrders.push({
@@ -198,6 +228,7 @@ export async function GET(request: NextRequest) {
               shopId: order.shop?.id || null,
               shopName: order.shop?.name || null,
               shopSubdomain: order.shop?.subdomain || null,
+              wholesaleChannel,
             })
           }
 
@@ -277,6 +308,22 @@ export async function GET(request: NextRequest) {
               items: {
                 select: {
                   productName: true,
+                  shopProduct: {
+                    select: {
+                      product: {
+                        select: {
+                          channel: {
+                            select: {
+                              id: true,
+                              kind: true,
+                              platform: true,
+                              name: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
                 },
               },
               payment: {
@@ -293,6 +340,14 @@ export async function GET(request: NextRequest) {
             const productSummary = productNames.length > 1
               ? `${productNames[0]} 외 ${productNames.length - 1}개`
               : productNames[0] || '상품 없음'
+
+            // 첫 번째 상품의 도매처 정보 추출
+            const firstGuestChannel = order.items[0]?.shopProduct?.product?.channel
+            const guestWholesaleChannel = firstGuestChannel?.kind === 'WHOLESALE' ? {
+              id: firstGuestChannel.id,
+              name: firstGuestChannel.name,
+              platform: firstGuestChannel.platform,
+            } : null
 
             const addr = order.shippingAddress
             unifiedOrders.push({
@@ -314,6 +369,7 @@ export async function GET(request: NextRequest) {
               shopId: order.shop?.id || null,
               shopName: order.shop?.name || null,
               shopSubdomain: order.shop?.subdomain || null,
+              wholesaleChannel: guestWholesaleChannel,
             })
           }
         }

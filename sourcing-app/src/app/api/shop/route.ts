@@ -45,6 +45,17 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         theme: true,
+        channels: {
+          where: {
+            kind: 'RETAIL',
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            name: true,
+          },
+          take: 1, // 소매처 채널 1개만 (주로 1:1 관계)
+        },
         _count: {
           select: {
             shopProducts: true,

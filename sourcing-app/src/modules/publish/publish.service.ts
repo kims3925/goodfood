@@ -261,8 +261,8 @@ export class PublishService {
         }
       }
 
-      // 3. 이미 발행 여부 확인 (Soft Delete 제외)
-      const existingPublish = await prisma.channelProduct.findFirst({
+      // 3. 이미 발행 여부 확인 (활성 레코드만 - deletedAt: null)
+      const existingActivePublish = await prisma.channelProduct.findFirst({
         where: {
           productId,
           channelId,
@@ -270,12 +270,12 @@ export class PublishService {
         },
       })
 
-      if (existingPublish) {
+      if (existingActivePublish) {
         return {
           success: true,
           productId,
           channelId,
-          publishedProductId: existingPublish.id,
+          publishedProductId: existingActivePublish.id,
           skipped: true,
           skipReason: '이미 발행된 상품입니다.',
         }
@@ -388,9 +388,17 @@ export class PublishService {
         console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
       }
 
-      // 7. ChannelProduct 레코드 생성
-      const channelProduct = await prisma.channelProduct.create({
-        data: {
+      // 7. ChannelProduct 레코드 생성 또는 복원 (soft-deleted 레코드가 있으면 복원)
+      const channelProduct = await prisma.channelProduct.upsert({
+        where: {
+          productId_channelId: { productId, channelId },
+        },
+        update: {
+          // soft-deleted 레코드 복원
+          deletedAt: null,
+          publishedAt: new Date(),
+        },
+        create: {
           userId,
           productId,
           channelId,
@@ -624,8 +632,8 @@ export class PublishService {
         }
       }
 
-      // 3. 이미 발행 여부 확인
-      const existingPublish = await prisma.shopProduct.findFirst({
+      // 3. 이미 발행 여부 확인 (활성 레코드만 - deletedAt: null)
+      const existingActivePublish = await prisma.shopProduct.findFirst({
         where: {
           productId,
           shopId,
@@ -633,20 +641,28 @@ export class PublishService {
         },
       })
 
-      if (existingPublish) {
+      if (existingActivePublish) {
         return {
           success: true,
           productId,
           shopId,
-          publishedProductId: existingPublish.id,
+          publishedProductId: existingActivePublish.id,
           skipped: true,
           skipReason: '이미 발행된 상품입니다.',
         }
       }
 
-      // 4. ShopProduct 레코드 생성
-      const shopProduct = await prisma.shopProduct.create({
-        data: {
+      // 4. ShopProduct 레코드 생성 또는 복원 (soft-deleted 레코드가 있으면 복원)
+      const shopProduct = await prisma.shopProduct.upsert({
+        where: {
+          productId_shopId: { productId, shopId },
+        },
+        update: {
+          // soft-deleted 레코드 복원
+          deletedAt: null,
+          publishedAt: new Date(),
+        },
+        create: {
           userId,
           productId,
           shopId,
@@ -892,8 +908,8 @@ export class PublishService {
         }
       }
 
-      // 3. 이미 발행 여부 확인 (Soft Delete 제외)
-      const existingPublish = await prisma.channelProduct.findFirst({
+      // 3. 이미 발행 여부 확인 (활성 레코드만 - deletedAt: null)
+      const existingActivePublish = await prisma.channelProduct.findFirst({
         where: {
           productId,
           channelId,
@@ -901,7 +917,7 @@ export class PublishService {
         },
       })
 
-      if (existingPublish) {
+      if (existingActivePublish) {
         // 건너뜀 상태 알림
         if (onStageProgress) {
           await onStageProgress({
@@ -915,7 +931,7 @@ export class PublishService {
           success: true,
           productId,
           channelId,
-          publishedProductId: existingPublish.id,
+          publishedProductId: existingActivePublish.id,
           skipped: true,
           skipReason: '이미 발행된 상품입니다.',
         }
@@ -1100,9 +1116,17 @@ export class PublishService {
         console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
       }
 
-      // 7. ChannelProduct 레코드 생성
-      const channelProduct = await prisma.channelProduct.create({
-        data: {
+      // 7. ChannelProduct 레코드 생성 또는 복원 (soft-deleted 레코드가 있으면 복원)
+      const channelProduct = await prisma.channelProduct.upsert({
+        where: {
+          productId_channelId: { productId, channelId },
+        },
+        update: {
+          // soft-deleted 레코드 복원
+          deletedAt: null,
+          publishedAt: new Date(),
+        },
+        create: {
           userId,
           productId,
           channelId,

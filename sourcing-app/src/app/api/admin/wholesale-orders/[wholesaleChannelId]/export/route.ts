@@ -461,7 +461,7 @@ export async function GET(
             cell.fill = {
               type: 'pattern',
               pattern: 'solid',
-              fgColor: { argb: 'FFE8E8E8' },  // 연한 회색
+              fgColor: { argb: 'FFD0D0D0' },  // 진한 회색
             }
           }
         })
