@@ -71,6 +71,7 @@ export async function GET(
       where: {
         id,
         userId: currentUser.userId,
+        deletedAt: null,
       },
       include: {
         theme: true,
@@ -132,6 +133,7 @@ export async function PUT(
       where: {
         id,
         userId: currentUser.userId,
+        deletedAt: null,
       },
       include: {
         theme: true,
@@ -171,8 +173,11 @@ export async function PUT(
         )
       }
 
-      const duplicateShop = await prisma.shop.findUnique({
-        where: { subdomain },
+      const duplicateShop = await prisma.shop.findFirst({
+        where: { 
+          subdomain,
+          deletedAt: null
+        },
       })
 
       if (duplicateShop) {
@@ -306,36 +311,23 @@ export async function DELETE(
       )
     }
 
-    const shop = await prisma.shop.findFirst({
+    // Soft Delete - deletedAt 설정
+    // updateMany를 사용하여 ID, 소유자, 미삭제 상태를 한 번에 검증
+    const result = await prisma.shop.updateMany({
       where: {
         id,
         userId: currentUser.userId,
+        deletedAt: null,
       },
-      include: {
-        theme: true,
-      },
+      data: { deletedAt: new Date() },
     })
 
-    if (!shop) {
+    if (result.count !== 1) {
       return NextResponse.json(
-        { success: false, error: '쇼핑몰을 찾을 수 없습니다.' },
+        { success: false, error: '쇼핑몰을 찾을 수 없거나 삭제 권한이 없습니다.' },
         { status: 404 }
       )
     }
-
-    // 쇼핑몰 삭제 전 이미지 파일 삭제
-    const imagesToDelete: string[] = []
-    if (shop.coverUrl) imagesToDelete.push(shop.coverUrl)
-    if (shop.theme?.logoUrl) imagesToDelete.push(shop.theme.logoUrl)
-    if (shop.theme?.faviconUrl) imagesToDelete.push(shop.theme.faviconUrl)
-    if (shop.theme?.bannerUrl) imagesToDelete.push(shop.theme.bannerUrl)
-
-    // 이미지 파일들 삭제 (비동기로 병렬 처리)
-    await Promise.all(imagesToDelete.map(deleteImageFromUrl))
-
-    await prisma.shop.delete({
-      where: { id },
-    })
 
     return NextResponse.json({
       success: true,

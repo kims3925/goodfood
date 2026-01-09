@@ -107,10 +107,11 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // 전체 상품 수 (발행율 분모로 사용 - 소매채널용, 날짜 필터 없이 전체)
+    // 전체 상품 수 (발행율 분모로 사용 - 소매채널용, 날짜 필터 적용)
     const totalProducts = await prisma.product.count({
       where: {
         userId: currentUser.userId,
+        ...(dateFilter ? { createdAt: dateFilter } : {}),
       },
     })
 
@@ -189,6 +190,7 @@ export async function GET(request: NextRequest) {
                 userId: currentUser.userId,
                 shopId: channel.shop.id,
                 publishedAt: { not: null },
+                deletedAt: null, // Soft Delete 필터링
                 ...(dateFilter ? { publishedAt: { ...dateFilter, not: null } } : {}),
               },
             })

@@ -6,15 +6,16 @@
   "main": "src/client.ts",
   "types": "src/client.ts",
   "scripts": {
-    "prisma:generate": "prisma generate",
-    "prisma:migrate:dev": "prisma migrate dev",
-    "prisma:migrate:deploy": "prisma migrate deploy",
-    "prisma:migrate:status": "prisma migrate status",
-    "prisma:db:push": "prisma db push",
-    "prisma:db:pull": "prisma db pull",
-    "prisma:studio": "prisma studio",
-    "prisma:validate": "prisma validate",
-    "postinstall": "prisma generate"
+    "prisma:generate": "prisma generate --schema prisma",
+    "prisma:migrate:dev": "prisma migrate dev --schema prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema prisma",
+    "prisma:migrate:status": "prisma migrate status --schema prisma",
+    "prisma:db:push": "prisma db push --schema prisma",
+    "prisma:db:pull": "prisma db pull --schema prisma",
+    "prisma:studio": "prisma studio --schema prisma",
+    "prisma:validate": "prisma validate --schema prisma",
+    "deploy": "node scripts/migrate-deploy.cjs",
+    "postinstall": "prisma generate --schema prisma"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1"

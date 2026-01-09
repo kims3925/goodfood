@@ -12,6 +12,7 @@ model Shop {
   ownerName      String?        @map("owner_name") @db.VarChar(100)
   businessNumber String?        @map("business_number") @db.VarChar(20)
   isActive       Boolean        @default(true) @map("is_active")
+  deletedAt      DateTime?      @map("deleted_at") @db.Timestamp(0)
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamp(0)
   carts          Cart[]

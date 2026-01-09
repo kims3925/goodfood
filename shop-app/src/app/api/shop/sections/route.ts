@@ -53,11 +53,17 @@ export async function GET(req: NextRequest) {
         const channelProducts = await prisma.channelProduct.findMany({
           where: {
             channelId: channel.id,
+            deletedAt: null, // Soft Delete 제외
+            product: {
+              deletedAt: null, // Product Soft Delete 제외
+              isActive: true, // 비활성화 상품 제외
+            },
           },
           include: {
             product: {
               include: {
                 variants: {
+                  where: { deletedAt: null }, // Soft Delete 제외
                   orderBy: { id: 'asc' },
                   take: 1,
                 },
@@ -159,14 +165,20 @@ async function getShopProducts(shopId: number, limit: number, search: string | n
     })
   }
 
-  // 검색 조건 구성
+  // 검색 조건 구성: 활성화된 상품만 표시
   const whereCondition: any = {
     shopId: shopId,
+    deletedAt: null, // Soft Delete 제외
+    product: {
+      isActive: true, // Product 레벨에서 비활성화된 상품 제외
+      deletedAt: null, // Product Soft Delete 제외
+    },
   }
 
   // 검색어가 있으면 상품명으로 필터링
   if (search) {
     whereCondition.product = {
+      ...whereCondition.product,
       name: {
         contains: search,
       },
@@ -180,6 +192,7 @@ async function getShopProducts(shopId: number, limit: number, search: string | n
       product: {
         include: {
           variants: {
+            where: { deletedAt: null }, // Soft Delete 제외
             orderBy: { id: 'asc' },
             take: 1,
           },
@@ -263,11 +276,17 @@ async function getChannelProducts(channelId: number, limit: number) {
   const channelProducts = await prisma.channelProduct.findMany({
     where: {
       channelId: channelId,
+      deletedAt: null, // Soft Delete 제외
+      product: {
+        deletedAt: null, // Product Soft Delete 제외
+        isActive: true, // 비활성화 상품 제외
+      },
     },
     include: {
       product: {
         include: {
           variants: {
+            where: { deletedAt: null }, // Soft Delete 제외
             orderBy: { id: 'asc' },
             take: 1,
           },

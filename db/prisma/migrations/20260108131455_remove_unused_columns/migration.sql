@@ -1,6 +1,9 @@
-﻿-- =============================================
+-- =============================================
 -- 전체 스키마 마이그레이션
 -- published_product -> shop_product/channel_product 전환
+--
+-- !중요!: 실행 전 데이터 백업을 권장합니다.
+-- 롤백 스크립트: db/prisma/migrations/20260108131455_remove_unused_columns/rollback.sql
 --
 -- 이 마이그레이션은 다음 변경사항을 포함합니다:
 -- 1. shop_product 테이블 생성 (published_product 대체)
@@ -31,8 +34,8 @@ CREATE TABLE IF NOT EXISTS `shop_product` (
   INDEX `idx_deleted_at` (`deleted_at`),
   UNIQUE KEY `uk_product_shop` (`product_id`, `shop_id`),
   CONSTRAINT `fk_shop_product_product_id` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `fk_shop_product_shop_id` FOREIGN KEY (`shop_id`) REFERENCES `shop` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-);
+  CONSTRAINT `fk_shop_product_shop_id` FOREIGN KEY (`shop_id`) REFERENCES `shop` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_shop_product_user_id` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE);
 
 -- channel_product 테이블 생성
 CREATE TABLE IF NOT EXISTS `channel_product` (
@@ -54,8 +57,8 @@ CREATE TABLE IF NOT EXISTS `channel_product` (
   INDEX `idx_legacy_id` (`legacy_published_product_id`),
   UNIQUE KEY `uk_product_channel` (`product_id`, `channel_id`),
   CONSTRAINT `fk_channel_product_product_id` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `fk_channel_product_channel_id` FOREIGN KEY (`channel_id`) REFERENCES `channel` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-);
+  CONSTRAINT `fk_channel_product_channel_id` FOREIGN KEY (`channel_id`) REFERENCES `channel` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_channel_product_user_id` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE);
 
 -- workflow_step_log 테이블 생성 (자동화 파이프라인 단계별 추적)
 CREATE TABLE IF NOT EXISTS `workflow_step_log` (
@@ -87,6 +90,34 @@ CREATE TABLE IF NOT EXISTS `workflow_step_log` (
 -- workflow_log에 current_step 컬럼 추가 (이미 존재하면 무시)
 SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'workflow_log' AND column_name = 'current_step');
 SET @sql = IF(@col_exists = 0, "ALTER TABLE `workflow_log` ADD COLUMN `current_step` ENUM('COLLECTION', 'TRANSFORM', 'PRODUCT_CREATE', 'PUBLISH') NULL", 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- user 테이블에 deleted_at 컬럼 추가 (이미 존재하면 무시) - Soft Delete 패턴 지원
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'user' AND column_name = 'deleted_at');
+SET @sql = IF(@col_exists = 0, "ALTER TABLE `user` ADD COLUMN `deleted_at` TIMESTAMP NULL AFTER `tos_agreed_at`", 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- user 테이블에 idx_user_deleted_at 인덱스 추가 (컬럼은 있지만 인덱스가 없는 경우 대응)
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'user' AND index_name = 'idx_user_deleted_at');
+SET @sql = IF(@idx_exists = 0, "ALTER TABLE `user` ADD INDEX `idx_user_deleted_at` (`deleted_at`)", 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- shop 테이블에 deleted_at 컬럼 추가 (이미 존재하면 무시) - Soft Delete 패턴 지원
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'shop' AND column_name = 'deleted_at');
+SET @sql = IF(@col_exists = 0, "ALTER TABLE `shop` ADD COLUMN `deleted_at` TIMESTAMP NULL AFTER `is_active`", 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- shop 테이블에 idx_shop_deleted_at 인덱스 추가 (컬럼은 있지만 인덱스가 없는 경우 대응)
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'shop' AND index_name = 'idx_shop_deleted_at');
+SET @sql = IF(@idx_exists = 0, "ALTER TABLE `shop` ADD INDEX `idx_shop_deleted_at` (`deleted_at`)", 'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
@@ -151,8 +182,20 @@ ON DUPLICATE KEY UPDATE
   `updated_at` = VALUES(`updated_at`),
   `legacy_published_product_id` = VALUES(`legacy_published_product_id`);
 
--- FK 체크 다시 활성화
+-- 데이터 마이그레이션 명시적 커밋 (DDL 실행 전 저장)
+COMMIT;
+
+-- FK 체크 다시 활성화 (데이터 마이그레이션 완료 즉시)
+-- 중요: 후속 AUTO_INCREMENT 로직 실패 시에도 FK 체크가 활성화된 상태 보장
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- (선택) AUTO_INCREMENT 시퀀스 재설정
+-- 주의: 이 블록이 실패해도 FK 체크는 이미 활성화됨
+SET @max_id = (SELECT IFNULL(MAX(id), 0) + 1 FROM `shop_product`);
+SET @sql = CONCAT('ALTER TABLE `shop_product` AUTO_INCREMENT = ', @max_id);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- =============================================
 -- 마이그레이션 검증 쿼리 (수동 실행용)
@@ -167,7 +210,11 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- =============================================
 -- PART 3: 레거시 테이블 삭제
 -- published_product 참조하는 FK 먼저 삭제 후 테이블 삭제
+-- 주의: DDL은 암시적으로 커밋을 수행합니다.
 -- =============================================
+
+-- FK 체크 일시 비활성화 (DDL 실행용)
+SET FOREIGN_KEY_CHECKS = 0;
 
 -- cart_item FK 삭제 (존재하는 경우에만)
 SET @fk_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
@@ -252,5 +299,4 @@ DEALLOCATE PREPARE stmt;
 -- FK 체크 다시 활성화
 SET FOREIGN_KEY_CHECKS = 1;
 
--- 트랜잭션 커밋
-COMMIT;
+-- DDL은 암시적 커밋을 수행하므로 별도의 COMMIT 문이 필요하지 않음

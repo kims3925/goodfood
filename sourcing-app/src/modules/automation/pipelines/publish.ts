@@ -8,7 +8,7 @@
 
 import prisma, { ChannelKind } from '@bandauto/db'
 import { getBatchContext, checkCancellation } from '../context'
-import { updateWorkflowProgress, setWaitingSessionStatus } from '../workflow-service'
+import { updateWorkflowProgress } from '../workflow-service'
 import { publishService } from '@/modules/publish'
 import {
   PublishConfig,
@@ -220,6 +220,30 @@ export async function runPublishPipeline(
     publishedChannelsMap.set(product.id, new Set<number>(publishedChannelIds))
   }
 
+  // 이미 Shop에 발행된 상품 정보 조회 (productId -> 발행된 shopIds)
+  const publishedShopsMap = new Map<number, Set<number>>()
+  if (shopIds && shopIds.length > 0) {
+    const existingShopProducts = await prisma.shopProduct.findMany({
+      where: {
+        userId,
+        productId: { in: productIds },
+        shopId: { in: shopIds },
+      },
+      select: {
+        productId: true,
+        shopId: true,
+      },
+    })
+    for (const sp of existingShopProducts) {
+      // null 체크 - productId와 shopId가 모두 있어야 함
+      if (sp.productId == null || sp.shopId == null) continue
+      if (!publishedShopsMap.has(sp.productId)) {
+        publishedShopsMap.set(sp.productId, new Set<number>())
+      }
+      publishedShopsMap.get(sp.productId)!.add(sp.shopId)
+    }
+  }
+
   // 진행 상황 추적 (초기화 제거 - executor.ts에서 누적 관리)
   // totalItems는 실제 발행 대상(미발행 상품)만 누적
   let totalItems = 0
@@ -249,9 +273,44 @@ export async function runPublishPipeline(
           errors: [...errors, { itemId: 'cancelled', message: '사용자에 의해 취소됨', timestamp: new Date() }],
         }
       }
+
+      // 해당 Shop에 아직 발행되지 않은 상품만 필터링
+      const unpublishedProductIds = productIds.filter(productId => {
+        const publishedShops = publishedShopsMap.get(productId)
+        return !publishedShops || !publishedShops.has(shopId)
+      })
+
+      // 실제 발행 대상 수만 totalItems에 누적
+      totalItems += unpublishedProductIds.length
+
+      if (unpublishedProductIds.length === 0) {
+        console.log(`[Publish Pipeline] All products already published to shop ${shopId}`)
+        // Shop 정보 조회
+        const shop = await prisma.shop.findFirst({
+          where: { id: shopId, userId },
+          select: { name: true },
+        })
+        channelResults.push({
+          targetType: 'SHOP',
+          targetId: shopId,
+          targetName: `Shop: ${shop?.name || 'Unknown'}`,
+          attempted: 0,
+          
+          success: 0,
+          failed: 0,
+          skipped: productIds.length,
+          errors: [],
+          channelId: shopId,
+          channelName: `Shop: ${shop?.name || 'Unknown'}`,
+        })
+        continue
+      }
+
+      console.log(`[Publish Pipeline] Publishing ${unpublishedProductIds.length} products to shop ${shopId} (${productIds.length - unpublishedProductIds.length} already published)`)
+
       const shopResult = await publishService.publishShopBatch({
         userId,
-        productIds,
+        productIds: unpublishedProductIds,
         shopId,
       })
 
@@ -300,13 +359,25 @@ export async function runPublishPipeline(
 
       currentSuccess += shopResult.successCount
       currentFailed += shopResult.failedCount
-      // 실제 발행 대상만 카운트 (이미 발행된 skipped 제외)
-      totalItems += shopResult.successCount + shopResult.failedCount
+      // totalItems는 이미 Line 284에서 추가됨 - 중복 집계 제거
 
       if (workflowLogId) {
         await updateWorkflowProgress(workflowLogId, totalItems, currentSuccess, currentFailed, {
           publish: {
-            channelResults,
+            totalItems,
+            successCount: currentSuccess,
+            failedCount: currentFailed,
+            currentChannel: `Shop: ${shopResult.shopName}`,
+            currentProgress: { current: shopResult.successCount, total: shopResult.total },
+            channelResults: channelResults.map(cr => ({
+              targetType: cr.targetType,
+              targetId: cr.targetId,
+              targetName: cr.targetName,
+              attempted: cr.attempted,
+              success: cr.success,
+              failed: cr.failed,
+              skipped: cr.skipped,
+            })),
             publishedProducts: publishedProducts.slice(-10),
             errors: errors.slice(-5),
           },
@@ -414,8 +485,20 @@ export async function runPublishPipeline(
         // 실시간 DB 업데이트 (업로드 진행 정보 포함)
         await updateWorkflowProgress(workflowLogId, totalItems, currentSuccess, currentFailed, {
           publish: {
+            totalItems,
+            successCount: currentSuccess,
+            failedCount: currentFailed,
             currentChannel: channel.name,
-            currentProgress: `${current}/${total}`,
+            currentProgress: { current, total },
+            channelResults: channelResults.map(cr => ({
+              targetType: cr.targetType,
+              targetId: cr.targetId,
+              targetName: cr.targetName,
+              attempted: cr.attempted,
+              success: cr.success,
+              failed: cr.failed,
+              skipped: cr.skipped,
+            })),
             uploadProgress: currentUploadProgress,
             publishedProducts: publishedProducts.slice(-10),
             errors: errors.slice(-5),
@@ -440,43 +523,32 @@ export async function runPublishPipeline(
     }
     channelResults.push(channelResult)
 
-    // 세션 만료 에러 감지 - 파이프라인 일시 중지
+    // 세션 만료 에러 감지 - 파이프라인 실패 처리
     const sessionExpiredError = result.errors.find(e => isSessionExpiredError(e))
-    if (sessionExpiredError && workflowLogId) {
-      console.log(`[Publish Pipeline] 세션 만료 감지 - WAITING_SESSION 상태로 변경`)
+    if (sessionExpiredError) {
+      console.log(`[Publish Pipeline] 세션 만료 감지 - 발행 실패 처리`)
 
-      // 아직 발행되지 않은 상품 ID들
-      const remainingProductIds = unpublishedProductIds.filter(
-        id => !publishedProducts.some(p =>
-          p.productId === id &&
-          p.targetType === 'CHANNEL' &&
-          p.targetId === channel.id &&
-          p.status === 'SUCCESS'
-        )
-      )
+      // 남은 채널들에 대해 실패 처리
+      const currentChannelIndex = channelIds.indexOf(channel.id)
+      const remainingChannels = channelIds.slice(currentChannelIndex + 1)
+      const remainingProductCount = remainingChannels.length * unpublishedProductIds.length
 
-      // 세션 대기 상태로 변경
-      await setWaitingSessionStatus(
-        workflowLogId,
-        { productIds: remainingProductIds, channelId: channel.id },
-        { successCount: currentSuccess, failedCount: currentFailed, totalItems }
-      )
-
-      // 결과 반환 (세션 대기 중)
+      // 이벤트 리스너 정리
       cleanup()
+
+      // 실패 결과 반환
       return {
         success: false,
         totalItems,
         successCount: currentSuccess,
-        failedCount: currentFailed,
+        failedCount: currentFailed + remainingProductCount,
         details: {
           publishedProducts,
-          channelResults,  // 이제 현재 채널 결과가 포함됨
-          waitingSession: true,
-          pendingChannel: { id: channel.id, name: channel.name },
-          pendingProductIds: remainingProductIds,
+          channelResults,
+          sessionExpired: true,
+          failedChannel: { id: channel.id, name: channel.name },
         },
-        errors: [...errors, { itemId: 'session', message: sessionExpiredError, timestamp: new Date() }],
+        errors: [...errors, { itemId: 'session', message: `세션 만료: ${sessionExpiredError}. Band에 다시 로그인 후 재시도해주세요.`, timestamp: new Date() }],
       }
     }
 

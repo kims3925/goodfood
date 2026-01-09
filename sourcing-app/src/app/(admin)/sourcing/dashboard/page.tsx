@@ -106,6 +106,17 @@ interface StepInfo {
   progress: number  // 0-100
 }
 
+// 발행 결과 타입 (채널/쇼핑몰 공통)
+interface PublishTargetResult {
+  targetType: 'SHOP' | 'CHANNEL'
+  targetId: number
+  targetName: string
+  attempted: number
+  success: number
+  failed: number
+  skipped: number
+}
+
 // API에서 반환하는 stageProgress 형태
 interface StageProgressItem {
   status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED'
@@ -119,13 +130,14 @@ interface StageProgressItem {
   failedCount: number
   progress: number  // 0-100
   errorMessage: string | null
-  // 기존 details 호환 필드
+  // 수집 단계용
   totalNewPosts?: number
-  channelResults?: { channelName: string; newPosts: number; failed: number }[]
-  batchProgress?: { current: number; total: number }
+  // 발행 단계용 - 채널/쇼핑몰별 발행 결과
+  channelResults?: PublishTargetResult[]
   currentChannel?: string
   currentProgress?: { current: number; total: number }
-  // 기존 필드명 호환 (deprecated)
+  // 기존 필드 호환
+  batchProgress?: { current: number; total: number }
   total?: number
   success?: number
   failed?: number
@@ -1168,261 +1180,301 @@ export default function AutomationDashboardPage() {
 
           {/* 단계별 진행 상태 (전체 파이프라인일 때만 표시) */}
           {runningWorkflow.type === 'FULL_PIPELINE' && (
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-3">
+            <div className="space-y-4">
+              {/* 4단계 카드 그리드 */}
+              <div className="grid grid-cols-4 gap-3">
                 {/* 1. 수집 */}
-                <div className={`flex-1 relative ${runningWorkflow.currentStage === 'collection' ? 'z-10' : ''}`}>
-                  <div className={`p-3 rounded-lg border-2 transition-all ${
-                    runningWorkflow.stageProgress?.collection?.completed
-                      ? 'bg-green-50 border-green-300'
-                      : runningWorkflow.currentStage === 'collection'
-                      ? 'bg-green-100 border-green-500 shadow-lg animate-pulse'
-                      : 'bg-gray-50 border-gray-200'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      {runningWorkflow.stageProgress?.collection?.completed ? (
-                        <CheckCircle size={16} className="text-green-600" />
-                      ) : runningWorkflow.currentStage === 'collection' ? (
-                        <RefreshCw size={16} className="text-green-600 animate-spin" />
-                      ) : (
-                        <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
-                      )}
-                      <span className="text-xs font-semibold text-gray-700">수집</span>
-                    </div>
-                    {runningWorkflow.stageProgress?.collection && (
-                      <p className="text-xs text-green-700 font-medium">
-                        {runningWorkflow.stageProgress.collection.totalNewPosts ?? runningWorkflow.stageProgress.collection.successCount ?? 0}건
-                        {runningWorkflow.currentStage === 'collection' && runningWorkflow.stageProgress.collection.progress !== undefined && (
-                          <span className="text-green-500 ml-1">({runningWorkflow.stageProgress.collection.progress}%)</span>
+                <div className={`rounded-xl border-2 transition-all overflow-hidden ${
+                  runningWorkflow.stageProgress?.collection?.completed
+                    ? 'bg-green-50 border-green-300'
+                    : runningWorkflow.currentStage === 'collection'
+                    ? 'bg-green-100 border-green-500 shadow-lg'
+                    : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <div className="p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {runningWorkflow.stageProgress?.collection?.completed ? (
+                          <CheckCircle size={18} className="text-green-600" />
+                        ) : runningWorkflow.currentStage === 'collection' ? (
+                          <RefreshCw size={18} className="text-green-600 animate-spin" />
+                        ) : (
+                          <div className="w-[18px] h-[18px] rounded-full border-2 border-gray-300" />
                         )}
-                      </p>
-                    )}
-                    {runningWorkflow.currentStage === 'collection' && !runningWorkflow.stageProgress?.collection && (
-                      <p className="text-xs text-green-600">진행 중...</p>
-                    )}
+                        <span className="text-sm font-bold text-gray-800">수집</span>
+                      </div>
+                      {runningWorkflow.stageProgress?.collection && (
+                        <span className="text-xs font-semibold text-green-600">
+                          {runningWorkflow.stageProgress.collection.progress ?? 0}%
+                        </span>
+                      )}
+                    </div>
+                    {/* 수집 진행률 바 */}
+                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-2">
+                      <div
+                        className="h-full bg-green-500 rounded-full transition-all duration-300"
+                        style={{ width: `${runningWorkflow.stageProgress?.collection?.progress ?? 0}%` }}
+                      />
+                    </div>
+                    {/* 수집 상세 정보 */}
+                    <div className="text-xs text-gray-600 space-y-0.5">
+                      {runningWorkflow.stageProgress?.collection ? (
+                        <>
+                          <p>성공: <span className="font-medium text-green-600">{runningWorkflow.stageProgress.collection.successCount ?? 0}건</span></p>
+                          {(runningWorkflow.stageProgress.collection.failedCount ?? 0) > 0 && (
+                            <p>실패: <span className="font-medium text-red-500">{runningWorkflow.stageProgress.collection.failedCount}건</span></p>
+                          )}
+                        </>
+                      ) : runningWorkflow.currentStage === 'collection' ? (
+                        <p className="text-green-600 animate-pulse">수집 중...</p>
+                      ) : (
+                        <p className="text-gray-400">대기 중</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
 
                 {/* 2. 변환 */}
-                <div className={`flex-1 relative ${runningWorkflow.currentStage === 'transform' ? 'z-10' : ''}`}>
-                  <div className={`p-3 rounded-lg border-2 transition-all ${
-                    runningWorkflow.stageProgress?.transform?.completed
-                      ? 'bg-yellow-50 border-yellow-300'
-                      : runningWorkflow.currentStage === 'transform'
-                      ? 'bg-yellow-100 border-yellow-500 shadow-lg animate-pulse'
-                      : runningWorkflow.stageProgress?.collection?.completed
-                      ? 'bg-gray-50 border-gray-200'
-                      : 'bg-gray-50 border-gray-100 opacity-50'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      {runningWorkflow.stageProgress?.transform?.completed ? (
-                        <CheckCircle size={16} className="text-yellow-600" />
-                      ) : runningWorkflow.currentStage === 'transform' ? (
-                        <RefreshCw size={16} className="text-yellow-600 animate-spin" />
-                      ) : (
-                        <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
-                      )}
-                      <span className="text-xs font-semibold text-gray-700">변환</span>
-                    </div>
-                    {runningWorkflow.stageProgress?.transform && (
-                      <p className="text-xs text-yellow-700 font-medium">
-                        {(() => {
-                          const t = runningWorkflow.stageProgress.transform
-                          const success = t.successCount ?? t.success
-                          const processed = t.processedItems ?? 0
-                          const total = t.totalItems ?? t.total ?? 0
-                          if (runningWorkflow.currentStage === 'transform' && total > 0) {
-                            return `${processed}/${total}건`
-                          }
-                          return success !== undefined ? `${success}건` : '처리 중...'
-                        })()}
-                        {runningWorkflow.currentStage === 'transform' && runningWorkflow.stageProgress.transform.progress !== undefined && (
-                          <span className="text-yellow-500 ml-1">
-                            ({runningWorkflow.stageProgress.transform.progress}%)
-                          </span>
+                <div className={`rounded-xl border-2 transition-all overflow-hidden ${
+                  runningWorkflow.stageProgress?.transform?.completed
+                    ? 'bg-yellow-50 border-yellow-300'
+                    : runningWorkflow.currentStage === 'transform'
+                    ? 'bg-yellow-100 border-yellow-500 shadow-lg'
+                    : runningWorkflow.stageProgress?.collection?.completed
+                    ? 'bg-gray-50 border-gray-200'
+                    : 'bg-gray-50 border-gray-100 opacity-50'
+                }`}>
+                  <div className="p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {runningWorkflow.stageProgress?.transform?.completed ? (
+                          <CheckCircle size={18} className="text-yellow-600" />
+                        ) : runningWorkflow.currentStage === 'transform' ? (
+                          <RefreshCw size={18} className="text-yellow-600 animate-spin" />
+                        ) : (
+                          <div className="w-[18px] h-[18px] rounded-full border-2 border-gray-300" />
                         )}
-                      </p>
-                    )}
-                    {runningWorkflow.currentStage === 'transform' && !runningWorkflow.stageProgress?.transform && (
-                      <p className="text-xs text-yellow-600">대기 중...</p>
-                    )}
+                        <span className="text-sm font-bold text-gray-800">AI변환</span>
+                      </div>
+                      {runningWorkflow.stageProgress?.transform && (
+                        <span className="text-xs font-semibold text-yellow-600">
+                          {runningWorkflow.stageProgress.transform.progress ?? 0}%
+                        </span>
+                      )}
+                    </div>
+                    {/* 변환 진행률 바 */}
+                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-2">
+                      <div
+                        className="h-full bg-yellow-500 rounded-full transition-all duration-300"
+                        style={{ width: `${runningWorkflow.stageProgress?.transform?.progress ?? 0}%` }}
+                      />
+                    </div>
+                    {/* 변환 상세 정보 */}
+                    <div className="text-xs text-gray-600 space-y-0.5">
+                      {runningWorkflow.stageProgress?.transform ? (
+                        <>
+                          <p>
+                            {runningWorkflow.currentStage === 'transform'
+                              ? `${runningWorkflow.stageProgress.transform.processedItems ?? 0}/${runningWorkflow.stageProgress.transform.totalItems ?? 0}건`
+                              : `성공: ${runningWorkflow.stageProgress.transform.successCount ?? 0}건`
+                            }
+                          </p>
+                          {(runningWorkflow.stageProgress.transform.failedCount ?? 0) > 0 && (
+                            <p>실패: <span className="font-medium text-red-500">{runningWorkflow.stageProgress.transform.failedCount}건</span></p>
+                          )}
+                        </>
+                      ) : runningWorkflow.currentStage === 'transform' ? (
+                        <p className="text-yellow-600 animate-pulse">변환 중...</p>
+                      ) : (
+                        <p className="text-gray-400">대기 중</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
 
                 {/* 3. 등록 */}
-                <div className={`flex-1 relative ${runningWorkflow.currentStage === 'productCreate' ? 'z-10' : ''}`}>
-                  <div className={`p-3 rounded-lg border-2 transition-all ${
-                    runningWorkflow.stageProgress?.productCreate?.completed
-                      ? 'bg-orange-50 border-orange-300'
-                      : runningWorkflow.currentStage === 'productCreate'
-                      ? 'bg-orange-100 border-orange-500 shadow-lg animate-pulse'
-                      : runningWorkflow.stageProgress?.transform?.completed
-                      ? 'bg-gray-50 border-gray-200'
-                      : 'bg-gray-50 border-gray-100 opacity-50'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      {runningWorkflow.stageProgress?.productCreate?.completed ? (
-                        <CheckCircle size={16} className="text-orange-600" />
-                      ) : runningWorkflow.currentStage === 'productCreate' ? (
-                        <RefreshCw size={16} className="text-orange-600 animate-spin" />
-                      ) : (
-                        <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
-                      )}
-                      <span className="text-xs font-semibold text-gray-700">등록</span>
-                    </div>
-                    {runningWorkflow.stageProgress?.productCreate && (
-                      <p className="text-xs text-orange-700 font-medium">
-                        {(() => {
-                          const p = runningWorkflow.stageProgress.productCreate
-                          const success = p.successCount ?? p.success ?? 0
-                          const processed = p.processedItems ?? 0
-                          const total = p.totalItems ?? p.total ?? 0
-                          if (runningWorkflow.currentStage === 'productCreate' && total > 0) {
-                            return `${processed}/${total}건`
-                          }
-                          return `${success}건`
-                        })()}
-                        {runningWorkflow.currentStage === 'productCreate' && runningWorkflow.stageProgress.productCreate.progress !== undefined && (
-                          <span className="text-orange-500 ml-1">
-                            ({runningWorkflow.stageProgress.productCreate.progress}%)
-                          </span>
+                <div className={`rounded-xl border-2 transition-all overflow-hidden ${
+                  runningWorkflow.stageProgress?.productCreate?.completed
+                    ? 'bg-orange-50 border-orange-300'
+                    : runningWorkflow.currentStage === 'productCreate'
+                    ? 'bg-orange-100 border-orange-500 shadow-lg'
+                    : runningWorkflow.stageProgress?.transform?.completed
+                    ? 'bg-gray-50 border-gray-200'
+                    : 'bg-gray-50 border-gray-100 opacity-50'
+                }`}>
+                  <div className="p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {runningWorkflow.stageProgress?.productCreate?.completed ? (
+                          <CheckCircle size={18} className="text-orange-600" />
+                        ) : runningWorkflow.currentStage === 'productCreate' ? (
+                          <RefreshCw size={18} className="text-orange-600 animate-spin" />
+                        ) : (
+                          <div className="w-[18px] h-[18px] rounded-full border-2 border-gray-300" />
                         )}
-                      </p>
-                    )}
-                    {runningWorkflow.currentStage === 'productCreate' && !runningWorkflow.stageProgress?.productCreate && (
-                      <p className="text-xs text-orange-600">대기 중...</p>
-                    )}
+                        <span className="text-sm font-bold text-gray-800">등록</span>
+                      </div>
+                      {runningWorkflow.stageProgress?.productCreate && (
+                        <span className="text-xs font-semibold text-orange-600">
+                          {runningWorkflow.stageProgress.productCreate.progress ?? 0}%
+                        </span>
+                      )}
+                    </div>
+                    {/* 등록 진행률 바 */}
+                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-2">
+                      <div
+                        className="h-full bg-orange-500 rounded-full transition-all duration-300"
+                        style={{ width: `${runningWorkflow.stageProgress?.productCreate?.progress ?? 0}%` }}
+                      />
+                    </div>
+                    {/* 등록 상세 정보 */}
+                    <div className="text-xs text-gray-600 space-y-0.5">
+                      {runningWorkflow.stageProgress?.productCreate ? (
+                        <>
+                          <p>성공: <span className="font-medium text-orange-600">{runningWorkflow.stageProgress.productCreate.successCount ?? 0}건</span></p>
+                          {(runningWorkflow.stageProgress.productCreate.failedCount ?? 0) > 0 && (
+                            <p>실패: <span className="font-medium text-red-500">{runningWorkflow.stageProgress.productCreate.failedCount}건</span></p>
+                          )}
+                        </>
+                      ) : runningWorkflow.currentStage === 'productCreate' ? (
+                        <p className="text-orange-600 animate-pulse">등록 중...</p>
+                      ) : (
+                        <p className="text-gray-400">대기 중</p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
-
                 {/* 4. 발행 */}
-                <div className={`flex-1 relative ${runningWorkflow.currentStage === 'publish' ? 'z-10' : ''}`}>
-                  <div className={`p-3 rounded-lg border-2 transition-all ${
-                    runningWorkflow.stageProgress?.publish?.completed
-                      ? 'bg-blue-50 border-blue-300'
-                      : runningWorkflow.currentStage === 'publish'
-                      ? 'bg-blue-100 border-blue-500 shadow-lg animate-pulse'
-                      : runningWorkflow.stageProgress?.productCreate?.completed
-                      ? 'bg-gray-50 border-gray-200'
-                      : 'bg-gray-50 border-gray-100 opacity-50'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      {runningWorkflow.stageProgress?.publish?.completed ? (
-                        <CheckCircle size={16} className="text-blue-600" />
-                      ) : runningWorkflow.currentStage === 'publish' ? (
-                        <RefreshCw size={16} className="text-blue-600 animate-spin" />
-                      ) : (
-                        <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
-                      )}
-                      <span className="text-xs font-semibold text-gray-700">발행</span>
-                    </div>
-                    {runningWorkflow.stageProgress?.publish && (
-                      <div className="text-xs text-blue-700 font-medium">
-                        {(() => {
-                          const pub = runningWorkflow.stageProgress.publish
-                          const success = pub.successCount ?? pub.success ?? 0
-                          const processed = pub.processedItems ?? 0
-                          const total = pub.totalItems ?? pub.total ?? 0
-
-                          if (runningWorkflow.currentStage === 'publish') {
-                            if (pub.currentChannel && pub.currentProgress) {
-                              return (
-                                <>
-                                  <p>{pub.currentChannel}</p>
-                                  <p>{pub.currentProgress.current}/{pub.currentProgress.total}</p>
-                                </>
-                              )
-                            }
-                            if (total > 0) {
-                              return `${processed}/${total}건`
-                            }
-                          }
-                          return `${success}건`
-                        })()}
-                        {runningWorkflow.currentStage === 'publish' && runningWorkflow.stageProgress.publish.progress !== undefined && (
-                          <span className="text-blue-500 ml-1">
-                            ({runningWorkflow.stageProgress.publish.progress}%)
-                          </span>
+                <div className={`rounded-xl border-2 transition-all overflow-hidden ${
+                  runningWorkflow.stageProgress?.publish?.completed
+                    ? 'bg-blue-50 border-blue-300'
+                    : runningWorkflow.currentStage === 'publish'
+                    ? 'bg-blue-100 border-blue-500 shadow-lg'
+                    : runningWorkflow.stageProgress?.productCreate?.completed
+                    ? 'bg-gray-50 border-gray-200'
+                    : 'bg-gray-50 border-gray-100 opacity-50'
+                }`}>
+                  <div className="p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {runningWorkflow.stageProgress?.publish?.completed ? (
+                          <CheckCircle size={18} className="text-blue-600" />
+                        ) : runningWorkflow.currentStage === 'publish' ? (
+                          <RefreshCw size={18} className="text-blue-600 animate-spin" />
+                        ) : (
+                          <div className="w-[18px] h-[18px] rounded-full border-2 border-gray-300" />
                         )}
+                        <span className="text-sm font-bold text-gray-800">발행</span>
                       </div>
-                    )}
-                    {runningWorkflow.currentStage === 'publish' && !runningWorkflow.stageProgress?.publish && (
-                      <p className="text-xs text-blue-600">대기 중...</p>
-                    )}
+                      {runningWorkflow.stageProgress?.publish && (
+                        <span className="text-xs font-semibold text-blue-600">
+                          {runningWorkflow.stageProgress.publish.progress ?? 0}%
+                        </span>
+                      )}
+                    </div>
+                    {/* 발행 진행률 바 */}
+                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-2">
+                      <div
+                        className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                        style={{ width: `${runningWorkflow.stageProgress?.publish?.progress ?? 0}%` }}
+                      />
+                    </div>
+                    {/* 발행 상세 정보 */}
+                    <div className="text-xs text-gray-600 space-y-0.5">
+                      {runningWorkflow.stageProgress?.publish ? (
+                        <>
+                          {runningWorkflow.currentStage === 'publish' && runningWorkflow.stageProgress.publish.currentChannel && (
+                            <p className="text-blue-600 font-medium truncate" title={runningWorkflow.stageProgress.publish.currentChannel}>
+                              {runningWorkflow.stageProgress.publish.currentChannel.startsWith('Shop:') ? '🛒' : '📢'} {runningWorkflow.stageProgress.publish.currentChannel.replace('Shop: ', '')}
+                            </p>
+                          )}
+                          <p>성공: <span className="font-medium text-blue-600">{runningWorkflow.stageProgress.publish.successCount ?? 0}건</span></p>
+                          {(runningWorkflow.stageProgress.publish.failedCount ?? 0) > 0 && (
+                            <p>실패: <span className="font-medium text-red-500">{runningWorkflow.stageProgress.publish.failedCount}건</span></p>
+                          )}
+                        </>
+                      ) : runningWorkflow.currentStage === 'publish' ? (
+                        <p className="text-blue-600 animate-pulse">발행 중...</p>
+                      ) : (
+                        <p className="text-gray-400">대기 중</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* 단계별 상세 정보 (완료된 단계들) */}
-              {runningWorkflow.stageProgress && (
-                <div className="bg-white rounded-lg p-4 border border-gray-100 space-y-2">
-                  {runningWorkflow.stageProgress.collection?.completed && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">수집 완료</span>
-                      <span className="text-green-600 font-medium">
-                        {runningWorkflow.stageProgress.collection.channelResults?.length ?? 0}개 채널에서 {runningWorkflow.stageProgress.collection.totalNewPosts ?? runningWorkflow.stageProgress.collection.successCount ?? 0}건
-                      </span>
-                    </div>
-                  )}
-                  {runningWorkflow.stageProgress.transform && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">AI 변환</span>
-                      <span className={runningWorkflow.stageProgress.transform.completed ? 'text-yellow-600 font-medium' : 'text-gray-500'}>
-                        {(() => {
-                          const t = runningWorkflow.stageProgress.transform
-                          const success = t.successCount ?? t.success
-                          const failed = t.failedCount ?? t.failed ?? 0
-                          const processed = t.processedItems ?? 0
-                          const total = t.totalItems ?? t.total ?? 0
+              {/* 현재 단계 상세 정보 패널 */}
+              {runningWorkflow.currentStage && runningWorkflow.stageProgress && (
+                <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <RefreshCw size={14} className="text-blue-500 animate-spin" />
+                    현재 진행 중: {
+                      runningWorkflow.currentStage === 'collection' ? '게시물 수집' :
+                      runningWorkflow.currentStage === 'transform' ? 'AI 변환' :
+                      runningWorkflow.currentStage === 'productCreate' ? '상품 등록' :
+                      runningWorkflow.currentStage === 'publish' ? '발행' : ''
+                    }
+                  </h4>
 
-                          if (success !== undefined) {
-                            return `${success}건 성공`
-                          }
-                          if (runningWorkflow.currentStage === 'transform' && total > 0) {
-                            return `${processed}/${total}건 처리 중`
-                          }
-                          return '처리 중...'
-                        })()}
-                        {runningWorkflow.currentStage === 'transform' && runningWorkflow.stageProgress.transform.progress !== undefined && (
-                          <span className="text-yellow-500 ml-1">
-                            ({runningWorkflow.stageProgress.transform.progress}%)
+                  {/* 수집 상세 */}
+                  {runningWorkflow.currentStage === 'collection' && runningWorkflow.stageProgress.collection && (
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">처리 현황</span>
+                        <span className="font-medium">{runningWorkflow.stageProgress.collection.processedItems ?? 0}/{runningWorkflow.stageProgress.collection.totalItems ?? 0}건</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 변환 상세 */}
+                  {runningWorkflow.currentStage === 'transform' && runningWorkflow.stageProgress.transform && (
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">처리 현황</span>
+                        <span className="font-medium">{runningWorkflow.stageProgress.transform.processedItems ?? 0}/{runningWorkflow.stageProgress.transform.totalItems ?? 0}건</span>
+                      </div>
+                      {runningWorkflow.stageProgress.transform.batchProgress && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">배치 진행</span>
+                          <span className="font-medium">{runningWorkflow.stageProgress.transform.batchProgress.current}/{runningWorkflow.stageProgress.transform.batchProgress.total}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 발행 상세 - 채널/쇼핑몰별 현황 */}
+                  {runningWorkflow.currentStage === 'publish' && runningWorkflow.stageProgress.publish && (
+                    <div className="space-y-2 text-sm">
+                      {runningWorkflow.stageProgress.publish.currentChannel && runningWorkflow.stageProgress.publish.currentProgress && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-500">현재 대상</span>
+                          <span className="font-medium">
+                            {runningWorkflow.stageProgress.publish.currentChannel.startsWith('Shop:') ? '🛒' : '📢'} {runningWorkflow.stageProgress.publish.currentChannel.replace('Shop: ', '')}
+                            <span className="text-blue-600 ml-2">
+                              ({runningWorkflow.stageProgress.publish.currentProgress.current}/{runningWorkflow.stageProgress.publish.currentProgress.total})
+                            </span>
                           </span>
-                        )}
-                        {(() => {
-                          const failed = runningWorkflow.stageProgress.transform?.failedCount ?? runningWorkflow.stageProgress.transform?.failed ?? 0
-                          return failed > 0 ? <span className="text-red-500 ml-1">({failed}건 실패)</span> : null
-                        })()}
-                      </span>
-                    </div>
-                  )}
-                  {runningWorkflow.stageProgress.productCreate && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">상품 등록</span>
-                      <span className="text-orange-600 font-medium">
-                        {runningWorkflow.stageProgress.productCreate.successCount ?? runningWorkflow.stageProgress.productCreate.success ?? 0}건 성공
-                        {(() => {
-                          const failed = runningWorkflow.stageProgress.productCreate?.failedCount ?? runningWorkflow.stageProgress.productCreate?.failed ?? 0
-                          return failed > 0 ? <span className="text-red-500 ml-1">({failed}건 실패)</span> : null
-                        })()}
-                      </span>
-                    </div>
-                  )}
-                  {runningWorkflow.stageProgress.publish && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">발행</span>
-                      <span className="text-blue-600 font-medium">
-                        {runningWorkflow.stageProgress.publish.successCount ?? runningWorkflow.stageProgress.publish.success ?? 0}건 성공
-                        {(() => {
-                          const failed = runningWorkflow.stageProgress.publish?.failedCount ?? runningWorkflow.stageProgress.publish?.failed ?? 0
-                          return failed > 0 ? <span className="text-red-500 ml-1">({failed}건 실패)</span> : null
-                        })()}
-                      </span>
+                        </div>
+                      )}
+                      {runningWorkflow.stageProgress.publish.channelResults && runningWorkflow.stageProgress.publish.channelResults.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-gray-100">
+                          <p className="text-xs text-gray-400 mb-2">채널/쇼핑몰별 현황</p>
+                          <div className="space-y-1.5">
+                            {runningWorkflow.stageProgress.publish.channelResults.map((result, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-xs">
+                                <span className="text-gray-600">
+                                  {result.targetType === 'SHOP' ? '🛒' : '📢'} {result.targetName || `${result.targetType === 'SHOP' ? '쇼핑몰' : '채널'} ${result.targetId}`}
+                                </span>
+                                <span className={result.failed > 0 ? 'text-orange-600' : 'text-blue-600'}>
+                                  {result.success}/{result.attempted}건
+                                  {result.failed > 0 && <span className="text-red-500 ml-1">({result.failed}실패)</span>}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1430,24 +1482,26 @@ export default function AutomationDashboardPage() {
             </div>
           )}
 
-          {/* 전체 Progress Bar (단일 파이프라인 또는 요약) */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-gray-600">전체 진행률</span>
-              <span className="font-medium text-blue-600">{pipelineProgress}%</span>
-            </div>
-            <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-500 relative"
-                style={{ width: `${pipelineProgress}%` }}
-              >
-                <div className="absolute inset-0 bg-white/20 animate-pulse" />
+          {/* 단일 파이프라인용 진행률 */}
+          {runningWorkflow.type !== 'FULL_PIPELINE' && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-gray-600">진행률</span>
+                <span className="font-medium text-blue-600">{pipelineProgress}%</span>
+              </div>
+              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-500 relative"
+                  style={{ width: `${pipelineProgress}%` }}
+                >
+                  <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Summary Stats */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-4 mt-4">
             <div className="bg-white rounded-lg p-4 border border-gray-100">
               <p className="text-xs text-gray-500 mb-1">총 처리</p>
               <p className="text-2xl font-bold text-gray-900">{runningWorkflow.totalItems}</p>

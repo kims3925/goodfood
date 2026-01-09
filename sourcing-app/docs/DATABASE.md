@@ -545,3 +545,42 @@ await prisma.$transaction(async (tx) => {
 
   return created
 })
+```
+
+---
+
+### 2026-01-09: Product 관련 모델 인덱스명 명시
+
+**TR-ID**: TR-20260109-001
+
+#### 변경 내용
+
+Prisma 스키마의 인덱스 이름을 명시적으로 지정하여 DB 인덱스명과 동기화 문제 방지
+
+| 모델 | 인덱스 | 명시된 이름 |
+|------|--------|------------|
+| Product | `[userId]` | `product_user_id_idx` |
+| Product | `[channelId]` | `product_channel_id_idx` |
+| Product | `[categoryId]` | `product_category_id_idx` |
+| Product | `[createdAt]` | `product_created_at_idx` |
+| Product | `[deletedAt]` | `product_deleted_at_idx` |
+| ProductVariant | `[productId]` | `product_variant_product_id_idx` |
+| ProductVariant | `[deletedAt]` | `product_variant_deleted_at_idx` |
+| ProductOption | `[productId]` | `product_option_product_id_idx` |
+| ProductOption | `[groupName]` | `product_option_group_name_idx` |
+| ProductImage | `[productId]` | `product_image_product_id_idx` |
+| ProductImage | `[fileHash]` | `product_image_file_hash_idx` |
+
+#### 변경 이유
+
+- Prisma 자동 생성 인덱스명과 실제 DB 인덱스명 불일치 방지
+- 마이그레이션 시 스키마-DB 동기화 문제 해결
+- 인덱스 관리 및 디버깅 용이성 향상
+
+#### 변경 파일
+
+- `db/prisma/models/product.prisma`
+
+#### Risk Level
+
+Low (스키마 메타데이터 변경, 기존 데이터 영향 없음)

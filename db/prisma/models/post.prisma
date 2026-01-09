@@ -5,11 +5,12 @@ model CollectedPost {
   title             String                 @db.VarChar(500)
   content           String                 @db.Text
   author            String?                @db.VarChar(100)
+  deletedAt         DateTime?              @map("deleted_at") @db.Timestamp(0)
   createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt         DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   channelId         Int                    @map("channel_id")
-  channel           Channel                @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel           Channel                @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
   comments          CollectedPostComment[]
   images            CollectedPostImage[]
   collectedProducts CollectedProduct[]
@@ -17,6 +18,7 @@ model CollectedPost {
   @@unique([channelId, externalId])
   @@index([userId])
   @@index([channelId])
+  @@index([deletedAt])
   @@index([createdAt])
   @@index([externalId])
   @@map("collected_post")

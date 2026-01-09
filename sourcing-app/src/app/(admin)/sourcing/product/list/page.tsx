@@ -39,6 +39,7 @@ interface Product {
   price: number | null
   currency: string
   createdAt: string
+  isActive: boolean
   images?: ProductImage[]
   channel?: {
     id: number
@@ -1180,8 +1181,9 @@ export default function ProductListPage() {
                       className="w-4 h-4 cursor-pointer"
                     />
                   </TableHead>
-                  <TableHead className="w-[50%]">상품명</TableHead>
-                  <TableHead className="w-[25%]">출처 채널</TableHead>
+                  <TableHead className="w-[42%]">상품명</TableHead>
+                  <TableHead className="w-[20%]">출처 채널</TableHead>
+                  <TableHead className="w-[13%]">상태</TableHead>
                   <TableHead className="w-[21%]">생성일시</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1234,6 +1236,17 @@ export default function ProductListPage() {
                       <div className="text-gray-600 truncate">
                         {product.channel?.name || '-'}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          product.isActive
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {product.isActive ? '활성' : '비활성'}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-600 whitespace-nowrap">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus, Upload, Info, Truck, Send } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus, Upload, Info, Truck, Send, ToggleLeft, ToggleRight } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -27,6 +27,7 @@ interface Product {
   wholesalePrice: number | null
   price: number | null
   currency: string
+  isActive: boolean // 쇼핑몰 노출 여부
   shippingFee: number | null
   shippingInfo: string | null
   bundleMaxQty: number | null
@@ -112,6 +113,9 @@ export default function ProductDetailPage() {
   // 삭제 확인 모달 상태
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Product 활성화 상태 토글
+  const [isTogglingActive, setIsTogglingActive] = useState(false)
 
 
   // 옵션 편집 상태
@@ -430,6 +434,34 @@ export default function ProductDetailPage() {
       toast.error('변형상품 저장에 실패했습니다.')
     } finally {
       setIsSavingVariants(false)
+    }
+  }
+
+  // Product 활성화 상태 토글 핸들러
+  const handleToggleProductActive = async () => {
+    if (!product) return
+    setIsTogglingActive(true)
+    try {
+      const response = await fetch(`/api/product/${product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isActive: !product.isActive,
+        }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        toast.success(data.message)
+        loadProduct() // 상품 정보 새로고침
+      } else {
+        toast.error(data.error || '상태 변경에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('Product 상태 변경 실패:', error)
+      toast.error('상태 변경에 실패했습니다.')
+    } finally {
+      setIsTogglingActive(false)
     }
   }
 
@@ -857,6 +889,59 @@ export default function ProductDetailPage() {
 
             {/* 오른쪽: 상품 정보 */}
             <div className="xl:col-span-7 2xl:col-span-8 space-y-6">
+              {/* 쇼핑몰 노출 상태 카드 */}
+              <div className={`rounded-2xl shadow-sm border overflow-hidden transition-colors ${
+                product.isActive
+                  ? 'bg-green-50 border-green-200'
+                  : 'bg-amber-50 border-amber-200'
+              }`}>
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${product.isActive ? 'bg-green-100' : 'bg-amber-100'}`}>
+                        {product.isActive ? (
+                          <ToggleRight size={20} className="text-green-600" />
+                        ) : (
+                          <ToggleLeft size={20} className="text-amber-600" />
+                        )}
+                      </div>
+                      <div>
+                        <p className={`font-semibold ${product.isActive ? 'text-green-800' : 'text-amber-800'}`}>
+                          {product.isActive ? '쇼핑몰 노출 중' : '쇼핑몰 숨김'}
+                        </p>
+                        <p className={`text-sm ${product.isActive ? 'text-green-600' : 'text-amber-600'}`}>
+                          {product.isActive
+                            ? '모든 쇼핑몰에서 이 상품이 노출됩니다'
+                            : '모든 쇼핑몰에서 이 상품이 숨겨집니다'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleToggleProductActive}
+                      disabled={isTogglingActive}
+                      className={`px-4 py-2 rounded-xl font-medium text-sm transition-colors ${
+                        isTogglingActive
+                          ? 'opacity-50 cursor-not-allowed'
+                          : product.isActive
+                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                      }`}
+                    >
+                      {isTogglingActive ? (
+                        <span className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          변경 중...
+                        </span>
+                      ) : product.isActive ? (
+                        '숨기기'
+                      ) : (
+                        '노출하기'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* 기본 정보 카드 */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50">

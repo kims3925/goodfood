@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
 
     const where: any = {
       userId: currentUser.userId,
+      deletedAt: null,
     }
 
     if (search) {
@@ -45,6 +46,17 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         theme: true,
+        channels: {
+          where: {
+            kind: 'RETAIL',
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            name: true,
+          },
+          take: 1, // 소매처 채널 1개만 (주로 1:1 관계)
+        },
         _count: {
           select: {
             shopProducts: true,
@@ -122,9 +134,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 도메인 중복 체크
-    const existingShop = await prisma.shop.findUnique({
-      where: { subdomain },
+    // 도메인 중복 체크 (삭제된 샵 제외)
+    const existingShop = await prisma.shop.findFirst({
+      where: { 
+        subdomain,
+        deletedAt: null
+      },
     })
 
     if (existingShop) {
@@ -192,6 +207,7 @@ export async function DELETE(request: NextRequest) {
       where: {
         id: parseInt(id),
         userId: currentUser.userId,
+        deletedAt: null, // Soft Delete 필터링
       },
     })
 
@@ -202,8 +218,26 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    await prisma.shop.delete({
-      where: { id: parseInt(id) },
+    // Soft Delete - Transaction (ShopProduct도 함께 삭제)
+    const now = new Date()
+
+    await prisma.$transaction(async (tx) => {
+      // 1. 연관된 ShopProduct Soft Delete
+      await tx.shopProduct.updateMany({
+        where: {
+          shopId: parseInt(id),
+          deletedAt: null,
+        },
+        data: {
+          deletedAt: now,
+        },
+      })
+
+      // 2. Shop Soft Delete
+      await tx.shop.update({
+        where: { id: parseInt(id) },
+        data: { deletedAt: now },
+      })
     })
 
     return NextResponse.json({

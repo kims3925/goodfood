@@ -33,15 +33,21 @@ export async function GET(
     }
 
     // shopProducts 조회 조건: shopId 기반 필터링
-    const shopProductsWhere: any = {}
+    const shopProductsWhere: any = {
+      deletedAt: null, // Soft Delete 제외
+    }
     if (currentShopId) {
       shopProductsWhere.shopId = currentShopId
     }
 
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        deletedAt: null, // Soft Delete 제외
+      },
       include: {
         variants: {
+          where: { deletedAt: null }, // Soft Delete 제외
           orderBy: { id: 'asc' },
         },
         options: {
@@ -103,7 +109,26 @@ export async function GET(
     const shopProduct = product.shopProducts[0]
     const shop = shopProduct?.shop
     const shopProductId = shopProduct?.id || null
-    const isActive = true // 품절 체크는 Product 레벨의 재고 관리로 대체됨 (ShopProduct에서 isActive 필드 제거됨)
+
+    // currentShopId가 있는데 shopProduct가 없으면 해당 샵에 발행되지 않은 상품
+    if (currentShopId && !shopProduct) {
+      return NextResponse.json(
+        { success: false, error: '상품을 찾을 수 없습니다' },
+        { status: 404 }
+      )
+    }
+
+    // Product 레벨에서 비활성화된 상품은 숨김 처리
+    // NOTE: Prisma 타입에 isActive가 없어 as any 사용. prisma generate 후 타입 안전성 확보 필요
+    const isActive = (product as any).isActive ?? true
+
+    // 비활성화된 상품 접근 시 404 반환 (쇼핑몰에서 노출되지 않아야 함)
+    if (!isActive) {
+      return NextResponse.json(
+        { success: false, error: '상품을 찾을 수 없습니다' },
+        { status: 404 }
+      )
+    }
 
     // 판매자 정보 (추후 별도 필드로 관리)
     const sellerName = null
@@ -145,7 +170,9 @@ export async function GET(
       bundleMaxQty: bundleMaxQty > 1 ? bundleMaxQty : undefined,
       // 합배송 타입: NONE(없음), INCLUDED(배송비 포함형), SEPARATE(배송비 별도형)
       bundleShippingType: product.bundleShippingType || null,
-      // 품절 상태 (isActive가 false면 품절)
+      // 상품 노출 상태
+      // - isActive: 판매자가 상품을 활성화했는지 여부
+      // - isSoldOut: 현재는 isActive와 동일하게 처리 (재고 관리 미사용)
       isActive,
       isSoldOut: !isActive,
     }

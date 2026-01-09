@@ -2,9 +2,9 @@
  * Transform Pipeline
  * AI를 사용하여 수집된 게시물(CollectedPost)을 수집상품(CollectedProduct)으로 변환
  *
- * 배치 처리 방식 (API 할당량 제한 대응):
- * - 10개 게시물당 1회 API 호출
- * - 요청 간 1분(60초) 대기 (할당량 초과 방지)
+ * 처리 방식 (수동 변환과 동일):
+ * - 수동과 동일한 transformPostToProduct 함수 사용 (프롬프트 통일)
+ * - 1개 게시물당 1회 API 호출 (순차 처리)
  * - 제한 없이 모든 대기 게시물 처리
  *
  * Note: Product 생성은 이 파이프라인에서 하지 않음
@@ -16,7 +16,8 @@
 import prisma, { AiProvider } from '@bandauto/db'
 import { getBatchContext, checkCancellation } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
-import { transformPostsToProductsBatch, BatchTransformResult } from '@/modules/transformation/product.transformer'
+import { transformPostToProduct } from '@/modules/transformation/product.transformer'
+import { ProductDraft } from '@/modules/transformation/product.types'
 import { settingsService } from '@/modules/config/domain/src/settings'
 import { ProductTransformationError } from '@/modules/transformation/product.types'
 import { collectedProductService } from '@/modules/catalog/domain/src/collected-product'
@@ -317,224 +318,139 @@ export async function runTransformPipeline(
     // 유료 API: 대기 없이 순차 처리 (응답 오면 바로 다음 요청)
     console.log(`[Transform] Processing ${batchIndex + 1}/${batches.length} (channel: ${batchChannelId}, policy: ${batchPolicyContent ? 'YES' : 'NO'})`)
 
-    try {
-      // 배치 입력 준비
-      const inputs = batchPosts.map(post => ({
-        post: post as any,
-        aiProvider: config.aiProvider,
-        aiConfig: {
-          apiKey: aiConfig.apiKey,
-          model: aiConfig.model,
-        },
-      }))
+    // BATCH_SIZE=1이므로 항상 1개 게시물
+    const post = batchPosts[0]
+    let transformedPost: TransformedPost
 
-      // 배치 변환 실행 (재시도 로직 포함) - 채널별 정책 적용
-      const batchResults = await runBatchWithRetry(
-        inputs,
+    try {
+      // 수동 변환과 동일한 함수 사용 (transformPostToProduct)
+      const draft = await runSingleTransformWithRetry(
+        post,
         {
           apiKey: aiConfig.apiKey,
           model: aiConfig.model,
           provider: config.aiProvider,
         },
-        batchPolicyContent  // 해당 채널의 정책 사용
+        batchPolicyContent
       )
 
-      // 결과 처리
-      for (let i = 0; i < batchResults.length; i++) {
-        // 취소 체크: 각 결과 처리 전에 확인
-        if (await checkCancellation()) {
-          console.log(`[Transform] Cancelled by user during result processing`)
-          return {
-            success: false,
-            totalItems: posts.length,
-            successCount: transformedPosts.filter((p) => p.status === 'success').length,
-            failedCount: transformedPosts.filter((p) => p.status === 'failed').length,
-            details: {
-              transformedPosts,
-              createdProducts,
-              skippedCount: 0,
-              retryablePostIds: [],
-              cancelled: true,
-            },
-            errors: [...errors, { itemId: 0, message: '사용자에 의해 취소됨', timestamp: new Date() }],
-          }
-        }
+      // 가격 정책 적용 검증 (정책이 설정된 경우에만)
+      if (batchPolicyContent && draft.variants && draft.variants.length > 0) {
+        const unpricedVariants = draft.variants.filter(v =>
+          v.wholesalePrice !== undefined &&
+          v.wholesalePrice !== null &&
+          v.price !== undefined &&
+          v.wholesalePrice === v.price
+        )
 
-        const result = batchResults[i]
-        const post = batchPosts[i]
+        if (unpricedVariants.length > 0) {
+          // 가격 정책 미적용 - 실패로 처리
+          const failedOptions = unpricedVariants.map(v => v.optionSummary || '기본').join(', ')
+          const errorMessage = `가격 정책 미적용: ${unpricedVariants.length}개 옵션의 도매가와 소매가가 동일합니다. (${failedOptions})`
 
-        let transformedPost: TransformedPost
+          console.log(`[Transform] Post ${post.id} failed price policy validation: ${errorMessage}`)
 
-        if (result.success && result.draft) {
-          // 가격 정책 적용 검증 (정책이 설정된 경우에만)
-          if (batchPolicyContent && result.draft.variants && result.draft.variants.length > 0) {
-            const unpricedVariants = result.draft.variants.filter(v =>
-              v.wholesalePrice !== undefined &&
-              v.wholesalePrice !== null &&
-              v.price !== undefined &&
-              v.wholesalePrice === v.price
-            )
-
-            if (unpricedVariants.length > 0) {
-              // 가격 정책 미적용 - 실패로 처리
-              const failedOptions = unpricedVariants.map(v => v.optionSummary || '기본').join(', ')
-              const errorMessage = `가격 정책 미적용: ${unpricedVariants.length}개 옵션의 도매가와 소매가가 동일합니다. (${failedOptions})`
-
-              console.log(`[Transform] Post ${post.id} failed price policy validation: ${errorMessage}`)
-
-              transformedPost = {
-                postId: result.postId,
-                status: 'failed',
-                error: errorMessage,
-                errorType: 'PERMANENT',
-                retryable: true,  // 정책 수정 후 재시도 가능
-              }
-
-              errors.push({
-                itemId: post.id,
-                message: errorMessage,
-                timestamp: new Date(),
-              })
-
-              transformedPosts.push(transformedPost)
-              continue  // 다음 결과로
-            }
-          }
-
-          try {
-            // 트랜잭션으로 CollectedProduct 생성 + AI 사용량 업데이트 (원자적 처리)
-            const today = new Date()
-            today.setHours(0, 0, 0, 0)
-
-            // TypeScript 타입 안전을 위해 draft를 미리 추출
-            const draft = result.draft!
-
-            const collectedProduct = await prisma.$transaction(async (tx) => {
-              // CollectedProduct 생성 (CollectedProductService 사용 - 수동과 동일한 로직)
-              const created = await collectedProductService.create({
-                userId,
-                postId: post.id,
-                name: draft.name,
-                description: draft.description || null,
-                currency: draft.currency || 'KRW',
-                pricingPolicyContent: batchPolicyContent,  // 적용된 가격 정책 전달
-                rawMetadata: {
-                  category: draft.categoryId,
-                  options: draft.options,
-                  variants: draft.variants,
-                  wholesalePrice: draft.wholesalePrice ?? null,
-                  price: draft.price ?? null,
-                  // 배송비 정보 (최상위 레벨 + shipping 객체 둘 다 저장)
-                  shippingFee: draft.shippingFee ?? null,
-                  shippingInfo: draft.shippingInfo ?? null,
-                  bundleMaxQty: draft.bundleMaxQty ?? 1,
-                  shipping: {
-                    shippingFee: draft.shippingFee ?? null,
-                    shippingInfo: draft.shippingInfo ?? null,
-                    bundleMaxQty: draft.bundleMaxQty ?? 1,
-                  },
-                },
-              }, { tx })
-
-              // AI 사용량 업데이트 (같은 트랜잭션 내에서)
-              await tx.aiApiConfig.update({
-                where: { id: aiConfig.id },
-                data: {
-                  usageCount: { increment: 1 },
-                  dailyUsageCount: { increment: 1 },
-                  dailyResetDate: today,
-                  lastUsedAt: new Date(),
-                },
-              })
-
-              return created
-            })
-
-            transformedPost = {
-              postId: result.postId,
-              status: 'success',
-              channelId: collectedProduct.id,
-            }
-            createdProducts++
-            currentRpdUsage++
-
-            console.log(`[Transform] Created collectedProduct ${collectedProduct.id} for post ${post.id}`)
-          } catch (dbError: any) {
-            console.error(`[Transform] DB error for post ${post.id}:`, dbError.message)
-            transformedPost = {
-              postId: result.postId,
-              status: 'failed',
-              error: `저장 실패: ${dbError.message}`,
-              errorType: 'PERMANENT',
-              retryable: false,
-            }
-
-            errors.push({
-              itemId: post.id,
-              message: `저장 실패: ${dbError.message}`,
-              timestamp: new Date(),
-            })
-          }
-        } else {
-          // 배치 내 개별 실패
           transformedPost = {
-            postId: result.postId,
+            postId: post.id,
             status: 'failed',
-            error: result.error || '알 수 없는 오류',
+            error: errorMessage,
             errorType: 'PERMANENT',
-            retryable: true,  // 배치 실패는 재시도 가능
+            retryable: true,  // 정책 수정 후 재시도 가능
           }
-
-          console.log(`[Transform] Post ${post.id} failed: ${result.error}`)
 
           errors.push({
             itemId: post.id,
-            message: result.error || '알 수 없는 오류',
+            message: errorMessage,
             timestamp: new Date(),
           })
+
+          transformedPosts.push(transformedPost)
+          continue  // 다음 게시물로
         }
-
-        transformedPosts.push(transformedPost)
       }
 
-      // 배치에서 토큰 사용량 추출 (첫 번째 결과에 포함)
-      const tokensUsed = batchResults[0]?.tokensUsed || 0
+      // 트랜잭션으로 CollectedProduct 생성 + AI 사용량 업데이트 (원자적 처리)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
 
-      // AI 사용량은 각 성공적인 create 트랜잭션 내에서 업데이트됨
-
-      if (tokensUsed > 0) {
-        console.log(`[Transform] Batch ${batchIndex + 1} used ${tokensUsed} tokens`)
-      }
-
-      console.log(`[Transform] Batch ${batchIndex + 1} completed (RPD: ${currentRpdUsage}/${rateLimit.rpd})`)
-
-    } catch (batchError: any) {
-      console.error(`[Transform] Batch ${batchIndex + 1} failed:`, batchError)
-
-      // 배치 전체 실패 시 모든 게시물을 실패로 처리
-      for (const post of batchPosts) {
-        const transformedPost: TransformedPost = {
+      const collectedProduct = await prisma.$transaction(async (tx) => {
+        // CollectedProduct 생성 (CollectedProductService 사용 - 수동과 동일한 로직)
+        const created = await collectedProductService.create({
+          userId,
           postId: post.id,
-          status: 'failed',
-          error: batchError.message,
-          errorType: batchError instanceof ProductTransformationError && batchError.isTransient()
-            ? 'TRANSIENT'
-            : 'PERMANENT',
-          retryable: batchError instanceof ProductTransformationError && batchError.isTransient(),
-        }
+          name: draft.name,
+          description: draft.description || null,
+          currency: draft.currency || 'KRW',
+          pricingPolicyContent: batchPolicyContent,  // 적용된 가격 정책 전달
+          rawMetadata: {
+            category: draft.categoryId,
+            options: draft.options,
+            variants: draft.variants,
+            wholesalePrice: draft.wholesalePrice ?? null,
+            price: draft.price ?? null,
+            // 배송비 정보 (최상위 레벨 + shipping 객체 둘 다 저장)
+            shippingFee: draft.shippingFee ?? null,
+            shippingInfo: draft.shippingInfo ?? null,
+            bundleMaxQty: draft.bundleMaxQty ?? 1,
+            shipping: {
+              shippingFee: draft.shippingFee ?? null,
+              shippingInfo: draft.shippingInfo ?? null,
+              bundleMaxQty: draft.bundleMaxQty ?? 1,
+            },
+          },
+        }, { tx })
 
-        transformedPosts.push(transformedPost)
-
-        errors.push({
-          itemId: post.id,
-          message: batchError.message,
-          timestamp: new Date(),
+        // AI 사용량 업데이트 (같은 트랜잭션 내에서)
+        await tx.aiApiConfig.update({
+          where: { id: aiConfig.id },
+          data: {
+            usageCount: { increment: 1 },
+            dailyUsageCount: { increment: 1 },
+            dailyResetDate: today,
+            lastUsedAt: new Date(),
+          },
         })
+
+        return created
+      })
+
+      transformedPost = {
+        postId: post.id,
+        status: 'success',
+        channelId: collectedProduct.id,
+      }
+      createdProducts++
+      currentRpdUsage++
+
+      console.log(`[Transform] Created collectedProduct ${collectedProduct.id} for post ${post.id}`)
+      console.log(`[Transform] Post ${batchIndex + 1}/${batches.length} completed (RPD: ${currentRpdUsage}/${rateLimit.rpd})`)
+
+      transformedPosts.push(transformedPost)
+
+    } catch (transformError: any) {
+      console.error(`[Transform] Post ${post.id} failed:`, transformError)
+
+      // 단일 게시물 실패 처리
+      transformedPost = {
+        postId: post.id,
+        status: 'failed',
+        error: transformError.message,
+        errorType: transformError instanceof ProductTransformationError && transformError.isTransient()
+          ? 'TRANSIENT'
+          : 'PERMANENT',
+        retryable: transformError instanceof ProductTransformationError && transformError.isTransient(),
       }
 
-      // 배치 실패 시 다음 배치 시도 여부 결정
-      if (batchError.message?.includes('API key') || batchError.message?.includes('401')) {
-        // API 키 에러는 중단
+      transformedPosts.push(transformedPost)
+
+      errors.push({
+        itemId: post.id,
+        message: transformError.message,
+        timestamp: new Date(),
+      })
+
+      // API 키 에러는 파이프라인 중단
+      if (transformError.message?.includes('API key') || transformError.message?.includes('401')) {
         console.log('[Transform] API key error, stopping pipeline')
         errors.push({
           itemId: 0,
@@ -543,7 +459,7 @@ export async function runTransformPipeline(
         })
         break
       }
-      // 그 외 에러는 다음 배치 계속 시도
+      // 그 외 에러는 다음 게시물 계속 시도
     }
 
     // 진행 상황 및 details 실시간 업데이트
@@ -571,8 +487,14 @@ export async function runTransformPipeline(
     .filter((p) => p.retryable)
     .map((p) => p.postId)
 
+  // 생성된 CollectedProduct ID 목록 (자동화 파이프라인 연계용)
+  const createdCollectedProductIds = transformedPosts
+    .filter((p) => p.status === 'success' && p.channelId)
+    .map((p) => p.channelId!)
+
   console.log(`[Transform] Completed: ${successCount} success, ${failedCount} failed, ${skippedCount} skipped`)
-  console.log(`[Transform] API calls made: ${batches.length} (batch mode)`)
+  console.log(`[Transform] API calls made: ${batches.length} (single mode - same as manual)`)
+  console.log(`[Transform] Created CollectedProduct IDs: ${createdCollectedProductIds.length}개`)
 
   if (retryablePostIds.length > 0) {
     console.log(`[Transform] Retryable post IDs: ${retryablePostIds.join(', ')}`)
@@ -588,6 +510,7 @@ export async function runTransformPipeline(
       createdProducts,
       skippedCount,
       retryablePostIds,
+      createdCollectedProductIds,  // 자동화 파이프라인 연계용
     },
     errors,
   }
@@ -598,17 +521,27 @@ export async function runTransformPipeline(
 // =============================================
 
 /**
- * 배치 변환 실행 (재시도 로직 포함)
- * TRANSIENT 에러 발생 시 최대 3회 재시도 (10s, 20s, 30s 대기)
+ * 단일 게시물 변환 실행 (재시도 로직 포함)
+ * 수동 변환과 동일한 transformPostToProduct 함수 사용
+ * TRANSIENT 에러 발생 시 최대 3회 재시도 (5s, 10s, 15s 대기)
  */
-async function runBatchWithRetry(
-  inputs: any[],
+async function runSingleTransformWithRetry(
+  post: any,
   aiConfig: { apiKey: string; model: string; provider: any },
   pricingPolicyContent: string | null,
   retryCount: number = 0
-): Promise<BatchTransformResult[]> {
+): Promise<ProductDraft> {
   try {
-    return await transformPostsToProductsBatch(inputs, aiConfig, pricingPolicyContent)
+    // 수동 변환과 동일한 함수 사용
+    return await transformPostToProduct({
+      post,
+      aiProvider: aiConfig.provider,
+      aiConfig: {
+        apiKey: aiConfig.apiKey,
+        model: aiConfig.model,
+      },
+      policyContent: pricingPolicyContent || undefined,
+    })
   } catch (error: any) {
     // TRANSIENT 에러이고 재시도 가능한 경우
     if (
@@ -616,12 +549,12 @@ async function runBatchWithRetry(
       error.isTransient() &&
       retryCount < MAX_RETRIES
     ) {
-      const delay = RETRY_DELAY_MS * (retryCount + 1)  // 10s, 20s, 30s
+      const delay = RETRY_DELAY_MS * (retryCount + 1)  // 5s, 10s, 15s
       console.log(`[Transform] TRANSIENT error, retrying in ${delay / 1000}s (attempt ${retryCount + 1}/${MAX_RETRIES})`)
       console.log(`[Transform] Error: ${error.message}`)
 
       await new Promise((resolve) => setTimeout(resolve, delay))
-      return runBatchWithRetry(inputs, aiConfig, pricingPolicyContent, retryCount + 1)
+      return runSingleTransformWithRetry(post, aiConfig, pricingPolicyContent, retryCount + 1)
     }
 
     // 재시도 불가능한 에러거나 최대 재시도 횟수 초과

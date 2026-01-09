@@ -170,3 +170,81 @@ export async function PUT(
     )
   }
 }
+
+/**
+ * PATCH /api/product/[id]
+ *
+ * Product 활성화 상태 토글
+ *
+ * Body:
+ * - isActive: boolean - 활성화 상태
+ *
+ * Response:
+ * - success: boolean
+ * - data?: Product
+ * - message?: string
+ * - error?: string
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: '로그인이 필요합니다.' },
+        { status: 401 }
+      )
+    }
+    const userId = currentUser.userId
+
+    const id = parseInt(params.id)
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { success: false, error: '유효하지 않은 상품 ID입니다.' },
+        { status: 400 }
+      )
+    }
+
+    const body = await request.json()
+    const { isActive } = body
+
+    if (typeof isActive !== 'boolean') {
+      return NextResponse.json(
+        { success: false, error: 'isActive는 필수 값입니다.' },
+        { status: 400 }
+      )
+    }
+
+    // 소유권 확인과 업데이트를 원자적으로 수행 (TOCTOU 방지)
+    const updateResult = await prisma.product.updateMany({
+      where: { id, userId },
+      data: { isActive },
+    })
+
+    if (updateResult.count === 0) {
+      return NextResponse.json(
+        { success: false, error: '상품을 찾을 수 없습니다.' },
+        { status: 404 }
+      )
+    }
+
+    // 업데이트된 상품 조회
+    const updatedProduct = await prisma.product.findUnique({
+      where: { id },
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: updatedProduct,
+      message: isActive ? '상품이 활성화되었습니다.' : '상품이 비활성화되었습니다.',
+    })
+  } catch (error) {
+    console.error('상품 활성화 상태 변경 실패:', error)
+    return NextResponse.json(
+      { success: false, error: '상품 활성화 상태 변경에 실패했습니다.' },
+      { status: 500 }
+    )
+  }
+}

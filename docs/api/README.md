@@ -139,9 +139,114 @@ BandAuto E-Commerce App의 REST API 문서입니다. 모든 API는 `/api` 경로
 
 ---
 
+## 📦 Product API
+
+상품 관리 API (sourcing-app)
+
+### PATCH /api/product/:id
+상품 활성화 상태 변경
+
+**인증**: 필수
+
+**URL 파라미터**:
+- `id`: 상품 ID
+
+**요청 Body**:
+```json
+{
+  "isActive": false
+}
+```
+
+**응답**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "name": "상품명",
+    "isActive": false
+  },
+  "message": "상품이 비활성화되었습니다."
+}
+```
+
+**에러**:
+- `400`: isActive 값 누락
+- `401`: 인증 필요
+- `403`: 접근 권한 없음
+- `404`: 상품을 찾을 수 없음
+
+**비고**:
+- 비활성화된 상품은 모든 쇼핑몰에서 즉시 숨김 처리됨
+- 상품 목록에서 미노출, 상세 페이지 접근 시 404 반환
+
+---
+
 ## 📦 Orders API
 
 주문 관리 API
+
+### POST /api/order/external
+외부 주문 생성 (sourcing-app)
+
+문자, 밴드 댓글 등 외부 경로로 받은 주문을 GuestOrder로 생성
+
+**인증**: 필수
+
+**요청 Body**:
+```json
+{
+  "shopId": 1,
+  "guestName": "홍길동",
+  "guestPhone": "010-1234-5678",
+  "guestEmail": "guest@example.com",
+  "shippingAddress": {
+    "recipientName": "홍길동",
+    "recipientPhone": "010-1234-5678",
+    "postalCode": "12345",
+    "address": "서울시 강남구 테헤란로 123",
+    "addressDetail": "456호",
+    "deliveryMemo": "부재시 경비실"
+  },
+  "items": [
+    {
+      "shopProductId": 100,
+      "variantId": 200,
+      "quantity": 2
+    }
+  ],
+  "memo": "주문 메모"
+}
+```
+
+**응답**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "orderNumber": "XORD-20260109-A1B2C3D4E5F6",
+    "status": "PENDING",
+    "totalAmount": 50000,
+    "itemCount": 1
+  }
+}
+```
+
+**에러**:
+- `400`: 필수 파라미터 누락 (shopId, guestName, guestPhone, shippingAddress, items)
+- `400`: 유효하지 않은 shopProductId, variantId, quantity
+- `400`: 상품 옵션 미선택 (옵션이 있는 상품)
+- `400`: 상품 가격 미설정
+- `401`: 인증 필요
+
+**비고**:
+- 주문번호 형식: `XORD-YYYYMMDD-XXXXXXXXXXXX` (eXternal ORDer)
+- 날짜는 KST (한국 표준시) 기준
+- PENDING 상태로 생성되며 관리자가 수동으로 상태 변경
+
+---
 
 ### POST /api/orders
 주문 생성

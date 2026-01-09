@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import {
   Search,
   ShoppingBag,
-  FileSpreadsheet,
   ChevronLeft,
   ChevronRight,
   Package,
@@ -15,12 +14,14 @@ import {
   CreditCard,
   Truck,
   XCircle,
+  Plus,
 } from 'lucide-react'
 import Input from '@/components/ui/Input'
 import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
+import { getChannelColor } from '@/lib/channel-utils'
 
 type OrderSource = 'SHOPPING_MALL'
 
@@ -43,6 +44,12 @@ interface UnifiedOrder {
   shopId?: number | null
   shopName?: string | null
   shopSubdomain?: string | null
+  // 도매처 정보
+  wholesaleChannel?: {
+    id: number
+    name: string
+    platform: string
+  } | null
 }
 
 interface Shop {
@@ -146,6 +153,11 @@ export default function UnifiedOrderListPage() {
     setPage(1)
   }
 
+  const formatPrice = (price: number | null) => {
+    if (!price) return '0원'
+    return `${price.toLocaleString()}원`
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('ko-KR', {
       year: 'numeric',
@@ -157,26 +169,33 @@ export default function UnifiedOrderListPage() {
     }).replace(/\. /g, '-').replace(/\.$/, '').replace(/-(\d{2}:\d{2})$/, ' $1')
   }
 
-  const formatPrice = (price: number) => {
-    return `${price.toLocaleString()}원`
-  }
-
   const getSourceBadge = (order: UnifiedOrder) => {
-    if (order.source === 'SHOPPING_MALL') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 whitespace-nowrap">
+    return (
+      <div className="flex flex-col items-center gap-1">
+        {/* 1줄: 소매처 (Shop) */}
+        <span
+          className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 max-w-[100px]"
+          title={order.shopName || '쇼핑몰'}
+        >
           <ShoppingBag size={12} className="flex-shrink-0" />
-          <span className="truncate max-w-[80px]" title={order.shopName || '쇼핑몰'}>
+          <span className="truncate">
             {order.shopName || '쇼핑몰'}
           </span>
         </span>
-      )
-    }
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 whitespace-nowrap">
-        <FileSpreadsheet size={12} className="flex-shrink-0" />
-        밴드주문
-      </span>
+
+        {/* 2줄: 도매처 (Channel, WHOLESALE) */}
+        {order.wholesaleChannel && (
+          <span
+            className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium max-w-[100px] ${getChannelColor(order.wholesaleChannel.platform)}`}
+            title={order.wholesaleChannel.name}
+          >
+            <Package size={12} className="flex-shrink-0" />
+            <span className="truncate">
+              {order.wholesaleChannel.name}
+            </span>
+          </span>
+        )}
+      </div>
     )
   }
 
@@ -202,11 +221,20 @@ export default function UnifiedOrderListPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">주문 목록</h1>
-          <p className="text-gray-600">
-            주문 현황을 확인하고 관리합니다.
-          </p>
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">주문 목록</h1>
+            <p className="text-gray-600">
+              주문 현황을 확인하고 관리합니다.
+            </p>
+          </div>
+          <Link
+            href="/shop/order/external/new"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
+          >
+            <Plus size={18} />
+            <span>외부 주문 추가</span>
+          </Link>
         </div>
 
         {/* 상태 필터 버튼 */}
@@ -390,15 +418,15 @@ export default function UnifiedOrderListPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[4%] text-center">No.</TableHead>
-                  <TableHead className="w-[8%]">출처</TableHead>
-                  <TableHead className="w-[11%]">주문번호</TableHead>
-                  <TableHead className="w-[9%]">고객명</TableHead>
-                  <TableHead className="w-[7%]">회원유형</TableHead>
-                  <TableHead className="w-[11%]">전화번호</TableHead>
-                  <TableHead className="w-[20%]">상품</TableHead>
-                  <TableHead className="w-[9%]">금액</TableHead>
-                  <TableHead className="w-[9%]">상태</TableHead>
-                  <TableHead className="w-[15%]">주문일시</TableHead>
+                  <TableHead className="w-[10%] text-center">출처</TableHead>
+                  <TableHead className="w-[10%] text-center">주문번호</TableHead>
+                  <TableHead className="w-[9%] text-center">고객명</TableHead>
+                  <TableHead className="w-[7%] text-center">회원유형</TableHead>
+                  <TableHead className="w-[11%] text-center">전화번호</TableHead>
+                  <TableHead className="w-[20%] text-center">상품</TableHead>
+                  <TableHead className="w-[9%] text-center">금액</TableHead>
+                  <TableHead className="w-[9%] text-center">상태</TableHead>
+                  <TableHead className="w-[15%] text-center">주문일시</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -414,16 +442,16 @@ export default function UnifiedOrderListPage() {
                       <TableCell className="text-center text-gray-500">
                         {(page - 1) * itemsPerPage + index + 1}
                       </TableCell>
-                      <TableCell>{getSourceBadge(order)}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">{getSourceBadge(order)}</TableCell>
+                      <TableCell className="text-center">
                         <span className="font-mono text-sm text-gray-900">
                           {order.orderNumber}
                         </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         <span className="font-medium text-gray-900">{order.customerName}</span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         {order.isGuestOrder ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
                             비회원
@@ -434,12 +462,12 @@ export default function UnifiedOrderListPage() {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         <span className="text-gray-600 text-sm">
                           {order.customerPhone ? formatPhoneNumber(order.customerPhone) : '-'}
                         </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         <div className="font-medium text-gray-900 truncate max-w-[250px]">
                           {order.productSummary}
                         </div>
@@ -449,15 +477,15 @@ export default function UnifiedOrderListPage() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         <span className="font-medium text-gray-900">
                           {formatPrice(order.totalAmount)}
                         </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         {getStatusBadge(order.status, order.statusLabel)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         <span className="text-gray-600 text-sm">
                           {formatDate(order.createdAt)}
                         </span>

@@ -164,9 +164,9 @@ export class ProductService {
       await deleteProductImageFiles(fileNames, id)
     }
 
-    // 관련 ShopProduct들의 ID 가져오기
+    // 관련 ShopProduct들의 ID 가져오기 (활성 ShopProduct만)
     const shopProducts = await prisma.shopProduct.findMany({
-      where: { productId: id },
+      where: { productId: id, deletedAt: null },
       select: { id: true },
     })
     const shopProductIds = shopProducts.map((sp) => sp.id)

@@ -12,6 +12,7 @@ model User {
   privacyAgreedAt    DateTime?           @map("privacy_agreed_at") @db.Timestamp(0)
   signupCompletedAt  DateTime?           @map("signup_completed_at") @db.Timestamp(0)
   tosAgreedAt        DateTime?           @map("tos_agreed_at") @db.Timestamp(0)
+  deletedAt          DateTime?           @map("deleted_at") @db.Timestamp(0)
   shopId             Int?                @map("shop_id")
   aiApiConfigs       AiApiConfig[]
   aiPromptConfigs    AiPromptConfig[]
