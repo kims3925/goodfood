@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@bandauto/db'
+import prisma, { Prisma } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 /**
@@ -31,11 +31,18 @@ export async function GET(request: NextRequest) {
     const pageParam = searchParams.get('page')
     const limitParam = searchParams.get('limit')
 
-    // shopId 검증: 있으면 유효한 양의 정수여야 함
+    // shopId 검증: 있으면 유효한 양의 정수여야 함 (숫자만 허용, "1abc" 같은 입력 거부)
     let validatedShopId: number | null = null
     if (shopIdParam) {
-      const parsed = parseInt(shopIdParam, 10)
-      if (isNaN(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
+      // 숫자로만 구성되었는지 먼저 검증
+      if (!/^\d+$/.test(shopIdParam)) {
+        return NextResponse.json(
+          { success: false, error: 'shopId는 유효한 양의 정수여야 합니다.' },
+          { status: 400 }
+        )
+      }
+      const parsed = Number(shopIdParam)
+      if (parsed <= 0) {
         return NextResponse.json(
           { success: false, error: 'shopId는 유효한 양의 정수여야 합니다.' },
           { status: 400 }
@@ -61,21 +68,19 @@ export async function GET(request: NextRequest) {
     }
 
     // 조회 조건 구성
-    const where: any = {
+    const where: Prisma.ShopProductWhereInput = {
       userId: user.userId,
       deletedAt: null, // Soft Delete 제외
       publishedAt: { not: null }, // 발행된 상품만
-    }
-
-    if (validatedShopId) {
-      where.shopId = validatedShopId
-    }
-
-    // Product 필터: isActive + 검색어 조건
-    where.product = {
-      isActive: true,
-      deletedAt: null,
-      ...(search && { name: { contains: search } }),
+      ...(validatedShopId && { shopId: validatedShopId }),
+      // Product 필터: optional relation이므로 'is' wrapper 사용
+      product: {
+        is: {
+          isActive: true,
+          deletedAt: null,
+          ...(search && { name: { contains: search } }),
+        },
+      },
     }
 
     // 전체 개수 조회
