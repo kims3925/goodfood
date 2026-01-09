@@ -12,7 +12,7 @@ model ChannelProduct {
   legacyPublishedProductId  Int?      @map("legacy_published_product_id") // 롤백용 원본 published_product ID
 
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  channel Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  channel Channel  @relation(fields: [channelId], references: [id], onDelete: Restrict)
   user    User     @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@unique([productId, channelId])

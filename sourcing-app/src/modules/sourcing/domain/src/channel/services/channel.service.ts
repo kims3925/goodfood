@@ -108,8 +108,9 @@ export class ChannelService {
       throw new Error('채널을 찾을 수 없습니다.')
     }
 
+    const now = new Date()
+
     // RETAIL 채널인 경우, 삭제 전에 먼저 isActive를 false로 설정
-    // 이렇게 하면 shop-app에서 캐시된 데이터가 있어도 즉시 접속 차단됨
     // 이렇게 하면 shop-app에서 캐시된 데이터가 있어도 즉시 접속 차단됨
     if (existing.kind === ChannelKind.RETAIL && existing.isActive) {
       await channelRepository.update(id, { isActive: false })
@@ -123,7 +124,31 @@ export class ChannelService {
         deletedAt: null,
       },
       data: {
-        deletedAt: new Date(),
+        deletedAt: now,
+      },
+    })
+
+    // 채널에 연결된 CollectedPost 소프트 삭제
+    await prisma.collectedPost.updateMany({
+      where: {
+        channelId: id,
+        deletedAt: null,
+      },
+      data: {
+        deletedAt: now,
+      },
+    })
+
+    // 채널에 연결된 CollectedProduct 소프트 삭제 (CollectedPost를 통해 연결됨)
+    await prisma.collectedProduct.updateMany({
+      where: {
+        post: {
+          channelId: id,
+        },
+        deletedAt: null,
+      },
+      data: {
+        deletedAt: now,
       },
     })
 
@@ -140,7 +165,11 @@ export class ChannelService {
       await this.invalidateEcommerceChannelCache(existing.shop.subdomain)
     }
 
-    return channelRepository.delete(id)
+    // 채널 소프트 삭제 (hard delete → soft delete)
+    return channelRepository.update(id, {
+      isActive: false,
+      deletedAt: now,
+    })
   }
 
   // shop-app 채널 캐시 무효화

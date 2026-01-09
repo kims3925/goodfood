@@ -17,6 +17,8 @@
 
 ### 2026-01-08: published_product 테이블 분리 마이그레이션
 
+**TR-ID**: TR-20260108-002
+
 **마이그레이션 파일**: `20260108131455_remove_unused_columns`
 
 #### 주요 변경사항
@@ -242,13 +244,16 @@ deleted_at TIMESTAMP NULL
 
 ### Soft Delete 적용 테이블
 
-이번 마이그레이션에서 추가/수정된 테이블:
+Soft Delete 패턴이 적용된 테이블 목록:
 
-- `shop_product` - 신규 생성
-- `channel_product` - 신규 생성
-- `workflow_step_log` - 신규 생성
-- `user` - `deleted_at` 컬럼 추가
-- `shop` - `deleted_at` 컬럼 추가
+- `shop_product` - 쇼핑몰 발행 상품
+- `channel_product` - 채널 발행 상품
+- `channel` - 채널 (도매/소매)
+- `collected_post` - 수집된 게시물
+- `collected_product` - 수집된 상품
+- `workflow_step_log` - 워크플로우 단계 로그
+- `user` - 사용자
+- `shop` - 쇼핑몰
 
 ### 조회 시 주의사항
 
