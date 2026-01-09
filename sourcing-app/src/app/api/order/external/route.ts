@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     // Shop 유효성 검증 (선택적)
     if (shopId) {
       const shop = await prisma.shop.findFirst({
-        where: { id: shopId, userId: user.userId, isActive: true },
+        where: { id: shopId, userId: user.userId, isActive: true, deletedAt: null },
       })
       if (!shop) {
         return NextResponse.json(
@@ -154,9 +154,11 @@ export async function POST(request: NextRequest) {
           unitPrice = Number(variant.price)
         }
       } else if (product.variants.length > 0) {
-        // 옵션이 있는 상품인데 옵션을 선택하지 않은 경우 첫 번째 옵션 사용
-        variant = product.variants[0]
-        unitPrice = Number(variant.price)
+        // 옵션이 있는 상품인데 옵션을 선택하지 않은 경우 에러 반환
+        return NextResponse.json(
+          { success: false, error: `상품 옵션을 선택해주세요. (상품: ${product.name})` },
+          { status: 400 }
+        )
       }
 
       const quantity = item.quantity || 1

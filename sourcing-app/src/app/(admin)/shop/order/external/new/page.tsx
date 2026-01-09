@@ -211,7 +211,7 @@ export default function ExternalOrderNewPage() {
 
     if (existingIndex >= 0) {
       // 이미 있으면 제거 (토글)
-      setOrderItems(orderItems.filter((_, i) => i !== existingIndex))
+      setOrderItems(prev => prev.filter((_, i) => i !== existingIndex))
     } else {
       // 없으면 새로 추가
       const newItem: OrderItem = {
@@ -223,26 +223,32 @@ export default function ExternalOrderNewPage() {
         unitPrice: selectedVariant?.price || Number(product.price) || 0,
         thumbnailUrl: product.thumbnailUrl,
       }
-      setOrderItems([...orderItems, newItem])
+      setOrderItems(prev => [...prev, newItem])
     }
   }
 
   // 수량 변경
   const handleQuantityChange = (index: number, delta: number) => {
-    const newItems = [...orderItems]
-    const newQty = newItems[index].quantity + delta
-    if (newQty <= 0) {
-      // 수량이 0 이하면 삭제
-      newItems.splice(index, 1)
-    } else {
-      newItems[index].quantity = newQty
-    }
-    setOrderItems(newItems)
+    setOrderItems((prev) => {
+      const newItems = [...prev]
+      const newQty = newItems[index].quantity + delta
+
+      if (newQty <= 0) {
+        // 수량이 0 이하면 삭제
+        newItems.splice(index, 1)
+      } else {
+        newItems[index] = {
+          ...newItems[index],
+          quantity: newQty,
+        }
+      }
+      return newItems
+    })
   }
 
   // 상품 삭제
   const handleRemoveItem = (index: number) => {
-    setOrderItems(orderItems.filter((_, i) => i !== index))
+    setOrderItems(prev => prev.filter((_, i) => i !== index))
   }
 
   // 합계 계산

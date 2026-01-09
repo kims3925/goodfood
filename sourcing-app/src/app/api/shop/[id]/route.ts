@@ -171,8 +171,11 @@ export async function PUT(
         )
       }
 
-      const duplicateShop = await prisma.shop.findUnique({
-        where: { subdomain },
+      const duplicateShop = await prisma.shop.findFirst({
+        where: { 
+          subdomain,
+          deletedAt: null
+        },
       })
 
       if (duplicateShop) {

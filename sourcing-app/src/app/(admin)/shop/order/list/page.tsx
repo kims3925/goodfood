@@ -163,22 +163,7 @@ export default function UnifiedOrderListPage() {
     }).replace(/\. /g, '-').replace(/\.$/, '').replace(/-(\d{2}:\d{2})$/, ' $1')
   }
 
-  const formatPrice = (price: number) => {
-    return `${price.toLocaleString()}원`
-  }
-
-  // 채널 플랫폼별 색상
-  const getChannelColor = (platform: string) => {
-    const colorMap: Record<string, string> = {
-      BAND: 'bg-green-100 text-green-700',
-      NAVER_CAFE: 'bg-green-100 text-green-700',
-      ALIEXPRESS: 'bg-orange-100 text-orange-700',
-      SMARTSTORE: 'bg-green-100 text-green-700',
-      COUPANG: 'bg-red-100 text-red-700',
-      CUSTOM: 'bg-gray-100 text-gray-700',
-    }
-    return colorMap[platform] || 'bg-gray-100 text-gray-700'
-  }
+import { getChannelColor } from '@/lib/channel-utils'
 
   const getSourceBadge = (order: UnifiedOrder) => {
     return (

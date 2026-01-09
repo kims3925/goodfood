@@ -164,10 +164,8 @@ export async function GET(request: NextRequest) {
       const kstNow = new Date(now.getTime() + kstOffset)
 
       // KST 기준 오늘 00:00:00 ~ 23:59:59
-      const todayStart = Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate())
+      const todayStart = Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()) - kstOffset
       const todayEnd = todayStart + 24 * 60 * 60 * 1000
-
-      console.log(`[Post Available] KST 기준 오늘: ${new Date(todayStart).toISOString()} ~ ${new Date(todayEnd).toISOString()}`)
 
       filteredPosts = filteredPosts.filter((post) => {
         if (!post.created_at) return false
