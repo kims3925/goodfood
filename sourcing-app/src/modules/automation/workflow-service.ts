@@ -105,20 +105,15 @@ export async function updateWorkflowLog(
   logId: number,
   update: WorkflowLogUpdate
 ): Promise<void> {
-  // details를 분리하여 JSON.stringify 처리 (객체가 직접 DB에 전달되는 것 방지)
-  const { details, ...rest } = update
-
   await prisma.workflowLog.update({
     where: { id: logId },
-    data: {
-      ...rest,
-      ...(details !== undefined && { details: JSON.stringify(details) }),
-    }
+    data: update
   })
 }
 
 /**
  * 워크플로우 완료 처리
+ * details는 step log에 이미 저장되어 있으므로 여기서는 저장하지 않음
  */
 export async function completeWorkflowLog(
   logId: number,
@@ -126,7 +121,7 @@ export async function completeWorkflowLog(
   totalItems: number,
   successCount: number,
   failedCount: number,
-  details: Record<string, any>,
+  _details?: Record<string, any>,  // 하위 호환성 유지 (사용하지 않음)
   errorMessage?: string
 ): Promise<void> {
   const status = failedCount === 0
@@ -140,57 +135,16 @@ export async function completeWorkflowLog(
     ? errorMessage.substring(0, 1000) + '...(truncated)'
     : errorMessage
 
-  // details 내 에러 배열 크기 제한 (각 채널별 최대 5개 에러만)
-  const sanitizedDetails = sanitizeDetails(details)
-
   await updateWorkflowLog(logId, {
     status,
     completedAt: new Date(),
     totalItems,
     successCount,
     failedCount,
-    details: sanitizedDetails,
     errorMessage: truncatedMessage,
   })
 }
 
-/**
- * details 객체 내 에러 배열 크기 제한
- */
-function sanitizeDetails(details: Record<string, any>): Record<string, any> {
-  if (!details) return details
-
-  const sanitized = { ...details }
-
-  // collection 결과의 에러 배열 제한
-  if (sanitized.collection?.channelResults) {
-    sanitized.collection = {
-      ...sanitized.collection,
-      channelResults: sanitized.collection.channelResults.map((cr: any) => ({
-        ...cr,
-        errors: cr.errors?.slice(0, 5) || [], // 채널당 최대 5개 에러
-      })),
-    }
-  }
-
-  // transform 결과의 에러 배열 제한
-  if (sanitized.transform?.errors) {
-    sanitized.transform = {
-      ...sanitized.transform,
-      errors: sanitized.transform.errors.slice(0, 10), // 최대 10개 에러
-    }
-  }
-
-  // publish 결과의 에러 배열 제한
-  if (sanitized.publish?.errors) {
-    sanitized.publish = {
-      ...sanitized.publish,
-      errors: sanitized.publish.errors.slice(0, 10), // 최대 10개 에러
-    }
-  }
-
-  return sanitized
-}
 
 /**
  * 워크플로우 실패 처리
@@ -198,7 +152,7 @@ function sanitizeDetails(details: Record<string, any>): Record<string, any> {
 export async function failWorkflowLog(
   logId: number,
   errorMessage: string,
-  details?: Record<string, any>
+  _details?: Record<string, any>  // 하위 호환성 유지 (사용하지 않음)
 ): Promise<void> {
   // 에러 메시지 길이 제한 (DB 컬럼 제한 및 중첩 에러 방지)
   const truncatedMessage = errorMessage && errorMessage.length > 1000
@@ -209,13 +163,22 @@ export async function failWorkflowLog(
     status: WorkflowStatus.FAILED,
     completedAt: new Date(),
     errorMessage: truncatedMessage,
-    details,
   })
 }
 
 /**
+ * StepType을 details 키로 변환하는 매핑
+ */
+const STEP_TYPE_TO_KEY: Record<string, string> = {
+  'COLLECTION': 'collection',
+  'TRANSFORM': 'transform',
+  'PRODUCT_CREATE': 'productCreate',
+  'PUBLISH': 'publish',
+}
+
+/**
  * 워크플로우 진행 상황 업데이트 (실시간)
- * details를 함께 저장하여 작업마다 로그 확인 가능
+ * workflow_log는 총 건수만 업데이트하고, 상세 정보는 step log에 저장
  */
 export async function updateWorkflowProgress(
   logId: number,
@@ -224,20 +187,49 @@ export async function updateWorkflowProgress(
   failedCount: number,
   details?: Record<string, any>
 ): Promise<void> {
-  const updateData: any = {
-    totalItems,
-    successCount,
-    failedCount,
-  }
-
-  if (details) {
-    updateData.details = JSON.stringify(sanitizeDetails(details))
-  }
-
-  await prisma.workflowLog.update({
+  // 워크플로우 로그 업데이트 (총 건수만)
+  const workflow = await prisma.workflowLog.update({
     where: { id: logId },
-    data: updateData,
+    data: {
+      totalItems,
+      successCount,
+      failedCount,
+    },
+    select: { currentStep: true }
   })
+
+  // 현재 단계가 있으면 해당 step log에 상세 정보 저장
+  if (workflow.currentStep && details) {
+    const stepKey = STEP_TYPE_TO_KEY[workflow.currentStep]
+    const stepDetails = stepKey ? details[stepKey] : null
+
+    if (stepDetails) {
+      // 단계별 진행 건수 계산
+      const stepSuccessCount = stepDetails.totalSuccess ?? stepDetails.successCount ??
+        (stepDetails.transformedPosts?.filter((p: any) => p.status === 'success').length) ??
+        (stepDetails.channelResults?.reduce((sum: number, cr: any) => sum + (cr.success ?? cr.newPosts ?? 0), 0)) ?? 0
+      const stepFailedCount = stepDetails.totalFailed ?? stepDetails.failedCount ??
+        (stepDetails.transformedPosts?.filter((p: any) => p.status === 'failed').length) ??
+        (stepDetails.channelResults?.reduce((sum: number, cr: any) => sum + (cr.failed ?? 0), 0)) ?? 0
+      const stepProcessedItems = stepSuccessCount + stepFailedCount
+      const stepTotalItems = stepDetails.batchProgress?.total ?? stepDetails.totalItems ?? stepProcessedItems
+
+      await prisma.workflowStepLog.update({
+        where: {
+          workflowId_stepType: { workflowId: logId, stepType: workflow.currentStep }
+        },
+        data: {
+          processedItems: stepProcessedItems,
+          successCount: stepSuccessCount,
+          failedCount: stepFailedCount,
+          totalItems: stepTotalItems,
+          details: JSON.stringify(stepDetails),
+        }
+      }).catch(() => {
+        // step log가 없을 수 있음 (단일 파이프라인 실행 시)
+      })
+    }
+  }
 }
 
 // =============================================
@@ -660,80 +652,6 @@ export async function getRunningWorkflow(userId: number) {
     },
     orderBy: { startedAt: 'desc' },
   })
-}
-
-/**
- * 워크플로우를 세션 대기 상태로 변경
- * 세션 만료 시 호출되어 프론트엔드에서 세션 저장을 기다림
- */
-export async function setWaitingSessionStatus(
-  logId: number,
-  pendingItems: { productIds: number[]; channelId: number },
-  currentProgress?: { successCount: number; failedCount: number; totalItems: number }
-): Promise<void> {
-  await prisma.workflowLog.update({
-    where: { id: logId },
-    data: {
-      status: WorkflowStatus.WAITING_SESSION,
-      details: JSON.stringify({
-        waitingSession: true,
-        pendingItems,
-        currentProgress,
-        waitingSince: new Date().toISOString(),
-      }),
-    },
-  })
-  console.log(`[WorkflowService] 워크플로우 ${logId} 세션 대기 상태로 변경`)
-}
-
-/**
- * 세션 대기 중인 워크플로우 조회
- */
-export async function getWaitingSessionWorkflow(userId: number) {
-  return prisma.workflowLog.findFirst({
-    where: {
-      userId,
-      status: WorkflowStatus.WAITING_SESSION,
-    },
-    orderBy: { startedAt: 'desc' },
-  })
-}
-
-/**
- * 세션 대기 워크플로우를 RUNNING 상태로 재개
- */
-export async function resumeWorkflow(logId: number): Promise<{
-  pendingItems: { productIds: number[]; channelId: number } | null
-  currentProgress: { successCount: number; failedCount: number; totalItems: number } | null
-}> {
-  const workflow = await prisma.workflowLog.findUnique({
-    where: { id: logId },
-  })
-
-  if (!workflow || workflow.status !== WorkflowStatus.WAITING_SESSION) {
-    throw new Error('재개할 수 있는 워크플로우가 없습니다')
-  }
-
-  const details = workflow.details ? JSON.parse(workflow.details as string) : {}
-
-  await prisma.workflowLog.update({
-    where: { id: logId },
-    data: {
-      status: WorkflowStatus.RUNNING,
-      details: JSON.stringify({
-        ...details,
-        waitingSession: false,
-        resumedAt: new Date().toISOString(),
-      }),
-    },
-  })
-
-  console.log(`[WorkflowService] 워크플로우 ${logId} 재개`)
-
-  return {
-    pendingItems: details.pendingItems || null,
-    currentProgress: details.currentProgress || null,
-  }
 }
 
 /**

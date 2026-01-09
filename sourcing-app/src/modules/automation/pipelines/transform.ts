@@ -487,8 +487,14 @@ export async function runTransformPipeline(
     .filter((p) => p.retryable)
     .map((p) => p.postId)
 
+  // 생성된 CollectedProduct ID 목록 (자동화 파이프라인 연계용)
+  const createdCollectedProductIds = transformedPosts
+    .filter((p) => p.status === 'success' && p.channelId)
+    .map((p) => p.channelId!)
+
   console.log(`[Transform] Completed: ${successCount} success, ${failedCount} failed, ${skippedCount} skipped`)
   console.log(`[Transform] API calls made: ${batches.length} (single mode - same as manual)`)
+  console.log(`[Transform] Created CollectedProduct IDs: ${createdCollectedProductIds.length}개`)
 
   if (retryablePostIds.length > 0) {
     console.log(`[Transform] Retryable post IDs: ${retryablePostIds.join(', ')}`)
@@ -504,6 +510,7 @@ export async function runTransformPipeline(
       createdProducts,
       skippedCount,
       retryablePostIds,
+      createdCollectedProductIds,  // 자동화 파이프라인 연계용
     },
     errors,
   }

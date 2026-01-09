@@ -315,7 +315,7 @@ export default function ChannelStatsTable({
               <span className="text-xs text-gray-500">({retailChannels.length})</span>
             </div>
             <span className="text-[12px] text-gray-400">
-              * 발행율은 전체 상품 기준
+              * 발행율은 선택 기간 내 상품 기준
             </span>
           </div>
         </CardHeader>

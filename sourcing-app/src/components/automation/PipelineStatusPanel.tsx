@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Download, Sparkles, ShoppingBag, Upload, X, Check, Loader2, AlertCircle, Clock, RefreshCw } from 'lucide-react'
-import { checkExtensionInstalled, saveSessionViaExtension } from '@/lib/band-extension'
+import { useState, useEffect } from 'react'
+import { Download, Sparkles, ShoppingBag, Upload, X, Check, Loader2, AlertCircle, Clock } from 'lucide-react'
 
 // WorkflowStepLog 기반 단계 진행 정보
 interface StageProgress {
@@ -49,7 +48,6 @@ interface PipelineWorkflow {
 interface PipelineStatusPanelProps {
   workflow: PipelineWorkflow
   onCancel: (workflowId: number) => void
-  onResume?: () => void  // 재개 후 워크플로우 새로고침 콜백
   isCancelling?: boolean
 }
 
@@ -62,82 +60,8 @@ const STAGES = [
 
 type StageKey = typeof STAGES[number]['key']
 
-export default function PipelineStatusPanel({ workflow, onCancel, onResume, isCancelling }: PipelineStatusPanelProps) {
+export default function PipelineStatusPanel({ workflow, onCancel, isCancelling }: PipelineStatusPanelProps) {
   const [elapsedTime, setElapsedTime] = useState('')
-  const [extensionAvailable, setExtensionAvailable] = useState(false)
-  const [isAutoRecovering, setIsAutoRecovering] = useState(false)
-  const [recoveryMessage, setRecoveryMessage] = useState('')
-  const autoRecoveryAttemptedRef = useRef(false)
-
-  // Extension 설치 확인
-  useEffect(() => {
-    checkExtensionInstalled().then(setExtensionAvailable)
-  }, [])
-
-  // 자동 복구 핸들러 (useCallback으로 메모이제이션)
-  const handleAutoRecovery = useCallback(async () => {
-    setIsAutoRecovering(true)
-    setRecoveryMessage('Extension에서 세션 저장 중...')
-
-    try {
-      // 1. Extension으로 세션 저장
-      const saveResult = await saveSessionViaExtension()
-
-      if (!saveResult.success) {
-        setRecoveryMessage(`세션 저장 실패: ${saveResult.error}`)
-        return
-      }
-
-      setRecoveryMessage('세션 저장 완료! 파이프라인 재개 중...')
-
-      // 2. 잠시 대기
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // 3. 파이프라인 재개 API 호출
-      const response = await fetch('/api/automation/resume', {
-        method: 'POST',
-      })
-
-      const result = await response.json()
-
-      if (!response.ok || result.waitingSession) {
-        setRecoveryMessage(result.message || '재개 실패: 세션이 여전히 만료 상태입니다')
-        setIsAutoRecovering(false)
-        return
-      }
-
-      setRecoveryMessage(`재개 완료! 성공: ${result.progress.successCount}건`)
-
-      // 4. 워크플로우 새로고침
-      if (onResume) {
-        setTimeout(onResume, 1500)
-      }
-    } catch (error: any) {
-      console.error('[PipelineStatusPanel] 자동 복구 실패:', error)
-      setRecoveryMessage(`자동 복구 실패: ${error.message}`)
-    } finally {
-      setIsAutoRecovering(false)
-    }
-  }, [onResume])
-
-  // 세션 대기 상태 자동 복구
-  useEffect(() => {
-    if (
-      workflow.status === 'WAITING_SESSION' &&
-      extensionAvailable &&
-      !autoRecoveryAttemptedRef.current &&
-      !isAutoRecovering
-    ) {
-      autoRecoveryAttemptedRef.current = true
-      handleAutoRecovery()
-    }
-  }, [workflow.status, extensionAvailable, isAutoRecovering, handleAutoRecovery])
-
-  // 수동 재시도 핸들러
-  const handleManualRetry = () => {
-    autoRecoveryAttemptedRef.current = false
-    handleAutoRecovery()
-  }
 
   // 경과 시간 계산
   useEffect(() => {
@@ -296,84 +220,6 @@ export default function PipelineStatusPanel({ workflow, onCancel, onResume, isCa
   })
 
   const overallProgress = calculateOverallProgress()
-
-  // WAITING_SESSION 상태 - 세션 대기 중 UI
-  if (workflow.status === 'WAITING_SESSION') {
-    return (
-      <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl p-5 text-white shadow-lg mb-6">
-        {/* 헤더 */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-              {isAutoRecovering ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <AlertCircle className="w-5 h-5" />
-              )}
-            </div>
-            <div>
-              <h3 className="font-bold text-lg">
-                {isAutoRecovering ? '세션 복구 중...' : '세션 만료 - 복구 필요'}
-              </h3>
-              <p className="text-sm text-white/80">
-                {recoveryMessage || 'Band 세션이 만료되어 파이프라인이 일시 중지되었습니다'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => onCancel(workflow.id)}
-            disabled={isCancelling || isAutoRecovering}
-            className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
-          >
-            <X className="w-4 h-4" />
-            취소
-          </button>
-        </div>
-
-        {/* 진행 상황 */}
-        <div className="bg-white/10 rounded-xl p-4 mb-4">
-          <div className="flex items-center justify-between text-sm mb-2">
-            <span>현재 진행</span>
-            <span>성공 {workflow.successCount}건 / 실패 {workflow.failedCount}건</span>
-          </div>
-          <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-white rounded-full"
-              style={{ width: `${overallProgress}%` }}
-            />
-          </div>
-        </div>
-
-        {/* 복구 옵션 */}
-        <div className="flex gap-3">
-          {extensionAvailable ? (
-            <button
-              onClick={handleManualRetry}
-              disabled={isAutoRecovering}
-              className="flex-1 px-4 py-3 bg-white text-orange-600 hover:bg-white/90 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isAutoRecovering ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  복구 중...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-4 h-4" />
-                  세션 저장 후 재시도
-                </>
-              )}
-            </button>
-          ) : (
-            <div className="flex-1 px-4 py-3 bg-white/10 rounded-lg text-center">
-              <p className="text-sm">Band Session Helper 확장이 설치되어 있지 않습니다</p>
-              <p className="text-xs text-white/70 mt-1">확장 설치 후 Band에 로그인해주세요</p>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg mb-6">
