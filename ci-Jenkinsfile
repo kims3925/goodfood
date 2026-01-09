@@ -25,10 +25,10 @@ pipeline {
         script {
           if (env.SHOULD_BUILD != 'true') {
             currentBuild.result = 'SUCCESS'
-            currentBuild.description = "Skipped: ${env.BRANCH_NAME} (only main, release-*, PR)"
-            echo "Skipping build for branch: ${env.BRANCH_NAME}"
+            currentBuild.description = "건너뜀: ${env.BRANCH_NAME} (main, release-*, PR만 빌드)"
+            echo "브랜치 빌드 건너뜀: ${env.BRANCH_NAME}"
           } else {
-            echo "Building branch: ${env.BRANCH_NAME}"
+            echo "브랜치 빌드 시작: ${env.BRANCH_NAME}"
           }
         }
       }
@@ -98,7 +98,7 @@ pipeline {
           if npm run | grep -q " lint"; then
             npm run lint
           else
-            echo "No lint script. Skip."
+            echo "lint 스크립트 없음. 건너뜀."
           fi
         '''
       }
@@ -112,7 +112,7 @@ pipeline {
           if npm run | grep -q " typecheck"; then
             npm run typecheck
           else
-            echo "No typecheck script. Skip."
+            echo "typecheck 스크립트 없음. 건너뜀."
           fi
         '''
       }
