@@ -51,7 +51,7 @@ export const orderService = {
 
     return await prisma.$transaction(async (tx) => {
       // 1. Shop Validation
-      if (shopId) {
+      if (shopId != null) {
         const shop = await tx.shop.findFirst({
           where: { id: shopId, userId, isActive: true, deletedAt: null },
         })
@@ -70,7 +70,7 @@ export const orderService = {
         },
       })
 
-      // 3. Fetch Products with soft-delete filter
+      // 3. Fetch Products with soft-delete and active filter
       const productIds = shopProducts
         .map(sp => sp.productId)
         .filter((id): id is number => id != null)
@@ -78,9 +78,15 @@ export const orderService = {
       const products = await tx.product.findMany({
         where: {
           id: { in: productIds },
+          deletedAt: null,
+          isActive: true,
         },
         include: {
-          variants: true,
+          variants: {
+            where: {
+              deletedAt: null,
+            },
+          },
         },
       })
 
@@ -124,8 +130,11 @@ export const orderService = {
           }
           // variant.price가 null/undefined인 경우 product.price로 fallback
           if (variant.price == null) {
+            if (product.price == null) {
+              throw new Error(`상품 가격이 설정되지 않았습니다. (옵션: ${variant.optionSummary || item.variantId}, 상품: ${product.name})`)
+            }
             console.warn(`[External Order] variant.price가 없습니다. product.price로 대체합니다. (variantId: ${item.variantId})`)
-            unitPrice = new Decimal(product.price ?? 0)
+            unitPrice = new Decimal(product.price)
           } else {
             unitPrice = new Decimal(variant.price)
           }
