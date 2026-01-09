@@ -176,47 +176,78 @@ if echo "$MIGRATE_STATUS" | grep -q "Following migrations have not yet been appl
     # .env에서 DB 정보 읽기
     if [ -f "/home/ubuntu/bandauto/db/.env" ]; then
         export $(grep -E '^DATABASE_URL=' /home/ubuntu/bandauto/db/.env | xargs)
-        # DATABASE_URL 파싱: mysql://user:pass@host:port/dbname
-        DB_USER=$(echo $DATABASE_URL | sed -E 's|mysql://([^:]+):.*|\1|')
-        DB_PASS=$(echo $DATABASE_URL | sed -E 's|mysql://[^:]+:([^@]+)@.*|\1|')
-        DB_HOST=$(echo $DATABASE_URL | sed -E 's|mysql://[^@]+@([^:/]+).*|\1|')
-        DB_NAME=$(echo $DATABASE_URL | sed -E 's|.*/([^?]+).*|\1|')
-
-        if mysqldump -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" > "$BACKUP_FILE" 2>/dev/null; then
+        # MySQL 설정 파일 사용 (비밀번호 노출 방지)
+        MYSQL_CNF=$(mktemp)
+        chmod 600 "$MYSQL_CNF"
+        
+        # URL 디코딩 및 파싱 (특수문자 처리)
+        DB_USER=$(echo "$DATABASE_URL" | python3 -c "import sys,urllib.parse as u; print(u.urlparse(sys.stdin.read().strip()).username or '')")
+        DB_PASS=$(echo "$DATABASE_URL" | python3 -c "import sys,urllib.parse as u; print(u.unquote(u.urlparse(sys.stdin.read().strip()).password or ''))")
+        DB_HOST=$(echo "$DATABASE_URL" | python3 -c "import sys,urllib.parse as u; print(u.urlparse(sys.stdin.read().strip()).hostname or '')")
+        DB_NAME=$(echo "$DATABASE_URL" | python3 -c "import sys,urllib.parse as u; print(u.urlparse(sys.stdin.read().strip()).path.lstrip('/').split('?')[0])")
+        
+        cat > "$MYSQL_CNF" << EOF
+[client]
+user=$DB_USER
+password=$DB_PASS
+host=$DB_HOST
+EOF
+        
+        if mysqldump --defaults-extra-file="$MYSQL_CNF" "$DB_NAME" > "$BACKUP_FILE" 2>/dev/null; then
             echo ">>> ✅ 백업 완료: $BACKUP_FILE"
+            # 오래된 백업 정리 (최근 5개만 유지)
+            ls -t /home/ubuntu/bandauto/backups/pre-migration-*.sql 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
         else
             echo ">>> ⚠️  백업 실패 - 마이그레이션은 계속 진행"
         fi
+        rm -f "$MYSQL_CNF"
     else
         echo ">>> ⚠️  DB 환경파일 없음 - 백업 건너뜀"
     fi
 fi
 
-# Failed 마이그레이션 자동 복구
+# Failed 마이그레이션 감지 - 수동 개입 필요
 if echo "$MIGRATE_STATUS" | grep -q "failed"; then
-    echo ">>> ⚠️  실패한 마이그레이션 감지! 자동 복구 시도 중..."
+    echo ""
+    echo ">>> ❌❌❌ 실패한 마이그레이션 감지! ❌❌❌"
+    echo ""
 
-    # 실패한 마이그레이션 이름 추출
-    FAILED_MIGRATION=$(echo "$MIGRATE_STATUS" | grep -oE '[0-9]{14}_[a-z_]+' | head -1)
+    # 실패한 마이그레이션 이름 추출 (대소문자, 숫자, 하이픈, 언더스코어 지원)
+    FAILED_MIGRATION=$(echo "$MIGRATE_STATUS" | grep -oE '[0-9]{14}_[A-Za-z0-9_-]+' | head -1)
 
     if [ -n "$FAILED_MIGRATION" ]; then
-        echo ">>> 실패한 마이그레이션 해결 중: $FAILED_MIGRATION"
-
-        # 마이그레이션이 실제로 적용되었는지 확인 후 resolve
-        # (DB에 변경이 적용되었으나 _prisma_migrations 테이블만 failed인 경우)
-        if npx prisma migrate resolve --applied "$FAILED_MIGRATION" --schema prisma; then
-            echo ">>> ✅ 실패한 마이그레이션 '적용됨'으로 해결 완료"
-        else
-            echo ">>> ❌ 오류: 실패한 마이그레이션을 해결할 수 없습니다!"
-            echo ">>> 수동 개입이 필요합니다."
-            exit 1
-        fi
+        echo ">>> 실패한 마이그레이션: $FAILED_MIGRATION"
+    else
+        echo ">>> 실패한 마이그레이션 이름을 추출할 수 없습니다."
+        echo ">>> 위의 마이그레이션 상태 출력을 확인하세요."
     fi
 
-    # 다시 상태 확인
-    MIGRATE_STATUS=$(npx prisma migrate status --schema prisma 2>&1) || true
-    echo ">>> 업데이트된 마이그레이션 상태:"
-    echo "$MIGRATE_STATUS"
+    echo ""
+    echo ">>> ⚠️  자동 복구가 비활성화되어 있습니다. 수동 개입이 필요합니다."
+    echo ""
+    echo ">>> === 해결 방법 ==="
+    echo ">>> 1. 운영 서버에 SSH 접속:"
+    echo ">>>    ssh ubuntu@43.200.225.91"
+    echo ""
+    echo ">>> 2. DB 디렉토리로 이동:"
+    echo ">>>    cd /home/ubuntu/bandauto/db"
+    echo ""
+    echo ">>> 3. 마이그레이션 상태 확인:"
+    echo ">>>    npx prisma migrate status --schema prisma"
+    echo ""
+    echo ">>> 4. _prisma_migrations 테이블에서 실패 기록 확인:"
+    echo ">>>    mysql -h <host> -u <user> -p<pass> <db> -e \"SELECT * FROM _prisma_migrations WHERE migration_name LIKE '%${FAILED_MIGRATION:-failed}%';\""
+    echo ""
+    echo ">>> 5. 실제 DB 스키마와 마이그레이션 SQL 비교 후, 상황에 맞게 처리:"
+    echo ">>>    - 스키마가 이미 적용된 경우 (DB에 변경이 반영됨):"
+    echo ">>>      npx prisma migrate resolve --applied \"$FAILED_MIGRATION\" --schema prisma"
+    echo ">>>    - 스키마가 적용되지 않은 경우 (롤백 필요):"
+    echo ">>>      npx prisma migrate resolve --rolled-back \"$FAILED_MIGRATION\" --schema prisma"
+    echo ""
+    echo ">>> 6. 해결 후 다시 배포 실행"
+    echo ""
+    echo ">>> ❌ 배포 중단 - 수동 개입 필요"
+    exit 1
 fi
 
 if echo "$MIGRATE_STATUS" | grep -q "Database schema is up to date"; then

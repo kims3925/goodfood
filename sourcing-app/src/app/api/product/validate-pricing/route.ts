@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 /**
  * 가격 정책 적용 검증 API
  * 도매가와 소매가가 동일한 상품을 조회합니다.
