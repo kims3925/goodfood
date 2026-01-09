@@ -10,6 +10,7 @@ model Product {
   wholesalePrice     Decimal?           @map("wholesale_price") @db.Decimal(12, 2)
   price              Int?
   isActive           Boolean           @default(true) @map("is_active") // 쇼핑몰 노출 여부
+  deletedAt          DateTime?         @map("deleted_at") @db.Timestamp(0) // Soft Delete
   createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamp(0)
   shippingFee        Int?              @map("shipping_fee")
@@ -29,6 +30,7 @@ model Product {
   @@index([channelId])
   @@index([categoryId])
   @@index([createdAt])
+  @@index([deletedAt])
   @@map("product")
 }
 
