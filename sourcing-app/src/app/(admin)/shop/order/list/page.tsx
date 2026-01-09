@@ -22,6 +22,8 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmp
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 
+import { getChannelColor } from '@/lib/channel-utils'
+
 type OrderSource = 'SHOPPING_MALL'
 
 interface UnifiedOrder {
@@ -162,8 +164,6 @@ export default function UnifiedOrderListPage() {
       hour12: false,
     }).replace(/\. /g, '-').replace(/\.$/, '').replace(/-(\d{2}:\d{2})$/, ' $1')
   }
-
-import { getChannelColor } from '@/lib/channel-utils'
 
   const getSourceBadge = (order: UnifiedOrder) => {
     return (
