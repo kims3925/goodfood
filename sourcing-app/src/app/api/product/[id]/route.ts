@@ -217,22 +217,22 @@ export async function PATCH(
       )
     }
 
-    // 상품 소유권 확인
-    const existingProduct = await prisma.product.findFirst({
+    // 소유권 확인과 업데이트를 원자적으로 수행 (TOCTOU 방지)
+    const updateResult = await prisma.product.updateMany({
       where: { id, userId },
+      data: { isActive },
     })
 
-    if (!existingProduct) {
+    if (updateResult.count === 0) {
       return NextResponse.json(
         { success: false, error: '상품을 찾을 수 없습니다.' },
         { status: 404 }
       )
     }
 
-    // 활성화 상태 업데이트
-    const updatedProduct = await prisma.product.update({
+    // 업데이트된 상품 조회
+    const updatedProduct = await prisma.product.findUnique({
       where: { id },
-      data: { isActive },
     })
 
     return NextResponse.json({

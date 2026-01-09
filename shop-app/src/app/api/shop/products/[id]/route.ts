@@ -105,6 +105,15 @@ export async function GET(
     const shopProduct = product.shopProducts[0]
     const shop = shopProduct?.shop
     const shopProductId = shopProduct?.id || null
+
+    // currentShopId가 있는데 shopProduct가 없으면 해당 샵에 발행되지 않은 상품
+    if (currentShopId && !shopProduct) {
+      return NextResponse.json(
+        { success: false, error: '상품을 찾을 수 없습니다' },
+        { status: 404 }
+      )
+    }
+
     // Product 레벨에서 비활성화된 상품은 숨김 처리
     const isActive = (product as any).isActive ?? true
 

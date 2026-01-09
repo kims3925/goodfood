@@ -15,6 +15,34 @@
 
 ## 스키마 변경 이력
 
+### 2026-01-09: Product 활성화 상태 필드 추가
+
+**TR-ID**: TR-20260109-001
+
+**마이그레이션 파일**: `20260109142600_add_product_is_active`
+
+#### 주요 변경사항
+
+| 변경 유형 | 대상 | 설명 |
+|-----------|------|------|
+| 컬럼 추가 | `product.is_active` | 쇼핑몰 노출 여부 (기본값: TRUE) |
+
+#### 변경 이유
+
+- 기존에는 `shop_product` 테이블에서 개별 쇼핑몰별로 활성화 상태를 관리했으나, 상품 자체의 노출 여부를 일괄 제어하는 요구사항 반영
+- 상품을 비활성화하면 **모든 쇼핑몰에서 즉시 숨김 처리**됨
+- `shop_product.is_active` 필드는 제거됨 (Product 레벨로 이동)
+
+#### 영향받는 API
+
+| API | 변경 내용 |
+|-----|-----------|
+| `PATCH /api/product/[id]` | 상품 활성화 상태 변경 API 추가 |
+| `GET /api/shop/sections` | `product.isActive = true` 필터 적용 |
+| `GET /api/shop/products/[id]` | 비활성화 상품 접근 시 404 반환 |
+
+---
+
 ### 2026-01-08: published_product 테이블 분리 마이그레이션
 
 **TR-ID**: TR-20260108-002
@@ -45,6 +73,44 @@
 ---
 
 ## 테이블 구조
+
+### product
+
+상품 정보를 관리하는 핵심 테이블입니다.
+
+#### 역할
+
+- 소싱된 상품의 기본 정보 저장
+- 쇼핑몰 노출 여부(`is_active`) 관리
+- 가격, 배송비, 합배송 설정 관리
+
+#### 주요 컬럼 구조
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | INT (PK, AUTO_INCREMENT) | 고유 식별자 |
+| `user_id` | INT (FK, NOT NULL) | 소유 사용자 ID |
+| `channel_id` | INT (FK, NULL) | 소싱 채널 ID |
+| `name` | VARCHAR(500) | 상품명 |
+| `description` | TEXT | 상품 설명 |
+| `thumbnail_url` | VARCHAR(1000) | 썸네일 이미지 URL |
+| `price` | INT | 판매가 |
+| `wholesale_price` | DECIMAL(12,2) | 도매가 |
+| `is_active` | BOOLEAN (기본값: TRUE) | **쇼핑몰 노출 여부** |
+| `shipping_fee` | INT | 배송비 |
+| `bundle_max_qty` | INT (기본값: 1) | 합배송 최대 수량 |
+| `bundle_shipping_type` | ENUM | 합배송 타입 (NONE, INCLUDED, SEPARATE) |
+| `created_at` | TIMESTAMP | 생성 일시 |
+| `updated_at` | TIMESTAMP | 수정 일시 |
+
+#### is_active 필드 설명
+
+- `TRUE` (기본값): 모든 쇼핑몰에서 정상 노출
+- `FALSE`: 모든 쇼핑몰에서 숨김 처리 (목록 미노출, 상세 페이지 404)
+
+> **참고**: 개별 쇼핑몰별 노출 제어가 아닌, 상품 자체의 전체 노출 여부를 제어합니다.
+
+---
 
 ### shop_product
 

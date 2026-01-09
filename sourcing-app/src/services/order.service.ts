@@ -5,7 +5,7 @@ const Decimal = Prisma.Decimal
 
 interface CreateExternalOrderParams {
   userId: number
-  shopId?: number
+  shopId: number
   guestName: string
   guestPhone: string
   guestEmail?: string
@@ -50,14 +50,12 @@ export const orderService = {
     const { userId, shopId, guestName, guestPhone, guestEmail, shippingAddress, items, memo } = params
 
     return await prisma.$transaction(async (tx) => {
-      // 1. Shop Validation
-      if (shopId != null) {
-        const shop = await tx.shop.findFirst({
-          where: { id: shopId, userId, isActive: true, deletedAt: null },
-        })
-        if (!shop) {
-          throw new Error('유효하지 않은 쇼핑몰입니다.')
-        }
+      // 1. Shop Validation (shopId는 필수)
+      const shop = await tx.shop.findFirst({
+        where: { id: shopId, userId, isActive: true, deletedAt: null },
+      })
+      if (!shop) {
+        throw new Error('유효하지 않은 쇼핑몰입니다.')
       }
 
       // 2. Fetch ShopProducts (without product include)
@@ -167,7 +165,7 @@ export const orderService = {
       // 7. Create Order
       const order = await tx.guestOrder.create({
         data: {
-          shopId: shopId || null,
+          shopId,
           orderNumber: generateExternalOrderNumber(),
           status: 'PENDING',
           guestName: guestName.trim(),

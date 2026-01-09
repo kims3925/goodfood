@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/modules/auth/auth.service'
 import { orderService } from '@/services/order.service'
 
 interface CreateExternalOrderRequest {
-  shopId?: number
+  shopId: number
   guestName: string
   guestPhone: string
   guestEmail?: string
@@ -22,7 +22,6 @@ interface CreateExternalOrderRequest {
     variantId?: number
     quantity: number
   }>
-  memo?: string
 }
 
 /**
@@ -146,7 +145,6 @@ export async function POST(request: NextRequest) {
         guestEmail: body.guestEmail,
         shippingAddress,
         items,
-        memo: body.memo,
       })
 
       return NextResponse.json({

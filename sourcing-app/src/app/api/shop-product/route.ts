@@ -26,10 +26,39 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const shopId = searchParams.get('shopId')
+    const shopIdParam = searchParams.get('shopId')
     const search = searchParams.get('search')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const pageParam = searchParams.get('page')
+    const limitParam = searchParams.get('limit')
+
+    // shopId 검증: 있으면 유효한 양의 정수여야 함
+    let validatedShopId: number | null = null
+    if (shopIdParam) {
+      const parsed = parseInt(shopIdParam, 10)
+      if (isNaN(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
+        return NextResponse.json(
+          { success: false, error: 'shopId는 유효한 양의 정수여야 합니다.' },
+          { status: 400 }
+        )
+      }
+      validatedShopId = parsed
+    }
+
+    // page 검증: 기본값 1, 최소값 1
+    let page = parseInt(pageParam || '1', 10)
+    if (isNaN(page) || page < 1) {
+      page = 1
+    }
+
+    // limit 검증: 기본값 20, 범위 1~100
+    const MAX_LIMIT = 100
+    const DEFAULT_LIMIT = 20
+    let limit = parseInt(limitParam || String(DEFAULT_LIMIT), 10)
+    if (isNaN(limit) || limit < 1) {
+      limit = DEFAULT_LIMIT
+    } else if (limit > MAX_LIMIT) {
+      limit = MAX_LIMIT
+    }
 
     // 조회 조건 구성
     const where: any = {
@@ -38,14 +67,15 @@ export async function GET(request: NextRequest) {
       publishedAt: { not: null }, // 발행된 상품만
     }
 
-    if (shopId) {
-      where.shopId = parseInt(shopId)
+    if (validatedShopId) {
+      where.shopId = validatedShopId
     }
 
-    if (search) {
-      where.product = {
-        name: { contains: search },
-      }
+    // Product 필터: isActive + 검색어 조건
+    where.product = {
+      isActive: true,
+      deletedAt: null,
+      ...(search && { name: { contains: search } }),
     }
 
     // 전체 개수 조회
@@ -63,6 +93,9 @@ export async function GET(request: NextRequest) {
             price: true,
             shippingFee: true,
             variants: {
+              where: {
+                deletedAt: null,
+              },
               select: {
                 id: true,
                 optionSummary: true,
