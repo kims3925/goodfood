@@ -10,7 +10,7 @@ model ShopProduct {
 
   product         Product?         @relation(fields: [productId], references: [id], onDelete: SetNull)
   shop            Shop             @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   cartItems       CartItem[]
   orderItems      OrderItem[]
   guestOrderItems GuestOrderItem[]

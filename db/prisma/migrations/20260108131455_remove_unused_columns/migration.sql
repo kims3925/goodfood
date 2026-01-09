@@ -94,6 +94,20 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+-- user 테이블에 deleted_at 컬럼 추가 (이미 존재하면 무시) - Soft Delete 패턴 지원
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'user' AND column_name = 'deleted_at');
+SET @sql = IF(@col_exists = 0, "ALTER TABLE `user` ADD COLUMN `deleted_at` TIMESTAMP NULL AFTER `tos_agreed_at`, ADD INDEX `idx_user_deleted_at` (`deleted_at`)", 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- shop 테이블에 deleted_at 컬럼 추가 (이미 존재하면 무시) - Soft Delete 패턴 지원
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'shop' AND column_name = 'deleted_at');
+SET @sql = IF(@col_exists = 0, "ALTER TABLE `shop` ADD COLUMN `deleted_at` TIMESTAMP NULL AFTER `is_active`, ADD INDEX `idx_shop_deleted_at` (`deleted_at`)", 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- =============================================
 -- PART 2.5: published_product 데이터 마이그레이션
 -- shop_product 및 channel_product로 데이터 이전
