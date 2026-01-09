@@ -113,15 +113,7 @@ interface UnifiedOrderDetail {
   cancelledBy: string | null
 }
 
-// 채널 플랫폼별 표시 정보
-const CHANNEL_PLATFORM_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
-  BAND: { label: '밴드', color: 'text-green-700', bgColor: 'bg-green-100' },
-  NAVER_CAFE: { label: '네이버카페', color: 'text-green-700', bgColor: 'bg-green-100' },
-  ALIEXPRESS: { label: '알리익스프레스', color: 'text-orange-700', bgColor: 'bg-orange-100' },
-  SMARTSTORE: { label: '스마트스토어', color: 'text-green-700', bgColor: 'bg-green-100' },
-  COUPANG: { label: '쿠팡', color: 'text-red-700', bgColor: 'bg-red-100' },
-  CUSTOM: { label: '기타', color: 'text-gray-700', bgColor: 'bg-gray-100' },
-}
+import { CHANNEL_PLATFORM_CONFIG } from '@/lib/channel-utils'
 
 const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   PENDING: { label: '결제대기', color: 'bg-yellow-100 text-yellow-700', icon: <Clock size={16} /> },
