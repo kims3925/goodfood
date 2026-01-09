@@ -13,7 +13,7 @@ model ChannelProduct {
 
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   channel Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@unique([productId, channelId])
   @@index([userId])

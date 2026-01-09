@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS `shop_product` (
   INDEX `idx_deleted_at` (`deleted_at`),
   UNIQUE KEY `uk_product_shop` (`product_id`, `shop_id`),
   CONSTRAINT `fk_shop_product_product_id` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `fk_shop_product_shop_id` FOREIGN KEY (`shop_id`) REFERENCES `shop` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_shop_product_shop_id` FOREIGN KEY (`shop_id`) REFERENCES `shop` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_shop_product_user_id` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE);
 
 -- channel_product 테이블 생성
@@ -167,6 +167,12 @@ ON DUPLICATE KEY UPDATE
   `published_at` = VALUES(`published_at`),
   `updated_at` = VALUES(`updated_at`),
   `legacy_published_product_id` = VALUES(`legacy_published_product_id`);
+-- AUTO_INCREMENT 시퀀스 재설정
+SET @max_id = (SELECT IFNULL(MAX(id), 0) + 1 FROM `shop_product`);
+SET @sql = CONCAT('ALTER TABLE `shop_product` AUTO_INCREMENT = ', @max_id);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- 데이터 마이그레이션 명시적 커밋 (DDL 실행 전 저장)
 COMMIT;
