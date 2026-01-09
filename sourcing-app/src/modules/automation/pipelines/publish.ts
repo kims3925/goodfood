@@ -295,6 +295,7 @@ export async function runPublishPipeline(
           targetId: shopId,
           targetName: `Shop: ${shop?.name || 'Unknown'}`,
           attempted: 0,
+          
           success: 0,
           failed: 0,
           skipped: productIds.length,

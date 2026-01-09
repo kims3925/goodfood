@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/modules/auth/auth.service'
 import { orderService } from '@/services/order.service'
 
 interface CreateExternalOrderRequest {
-  shopId: number
+  shopId?: number
   guestName: string
   guestPhone: string
   guestEmail?: string
@@ -41,7 +41,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body: CreateExternalOrderRequest = await request.json()
+    let body: CreateExternalOrderRequest
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json(
+        { success: false, error: '요청 본문(JSON)이 올바르지 않습니다.' },
+        { status: 400 }
+      )
+    }
     const { guestName, guestPhone, shippingAddress, items } = body
 
     // 입력 검증
@@ -78,6 +86,31 @@ export async function POST(request: NextRequest) {
         { success: false, error: '주문 상품이 없습니다.' },
         { status: 400 }
       )
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+
+      if (!Number.isInteger(item.shopProductId) || item.shopProductId <= 0) {
+        return NextResponse.json(
+          { success: false, error: `잘못된 주문 항목: ${i + 1}번 항목의 상품 ID가 유효하지 않습니다.` },
+          { status: 400 }
+        )
+      }
+
+      if (item.variantId !== undefined && (!Number.isInteger(item.variantId) || item.variantId <= 0)) {
+        return NextResponse.json(
+          { success: false, error: `잘못된 주문 항목: ${i + 1}번 항목의 옵션 ID가 유효하지 않습니다.` },
+          { status: 400 }
+        )
+      }
+
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+        return NextResponse.json(
+          { success: false, error: `잘못된 주문 항목: ${i + 1}번 항목의 수량이 유효하지 않습니다.` },
+          { status: 400 }
+        )
+      }
     }
 
     try {
