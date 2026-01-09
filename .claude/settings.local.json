@@ -48,7 +48,8 @@
       "Bash(npx tsx:*)",
       "Bash(dir:*)",
       "WebFetch(domain:developers.band.us)",
-      "Bash(gh pr list:*)"
+      "Bash(gh pr list:*)",
+      "Bash(find . -name '*.md' -exec sed -i 's/\\r$//' {} +)"
     ],
     "deny": [],
     "ask": []

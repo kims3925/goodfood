@@ -40,9 +40,10 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
 
-    // Build where clause - 채널 발행 조회 (RETAIL kind 채널만)
+    // Build where clause - 채널 발행 조회 (RETAIL kind 채널만, Soft Delete 제외)
     const where: any = {
       userId,
+      deletedAt: null,
       channel: {
         kind: ChannelKind.RETAIL,
       },
@@ -151,11 +152,12 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Check channel product exists and belongs to user
+    // Check channel product exists and belongs to user (Soft Delete 제외)
     const channelProduct = await prisma.channelProduct.findFirst({
       where: {
         id,
         userId,
+        deletedAt: null,
       },
     })
 
@@ -166,9 +168,12 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Delete channel product
-    await prisma.channelProduct.delete({
+    // Soft delete channel product
+    await prisma.channelProduct.update({
       where: { id },
+      data: {
+        deletedAt: new Date(),
+      },
     })
 
     return NextResponse.json({

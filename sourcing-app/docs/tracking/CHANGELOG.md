@@ -21,6 +21,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260109-002 | Done | 2026-01-09 | - | ShopProduct/ChannelProduct upsert로 Soft Delete 레코드 복원 지원 | Low | Claude |
+| TR-20260109-001 | Done | 2026-01-09 | - | ShopProduct/Shop Soft Delete 필터링 강화 | Low | Claude |
 | TR-20260108-003 | Done | 2026-01-08 | - | 역할명 변경 (회원/매니저) | Low | Claude |
 | TR-20260108-002 | Done | 2026-01-08 | - | published_product → shop_product/channel_product 스키마 마이그레이션 | Medium | Claude |
 | TR-20260108-001 | Done | 2026-01-08 | - | AutomationConfig 테이블에서 pricing_policy_id 컬럼 및 관계 삭제 | Low | Claude |
@@ -130,6 +132,117 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260109-002: ShopProduct/ChannelProduct upsert로 Soft Delete 레코드 복원 지원
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-09 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+
+CodeRabbit 리뷰 피드백 반영. `findFirst` + `create` 패턴을 `upsert`로 변경하여 soft-deleted 레코드 복원 지원.
+
+**문제점**:
+- 기존 `findFirst` + `create` 로직은 soft-deleted 레코드를 놓침
+- `(productId, channelId)` 또는 `(productId, shopId)` unique constraint로 인해 soft-deleted 레코드가 있으면 create 시 에러 발생
+
+**해결책**:
+- `upsert`를 사용하여 원자적으로 처리
+- soft-deleted 레코드가 있으면 `deletedAt: null`로 복원하고 `publishedAt` 갱신
+- 레코드가 없으면 새로 생성
+
+### 변경 파일
+
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| sourcing-app/src/modules/publish/publish.service.ts | Modified | `publishToChannel`, `publishToShop`, `publishToChannelWithProgress` 메서드에 upsert 적용 |
+
+### 영향 분석
+
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+
+| 유형 | 상태 |
+|-----|-----|
+| TypeScript Build | Pass |
+
+### 롤백 계획
+
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+
+- REQ-ID: -
+- Flow-ID: Publish
+- 참조 문서: [docs/DATABASE.md](../DATABASE.md#soft-delete-패턴)
+
+---
+
+## TR-20260109-001: ShopProduct/Shop Soft Delete 필터링 강화
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-09 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+
+**1. ShopProduct 조회 쿼리에 `deletedAt: null` 조건 추가**
+
+CodeRabbit 리뷰 피드백 반영. Soft Delete된 ShopProduct가 조회되지 않도록 모든 조회 쿼리에 필터링 조건 추가.
+
+**2. Shop 삭제 핸들러 Soft Delete로 변경**
+
+ShopProduct 모델의 FK 제약조건(`onDelete: Restrict`)으로 인해 Hard Delete 시 에러 발생 가능. `prisma.shop.delete()` 대신 `prisma.shop.update({ data: { deletedAt: new Date() } })` 사용으로 변경.
+
+### 변경 파일
+
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| sourcing-app/src/app/api/shop/publish/route.ts | Modified | ShopProduct 조회에 `deletedAt: null` 추가 |
+| sourcing-app/src/modules/publish/publish.service.ts | Modified | 발행 여부 확인 시 `deletedAt: null` 추가 |
+| sourcing-app/src/modules/catalog/domain/src/product/services/product.service.ts | Modified | 관련 ShopProduct 조회에 `deletedAt: null` 추가 |
+| sourcing-app/src/app/api/order/unified/route.ts | Modified | 사용자 ShopProduct 조회에 `deletedAt: null` 추가 |
+| sourcing-app/src/app/api/channel/stats/route.ts | Modified | Shop 발행 수 카운트에 `deletedAt: null` 추가 |
+| sourcing-app/src/app/api/shop/[id]/route.ts | Modified | DELETE 핸들러 Soft Delete로 변경, 조회에 `deletedAt: null` 추가 |
+| sourcing-app/src/app/api/shop/route.ts | Modified | DELETE 핸들러 Soft Delete로 변경, 조회에 `deletedAt: null` 추가 |
+
+### 영향 분석
+
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+
+| 유형 | 상태 |
+|-----|-----|
+| TypeScript Build | Pass |
+
+### 롤백 계획
+
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+
+- REQ-ID: -
+- Flow-ID: Publish, Shop Management
+- 참조 문서: [docs/DATABASE.md](../DATABASE.md#soft-delete-패턴)
+
+---
 
 ## TR-20260108-003: 역할명 변경 (회원/매니저)
 

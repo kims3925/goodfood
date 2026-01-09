@@ -7,6 +7,7 @@ export class ChannelRepository {
     const { userId, kind, platform, search = '', page = 1, limit = 10 } = params
 
     const where = {
+      deletedAt: null,
       ...(userId && { userId }),
       ...(kind && { kind }),
       ...(platform && { platform }),
@@ -35,9 +36,10 @@ export class ChannelRepository {
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: [
+        { kind: 'asc' },
+        { createdAt: 'desc' },
+      ],
       skip: (page - 1) * limit,
       take: limit,
     })
@@ -57,7 +59,10 @@ export class ChannelRepository {
     try {
       console.log('[ChannelRepository] findById 호출 - ID:', id)
       const channel = await prisma.channel.findFirst({
-        where: { id },
+        where: { 
+          id,
+          deletedAt: null,
+        },
         include: {
           shop: {
             select: {
@@ -88,6 +93,7 @@ export class ChannelRepository {
       where: {
         userId,
         channelKey,
+        deletedAt: null,
       },
     })
   }
@@ -131,8 +137,11 @@ export class ChannelRepository {
   }
 
   async delete(id: number) {
-    return prisma.channel.delete({
+    return prisma.channel.update({
       where: { id },
+      data: {
+        deletedAt: new Date(),
+      },
     })
   }
 

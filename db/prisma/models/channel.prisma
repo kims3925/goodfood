@@ -7,13 +7,14 @@ model Channel {
   name              String           @db.VarChar(255)
   coverUrl          String?          @map("cover_url") @db.VarChar(500)
   isActive          Boolean          @default(true) @map("is_active")
+  deletedAt         DateTime?        @map("deleted_at") @db.Timestamp(0)
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   shopId            Int?             @map("shop_id")
   bandSessionCookie String?          @map("band_session_cookie") @db.Text
   sessionExpiresAt  DateTime?        @map("session_expires_at")
   shop              Shop?            @relation(fields: [shopId], references: [id])
-  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   collectedPosts    CollectedPost[]
   pricingPolicies   PricingPolicy[]
   products          Product[]
@@ -23,6 +24,7 @@ model Channel {
   @@index([userId])
   @@index([shopId])
   @@index([isActive])
+  @@index([deletedAt])
   @@index([kind, platform])
   @@map("channel")
 }

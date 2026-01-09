@@ -23,6 +23,7 @@ export interface ChannelUpdateInput {
   isActive?: boolean
   coverUrl?: string | null
   shopId?: number | null
+  deletedAt?: Date | null
 }
 
 export interface PaginatedResult<T> {

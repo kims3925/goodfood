@@ -190,6 +190,7 @@ export async function GET(request: NextRequest) {
                 userId: currentUser.userId,
                 shopId: channel.shop.id,
                 publishedAt: { not: null },
+                deletedAt: null, // Soft Delete 필터링
                 ...(dateFilter ? { publishedAt: { ...dateFilter, not: null } } : {}),
               },
             })

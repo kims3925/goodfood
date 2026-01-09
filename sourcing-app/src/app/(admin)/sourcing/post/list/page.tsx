@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2, AlertCircle, ChevronDown, ChevronRight, ChevronUp, FileText, Store } from 'lucide-react'
+import { Plus, Search, Trash2, AlertCircle, ChevronDown, ChevronRight, ChevronUp, FileText, Store, CalendarDays } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -217,7 +217,7 @@ export default function PostsManagePage() {
     setExpandedBandKeys([])
 
     try {
-      const response = await fetch(`/api/post/available?platform=${platform}`)
+      const response = await fetch(`/api/post/available?platform=${platform}&todayOnly=true`)
       const data = await response.json()
 
       if (data.success) {
@@ -848,8 +848,17 @@ export default function PostsManagePage() {
             </div>
           </div>
 
+          {/* 오늘 날짜 안내 */}
+          <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <CalendarDays size={20} className="text-blue-600 flex-shrink-0" />
+            <p className="text-sm text-blue-800">
+              <span className="font-bold">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+              <span className="ml-1">에 작성된 게시물만 표시됩니다.</span>
+            </p>
+          </div>
+
           {/* 게시물 목록 영역 - 고정 높이 */}
-          <div className="h-[750px] overflow-hidden">
+          <div className="h-[700px] overflow-hidden">
             {isLoadingPosts ? (
               <div className="h-full flex flex-col items-center justify-center">
                 <Loading />
