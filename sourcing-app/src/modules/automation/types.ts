@@ -65,6 +65,7 @@ export interface ChannelCollectionResult {
   duplicates: number
   failed: number
   errors: string[]
+  createdPostIds?: number[]  // 생성된 게시물 ID 목록 (자동화 파이프라인 연계용)
 }
 
 /** @deprecated use ChannelCollectionResult instead */
@@ -88,6 +89,7 @@ export interface TransformResult extends PipelineResult {
     createdProducts: number      // 생성된 CollectedProduct 수
     skippedCount: number         // 스킵된 항목 수 (일시적 에러)
     retryablePostIds: number[]   // 재처리 가능한 postId 목록
+    createdCollectedProductIds?: number[]  // 생성된 CollectedProduct ID 목록 (자동화 파이프라인 연계용)
     cancelled?: boolean          // 사용자 취소 여부
     rpdLimitReached?: boolean    // RPD 한도 도달 여부
   }
@@ -107,7 +109,8 @@ export interface TransformedPost {
 // =============================================
 
 export interface ProductCreateConfig {
-  channelIds?: number[]  // 특정 수집상품만 처리
+  channelIds?: number[]  // 특정 수집상품만 처리 (deprecated)
+  collectedProductIds?: number[]  // 처리할 CollectedProduct ID 목록 (자동화 파이프라인 연계용)
   createPendingOnly?: boolean     // Product가 없는 수집상품만 처리
 }
 
@@ -115,6 +118,7 @@ export interface ProductCreateResult extends PipelineResult {
   details: {
     createdProducts: CreatedProductResult[]
     totalCreated: number
+    createdProductIds?: number[]  // 생성된 Product ID 목록 (자동화 파이프라인 연계용)
     cancelled?: boolean          // 사용자 취소 여부
   }
 }
@@ -146,9 +150,8 @@ export interface PublishResult extends PipelineResult {
       reason: string
     }[]
     cancelled?: boolean          // 사용자 취소 여부
-    waitingSession?: boolean     // 세션 대기 중 여부
-    pendingChannel?: { id: number; name: string }  // 대기 중인 채널 정보
-    pendingProductIds?: number[] // 대기 중인 상품 IDs
+    sessionExpired?: boolean     // 세션 만료로 실패 여부
+    failedChannel?: { id: number; name: string }  // 세션 만료된 채널 정보
   }
 }
 
@@ -229,7 +232,6 @@ export interface WorkflowLogUpdate {
   totalItems?: number
   successCount?: number
   failedCount?: number
-  details?: Record<string, any>
   errorMessage?: string
 }
 

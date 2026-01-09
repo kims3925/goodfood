@@ -419,9 +419,18 @@ export async function executeFullPipeline(
       logStageStart('AI변환(Transform)', { ...logCtx, stage: 'TRANSFORM' })
       log('DEBUG', `AI 제공자: ${automationConfig.aiProvider}`, { ...logCtx, stage: 'TRANSFORM' })
 
+      // 수집 단계에서 생성된 postId만 변환 (자동화 파이프라인 연계)
+      const collectedPostIds = collectionResult?.details?.channelResults
+        ?.flatMap((ch: any) => ch.createdPostIds || []) || []
+
+      if (collectedPostIds.length > 0) {
+        log('DEBUG', `수집된 게시물 ${collectedPostIds.length}개만 변환 대상`, { ...logCtx, stage: 'TRANSFORM' })
+      }
+
       transformResult = await runTransformPipeline({
         aiProvider: automationConfig.aiProvider,
         transformPendingOnly: true,
+        postIds: collectedPostIds.length > 0 ? collectedPostIds : undefined,  // 수집된 게시물만 변환
       })
 
       totalItems += transformResult.totalItems
@@ -441,8 +450,16 @@ export async function executeFullPipeline(
     if (!options?.skipProductCreate) {
       logStageStart('상품생성(ProductCreate)', { ...logCtx, stage: 'PRODUCT' })
 
+      // 변환 단계에서 생성된 collectedProductId만 상품 생성 (자동화 파이프라인 연계)
+      const createdCollectedProductIds = transformResult?.details?.createdCollectedProductIds || []
+
+      if (createdCollectedProductIds.length > 0) {
+        log('DEBUG', `변환된 수집상품 ${createdCollectedProductIds.length}개만 상품 생성 대상`, { ...logCtx, stage: 'PRODUCT' })
+      }
+
       productCreateResult = await runProductCreatePipeline({
         createPendingOnly: true,
+        collectedProductIds: createdCollectedProductIds.length > 0 ? createdCollectedProductIds : undefined,  // 변환된 수집상품만 등록
       })
 
       totalItems += productCreateResult.totalItems
@@ -477,17 +494,16 @@ export async function executeFullPipeline(
         logStageStart('발행(Publish)', { ...logCtx, stage: 'PUBLISH' })
         log('DEBUG', `발행 대상 채널: ${retailChannelIds.join(', ')}`, { ...logCtx, stage: 'PUBLISH' })
 
-        const newlyCreatedProductIds = productCreateResult?.details?.createdProducts
-          ?.filter((p: any) => p.status === 'success' && p.productId)
-          .map((p: any) => p.productId!) || []
+        // 상품 생성 단계에서 생성된 productId만 발행 (자동화 파이프라인 연계)
+        const createdProductIds = productCreateResult?.details?.createdProductIds || []
 
-        if (newlyCreatedProductIds.length > 0) {
-          log('DEBUG', `이번에 생성된 상품 ${newlyCreatedProductIds.length}개 발행 대상`, { ...logCtx, stage: 'PUBLISH' })
+        if (createdProductIds.length > 0) {
+          log('DEBUG', `생성된 상품 ${createdProductIds.length}개만 발행 대상`, { ...logCtx, stage: 'PUBLISH' })
         }
 
         publishResult = await runPublishPipeline({
           channelIds: retailChannelIds,
-          productIds: newlyCreatedProductIds.length > 0 ? newlyCreatedProductIds : undefined,
+          productIds: createdProductIds.length > 0 ? createdProductIds : undefined,  // 생성된 상품만 발행
           publishReadyOnly: true,
         })
 
@@ -812,11 +828,30 @@ export async function executeFullPipelineWithLock(
     if (!options?.skipTransform) {
       await throwIfCancelled()
       logStageStart('AI변환(Transform)', { ...logCtx, stage: 'TRANSFORM' })
-      await startWorkflowStep(logId, StepType.TRANSFORM)
+
+      // 수집 단계에서 생성된 postId만 변환 (자동화 파이프라인 연계)
+      const collectedPostIds = collectionResult?.details?.channelResults
+        ?.flatMap((ch: any) => ch.createdPostIds || []) || []
+
+      // 처리할 항목 수를 미리 확인하여 step 시작 시 totalItems 설정
+      const transformTargetCount = collectedPostIds.length > 0
+        ? collectedPostIds.length
+        : await prisma.collectedPost.count({
+            where: {
+              userId,
+              collectedProducts: { none: {} }, // 변환 안된 게시물
+            },
+          })
+      await startWorkflowStep(logId, StepType.TRANSFORM, transformTargetCount)
+
+      if (collectedPostIds.length > 0) {
+        log('DEBUG', `수집된 게시물 ${collectedPostIds.length}개만 변환 대상`, { ...logCtx, stage: 'TRANSFORM' })
+      }
 
       transformResult = await runTransformPipeline({
         aiProvider: automationConfig.aiProvider,
         transformPendingOnly: true,
+        postIds: collectedPostIds.length > 0 ? collectedPostIds : undefined,  // 수집된 게시물만 변환
       })
 
       totalItems += transformResult.totalItems
@@ -844,10 +879,28 @@ export async function executeFullPipelineWithLock(
     if (!options?.skipProductCreate) {
       await throwIfCancelled()
       logStageStart('상품생성(ProductCreate)', { ...logCtx, stage: 'PRODUCT' })
-      await startWorkflowStep(logId, StepType.PRODUCT_CREATE)
+
+      // 변환 단계에서 생성된 collectedProductId만 상품 생성 (자동화 파이프라인 연계)
+      const createdCollectedProductIds = transformResult?.details?.createdCollectedProductIds || []
+
+      // 처리할 항목 수를 미리 확인하여 step 시작 시 totalItems 설정
+      const productCreateTargetCount = createdCollectedProductIds.length > 0
+        ? createdCollectedProductIds.length
+        : await prisma.collectedProduct.count({
+            where: {
+              userId,
+              isConverted: false,
+            },
+          })
+      await startWorkflowStep(logId, StepType.PRODUCT_CREATE, productCreateTargetCount)
+
+      if (createdCollectedProductIds.length > 0) {
+        log('DEBUG', `변환된 수집상품 ${createdCollectedProductIds.length}개만 상품 생성 대상`, { ...logCtx, stage: 'PRODUCT' })
+      }
 
       productCreateResult = await runProductCreatePipeline({
         createPendingOnly: true,
+        collectedProductIds: createdCollectedProductIds.length > 0 ? createdCollectedProductIds : undefined,  // 변환된 수집상품만 등록
       })
 
       totalItems += productCreateResult.totalItems
@@ -887,8 +940,16 @@ export async function executeFullPipelineWithLock(
       } else {
         logStageStart('발행(Publish)', { ...logCtx, stage: 'PUBLISH' })
 
+        // 상품 생성 단계에서 생성된 productId만 발행 (자동화 파이프라인 연계)
+        const createdProductIds = productCreateResult?.details?.createdProductIds || []
+
+        if (createdProductIds.length > 0) {
+          log('DEBUG', `생성된 상품 ${createdProductIds.length}개만 발행 대상`, { ...logCtx, stage: 'PUBLISH' })
+        }
+
         publishResult = await runPublishPipeline({
           channelIds: retailChannelIds,
+          productIds: createdProductIds.length > 0 ? createdProductIds : undefined,  // 생성된 상품만 발행
           publishReadyOnly: true,
         })
 
@@ -991,19 +1052,6 @@ export async function executeFullPipelineWithLock(
 
       // RUNNING 상태인 step들을 FAILED로 변경
       await failRunningSteps(logId, '사용자에 의해 작업이 취소되었습니다.')
-
-      await prisma.workflowLog.update({
-        where: { id: logId },
-        data: {
-          details: JSON.stringify({
-            collection: collectionResult?.details,
-            transform: transformResult?.details,
-            productCreate: productCreateResult?.details,
-            publish: publishResult?.details,
-            cancelledAt: completedAt.toISOString(),
-          }),
-        },
-      })
 
       const cancelledResult: FullPipelineResult = {
         success: false,

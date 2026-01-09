@@ -134,6 +134,7 @@ export async function runCollectionPipeline(
       duplicates: 0,
       failed: 0,
       errors: [],
+      createdPostIds: [],  // 생성된 게시물 ID 추적
     }
 
     try {
@@ -173,9 +174,11 @@ export async function runCollectionPipeline(
       channelResult.duplicates = batchResult.skippedCount
       channelResult.failed = batchResult.failedCount
 
-      // 실패한 항목의 에러 메시지 수집
+      // 성공한 항목의 postId 수집 및 에러 메시지 수집
       for (const item of batchResult.results) {
-        if (!item.success && item.error) {
+        if (item.success && item.data?.id) {
+          channelResult.createdPostIds!.push(item.data.id)
+        } else if (!item.success && item.error) {
           channelResult.errors.push(truncateErrorMessage(item.error, 200))
         }
       }

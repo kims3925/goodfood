@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/modules/auth/auth.service'
 import { orderService } from '@/services/order.service'
 
 interface CreateExternalOrderRequest {
-  shopId: number
+  shopId?: number
   guestName: string
   guestPhone: string
   guestEmail?: string
@@ -42,9 +42,27 @@ export async function POST(request: NextRequest) {
     }
 
     const body: CreateExternalOrderRequest = await request.json()
-    const { guestName, guestPhone, shippingAddress, items } = body
+    const { shopId, guestName, guestPhone, shippingAddress, items } = body
 
     // 입력 검증
+    // shopId 검증: 유효한 양의 정수인지 확인
+    if (shopId === undefined || shopId === null) {
+      return NextResponse.json(
+        { success: false, error: 'shopId는 필수입니다.' },
+        { status: 400 }
+      )
+    }
+
+    if (!Number.isFinite(shopId) || !Number.isInteger(shopId) || shopId <= 0) {
+      return NextResponse.json(
+        { success: false, error: 'shopId는 유효한 양의 정수여야 합니다.' },
+        { status: 400 }
+      )
+    }
+
+    // 검증된 shopId 값 사용
+    const validatedShopId = shopId
+
     if (!guestName?.trim()) {
       return NextResponse.json(
         { success: false, error: '고객명은 필수입니다.' },
@@ -83,7 +101,13 @@ export async function POST(request: NextRequest) {
     try {
       const result = await orderService.createExternalOrder({
         userId: user.userId,
-        ...body,
+        shopId: validatedShopId,
+        guestName,
+        guestPhone,
+        guestEmail: body.guestEmail,
+        shippingAddress,
+        items,
+        memo: body.memo,
       })
 
       return NextResponse.json({

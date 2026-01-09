@@ -48,7 +48,6 @@ model WorkflowLog {
   totalItems   Int            @default(0) @map("total_items")
   successCount Int            @default(0) @map("success_count")
   failedCount  Int            @default(0) @map("failed_count")
-  details      String?        @db.LongText
   errorMessage String?        @map("error_message") @db.Text
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   steps        WorkflowStepLog[]
