@@ -571,7 +571,8 @@ export class BandPostAutomation {
           imagesToUpload,
           async (current, total) => {
             await reportStage('downloading', { current, total })
-          }
+          },
+          signal
         )
         tempFiles.push(...downloadedImages)
         console.log(`[밴드자동화] ${downloadedImages.length}/${totalImages}개 이미지 다운로드 완료`)
@@ -690,7 +691,8 @@ export class BandPostAutomation {
    */
   private async downloadImagesWithProgress(
     imageUrls: string[],
-    onProgress?: (current: number, total: number) => void | Promise<void>
+    onProgress?: (current: number, total: number) => void | Promise<void>,
+    signal?: AbortSignal
   ): Promise<string[]> {
     const tempDir = os.tmpdir()
     const downloaded: string[] = []
@@ -698,6 +700,12 @@ export class BandPostAutomation {
 
     // 순차 다운로드 (진행률 추적을 위해)
     for (let i = 0; i < imageUrls.length; i++) {
+      // 취소 확인
+      if (signal?.aborted) {
+        console.log(`[밴드자동화] 이미지 다운로드 취소됨 (${i}/${total} 완료)`)
+        throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+
       const result = await this.downloadSingleImage(imageUrls[i], tempDir, i)
       if (result) {
         downloaded.push(result)

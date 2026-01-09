@@ -166,9 +166,12 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Delete channel product
-    await prisma.channelProduct.delete({
+    // Soft delete channel product
+    await prisma.channelProduct.update({
       where: { id },
+      data: {
+        deletedAt: new Date(),
+      },
     })
 
     return NextResponse.json({

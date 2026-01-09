@@ -460,16 +460,20 @@ export async function DELETE(request: NextRequest) {
         }, { status: 400 })
       }
 
-      // Shop 발행 삭제 (DB만)
+      // Shop 발행 취소 (Soft Delete - deletedAt 설정)
       let deletedCount = 0
       if (canDeleteIds.length > 0) {
-        const deleteResult = await prisma.shopProduct.deleteMany({
+        const softDeleteResult = await prisma.shopProduct.updateMany({
           where: {
             id: { in: canDeleteIds },
             userId,
+            deletedAt: null, // 이미 삭제되지 않은 것만
+          },
+          data: {
+            deletedAt: new Date(),
           },
         })
-        deletedCount = deleteResult.count
+        deletedCount = softDeleteResult.count
       }
 
       return NextResponse.json({
@@ -516,15 +520,19 @@ export async function DELETE(request: NextRequest) {
       successfulDeletes.push(cp.id)
     }
 
-    // DB에서 레코드 삭제
+    // DB에서 레코드 소프트 삭제
     if (successfulDeletes.length > 0) {
-      const deleteResult = await prisma.channelProduct.deleteMany({
+      const softDeleteResult = await prisma.channelProduct.updateMany({
         where: {
           id: { in: successfulDeletes },
           userId,
+          deletedAt: null,
+        },
+        data: {
+          deletedAt: new Date(),
         },
       })
-      deletedCount = deleteResult.count
+      deletedCount = softDeleteResult.count
     }
 
     // Band 삭제 실패가 있으면 실패로 처리

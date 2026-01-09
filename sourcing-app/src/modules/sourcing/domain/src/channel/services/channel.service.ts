@@ -115,10 +115,16 @@ export class ChannelService {
       await channelRepository.update(id, { isActive: false })
     }
 
-    // 채널에 연결된 ChannelProduct 삭제 (채널 발행 추적용)
+    // 채널에 연결된 ChannelProduct 소프트 삭제 (채널 발행 추적용)
     // 참고: ShopProduct는 Shop과 연결되어 있으므로 채널 삭제와 무관함
-    await prisma.channelProduct.deleteMany({
-      where: { channelId: id },
+    await prisma.channelProduct.updateMany({
+      where: {
+        channelId: id,
+        deletedAt: null,
+      },
+      data: {
+        deletedAt: new Date(),
+      },
     })
 
     // 자동화 설정에서 삭제되는 채널 ID 제거
