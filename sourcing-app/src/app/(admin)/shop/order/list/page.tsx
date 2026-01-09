@@ -21,7 +21,6 @@ import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
-
 import { getChannelColor } from '@/lib/channel-utils'
 
 type OrderSource = 'SHOPPING_MALL'
@@ -152,6 +151,11 @@ export default function UnifiedOrderListPage() {
 
   const handleSearch = () => {
     setPage(1)
+  }
+
+  const formatPrice = (price: number | null) => {
+    if (!price) return '0원'
+    return `${price.toLocaleString()}원`
   }
 
   const formatDate = (dateString: string) => {

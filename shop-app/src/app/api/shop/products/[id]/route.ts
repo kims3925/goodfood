@@ -33,7 +33,9 @@ export async function GET(
     }
 
     // shopProducts 조회 조건: shopId 기반 필터링
-    const shopProductsWhere: any = {}
+    const shopProductsWhere: any = {
+      deletedAt: null, // Soft Delete 제외
+    }
     if (currentShopId) {
       shopProductsWhere.shopId = currentShopId
     }
@@ -103,7 +105,16 @@ export async function GET(
     const shopProduct = product.shopProducts[0]
     const shop = shopProduct?.shop
     const shopProductId = shopProduct?.id || null
-    const isActive = true // 품절 체크는 Product 레벨의 재고 관리로 대체됨 (ShopProduct에서 isActive 필드 제거됨)
+    // 비활성화된 상품은 숨김 처리
+    const isActive = shopProduct?.isActive ?? true
+
+    // 비활성화된 상품 접근 시 404 반환 (쇼핑몰에서 노출되지 않아야 함)
+    if (!isActive) {
+      return NextResponse.json(
+        { success: false, error: '상품을 찾을 수 없습니다' },
+        { status: 404 }
+      )
+    }
 
     // 판매자 정보 (추후 별도 필드로 관리)
     const sellerName = null

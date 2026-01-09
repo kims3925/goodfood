@@ -309,35 +309,21 @@ export async function DELETE(
       )
     }
 
-    const shop = await prisma.shop.findFirst({
+    // Soft Delete - deletedAt 설정
+    // updateMany를 사용하여 ID, 소유자, 미삭제 상태를 한 번에 검증
+    const result = await prisma.shop.updateMany({
       where: {
         id,
         userId: currentUser.userId,
-        deletedAt: null, // Soft Delete 필터링
+        deletedAt: null,
       },
-      include: {
-        theme: true,
-      },
-    })
-
-    if (!shop) {
-      return NextResponse.json(
-        { success: false, error: '쇼핑몰을 찾을 수 없습니다.' },
-        { status: 404 }
-      )
-    }
-
-    // Soft Delete - deletedAt 설정
-    // 주의: Soft Delete 시 이미지 파일은 삭제하지 않음 (복구 가능성을 위해)
-    const softDeleteResult = await prisma.shop.update({
-      where: { id },
       data: { deletedAt: new Date() },
     })
 
-    if (!softDeleteResult) {
+    if (result.count !== 1) {
       return NextResponse.json(
-        { success: false, error: '쇼핑몰 삭제에 실패했습니다.' },
-        { status: 500 }
+        { success: false, error: '쇼핑몰을 찾을 수 없거나 삭제 권한이 없습니다.' },
+        { status: 404 }
       )
     }
 

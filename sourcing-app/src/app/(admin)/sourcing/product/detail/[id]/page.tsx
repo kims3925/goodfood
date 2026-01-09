@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus, Upload, Info, Truck, Send } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Package, FileText, Trash2, AlertCircle, ChevronLeft, ChevronRight, Store, Calendar, ExternalLink, ImageIcon, Tag, Layers, History, Plus, Minus, Upload, Info, Truck, Send, ToggleLeft, ToggleRight } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -60,6 +60,7 @@ interface Product {
 interface ShopProductItem {
   id: number
   shopId: number
+  isActive: boolean
   publishedAt: string | null
   createdAt: string
   shop: {
@@ -112,6 +113,9 @@ export default function ProductDetailPage() {
   // 삭제 확인 모달 상태
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // ShopProduct 활성화 상태 토글
+  const [togglingShopProductId, setTogglingShopProductId] = useState<number | null>(null)
 
 
   // 옵션 편집 상태
@@ -430,6 +434,34 @@ export default function ProductDetailPage() {
       toast.error('변형상품 저장에 실패했습니다.')
     } finally {
       setIsSavingVariants(false)
+    }
+  }
+
+  // ShopProduct 활성화 상태 토글 핸들러
+  const handleToggleShopProductActive = async (shopProductId: number, currentIsActive: boolean) => {
+    setTogglingShopProductId(shopProductId)
+    try {
+      const response = await fetch('/api/shop-product', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: shopProductId,
+          isActive: !currentIsActive,
+        }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        toast.success(data.message)
+        loadProduct() // 상품 정보 새로고침
+      } else {
+        toast.error(data.error || '상태 변경에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('ShopProduct 상태 변경 실패:', error)
+      toast.error('상태 변경에 실패했습니다.')
+    } finally {
+      setTogglingShopProductId(null)
     }
   }
 
@@ -1536,25 +1568,63 @@ export default function ProductDetailPage() {
                             {product.shopProducts.map((sp) => (
                               <div
                                 key={sp.id}
-                                className="flex items-center justify-between p-3 bg-blue-50/50 rounded-xl border border-blue-100 hover:bg-blue-50 transition-colors"
+                                className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${
+                                  sp.isActive
+                                    ? 'bg-blue-50/50 border-blue-100 hover:bg-blue-50'
+                                    : 'bg-slate-50/50 border-slate-200 hover:bg-slate-100'
+                                }`}
                               >
                                 <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                                    <Store size={14} className="text-blue-600" />
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                    sp.isActive ? 'bg-blue-100' : 'bg-slate-200'
+                                  }`}>
+                                    <Store size={14} className={sp.isActive ? 'text-blue-600' : 'text-slate-400'} />
                                   </div>
                                   <div>
-                                    <p className="font-medium text-slate-900 text-sm">{sp.shop.name}</p>
+                                    <div className="flex items-center gap-2">
+                                      <p className={`font-medium text-sm ${sp.isActive ? 'text-slate-900' : 'text-slate-500'}`}>
+                                        {sp.shop.name}
+                                      </p>
+                                      {!sp.isActive && (
+                                        <span className="px-1.5 py-0.5 text-xs font-medium bg-slate-200 text-slate-600 rounded">
+                                          비활성
+                                        </span>
+                                      )}
+                                    </div>
                                     <p className="text-xs text-slate-500">{formatDate(sp.publishedAt || sp.createdAt)}</p>
                                   </div>
                                 </div>
-                                <a
-                                  href={`https://${sp.shop.subdomain}.bandauto.shop`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                                >
-                                  <ExternalLink size={14} />
-                                </a>
+                                <div className="flex items-center gap-2">
+                                  {/* 활성화/비활성화 토글 버튼 */}
+                                  <button
+                                    onClick={() => handleToggleShopProductActive(sp.id, sp.isActive)}
+                                    disabled={togglingShopProductId === sp.id}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                      togglingShopProductId === sp.id
+                                        ? 'opacity-50 cursor-not-allowed'
+                                        : sp.isActive
+                                          ? 'text-green-500 hover:text-green-600 hover:bg-green-50'
+                                          : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+                                    }`}
+                                    title={sp.isActive ? '쇼핑몰 노출 중 (클릭하여 숨김)' : '쇼핑몰 숨김 (클릭하여 노출)'}
+                                  >
+                                    {togglingShopProductId === sp.id ? (
+                                      <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                    ) : sp.isActive ? (
+                                      <ToggleRight size={20} />
+                                    ) : (
+                                      <ToggleLeft size={20} />
+                                    )}
+                                  </button>
+                                  <a
+                                    href={`https://${sp.shop.subdomain}.bandauto.shop`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                  >
+                                    <ExternalLink size={14} />
+                                  </a>
+                                </div>
                               </div>
                             ))}
                           </div>

@@ -3,6 +3,7 @@ model ShopProduct {
   userId      Int       @map("user_id")
   productId   Int?      @map("product_id")
   shopId      Int       @map("shop_id")
+  isActive    Boolean   @default(true) @map("is_active") // 쇼핑몰 노출 여부
   publishedAt DateTime? @map("published_at") @db.Timestamp(0)
   deletedAt   DateTime? @map("deleted_at") @db.Timestamp(0)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(0)

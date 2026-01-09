@@ -300,8 +300,7 @@ export async function runPublishPipeline(
 
       currentSuccess += shopResult.successCount
       currentFailed += shopResult.failedCount
-      // 실제 발행 대상만 카운트 (이미 발행된 skipped 제외)
-      totalItems += shopResult.successCount + shopResult.failedCount
+      // totalItems는 이미 Line 284에서 추가됨 - 중복 집계 제거
 
       if (workflowLogId) {
         await updateWorkflowProgress(workflowLogId, totalItems, currentSuccess, currentFailed, {
