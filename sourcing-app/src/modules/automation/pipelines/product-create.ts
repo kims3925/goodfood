@@ -53,7 +53,11 @@ export async function runProductCreatePipeline(
     isConverted: false, // Product로 아직 변환되지 않은 수집상품만
   }
 
-  if (config.channelIds?.length) {
+  // collectedProductIds가 지정된 경우 해당 ID만 처리 (자동화 파이프라인 연계용)
+  if (config.collectedProductIds?.length) {
+    whereClause.id = { in: config.collectedProductIds }
+  } else if (config.channelIds?.length) {
+    // 하위호환: channelIds 지정된 경우 (deprecated)
     whereClause.id = { in: config.channelIds }
   }
 
@@ -153,6 +157,9 @@ export async function runProductCreatePipeline(
         const currentFailed = createdProducts.filter((p) => p.status === 'failed').length
         await updateWorkflowProgress(workflowLogId, collectedProducts.length, currentSuccess, currentFailed, {
           productCreate: {
+            totalItems: collectedProducts.length,
+            successCount: currentSuccess,
+            failedCount: currentFailed,
             createdProducts: createdProducts.slice(-10),
             totalCreated,
             errors: errors.slice(-5),
@@ -176,6 +183,11 @@ export async function runProductCreatePipeline(
 
   // 조기 종료된 경우
   if (!batchResult) {
+    // 생성된 Product ID 목록 (조기 종료 시에도 반환)
+    const earlyCreatedProductIds = createdProducts
+      .filter((p) => p.status === 'success' && p.productId)
+      .map((p) => p.productId!)
+
     return {
       success: false,
       totalItems: collectedProducts.length,
@@ -184,6 +196,7 @@ export async function runProductCreatePipeline(
       details: {
         createdProducts,
         totalCreated,
+        createdProductIds: earlyCreatedProductIds,  // 자동화 파이프라인 연계용
         cancelled: errors.some(e => e.message.includes('취소')),
       },
       errors,
@@ -193,6 +206,13 @@ export async function runProductCreatePipeline(
   const successCount = createdProducts.filter((p) => p.status === 'success').length
   const failedCount = createdProducts.filter((p) => p.status === 'failed').length
 
+  // 생성된 Product ID 목록 (자동화 파이프라인 연계용)
+  const createdProductIds = createdProducts
+    .filter((p) => p.status === 'success' && p.productId)
+    .map((p) => p.productId!)
+
+  console.log(`[ProductCreate] Created Product IDs: ${createdProductIds.length}개`)
+
   return {
     success: failedCount === 0,
     totalItems: collectedProducts.length,
@@ -201,6 +221,7 @@ export async function runProductCreatePipeline(
     details: {
       createdProducts,
       totalCreated,
+      createdProductIds,  // 자동화 파이프라인 연계용
     },
     errors,
   }

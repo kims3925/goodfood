@@ -485,7 +485,7 @@ const TimelineLogSection = ({
       totalSuccess = channelResults.reduce((sum: number, ch: any) => sum + (ch.success || 0), 0)
       totalFailed = channelResults.reduce((sum: number, ch: any) => sum + (ch.failed || 0), 0)
       displayItems = channelResults.map((ch: any) => ({
-        channelName: ch.channelName?.replace(/^Shop:\s*/, '') || `채널 ${ch.channelId}`,
+        channelName: (ch.targetName || ch.channelName || '')?.replace(/^Shop:\s*/, '') || `채널 ${ch.targetId || ch.channelId}`,
         success: ch.success || 0,
         failed: ch.failed || 0,
         attempted: ch.attempted || (ch.success || 0) + (ch.failed || 0),
@@ -494,13 +494,14 @@ const TimelineLogSection = ({
       // publishedProducts에서 통계 계산
       const channelMap = new Map<number, { name: string; success: number; failed: number }>()
       for (const p of publishedProducts) {
-        const channelId = p.channelId
+        const channelId = p.targetId || p.channelId
         if (!channelMap.has(channelId)) {
-          channelMap.set(channelId, { name: p.channelName || '', success: 0, failed: 0 })
+          channelMap.set(channelId, { name: p.targetName || p.channelName || '', success: 0, failed: 0 })
         }
         const stats = channelMap.get(channelId)!
-        if (p.channelName && !stats.name) {
-          stats.name = p.channelName
+        const pName = p.targetName || p.channelName
+        if (pName && !stats.name) {
+          stats.name = pName
         }
         if (p.status === 'SUCCESS') {
           stats.success++
@@ -1054,9 +1055,15 @@ export default function AutomationLogsPage() {
           {logs.map((log) => {
             const status = STATUS_CONFIG[log.status] || STATUS_CONFIG.PENDING
             const isExpanded = expandedLogId === log.id
+            // 실행 중이면 진행률(progress), 완료되면 성공률(successRate) 사용
+            const isRunning = log.status === 'RUNNING'
             const successRate = log.totalItems > 0
               ? Math.round((log.successCount / log.totalItems) * 100)
               : 0
+            // API에서 전달받은 progress 사용 (없으면 successRate 사용)
+            const displayProgress = isRunning
+              ? (log.progress ?? successRate)
+              : successRate
 
             return (
               <div
@@ -1086,18 +1093,19 @@ export default function AutomationLogsPage() {
                       </span>
                     </div>
 
-                    {/* 성공률 미니 차트 */}
+                    {/* 진행률/성공률 미니 차트 */}
                     <div className="w-[100px] shrink-0 hidden md:flex items-center justify-center gap-2">
                       <div className="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full ${
-                            successRate >= 80 ? 'bg-emerald-500' :
-                            successRate >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                            isRunning ? 'bg-blue-500' :
+                            displayProgress >= 80 ? 'bg-emerald-500' :
+                            displayProgress >= 50 ? 'bg-amber-500' : 'bg-red-500'
                           }`}
-                          style={{ width: `${successRate}%` }}
+                          style={{ width: `${displayProgress}%` }}
                         />
                       </div>
-                      <span className="text-xs font-medium text-slate-500">{successRate}%</span>
+                      <span className={`text-xs font-medium ${isRunning ? 'text-blue-600' : 'text-slate-500'}`}>{displayProgress}%</span>
                     </div>
 
                     {/* 대상 건수 */}
