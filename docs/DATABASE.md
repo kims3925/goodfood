@@ -312,6 +312,8 @@ deleted_at TIMESTAMP NULL
 
 Soft Delete 패턴이 적용된 테이블 목록:
 
+- `product` - 상품
+- `product_variant` - 상품 옵션
 - `shop_product` - 쇼핑몰 발행 상품
 - `channel_product` - 채널 발행 상품
 - `channel` - 채널 (도매/소매)
