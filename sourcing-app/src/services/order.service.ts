@@ -5,7 +5,7 @@ const Decimal = Prisma.Decimal
 
 interface CreateExternalOrderParams {
   userId: number
-  shopId: number
+  shopId?: number
   guestName: string
   guestPhone: string
   guestEmail?: string

@@ -41,8 +41,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body: CreateExternalOrderRequest = await request.json()
-    const { shopId, guestName, guestPhone, shippingAddress, items } = body
+    let body: CreateExternalOrderRequest
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json(
+        { success: false, error: '요청 본문(JSON)이 올바르지 않습니다.' },
+        { status: 400 }
+      )
+    }
+    const { guestName, guestPhone, shippingAddress, items } = body
 
     // 입력 검증
     // shopId 검증: 유효한 양의 정수인지 확인
