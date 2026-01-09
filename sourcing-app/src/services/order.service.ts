@@ -77,7 +77,7 @@ export const orderService = {
 
       // 3. Process Items & Calculate Totals
       const orderItemsData = []
-      let subtotal = 0
+      let subtotal = new Decimal(0)
 
       for (const item of items) {
         const shopProduct = shopProductMap.get(item.shopProductId)
@@ -86,9 +86,15 @@ export const orderService = {
           throw new Error(`상품을 찾을 수 없습니다. (ID: ${item.shopProductId})`)
         }
 
+        // quantity 검증: 1 이상의 정수여야 함
+        if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+          throw new Error(`유효하지 않은 수량입니다. (수량: ${item.quantity}, 상품ID: ${item.shopProductId})`)
+        }
+        const quantity = item.quantity
+
         const product = shopProduct.product
         let variant = null
-        let unitPrice = Number(product.price) || 0
+        let unitPrice: Prisma.Decimal
 
         // 옵션(variant) 처리
         if (item.variantId) {
@@ -96,15 +102,26 @@ export const orderService = {
           if (!variant) {
             throw new Error(`유효하지 않은 상품 옵션입니다. (variantId: ${item.variantId})`)
           }
-          unitPrice = Number(variant.price)
+          // variant.price가 null/undefined인 경우 product.price로 fallback
+          if (variant.price == null) {
+            console.warn(`[External Order] variant.price가 없습니다. product.price로 대체합니다. (variantId: ${item.variantId})`)
+            unitPrice = new Decimal(product.price ?? 0)
+          } else {
+            unitPrice = new Decimal(variant.price)
+          }
         } else if (product.variants.length > 0) {
           // 옵션이 있는 상품인데 옵션을 선택하지 않은 경우 에러
           throw new Error(`상품 옵션을 선택해주세요. (상품: ${product.name})`)
+        } else {
+          // 옵션이 없는 상품: product.price 사용
+          if (product.price == null) {
+            throw new Error(`상품 가격이 설정되지 않았습니다. (상품: ${product.name})`)
+          }
+          unitPrice = new Decimal(product.price)
         }
 
-        const quantity = item.quantity || 1
-        const totalPrice = unitPrice * quantity
-        subtotal += totalPrice
+        const totalPrice = unitPrice.mul(quantity)
+        subtotal = subtotal.add(totalPrice)
 
         orderItemsData.push({
           shopProductId: shopProduct.id,
@@ -113,8 +130,8 @@ export const orderService = {
           optionSummary: variant?.optionSummary || null,
           thumbnailUrl: product.thumbnailUrl,
           quantity,
-          unitPrice: new Decimal(unitPrice),
-          totalPrice: new Decimal(totalPrice),
+          unitPrice,
+          totalPrice,
         })
       }
 
