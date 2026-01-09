@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
       try {
         // 먼저 현재 사용자의 ShopProduct ID 목록을 조회
         const userShopProducts = await prisma.shopProduct.findMany({
-          where: { userId: user.userId },
+          where: { userId: user.userId, deletedAt: null },
           select: { id: true },
         })
         const shopProductIds = userShopProducts.map(pp => pp.id)

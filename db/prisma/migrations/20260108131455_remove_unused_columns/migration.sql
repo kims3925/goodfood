@@ -3,7 +3,7 @@
 -- published_product -> shop_product/channel_product 전환
 --
 -- !중요!: 실행 전 데이터 백업을 권장합니다.
--- 롤백 스크립트: rollback_20260108131455.sql (별도 제공)
+-- 롤백 스크립트: db/prisma/migrations/20260108131455_remove_unused_columns/rollback.sql
 --
 -- 이 마이그레이션은 다음 변경사항을 포함합니다:
 -- 1. shop_product 테이블 생성 (published_product 대체)
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS `channel_product` (
   INDEX `idx_legacy_id` (`legacy_published_product_id`),
   UNIQUE KEY `uk_product_channel` (`product_id`, `channel_id`),
   CONSTRAINT `fk_channel_product_product_id` FOREIGN KEY (`product_id`) REFERENCES `product` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `fk_channel_product_channel_id` FOREIGN KEY (`channel_id`) REFERENCES `channel` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_channel_product_channel_id` FOREIGN KEY (`channel_id`) REFERENCES `channel` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_channel_product_user_id` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE);
 
 -- workflow_step_log 테이블 생성 (자동화 파이프라인 단계별 추적)
@@ -96,14 +96,28 @@ DEALLOCATE PREPARE stmt;
 
 -- user 테이블에 deleted_at 컬럼 추가 (이미 존재하면 무시) - Soft Delete 패턴 지원
 SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'user' AND column_name = 'deleted_at');
-SET @sql = IF(@col_exists = 0, "ALTER TABLE `user` ADD COLUMN `deleted_at` TIMESTAMP NULL AFTER `tos_agreed_at`, ADD INDEX `idx_user_deleted_at` (`deleted_at`)", 'SELECT 1');
+SET @sql = IF(@col_exists = 0, "ALTER TABLE `user` ADD COLUMN `deleted_at` TIMESTAMP NULL AFTER `tos_agreed_at`", 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- user 테이블에 idx_user_deleted_at 인덱스 추가 (컬럼은 있지만 인덱스가 없는 경우 대응)
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'user' AND index_name = 'idx_user_deleted_at');
+SET @sql = IF(@idx_exists = 0, "ALTER TABLE `user` ADD INDEX `idx_user_deleted_at` (`deleted_at`)", 'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 -- shop 테이블에 deleted_at 컬럼 추가 (이미 존재하면 무시) - Soft Delete 패턴 지원
 SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'shop' AND column_name = 'deleted_at');
-SET @sql = IF(@col_exists = 0, "ALTER TABLE `shop` ADD COLUMN `deleted_at` TIMESTAMP NULL AFTER `is_active`, ADD INDEX `idx_shop_deleted_at` (`deleted_at`)", 'SELECT 1');
+SET @sql = IF(@col_exists = 0, "ALTER TABLE `shop` ADD COLUMN `deleted_at` TIMESTAMP NULL AFTER `is_active`", 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- shop 테이블에 idx_shop_deleted_at 인덱스 추가 (컬럼은 있지만 인덱스가 없는 경우 대응)
+SET @idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'shop' AND index_name = 'idx_shop_deleted_at');
+SET @sql = IF(@idx_exists = 0, "ALTER TABLE `shop` ADD INDEX `idx_shop_deleted_at` (`deleted_at`)", 'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
@@ -167,15 +181,16 @@ ON DUPLICATE KEY UPDATE
   `published_at` = VALUES(`published_at`),
   `updated_at` = VALUES(`updated_at`),
   `legacy_published_product_id` = VALUES(`legacy_published_product_id`);
--- AUTO_INCREMENT 시퀀스 재설정
+
+-- 데이터 마이그레이션 명시적 커밋 (DDL 실행 전 저장)
+COMMIT;
+
+-- (선택) AUTO_INCREMENT 시퀀스 재설정
 SET @max_id = (SELECT IFNULL(MAX(id), 0) + 1 FROM `shop_product`);
 SET @sql = CONCAT('ALTER TABLE `shop_product` AUTO_INCREMENT = ', @max_id);
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
-
--- 데이터 마이그레이션 명시적 커밋 (DDL 실행 전 저장)
-COMMIT;
 
 -- FK 체크 다시 활성화 (안전장치)
 SET FOREIGN_KEY_CHECKS = 1;

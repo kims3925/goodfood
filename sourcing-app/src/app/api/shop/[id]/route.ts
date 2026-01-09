@@ -310,6 +310,7 @@ export async function DELETE(
       where: {
         id,
         userId: currentUser.userId,
+        deletedAt: null, // Soft Delete 필터링
       },
       include: {
         theme: true,
@@ -323,19 +324,19 @@ export async function DELETE(
       )
     }
 
-    // 쇼핑몰 삭제 전 이미지 파일 삭제
-    const imagesToDelete: string[] = []
-    if (shop.coverUrl) imagesToDelete.push(shop.coverUrl)
-    if (shop.theme?.logoUrl) imagesToDelete.push(shop.theme.logoUrl)
-    if (shop.theme?.faviconUrl) imagesToDelete.push(shop.theme.faviconUrl)
-    if (shop.theme?.bannerUrl) imagesToDelete.push(shop.theme.bannerUrl)
-
-    // 이미지 파일들 삭제 (비동기로 병렬 처리)
-    await Promise.all(imagesToDelete.map(deleteImageFromUrl))
-
-    await prisma.shop.delete({
+    // Soft Delete - deletedAt 설정
+    // 주의: Soft Delete 시 이미지 파일은 삭제하지 않음 (복구 가능성을 위해)
+    const softDeleteResult = await prisma.shop.update({
       where: { id },
+      data: { deletedAt: new Date() },
     })
+
+    if (!softDeleteResult) {
+      return NextResponse.json(
+        { success: false, error: '쇼핑몰 삭제에 실패했습니다.' },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({
       success: true,

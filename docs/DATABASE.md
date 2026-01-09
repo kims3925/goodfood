@@ -263,4 +263,48 @@ Soft Delete 패턴이 적용된 테이블 목록:
 SELECT * FROM shop_product WHERE deleted_at IS NULL;
 ```
 
+#### Prisma 조회 예시
+
+```typescript
+// ✅ Good: deletedAt 필터 포함
+const shopProducts = await prisma.shopProduct.findMany({
+  where: {
+    userId,
+    deletedAt: null, // Soft Delete 필터링
+  },
+})
+
+// ❌ Bad: deletedAt 필터 누락 (삭제된 레코드도 조회됨)
+const shopProducts = await prisma.shopProduct.findMany({
+  where: { userId },
+})
+```
+
+### 삭제 핸들러 구현 주의사항
+
+Soft Delete를 사용하는 테이블은 `delete()` 대신 `update()`를 사용해야 합니다:
+
+```typescript
+// ✅ Good: Soft Delete 사용
+await prisma.shop.update({
+  where: { id },
+  data: { deletedAt: new Date() },
+})
+
+// ❌ Bad: Hard Delete 사용 (FK Restrict 제약조건으로 에러 발생 가능)
+await prisma.shop.delete({
+  where: { id },
+})
+```
+
+### FK 제약조건과 Soft Delete
+
+| FK onDelete 설정 | 삭제 방식 | 설명 |
+|------------------|----------|------|
+| `CASCADE` | Hard Delete 가능 | 자식 레코드도 함께 삭제됨 |
+| `SET NULL` | Hard Delete 가능 | 자식의 FK가 NULL로 설정됨 |
+| `RESTRICT` | **Soft Delete 필수** | 자식 레코드 있으면 삭제 불가 |
+
+> **중요**: `onDelete: Restrict`가 설정된 관계에서는 반드시 Soft Delete를 사용해야 합니다. 그렇지 않으면 FK 제약조건 위반 에러가 발생합니다.
+
 Prisma에서는 미들웨어나 쿼리 확장을 통해 자동 필터링을 구현할 수 있습니다.

@@ -261,11 +261,12 @@ export class PublishService {
         }
       }
 
-      // 3. 이미 발행 여부 확인
+      // 3. 이미 발행 여부 확인 (Soft Delete 제외)
       const existingPublish = await prisma.channelProduct.findFirst({
         where: {
           productId,
           channelId,
+          deletedAt: null,
         },
       })
 
@@ -628,6 +629,7 @@ export class PublishService {
         where: {
           productId,
           shopId,
+          deletedAt: null, // Soft Delete 필터링
         },
       })
 
@@ -890,11 +892,12 @@ export class PublishService {
         }
       }
 
-      // 3. 이미 발행 여부 확인
+      // 3. 이미 발행 여부 확인 (Soft Delete 제외)
       const existingPublish = await prisma.channelProduct.findFirst({
         where: {
           productId,
           channelId,
+          deletedAt: null,
         },
       })
 

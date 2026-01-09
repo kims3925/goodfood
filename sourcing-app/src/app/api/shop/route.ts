@@ -192,6 +192,7 @@ export async function DELETE(request: NextRequest) {
       where: {
         id: parseInt(id),
         userId: currentUser.userId,
+        deletedAt: null, // Soft Delete 필터링
       },
     })
 
@@ -202,9 +203,18 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    await prisma.shop.delete({
+    // Soft Delete - deletedAt 설정
+    const softDeleteResult = await prisma.shop.update({
       where: { id: parseInt(id) },
+      data: { deletedAt: new Date() },
     })
+
+    if (!softDeleteResult) {
+      return NextResponse.json(
+        { success: false, error: '쇼핑몰 삭제에 실패했습니다.' },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({
       success: true,

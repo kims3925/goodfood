@@ -49,9 +49,7 @@
       "Bash(dir:*)",
       "WebFetch(domain:developers.band.us)",
       "Bash(gh pr list:*)",
-      "Bash(for f in *.md)",
-      "Bash(do sed -i 's/\\\\r$//' \"$f\")",
-      "Bash(done)"
+      "Bash(find . -name '*.md' -exec sed -i 's/\\r$//' {} +)"
     ],
     "deny": [],
     "ask": []

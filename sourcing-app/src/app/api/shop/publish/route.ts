@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         shopProducts: {
+          where: { deletedAt: null }, // Soft Delete 제외
           select: {
             id: true,
             shopId: true,
@@ -66,6 +67,7 @@ export async function GET(request: NextRequest) {
           },
         },
         channelProducts: {
+          where: { deletedAt: null }, // Soft Delete 제외
           select: {
             id: true,
             channelId: true,
@@ -121,6 +123,7 @@ export async function GET(request: NextRequest) {
           take: 1,
         },
         shopProducts: {
+          where: { deletedAt: null }, // Soft Delete 제외
           select: {
             id: true,
             shopId: true,
@@ -135,6 +138,7 @@ export async function GET(request: NextRequest) {
           },
         },
         channelProducts: {
+          where: { deletedAt: null }, // Soft Delete 제외
           select: {
             id: true,
             channelId: true,
@@ -414,6 +418,7 @@ export async function DELETE(request: NextRequest) {
         where: {
           id: { in: publishIds },
           userId,
+          deletedAt: null, // Soft Delete 필터링
         },
         include: {
           product: {
@@ -492,6 +497,7 @@ export async function DELETE(request: NextRequest) {
       where: {
         id: { in: publishIds },
         userId,
+        deletedAt: null, // Soft Delete 제외
       },
       include: {
         product: {

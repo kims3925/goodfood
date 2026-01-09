@@ -6,14 +6,19 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    // ShopProduct 통계
-    const shopProductTotal = await prisma.shopProduct.count()
+    // ShopProduct 통계 (Soft Delete 제외)
+    const shopProductTotal = await prisma.shopProduct.count({
+      where: { deletedAt: null },
+    })
 
-    // ChannelProduct 통계
-    const channelProductTotal = await prisma.channelProduct.count()
+    // ChannelProduct 통계 (Soft Delete 제외)
+    const channelProductTotal = await prisma.channelProduct.count({
+      where: { deletedAt: null },
+    })
 
-    // ShopProduct 샘플 데이터 조회 (최근 10개)
+    // ShopProduct 샘플 데이터 조회 (최근 10개, Soft Delete 제외)
     const shopProductSamples = await prisma.shopProduct.findMany({
+      where: { deletedAt: null },
       take: 10,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -26,8 +31,9 @@ export async function GET() {
       }
     })
 
-    // ChannelProduct 샘플 데이터 조회 (최근 10개)
+    // ChannelProduct 샘플 데이터 조회 (최근 10개, Soft Delete 제외)
     const channelProductSamples = await prisma.channelProduct.findMany({
+      where: { deletedAt: null },
       take: 10,
       orderBy: { createdAt: 'desc' },
       select: {
