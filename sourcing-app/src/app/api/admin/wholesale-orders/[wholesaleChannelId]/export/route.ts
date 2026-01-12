@@ -7,6 +7,8 @@ import ExcelJS from 'exceljs'
 
 // 엑셀 행 데이터 타입
 interface ExcelRowData {
+  orderNumber: string        // 주문번호 (출처 추적용)
+  shopName: string           // 출처 (소매처/쇼핑몰 이름)
   timestamp: string          // 타임스탬프(날짜,시간)
   productName: string        // 상품및 제품명
   quantity: number           // 수량
@@ -101,6 +103,11 @@ export async function GET(
         },
         shopProduct: {
           include: {
+            shop: {
+              select: {
+                name: true,
+              },
+            },
             product: {
               select: {
                 shippingFee: true,
@@ -161,6 +168,11 @@ export async function GET(
         },
         shopProduct: {
           include: {
+            shop: {
+              select: {
+                name: true,
+              },
+            },
             product: {
               select: {
                 shippingFee: true,
@@ -219,6 +231,8 @@ export async function GET(
       const isShipped = shippedStatuses.includes(item.order.status)
 
       excelRows.push({
+        orderNumber: item.order.orderNumber,
+        shopName: item.shopProduct?.shop?.name || '-',
         timestamp,
         productName: item.productName,
         quantity: item.quantity,
@@ -261,6 +275,8 @@ export async function GET(
       const isShipped = shippedStatuses.includes(item.guestOrder.status)
 
       excelRows.push({
+        orderNumber: item.guestOrder.orderNumber,
+        shopName: item.shopProduct?.shop?.name || '-',
         timestamp,
         productName: item.productName,
         quantity: item.quantity,
@@ -354,21 +370,23 @@ export async function GET(
     }
 
     // 열 너비 설정
-    sheet.getColumn(1).width = 18  // 타임스탬프
-    sheet.getColumn(2).width = 40  // 상품및 제품명
-    sheet.getColumn(3).width = 8   // 수량
-    sheet.getColumn(4).width = 12  // 상품금액
-    sheet.getColumn(5).width = 10  // 배송비
-    sheet.getColumn(6).width = 12  // 합계
-    sheet.getColumn(7).width = 12  // 배송받는분 이름
-    sheet.getColumn(8).width = 15  // 받는분 연락처
-    sheet.getColumn(9).width = 50  // 배송지 주소
-    sheet.getColumn(10).width = 12 // 보내는 사람
-    sheet.getColumn(11).width = 20 // 현금영수증 신청
-    sheet.getColumn(12).width = 25 // 이메일주소
+    sheet.getColumn(1).width = 18  // 주문번호
+    sheet.getColumn(2).width = 15  // 출처 (소매처)
+    sheet.getColumn(3).width = 18  // 타임스탬프
+    sheet.getColumn(4).width = 40  // 상품및 제품명
+    sheet.getColumn(5).width = 8   // 수량
+    sheet.getColumn(6).width = 12  // 상품금액
+    sheet.getColumn(7).width = 10  // 배송비
+    sheet.getColumn(8).width = 12  // 합계
+    sheet.getColumn(9).width = 12  // 배송받는분 이름
+    sheet.getColumn(10).width = 15 // 받는분 연락처
+    sheet.getColumn(11).width = 50 // 배송지 주소
+    sheet.getColumn(12).width = 12 // 보내는 사람
+    sheet.getColumn(13).width = 20 // 현금영수증 신청
+    sheet.getColumn(14).width = 25 // 이메일주소
 
     // 타이틀
-    sheet.mergeCells('A1:L1')
+    sheet.mergeCells('A1:N1')
     const titleCell = sheet.getCell('A1')
     titleCell.value = '도매 발주견적서'
     titleCell.font = { bold: true, size: 16 }
@@ -396,7 +414,7 @@ export async function GET(
       const dayName = dayNames[date.getDay()]
 
       // 날짜 구분선
-      sheet.mergeCells(`A${rowIndex}:L${rowIndex}`)
+      sheet.mergeCells(`A${rowIndex}:N${rowIndex}`)
       const dateCell = sheet.getCell(`A${rowIndex}`)
       dateCell.value = `▼ ${dateKey} (${dayName}) - ${dateRows.length}건`
       Object.assign(dateCell, { style: dateSeparatorStyle })
@@ -404,7 +422,7 @@ export async function GET(
 
       // 테이블 헤더
       const headerRow = sheet.getRow(rowIndex)
-      headerRow.values = ['타임스탬프', '상품및 제품명', '수량', '상품금액', '배송비', '합계', '배송받는분 이름', '받는분 연락처', '배송지 주소', '보내는사람(받는분과 다른경우만 작성)', '현금영수증 신청', '이메일주소']
+      headerRow.values = ['주문번호', '출처(소매처)', '타임스탬프', '상품및 제품명', '수량', '상품금액', '배송비', '합계', '배송받는분 이름', '받는분 연락처', '배송지 주소', '보내는사람(받는분과 다른경우만 작성)', '현금영수증 신청', '이메일주소']
       headerRow.eachCell((cell) => {
         Object.assign(cell, { style: headerStyle })
       })
@@ -428,6 +446,8 @@ export async function GET(
 
         const row = sheet.getRow(rowIndex)
         row.values = [
+          rowData.orderNumber,
+          rowData.shopName,
           rowData.timestamp,
           rowData.productName,
           rowData.quantity,
@@ -443,10 +463,10 @@ export async function GET(
         ]
 
         // 숫자 포맷
-        row.getCell(3).numFmt = '#,##0'
-        row.getCell(4).numFmt = '#,##0'
         row.getCell(5).numFmt = '#,##0'
         row.getCell(6).numFmt = '#,##0'
+        row.getCell(7).numFmt = '#,##0'
+        row.getCell(8).numFmt = '#,##0'
 
         // 테두리 및 발주 완료 음영 처리
         row.eachCell((cell) => {
@@ -471,14 +491,14 @@ export async function GET(
 
       // 일별 소계
       const subtotalRow = sheet.getRow(rowIndex)
-      subtotalRow.values = [`소계 (${dateKey})`, '', dateTotalQty, dateTotalProductAmount, dateTotalShippingFee, dateTotalAmount, '', '', '', '', '', '']
+      subtotalRow.values = [`소계 (${dateKey})`, '', '', '', dateTotalQty, dateTotalProductAmount, dateTotalShippingFee, dateTotalAmount, '', '', '', '', '', '']
       subtotalRow.eachCell((cell) => {
         Object.assign(cell, { style: subtotalStyle })
       })
-      subtotalRow.getCell(3).numFmt = '#,##0'
-      subtotalRow.getCell(4).numFmt = '#,##0'
       subtotalRow.getCell(5).numFmt = '#,##0'
       subtotalRow.getCell(6).numFmt = '#,##0'
+      subtotalRow.getCell(7).numFmt = '#,##0'
+      subtotalRow.getCell(8).numFmt = '#,##0'
       rowIndex++
 
       // 빈 줄 추가 (날짜 그룹 사이)
@@ -487,14 +507,14 @@ export async function GET(
 
     // 총합계
     const totalRow = sheet.getRow(rowIndex)
-    totalRow.values = ['총합계', '', grandTotalQty, grandTotalProductAmount, grandTotalShippingFee, grandTotalAmount, '', '', '', '', '', '']
+    totalRow.values = ['총합계', '', '', '', grandTotalQty, grandTotalProductAmount, grandTotalShippingFee, grandTotalAmount, '', '', '', '', '', '']
     totalRow.eachCell((cell) => {
       Object.assign(cell, { style: totalStyle })
     })
-    totalRow.getCell(3).numFmt = '#,##0'
-    totalRow.getCell(4).numFmt = '#,##0'
     totalRow.getCell(5).numFmt = '#,##0'
     totalRow.getCell(6).numFmt = '#,##0'
+    totalRow.getCell(7).numFmt = '#,##0'
+    totalRow.getCell(8).numFmt = '#,##0'
 
     // 엑셀 파일 생성
     const buffer = await workbook.xlsx.writeBuffer()
