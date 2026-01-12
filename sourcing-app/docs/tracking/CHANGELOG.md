@@ -241,6 +241,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 - REQ-ID: -
 - Flow-ID: Settlement
+- 문서 업데이트:
+  - [docs/API.md](../API.md#get-apisettlementtoss-transactions): 거래 조회 API 응답 스키마 업데이트 (transfer/virtualAccount 필드)
 
 ---
 
