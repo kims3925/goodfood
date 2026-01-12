@@ -121,8 +121,10 @@ interface TossTransactionsSummary {
   totalCount: number
   cardAmount: number
   cardCount: number
-  tossPayAmount: number
-  tossPayCount: number
+  transferAmount: number      // 계좌이체
+  transferCount: number
+  virtualAccountAmount: number  // 가상계좌
+  virtualAccountCount: number
   canceledAmount: number
   canceledCount: number
   methodTypes?: string[]  // 디버깅용
@@ -539,7 +541,7 @@ export default function SettlementListPage() {
                 </div>
               </div>
             ) : tossData ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 {/* 총 결제 금액 */}
                 <div className="bg-white/10 backdrop-blur rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -566,17 +568,30 @@ export default function SettlementListPage() {
                   <p className="text-blue-200 text-xs mt-1">{tossData.summary.cardCount}건</p>
                 </div>
 
-                {/* 토스페이 (간편결제) */}
+                {/* 계좌이체 */}
                 <div className="bg-white/10 backdrop-blur rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Wallet size={18} className="text-cyan-300" />
-                    <span className="text-blue-100 text-sm">토스페이</span>
+                    <span className="text-blue-100 text-sm">계좌이체</span>
                   </div>
                   <p className="text-2xl font-bold text-white">
-                    {(tossData.summary.tossPayAmount || 0).toLocaleString()}
+                    {(tossData.summary.transferAmount || 0).toLocaleString()}
                     <span className="text-sm font-normal text-blue-200 ml-1">원</span>
                   </p>
-                  <p className="text-blue-200 text-xs mt-1">{tossData.summary.tossPayCount || 0}건</p>
+                  <p className="text-blue-200 text-xs mt-1">{tossData.summary.transferCount || 0}건</p>
+                </div>
+
+                {/* 가상계좌 */}
+                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building size={18} className="text-amber-300" />
+                    <span className="text-blue-100 text-sm">가상계좌</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">
+                    {(tossData.summary.virtualAccountAmount || 0).toLocaleString()}
+                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
+                  </p>
+                  <p className="text-blue-200 text-xs mt-1">{tossData.summary.virtualAccountCount || 0}건</p>
                 </div>
 
                 {/* 취소 */}
