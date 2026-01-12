@@ -205,8 +205,7 @@ export async function POST(
       const orderUserName = (item.order as any).user?.name || ''
       const senderName = recipientName !== orderUserName && orderUserName ? orderUserName : ''
 
-      const shippedStatuses = ['SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURNED', 'REFUNDED']
-      const isShipped = shippedStatuses.includes(item.order.status)
+      const isShipped = SHIPPED_STATUSES.includes(item.order.status as typeof SHIPPED_STATUSES[number])
 
       sheetRows.push({
         orderNumber: item.order.orderNumber,
@@ -248,8 +247,7 @@ export async function POST(
       const guestName = item.guestOrder.guestName
       const senderName = recipientName !== guestName ? guestName : ''
 
-      const shippedStatuses = ['SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURNED', 'REFUNDED']
-      const isShipped = shippedStatuses.includes(item.guestOrder.status)
+      const isShipped = SHIPPED_STATUSES.includes(item.guestOrder.status as typeof SHIPPED_STATUSES[number])
 
       sheetRows.push({
         orderNumber: item.guestOrder.orderNumber,
