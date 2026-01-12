@@ -211,6 +211,62 @@ export class TossPaymentsService {
   validateOrderId(orderId: string): boolean {
     return orderId.length <= 64 && /^[A-Za-z0-9\-_]+$/.test(orderId)
   }
+
+  /**
+   * 거래 내역 조회 (기간별)
+   * @param startDate 시작일 (YYYY-MM-DDTHH:mm:ss 형식)
+   * @param endDate 종료일 (YYYY-MM-DDTHH:mm:ss 형식)
+   * @param startingAfter 페이지네이션 커서 (transactionKey)
+   */
+  async fetchTransactions(
+    startDate: string,
+    endDate: string,
+    startingAfter?: string
+  ): Promise<{ hasMore: boolean; lastCursor?: string; data: any[] }> {
+    try {
+      const params = new URLSearchParams({
+        startDate,
+        endDate,
+      })
+      if (startingAfter) {
+        params.set('startingAfter', startingAfter)
+      }
+
+      const response = await fetch(
+        `${this.baseUrl}/transactions?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`${this.secretKey}:`).toString('base64')}`,
+          }
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error('토스페이먼츠 거래 조회 실패:', errorData)
+        throw new Error(`거래 조회 실패: ${errorData.message || '알 수 없는 오류'}`)
+      }
+
+      const data = await response.json()
+
+      // 토스페이먼츠 응답 형식에 맞게 파싱
+      const transactions = Array.isArray(data) ? data : []
+      const hasMore = transactions.length >= 100 // 토스페이먼츠는 한번에 최대 100건
+      const lastCursor = transactions.length > 0
+        ? transactions[transactions.length - 1].transactionKey
+        : undefined
+
+      return {
+        hasMore,
+        lastCursor,
+        data: transactions
+      }
+    } catch (error) {
+      console.error('토스페이먼츠 거래 조회 오류:', error)
+      throw error
+    }
+  }
 }
 
 // 파일에서 토스페이먼츠 API 키를 가져오는 함수
@@ -284,3 +340,106 @@ export const PAYMENT_METHOD = {
   GIFT_CERTIFICATE: '상품권',
   CASH_RECEIPT: '현금영수증'
 } as const
+
+// 거래 조회 응답 타입
+export interface TossTransaction {
+  mId: string
+  transactionKey: string
+  paymentKey: string
+  orderId: string
+  method: string
+  customerKey?: string
+  useEscrow: boolean
+  receiptUrl?: string
+  status: string
+  transactionAt: string
+  currency: string
+  amount: number
+}
+
+export interface TossTransactionsResponse {
+  hasMore: boolean
+  lastCursor?: string
+  data: TossTransaction[]
+}
+
+// 거래 조회 요약
+export interface TransactionsSummary {
+  totalAmount: number
+  totalCount: number
+  cardAmount: number
+  cardCount: number
+  transferAmount: number
+  transferCount: number
+  virtualAccountAmount: number
+  virtualAccountCount: number
+  canceledAmount: number
+  canceledCount: number
+  transactions: TossTransaction[]
+}
+
+/**
+ * 토스페이먼츠 거래 조회 서비스
+ */
+export async function getTransactions(
+  startDate: string,
+  endDate: string
+): Promise<TransactionsSummary> {
+  const service = await getTossPaymentsService()
+
+  const allTransactions: TossTransaction[] = []
+  let cursor: string | undefined = undefined
+  let hasMore = true
+
+  // 페이지네이션으로 모든 거래 조회
+  while (hasMore) {
+    const response = await service.fetchTransactions(startDate, endDate, cursor)
+    allTransactions.push(...response.data)
+    hasMore = response.hasMore
+    cursor = response.lastCursor
+  }
+
+  // 거래 요약 계산
+  const summary: TransactionsSummary = {
+    totalAmount: 0,
+    totalCount: 0,
+    cardAmount: 0,
+    cardCount: 0,
+    transferAmount: 0,
+    transferCount: 0,
+    virtualAccountAmount: 0,
+    virtualAccountCount: 0,
+    canceledAmount: 0,
+    canceledCount: 0,
+    transactions: allTransactions
+  }
+
+  for (const tx of allTransactions) {
+    // 취소 거래 처리
+    if (tx.status === 'CANCELED' || tx.status === 'PARTIAL_CANCELED') {
+      summary.canceledAmount += tx.amount
+      summary.canceledCount++
+      continue
+    }
+
+    // 완료된 거래만 집계
+    if (tx.status === 'DONE') {
+      summary.totalAmount += tx.amount
+      summary.totalCount++
+
+      // 결제 수단별 집계
+      if (tx.method === '카드') {
+        summary.cardAmount += tx.amount
+        summary.cardCount++
+      } else if (tx.method === '계좌이체') {
+        summary.transferAmount += tx.amount
+        summary.transferCount++
+      } else if (tx.method === '가상계좌') {
+        summary.virtualAccountAmount += tx.amount
+        summary.virtualAccountCount++
+      }
+    }
+  }
+
+  return summary
+}

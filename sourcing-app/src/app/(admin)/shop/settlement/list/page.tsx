@@ -16,11 +16,20 @@ import {
   TrendingUp,
   X,
   Globe,
+  CreditCard,
+  Building,
+  Wallet,
+  XCircle,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
 import SettlementModal from '@/components/settlement/SettlementModal'
 import { useToast } from '@/components/ui/Toast'
+
+// 결제 수단 타입
+type TossPaymentMethod = 'CARD' | 'VIRTUAL_ACCOUNT' | 'TRANSFER' | 'MOBILE' | 'CULTURE_GIFT' | 'BOOK_GIFT' | 'GAME_GIFT' | 'BANK_TRANSFER'
+// 결제 상태 타입
+type TossPaymentStatus = 'READY' | 'IN_PROGRESS' | 'WAITING_FOR_DEPOSIT' | 'DONE' | 'CANCELED' | 'PARTIAL_CANCELED' | 'ABORTED' | 'EXPIRED'
 
 interface OrderItem {
   id: number
@@ -40,6 +49,9 @@ interface OrderItem {
   shopId: number | null
   shopName: string | null
   isSettled: boolean
+  // 결제 정보
+  paymentMethod: TossPaymentMethod | null
+  paymentStatus: TossPaymentStatus | null
 }
 
 interface ShopData {
@@ -78,6 +90,30 @@ interface SettlementData {
   }
 }
 
+// 토스페이먼츠 거래 조회 응답 타입
+interface TossTransactionsSummary {
+  totalAmount: number
+  totalCount: number
+  cardAmount: number
+  cardCount: number
+  tossPayAmount: number
+  tossPayCount: number
+  canceledAmount: number
+  canceledCount: number
+  methodTypes?: string[]  // 디버깅용
+}
+
+interface TossTransactionsData {
+  period: {
+    year: number
+    month: number
+    startDate: string
+    endDate: string
+  }
+  summary: TossTransactionsSummary
+  transactions: any[]
+}
+
 export default function SettlementListPage() {
   const toast = useToast()
   const [loading, setLoading] = useState(true)
@@ -101,6 +137,13 @@ export default function SettlementListPage() {
     orderCount: number
     items: OrderItem[]
   } | null>(null)
+
+  // 토스페이먼츠 거래 조회 상태
+  const [tossData, setTossData] = useState<TossTransactionsData | null>(null)
+  const [tossLoading, setTossLoading] = useState(false)
+  const [tossError, setTossError] = useState<string | null>(null)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -126,6 +169,31 @@ export default function SettlementListPage() {
     fetchData()
   }, [fetchData])
 
+  // 토스페이먼츠 거래 조회
+  const fetchTossTransactions = useCallback(async () => {
+    setTossLoading(true)
+    setTossError(null)
+    try {
+      const res = await fetch(`/api/settlement/toss-transactions?year=${selectedYear}&month=${selectedMonth}`)
+      const result = await res.json()
+
+      if (result.success) {
+        setTossData(result.data)
+      } else {
+        setTossError(result.error || '거래 조회에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('토스페이먼츠 거래 조회 실패:', error)
+      setTossError('거래 조회 중 오류가 발생했습니다.')
+    } finally {
+      setTossLoading(false)
+    }
+  }, [selectedYear, selectedMonth])
+
+  useEffect(() => {
+    fetchTossTransactions()
+  }, [fetchTossTransactions])
+
   const formatPrice = (price: number | null) => {
     if (!price) return '0원'
     return `${price.toLocaleString()}원`
@@ -139,6 +207,64 @@ export default function SettlementListPage() {
     const hour = String(date.getHours()).padStart(2, '0')
     const minute = String(date.getMinutes()).padStart(2, '0')
     return `${year}-${month}-${day} ${hour}:${minute}`
+  }
+
+  // 결제 상태 라벨 및 스타일 반환
+  const getPaymentStatusInfo = (method: TossPaymentMethod | null, status: TossPaymentStatus | null): {
+    label: string
+    bgColor: string
+    textColor: string
+    icon: typeof CreditCard
+  } => {
+    if (!method || !status) {
+      return { label: '정보없음', bgColor: 'bg-gray-100', textColor: 'text-gray-500', icon: AlertCircle }
+    }
+
+    // 가상계좌 (현금입금)
+    if (method === 'VIRTUAL_ACCOUNT') {
+      if (status === 'WAITING_FOR_DEPOSIT') {
+        return { label: '결제대기', bgColor: 'bg-amber-100', textColor: 'text-amber-700', icon: Building }
+      }
+      if (status === 'DONE') {
+        return { label: '계좌입금완료', bgColor: 'bg-green-100', textColor: 'text-green-700', icon: Building }
+      }
+      if (status === 'CANCELED' || status === 'PARTIAL_CANCELED') {
+        return { label: '취소', bgColor: 'bg-red-100', textColor: 'text-red-700', icon: XCircle }
+      }
+      if (status === 'EXPIRED') {
+        return { label: '입금기한만료', bgColor: 'bg-gray-100', textColor: 'text-gray-500', icon: Building }
+      }
+      return { label: '입금대기', bgColor: 'bg-amber-100', textColor: 'text-amber-700', icon: Building }
+    }
+
+    // 카드 결제
+    if (method === 'CARD') {
+      if (status === 'DONE') {
+        return { label: '결제완료', bgColor: 'bg-blue-100', textColor: 'text-blue-700', icon: CreditCard }
+      }
+      if (status === 'CANCELED' || status === 'PARTIAL_CANCELED') {
+        return { label: '취소', bgColor: 'bg-red-100', textColor: 'text-red-700', icon: XCircle }
+      }
+      return { label: '카드결제중', bgColor: 'bg-blue-100', textColor: 'text-blue-600', icon: CreditCard }
+    }
+
+    // 계좌이체
+    if (method === 'TRANSFER' || method === 'BANK_TRANSFER') {
+      if (status === 'DONE') {
+        return { label: '이체완료', bgColor: 'bg-green-100', textColor: 'text-green-700', icon: Wallet }
+      }
+      return { label: '이체중', bgColor: 'bg-blue-100', textColor: 'text-blue-600', icon: Wallet }
+    }
+
+    // 기타 결제 수단
+    if (status === 'DONE') {
+      return { label: '결제완료', bgColor: 'bg-green-100', textColor: 'text-green-700', icon: CheckCircle }
+    }
+    if (status === 'CANCELED' || status === 'PARTIAL_CANCELED') {
+      return { label: '취소', bgColor: 'bg-red-100', textColor: 'text-red-700', icon: XCircle }
+    }
+
+    return { label: '처리중', bgColor: 'bg-gray-100', textColor: 'text-gray-600', icon: AlertCircle }
   }
 
   const openSettlementModal = (shop: ShopData) => {
@@ -317,6 +443,124 @@ export default function SettlementListPage() {
           </button>
         </div>
 
+        {/* 토스페이먼츠 결제 현황 */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg mb-6 overflow-hidden">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <CreditCard size={24} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">토스페이먼츠 결제 현황</h2>
+                  <p className="text-blue-100 text-sm">PG사 연동 실시간 데이터</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  className="px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50"
+                >
+                  {[2024, 2025, 2026].map((y) => (
+                    <option key={y} value={y} className="text-gray-900">{y}년</option>
+                  ))}
+                </select>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                  className="px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
+                    <option key={m} value={m} className="text-gray-900">{m}월</option>
+                  ))}
+                </select>
+                <button
+                  onClick={fetchTossTransactions}
+                  disabled={tossLoading}
+                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                >
+                  <RefreshCw size={20} className={`text-white ${tossLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {tossLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+              </div>
+            ) : tossError ? (
+              <div className="bg-red-500/20 border border-red-400/30 rounded-lg p-4 text-white">
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={20} />
+                  <span>{tossError}</span>
+                </div>
+              </div>
+            ) : tossData ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* 총 결제 금액 */}
+                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign size={18} className="text-green-300" />
+                    <span className="text-blue-100 text-sm">총 결제</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">
+                    {tossData.summary.totalAmount.toLocaleString()}
+                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
+                  </p>
+                  <p className="text-blue-200 text-xs mt-1">{tossData.summary.totalCount}건</p>
+                </div>
+
+                {/* 카드 결제 */}
+                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CreditCard size={18} className="text-purple-300" />
+                    <span className="text-blue-100 text-sm">카드</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">
+                    {tossData.summary.cardAmount.toLocaleString()}
+                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
+                  </p>
+                  <p className="text-blue-200 text-xs mt-1">{tossData.summary.cardCount}건</p>
+                </div>
+
+                {/* 토스페이 (간편결제) */}
+                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Wallet size={18} className="text-cyan-300" />
+                    <span className="text-blue-100 text-sm">토스페이</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">
+                    {(tossData.summary.tossPayAmount || 0).toLocaleString()}
+                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
+                  </p>
+                  <p className="text-blue-200 text-xs mt-1">{tossData.summary.tossPayCount || 0}건</p>
+                </div>
+
+                {/* 취소 */}
+                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <XCircle size={18} className="text-red-300" />
+                    <span className="text-blue-100 text-sm">취소</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">
+                    {tossData.summary.canceledAmount.toLocaleString()}
+                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
+                  </p>
+                  <p className="text-blue-200 text-xs mt-1">{tossData.summary.canceledCount}건</p>
+                </div>
+              </div>
+            ) : null}
+
+            {/* 디버깅: method 타입들 표시 */}
+            {tossData?.summary.methodTypes && tossData.summary.methodTypes.length > 0 && (
+              <div className="mt-4 text-xs text-blue-200">
+                결제수단 종류: {tossData.summary.methodTypes.join(', ')}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* 필터 영역 */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 p-4">
           <div className="flex flex-wrap items-center gap-4">
@@ -421,8 +665,9 @@ export default function SettlementListPage() {
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">수량</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">금액</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">마진율</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">결제</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">정산</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">배송</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">주문일</th>
                       </tr>
                     </thead>
@@ -473,6 +718,18 @@ export default function SettlementListPage() {
                             ) : (
                               <span className="text-gray-400">-</span>
                             )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {(() => {
+                              const paymentInfo = getPaymentStatusInfo(item.paymentMethod, item.paymentStatus)
+                              const PaymentIcon = paymentInfo.icon
+                              return (
+                                <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${paymentInfo.bgColor} ${paymentInfo.textColor}`}>
+                                  <PaymentIcon size={12} />
+                                  {paymentInfo.label}
+                                </span>
+                              )
+                            })()}
                           </td>
                           <td className="px-4 py-3 text-center">
                             {item.isSettled ? (

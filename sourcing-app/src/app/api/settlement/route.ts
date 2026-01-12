@@ -163,6 +163,13 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        // 결제 정보 포함
+        payment: {
+          select: {
+            method: true,
+            status: true,
+          },
+        },
       },
       orderBy: { orderedAt: 'desc' },
     })
@@ -360,6 +367,13 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        // 결제 정보 포함
+        payment: {
+          select: {
+            method: true,
+            status: true,
+          },
+        },
       },
       orderBy: { orderedAt: 'desc' },
     })
@@ -397,6 +411,9 @@ export async function GET(request: NextRequest) {
             shopId: null,
             shopName: null,
             isSettled,
+            // 결제 정보
+            paymentMethod: order.payment?.method || null,
+            paymentStatus: order.payment?.status || null,
           })
         }
         continue
@@ -452,6 +469,9 @@ export async function GET(request: NextRequest) {
           shopId: orderShopId,
           shopName: shopData.name,
           isSettled,
+          // 결제 정보
+          paymentMethod: order.payment?.method || null,
+          paymentStatus: order.payment?.status || null,
         })
 
         shopData.itemCount++
@@ -494,6 +514,9 @@ export async function GET(request: NextRequest) {
             shopName: null,
             isSettled,
             isGuestOrder: true,  // 비회원 주문 표시
+            // 결제 정보
+            paymentMethod: guestOrder.payment?.method || null,
+            paymentStatus: guestOrder.payment?.status || null,
           })
         }
         continue
@@ -550,6 +573,9 @@ export async function GET(request: NextRequest) {
           shopName: shopData.name,
           isSettled,
           isGuestOrder: true,  // 비회원 주문 표시
+          // 결제 정보
+          paymentMethod: guestOrder.payment?.method || null,
+          paymentStatus: guestOrder.payment?.status || null,
         })
 
         shopData.itemCount++
