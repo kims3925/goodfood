@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260112-002 | Done | 2026-01-12 | - | 정산 페이지에 결제 상태 구분 및 토스페이먼츠 현황 추가 | Low | Claude |
 | TR-20260112-001 | Done | 2026-01-12 | - | 사용자 관리 메뉴를 매니저/회원으로 분리 | Low | Claude |
 | TR-20260109-002 | Done | 2026-01-09 | - | ShopProduct/ChannelProduct upsert로 Soft Delete 레코드 복원 지원 | Low | Claude |
 | TR-20260109-001 | Done | 2026-01-09 | - | ShopProduct/Shop Soft Delete 필터링 강화 | Low | Claude |
@@ -133,6 +134,69 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260112-002: 정산 페이지에 결제 상태 구분 및 토스페이먼츠 현황 추가
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-12 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+
+정산 페이지에 결제 상태 구분 기능과 토스페이먼츠 거래 현황 대시보드를 추가:
+
+**1. 결제 상태 구분 표시**
+- 카드 결제: "결제완료" (초록색)
+- 가상계좌 입금대기: "결제대기" (노란색)
+- 가상계좌 입금완료: "계좌입금완료" (초록색)
+- 기타/알 수 없음: "확인필요" (회색)
+
+**2. 토스페이먼츠 거래 현황 대시보드**
+- 해당 월의 총 거래 금액/건수
+- 카드 결제 금액/건수
+- 취소 금액/건수
+- 토스페이먼츠 API에서 실시간 조회
+
+**3. API 변경**
+- `/api/settlement` 응답에 `paymentMethod`, `paymentStatus` 필드 추가
+- `/api/settlement/toss-transactions` 신규 엔드포인트 추가
+
+### 변경 파일
+
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| sourcing-app/src/app/(admin)/shop/settlement/list/page.tsx | Modified | 결제 상태 컬럼 추가, 토스페이먼츠 현황 섹션 추가 |
+| sourcing-app/src/app/api/settlement/route.ts | Modified | 응답에 payment 정보 포함 |
+| sourcing-app/src/app/api/settlement/toss-transactions/route.ts | Added | 토스페이먼츠 거래 조회 API |
+| shop-app/src/modules/payments/services/toss-payments.service.ts | Modified | fetchTransactions, getTransactions 메서드 추가 |
+
+### 영향 분석
+
+- [x] API Contract 변경 (settlement API 응답 필드 추가, 신규 API)
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+
+- REQ-ID: -
+- Flow-ID: Settlement
+
+---
 
 ## TR-20260112-001: 사용자 관리 메뉴를 매니저/회원으로 분리
 

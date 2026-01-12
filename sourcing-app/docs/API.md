@@ -62,6 +62,7 @@ app/api/
 ├── coupon/                  # 쿠폰
 │   └── [id]/
 ├── settlement/              # 정산
+│   ├── toss-transactions/   # 토스페이먼츠 거래 조회
 │   ├── history/
 │   └── [id]/
 ├── policy/                  # 정책
@@ -540,3 +541,105 @@ interface ShopListResponse {
 
 **변경 이력:**
 - TR-20260107-005: `_count.guestOrders` 필드 추가
+
+---
+
+### GET /api/settlement/toss-transactions
+
+토스페이먼츠 거래 내역을 조회합니다. (TR-20260112-002 추가)
+
+**인증:** 필수 (JWT)
+
+**쿼리 파라미터:**
+
+| Param | Type | Required | 설명 |
+|-------|------|----------|------|
+| year | number | Yes | 조회 연도 |
+| month | number | Yes | 조회 월 (1-12) |
+
+**요청 예시:**
+
+```
+GET /api/settlement/toss-transactions?year=2026&month=1
+```
+
+**응답 스키마:**
+
+```typescript
+interface TossTransactionsResponse {
+  success: true
+  data: {
+    period: {
+      year: number
+      month: number
+      startDate: string       // ISO 날짜 시작
+      endDate: string         // ISO 날짜 끝
+    }
+    summary: {
+      totalAmount: number     // 총 거래 금액 (DONE 상태)
+      totalCount: number      // 총 거래 건수 (DONE 상태)
+      cardAmount: number      // 카드 결제 금액
+      cardCount: number       // 카드 결제 건수
+      tossPayAmount: number   // 토스페이 금액
+      tossPayCount: number    // 토스페이 건수
+      canceledAmount: number  // 취소 금액
+      canceledCount: number   // 취소 건수
+      methodTypes: string[]   // 결제 수단 목록 (디버깅용)
+    }
+    transactions: TossTransaction[]  // 최근 100건
+  }
+}
+
+interface TossTransaction {
+  mId: string
+  transactionKey: string
+  paymentKey: string
+  orderId: string
+  method: string              // 결제 수단 (카드, 간편결제 등)
+  customerKey?: string
+  useEscrow: boolean
+  receiptUrl?: string
+  status: string              // DONE, CANCELED, PARTIAL_CANCELED 등
+  transactionAt: string       // 거래 시각
+  currency: string
+  amount: number
+}
+```
+
+**응답 예시:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "period": {
+      "year": 2026,
+      "month": 1,
+      "startDate": "2026-01-01T00:00:00",
+      "endDate": "2026-01-31T23:59:59"
+    },
+    "summary": {
+      "totalAmount": 1500000,
+      "totalCount": 45,
+      "cardAmount": 1200000,
+      "cardCount": 35,
+      "tossPayAmount": 300000,
+      "tossPayCount": 10,
+      "canceledAmount": 50000,
+      "canceledCount": 2,
+      "methodTypes": ["카드", "간편결제"]
+    },
+    "transactions": [...]
+  }
+}
+```
+
+**에러:**
+
+| Code | HTTP | 설명 |
+|------|------|-----|
+| 400 | Bad Request | year, month 파라미터 누락 |
+| 500 | Internal Server Error | 토스페이먼츠 API 키 미설정 또는 조회 실패 |
+
+**변경 이력:**
+- TR-20260112-002: 신규 API 추가

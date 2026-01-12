@@ -365,11 +365,10 @@ export default function SettlementListPage() {
               e.stopPropagation()
               openSettlementModal(shop)
             }}
-            className={`w-full py-2 rounded-lg text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
-              unsettledCount > 0
+            className={`w-full py-2 rounded-lg text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${unsettledCount > 0
                 ? 'bg-blue-500 hover:bg-blue-600'
                 : 'bg-gray-400 hover:bg-gray-500'
-            }`}
+              }`}
           >
             <CheckCircle size={14} />
             {unsettledCount > 0 ? `정산하기 (${formatPrice(unsettledAmount)})` : '전체 정산 완료'}
@@ -482,6 +481,15 @@ export default function SettlementListPage() {
                 >
                   <RefreshCw size={20} className={`text-white ${tossLoading ? 'animate-spin' : ''}`} />
                 </button>
+                <a
+                  href="https://dashboard.tosspayments.com/sales-reports/tm/1373850?mid=cansho2x65"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                  title="토스페이먼츠 대시보드"
+                >
+                  <ExternalLink size={20} className="text-white" />
+                </a>
               </div>
             </div>
 
@@ -707,12 +715,11 @@ export default function SettlementListPage() {
                           <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">{formatPrice(item.totalPrice)}</td>
                           <td className="px-4 py-3 text-sm text-right">
                             {item.marginRate !== null ? (
-                              <span className={`font-medium ${
-                                item.marginRate >= 30 ? 'text-green-600' :
-                                item.marginRate >= 15 ? 'text-blue-600' :
-                                item.marginRate >= 0 ? 'text-orange-600' :
-                                'text-red-600'
-                              }`}>
+                              <span className={`font-medium ${item.marginRate >= 30 ? 'text-green-600' :
+                                  item.marginRate >= 15 ? 'text-blue-600' :
+                                    item.marginRate >= 0 ? 'text-orange-600' :
+                                      'text-red-600'
+                                }`}>
                                 {item.marginRate}%
                               </span>
                             ) : (
@@ -743,16 +750,15 @@ export default function SettlementListPage() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                              item.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
-                              item.status === 'SHIPPED' ? 'bg-blue-100 text-blue-700' :
-                              item.status === 'PAID' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-gray-100 text-gray-700'
-                            }`}>
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${item.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
+                                item.status === 'SHIPPED' ? 'bg-blue-100 text-blue-700' :
+                                  item.status === 'PAID' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-gray-100 text-gray-700'
+                              }`}>
                               {item.status === 'DELIVERED' ? '배송완료' :
-                               item.status === 'SHIPPED' ? '배송중' :
-                               item.status === 'PAID' ? '결제완료' :
-                               item.status === 'PENDING' ? '대기중' : item.status}
+                                item.status === 'SHIPPED' ? '배송중' :
+                                  item.status === 'PAID' ? '결제완료' :
+                                    item.status === 'PENDING' ? '대기중' : item.status}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-500">{formatDate(item.orderedAt)}</td>
