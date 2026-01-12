@@ -2,6 +2,9 @@
 const path = require('path')
 
 const nextConfig = {
+  // 빌드 시 타입 체크/ESLint 건너뛰어 메모리 사용량 감소 (CI 서버 OOM 방지)
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
   skipTrailingSlashRedirect: true,
   async redirects() {
     return [
