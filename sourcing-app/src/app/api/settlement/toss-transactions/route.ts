@@ -104,8 +104,31 @@ export async function GET(request: Request) {
     }
 
     // 해당 월의 시작일과 종료일 계산
-    const yearNum = parseInt(year)
-    const monthNum = parseInt(month)
+    const yearNum = parseInt(year, 10)
+    const monthNum = parseInt(month, 10)
+
+    // NaN 및 유효 범위 검증
+    if (Number.isNaN(yearNum) || Number.isNaN(monthNum)) {
+      return NextResponse.json(
+        { success: false, error: '년도와 월은 숫자여야 합니다.' },
+        { status: 400 }
+      )
+    }
+
+    if (monthNum < 1 || monthNum > 12) {
+      return NextResponse.json(
+        { success: false, error: '월은 1~12 사이의 값이어야 합니다.' },
+        { status: 400 }
+      )
+    }
+
+    if (yearNum < 2020 || yearNum > 2100) {
+      return NextResponse.json(
+        { success: false, error: '유효하지 않은 연도입니다.' },
+        { status: 400 }
+      )
+    }
+
     const startDate = `${yearNum}-${String(monthNum).padStart(2, '0')}-01T00:00:00`
 
     // 다음 달의 첫날에서 1초를 빼서 마지막 날 23:59:59 구하기
@@ -126,15 +149,27 @@ export async function GET(request: Request) {
     const allTransactions: TossTransaction[] = []
     let cursor: string | undefined = undefined
     let hasMore = true
+    let pageCount = 0
+    const MAX_PAGES = 10  // 무한 루프 방지용 최대 페이지 수
 
     while (hasMore) {
       const response = await fetchTransactions(keys.secretKey, startDate, endDate, cursor)
+
+      // 빈 응답 처리 (무한 루프 방지)
+      if (response.data.length === 0) {
+        break
+      }
+
       allTransactions.push(...response.data)
       hasMore = response.hasMore
       cursor = response.lastCursor
+      pageCount++
 
-      // 무한 루프 방지 (최대 10페이지)
-      if (allTransactions.length > 1000) break
+      // 페이지 카운트 기반 무한 루프 방지
+      if (pageCount >= MAX_PAGES) {
+        console.warn(`토스페이먼츠 거래 조회: 최대 페이지(${MAX_PAGES}) 도달, 조회 중단`)
+        break
+      }
     }
 
     // 거래 요약 계산
