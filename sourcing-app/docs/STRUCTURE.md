@@ -59,7 +59,9 @@ bandauto/
 │   │   ├── app/                  # Next.js App Router
 │   │   │   ├── (admin)/          # 인증 필요 라우트
 │   │   │   │   ├── sourcing/     # 소싱 관련 페이지
+│   │   │   │   │   └── user/     # 매니저 관리
 │   │   │   │   └── shop/         # 쇼핑몰 관리 페이지
+│   │   │   │       └── user/     # 회원 관리
 │   │   │   └── api/              # API Routes
 │   │   ├── components/           # UI 컴포넌트
 │   │   │   ├── layout/           # 레이아웃 (Header, Sidebar)

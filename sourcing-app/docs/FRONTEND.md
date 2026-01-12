@@ -42,12 +42,14 @@ src/
 │   │   │   ├── posts/        # 게시물 관리
 │   │   │   ├── products/     # 상품 관리
 │   │   │   ├── automation/   # 자동화 설정
-│   │   │   └── settings/     # 설정
+│   │   │   ├── settings/     # 설정
+│   │   │   └── user/         # 매니저 관리
 │   │   └── shop/             # 쇼핑몰 관리
 │   │       ├── order/        # 주문 관리
 │   │       ├── coupon/       # 쿠폰 관리
 │   │       ├── cs/           # CS 관리
-│   │       └── settlement/   # 정산 관리
+│   │       ├── settlement/   # 정산 관리
+│   │       └── user/         # 회원 관리
 │   └── api/                  # API Routes
 ├── components/
 │   ├── layout/               # Header, Sidebar

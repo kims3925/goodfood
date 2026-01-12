@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260112-001 | Done | 2026-01-12 | - | 사용자 관리 메뉴를 매니저/회원으로 분리 | Low | Claude |
 | TR-20260109-002 | Done | 2026-01-09 | - | ShopProduct/ChannelProduct upsert로 Soft Delete 레코드 복원 지원 | Low | Claude |
 | TR-20260109-001 | Done | 2026-01-09 | - | ShopProduct/Shop Soft Delete 필터링 강화 | Low | Claude |
 | TR-20260108-003 | Done | 2026-01-08 | - | 역할명 변경 (회원/매니저) | Low | Claude |
@@ -132,6 +133,61 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260112-001: 사용자 관리 메뉴를 매니저/회원으로 분리
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-12 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+
+기존 `/shop/user/list` 페이지를 역할별로 분리:
+- `/sourcing/user/list` - 매니저 관리 (MANAGER 역할만 조회)
+- `/shop/user/list` - 회원 관리 (USER 역할만 조회)
+
+**주요 변경:**
+- 소싱 앱 사이드바에 "매니저 관리" 메뉴 추가
+- 쇼핑몰 탭 "사용자 관리" → "회원 관리"로 명칭 변경
+- 각 페이지에서 해당 역할만 필터링하여 표시
+- 매니저 상세 페이지 신규 생성
+
+### 변경 파일
+
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/config/navigation.ts | Modified | 매니저 관리 메뉴 추가, 회원 관리 명칭 변경 |
+| src/app/(admin)/sourcing/user/list/page.tsx | Added | 매니저 목록 페이지 |
+| src/app/(admin)/sourcing/user/detail/[id]/page.tsx | Added | 매니저 상세 페이지 |
+| src/app/(admin)/shop/user/list/page.tsx | Modified | USER 역할만 조회하도록 변경 |
+
+### 영향 분석
+
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+
+- REQ-ID: -
+- Flow-ID: User Management
+
+---
 
 ## TR-20260109-002: ShopProduct/ChannelProduct upsert로 Soft Delete 레코드 복원 지원
 
