@@ -140,6 +140,215 @@ TR-{YYYYMMDD}-{NUMBER}
 
 <!-- 최신 항목이 위로 -->
 
+## TR-20260112-007: 소매밴드 발행 양식 상단 링크 제거 (제목 최상단 노출)
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-12 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+
+소매밴드 발행 양식에서 상단 쇼핑몰 링크를 제거하고 제목이 최상단에 노출되도록 변경:
+
+- 기존: `🔗 쇼핑몰 링크\n\n제목\n...`
+- 변경: `제목\n\n본문...\n🔗 쇼핑몰 링크`
+
+### 변경 파일
+
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| sourcing-app/src/modules/band-playwright/band-post.automation.ts | Modified | 발행 양식 상단 링크 제거, 하단으로 이동 |
+
+### 영향 분석
+
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+
+- REQ-ID: -
+- Flow-ID: Publish (소매밴드 발행)
+
+---
+
+## TR-20260112-006: 토스페이먼츠 거래 API 스키마 변경 (tossPay → transfer/virtualAccount)
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-12 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+
+토스페이먼츠 거래 조회 API 응답 스키마를 개선하여 타입 안전성 강화:
+
+**1. TossTransaction 인터페이스 정의**
+- `any[]` 타입을 명시적인 `TossTransaction[]` 인터페이스로 변경
+- db 패키지에 공통 타입 정의 추가
+
+**2. 요약 데이터 스키마 변경**
+- `tossPayAmount/tossPayCount` 제거
+- `transferAmount/transferCount` 추가 (계좌이체)
+- `virtualAccountAmount/virtualAccountCount` 추가 (가상계좌)
+
+### 변경 파일
+
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| db/src/types/toss-payments.types.ts | Added | TossTransaction 공통 타입 정의 |
+| db/src/client.ts | Modified | 공통 타입 export 추가 |
+| sourcing-app/src/app/(admin)/shop/settlement/list/page.tsx | Modified | TossTransaction 인터페이스 적용 |
+| sourcing-app/src/app/api/settlement/toss-transactions/route.ts | Modified | 공통 타입 사용 |
+| shop-app/src/modules/payments/services/toss-payments.service.ts | Modified | 공통 타입 사용 |
+
+### 영향 분석
+
+- [x] API Contract 변경 (응답 타입 구조 변경)
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+
+- REQ-ID: -
+- Flow-ID: Settlement
+
+---
+
+## TR-20260112-005: 게시물 수집 날짜 선택 기능 제거 (오늘 날짜만 KST 기준)
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-12 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+
+게시물 수집 모달에서 날짜 범위 선택 기능을 제거하고, 오늘 날짜(KST 기준) 게시물만 수집하도록 단순화:
+
+**1. UI 변경**
+- 날짜 선택(DatePicker) UI 제거
+- "오늘 (KST 기준) 작성된 게시물만 표시됩니다" 안내 메시지로 대체
+
+**2. API 단순화**
+- 날짜 범위 파라미터(startDate, endDate) 제거
+- 페이지네이션 로직(after 파라미터, MAX_PAGES) 제거
+- `todayOnly=true` 파라미터만 사용
+
+### 변경 파일
+
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| sourcing-app/src/app/(admin)/sourcing/post/list/page.tsx | Modified | 날짜 선택 UI 제거, 안내 메시지 추가 |
+| sourcing-app/src/app/api/post/available/route.ts | Modified | 날짜 범위 파라미터 제거, 페이지네이션 제거 |
+
+### 영향 분석
+
+- [x] API Contract 변경 (파라미터 제거)
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+
+- REQ-ID: -
+- Flow-ID: Collection (게시물 수집)
+
+---
+
+## TR-20260112-004: 매니저 관리 페이지 TypeScript 타입 오류 수정
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-12 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+
+매니저 관리 페이지에서 TypeScript 타입 오류 수정:
+
+**문제**
+- `onClick={fetchUsers}` 에서 타입 불일치 오류
+- `fetchUsers(overridePage?: number)` 함수에 `MouseEvent`가 전달됨
+
+**해결**
+- `onClick={() => fetchUsers()}` 로 변경하여 인자 없이 호출
+
+### 변경 파일
+
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| sourcing-app/src/app/(admin)/sourcing/user/list/page.tsx | Modified | onClick 핸들러 타입 수정 |
+
+### 영향 분석
+
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+
+| 유형 | 상태 |
+|-----|-----|
+| TypeScript Build | Pass |
+
+### 롤백 계획
+
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+
+- REQ-ID: -
+- Flow-ID: -
+
+---
+
 ## TR-20260112-003: 구글 시트 연동 기능 추가 (발주서 동기화)
 
 | 항목 | 값 |

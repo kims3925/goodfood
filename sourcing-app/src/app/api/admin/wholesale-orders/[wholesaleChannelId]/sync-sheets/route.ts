@@ -5,6 +5,9 @@ import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { googleSheetsService, SheetRowData } from '@/services/google-sheets.service'
 
+// 발주 완료로 간주되는 주문 상태
+const SHIPPED_STATUSES = ['SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURNED', 'REFUNDED'] as const
+
 /**
  * POST /api/admin/wholesale-orders/:wholesaleChannelId/sync-sheets
  * 도매처별 발주서를 구글 시트로 동기화

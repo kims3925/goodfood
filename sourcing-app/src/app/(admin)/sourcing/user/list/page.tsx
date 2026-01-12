@@ -49,17 +49,17 @@ export default function ManagerListPage() {
 
   const itemsPerPage = 20
 
-  const fetchUsers = useCallback(async (overridePage?: number) => {
+  // fetchUsers: 명시적 파라미터로 stale-closure 방지
+  const fetchUsers = useCallback(async (targetPage: number, searchQuery: string) => {
     setLoading(true)
     try {
-      const currentPage = overridePage ?? page
       const params = new URLSearchParams({
-        page: currentPage.toString(),
+        page: targetPage.toString(),
         limit: itemsPerPage.toString(),
         role: 'MANAGER', // 매니저만 조회
       })
 
-      if (search) params.set('search', search)
+      if (searchQuery) params.set('search', searchQuery)
 
       const res = await fetch(`/api/user?${params}`)
       const data = await res.json()
@@ -79,15 +79,22 @@ export default function ManagerListPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, toast])
+  }, [toast])
 
+  // 마운트 시 최초 로드
   useEffect(() => {
-    fetchUsers(1)
+    fetchUsers(1, '')
   }, [fetchUsers])
 
   const handleSearch = () => {
     setPage(1)
-    fetchUsers()
+    fetchUsers(1, search) // 명시적으로 page=1 전달하여 stale-closure 방지
+  }
+
+  // 페이지 변경 핸들러 (stale-closure 방지)
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage)
+    fetchUsers(newPage, search)
   }
 
   const formatDate = (dateString: string) => {
@@ -146,7 +153,7 @@ export default function ManagerListPage() {
                     placeholder="이메일, 이름, 전화번호..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                     className="pl-9 w-64"
                   />
                 </div>
@@ -155,7 +162,7 @@ export default function ManagerListPage() {
                 </Button>
                 <Button
                   variant="secondary"
-                  onClick={() => fetchUsers()}
+                  onClick={() => fetchUsers(page, search)}
                   disabled={loading}
                 >
                   <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
@@ -243,7 +250,7 @@ export default function ManagerListPage() {
               </p>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  onClick={() => handlePageChange(Math.max(1, page - 1))}
                   disabled={page === 1}
                   className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
@@ -253,7 +260,7 @@ export default function ManagerListPage() {
                   {page} / {totalPages}
                 </span>
                 <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
                   disabled={page === totalPages}
                   className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
