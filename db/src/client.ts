@@ -57,5 +57,12 @@ export {
   StepStatus,
 } from './generated'
 
+// Toss Payments 공통 타입
+export type {
+  TossTransaction,
+  TossTransactionsResponse,
+  TransactionsSummary,
+} from './types/toss-payments.types'
+
 // Default export for backwards compatibility
 export default prisma

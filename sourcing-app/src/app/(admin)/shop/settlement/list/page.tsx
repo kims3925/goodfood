@@ -90,6 +90,31 @@ interface SettlementData {
   }
 }
 
+// 토스페이먼츠 개별 거래 타입
+interface TossTransaction {
+  mId: string
+  transactionKey: string
+  paymentKey: string
+  orderId: string
+  orderName: string
+  method: TossPaymentMethod | string
+  status: TossPaymentStatus
+  requestedAt: string
+  approvedAt: string | null
+  amount: number
+  balanceAmount: number
+  suppliedAmount: number
+  vat: number
+  receipt?: {
+    url: string
+  }
+  cancels?: Array<{
+    cancelAmount: number
+    canceledAt: string
+    cancelReason: string
+  }>
+}
+
 // 토스페이먼츠 거래 조회 응답 타입
 interface TossTransactionsSummary {
   totalAmount: number
@@ -111,7 +136,7 @@ interface TossTransactionsData {
     endDate: string
   }
   summary: TossTransactionsSummary
-  transactions: any[]
+  transactions: TossTransaction[]
 }
 
 // 토스페이먼츠 대시보드 URL 생성
@@ -468,7 +493,7 @@ export default function SettlementListPage() {
                   onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                   className="px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50"
                 >
-                  {[2024, 2025, 2026].map((y) => (
+                  {Array.from({ length: 3 }, (_, i) => new Date().getFullYear() - 1 + i).map((y) => (
                     <option key={y} value={y} className="text-gray-900">{y}년</option>
                   ))}
                 </select>

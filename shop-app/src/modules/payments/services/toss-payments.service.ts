@@ -1,5 +1,9 @@
 import crypto from 'crypto'
-import prisma from '@/modules/common/utils/src/database/client'
+import prisma, {
+  TossTransaction,
+  TossTransactionsResponse,
+  TransactionsSummary,
+} from '@bandauto/db'
 
 // 토스페이먼츠 API 응답 타입 정의
 export interface TossPaymentResponse {
@@ -341,42 +345,7 @@ export const PAYMENT_METHOD = {
   CASH_RECEIPT: '현금영수증'
 } as const
 
-// 거래 조회 응답 타입
-export interface TossTransaction {
-  mId: string
-  transactionKey: string
-  paymentKey: string
-  orderId: string
-  method: string
-  customerKey?: string
-  useEscrow: boolean
-  receiptUrl?: string
-  status: string
-  transactionAt: string
-  currency: string
-  amount: number
-}
-
-export interface TossTransactionsResponse {
-  hasMore: boolean
-  lastCursor?: string
-  data: TossTransaction[]
-}
-
-// 거래 조회 요약
-export interface TransactionsSummary {
-  totalAmount: number
-  totalCount: number
-  cardAmount: number
-  cardCount: number
-  transferAmount: number
-  transferCount: number
-  virtualAccountAmount: number
-  virtualAccountCount: number
-  canceledAmount: number
-  canceledCount: number
-  transactions: TossTransaction[]
-}
+// 거래 조회 타입은 @bandauto/db에서 import
 
 /**
  * 토스페이먼츠 거래 조회 서비스

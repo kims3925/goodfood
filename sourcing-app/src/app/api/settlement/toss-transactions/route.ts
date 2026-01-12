@@ -1,35 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { TossTransaction, TransactionsSummary } from '@bandauto/db'
 
-// 토스페이먼츠 거래 조회 응답 타입
-interface TossTransaction {
-  mId: string
-  transactionKey: string
-  paymentKey: string
-  orderId: string
-  method: string
-  customerKey?: string
-  useEscrow: boolean
-  receiptUrl?: string
-  status: string
-  transactionAt: string
-  currency: string
-  amount: number
-}
-
-interface TransactionsSummary {
-  totalAmount: number
-  totalCount: number
-  cardAmount: number
-  cardCount: number
-  transferAmount: number  // 계좌이체
-  transferCount: number
-  virtualAccountAmount: number  // 가상계좌
-  virtualAccountCount: number
-  canceledAmount: number
-  canceledCount: number
-  transactions: TossTransaction[]
-  // 디버깅용: 어떤 method 값들이 있는지
-  methodTypes: string[]
+// 로컬 확장 타입 (methodTypes 포함)
+interface LocalTransactionsSummary extends Omit<TransactionsSummary, 'methodTypes'> {
+  methodTypes: string[]  // 디버깅용: 어떤 method 값들이 있는지 (필수)
 }
 
 // 토스페이먼츠 API 키 가져오기
@@ -171,7 +145,7 @@ export async function GET(request: NextRequest) {
 
     // 거래 요약 계산
     const methodSet = new Set<string>()
-    const summary: TransactionsSummary = {
+    const summary: LocalTransactionsSummary = {
       totalAmount: 0,
       totalCount: 0,
       cardAmount: 0,
