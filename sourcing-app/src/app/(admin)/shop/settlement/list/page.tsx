@@ -114,6 +114,13 @@ interface TossTransactionsData {
   transactions: any[]
 }
 
+// 토스페이먼츠 대시보드 URL 생성
+const getTossDashboardUrl = () => {
+  const merchantId = process.env.NEXT_PUBLIC_TOSS_MERCHANT_ID
+  if (!merchantId) return null
+  return `https://dashboard.tosspayments.com/sales-reports?mid=${encodeURIComponent(merchantId)}`
+}
+
 export default function SettlementListPage() {
   const toast = useToast()
   const [loading, setLoading] = useState(true)
@@ -481,15 +488,17 @@ export default function SettlementListPage() {
                 >
                   <RefreshCw size={20} className={`text-white ${tossLoading ? 'animate-spin' : ''}`} />
                 </button>
-                <a
-                  href="https://dashboard.tosspayments.com/sales-reports/tm/1373850?mid=cansho2x65"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
-                  title="토스페이먼츠 대시보드"
-                >
-                  <ExternalLink size={20} className="text-white" />
-                </a>
+                {getTossDashboardUrl() && (
+                  <a
+                    href={getTossDashboardUrl()!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                    title="토스페이먼츠 대시보드"
+                  >
+                    <ExternalLink size={20} className="text-white" />
+                  </a>
+                )}
               </div>
             </div>
 

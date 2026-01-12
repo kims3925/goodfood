@@ -60,3 +60,18 @@ export interface PromptConfigInput {
   prompt: string
   description?: string | null
 }
+
+// Google Sheets 설정
+export interface GoogleSheetSettings {
+  spreadsheetId: string
+  sheetName: string | null
+  isActive: boolean
+  hasServiceAccount: boolean
+  lastSyncedAt: Date | null
+}
+
+export interface GoogleSheetSettingsInput {
+  serviceAccountJson: string
+  spreadsheetId: string
+  sheetName?: string | null
+}

@@ -16,6 +16,7 @@ import {
   CheckCircle,
   Calendar,
   History,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 import Loading from '@/components/ui/Loading'
@@ -318,6 +319,40 @@ export default function WholesaleOrdersPage() {
     } catch (error) {
       console.error('엑셀 다운로드 실패:', error)
       toast.error('엑셀 다운로드에 실패했습니다.')
+    }
+  }
+
+  const [isSyncingSheets, setIsSyncingSheets] = useState(false)
+  const [sheetsSyncResult, setSheetsSyncResult] = useState<{ message: string; url: string } | null>(null)
+
+  const syncToGoogleSheets = async (channelId: number, channelName: string) => {
+    setIsSyncingSheets(true)
+    try {
+      const res = await fetch(`/api/admin/wholesale-orders/${channelId}/sync-sheets`, {
+        method: 'POST',
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        if (data.error?.includes('설정')) {
+          toast.error(data.error + ' 설정 > 구글 시트에서 설정하세요.')
+        } else {
+          toast.error(data.error || '구글 시트 동기화에 실패했습니다.')
+        }
+        return
+      }
+
+      // 성공 모달 표시
+      setSheetsSyncResult({
+        message: data.data.message,
+        url: data.data.url,
+      })
+    } catch (error) {
+      console.error('구글 시트 동기화 실패:', error)
+      toast.error('구글 시트 동기화에 실패했습니다.')
+    } finally {
+      setIsSyncingSheets(false)
     }
   }
 
@@ -674,6 +709,14 @@ export default function WholesaleOrdersPage() {
                       >
                         <Download size={16} />
                         엑셀
+                      </button>
+                      <button
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => syncToGoogleSheets(selectedChannel.wholesaleChannelId, selectedChannel.wholesaleChannelName)}
+                        disabled={isSyncingSheets}
+                      >
+                        <FileSpreadsheet size={16} />
+                        {isSyncingSheets ? '동기화 중...' : '구글시트'}
                       </button>
                       <button
                         className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1041,6 +1084,41 @@ export default function WholesaleOrdersPage() {
                   className="flex-1 py-3 text-white bg-gray-800 hover:bg-gray-900 rounded-lg font-medium transition-colors"
                 >
                   저장
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 구글 시트 동기화 성공 모달 */}
+        {sheetsSyncResult && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-green-100 rounded-full">
+                  <FileSpreadsheet size={24} className="text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">동기화 완료</h3>
+                  <p className="text-sm text-gray-500">{sheetsSyncResult.message}</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setSheetsSyncResult(null)}
+                  className="flex-1 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                >
+                  닫기
+                </button>
+                <button
+                  onClick={() => {
+                    window.open(sheetsSyncResult.url, '_blank')
+                    setSheetsSyncResult(null)
+                  }}
+                  className="flex-1 py-3 text-white bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <FileSpreadsheet size={18} />
+                  시트 열기
                 </button>
               </div>
             </div>

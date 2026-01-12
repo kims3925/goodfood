@@ -121,6 +121,53 @@ export class SettingsRepository {
       throw error
     }
   }
+
+  // Google Sheets Config
+  async findGoogleSheetConfig(userId: number) {
+    return prisma.googleSheetConfig.findUnique({
+      where: { userId },
+    })
+  }
+
+  async upsertGoogleSheetConfig(userId: number, data: {
+    serviceAccountJson: string
+    spreadsheetId: string
+    sheetName?: string | null
+    isActive?: boolean
+  }) {
+    const existing = await this.findGoogleSheetConfig(userId)
+
+    if (existing) {
+      return prisma.googleSheetConfig.update({
+        where: { id: existing.id },
+        data,
+      })
+    }
+
+    return prisma.googleSheetConfig.create({
+      data: {
+        userId,
+        ...data,
+      },
+    })
+  }
+
+  async deleteGoogleSheetConfig(userId: number) {
+    const existing = await this.findGoogleSheetConfig(userId)
+    if (existing) {
+      return prisma.googleSheetConfig.delete({
+        where: { id: existing.id },
+      })
+    }
+    return null
+  }
+
+  async updateGoogleSheetLastSynced(userId: number) {
+    return prisma.googleSheetConfig.update({
+      where: { userId },
+      data: { lastSyncedAt: new Date() },
+    })
+  }
 }
 
 export const settingsRepository = new SettingsRepository()

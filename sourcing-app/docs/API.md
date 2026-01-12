@@ -50,11 +50,15 @@ app/api/
 │   │   └── test/
 │   ├── api/                 # API 설정
 │   │   └── test/
+│   ├── google-sheets/       # 구글 시트 설정 (TR-20260112-003)
+│   │   └── test/
 │   └── prompt/              # 프롬프트 설정
 ├── admin/                   # 관리자
 │   ├── notifications/       # 알림
 │   ├── reviews/             # 리뷰 관리
 │   └── wholesale-orders/    # 도매 주문
+│       └── [id]/
+│           └── sync-sheets/ # 구글 시트 동기화 (TR-20260112-003)
 ├── cs/                      # 고객 서비스
 │   └── inquiry/             # 문의
 │       └── [id]/
@@ -559,7 +563,7 @@ interface ShopListResponse {
 
 **요청 예시:**
 
-```
+```http
 GET /api/settlement/toss-transactions?year=2026&month=1
 ```
 
@@ -580,8 +584,10 @@ interface TossTransactionsResponse {
       totalCount: number      // 총 거래 건수 (DONE 상태)
       cardAmount: number      // 카드 결제 금액
       cardCount: number       // 카드 결제 건수
-      tossPayAmount: number   // 토스페이 금액
-      tossPayCount: number    // 토스페이 건수
+      transferAmount: number  // 계좌이체 금액
+      transferCount: number   // 계좌이체 건수
+      virtualAccountAmount: number  // 가상계좌 금액
+      virtualAccountCount: number   // 가상계좌 건수
       canceledAmount: number  // 취소 금액
       canceledCount: number   // 취소 건수
       methodTypes: string[]   // 결제 수단 목록 (디버깅용)
@@ -623,11 +629,13 @@ interface TossTransaction {
       "totalCount": 45,
       "cardAmount": 1200000,
       "cardCount": 35,
-      "tossPayAmount": 300000,
-      "tossPayCount": 10,
+      "transferAmount": 200000,
+      "transferCount": 5,
+      "virtualAccountAmount": 100000,
+      "virtualAccountCount": 5,
       "canceledAmount": 50000,
       "canceledCount": 2,
-      "methodTypes": ["카드", "간편결제"]
+      "methodTypes": ["카드", "계좌이체", "가상계좌"]
     },
     "transactions": [...]
   }
@@ -642,4 +650,230 @@ interface TossTransaction {
 | 500 | Internal Server Error | 토스페이먼츠 API 키 미설정 또는 조회 실패 |
 
 **변경 이력:**
+- TR-20260112-006: 스키마 변경 (tossPayAmount/Count → transferAmount/Count, virtualAccountAmount/Count)
 - TR-20260112-002: 신규 API 추가
+
+---
+
+### Google Sheets API (TR-20260112-003)
+
+구글 시트 연동 설정 및 동기화 기능을 제공합니다.
+
+#### GET /api/settings/google-sheets
+
+구글 시트 설정을 조회합니다.
+
+**인증:** 필수 (JWT)
+
+**응답 스키마:**
+
+```typescript
+interface GoogleSheetsSettingsResponse {
+  success: true
+  data: {
+    spreadsheetId: string | null  // 스프레드시트 ID
+    sheetUrl: string | null       // 전체 URL (편의용)
+    createdAt: string | null
+    updatedAt: string | null
+  } | null
+}
+```
+
+**응답 예시:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "spreadsheetId": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
+    "sheetUrl": "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
+    "createdAt": "2026-01-12T10:00:00.000Z",
+    "updatedAt": "2026-01-12T10:00:00.000Z"
+  }
+}
+```
+
+---
+
+#### POST /api/settings/google-sheets
+
+구글 시트 설정을 저장합니다.
+
+**인증:** 필수 (JWT)
+
+**요청 바디:**
+
+```typescript
+interface GoogleSheetsSettingsRequest {
+  spreadsheetId: string  // 스프레드시트 ID (URL에서 추출된 ID)
+}
+```
+
+**요청 예시:**
+
+```json
+{
+  "spreadsheetId": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+}
+```
+
+**응답 스키마:**
+
+```typescript
+interface GoogleSheetsSettingsSaveResponse {
+  success: true
+  data: {
+    spreadsheetId: string
+    sheetUrl: string
+    createdAt: string
+    updatedAt: string
+  }
+}
+```
+
+**에러:**
+
+| Code | HTTP | 설명 |
+|------|------|-----|
+| 400 | Bad Request | spreadsheetId 누락 |
+
+---
+
+#### DELETE /api/settings/google-sheets
+
+구글 시트 설정을 삭제합니다.
+
+**인증:** 필수 (JWT)
+
+**응답:**
+
+```json
+{
+  "success": true
+}
+```
+
+---
+
+#### POST /api/settings/google-sheets/test
+
+구글 시트 연결을 테스트합니다.
+
+**인증:** 필수 (JWT)
+
+**요청 바디:**
+
+```typescript
+interface GoogleSheetsTestRequest {
+  spreadsheetId: string
+}
+```
+
+**응답 스키마:**
+
+```typescript
+interface GoogleSheetsTestResponse {
+  success: true
+  data: {
+    success: true
+    message: string       // "연결 성공: {시트 제목}"
+    title: string         // 스프레드시트 제목
+  }
+}
+```
+
+**에러:**
+
+| Code | HTTP | 설명 |
+|------|------|-----|
+| 400 | Bad Request | spreadsheetId 누락 또는 서비스 계정 미설정 |
+| 403 | Forbidden | 스프레드시트 접근 권한 없음 |
+
+---
+
+#### POST /api/admin/wholesale-orders/[wholesaleChannelId]/sync-sheets
+
+도매처별 발주 데이터를 구글 시트로 동기화합니다.
+
+**인증:** 필수 (JWT)
+
+**경로 파라미터:**
+
+| Param | Type | 설명 |
+|-------|------|------|
+| wholesaleChannelId | number | 도매처(채널) ID |
+
+**기능:**
+- 해당 도매처의 결제 완료된 주문(회원/비회원)을 구글 시트로 동기화
+- 날짜별로 그룹핑하여 소계/합계 자동 계산
+- 엑셀 내보내기와 동일한 포맷 적용
+
+**시트 구조:**
+
+| 컬럼 | 설명 |
+|------|------|
+| A | 주문번호 |
+| B | 쇼핑몰 |
+| C | 일시 |
+| D | 상품명 |
+| E | 수량 |
+| F | 상품금액 |
+| G | 배송비 |
+| H | 총금액 |
+| I | 수취인 |
+| J | 연락처 |
+| K | 주소 |
+| L | 의뢰인 |
+| M | 현금영수증 |
+| N | 이메일 |
+
+**포맷팅:**
+- 제목: 16pt bold, 중앙정렬, 셀 병합
+- 정보 섹션 (도매처, 생성일시, 총 주문, 발주일수): 12pt
+- 날짜 구분행: #4472C4 파란색 배경, 흰색 12pt bold, 셀 병합
+- 헤더: #E0E0E0 회색 배경, 11pt bold, 중앙정렬, 테두리
+- 데이터 행: 11pt, 테두리
+- 발주 완료 행: #D0D0D0 회색 배경, 11pt, 테두리
+- 소계: #D9E1F2 연한 파란색 배경, bold, 테두리
+- 총계: #FFF0C0 연한 노란색 배경, 12pt bold, 테두리
+
+**응답 스키마:**
+
+```typescript
+interface SyncSheetsResponse {
+  success: true
+  data: {
+    success: true
+    message: string
+    url: string        // 동기화된 시트 URL
+    sheetName: string  // 생성/업데이트된 시트 탭 이름
+    rowCount: number   // 동기화된 행 수
+  }
+}
+```
+
+**응답 예시:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "success": true,
+    "message": "도매처A 발주서를 구글 시트로 동기화했습니다.",
+    "url": "https://docs.google.com/spreadsheets/d/xxx#gid=123",
+    "sheetName": "도매처A",
+    "rowCount": 150
+  }
+}
+```
+
+**에러:**
+
+| Code | HTTP | 설명 |
+|------|------|-----|
+| 400 | Bad Request | 구글 시트 설정 미완료 |
+| 403 | Forbidden | 스프레드시트 접근 권한 없음 |
+| 404 | Not Found | 도매처를 찾을 수 없음 |
+
+**변경 이력:**
+- TR-20260112-003: 신규 API 추가

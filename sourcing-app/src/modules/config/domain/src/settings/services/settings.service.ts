@@ -1,5 +1,5 @@
 import { settingsRepository } from '../repository/settings.repository'
-import type { ApiSettings, AiSettings, AiSettingsInput, PromptSettings, PromptConfigInput, PromptConfig } from '../types/settings.types'
+import type { ApiSettings, AiSettings, AiSettingsInput, PromptSettings, PromptConfigInput, PromptConfig, GoogleSheetSettings, GoogleSheetSettingsInput } from '../types/settings.types'
 
 export class SettingsService {
   // API 설정 조회
@@ -220,6 +220,69 @@ export class SettingsService {
   // 프롬프트 설정 삭제 (기본값 사용으로 복구)
   async deletePromptSettings(userId: number, promptType: string) {
     return settingsRepository.deletePromptConfig(userId, promptType)
+  }
+
+  // Google Sheets 설정 조회
+  async getGoogleSheetSettings(userId: number): Promise<GoogleSheetSettings | null> {
+    const config = await settingsRepository.findGoogleSheetConfig(userId)
+
+    if (!config) {
+      return null
+    }
+
+    return {
+      spreadsheetId: config.spreadsheetId,
+      sheetName: config.sheetName,
+      isActive: config.isActive,
+      hasServiceAccount: !!config.serviceAccountJson,
+      lastSyncedAt: config.lastSyncedAt,
+    }
+  }
+
+  // Google Sheets 설정 저장
+  async saveGoogleSheetSettings(userId: number, settings: GoogleSheetSettingsInput) {
+    // JSON 형식 검증
+    try {
+      const parsed = JSON.parse(settings.serviceAccountJson)
+      if (!parsed.client_email || !parsed.private_key) {
+        throw new Error('유효하지 않은 서비스 계정 JSON입니다. client_email과 private_key가 필요합니다.')
+      }
+    } catch (e: any) {
+      if (e.message.includes('client_email') || e.message.includes('private_key')) {
+        throw e
+      }
+      throw new Error('유효하지 않은 JSON 형식입니다.')
+    }
+
+    // 스프레드시트 ID 추출 (URL이 입력된 경우)
+    let spreadsheetId = settings.spreadsheetId
+    const urlMatch = spreadsheetId.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)
+    if (urlMatch) {
+      spreadsheetId = urlMatch[1]
+    }
+
+    return settingsRepository.upsertGoogleSheetConfig(userId, {
+      serviceAccountJson: settings.serviceAccountJson,
+      spreadsheetId,
+      sheetName: settings.sheetName || null,
+      isActive: true,
+    })
+  }
+
+  // Google Sheets 설정 삭제
+  async deleteGoogleSheetSettings(userId: number) {
+    return settingsRepository.deleteGoogleSheetConfig(userId)
+  }
+
+  // Google Sheets 서비스 계정 JSON 조회 (내부용)
+  async getGoogleSheetServiceAccount(userId: number): Promise<string | null> {
+    const config = await settingsRepository.findGoogleSheetConfig(userId)
+    return config?.serviceAccountJson || null
+  }
+
+  // Google Sheets 마지막 동기화 시간 업데이트
+  async updateGoogleSheetLastSynced(userId: number) {
+    return settingsRepository.updateGoogleSheetLastSynced(userId)
   }
 }
 

@@ -39,6 +39,7 @@ model User {
   wishlists          Wishlist[]
   workflowLogs       WorkflowLog[]
   notifications      Notification[]
+  googleSheetConfig  GoogleSheetConfig?
 
   @@index([shopId])
   @@index([email])
@@ -128,4 +129,21 @@ model AiPromptConfig {
   @@index([promptType])
   @@index([isActive])
   @@map("ai_prompt_config")
+}
+
+model GoogleSheetConfig {
+  id                 Int       @id @default(autoincrement())
+  userId             Int       @unique @map("user_id")
+  serviceAccountJson String    @map("service_account_json") @db.LongText
+  spreadsheetId      String    @map("spreadsheet_id") @db.VarChar(255)
+  sheetName          String?   @map("sheet_name") @db.VarChar(100)
+  isActive           Boolean   @default(true) @map("is_active")
+  lastSyncedAt       DateTime? @map("last_synced_at") @db.Timestamp(0)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
+  @@map("google_sheet_config")
 }

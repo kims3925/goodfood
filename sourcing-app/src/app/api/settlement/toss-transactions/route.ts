@@ -1,5 +1,3 @@
-'use server'
-
 import { NextRequest, NextResponse } from 'next/server'
 
 // 토스페이먼츠 거래 조회 응답 타입
@@ -23,8 +21,10 @@ interface TransactionsSummary {
   totalCount: number
   cardAmount: number
   cardCount: number
-  tossPayAmount: number  // 토스페이(간편결제)
-  tossPayCount: number
+  transferAmount: number  // 계좌이체
+  transferCount: number
+  virtualAccountAmount: number  // 가상계좌
+  virtualAccountCount: number
   canceledAmount: number
   canceledCount: number
   transactions: TossTransaction[]
@@ -117,6 +117,13 @@ async function fetchTransactions(
  */
 export async function GET(request: NextRequest) {
   try {
+    const token = request.cookies.get('auth-token')?.value
+    if (!token) {
+      return NextResponse.json(
+        { success: false, error: '인증이 필요합니다.' },
+        { status: 401 }
+      )
+    }
     const { searchParams } = new URL(request.url)
     const year = searchParams.get('year')
     const month = searchParams.get('month')
@@ -169,8 +176,10 @@ export async function GET(request: NextRequest) {
       totalCount: 0,
       cardAmount: 0,
       cardCount: 0,
-      tossPayAmount: 0,
-      tossPayCount: 0,
+      transferAmount: 0,
+      transferCount: 0,
+      virtualAccountAmount: 0,
+      virtualAccountCount: 0,
       canceledAmount: 0,
       canceledCount: 0,
       transactions: allTransactions,
@@ -201,9 +210,12 @@ export async function GET(request: NextRequest) {
         if (method.includes('카드') || method.includes('card')) {
           summary.cardAmount += tx.amount
           summary.cardCount++
-        } else if (method.includes('토스') || method.includes('toss') || method.includes('간편결제')) {
-          summary.tossPayAmount += tx.amount
-          summary.tossPayCount++
+        } else if (method.includes('계좌이체') || method.includes('transfer')) {
+          summary.transferAmount += tx.amount
+          summary.transferCount++
+        } else if (method.includes('가상계좌') || method.includes('virtualaccount')) {
+          summary.virtualAccountAmount += tx.amount
+          summary.virtualAccountCount++
         }
       }
     }
@@ -226,8 +238,10 @@ export async function GET(request: NextRequest) {
           totalCount: summary.totalCount,
           cardAmount: summary.cardAmount,
           cardCount: summary.cardCount,
-          tossPayAmount: summary.tossPayAmount,
-          tossPayCount: summary.tossPayCount,
+          transferAmount: summary.transferAmount,
+          transferCount: summary.transferCount,
+          virtualAccountAmount: summary.virtualAccountAmount,
+          virtualAccountCount: summary.virtualAccountCount,
           canceledAmount: summary.canceledAmount,
           canceledCount: summary.canceledCount,
           methodTypes: summary.methodTypes  // 디버깅용

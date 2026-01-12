@@ -79,13 +79,7 @@ function buildPostContent(
 ): string {
   const lines: string[] = []
 
-  // 상단 쇼핑몰 링크
-  if (options?.orderLink) {
-    lines.push(`🛒 주문하기 👉 ${options.orderLink}`)
-    lines.push('')
-  }
-
-  // 상품명
+  // 상품명 (맨 위에 노출)
   lines.push(product.name)
   lines.push('')
 

@@ -20,6 +20,7 @@
     "crypto-js": "^4.2.0",
     "dotenv": "^17.2.1",
     "exceljs": "^4.4.0",
+    "googleapis": "^170.0.0",
     "jose": "^4.15.9",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.321.0",

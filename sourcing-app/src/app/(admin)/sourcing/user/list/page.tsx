@@ -49,11 +49,12 @@ export default function ManagerListPage() {
 
   const itemsPerPage = 20
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (overridePage?: number) => {
     setLoading(true)
     try {
+      const currentPage = overridePage ?? page
       const params = new URLSearchParams({
-        page: page.toString(),
+        page: currentPage.toString(),
         limit: itemsPerPage.toString(),
         role: 'MANAGER', // 매니저만 조회
       })
@@ -78,11 +79,10 @@ export default function ManagerListPage() {
     } finally {
       setLoading(false)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search])
+  }, [page, search, toast])
 
   useEffect(() => {
-    fetchUsers()
+    fetchUsers(1)
   }, [fetchUsers])
 
   const handleSearch = () => {
@@ -155,7 +155,7 @@ export default function ManagerListPage() {
                 </Button>
                 <Button
                   variant="secondary"
-                  onClick={fetchUsers}
+                  onClick={() => fetchUsers()}
                   disabled={loading}
                 >
                   <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />

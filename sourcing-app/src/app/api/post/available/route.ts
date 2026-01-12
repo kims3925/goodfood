@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
-// GET: 도매채널에서 수집 가능한 게시물 목록 조회
+// GET: 도매채널에서 수집 가능한 게시물 목록 조회 (오늘 날짜만 - KST 기준)
 export async function GET(request: NextRequest) {
   try {
     // 세션에서 userId 가져오기
@@ -22,8 +22,6 @@ export async function GET(request: NextRequest) {
     const platformParam = searchParams.get('platform') as ChannelPlatform | null
     const platform = platformParam || ChannelPlatform.BAND
     const todayOnly = searchParams.get('todayOnly') === 'true'
-    const startDateParam = searchParams.get('startDate') // YYYY-MM-DD 형식
-    const endDateParam = searchParams.get('endDate')     // YYYY-MM-DD 형식
 
     // 현재 BAND만 지원
     if (platform !== ChannelPlatform.BAND) {
@@ -108,15 +106,14 @@ export async function GET(request: NextRequest) {
       try {
         // Band API 호출
         const bandApiUrl = `https://openapi.band.us/v2/band/posts`
-        const response = await fetch(
-          `${bandApiUrl}?access_token=${accessToken}&band_key=${channel.channelKey}&locale=ko_KR`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
-        )
+        const apiUrl = `${bandApiUrl}?access_token=${accessToken}&band_key=${channel.channelKey}&locale=ko_KR&limit=100`
+
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
 
         if (!response.ok) {
           console.error(`Band API 오류 (${channel.name}):`, await response.text())
@@ -126,7 +123,7 @@ export async function GET(request: NextRequest) {
         const data = await response.json()
 
         if (data.result_data && data.result_data.items) {
-          // 게시물 데이터 변환 (채널 정보 포함) - 댓글 조회 제거하여 API 호출 최소화
+          // 게시물 데이터 변환 (채널 정보 포함)
           const posts = data.result_data.items.map((item: any) => ({
             post_key: item.post_key,
             title: item.content ? item.content.substring(0, 100) : '(제목 없음)',
@@ -134,7 +131,7 @@ export async function GET(request: NextRequest) {
             author: item.author?.name || '알 수 없음',
             created_at: item.created_at || null,
             images: item.photos ? item.photos.map((photo: any) => photo.url) : [],
-            comments: [], // 댓글 조회 제거 - API 호출 최소화
+            comments: [],
             channel: {
               id: channel.id,
               name: channel.name,
@@ -147,7 +144,6 @@ export async function GET(request: NextRequest) {
         }
       } catch (error) {
         console.error(`채널 ${channel.name}의 게시물 조회 실패:`, error)
-        continue
       }
     }
 
@@ -158,31 +154,10 @@ export async function GET(request: NextRequest) {
 
     const totalAvailable = filteredPosts.length
 
-    // 날짜 범위 필터링 (startDate, endDate가 있는 경우 우선 적용)
-    const kstOffset = 9 * 60 * 60 * 1000 // UTC+9
-
-    if (startDateParam && endDateParam) {
-      // 날짜 범위 필터링 (KST 기준)
-      const [startYear, startMonth, startDay] = startDateParam.split('-').map(Number)
-      const [endYear, endMonth, endDay] = endDateParam.split('-').map(Number)
-
-      // KST 기준 시작일 00:00:00 ~ 종료일 23:59:59
-      const rangeStart = Date.UTC(startYear, startMonth - 1, startDay) - kstOffset
-      const rangeEnd = Date.UTC(endYear, endMonth - 1, endDay) - kstOffset + 24 * 60 * 60 * 1000
-
-      filteredPosts = filteredPosts.filter((post) => {
-        if (!post.created_at) return false
-
-        const postTime = post.created_at
-        const postTimeMs = postTime > 9999999999999 ? postTime : (postTime > 9999999999 ? postTime : postTime * 1000)
-
-        return postTimeMs >= rangeStart && postTimeMs < rangeEnd
-      })
-
-      console.log(`[Post Available] 전체: ${totalAvailable}개, ${startDateParam}~${endDateParam}: ${filteredPosts.length}개`)
-    } else if (todayOnly) {
-      // 오늘 게시물만 필터링 (todayOnly=true인 경우)
+    // 오늘 게시물만 필터링 (todayOnly=true인 경우)
+    if (todayOnly) {
       // KST(UTC+9) 기준으로 오늘 날짜 계산
+      const kstOffset = 9 * 60 * 60 * 1000 // UTC+9
       const now = new Date()
       const kstNow = new Date(now.getTime() + kstOffset)
 
@@ -198,12 +173,7 @@ export async function GET(request: NextRequest) {
         const postTime = post.created_at
         const postTimeMs = postTime > 9999999999999 ? postTime : (postTime > 9999999999 ? postTime : postTime * 1000)
 
-        const isToday = postTimeMs >= todayStart && postTimeMs < todayEnd
-
-        // 디버깅: 원본 값과 변환된 시간 출력
-        console.log(`[Post] ${post.post_key}: 원본=${postTime}, 변환=${new Date(postTimeMs).toISOString()} -> ${isToday ? '오늘' : '오늘 아님'}`)
-
-        return isToday
+        return postTimeMs >= todayStart && postTimeMs < todayEnd
       })
 
       console.log(`[Post Available] 전체: ${totalAvailable}개, 오늘(KST): ${filteredPosts.length}개`)

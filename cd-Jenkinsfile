@@ -48,7 +48,7 @@ pipeline {
                 // SSH로 운영 서버에 접속하여 배포 스크립트 실행
                 sshagent(['deploy-ssh-key']) {
                     sh '''
-                        ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_SERVER} 'bash -s' << 'DEPLOY_EOF'
+                        ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_SERVER} "DEPLOY_SERVER=${DEPLOY_SERVER} bash -s" << 'DEPLOY_EOF'
 cd /home/ubuntu/bandauto
 
 echo "=== 배포 시작 ==="
@@ -227,7 +227,7 @@ if echo "$MIGRATE_STATUS" | grep -q "failed"; then
     echo ""
     echo ">>> === 해결 방법 ==="
     echo ">>> 1. 운영 서버에 SSH 접속:"
-    echo ">>>    ssh ubuntu@43.200.225.91"
+    echo ">>>    ssh ubuntu@$DEPLOY_SERVER"
     echo ""
     echo ">>> 2. DB 디렉토리로 이동:"
     echo ">>>    cd /home/ubuntu/bandauto/db"

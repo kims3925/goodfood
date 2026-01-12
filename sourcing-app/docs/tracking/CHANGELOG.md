@@ -21,6 +21,11 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260112-007 | Done | 2026-01-12 | - | 소매밴드 발행 양식 상단 링크 제거 (제목 최상단 노출) | Low | Claude |
+| TR-20260112-006 | Done | 2026-01-12 | - | 토스페이먼츠 거래 API 스키마 변경 (tossPay → transfer/virtualAccount) | Low | Claude |
+| TR-20260112-005 | Done | 2026-01-12 | - | 게시물 수집 날짜 선택 기능 제거 (오늘 날짜만 KST 기준) | Low | Claude |
+| TR-20260112-004 | Done | 2026-01-12 | - | 매니저 관리 페이지 TypeScript 타입 오류 수정 | Low | Claude |
+| TR-20260112-003 | Done | 2026-01-12 | - | 구글 시트 연동 기능 추가 (발주서 동기화) | Low | Claude |
 | TR-20260112-002 | Done | 2026-01-12 | - | 정산 페이지에 결제 상태 구분 및 토스페이먼츠 현황 추가 | Low | Claude |
 | TR-20260112-001 | Done | 2026-01-12 | - | 사용자 관리 메뉴를 매니저/회원으로 분리 | Low | Claude |
 | TR-20260109-002 | Done | 2026-01-09 | - | ShopProduct/ChannelProduct upsert로 Soft Delete 레코드 복원 지원 | Low | Claude |
@@ -134,6 +139,95 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260112-003: 구글 시트 연동 기능 추가 (발주서 동기화)
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-12 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+
+도매 발주서를 구글 시트로 동기화하는 기능 추가:
+
+**1. 구글 시트 설정 페이지**
+- `/sourcing/settings/google-sheets` 페이지 신규 생성
+- Google Cloud 서비스 계정 JSON 파일 업로드
+- 스프레드시트 URL/ID 입력
+- 연결 테스트 기능
+- 사용자별 설정 저장 (SaaS 모델 지원)
+
+**2. 발주서 동기화**
+- 발주서 페이지에 "구글시트" 버튼 추가
+- 엑셀 내보내기와 동일한 양식/서식으로 구글 시트에 동기화
+- 날짜별 그룹핑, 소계/총합계, 발주완료 행 구분
+
+**3. 엑셀과 동일한 서식 적용**
+- 글꼴: Calibri
+- 타이틀: 16pt 굵게, 가운데 정렬, 셀 병합
+- 타이틀 정보: 12pt
+- 날짜 구분선: 파란색(#4472C4) 배경, 흰색 12pt 굵은 글씨, 셀 병합
+- 헤더: 회색(#E0E0E0) 배경, 11pt 굵은 글씨, 가운데 정렬, 테두리
+- 데이터 행: 11pt, 테두리
+- 발주 완료 행: 진한 회색(#D0D0D0) 배경, 테두리
+- 소계: 연파란색(#D9E1F2) 배경, 굵은 글씨, 테두리
+- 총합계: 연노란색(#FFF0C0) 배경, 12pt 굵은 글씨, 테두리
+- 숫자: 천단위 콤마 포맷
+
+**4. API 신규 추가**
+- `GET /api/settings/google-sheets` - 설정 조회
+- `POST /api/settings/google-sheets` - 설정 저장
+- `DELETE /api/settings/google-sheets` - 설정 삭제
+- `POST /api/settings/google-sheets/test` - 연결 테스트
+- `POST /api/admin/wholesale-orders/[id]/sync-sheets` - 동기화 실행
+
+**5. DB 스키마**
+- `GoogleSheetConfig` 모델 추가 (사용자별 구글 시트 설정 저장)
+
+### 변경 파일
+
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| db/prisma/models/user.prisma | Modified | GoogleSheetConfig 모델 추가 |
+| sourcing-app/src/services/google-sheets.service.ts | Added | 구글 시트 동기화 서비스 |
+| sourcing-app/src/app/api/settings/google-sheets/route.ts | Added | 설정 API (GET, POST, DELETE) |
+| sourcing-app/src/app/api/settings/google-sheets/test/route.ts | Added | 연결 테스트 API |
+| sourcing-app/src/app/api/admin/wholesale-orders/[wholesaleChannelId]/sync-sheets/route.ts | Added | 동기화 API |
+| sourcing-app/src/app/(admin)/sourcing/settings/google-sheets/page.tsx | Added | 설정 UI 페이지 |
+| sourcing-app/src/app/(admin)/shop/wholesale-orders/page.tsx | Modified | 구글시트 버튼 추가 |
+| sourcing-app/src/modules/config/domain/src/settings/settings.repository.ts | Modified | GoogleSheetConfig 메서드 추가 |
+| sourcing-app/src/modules/config/domain/src/settings/settings.service.ts | Modified | GoogleSheetConfig 서비스 메서드 추가 |
+| sourcing-app/src/modules/config/domain/src/settings/settings.types.ts | Modified | GoogleSheetSettings 타입 추가 |
+
+### 영향 분석
+
+- [x] API Contract 변경 (신규 API 5개)
+- [x] DB Schema 변경 (GoogleSheetConfig 모델)
+- [x] Domain Logic 변경 (설정 서비스)
+- [ ] Security 변경
+
+### 테스트
+
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+| Manual | Pass |
+
+### 롤백 계획
+
+1. git revert로 해당 커밋 롤백
+2. npx prisma db push로 GoogleSheetConfig 테이블 삭제
+
+### 관련 항목
+
+- REQ-ID: -
+- Flow-ID: Wholesale Orders
+
+---
 
 ## TR-20260112-002: 정산 페이지에 결제 상태 구분 및 토스페이먼츠 현황 추가
 
