@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import type { TossTransaction, TransactionsSummary } from '@bandauto/db'
+import { getCurrentUser } from '@/modules/auth/auth.service'
+import { readShopSettings } from '@/lib/paths'
 
 // 로컬 확장 타입 (methodTypes 포함)
 interface LocalTransactionsSummary extends Omit<TransactionsSummary, 'methodTypes'> {
@@ -7,26 +9,18 @@ interface LocalTransactionsSummary extends Omit<TransactionsSummary, 'methodType
 }
 
 // 토스페이먼츠 API 키 가져오기
-async function getTossPaymentsKeys() {
-  try {
-    const fs = await import('fs')
-    const path = await import('path')
+function getTossPaymentsKeys() {
+  // shop-app 설정 파일에서 키 조회 (환경변수 SHOP_SETTINGS_PATH 지원)
+  const settings = readShopSettings()
 
-    // shop-app의 설정 파일에서 키 조회
-    const shopAppPath = path.join(process.cwd(), '..', 'shop-app', 'data', 'shop-settings.json')
-
-    if (fs.existsSync(shopAppPath)) {
-      const fileContent = fs.readFileSync(shopAppPath, 'utf-8')
-      const settings = JSON.parse(fileContent)
-      return {
-        secretKey: settings.tossSecretKey || process.env.TOSS_PAYMENTS_SECRET_KEY || '',
-        clientKey: settings.tossClientKey || process.env.TOSS_PAYMENTS_CLIENT_KEY || ''
-      }
+  if (settings) {
+    return {
+      secretKey: (settings.tossSecretKey as string) || process.env.TOSS_PAYMENTS_SECRET_KEY || '',
+      clientKey: (settings.tossClientKey as string) || process.env.TOSS_PAYMENTS_CLIENT_KEY || ''
     }
-  } catch (error) {
-    console.error('토스페이먼츠 키 조회 실패:', error)
   }
 
+  // 환경변수 폴백
   return {
     secretKey: process.env.TOSS_PAYMENTS_SECRET_KEY || '',
     clientKey: process.env.TOSS_PAYMENTS_CLIENT_KEY || ''
@@ -89,10 +83,10 @@ async function fetchTransactions(
  * - year: 조회 연도 (필수)
  * - month: 조회 월 (필수)
  */
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
-    const token = request.cookies.get('auth-token')?.value
-    if (!token) {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
       return NextResponse.json(
         { success: false, error: '인증이 필요합니다.' },
         { status: 401 }
@@ -119,7 +113,7 @@ export async function GET(request: NextRequest) {
     const endDate = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}T23:59:59`
 
     // API 키 조회
-    const keys = await getTossPaymentsKeys()
+    const keys = getTossPaymentsKeys()
 
     if (!keys.secretKey) {
       return NextResponse.json(

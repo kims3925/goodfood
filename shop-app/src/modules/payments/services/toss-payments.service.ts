@@ -359,6 +359,8 @@ export async function getTransactions(
   const allTransactions: TossTransaction[] = []
   let cursor: string | undefined = undefined
   let hasMore = true
+  let pageCount = 0
+  const maxPages = 10  // 무한 루프 방지
 
   // 페이지네이션으로 모든 거래 조회
   while (hasMore) {
@@ -366,6 +368,13 @@ export async function getTransactions(
     allTransactions.push(...response.data)
     hasMore = response.hasMore
     cursor = response.lastCursor
+    pageCount++
+
+    // 무한 루프 방지: 최대 페이지 수 초과 시 중단
+    if (pageCount >= maxPages) {
+      console.warn(`토스페이먼츠 거래 조회: 최대 페이지(${maxPages}) 도달, 조회 중단`)
+      break
+    }
   }
 
   // 거래 요약 계산
@@ -396,14 +405,16 @@ export async function getTransactions(
       summary.totalAmount += tx.amount
       summary.totalCount++
 
-      // 결제 수단별 집계
-      if (tx.method === '카드') {
+      // 결제 수단별 집계 (다양한 값 처리 - route.ts와 일관성 유지)
+      const method = tx.method?.toLowerCase() || ''
+
+      if (method.includes('카드') || method.includes('card')) {
         summary.cardAmount += tx.amount
         summary.cardCount++
-      } else if (tx.method === '계좌이체') {
+      } else if (method.includes('계좌이체') || method.includes('transfer')) {
         summary.transferAmount += tx.amount
         summary.transferCount++
-      } else if (tx.method === '가상계좌') {
+      } else if (method.includes('가상계좌') || method.includes('virtualaccount')) {
         summary.virtualAccountAmount += tx.amount
         summary.virtualAccountCount++
       }

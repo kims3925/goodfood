@@ -3,22 +3,24 @@ export const dynamic = 'force-dynamic'
 /**
  * Band Session Extension 다운로드 API
  * 확장 프로그램을 zip 파일로 다운로드
+ *
+ * 환경변수: EXTENSION_PATH로 경로 지정 가능
  */
 
 import { NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
 import archiver from 'archiver'
+import { checkExtensionPath } from '@/lib/paths'
 
 export async function GET() {
   try {
-    // 확장 프로그램 폴더 경로
-    const extensionPath = path.join(process.cwd(), '..', 'band-session-extension')
+    // 확장 프로그램 폴더 경로 (환경변수 EXTENSION_PATH 지원)
+    const { exists, path: extensionPath } = checkExtensionPath()
 
     // 폴더 존재 확인
-    if (!fs.existsSync(extensionPath)) {
+    if (!exists) {
+      console.error(`[extension/download] 폴더 없음: ${extensionPath}`)
       return NextResponse.json(
-        { success: false, error: '확장 프로그램 폴더를 찾을 수 없습니다.' },
+        { success: false, error: `확장 프로그램 폴더를 찾을 수 없습니다. (경로: ${extensionPath})` },
         { status: 404 }
       )
     }

@@ -26,7 +26,14 @@ export async function POST(
     }
 
     const { wholesaleChannelId } = await params
-    const channelId = parseInt(wholesaleChannelId)
+    const channelId = parseInt(wholesaleChannelId, 10)
+
+    if (Number.isNaN(channelId)) {
+      return NextResponse.json(
+        { success: false, error: `유효하지 않은 도매처 ID입니다: ${wholesaleChannelId}` },
+        { status: 400 }
+      )
+    }
 
     // 도매처 정보 조회
     const channel = await prisma.channel.findUnique({
@@ -300,7 +307,7 @@ export async function POST(
   } catch (error: any) {
     console.error('구글 시트 동기화 실패:', error)
 
-    if (error.message.includes('설정')) {
+    if (error.message?.includes('설정')) {
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 400 }
