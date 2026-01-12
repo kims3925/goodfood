@@ -877,3 +877,85 @@ interface SyncSheetsResponse {
 
 **변경 이력:**
 - TR-20260112-003: 신규 API 추가
+
+---
+
+### GET /api/post/available
+
+도매채널에서 수집 가능한 게시물 목록을 조회합니다.
+
+**인증:** 필수 (JWT)
+
+**쿼리 파라미터:**
+
+| Param | Type | Default | 설명 |
+|-------|------|---------|------|
+| platform | ChannelPlatform | BAND | 플랫폼 (현재 BAND만 지원) |
+| todayOnly | string | false | "true"인 경우 오늘(KST) 게시물만 필터링 |
+
+**응답 스키마:**
+
+```typescript
+interface PostAvailableResponse {
+  success: true
+  data: Array<{
+    post_key: string        // Band 게시물 키
+    title: string           // 게시물 제목 (내용 앞 100자)
+    content: string         // 게시물 전체 내용
+    author: string          // 작성자명
+    created_at: number      // 작성 시각 (Unix timestamp, 초 단위)
+    images: string[]        // 이미지 URL 배열
+    comments: any[]         // 댓글 배열
+    channel: {
+      id: number
+      name: string
+      channelKey: string
+      coverUrl: string | null
+    }
+  }>
+  todayOnly: boolean        // 오늘 필터 적용 여부
+  totalAvailable: number    // 전체 수집 가능 게시물 수
+  todayCount: number        // 오늘 게시물 수
+}
+```
+
+**응답 예시:**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "post_key": "AAA...",
+      "title": "신상품 입고 안내",
+      "content": "신상품 입고 안내...",
+      "author": "도매처A",
+      "created_at": 1736640000,
+      "images": ["https://..."],
+      "comments": [],
+      "channel": {
+        "id": 1,
+        "name": "도매채널A",
+        "channelKey": "BBB...",
+        "coverUrl": null
+      }
+    }
+  ],
+  "todayOnly": true,
+  "totalAvailable": 150,
+  "todayCount": 12
+}
+```
+
+**에러:**
+
+| Code | HTTP | 설명 |
+|------|------|-----|
+| 400 | Bad Request | Band API 설정 미완료 |
+| 401 | Unauthorized | 로그인 필요 |
+| 500 | Internal Server Error | 게시물 조회 실패 |
+
+**기능 설명:**
+- 사용자의 도매채널(WHOLESALE)에서 Band API를 통해 게시물 조회
+- 이미 수집한 게시물(CollectedPost)은 자동 제외
+- `todayOnly=true` 시 KST 기준 오늘 게시물만 필터링

@@ -584,3 +584,45 @@ Prisma 스키마의 인덱스 이름을 명시적으로 지정하여 DB 인덱�
 #### Risk Level
 
 Low (스키마 메타데이터 변경, 기존 데이터 영향 없음)
+
+---
+
+### 2026-01-12: GoogleSheetConfig 모델 추가
+
+**TR-ID**: TR-20260112-003
+
+#### 변경 내용
+
+구글 시트 연동 설정을 저장하는 `GoogleSheetConfig` 모델 추가
+
+#### GoogleSheetConfig (구글 시트 설정)
+
+| 필드 | 타입 | 설명 |
+|-----|-----|-----|
+| id | Int | PK |
+| userId | Int | 사용자 FK (Unique) |
+| serviceAccountJson | String | 서비스 계정 JSON (LongText) |
+| spreadsheetId | String | 스프레드시트 ID |
+| sheetName | String? | 시트 탭 이름 (선택) |
+| isActive | Boolean | 활성 상태 (기본: true) |
+| lastSyncedAt | DateTime? | 마지막 동기화 시각 |
+| createdAt | DateTime | 생성일시 |
+| updatedAt | DateTime | 수정일시 |
+
+**Relations:**
+- `user` - 소유자 (onDelete: Cascade)
+
+**Unique:** `userId` - 사용자당 1개 설정만 가능
+
+**인덱스:**
+- `google_sheet_config_user_id_idx` - userId
+- `google_sheet_config_is_active_idx` - isActive
+
+#### 용도
+
+- 도매 주문 발주서를 구글 시트로 동기화
+- 서비스 계정 기반 인증으로 사용자 개입 없이 자동 동기화 지원
+
+#### Risk Level
+
+Low (신규 테이블 추가, 기존 스키마 영향 없음)

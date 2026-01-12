@@ -295,6 +295,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 - REQ-ID: -
 - Flow-ID: Collection (게시물 수집)
+- 문서 업데이트:
+  - [docs/API.md](../API.md#get-apipostavailable): GET /api/post/available API 문서 추가
 
 ---
 
@@ -435,6 +437,9 @@ TR-{YYYYMMDD}-{NUMBER}
 
 - REQ-ID: -
 - Flow-ID: Wholesale Orders
+- 문서 업데이트:
+  - [docs/API.md](../API.md#google-sheets-api-tr-20260112-003): Google Sheets API 문서 추가
+  - [docs/DATABASE.md](../DATABASE.md#2026-01-12-googlesheetconfig-모델-추가): GoogleSheetConfig 모델 문서 추가
 
 ---
 
@@ -498,6 +503,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 - REQ-ID: -
 - Flow-ID: Settlement
+- 문서 업데이트:
+  - [docs/API.md](../API.md#get-apisettlementtoss-transactions): 토스페이먼츠 거래 조회 API 문서 추가
 
 ---
 
