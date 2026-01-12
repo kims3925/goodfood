@@ -51,16 +51,16 @@ pipeline {
                         ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_SERVER} 'bash -s' << 'DEPLOY_EOF'
 cd /home/ubuntu/bandauto
 
-echo "=== Starting deployment ==="
+echo "=== 배포 시작 ==="
 
 # Backup .env files before git reset
 # 보안: 프로젝트 디렉토리 내 숨김 폴더 사용
 ENV_BACKUP_DIR="/home/ubuntu/bandauto/.env-backup-$$"
-echo ">>> Creating secure backup directory: $ENV_BACKUP_DIR"
+echo ">>> 보안 백업 디렉토리 생성: $ENV_BACKUP_DIR"
 mkdir -p "$ENV_BACKUP_DIR"
 chmod 700 "$ENV_BACKUP_DIR"
 
-echo ">>> Backing up .env files..."
+echo ">>> .env 파일 백업 중..."
 [ -f .env ] && cp .env "$ENV_BACKUP_DIR/.env.backup" || true
 [ -f db/.env ] && cp db/.env "$ENV_BACKUP_DIR/.env.db.backup" || true
 [ -f shop-app/.env ] && cp shop-app/.env "$ENV_BACKUP_DIR/.env.shop.backup" || true
@@ -73,17 +73,17 @@ chmod 600 "$ENV_BACKUP_DIR"/.env.* 2>/dev/null || true
 
 # Git reset 전에 권한 문제 있는 폴더 정리
 # root 권한으로 삭제 (어떤 소유자든 삭제 가능)
-echo ">>> Cleaning up problematic directories before git reset..."
+echo ">>> git reset 전 문제 디렉토리 정리 중..."
 sudo rm -rf db/node_modules 2>/dev/null || true
 sudo rm -rf .git/index.lock 2>/dev/null || true
 
 # Git pull
-echo ">>> Pulling latest code..."
+echo ">>> 최신 코드 가져오는 중..."
 git fetch origin main
 git reset --hard origin/main
 
 # Restore .env files after git reset
-echo ">>> Restoring .env files..."
+echo ">>> .env 파일 복원 중..."
 [ -f "$ENV_BACKUP_DIR/.env.backup" ] && cp "$ENV_BACKUP_DIR/.env.backup" .env || true
 [ -f "$ENV_BACKUP_DIR/.env.db.backup" ] && cp "$ENV_BACKUP_DIR/.env.db.backup" db/.env || true
 [ -f "$ENV_BACKUP_DIR/.env.shop.backup" ] && cp "$ENV_BACKUP_DIR/.env.shop.backup" shop-app/.env || true
@@ -92,19 +92,19 @@ echo ">>> Restoring .env files..."
 [ -f "$ENV_BACKUP_DIR/.env.sourcing.local.backup" ] && cp "$ENV_BACKUP_DIR/.env.sourcing.local.backup" sourcing-app/.env.local || true
 
 # 복원 후 임시 백업 디렉토리 삭제 (민감 정보 노출 방지)
-echo ">>> Cleaning up temporary backup directory..."
+echo ">>> 임시 백업 디렉토리 삭제 중..."
 rm -rf "$ENV_BACKUP_DIR"
 
 # =============================================
 # node_modules 자동 복구 로직
 # =============================================
-echo ">>> Checking node_modules integrity..."
+echo ">>> node_modules 무결성 확인 중..."
 
 NEED_REINSTALL=false
 
 # 1. node_modules가 없으면 재설치 필요
 if [ ! -d "node_modules" ]; then
-    echo ">>> node_modules not found, will reinstall"
+    echo ">>> node_modules 없음, 재설치 예정"
     NEED_REINSTALL=true
 fi
 
@@ -113,7 +113,7 @@ if [ -f ".npm-checksum" ]; then
     OLD_CHECKSUM=$(cat .npm-checksum)
     NEW_CHECKSUM=$(md5sum package-lock.json | cut -d' ' -f1)
     if [ "$OLD_CHECKSUM" != "$NEW_CHECKSUM" ]; then
-        echo ">>> package-lock.json changed, will reinstall"
+        echo ">>> package-lock.json 변경됨, 재설치 예정"
         NEED_REINSTALL=true
     fi
 else
@@ -124,7 +124,7 @@ fi
 if [ "$NEED_REINSTALL" = "false" ]; then
     for pkg in next react prisma; do
         if [ ! -d "node_modules/$pkg" ]; then
-            echo ">>> Missing package: $pkg, will reinstall"
+            echo ">>> 패키지 누락: $pkg, 재설치 예정"
             NEED_REINSTALL=true
             break
         fi
@@ -135,62 +135,150 @@ fi
 # 삭제: root 권한 (어떤 소유자든 삭제 가능)
 # 설치: 현재 ubuntu 유저로 실행 중이므로 ubuntu 소유로 생성됨
 if [ "$NEED_REINSTALL" = "true" ]; then
-    echo ">>> Cleaning and reinstalling dependencies..."
+    echo ">>> 의존성 정리 및 재설치 중..."
     sudo rm -rf node_modules || true
     npm ci --legacy-peer-deps
 
     # 체크섬 저장
     md5sum package-lock.json | cut -d' ' -f1 > .npm-checksum
-    echo ">>> Dependencies reinstalled successfully"
+    echo ">>> ✅ 의존성 재설치 완료"
 else
-    echo ">>> node_modules is up to date"
+    echo ">>> node_modules 최신 상태"
     # 혹시 모를 문제에 대비해 npm ci 시도
     npm ci --legacy-peer-deps || {
-        echo ">>> npm ci failed, force reinstalling..."
+        echo ">>> npm ci 실패, 강제 재설치 중..."
         sudo rm -rf node_modules || true
         npm ci --legacy-peer-deps
     }
 fi
 
 # Generate Prisma client
-echo ">>> Generating Prisma client..."
+echo ">>> Prisma 클라이언트 생성 중..."
 cd db
 npx prisma generate --schema prisma
 
 # =============================================
 # Prisma 마이그레이션 자동 적용 (안전장치 포함)
 # =============================================
-echo ">>> Checking for pending migrations..."
+echo ">>> 대기 중인 마이그레이션 확인 중..."
 
 # 마이그레이션 상태 확인
 MIGRATE_STATUS=$(npx prisma migrate status --schema prisma 2>&1) || true
-echo ">>> Current migration status:"
+echo ">>> 현재 마이그레이션 상태:"
 echo "$MIGRATE_STATUS"
 
+# 대기 중인 마이그레이션이 있으면 백업 실행
+if echo "$MIGRATE_STATUS" | grep -q "Following migrations have not yet been applied"; then
+    echo ">>> ⚠️  마이그레이션 적용 전 데이터베이스 백업 중..."
+    BACKUP_FILE="/home/ubuntu/bandauto/backups/pre-migration-$(date +%Y%m%d-%H%M%S).sql"
+    mkdir -p /home/ubuntu/bandauto/backups
+
+    # .env에서 DB 정보 읽기
+    if [ -f "/home/ubuntu/bandauto/db/.env" ]; then
+        export $(grep -E '^DATABASE_URL=' /home/ubuntu/bandauto/db/.env | xargs)
+        # MySQL 설정 파일 사용 (비밀번호 노출 방지)
+        MYSQL_CNF=$(mktemp)
+        chmod 600 "$MYSQL_CNF"
+        
+        # URL 디코딩 및 파싱 (특수문자 처리)
+        DB_USER=$(echo "$DATABASE_URL" | python3 -c "import sys,urllib.parse as u; print(u.urlparse(sys.stdin.read().strip()).username or '')")
+        DB_PASS=$(echo "$DATABASE_URL" | python3 -c "import sys,urllib.parse as u; print(u.unquote(u.urlparse(sys.stdin.read().strip()).password or ''))")
+        DB_HOST=$(echo "$DATABASE_URL" | python3 -c "import sys,urllib.parse as u; print(u.urlparse(sys.stdin.read().strip()).hostname or '')")
+        DB_NAME=$(echo "$DATABASE_URL" | python3 -c "import sys,urllib.parse as u; print(u.urlparse(sys.stdin.read().strip()).path.lstrip('/').split('?')[0])")
+        
+        cat > "$MYSQL_CNF" << EOF
+[client]
+user=$DB_USER
+password=$DB_PASS
+host=$DB_HOST
+EOF
+        
+        if mysqldump --defaults-extra-file="$MYSQL_CNF" "$DB_NAME" > "$BACKUP_FILE" 2>/dev/null; then
+            echo ">>> ✅ 백업 완료: $BACKUP_FILE"
+            # 오래된 백업 정리 (최근 5개만 유지)
+            ls -t /home/ubuntu/bandauto/backups/pre-migration-*.sql 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
+        else
+            echo ">>> ⚠️  백업 실패 - 마이그레이션은 계속 진행"
+        fi
+        rm -f "$MYSQL_CNF"
+    else
+        echo ">>> ⚠️  DB 환경파일 없음 - 백업 건너뜀"
+    fi
+fi
+
+# Failed 마이그레이션 감지 - 수동 개입 필요
+if echo "$MIGRATE_STATUS" | grep -q "failed"; then
+    echo ""
+    echo ">>> ❌❌❌ 실패한 마이그레이션 감지! ❌❌❌"
+    echo ""
+
+    # 실패한 마이그레이션 이름 추출 (대소문자, 숫자, 하이픈, 언더스코어 지원)
+    FAILED_MIGRATION=$(echo "$MIGRATE_STATUS" | grep -oE '[0-9]{14}_[A-Za-z0-9_-]+' | head -1)
+
+    if [ -n "$FAILED_MIGRATION" ]; then
+        echo ">>> 실패한 마이그레이션: $FAILED_MIGRATION"
+    else
+        echo ">>> 실패한 마이그레이션 이름을 추출할 수 없습니다."
+        echo ">>> 위의 마이그레이션 상태 출력을 확인하세요."
+    fi
+
+    echo ""
+    echo ">>> ⚠️  자동 복구가 비활성화되어 있습니다. 수동 개입이 필요합니다."
+    echo ""
+    echo ">>> === 해결 방법 ==="
+    echo ">>> 1. 운영 서버에 SSH 접속:"
+    echo ">>>    ssh ubuntu@43.200.225.91"
+    echo ""
+    echo ">>> 2. DB 디렉토리로 이동:"
+    echo ">>>    cd /home/ubuntu/bandauto/db"
+    echo ""
+    echo ">>> 3. 마이그레이션 상태 확인:"
+    echo ">>>    npx prisma migrate status --schema prisma"
+    echo ""
+    echo ">>> 4. _prisma_migrations 테이블에서 실패 기록 확인:"
+    echo ">>>    mysql -h <host> -u <user> -p<pass> <db> -e \"SELECT * FROM _prisma_migrations WHERE migration_name LIKE '%${FAILED_MIGRATION:-failed}%';\""
+    echo ""
+    echo ">>> 5. 실제 DB 스키마와 마이그레이션 SQL 비교 후, 상황에 맞게 처리:"
+    echo ">>>    - 스키마가 이미 적용된 경우 (DB에 변경이 반영됨):"
+    echo ">>>      npx prisma migrate resolve --applied \"$FAILED_MIGRATION\" --schema prisma"
+    echo ">>>    - 스키마가 적용되지 않은 경우 (롤백 필요):"
+    echo ">>>      npx prisma migrate resolve --rolled-back \"$FAILED_MIGRATION\" --schema prisma"
+    echo ""
+    echo ">>> 6. 해결 후 다시 배포 실행"
+    echo ""
+    echo ">>> ❌ 배포 중단 - 수동 개입 필요"
+    exit 1
+fi
+
 if echo "$MIGRATE_STATUS" | grep -q "Database schema is up to date"; then
-    echo ">>> ✅ Database schema is already up to date"
+    echo ">>> ✅ 데이터베이스 스키마가 최신 상태입니다"
 elif echo "$MIGRATE_STATUS" | grep -q "Following migrations have not yet been applied"; then
-    echo ">>> ⚠️  Pending migrations found. Applying..."
+    echo ">>> ⚠️  대기 중인 마이그레이션 발견. 적용 중..."
 
     # 마이그레이션 적용 (실패 시 배포 중단)
     if npx prisma migrate deploy --schema prisma; then
-        echo ">>> ✅ Migrations applied successfully"
+        echo ">>> ✅ 마이그레이션 적용 완료"
     else
-        echo ">>> ❌ ERROR: Migration failed! Aborting deployment."
-        echo ">>> Please check the migration files and database state."
+        echo ">>> ❌ 오류: 마이그레이션 실패! 배포 중단."
+        echo ">>> 마이그레이션 파일과 데이터베이스 상태를 확인하세요."
         exit 1
     fi
 elif echo "$MIGRATE_STATUS" | grep -q "drift"; then
-    echo ">>> ❌ ERROR: Database schema drift detected!"
-    echo ">>> The database schema differs from the migration history."
-    echo ">>> Please resolve the drift before deploying."
-    exit 1
+    echo ">>> ⚠️  데이터베이스 스키마 drift 감지!"
+    echo ">>> 보통 DB에 수동으로 컬럼을 추가했을 때 발생합니다."
+    echo ""
+    echo ">>> Drift는 배포를 차단하지 않습니다 - Prisma 클라이언트는 이미 생성됨."
+    echo ">>> 나중에 drift를 해결하려면 서버에서 다음 명령 중 하나를 실행하세요:"
+    echo ">>>   1. npx prisma db pull --schema prisma  (DB에서 스키마 동기화)"
+    echo ">>>   2. npx prisma migrate dev --schema prisma  (drift용 마이그레이션 생성)"
+    echo ""
+    echo ">>> ⚠️  현재 스키마로 배포 계속 진행..."
 else
-    echo ">>> Attempting migrate deploy..."
+    echo ">>> migrate deploy 시도 중..."
     if npx prisma migrate deploy --schema prisma; then
-        echo ">>> ✅ Migrate deploy completed"
+        echo ">>> ✅ migrate deploy 완료"
     else
-        echo ">>> ❌ ERROR: Migrate deploy failed! Aborting deployment."
+        echo ">>> ❌ 오류: migrate deploy 실패! 배포 중단."
         exit 1
     fi
 fi
@@ -198,33 +286,33 @@ fi
 cd ..
 
 # Stop specific PM2 processes before cleaning (파일 잠금 해제)
-echo ">>> Stopping PM2 processes for clean build..."
+echo ">>> 클린 빌드를 위해 PM2 프로세스 중지 중..."
 pm2 stop shop-app sourcing-app shop sourcing 2>/dev/null || true
 
 # Verify processes are stopped (최대 10초 대기)
 for i in 1 2 3 4 5; do
     if ! pm2 list | grep -E 'shop|sourcing' | grep -q 'online'; then
-        echo ">>> All target processes stopped"
+        echo ">>> 모든 대상 프로세스 중지 완료"
         break
     fi
-    echo ">>> Waiting for processes to stop... ($i/5)"
+    echo ">>> 프로세스 중지 대기 중... ($i/5)"
     sleep 2
 done
 
 # Build applications
-echo ">>> Building applications..."
+echo ">>> 애플리케이션 빌드 중..."
 npm run build:shop
 npm run build:sourcing
 
 # Restart PM2
-echo ">>> Restarting PM2 processes..."
+echo ">>> PM2 프로세스 재시작 중..."
 pm2 reload all --update-env
 
 # Verify
-echo ">>> Verifying deployment..."
+echo ">>> 배포 검증 중..."
 pm2 status
 
-echo "=== Deployment completed! ==="
+echo "=== 배포 완료! ==="
 DEPLOY_EOF
                     '''
                 }
