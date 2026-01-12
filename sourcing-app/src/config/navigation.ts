@@ -47,7 +47,7 @@ export const sourcingMenuItems: MenuItem[] = [
     label: '수집',
     icon: Database,
     children: [
-      { label: '수집 게시물', href: '/sourcing/post/list', icon: FileText },
+      { label: '게시물 수집', href: '/sourcing/post/list', icon: FileText },
       { label: '수집 상품', href: '/sourcing/collected-product/list', icon: Database },
     ],
   },

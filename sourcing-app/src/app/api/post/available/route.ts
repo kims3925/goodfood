@@ -22,6 +22,8 @@ export async function GET(request: NextRequest) {
     const platformParam = searchParams.get('platform') as ChannelPlatform | null
     const platform = platformParam || ChannelPlatform.BAND
     const todayOnly = searchParams.get('todayOnly') === 'true'
+    const startDateParam = searchParams.get('startDate') // YYYY-MM-DD 형식
+    const endDateParam = searchParams.get('endDate')     // YYYY-MM-DD 형식
 
     // 현재 BAND만 지원
     if (platform !== ChannelPlatform.BAND) {
@@ -156,11 +158,32 @@ export async function GET(request: NextRequest) {
 
     const totalAvailable = filteredPosts.length
 
-    // 오늘 게시물만 필터링 (todayOnly=true인 경우)
-    if (todayOnly) {
+    // 날짜 범위 필터링 (startDate, endDate가 있는 경우 우선 적용)
+    const kstOffset = 9 * 60 * 60 * 1000 // UTC+9
+
+    if (startDateParam && endDateParam) {
+      // 날짜 범위 필터링 (KST 기준)
+      const [startYear, startMonth, startDay] = startDateParam.split('-').map(Number)
+      const [endYear, endMonth, endDay] = endDateParam.split('-').map(Number)
+
+      // KST 기준 시작일 00:00:00 ~ 종료일 23:59:59
+      const rangeStart = Date.UTC(startYear, startMonth - 1, startDay) - kstOffset
+      const rangeEnd = Date.UTC(endYear, endMonth - 1, endDay) - kstOffset + 24 * 60 * 60 * 1000
+
+      filteredPosts = filteredPosts.filter((post) => {
+        if (!post.created_at) return false
+
+        const postTime = post.created_at
+        const postTimeMs = postTime > 9999999999999 ? postTime : (postTime > 9999999999 ? postTime : postTime * 1000)
+
+        return postTimeMs >= rangeStart && postTimeMs < rangeEnd
+      })
+
+      console.log(`[Post Available] 전체: ${totalAvailable}개, ${startDateParam}~${endDateParam}: ${filteredPosts.length}개`)
+    } else if (todayOnly) {
+      // 오늘 게시물만 필터링 (todayOnly=true인 경우)
       // KST(UTC+9) 기준으로 오늘 날짜 계산
       const now = new Date()
-      const kstOffset = 9 * 60 * 60 * 1000 // UTC+9
       const kstNow = new Date(now.getTime() + kstOffset)
 
       // KST 기준 오늘 00:00:00 ~ 23:59:59

@@ -126,6 +126,15 @@ export default function PostsManagePage() {
   const [totalCount, setTotalCount] = useState(0)
   const [failedCount, setFailedCount] = useState(0)
 
+  // 날짜 범위 필터 상태
+  const getToday = () => {
+    const now = new Date()
+    return now.toISOString().split('T')[0] // YYYY-MM-DD
+  }
+  const [startDate, setStartDate] = useState(getToday())
+  const [endDate, setEndDate] = useState(getToday())
+  const [showDatePicker, setShowDatePicker] = useState(false)
+
   // 채널 목록 로드
   const loadChannels = useCallback(async () => {
     try {
@@ -207,7 +216,7 @@ export default function PostsManagePage() {
   }
 
   // 플랫폼별 게시물 로드 함수
-  const loadPostsByPlatform = useCallback(async (platform: ChannelPlatform) => {
+  const loadPostsByPlatform = useCallback(async (platform: ChannelPlatform, start?: string, end?: string) => {
     setIsLoadingPosts(true)
     setApiError(null)
     setAvailablePosts([])
@@ -217,7 +226,14 @@ export default function PostsManagePage() {
     setExpandedBandKeys([])
 
     try {
-      const response = await fetch(`/api/post/available?platform=${platform}&todayOnly=true`)
+      // 날짜 범위가 있으면 startDate/endDate 파라미터 사용, 없으면 todayOnly
+      const dateStart = start || startDate
+      const dateEnd = end || endDate
+      const params = new URLSearchParams({ platform })
+      params.set('startDate', dateStart)
+      params.set('endDate', dateEnd)
+
+      const response = await fetch(`/api/post/available?${params}`)
       const data = await response.json()
 
       if (data.success) {
@@ -232,7 +248,7 @@ export default function PostsManagePage() {
     } finally {
       setIsLoadingPosts(false)
     }
-  }, [])
+  }, [startDate, endDate])
 
   // 플랫폼 선택 핸들러
   const handlePlatformSelect = (platform: ChannelPlatform) => {
@@ -848,14 +864,81 @@ export default function PostsManagePage() {
             </div>
           </div>
 
-          {/* 오늘 날짜 안내 */}
+          {/* 날짜 범위 선택 */}
           <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
             <CalendarDays size={20} className="text-blue-600 flex-shrink-0" />
-            <p className="text-sm text-blue-800">
-              <span className="font-bold">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-              <span className="ml-1">에 작성된 게시물만 표시됩니다.</span>
-            </p>
+            <div className="flex-1 flex items-center gap-2 flex-wrap">
+              <p className="text-sm text-blue-800">
+                <span className="font-bold">
+                  {new Date(startDate + 'T00:00:00').toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </span>
+                <span className="mx-1">~</span>
+                <span className="font-bold">
+                  {new Date(endDate + 'T00:00:00').toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </span>
+                <span className="ml-1">에 작성된 게시물이 표시됩니다.</span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDatePicker(!showDatePicker)}
+              className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors flex items-center gap-1"
+            >
+              <CalendarDays size={16} />
+              기간 설정
+            </button>
           </div>
+
+          {/* 날짜 선택 팝업 */}
+          {showDatePicker && (
+            <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+              <div className="flex items-end gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">시작일</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    max={endDate}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <span className="text-gray-400 pb-2">~</span>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">종료일</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    min={startDate}
+                    max={getToday()}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const today = getToday()
+                    setStartDate(today)
+                    setEndDate(today)
+                  }}
+                  className="px-3 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  오늘
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDatePicker(false)
+                    loadPostsByPlatform(selectedPlatform, startDate, endDate)
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                >
+                  적용
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* 게시물 목록 영역 - 고정 높이 */}
           <div className="h-[700px] overflow-hidden">
