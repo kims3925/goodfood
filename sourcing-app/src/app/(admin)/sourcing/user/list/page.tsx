@@ -5,16 +5,12 @@ import { useRouter } from 'next/navigation'
 import {
   Search,
   RefreshCw,
-  Users,
   ChevronLeft,
   ChevronRight,
   Mail,
   Phone,
-  ShoppingBag,
-  MessageSquare,
-  Star,
-  UserCheck,
-  Store,
+  UserCog,
+  Plus,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -31,38 +27,22 @@ import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 
-interface Shop {
-  id: number
-  name: string
-  subdomain: string
-}
-
 interface User {
   id: number
-  shopId: number | null
   email: string
   name: string | null
   phone: string | null
-  role: 'USER'
+  role: 'MANAGER'
   profileImage: string | null
   createdAt: string
-  signupCompletedAt: string | null
-  registeredShop: Shop | null
-  _count: {
-    orders: number
-    inquiries: number
-    reviews: number
-  }
 }
 
-export default function MemberListPage() {
+export default function ManagerListPage() {
   const router = useRouter()
   const toast = useToast()
   const [users, setUsers] = useState<User[]>([])
-  const [shops, setShops] = useState<Shop[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [shopFilter, setShopFilter] = useState<number | null>(null)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [stats, setStats] = useState({ total: 0 })
@@ -75,33 +55,31 @@ export default function MemberListPage() {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: itemsPerPage.toString(),
-        role: 'USER', // 회원만 조회
+        role: 'MANAGER', // 매니저만 조회
       })
 
       if (search) params.set('search', search)
-      if (shopFilter) params.set('shopId', shopFilter.toString())
 
       const res = await fetch(`/api/user?${params}`)
       const data = await res.json()
 
       if (res.ok && data.users) {
         setUsers(data.users)
-        setShops(data.shops || [])
-        setStats({ total: data.stats?.USER || 0 })
+        setStats({ total: data.stats?.MANAGER || 0 })
         setTotalPages(data.pagination.totalPages)
       } else if (res.status === 401) {
         console.log('인증이 필요합니다')
       } else {
-        toast.error(data.error || '회원 목록을 불러오는데 실패했습니다.')
+        toast.error(data.error || '매니저 목록을 불러오는데 실패했습니다.')
       }
     } catch (error) {
-      console.error('회원 로드 실패:', error)
-      toast.error('회원 목록을 불러오는데 실패했습니다.')
+      console.error('매니저 로드 실패:', error)
+      toast.error('매니저 목록을 불러오는데 실패했습니다.')
     } finally {
       setLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search, shopFilter])
+  }, [page, search])
 
   useEffect(() => {
     fetchUsers()
@@ -124,23 +102,32 @@ export default function MemberListPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">회원 관리</h1>
-          <p className="text-gray-600">
-            쇼핑몰 회원을 관리합니다.
-          </p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">매니저 관리</h1>
+            <p className="text-gray-600">
+              소싱 앱을 관리하는 매니저 계정을 관리합니다.
+            </p>
+          </div>
+          <Button
+            onClick={() => router.push('/sourcing/user/create')}
+            className="flex items-center gap-2"
+          >
+            <Plus size={18} />
+            매니저 추가
+          </Button>
         </div>
 
         {/* 통계 카드 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <UserCheck size={24} className="text-green-600" />
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <UserCog size={24} className="text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">전체 회원</p>
-                <p className="text-2xl font-bold text-green-600">{stats.total}</p>
+                <p className="text-sm text-gray-500">전체 매니저</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
               </div>
             </div>
           </div>
@@ -149,31 +136,8 @@ export default function MemberListPage() {
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-4 border-b border-gray-200">
-            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-              {/* 왼쪽: 쇼핑몰 필터 */}
-              <div className="flex flex-wrap gap-3 items-center">
-                {/* 쇼핑몰 필터 */}
-                <div className="flex items-center gap-2">
-                  <Store size={16} className="text-gray-500" />
-                  <select
-                    value={shopFilter ?? ''}
-                    onChange={(e) => {
-                      setShopFilter(e.target.value ? parseInt(e.target.value) : null)
-                      setPage(1)
-                    }}
-                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">전체 쇼핑몰</option>
-                    {shops.map((shop) => (
-                      <option key={shop.id} value={shop.id}>
-                        {shop.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* 오른쪽: 검색 + 새로고침 */}
+            <div className="flex gap-4 items-center justify-end">
+              {/* 검색 + 새로고침 */}
               <div className="flex gap-2 items-center">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -209,24 +173,20 @@ export default function MemberListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[5%]">순서</TableHead>
-                  <TableHead className="w-[30%]">회원</TableHead>
-                  <TableHead className="w-[15%]">소속 쇼핑몰</TableHead>
-                  <TableHead className="w-[10%] text-center">주문</TableHead>
-                  <TableHead className="w-[10%] text-center">문의</TableHead>
-                  <TableHead className="w-[10%] text-center">리뷰</TableHead>
-                  <TableHead className="w-[15%]">가입일</TableHead>
+                  <TableHead className="w-[10%]">순서</TableHead>
+                  <TableHead className="w-[60%]">매니저</TableHead>
+                  <TableHead className="w-[30%]">가입일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.length === 0 ? (
-                  <TableEmpty message="등록된 회원이 없습니다." />
+                  <TableEmpty message="등록된 매니저가 없습니다." />
                 ) : (
                   users.map((user, index) => (
                     <TableRow
                       key={user.id}
                       className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/shop/user/detail/${user.id}`)}
+                      onClick={() => router.push(`/sourcing/user/detail/${user.id}`)}
                     >
                       <TableCell>
                         <span className="text-gray-500 text-sm">
@@ -242,8 +202,8 @@ export default function MemberListPage() {
                               className="w-10 h-10 rounded-full object-cover"
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                              <UserCheck className="w-5 h-5 text-green-500" />
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                              <UserCog className="w-5 h-5 text-blue-500" />
                             </div>
                           )}
                           <div>
@@ -261,34 +221,6 @@ export default function MemberListPage() {
                               </div>
                             )}
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {user.registeredShop ? (
-                          <div className="flex items-center gap-1.5">
-                            <Store size={14} className="text-gray-400" />
-                            <span className="text-gray-900">{user.registeredShop.name}</span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1 text-gray-600">
-                          <ShoppingBag className="w-4 h-4" />
-                          <span>{user._count.orders}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1 text-gray-600">
-                          <MessageSquare className="w-4 h-4" />
-                          <span>{user._count.inquiries}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1 text-gray-600">
-                          <Star className="w-4 h-4" />
-                          <span>{user._count.reviews}</span>
                         </div>
                       </TableCell>
                       <TableCell>

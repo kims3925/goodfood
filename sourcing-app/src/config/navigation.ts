@@ -77,6 +77,7 @@ export const sourcingMenuItems: MenuItem[] = [
       { label: '프롬프트 / 가격 정책', href: '/sourcing/settings/prompt', icon: FileText },
     ],
   },
+  { label: '매니저 관리', href: '/sourcing/user/list', icon: Users },
   {
     label: '정책 관리',
     icon: Shield,
@@ -112,7 +113,7 @@ export const shopMenuItems: MenuItem[] = [
   { label: '리뷰 관리', href: '/shop/reviews/list', icon: Star },
   { label: '쿠폰', href: '/shop/coupon/list', icon: Ticket },
   { label: '알림 관리', href: '/shop/notification', icon: Bell },
-  { label: '사용자 관리', href: '/shop/user/list', icon: Users },
+  { label: '회원 관리', href: '/shop/user/list', icon: Users },
   {
     label: '정책 관리',
     icon: Shield,
@@ -154,6 +155,7 @@ export const sourcingPathToMenuMap: Record<string, string> = {
   '/sourcing/automation': '자동화',
   '/sourcing/notification': '알림 관리',
   '/sourcing/settings': '설정',
+  '/sourcing/user': '매니저 관리',
   '/shop/policy': '정책 관리',
 }
 
@@ -163,7 +165,7 @@ export const shopPathToMenuMap: Record<string, string> = {
   '/shop/order': '주문',
   '/shop/wholesale-orders': '주문',
   '/shop/settlement': '정산',
-  '/shop/user': '사용자 관리',
+  '/shop/user': '회원 관리',
   '/shop/cs': '고객 문의',
   '/shop/reviews': '리뷰 관리',
   '/shop/coupon': '쿠폰',
