@@ -83,12 +83,14 @@ export async function GET(
     }
 
     // 1. 회원 주문 조회
+    // 발주 완료(completed)는 paidAt 기준, 발주 대기(pending)는 orderedAt 기준
+    const dateFieldName = statusFilter === 'completed' ? 'paidAt' : 'orderedAt'
     const memberItems = await prisma.orderItem.findMany({
       where: {
         order: {
           status: { in: orderStatuses },
           paidAt: { not: null },
-          ...(dateFilter && { orderedAt: dateFilter }),
+          ...(dateFilter && { [dateFieldName]: dateFilter }),
         },
         shopProduct: productCondition,
       },
@@ -161,7 +163,7 @@ export async function GET(
         guestOrder: {
           status: { in: orderStatuses },
           paidAt: { not: null },
-          ...(dateFilter && { orderedAt: dateFilter }),
+          ...(dateFilter && { [dateFieldName]: dateFilter }),
         },
         shopProduct: productCondition,
       },

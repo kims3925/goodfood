@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260113-001 | Done | 2026-01-13 | - | 발주 이력 날짜별 필터링 버그 수정 | Low | Claude |
 | TR-20260112-007 | Done | 2026-01-12 | - | 소매밴드 발행 양식 상단 링크 제거 (제목 최상단 노출) | Low | Claude |
 | TR-20260112-006 | Done | 2026-01-12 | - | 토스페이먼츠 거래 API 스키마 변경 (tossPay → transfer/virtualAccount) | Low | Claude |
 | TR-20260112-005 | Done | 2026-01-12 | - | 게시물 수집 날짜 선택 기능 제거 (오늘 날짜만 KST 기준) | Low | Claude |
@@ -139,6 +140,61 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260113-001: 발주 이력 날짜별 필터링 버그 수정
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-13 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+
+도매처별 발주 완료 이력 페이지에서 날짜 필터가 작동하지 않던 버그 수정:
+
+**문제**
+- 발주 완료 이력 페이지에서 날짜를 변경해도 모든 날짜의 데이터가 동일하게 표시됨
+- 프론트엔드에서 `from`, `to` 파라미터를 전송하지만 API에서 무시됨
+
+**해결**
+- API에서 `from`, `to` 쿼리 파라미터를 파싱하여 날짜 필터 적용
+- 회원 주문(`OrderItem`)과 비회원 주문(`GuestOrderItem`) 모두에 `orderedAt` 필터 적용
+- `from` 날짜는 00:00:00, `to` 날짜는 23:59:59로 시간 설정
+
+### 변경 파일
+
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| sourcing-app/src/app/api/admin/wholesale-orders/[wholesaleChannelId]/items/route.ts | Modified | from/to 날짜 필터 파싱 및 적용 |
+
+### 영향 분석
+
+- [x] API Contract 변경 (기존 파라미터 동작 수정)
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+
+| 유형 | 상태 |
+|-----|-----|
+| TypeScript Build | Pass |
+
+### 롤백 계획
+
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+
+- REQ-ID: -
+- Flow-ID: Wholesale Orders
+- 문서 업데이트:
+  - [docs/API.md](../API.md#get-apiadminwholesale-orderswholesalechanneliditems): 날짜 필터 파라미터 문서화
+
+---
 
 ## TR-20260112-007: 소매밴드 발행 양식 상단 링크 제거 (제목 최상단 노출)
 

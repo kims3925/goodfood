@@ -959,3 +959,130 @@ interface PostAvailableResponse {
 - 사용자의 도매채널(WHOLESALE)에서 Band API를 통해 게시물 조회
 - 이미 수집한 게시물(CollectedPost)은 자동 제외
 - `todayOnly=true` 시 KST 기준 오늘 게시물만 필터링
+
+---
+
+### GET /api/admin/wholesale-orders/[wholesaleChannelId]/items
+
+도매처별 상세 주문 목록을 조회합니다. (회원 + 비회원 주문 통합)
+
+**인증:** 필수 (JWT)
+
+**경로 파라미터:**
+
+| Param | Type | 설명 |
+|-------|------|------|
+| wholesaleChannelId | number | 도매처(채널) ID |
+
+**쿼리 파라미터:**
+
+| Param | Type | Default | 설명 |
+|-------|------|---------|------|
+| page | number | 1 | 페이지 번호 |
+| limit | number | 50 | 페이지당 항목 수 |
+| status | string | "pending" | 주문 상태 필터 ("pending": 발주대기, "completed": 발주완료) |
+| from | string | - | 시작 날짜 (ISO 8601, 예: "2026-01-01") |
+| to | string | - | 종료 날짜 (ISO 8601, 예: "2026-01-31") |
+
+**요청 예시:**
+
+```http
+GET /api/admin/wholesale-orders/1/items?status=completed&from=2026-01-01&to=2026-01-13&page=1&limit=50
+```
+
+**응답 스키마:**
+
+```typescript
+interface WholesaleOrderItemsResponse {
+  success: true
+  data: {
+    items: UnifiedOrderItem[]
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+    }
+    summary: {
+      totalQuantity: number  // 총 수량
+      totalAmount: number    // 총 금액
+    }
+  }
+}
+
+interface UnifiedOrderItem {
+  orderItemId: number
+  orderId: number           // 발주완료 처리용
+  orderNumber: string
+  orderedAt: string         // ISO 8601 날짜
+  isMember: boolean         // 회원 주문 여부
+  retailChannelName: string // 소매 채널명
+  productName: string
+  optionSummary: string
+  quantity: number
+  productAmount: number     // 상품금액 (도매가 × 수량)
+  shippingFee: number       // 배송비 (합배송 단위 계산)
+  totalAmount: number       // 합산금액 (상품금액 + 배송비)
+  customerName: string
+  customerPhone: string     // 마스킹됨 (010-****-5678)
+  customerAddress: string
+  postalCode: string
+}
+```
+
+**응답 예시:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "orderItemId": 123,
+        "orderId": 456,
+        "orderNumber": "ORD-20260113-001",
+        "orderedAt": "2026-01-13T10:30:00.000Z",
+        "isMember": true,
+        "retailChannelName": "마이쇼핑몰",
+        "productName": "상품명",
+        "optionSummary": "색상: 블랙, 사이즈: M",
+        "quantity": 2,
+        "productAmount": 40000,
+        "shippingFee": 3000,
+        "totalAmount": 43000,
+        "customerName": "홍길동",
+        "customerPhone": "010-****-5678",
+        "customerAddress": "서울시 강남구 테헤란로 123",
+        "postalCode": "06234"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 50,
+      "total": 25,
+      "totalPages": 1
+    },
+    "summary": {
+      "totalQuantity": 45,
+      "totalAmount": 1500000
+    }
+  }
+}
+```
+
+**상태 필터:**
+
+| status | 조회 대상 주문 상태 |
+|--------|-------------------|
+| pending | PAID, PREPARING (발주 대기) |
+| completed | SHIPPED, DELIVERED (발주 완료) |
+
+**에러:**
+
+| Code | HTTP | 설명 |
+|------|------|-----|
+| 401 | Unauthorized | 인증 필요 |
+| 500 | Internal Server Error | 조회 실패 |
+
+**변경 이력:**
+- TR-20260113-001: `from`, `to` 날짜 필터 파라미터 동작 수정 (기존 무시 → 정상 동작)
