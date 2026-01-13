@@ -361,7 +361,7 @@ TR-{YYYYMMDD}-{NUMBER}
 | Author | Claude |
 | Date | 2026-01-12 |
 | REQ-ID | - |
-| Risk | Low |
+| Risk | Medium |
 
 ### 변경 사항
 
@@ -421,7 +421,7 @@ TR-{YYYYMMDD}-{NUMBER}
 - [x] API Contract 변경 (신규 API 5개)
 - [x] DB Schema 변경 (GoogleSheetConfig 모델)
 - [x] Domain Logic 변경 (설정 서비스)
-- [ ] Security 변경
+- [x] Security 변경 (서비스 계정 인증 정보 관리)
 
 ### 테스트
 
