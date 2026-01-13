@@ -204,11 +204,14 @@ export default function SettlementListPage() {
   }, [fetchData])
 
   // 토스페이먼츠 거래 조회
-  const fetchTossTransactions = useCallback(async () => {
+  const fetchTossTransactions = useCallback(async (signal?: AbortSignal) => {
     setTossLoading(true)
     setTossError(null)
     try {
-      const res = await fetch(`/api/settlement/toss-transactions?year=${selectedYear}&month=${selectedMonth}`)
+      const res = await fetch(
+        `/api/settlement/toss-transactions?year=${selectedYear}&month=${selectedMonth}`,
+        { signal }
+      )
       const result = await res.json()
 
       if (result.success) {
@@ -217,15 +220,19 @@ export default function SettlementListPage() {
         setTossError(result.error || '거래 조회에 실패했습니다.')
       }
     } catch (error) {
-      console.error('토스페이먼츠 거래 조회 실패:', error)
-      setTossError('거래 조회 중 오류가 발생했습니다.')
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('토스페이먼츠 거래 조회 실패:', error)
+        setTossError('거래 조회 중 오류가 발생했습니다.')
+      }
     } finally {
       setTossLoading(false)
     }
   }, [selectedYear, selectedMonth])
 
   useEffect(() => {
-    fetchTossTransactions()
+    const controller = new AbortController()
+    fetchTossTransactions(controller.signal)
+    return () => controller.abort()
   }, [fetchTossTransactions])
 
   const formatPrice = (price: number | null) => {
@@ -399,10 +406,11 @@ export default function SettlementListPage() {
               e.stopPropagation()
               openSettlementModal(shop)
             }}
-            className={`w-full py-2 rounded-lg text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${unsettledCount > 0
+            className={`w-full py-2 rounded-lg text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+              unsettledCount > 0
                 ? 'bg-blue-500 hover:bg-blue-600'
                 : 'bg-gray-400 hover:bg-gray-500'
-              }`}
+            }`}
           >
             <CheckCircle size={14} />
             {unsettledCount > 0 ? `정산하기 (${formatPrice(unsettledAmount)})` : '전체 정산 완료'}
@@ -492,7 +500,7 @@ export default function SettlementListPage() {
               <div className="flex items-center gap-2">
                 <select
                   value={selectedYear}
-                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
                   className="px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50"
                 >
                   {Array.from({ length: 3 }, (_, i) => new Date().getFullYear() - 1 + i).map((y) => (
@@ -501,7 +509,7 @@ export default function SettlementListPage() {
                 </select>
                 <select
                   value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                  onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
                   className="px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50"
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
@@ -515,17 +523,20 @@ export default function SettlementListPage() {
                 >
                   <RefreshCw size={20} className={`text-white ${tossLoading ? 'animate-spin' : ''}`} />
                 </button>
-                {getTossDashboardUrl() && (
-                  <a
-                    href={getTossDashboardUrl()!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
-                    title="토스페이먼츠 대시보드"
-                  >
-                    <ExternalLink size={20} className="text-white" />
-                  </a>
-                )}
+                {(() => {
+                  const tossDashboardUrl = getTossDashboardUrl()
+                  return tossDashboardUrl && (
+                    <a
+                      href={tossDashboardUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                      title="토스페이먼츠 대시보드"
+                    >
+                      <ExternalLink size={20} className="text-white" />
+                    </a>
+                  )
+                })()}
               </div>
             </div>
 
@@ -609,8 +620,8 @@ export default function SettlementListPage() {
               </div>
             ) : null}
 
-            {/* 디버깅: method 타입들 표시 */}
-            {tossData?.summary.methodTypes && tossData.summary.methodTypes.length > 0 && (
+            {/* 디버깅: method 타입들 표시 (개발 환경에서만) */}
+            {process.env.NODE_ENV === 'development' && tossData?.summary.methodTypes && tossData.summary.methodTypes.length > 0 && (
               <div className="mt-4 text-xs text-blue-200">
                 결제수단 종류: {tossData.summary.methodTypes.join(', ')}
               </div>

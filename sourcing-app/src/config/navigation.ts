@@ -23,6 +23,7 @@ import {
   Shield,
   ScrollText,
   Lock,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
@@ -75,6 +76,7 @@ export const sourcingMenuItems: MenuItem[] = [
       { label: 'API', href: '/sourcing/settings/api', icon: Link2 },
       { label: 'AI', href: '/sourcing/settings/ai', icon: Bot },
       { label: '프롬프트 / 가격 정책', href: '/sourcing/settings/prompt', icon: FileText },
+      { label: '구글 시트', href: '/sourcing/settings/google-sheets', icon: FileSpreadsheet },
     ],
   },
   { label: '매니저 관리', href: '/sourcing/user/list', icon: Users },

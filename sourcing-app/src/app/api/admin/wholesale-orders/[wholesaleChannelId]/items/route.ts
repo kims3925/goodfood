@@ -49,6 +49,25 @@ export async function GET(
     const limit = parseInt(searchParams.get('limit') || '50')
     // status 파라미터: pending(발주대기), completed(발주완료), 미지정시 pending
     const statusFilter = searchParams.get('status') || 'pending'
+    // 날짜 필터 (from, to)
+    const fromParam = searchParams.get('from')
+    const toParam = searchParams.get('to')
+
+    // 날짜 필터 설정
+    let dateFilter: { gte?: Date; lte?: Date } | undefined
+    if (fromParam || toParam) {
+      dateFilter = {}
+      if (fromParam) {
+        const fromDate = new Date(fromParam)
+        fromDate.setHours(0, 0, 0, 0)
+        dateFilter.gte = fromDate
+      }
+      if (toParam) {
+        const toDate = new Date(toParam)
+        toDate.setHours(23, 59, 59, 999)
+        dateFilter.lte = toDate
+      }
+    }
 
     // status 필터에 따라 조회할 주문 상태 결정
     const orderStatuses: CustomerOrderStatus[] = statusFilter === 'completed'
@@ -69,6 +88,7 @@ export async function GET(
         order: {
           status: { in: orderStatuses },
           paidAt: { not: null },
+          ...(dateFilter && { orderedAt: dateFilter }),
         },
         shopProduct: productCondition,
       },
@@ -141,6 +161,7 @@ export async function GET(
         guestOrder: {
           status: { in: orderStatuses },
           paidAt: { not: null },
+          ...(dateFilter && { orderedAt: dateFilter }),
         },
         shopProduct: productCondition,
       },
