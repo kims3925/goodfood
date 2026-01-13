@@ -21,9 +21,26 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const wholesaleChannelId = searchParams.get('wholesaleChannelId')
 
-    // 날짜 필터 없이 발주 대기(PAID, PREPARING) 상태의 모든 주문 조회
+    // 공통 쿼리 조건 (도매처 필터) - Product.channelId가 도매처를 가리킴
+    const channelFilter = wholesaleChannelId ? { id: parseInt(wholesaleChannelId) } : undefined
 
-    // 도매처별 집계 맵
+    // 모든 도매처 조회 (주문 유무와 관계없이)
+    const allWholesaleChannels = await prisma.channel.findMany({
+      where: {
+        userId: user.userId,
+        kind: 'WHOLESALE',
+        isActive: true,
+        ...channelFilter,
+      },
+      select: {
+        id: true,
+        name: true,
+        coverUrl: true,
+      },
+      orderBy: { name: 'asc' },
+    })
+
+    // 도매처별 집계 맵 (모든 도매처로 초기화)
     const wholesaleSummaryMap = new Map<number, {
       wholesaleChannelId: number
       wholesaleChannelName: string
@@ -33,8 +50,17 @@ export async function GET(request: NextRequest) {
       totalAmount: number
     }>()
 
-    // 공통 쿼리 조건 (도매처 필터) - Product.channelId가 도매처를 가리킴
-    const channelFilter = wholesaleChannelId ? { id: parseInt(wholesaleChannelId) } : undefined
+    // 모든 도매처를 Map에 초기화 (주문이 없어도 표시)
+    for (const channel of allWholesaleChannels) {
+      wholesaleSummaryMap.set(channel.id, {
+        wholesaleChannelId: channel.id,
+        wholesaleChannelName: channel.name,
+        wholesaleChannelCoverUrl: channel.coverUrl,
+        totalOrders: new Set(),
+        totalQuantity: 0,
+        totalAmount: 0,
+      })
+    }
 
     // 1. 회원 주문 (Order + OrderItem) 조회 - Product.channelId 사용 (소싱 출처)
     // 발주 대기 주문만 조회 (PAID, PREPARING)
