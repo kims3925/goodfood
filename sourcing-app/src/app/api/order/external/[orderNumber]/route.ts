@@ -38,7 +38,6 @@ export async function GET(
         shop: {
           userId: user.userId,
         },
-        deletedAt: null,
       },
       include: {
         items: {
@@ -109,7 +108,6 @@ export async function GET(
       where: {
         orderNumber,
         userId: user.userId,
-        deletedAt: null,
       },
       include: {
         items: {
@@ -264,7 +262,6 @@ export async function PATCH(
         shop: {
           userId: user.userId,
         },
-        deletedAt: null,
       },
     })
 
@@ -297,7 +294,6 @@ export async function PATCH(
       where: {
         orderNumber,
         userId: user.userId,
-        deletedAt: null,
       },
     })
 

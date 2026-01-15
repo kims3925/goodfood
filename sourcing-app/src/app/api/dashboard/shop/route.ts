@@ -186,11 +186,22 @@ export async function GET(request: NextRequest) {
         shippingAddress: true,
         items: {
           include: {
-            variant: { select: { bundleUnit: true } },
+            variant: {
+              select: {
+                bundleUnit: true,
+                wholesalePrice: true,
+              },
+            },
             shopProduct: {
               include: {
                 product: {
-                  select: { id: true, shippingFee: true, bundleMaxQty: true, bundleShippingType: true },
+                  select: {
+                    id: true,
+                    shippingFee: true,
+                    bundleMaxQty: true,
+                    bundleShippingType: true,
+                    wholesalePrice: true,
+                  },
                 },
               },
             },
@@ -210,11 +221,22 @@ export async function GET(request: NextRequest) {
         shippingAddress: true,
         items: {
           include: {
-            variant: { select: { bundleUnit: true } },
+            variant: {
+              select: {
+                bundleUnit: true,
+                wholesalePrice: true,
+              },
+            },
             shopProduct: {
               include: {
                 product: {
-                  select: { id: true, shippingFee: true, bundleMaxQty: true, bundleShippingType: true },
+                  select: {
+                    id: true,
+                    shippingFee: true,
+                    bundleMaxQty: true,
+                    bundleShippingType: true,
+                    wholesalePrice: true,
+                  },
                 },
               },
             },
@@ -334,6 +356,7 @@ export async function GET(request: NextRequest) {
         } else if (item.shopProduct?.product?.wholesalePrice) {
           wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
         }
+
         memberProductMargin += (unitPrice - wholesalePrice) * item.quantity
       }
     }
@@ -352,6 +375,7 @@ export async function GET(request: NextRequest) {
         } else if (item.shopProduct?.product?.wholesalePrice) {
           wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
         }
+
         guestProductMargin += (unitPrice - wholesalePrice) * item.quantity
       }
     }
