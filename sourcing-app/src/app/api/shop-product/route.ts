@@ -97,6 +97,7 @@ export async function GET(request: NextRequest) {
             thumbnailUrl: true,
             price: true,
             shippingFee: true,
+            bundleShippingType: true,
             variants: {
               where: {
                 deletedAt: null,

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import { calculateSellingPrice, BundleShippingType } from '@/lib/price-calculator'
 
 interface Shop {
   id: number
@@ -42,6 +43,8 @@ interface ShopProduct {
     name: string
     thumbnailUrl: string | null
     price: number | null
+    shippingFee: number | null
+    bundleShippingType: BundleShippingType
     variants: ProductVariant[]
   }
   shop: {
@@ -56,7 +59,9 @@ interface OrderItem {
   quantity: number
   productName: string
   optionSummary: string
-  unitPrice: number
+  basePrice: number  // 소매가 (배송비 제외)
+  shippingFee: number
+  bundleShippingType: BundleShippingType
   thumbnailUrl: string | null
 }
 
@@ -214,13 +219,16 @@ export default function ExternalOrderNewPage() {
       setOrderItems(prev => prev.filter((_, i) => i !== existingIndex))
     } else {
       // 없으면 새로 추가
+      const productBasePrice = selectedVariant?.price || Number(product.price) || 0
       const newItem: OrderItem = {
         shopProductId: shopProduct.id,
         variantId: selectedVariant?.id || null,
         quantity: 1,
         productName: product.name,
         optionSummary: selectedVariant?.optionSummary || '',
-        unitPrice: selectedVariant?.price || Number(product.price) || 0,
+        basePrice: productBasePrice,
+        shippingFee: product.shippingFee || 0,
+        bundleShippingType: product.bundleShippingType,
         thumbnailUrl: product.thumbnailUrl,
       }
       setOrderItems(prev => [...prev, newItem])
@@ -251,11 +259,24 @@ export default function ExternalOrderNewPage() {
     setOrderItems(prev => prev.filter((_, i) => i !== index))
   }
 
-  // 합계 계산
-  const totalAmount = orderItems.reduce(
-    (sum, item) => sum + item.unitPrice * item.quantity,
-    0
-  )
+  // 합배송 적용 합계 계산
+  const calculateTotalWithShipping = () => {
+    let total = 0
+
+    for (const item of orderItems) {
+      if (item.bundleShippingType === 'INCLUDED') {
+        // 배송비 포함: 소매가만 곱함 (배송비 이미 포함)
+        total += item.basePrice * item.quantity
+      } else {
+        // 배송비 별도: 소매가 * 수량 + 배송비 1번
+        total += item.basePrice * item.quantity + item.shippingFee
+      }
+    }
+
+    return total
+  }
+
+  const totalAmount = calculateTotalWithShipping()
 
   // 폼 유효성 검사
   const isFormValid = () => {
@@ -547,9 +568,14 @@ export default function ExternalOrderNewPage() {
                       {shopProducts.map((sp) => {
                         const hasVariants = sp.product.variants.length > 0
                         const hasMultipleVariants = sp.product.variants.length > 1
-                        const basePrice = hasVariants
+                        const productBasePrice = hasVariants
                           ? sp.product.variants[0].price
                           : Number(sp.product.price) || 0
+                        const basePrice = calculateSellingPrice(
+                          productBasePrice,
+                          sp.product.shippingFee || 0,
+                          sp.product.bundleShippingType
+                        )
                         const isExpanded = expandedProductId === sp.id
 
                         // 이 상품의 총 장바구니 수량 (모든 옵션 합계)
@@ -625,6 +651,11 @@ export default function ExternalOrderNewPage() {
                               <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
                                 {sp.product.variants.map((variant) => {
                                   const variantInCart = getItemQuantity(sp.id, variant.id)
+                                  const variantSellingPrice = calculateSellingPrice(
+                                    variant.price,
+                                    sp.product.shippingFee || 0,
+                                    sp.product.bundleShippingType
+                                  )
                                   return (
                                     <button
                                       key={variant.id}
@@ -643,7 +674,7 @@ export default function ExternalOrderNewPage() {
                                         <span className="truncate">{variant.optionSummary || '기본'}</span>
                                         <span className="font-medium ml-1 flex-shrink-0">
                                           {variantInCart > 0 && <Check size={12} className="inline mr-1" />}
-                                          {variant.price.toLocaleString()}원
+                                          {variantSellingPrice.toLocaleString()}원
                                         </span>
                                       </div>
                                     </button>
@@ -706,7 +737,7 @@ export default function ExternalOrderNewPage() {
                           <p className="text-sm text-gray-500">{item.optionSummary}</p>
                         )}
                         <p className="text-sm font-semibold text-blue-600">
-                          {item.unitPrice.toLocaleString()}원
+                          {calculateSellingPrice(item.basePrice, item.shippingFee, item.bundleShippingType).toLocaleString()}원
                         </p>
                       </div>
 
@@ -732,7 +763,13 @@ export default function ExternalOrderNewPage() {
                       {/* 소계 */}
                       <div className="text-right w-24">
                         <p className="font-bold text-gray-900">
-                          {(item.unitPrice * item.quantity).toLocaleString()}원
+                          {(() => {
+                            if (item.bundleShippingType === 'INCLUDED') {
+                              return (item.basePrice * item.quantity).toLocaleString()
+                            } else {
+                              return (item.basePrice * item.quantity + item.shippingFee).toLocaleString()
+                            }
+                          })()}원
                         </p>
                       </div>
 
