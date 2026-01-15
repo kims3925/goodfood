@@ -41,17 +41,17 @@ export async function GET(
       include: {
         items: {
           include: {
+            variant: {
+              select: {
+                optionSummary: true,
+              },
+            },
             shopProduct: {
               include: {
                 product: {
                   select: {
                     name: true,
                     thumbnailUrl: true,
-                  },
-                },
-                variant: {
-                  select: {
-                    optionSummary: true,
                   },
                 },
               },
@@ -91,7 +91,7 @@ export async function GET(
           items: guestOrder.items.map(item => ({
             id: item.id,
             productName: item.shopProduct.product.name,
-            optionSummary: item.shopProduct.variant?.optionSummary || null,
+            optionSummary: item.variant?.optionSummary || null,
             thumbnailUrl: item.shopProduct.product.thumbnailUrl,
             quantity: item.quantity,
             unitPrice: Number(item.unitPrice),
@@ -112,17 +112,17 @@ export async function GET(
       include: {
         items: {
           include: {
+            variant: {
+              select: {
+                optionSummary: true,
+              },
+            },
             shopProduct: {
               include: {
                 product: {
                   select: {
                     name: true,
                     thumbnailUrl: true,
-                  },
-                },
-                variant: {
-                  select: {
-                    optionSummary: true,
                   },
                 },
               },
@@ -169,7 +169,7 @@ export async function GET(
           items: memberOrder.items.map(item => ({
             id: item.id,
             productName: item.shopProduct.product.name,
-            optionSummary: item.shopProduct.variant?.optionSummary || null,
+            optionSummary: item.variant?.optionSummary || null,
             thumbnailUrl: item.shopProduct.product.thumbnailUrl,
             quantity: item.quantity,
             unitPrice: Number(item.unitPrice),
