@@ -21,6 +21,9 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260115-006 | Done | 2026-01-15 | - | 대시보드 마진 계산에 도매가 정보 추가 | Low | Claude |
+| TR-20260115-005 | Done | 2026-01-15 | - | 도매주문 발주완료 상태를 PREPARING으로 변경 | Low | Claude |
+| TR-20260115-004 | Done | 2026-01-15 | - | 토스페이먼츠 결제 수단 타입 정리 | Low | Claude |
 | TR-20260115-003 | Done | 2026-01-15 | - | Turbopack 활성화로 개발 서버 성능 개선 | Low | Claude |
 | TR-20260115-002 | Done | 2026-01-15 | - | 차트 렌더링 오류 및 CSS 파싱 오류 수정 | Low | Claude |
 | TR-20260115-001 | Done | 2026-01-15 | - | 외부 주문 추가에서 합배송 반영 가격 계산 | Medium | Claude |
