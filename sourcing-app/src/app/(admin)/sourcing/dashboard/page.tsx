@@ -895,7 +895,7 @@ export default function AutomationDashboardPage() {
             </h3>
 
             {/* recharts 선 그래프 */}
-            <div className="h-72">
+            <div style={{ width: '100%', height: '288px' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={stats.hourlyStats.map(h => ({
@@ -953,8 +953,8 @@ export default function AutomationDashboardPage() {
                             y={12}
                             textAnchor="middle"
                             fill={isScheduled ? '#ffffff' : '#9ca3af'}
-                            fontSize={isScheduled ? 10 : 11}
-                            fontWeight={isScheduled ? 600 : 400}
+                            fontSize={isScheduled ? "10px" : "11px"}
+                            fontWeight={isScheduled ? "600" : "400"}
                           >
                             {hour.toString().padStart(2, '0')}
                           </text>

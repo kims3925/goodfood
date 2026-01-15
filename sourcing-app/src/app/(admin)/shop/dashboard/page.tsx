@@ -357,7 +357,7 @@ export default function ShopDashboardPage() {
             <h3 className="text-lg font-semibold text-gray-900">매출 추이</h3>
           </div>
           {revenueChart.length > 0 ? (
-            <div className="h-72">
+            <div style={{ width: '100%', height: '288px' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={revenueChart}>
                   <defs>
@@ -404,7 +404,7 @@ export default function ShopDashboardPage() {
           </div>
           {orderStatusChart.length > 0 ? (
             <>
-              <div className="h-48">
+              <div style={{ width: '100%', height: '192px' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
