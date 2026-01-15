@@ -97,12 +97,22 @@ export default function ExternalOrderNewPage() {
   // 주문 메모
   const [memo, setMemo] = useState('')
 
+  // 결제금액 (null이면 자동 계산, 값이 있으면 수동 입력)
+  const [customTotalAmount, setCustomTotalAmount] = useState<number | null>(null)
+
   // 옵션 선택 모드 (열린 상품 ID)
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null)
 
   // 제출 상태
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  // 모달 상태
+  const [addressLoadingModal, setAddressLoadingModal] = useState(false)
+  const [successModal, setSuccessModal] = useState<{ show: boolean; orderNumber: string }>({
+    show: false,
+    orderNumber: '',
+  })
 
   // Daum 우편번호 스크립트 로드
   useEffect(() => {
@@ -193,7 +203,7 @@ export default function ExternalOrderNewPage() {
         },
       }).open()
     } else {
-      alert('주소 검색 서비스를 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
+      setAddressLoadingModal(true)
     }
   }
 
@@ -260,7 +270,8 @@ export default function ExternalOrderNewPage() {
   }
 
   // 합배송 적용 합계 계산
-  const calculateTotalWithShipping = () => {
+  // 자동 계산된 합계
+  const calculateAutoTotal = () => {
     let total = 0
 
     for (const item of orderItems) {
@@ -274,6 +285,11 @@ export default function ExternalOrderNewPage() {
     }
 
     return total
+  }
+
+  // 실제 표시할 결제금액 (수동 입력 우선, 없으면 자동 계산)
+  const calculateTotalWithShipping = () => {
+    return customTotalAmount !== null ? customTotalAmount : calculateAutoTotal()
   }
 
   const totalAmount = calculateTotalWithShipping()
@@ -323,14 +339,14 @@ export default function ExternalOrderNewPage() {
             quantity: item.quantity,
           })),
           memo: memo.trim() || undefined,
+          customTotalAmount: customTotalAmount !== null ? customTotalAmount : undefined,
         }),
       })
 
       const data = await res.json()
 
       if (data.success) {
-        alert(`외부 주문이 생성되었습니다.\n주문번호: ${data.data.orderNumber}`)
-        router.push('/shop/order/list')
+        setSuccessModal({ show: true, orderNumber: data.data.orderNumber })
       } else {
         setError(data.error || '주문 생성에 실패했습니다.')
       }
@@ -804,15 +820,65 @@ export default function ExternalOrderNewPage() {
 
             {/* 합계 및 버튼 */}
             <div className="rounded-xl bg-white p-6 shadow-sm border border-gray-100">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <div className="mb-6 space-y-4">
+                {/* 자동 계산 금액 */}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">자동 계산 금액</span>
+                  <span className="font-medium text-gray-700">
+                    {calculateAutoTotal().toLocaleString()}원
+                  </span>
+                </div>
+
+                {/* 결제금액 입력 */}
                 <div>
-                  <p className="text-sm text-gray-500">주문 합계</p>
-                  <p className="text-3xl font-bold text-blue-600">
-                    {totalAmount.toLocaleString()}원
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    최종 결제금액 *
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      value={customTotalAmount !== null ? customTotalAmount : ''}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === '') {
+                          setCustomTotalAmount(null)
+                        } else {
+                          const num = parseInt(value, 10)
+                          if (!isNaN(num) && num >= 0) {
+                            setCustomTotalAmount(num)
+                          }
+                        }
+                      }}
+                      placeholder={`자동: ${calculateAutoTotal().toLocaleString()}원`}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setCustomTotalAmount(null)}
+                      disabled={customTotalAmount === null}
+                    >
+                      자동 적용
+                    </Button>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    할인이나 협의된 가격이 있다면 직접 입력하세요. 비워두면 자동 계산됩니다.
                   </p>
                 </div>
-                <div className="text-sm text-gray-500">
-                  총 {orderItems.reduce((sum, item) => sum + item.quantity, 0)}개 상품
+
+                {/* 최종 금액 표시 */}
+                <div className="pt-4 border-t border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-500">최종 결제금액</p>
+                      <p className="text-xs text-gray-400">
+                        총 {orderItems.reduce((sum, item) => sum + item.quantity, 0)}개 상품
+                      </p>
+                    </div>
+                    <p className="text-3xl font-bold text-blue-600">
+                      {totalAmount.toLocaleString()}원
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -843,6 +909,52 @@ export default function ExternalOrderNewPage() {
           </div>
         </div>
       </div>
+
+      {/* 주소 검색 로딩 모달 */}
+      {addressLoadingModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">알림</h3>
+            <p className="text-gray-600 mb-6">
+              주소 검색 서비스를 불러오는 중입니다.
+              <br />
+              잠시 후 다시 시도해주세요.
+            </p>
+            <button
+              onClick={() => setAddressLoadingModal(false)}
+              className="w-full py-2.5 text-white bg-gray-800 hover:bg-gray-900 rounded-lg font-medium transition-colors"
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 주문 생성 성공 모달 */}
+      {successModal.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mx-auto mb-4">
+              <Check size={24} className="text-green-600" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 text-center mb-3">주문 생성 완료</h3>
+            <p className="text-gray-600 text-center mb-6">
+              외부 주문이 생성되었습니다.
+              <br />
+              주문번호: <span className="font-semibold">{successModal.orderNumber}</span>
+            </p>
+            <button
+              onClick={() => {
+                setSuccessModal({ show: false, orderNumber: '' })
+                router.push('/shop/order/list')
+              }}
+              className="w-full py-2.5 text-white bg-gray-800 hover:bg-gray-900 rounded-lg font-medium transition-colors"
+            >
+              주문 목록으로
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

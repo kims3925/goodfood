@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import prisma, { Prisma } from '@bandauto/db'
+import { calculateSellingPrice, type BundleShippingType } from '@/lib/price-calculator'
 
 const Decimal = Prisma.Decimal
 
@@ -23,6 +24,7 @@ interface CreateExternalOrderParams {
     quantity: number
   }>
   memo?: string // 외부 주문 메모
+  customTotalAmount?: number // 수동 입력 결제금액 (할인/협의 가격)
 }
 
 /**
@@ -47,7 +49,7 @@ export const orderService = {
    * - 트랜잭션 내 주문 생성
    */
   async createExternalOrder(params: CreateExternalOrderParams) {
-    const { userId, shopId, guestName, guestPhone, guestEmail, shippingAddress, items, memo } = params
+    const { userId, shopId, guestName, guestPhone, guestEmail, shippingAddress, items, memo, customTotalAmount } = params
 
     return await prisma.$transaction(async (tx) => {
       // 1. Shop Validation (shopId는 필수)
@@ -118,7 +120,8 @@ export const orderService = {
 
         const product = shopProduct.product
         let variant = null
-        let unitPrice: Prisma.Decimal
+        let basePrice: number // 소매가 (배송비 제외)
+        let unitPrice: Prisma.Decimal // 판매가 (배송비 포함 가능)
 
         // 옵션(variant) 처리
         if (item.variantId) {
@@ -132,9 +135,9 @@ export const orderService = {
               throw new Error(`상품 가격이 설정되지 않았습니다. (옵션: ${variant.optionSummary || item.variantId}, 상품: ${product.name})`)
             }
             console.warn(`[External Order] variant.price가 없습니다. product.price로 대체합니다. (variantId: ${item.variantId})`)
-            unitPrice = new Decimal(product.price)
+            basePrice = product.price
           } else {
-            unitPrice = new Decimal(variant.price)
+            basePrice = variant.price
           }
         } else if (product.variants.length > 0) {
           // 옵션이 있는 상품인데 옵션을 선택하지 않은 경우 에러
@@ -144,10 +147,25 @@ export const orderService = {
           if (product.price == null) {
             throw new Error(`상품 가격이 설정되지 않았습니다. (상품: ${product.name})`)
           }
-          unitPrice = new Decimal(product.price)
+          basePrice = product.price
         }
 
-        const totalPrice = unitPrice.mul(quantity)
+        // 배송비를 포함한 판매가 계산
+        const shippingFee = product.shippingFee || 0
+        const bundleShippingType = product.bundleShippingType as BundleShippingType
+        const sellingPrice = calculateSellingPrice(basePrice, shippingFee, bundleShippingType)
+        unitPrice = new Decimal(sellingPrice)
+
+        // 합배송 규칙 적용: SEPARATE 타입은 배송비를 1회만 부과
+        let totalPrice: Prisma.Decimal
+        if (bundleShippingType === 'INCLUDED') {
+          // 배송비 포함 상품: unitPrice * quantity
+          totalPrice = unitPrice.mul(quantity)
+        } else {
+          // 배송비 별도 상품: (basePrice * quantity) + shippingFee (1회만)
+          totalPrice = new Decimal(basePrice).mul(quantity).add(shippingFee)
+        }
+
         subtotal = subtotal.add(totalPrice)
 
         orderItemsData.push({
@@ -162,7 +180,22 @@ export const orderService = {
         })
       }
 
-      // 7. Create Order
+      // 7. 최종 결제금액 결정
+      let finalTotalAmount: Prisma.Decimal
+      let discountAmount: Prisma.Decimal
+
+      if (customTotalAmount !== undefined && customTotalAmount !== null) {
+        // 수동 입력 금액 사용 (할인/협의 가격)
+        finalTotalAmount = new Decimal(customTotalAmount)
+        // 할인액 = 자동 계산 금액 - 수동 입력 금액
+        discountAmount = subtotal.sub(finalTotalAmount)
+      } else {
+        // 자동 계산 금액 사용
+        finalTotalAmount = subtotal
+        discountAmount = new Decimal(0)
+      }
+
+      // 8. Create Order
       const order = await tx.guestOrder.create({
         data: {
           shopId,
@@ -172,8 +205,8 @@ export const orderService = {
           guestPhone: guestPhone.trim(),
           guestEmail: guestEmail?.trim() || null,
           subtotalAmount: subtotal,
-          discountAmount: new Decimal(0),
-          totalAmount: subtotal,
+          discountAmount,
+          totalAmount: finalTotalAmount,
           orderedAt: new Date(),
           shippingAddress: {
             create: {
@@ -195,7 +228,11 @@ export const orderService = {
         },
       })
 
-      console.log(`[External Order] 외부 주문 생성 완료: ${order.orderNumber} (${orderItemsData.length}개 상품, 총 ${subtotal.toString()}원)`)
+      const logMessage = customTotalAmount !== undefined && customTotalAmount !== null
+        ? `[External Order] 외부 주문 생성 완료: ${order.orderNumber} (${orderItemsData.length}개 상품, 자동계산: ${subtotal.toString()}원, 최종금액: ${finalTotalAmount.toString()}원, 할인: ${discountAmount.toString()}원)`
+        : `[External Order] 외부 주문 생성 완료: ${order.orderNumber} (${orderItemsData.length}개 상품, 총 ${subtotal.toString()}원)`
+
+      console.log(logMessage)
 
       return {
         id: order.id,

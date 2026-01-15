@@ -22,6 +22,8 @@ interface CreateExternalOrderRequest {
     variantId?: number
     quantity: number
   }>
+  memo?: string
+  customTotalAmount?: number
 }
 
 /**
@@ -136,6 +138,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // customTotalAmount 검증 (optional이지만 있으면 양의 정수여야 함)
+    if (body.customTotalAmount !== undefined && body.customTotalAmount !== null) {
+      if (!Number.isInteger(body.customTotalAmount) || body.customTotalAmount < 0) {
+        return NextResponse.json(
+          { success: false, error: '결제금액은 0 이상의 정수여야 합니다.' },
+          { status: 400 }
+        )
+      }
+    }
+
     try {
       const result = await orderService.createExternalOrder({
         userId: user.userId,
@@ -145,6 +157,8 @@ export async function POST(request: NextRequest) {
         guestEmail: body.guestEmail,
         shippingAddress,
         items,
+        memo: body.memo,
+        customTotalAmount: body.customTotalAmount,
       })
 
       return NextResponse.json({
