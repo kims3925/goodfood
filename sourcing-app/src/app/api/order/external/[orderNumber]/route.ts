@@ -35,8 +35,9 @@ export async function GET(
     const guestOrder = await prisma.guestOrder.findFirst({
       where: {
         orderNumber,
-        userId: user.userId,
-        deletedAt: null,
+        shop: {
+          userId: user.userId,
+        },
       },
       include: {
         items: {
@@ -107,7 +108,6 @@ export async function GET(
       where: {
         orderNumber,
         userId: user.userId,
-        deletedAt: null,
       },
       include: {
         items: {
@@ -259,8 +259,9 @@ export async function PATCH(
     const guestOrder = await prisma.guestOrder.findFirst({
       where: {
         orderNumber,
-        userId: user.userId,
-        deletedAt: null,
+        shop: {
+          userId: user.userId,
+        },
       },
     })
 
@@ -293,7 +294,6 @@ export async function PATCH(
       where: {
         orderNumber,
         userId: user.userId,
-        deletedAt: null,
       },
     })
 

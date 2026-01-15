@@ -34,7 +34,14 @@ export async function DELETE(
     // 외부 주문 확인 (주문번호가 'x'로 시작하는지)
     const order = await prisma.guestOrder.findUnique({
       where: { id: orderId },
-      select: { orderNumber: true, userId: true },
+      select: {
+        orderNumber: true,
+        shop: {
+          select: {
+            userId: true,
+          },
+        },
+      },
     })
 
     if (!order) {
@@ -45,7 +52,7 @@ export async function DELETE(
     }
 
     // 권한 확인
-    if (order.userId !== user.userId) {
+    if (order.shop?.userId !== user.userId) {
       return NextResponse.json(
         { success: false, error: '권한이 없습니다.' },
         { status: 403 }
@@ -60,11 +67,14 @@ export async function DELETE(
       )
     }
 
-    // Soft Delete
+    // Soft Delete (취소 처리)
     await prisma.guestOrder.update({
       where: { id: orderId },
       data: {
-        deletedAt: new Date(),
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+        cancelReason: '외부 주문 삭제',
+        cancelledBy: 'ADMIN',
       },
     })
 
