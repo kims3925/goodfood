@@ -26,6 +26,7 @@ export default function GoogleSheetsSettingsPage() {
     sheetNames?: string[]
   } | null>(null)
   const [testSuccess, setTestSuccess] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -145,8 +146,8 @@ export default function GoogleSheetsSettingsPage() {
     }
   }
 
-  const deleteSettings = async () => {
-    if (!confirm('구글 시트 연동 설정을 삭제하시겠습니까?')) return
+  const confirmDelete = async () => {
+    setShowDeleteModal(false)
 
     try {
       setIsDeleting(true)
@@ -358,7 +359,7 @@ export default function GoogleSheetsSettingsPage() {
               <div className="flex justify-between">
                 {settings?.hasServiceAccount && (
                   <button
-                    onClick={deleteSettings}
+                    onClick={() => setShowDeleteModal(true)}
                     disabled={isDeleting}
                     className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50 transition-colors"
                   >
@@ -397,6 +398,34 @@ export default function GoogleSheetsSettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* 삭제 확인 모달 */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">구글 시트 연동 해제</h3>
+            <p className="text-gray-600 mb-6">
+              구글 시트 연동 설정을 삭제하시겠습니까?
+              <br />
+              <span className="text-sm text-red-600 mt-2 block">이 작업은 되돌릴 수 없습니다.</span>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 py-2.5 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
