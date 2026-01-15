@@ -99,13 +99,13 @@ export default function ExternalOrderEditPage() {
         if (data.success) {
           setOrder(data.data)
           // 폼 초기화
-          setRecipientName(data.data.shippingAddress.recipientName)
-          setRecipientPhone(data.data.shippingAddress.recipientPhone)
-          setPostalCode(data.data.shippingAddress.postalCode)
-          setAddress(data.data.shippingAddress.address)
+          setRecipientName(data.data.shippingAddress.recipientName || '')
+          setRecipientPhone(data.data.shippingAddress.recipientPhone || '')
+          setPostalCode(data.data.shippingAddress.postalCode || '')
+          setAddress(data.data.shippingAddress.address || '')
           setAddressDetail(data.data.shippingAddress.addressDetail || '')
           setDeliveryMemo(data.data.shippingAddress.deliveryMemo || '')
-          setTotalAmount(data.data.totalAmount)
+          setTotalAmount(data.data.totalAmount || 0)
         } else {
           setError(data.error || '주문을 불러오는데 실패했습니다.')
         }
@@ -138,8 +138,8 @@ export default function ExternalOrderEditPage() {
 
   // 폼 유효성 검사
   const isFormValid = () => {
-    if (!recipientName.trim()) return false
-    if (!recipientPhone.trim()) return false
+    if (!recipientName?.trim()) return false
+    if (!recipientPhone?.trim()) return false
     if (!postalCode || !address) return false
     if (totalAmount < 0) return false
     return true

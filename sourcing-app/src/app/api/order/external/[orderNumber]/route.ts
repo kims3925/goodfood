@@ -266,22 +266,37 @@ export async function PATCH(
     })
 
     if (guestOrder) {
-      await prisma.guestOrder.update({
-        where: { id: guestOrder.id },
-        data: {
-          ...(shippingAddress && {
+      // 배송지 정보 업데이트
+      if (shippingAddress) {
+        await prisma.shippingAddress.upsert({
+          where: { guestOrderId: guestOrder.id },
+          create: {
+            guestOrderId: guestOrder.id,
             recipientName: shippingAddress.recipientName.trim(),
             recipientPhone: shippingAddress.recipientPhone.trim(),
             postalCode: shippingAddress.postalCode,
             address: shippingAddress.address,
             addressDetail: shippingAddress.addressDetail?.trim() || null,
             deliveryMemo: shippingAddress.deliveryMemo?.trim() || null,
-          }),
-          ...(totalAmount !== undefined && totalAmount !== null && {
-            totalAmount,
-          }),
-        },
-      })
+          },
+          update: {
+            recipientName: shippingAddress.recipientName.trim(),
+            recipientPhone: shippingAddress.recipientPhone.trim(),
+            postalCode: shippingAddress.postalCode,
+            address: shippingAddress.address,
+            addressDetail: shippingAddress.addressDetail?.trim() || null,
+            deliveryMemo: shippingAddress.deliveryMemo?.trim() || null,
+          },
+        })
+      }
+
+      // 결제금액 업데이트
+      if (totalAmount !== undefined && totalAmount !== null) {
+        await prisma.guestOrder.update({
+          where: { id: guestOrder.id },
+          data: { totalAmount },
+        })
+      }
 
       return NextResponse.json({
         success: true,
@@ -298,22 +313,37 @@ export async function PATCH(
     })
 
     if (memberOrder) {
-      await prisma.order.update({
-        where: { id: memberOrder.id },
-        data: {
-          ...(shippingAddress && {
+      // 배송지 정보 업데이트
+      if (shippingAddress) {
+        await prisma.shippingAddress.upsert({
+          where: { orderId: memberOrder.id },
+          create: {
+            orderId: memberOrder.id,
             recipientName: shippingAddress.recipientName.trim(),
             recipientPhone: shippingAddress.recipientPhone.trim(),
             postalCode: shippingAddress.postalCode,
             address: shippingAddress.address,
             addressDetail: shippingAddress.addressDetail?.trim() || null,
             deliveryMemo: shippingAddress.deliveryMemo?.trim() || null,
-          }),
-          ...(totalAmount !== undefined && totalAmount !== null && {
-            totalAmount,
-          }),
-        },
-      })
+          },
+          update: {
+            recipientName: shippingAddress.recipientName.trim(),
+            recipientPhone: shippingAddress.recipientPhone.trim(),
+            postalCode: shippingAddress.postalCode,
+            address: shippingAddress.address,
+            addressDetail: shippingAddress.addressDetail?.trim() || null,
+            deliveryMemo: shippingAddress.deliveryMemo?.trim() || null,
+          },
+        })
+      }
+
+      // 결제금액 업데이트
+      if (totalAmount !== undefined && totalAmount !== null) {
+        await prisma.order.update({
+          where: { id: memberOrder.id },
+          data: { totalAmount },
+        })
+      }
 
       return NextResponse.json({
         success: true,
