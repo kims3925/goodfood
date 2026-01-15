@@ -30,12 +30,23 @@ const nextConfig = {
       { source: '/', destination: '/sourcing/automation/settings', permanent: false },
     ]
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@modules': path.resolve(__dirname, '../modules'),
       '@': path.resolve(__dirname, './src'),
     }
+
+    // 서버 전용 패키지 external 설정
+    if (isServer) {
+      config.externals.push({
+        'playwright-core': 'commonjs playwright-core',
+        'playwright': 'commonjs playwright',
+        'chromium-bidi': 'commonjs chromium-bidi',
+        'electron': 'commonjs electron',
+      })
+    }
+
     return config
   },
   images: {
@@ -51,6 +62,13 @@ const nextConfig = {
       bodySizeLimit: '10mb',
     },
     instrumentationHook: true,
+    serverComponentsExternalPackages: [
+      'playwright-core',
+      'playwright',
+      'node-cron',
+      '@bandauto/db',
+      'prisma',
+    ],
   },
 }
 
