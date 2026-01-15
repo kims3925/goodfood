@@ -303,11 +303,14 @@ export async function GET(request: NextRequest) {
       let totalShippingFee = 0
       for (const [_, info] of productShippingMap) {
         if (info.shippingFee > 0) {
-          if (info.bundleShippingType === 'NONE') {
+          if (info.bundleShippingType === 'INCLUDED') {
+            // 배송비 포함 상품: 배송비 계산하지 않음 (이미 소매가에 포함되어 있음)
+            continue
+          } else if (info.bundleShippingType === 'NONE') {
             // 합배송 없음: 아이템 수 × 배송비
             totalShippingFee += info.itemCount * info.shippingFee
           } else {
-            // 합배송 적용: ceil(총 배송단위 / 합배송 최대수량) × 배송비
+            // SEPARATE: 합배송 적용: ceil(총 배송단위 / 합배송 최대수량) × 배송비
             const shippingCount = Math.ceil(info.totalBundleUnits / info.bundleMaxQty)
             totalShippingFee += shippingCount * info.shippingFee
           }
