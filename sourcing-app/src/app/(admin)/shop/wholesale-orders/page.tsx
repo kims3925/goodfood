@@ -511,7 +511,7 @@ export default function WholesaleOrdersPage() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">발주 관리</h1>
           <p className="text-gray-600">
-            결제 완료된 주문을 도매처별로 집계하고 발주서를 생성합니다.
+            결제 완료(PAID) 주문을 도매처별로 집계하고 발주서를 생성합니다.
           </p>
         </div>
 
@@ -590,7 +590,7 @@ export default function WholesaleOrdersPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
             <Truck size={48} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500">해당 날짜에 발주 대상 주문이 없습니다.</p>
-            <p className="text-gray-400 text-sm mt-1">결제 완료(PAID) 주문만 표시됩니다.</p>
+            <p className="text-gray-400 text-sm mt-1">결제 완료 상태의 주문만 표시됩니다.</p>
           </div>
         ) : !loading && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -699,7 +699,7 @@ export default function WholesaleOrdersPage() {
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900">발주 대기</h3>
-                        <p className="text-sm text-gray-500">결제 완료된 미발주 주문</p>
+                        <p className="text-sm text-gray-500">결제 완료 주문</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -919,7 +919,7 @@ export default function WholesaleOrdersPage() {
                       </div>
                       <div className="text-left">
                         <h3 className="font-semibold text-gray-900">발주 완료 이력</h3>
-                        <p className="text-sm text-gray-500">최근 30일 발주 내역</p>
+                        <p className="text-sm text-gray-500">최근 30일 발주 완료 내역 (상품 준비 이상)</p>
                       </div>
                       {historySummary && (
                         <div className="flex items-center gap-4 ml-4 text-sm">

@@ -71,8 +71,8 @@ export async function GET(
 
     // status 필터에 따라 조회할 주문 상태 결정
     const orderStatuses: CustomerOrderStatus[] = statusFilter === 'completed'
-      ? [CustomerOrderStatus.SHIPPED, CustomerOrderStatus.DELIVERED]
-      : [CustomerOrderStatus.PAID, CustomerOrderStatus.PREPARING]
+      ? [CustomerOrderStatus.PREPARING, CustomerOrderStatus.SHIPPED, CustomerOrderStatus.DELIVERED]
+      : [CustomerOrderStatus.PAID]
 
     // 공통 쿼리 조건 (Product의 channelId 참조 - 소싱 출처인 도매처)
     const productCondition = {

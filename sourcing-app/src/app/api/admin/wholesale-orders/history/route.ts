@@ -24,12 +24,12 @@ export async function GET(request: NextRequest) {
     const to = searchParams.get('to') // YYYY-MM-DD
 
     // 도매처 목록 조회 (주문이 있는 도매처만) - Product.channelId 사용 (소싱 출처)
-    // 발주 완료된 주문만 조회 (SHIPPED, DELIVERED)
+    // 발주 완료된 주문만 조회 (PREPARING, SHIPPED, DELIVERED)
     const [channelsWithOrders, channelsWithGuestOrders] = await Promise.all([
       prisma.orderItem.findMany({
         where: {
           order: {
-            status: { in: ['SHIPPED', 'DELIVERED'] },
+            status: { in: ['PREPARING', 'SHIPPED', 'DELIVERED'] },
             paidAt: { not: null },
           },
           shopProduct: {
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       prisma.guestOrderItem.findMany({
         where: {
           guestOrder: {
-            status: { in: ['SHIPPED', 'DELIVERED'] },
+            status: { in: ['PREPARING', 'SHIPPED', 'DELIVERED'] },
             paidAt: { not: null },
           },
           shopProduct: {
@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
       prisma.orderItem.findMany({
         where: {
           order: {
-            status: { in: ['SHIPPED', 'DELIVERED'] },
+            status: { in: ['PREPARING', 'SHIPPED', 'DELIVERED'] },
             paidAt: {
               not: null,
               gte: fromDate,
@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
       prisma.guestOrderItem.findMany({
         where: {
           guestOrder: {
-            status: { in: ['SHIPPED', 'DELIVERED'] },
+            status: { in: ['PREPARING', 'SHIPPED', 'DELIVERED'] },
             paidAt: {
               not: null,
               gte: fromDate,
