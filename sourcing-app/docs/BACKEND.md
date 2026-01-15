@@ -336,3 +336,100 @@ const publicKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY
 | Prisma 직접 호출 (Route Handler) | Service 계층 사용 |
 | 민감정보 로깅 | 보안 |
 | try-catch 없이 외부 API 호출 | 서버 크래시 방지 |
+
+---
+
+## 주요 서비스
+
+### Order Service (`src/services/order.service.ts`)
+
+**외부 주문 생성 (`createExternalOrder`)**
+
+외부 채널(밴드, 문자 등)에서 받은 주문을 시스템에 등록하는 서비스입니다.
+
+**주요 기능:**
+
+1. **배송비 포함 판매가 계산**
+   ```typescript
+   // calculateSellingPrice 함수 사용
+   const sellingPrice = calculateSellingPrice(basePrice, shippingFee, bundleShippingType)
+   ```
+
+2. **합배송 규칙 적용**
+   ```typescript
+   if (bundleShippingType === 'INCLUDED') {
+     // 배송비 포함 상품: unitPrice * quantity
+     totalPrice = unitPrice.mul(quantity)
+   } else {
+     // 배송비 별도 상품: (basePrice * quantity) + shippingFee (1회만)
+     totalPrice = new Decimal(basePrice).mul(quantity).add(shippingFee)
+   }
+   ```
+
+3. **결제금액 수동 조정**
+   ```typescript
+   if (customTotalAmount !== undefined && customTotalAmount !== null) {
+     finalTotalAmount = new Decimal(customTotalAmount)
+     discountAmount = subtotal.sub(finalTotalAmount)
+   } else {
+     finalTotalAmount = subtotal
+     discountAmount = new Decimal(0)
+   }
+   ```
+
+**파라미터:**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| userId | number | O | 사용자 ID |
+| shopId | number | O | 쇼핑몰 ID |
+| guestName | string | O | 고객명 |
+| guestPhone | string | O | 전화번호 |
+| items | array | O | 주문 상품 목록 |
+| customTotalAmount | number | X | 수동 입력 결제금액 |
+
+**변경 이력:**
+- TR-20260115-007: 배송비 반영 및 결제금액 수동 조정 기능 추가
+
+---
+
+## 가격 계산
+
+### Price Calculator (`src/lib/price-calculator.ts`)
+
+**배송비 포함 판매가 계산 (`calculateSellingPrice`)**
+
+```typescript
+export function calculateSellingPrice(
+  basePrice: number,
+  shippingFee: number,
+  bundleShippingType: BundleShippingType | string | null
+): number {
+  if (bundleShippingType === 'INCLUDED') {
+    return basePrice // 배송비 이미 포함
+  }
+  return basePrice + shippingFee // 배송비 추가
+}
+```
+
+**배송 타입:**
+
+| 타입 | 설명 | 계산 방식 |
+|------|------|----------|
+| INCLUDED | 배송비 포함 | 판매가 = 소매가 |
+| SEPARATE | 배송비 별도 | 판매가 = 소매가 + 배송비 |
+| NONE | 합배송 없음 | 판매가 = 소매가 + 배송비 |
+
+**마진 계산:**
+
+```
+마진액 = (판매가 - 도매가) - 실제 배송비용
+
+- INCLUDED: 마진 = (소매가 - 도매가) - 0
+- SEPARATE: 마진 = (소매가 - 도매가) - 배송비 (1회)
+- NONE: 마진 = (소매가 - 도매가) - (배송비 × 아이템 수)
+```
+
+**변경 이력:**
+- TR-20260115-008: 대시보드 마진액 계산 버그 수정 (INCLUDED 타입 처리)
+

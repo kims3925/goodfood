@@ -1966,3 +1966,276 @@ uploadProgressEmitter (EventEmitter 싱글톤)
 ### 관련 항목
 - REQ-ID: -
 - Flow-ID: -
+
+---
+
+## TR-20260115-007: 외부 주문 배송비 반영 및 결제금액 수동 조정
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-15 |
+| REQ-ID | - |
+| Risk | Medium |
+
+### 변경 사항
+- 외부 주문 생성 시 배송비를 포함한 판매가 계산 로직 구현
+- 합배송 규칙 적용 (INCLUDED: 배송비 포함, SEPARATE: 1회만 부과)
+- 결제금액 수동 입력 기능 추가 (할인/협의 가격 지원)
+- 수동 금액 입력 시 할인액 자동 계산 (subtotal - customTotalAmount)
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/services/order.service.ts | Modified | 배송비 포함 판매가 계산, customTotalAmount 지원 |
+| src/app/api/order/external/route.ts | Modified | customTotalAmount 파라미터 추가 및 검증 |
+| src/app/(admin)/shop/order/external/new/page.tsx | Modified | 결제금액 수동 입력 UI 추가 |
+| src/lib/price-calculator.ts | Referenced | calculateSellingPrice 함수 사용 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Lint | Pass |
+| Build | Pass |
+| Integration | Manual |
+
+### 롤백 계획
+1. git revert 2777d5df
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: 외부 주문 생성
+
+---
+
+## TR-20260115-008: 대시보드 마진액 계산 오류 수정
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-15 |
+| REQ-ID | - |
+| Risk | High |
+
+### 변경 사항
+- 배송비포함(INCLUDED) 상품의 배송비를 중복으로 차감하던 버그 수정
+- 소매가에 이미 배송비가 포함된 경우 별도 배송비 계산 제외
+- 정확한 마진 계산 공식 적용
+  - INCLUDED: 마진 = (소매가 - 도매가) - 0
+  - SEPARATE: 마진 = (소매가 - 도매가) - 배송비 (1회)
+  - NONE: 마진 = (소매가 - 도매가) - (배송비 × 아이템 수)
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/api/dashboard/shop/route.ts | Modified | 배송비 계산 로직 수정 (INCLUDED 타입 처리) |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Lint | Pass |
+| Build | Pass |
+| Manual | Pass |
+
+### 롤백 계획
+1. git revert 34683e35
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: 대시보드 통계
+
+---
+
+## TR-20260115-009: 도매 주문 이력에 PREPARING 상태 포함
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-15 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 발주 완료(발주 확정) 처리된 주문의 상태가 PREPARING으로 변경됨
+- 도매 주문 이력 조회 시 PREPARING 상태도 포함하도록 수정
+- 상태 필터: PREPARING, SHIPPED, DELIVERED
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/api/admin/wholesale-orders/history/route.ts | Modified | PREPARING 상태 포함 |
+| src/app/api/admin/wholesale-orders/summary/route.ts | Modified | PREPARING 상태 포함 |
+| src/app/api/admin/wholesale-orders/[wholesaleChannelId]/items/route.ts | Modified | PREPARING 상태 포함 |
+| src/app/(admin)/shop/wholesale-orders/page.tsx | Modified | 상태 필터 개선 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [x] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Lint | Pass |
+| Build | Pass |
+| Integration | N/A |
+
+### 롤백 계획
+1. git revert e6c2d199
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: 도매 주문 관리
+
+---
+
+## TR-20260115-010: 외부 주문 수정 및 삭제 기능 추가
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-15 |
+| REQ-ID | - |
+| Risk | Medium |
+
+### 변경 사항
+- 주문 목록 페이지에서 외부 주문(주문번호 'X'로 시작) 수정/삭제 버튼 추가
+- 외부 주문 판별 로직 구현 (주문번호 소문자 'x'로 시작)
+- 삭제 확인 모달 추가
+- 주문 상세 페이지에서 외부 주문 정보 표시 개선
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(admin)/shop/order/list/page.tsx | Modified | 외부 주문 수정/삭제 UI 추가 |
+| src/app/(admin)/shop/order/detail/[id]/page.tsx | Modified | 외부 주문 정보 표시 개선 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Lint | Pass |
+| Build | Pass |
+| Integration | N/A |
+
+### 롤백 계획
+1. git revert bc5bf000
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: 주문 관리
+
+---
+
+## TR-20260115-011: 외부 주문 CRUD API 및 수정 페이지 구현
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-15 |
+| REQ-ID | - |
+| Risk | Medium |
+
+### 변경 사항
+- 외부 주문 전체 생명주기 관리 API 구현
+- GET /api/order/external/[orderNumber] - 주문번호로 상세 조회
+- GET /api/order/external/guest/[id] - 비회원 주문 상세 조회
+- GET /api/order/external/member/[id] - 회원 주문 상세 조회
+- DELETE /api/order/external/guest/[id] - 비회원 주문 삭제 (Soft Delete)
+- DELETE /api/order/external/member/[id] - 회원 주문 삭제 (Soft Delete)
+- 외부 주문 수정 페이지: /shop/order/external/edit/[orderNumber]
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/api/order/external/[orderNumber]/route.ts | Added | 주문번호로 조회 API |
+| src/app/api/order/external/guest/[id]/route.ts | Added | 비회원 주문 조회/삭제 API |
+| src/app/api/order/external/member/[id]/route.ts | Added | 회원 주문 조회/삭제 API |
+| src/app/(admin)/shop/order/external/edit/[orderNumber]/page.tsx | Added | 외부 주문 수정 페이지 |
+
+### 영향 분석
+- [x] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Lint | Pass |
+| Build | Pass |
+| Integration | N/A |
+
+### 롤백 계획
+1. git revert a7a03d9c
+2. 추가된 파일 삭제
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: 외부 주문 관리
+
+---
+
+## TR-20260115-012: 구글 시트 연동 해제 확인 모달 추가
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-15 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 구글 시트 연동 설정 삭제 시 confirm() 대신 모달 UI 사용
+- 삭제 불가 안내 메시지 추가
+- 취소/삭제 버튼 제공
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(admin)/sourcing/settings/google-sheets/page.tsx | Modified | 삭제 확인 모달 추가 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Lint | Pass |
+| Build | Pass |
+| Integration | N/A |
+
+### 롤백 계획
+1. git revert 918a3d3d
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: 구글 시트 연동
+

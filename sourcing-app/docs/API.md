@@ -37,8 +37,14 @@ app/api/
 │   │   └── stream/          # SSE 스트림
 │   └── [id]/
 ├── order/                   # 주문
-│   └── unified/             # 통합 주문
-│       └── [id]/
+│   ├── unified/             # 통합 주문
+│   │   └── [id]/
+│   └── external/            # 외부 주문
+│       ├── [orderNumber]/   # 주문번호로 조회
+│       ├── guest/           # 비회원 주문
+│       │   └── [id]/        # 조회/삭제
+│       └── member/          # 회원 주문
+│           └── [id]/        # 조회/삭제
 ├── automation/              # 자동화
 │   ├── config/              # 설정
 │   ├── execute/             # 실행
@@ -1086,3 +1092,244 @@ interface UnifiedOrderItem {
 
 **변경 이력:**
 - TR-20260113-001: `from`, `to` 날짜 필터 파라미터 동작 수정 (기존 무시 → 정상 동작)
+
+---
+
+## POST /api/order/external
+
+**설명:** 외부 주문 생성 (문자, 밴드 댓글 등)
+
+**인증:** Required
+
+**Request Body:**
+
+```json
+{
+  "shopId": 1,
+  "guestName": "홍길동",
+  "guestPhone": "010-1234-5678",
+  "guestEmail": "hong@example.com",
+  "shippingAddress": {
+    "recipientName": "홍길동",
+    "recipientPhone": "010-1234-5678",
+    "postalCode": "06234",
+    "address": "서울시 강남구 테헤란로 123",
+    "addressDetail": "A동 101호",
+    "deliveryMemo": "문 앞에 놓아주세요"
+  },
+  "items": [
+    {
+      "shopProductId": 10,
+      "variantId": 20,
+      "quantity": 2
+    }
+  ],
+  "memo": "밴드 댓글 주문",
+  "customTotalAmount": 30000
+}
+```
+
+**파라미터:**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| shopId | number | O | 쇼핑몰 ID |
+| guestName | string | O | 고객명 |
+| guestPhone | string | O | 전화번호 |
+| guestEmail | string | X | 이메일 |
+| shippingAddress | object | O | 배송 주소 |
+| items | array | O | 주문 상품 목록 |
+| memo | string | X | 주문 메모 |
+| customTotalAmount | number | X | 수동 입력 결제금액 (할인/협의 가격) |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "orderNumber": "XORD-20260115-ABC123456789",
+    "status": "PENDING",
+    "totalAmount": 30000,
+    "itemCount": 1
+  }
+}
+```
+
+**에러:**
+
+| Code | HTTP | 설명 |
+|------|------|-----|
+| 400 | Bad Request | 유효성 검증 실패 |
+| 401 | Unauthorized | 인증 필요 |
+| 500 | Internal Server Error | 주문 생성 실패 |
+
+**변경 이력:**
+- TR-20260115-007: customTotalAmount 파라미터 추가 (할인/협의 가격 지원)
+
+---
+
+## GET /api/order/external/[orderNumber]
+
+**설명:** 주문번호로 외부 주문 상세 조회
+
+**인증:** Required
+
+**URL Parameters:**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| orderNumber | string | 주문번호 (예: XORD-20260115-ABC123456789) |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "orderNumber": "XORD-20260115-ABC123456789",
+    "status": "PENDING",
+    "guestName": "홍길동",
+    "guestPhone": "010-1234-5678",
+    "subtotalAmount": 33000,
+    "discountAmount": 3000,
+    "totalAmount": 30000,
+    "isGuest": true,
+    "items": [
+      {
+        "productName": "상품명",
+        "optionSummary": "옵션",
+        "quantity": 2,
+        "unitPrice": 15000,
+        "totalPrice": 30000
+      }
+    ],
+    "shippingAddress": {
+      "recipientName": "홍길동",
+      "recipientPhone": "010-1234-5678",
+      "postalCode": "06234",
+      "address": "서울시 강남구 테헤란로 123",
+      "addressDetail": "A동 101호"
+    }
+  }
+}
+```
+
+**에러:**
+
+| Code | HTTP | 설명 |
+|------|------|-----|
+| 401 | Unauthorized | 인증 필요 |
+| 404 | Not Found | 주문을 찾을 수 없음 |
+| 500 | Internal Server Error | 조회 실패 |
+
+**변경 이력:**
+- TR-20260115-011: API 엔드포인트 추가
+
+---
+
+## GET /api/order/external/guest/[id]
+
+**설명:** 비회원 외부 주문 상세 조회
+
+**인증:** Required
+
+**URL Parameters:**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | number | 주문 ID |
+
+**Response:** GET /api/order/external/[orderNumber]와 동일
+
+**변경 이력:**
+- TR-20260115-011: API 엔드포인트 추가
+
+---
+
+## DELETE /api/order/external/guest/[id]
+
+**설명:** 비회원 외부 주문 삭제 (Soft Delete)
+
+**인증:** Required
+
+**URL Parameters:**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | number | 주문 ID |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "주문이 삭제되었습니다."
+}
+```
+
+**에러:**
+
+| Code | HTTP | 설명 |
+|------|------|-----|
+| 401 | Unauthorized | 인증 필요 |
+| 404 | Not Found | 주문을 찾을 수 없음 |
+| 500 | Internal Server Error | 삭제 실패 |
+
+**변경 이력:**
+- TR-20260115-011: API 엔드포인트 추가
+
+---
+
+## GET /api/order/external/member/[id]
+
+**설명:** 회원 외부 주문 상세 조회
+
+**인증:** Required
+
+**URL Parameters:**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | number | 주문 ID |
+
+**Response:** GET /api/order/external/[orderNumber]와 동일
+
+**변경 이력:**
+- TR-20260115-011: API 엔드포인트 추가
+
+---
+
+## DELETE /api/order/external/member/[id]
+
+**설명:** 회원 외부 주문 삭제 (Soft Delete)
+
+**인증:** Required
+
+**URL Parameters:**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | number | 주문 ID |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "주문이 삭제되었습니다."
+}
+```
+
+**에러:**
+
+| Code | HTTP | 설명 |
+|------|------|-----|
+| 401 | Unauthorized | 인증 필요 |
+| 404 | Not Found | 주문을 찾을 수 없음 |
+| 500 | Internal Server Error | 삭제 실패 |
+
+**변경 이역:**
+- TR-20260115-011: API 엔드포인트 추가
