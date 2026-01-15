@@ -121,10 +121,8 @@ interface TossTransactionsSummary {
   totalCount: number
   cardAmount: number
   cardCount: number
-  transferAmount: number      // 계좌이체
-  transferCount: number
-  virtualAccountAmount: number  // 가상계좌
-  virtualAccountCount: number
+  easyPayAmount: number       // 간편결제
+  easyPayCount: number
   canceledAmount: number
   canceledCount: number
   methodTypes?: string[]  // 디버깅용
@@ -143,6 +141,11 @@ interface TossTransactionsData {
 
 // 토스페이먼츠 대시보드 URL 생성
 const getTossDashboardUrl = () => {
+  // 전체 URL이 환경변수에 있으면 그대로 사용
+  const dashboardUrl = process.env.NEXT_PUBLIC_TOSS_DASHBOARD_URL
+  if (dashboardUrl) return dashboardUrl
+
+  // 없으면 Merchant ID로 기본 URL 생성
   const merchantId = process.env.NEXT_PUBLIC_TOSS_MERCHANT_ID
   if (!merchantId) return null
   return `https://dashboard.tosspayments.com/sales-reports?mid=${encodeURIComponent(merchantId)}`
@@ -204,13 +207,12 @@ export default function SettlementListPage() {
   }, [fetchData])
 
   // 토스페이먼츠 거래 조회
-  const fetchTossTransactions = useCallback(async (signal?: AbortSignal) => {
+  const fetchTossTransactions = useCallback(async () => {
     setTossLoading(true)
     setTossError(null)
     try {
       const res = await fetch(
-        `/api/settlement/toss-transactions?year=${selectedYear}&month=${selectedMonth}`,
-        { signal }
+        `/api/settlement/toss-transactions?year=${selectedYear}&month=${selectedMonth}`
       )
       const result = await res.json()
 
@@ -230,9 +232,7 @@ export default function SettlementListPage() {
   }, [selectedYear, selectedMonth])
 
   useEffect(() => {
-    const controller = new AbortController()
-    fetchTossTransactions(controller.signal)
-    return () => controller.abort()
+    fetchTossTransactions()
   }, [fetchTossTransactions])
 
   const formatPrice = (price: number | null) => {
@@ -566,6 +566,19 @@ export default function SettlementListPage() {
                   <p className="text-blue-200 text-xs mt-1">{tossData.summary.totalCount}건</p>
                 </div>
 
+                {/* 간편결제 */}
+                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Wallet size={18} className="text-cyan-300" />
+                    <span className="text-blue-100 text-sm">간편결제</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">
+                    {tossData.summary.easyPayAmount.toLocaleString()}
+                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
+                  </p>
+                  <p className="text-blue-200 text-xs mt-1">{tossData.summary.easyPayCount}건</p>
+                </div>
+
                 {/* 카드 결제 */}
                 <div className="bg-white/10 backdrop-blur rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -577,32 +590,6 @@ export default function SettlementListPage() {
                     <span className="text-sm font-normal text-blue-200 ml-1">원</span>
                   </p>
                   <p className="text-blue-200 text-xs mt-1">{tossData.summary.cardCount}건</p>
-                </div>
-
-                {/* 계좌이체 */}
-                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wallet size={18} className="text-cyan-300" />
-                    <span className="text-blue-100 text-sm">계좌이체</span>
-                  </div>
-                  <p className="text-2xl font-bold text-white">
-                    {(tossData.summary.transferAmount || 0).toLocaleString()}
-                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
-                  </p>
-                  <p className="text-blue-200 text-xs mt-1">{tossData.summary.transferCount || 0}건</p>
-                </div>
-
-                {/* 가상계좌 */}
-                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Building size={18} className="text-amber-300" />
-                    <span className="text-blue-100 text-sm">가상계좌</span>
-                  </div>
-                  <p className="text-2xl font-bold text-white">
-                    {(tossData.summary.virtualAccountAmount || 0).toLocaleString()}
-                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
-                  </p>
-                  <p className="text-blue-200 text-xs mt-1">{tossData.summary.virtualAccountCount || 0}건</p>
                 </div>
 
                 {/* 취소 */}
@@ -617,15 +604,21 @@ export default function SettlementListPage() {
                   </p>
                   <p className="text-blue-200 text-xs mt-1">{tossData.summary.canceledCount}건</p>
                 </div>
+
+                {/* 매출 (총 결제 - 취소) */}
+                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp size={18} className="text-yellow-300" />
+                    <span className="text-blue-100 text-sm">매출</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">
+                    {(tossData.summary.totalAmount - tossData.summary.canceledAmount).toLocaleString()}
+                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
+                  </p>
+                  <p className="text-blue-200 text-xs mt-1">{tossData.summary.totalCount - tossData.summary.canceledCount}건</p>
+                </div>
               </div>
             ) : null}
-
-            {/* 디버깅: method 타입들 표시 (개발 환경에서만) */}
-            {process.env.NODE_ENV === 'development' && tossData?.summary.methodTypes && tossData.summary.methodTypes.length > 0 && (
-              <div className="mt-4 text-xs text-blue-200">
-                결제수단 종류: {tossData.summary.methodTypes.join(', ')}
-              </div>
-            )}
           </div>
         </div>
 

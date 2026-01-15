@@ -3,9 +3,18 @@ import type { TossTransaction, TransactionsSummary } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { readShopSettings } from '@/lib/paths'
 
-// 로컬 확장 타입 (methodTypes 포함)
-interface LocalTransactionsSummary extends Omit<TransactionsSummary, 'methodTypes'> {
-  methodTypes: string[]  // 디버깅용: 어떤 method 값들이 있는지 (필수)
+// 로컬 확장 타입
+interface LocalTransactionsSummary {
+  totalAmount: number
+  totalCount: number
+  cardAmount: number
+  cardCount: number
+  easyPayAmount: number
+  easyPayCount: number
+  canceledAmount: number
+  canceledCount: number
+  transactions: TossTransaction[]
+  methodTypes: string[]  // 디버깅용
 }
 
 // 토스페이먼츠 API 키 가져오기
@@ -179,10 +188,8 @@ export async function GET(request: Request) {
       totalCount: 0,
       cardAmount: 0,
       cardCount: 0,
-      transferAmount: 0,
-      transferCount: 0,
-      virtualAccountAmount: 0,
-      virtualAccountCount: 0,
+      easyPayAmount: 0,
+      easyPayCount: 0,
       canceledAmount: 0,
       canceledCount: 0,
       transactions: allTransactions,
@@ -207,18 +214,15 @@ export async function GET(request: Request) {
         summary.totalAmount += tx.amount
         summary.totalCount++
 
-        // 결제 수단별 집계 (다양한 값 처리)
-        const method = tx.method?.toLowerCase() || ''
+        // 결제 수단별 집계
+        const method = tx.method || ''
 
-        if (method.includes('카드') || method.includes('card')) {
+        if (method.includes('카드') || method.toLowerCase().includes('card')) {
           summary.cardAmount += tx.amount
           summary.cardCount++
-        } else if (method.includes('계좌이체') || method.includes('transfer')) {
-          summary.transferAmount += tx.amount
-          summary.transferCount++
-        } else if (method.includes('가상계좌') || method.includes('virtualaccount')) {
-          summary.virtualAccountAmount += tx.amount
-          summary.virtualAccountCount++
+        } else if (method.includes('간편결제') || method.toLowerCase().includes('easypay')) {
+          summary.easyPayAmount += tx.amount
+          summary.easyPayCount++
         }
       }
     }
@@ -241,10 +245,8 @@ export async function GET(request: Request) {
           totalCount: summary.totalCount,
           cardAmount: summary.cardAmount,
           cardCount: summary.cardCount,
-          transferAmount: summary.transferAmount,
-          transferCount: summary.transferCount,
-          virtualAccountAmount: summary.virtualAccountAmount,
-          virtualAccountCount: summary.virtualAccountCount,
+          easyPayAmount: summary.easyPayAmount,
+          easyPayCount: summary.easyPayCount,
           canceledAmount: summary.canceledAmount,
           canceledCount: summary.canceledCount,
           methodTypes: summary.methodTypes  // 디버깅용
