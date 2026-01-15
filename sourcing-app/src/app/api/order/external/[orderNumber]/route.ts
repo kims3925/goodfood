@@ -65,6 +65,7 @@ export async function GET(
             name: true,
           },
         },
+        shippingAddress: true,
       },
     })
 
@@ -81,12 +82,12 @@ export async function GET(
           shopId: guestOrder.shopId,
           shopName: guestOrder.shop.name,
           shippingAddress: {
-            recipientName: guestOrder.recipientName,
-            recipientPhone: guestOrder.recipientPhone,
-            postalCode: guestOrder.postalCode,
-            address: guestOrder.address,
-            addressDetail: guestOrder.addressDetail,
-            deliveryMemo: guestOrder.deliveryMemo,
+            recipientName: guestOrder.shippingAddress?.recipientName || '',
+            recipientPhone: guestOrder.shippingAddress?.recipientPhone || '',
+            postalCode: guestOrder.shippingAddress?.postalCode || '',
+            address: guestOrder.shippingAddress?.address || '',
+            addressDetail: guestOrder.shippingAddress?.addressDetail || null,
+            deliveryMemo: guestOrder.shippingAddress?.deliveryMemo || null,
           },
           totalAmount: Number(guestOrder.totalAmount),
           items: guestOrder.items.map(item => ({
@@ -142,6 +143,7 @@ export async function GET(
             phone: true,
           },
         },
+        shippingAddress: true,
       },
     })
 
@@ -158,12 +160,12 @@ export async function GET(
           shopId: memberOrder.shopId,
           shopName: memberOrder.shop.name,
           shippingAddress: {
-            recipientName: memberOrder.recipientName,
-            recipientPhone: memberOrder.recipientPhone,
-            postalCode: memberOrder.postalCode,
-            address: memberOrder.address,
-            addressDetail: memberOrder.addressDetail,
-            deliveryMemo: memberOrder.deliveryMemo,
+            recipientName: memberOrder.shippingAddress?.recipientName || '',
+            recipientPhone: memberOrder.shippingAddress?.recipientPhone || '',
+            postalCode: memberOrder.shippingAddress?.postalCode || '',
+            address: memberOrder.shippingAddress?.address || '',
+            addressDetail: memberOrder.shippingAddress?.addressDetail || null,
+            deliveryMemo: memberOrder.shippingAddress?.deliveryMemo || null,
           },
           totalAmount: Number(memberOrder.totalAmount),
           items: memberOrder.items.map(item => ({
