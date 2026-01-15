@@ -114,7 +114,10 @@ export async function GET(request: NextRequest) {
         items: {
           include: {
             variant: {
-              select: { bundleUnit: true },
+              select: {
+                bundleUnit: true,
+                wholesalePrice: true,
+              },
             },
             shopProduct: {
               include: {
@@ -124,6 +127,7 @@ export async function GET(request: NextRequest) {
                     shippingFee: true,
                     bundleMaxQty: true,
                     bundleShippingType: true,
+                    wholesalePrice: true,
                   },
                 },
               },
@@ -147,7 +151,10 @@ export async function GET(request: NextRequest) {
         items: {
           include: {
             variant: {
-              select: { bundleUnit: true },
+              select: {
+                bundleUnit: true,
+                wholesalePrice: true,
+              },
             },
             shopProduct: {
               include: {
@@ -157,6 +164,7 @@ export async function GET(request: NextRequest) {
                     shippingFee: true,
                     bundleMaxQty: true,
                     bundleShippingType: true,
+                    wholesalePrice: true,
                   },
                 },
               },
@@ -312,28 +320,36 @@ export async function GET(request: NextRequest) {
     // 회원 주문 마진 계산
     let memberProductMargin = 0  // 상품 마진 (판매가 - 도매가)
     let memberShippingFee = 0    // Product 기반 배송비
-    let memberTotalRevenue = 0
     for (const order of currentMemberOrders) {
       memberShippingFee += calculateOrderShippingFee(order.items)
       for (const item of order.items) {
         const unitPrice = Number(item.unitPrice)
-        const wholesalePrice = (item as unknown as { wholesalePrice?: number }).wholesalePrice || 0
+        // 옵션이 있으면 variant.wholesalePrice, 없으면 product.wholesalePrice 사용
+        let wholesalePrice = 0
+        if (item.variant?.wholesalePrice) {
+          wholesalePrice = Number(item.variant.wholesalePrice)
+        } else if (item.shopProduct?.product?.wholesalePrice) {
+          wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
+        }
         memberProductMargin += (unitPrice - wholesalePrice) * item.quantity
-        memberTotalRevenue += unitPrice * item.quantity
       }
     }
 
     // 비회원 주문 마진 계산
     let guestProductMargin = 0
     let guestShippingFee = 0
-    let guestTotalRevenue = 0
     for (const order of currentGuestOrders) {
       guestShippingFee += calculateOrderShippingFee(order.items)
       for (const item of order.items) {
         const unitPrice = Number(item.unitPrice)
-        const wholesalePrice = (item as unknown as { wholesalePrice?: number }).wholesalePrice || 0
+        // 옵션이 있으면 variant.wholesalePrice, 없으면 product.wholesalePrice 사용
+        let wholesalePrice = 0
+        if (item.variant?.wholesalePrice) {
+          wholesalePrice = Number(item.variant.wholesalePrice)
+        } else if (item.shopProduct?.product?.wholesalePrice) {
+          wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
+        }
         guestProductMargin += (unitPrice - wholesalePrice) * item.quantity
-        guestTotalRevenue += unitPrice * item.quantity
       }
     }
 
@@ -341,8 +357,7 @@ export async function GET(request: NextRequest) {
     const totalProductMargin = memberProductMargin + guestProductMargin
     const totalShippingFee = memberShippingFee + guestShippingFee
     const totalMargin = totalProductMargin - totalShippingFee
-    const totalItemRevenue = memberTotalRevenue + guestTotalRevenue
-    const marginRate = totalItemRevenue > 0 ? Math.round((totalMargin / totalItemRevenue) * 1000) / 10 : 0
+    const marginRate = currentRevenue > 0 ? Math.round((totalMargin / currentRevenue) * 1000) / 10 : 0
 
     // 이전 기간 마진 계산 (비교용)
     let prevProductMargin = 0
@@ -351,7 +366,12 @@ export async function GET(request: NextRequest) {
       prevShippingFee += calculateOrderShippingFee(order.items)
       for (const item of order.items) {
         const unitPrice = Number(item.unitPrice)
-        const wholesalePrice = (item as unknown as { wholesalePrice?: number }).wholesalePrice || 0
+        let wholesalePrice = 0
+        if (item.variant?.wholesalePrice) {
+          wholesalePrice = Number(item.variant.wholesalePrice)
+        } else if (item.shopProduct?.product?.wholesalePrice) {
+          wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
+        }
         prevProductMargin += (unitPrice - wholesalePrice) * item.quantity
       }
     }
@@ -359,7 +379,12 @@ export async function GET(request: NextRequest) {
       prevShippingFee += calculateOrderShippingFee(order.items)
       for (const item of order.items) {
         const unitPrice = Number(item.unitPrice)
-        const wholesalePrice = (item as unknown as { wholesalePrice?: number }).wholesalePrice || 0
+        let wholesalePrice = 0
+        if (item.variant?.wholesalePrice) {
+          wholesalePrice = Number(item.variant.wholesalePrice)
+        } else if (item.shopProduct?.product?.wholesalePrice) {
+          wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
+        }
         prevProductMargin += (unitPrice - wholesalePrice) * item.quantity
       }
     }
