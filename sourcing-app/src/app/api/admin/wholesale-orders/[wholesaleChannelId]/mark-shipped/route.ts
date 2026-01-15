@@ -6,7 +6,7 @@ import { getCurrentUser } from '@/modules/auth/auth.service'
 
 /**
  * POST /api/admin/wholesale-orders/:wholesaleChannelId/mark-shipped
- * 주문을 배송시작(SHIPPED) 상태로 변경 (발주 완료)
+ * 주문을 상품 준비(PREPARING) 상태로 변경 (발주 완료)
  *
  * Body:
  * - orderIds: { memberId?: number[], guestId?: number[] } - 선택 발주완료 시 사용
@@ -38,17 +38,16 @@ export async function POST(
       markAll?: boolean
     }
 
-    if (!from || !to) {
-      return NextResponse.json(
-        { success: false, error: '기간(from, to)은 필수입니다.' },
-        { status: 400 }
-      )
-    }
+    // from/to가 없으면 전체 기간 조회
+    let fromDate: Date | undefined
+    let toDate: Date | undefined
 
-    const fromDate = new Date(from)
-    fromDate.setHours(0, 0, 0, 0)
-    const toDate = new Date(to)
-    toDate.setHours(23, 59, 59, 999)
+    if (from && to) {
+      fromDate = new Date(from)
+      fromDate.setHours(0, 0, 0, 0)
+      toDate = new Date(to)
+      toDate.setHours(23, 59, 59, 999)
+    }
 
     const now = new Date()
 
@@ -64,18 +63,18 @@ export async function POST(
     let guestUpdatedCount = 0
 
     if (markAll) {
-      // 전체 발주완료: 해당 도매처의 모든 PAID/PREPARING 주문을 SHIPPED로 변경
+      // 전체 발주완료: 해당 도매처의 모든 PAID 주문을 PREPARING으로 변경
 
       // 1. 회원 주문 조회
       const memberOrders = await prisma.orderItem.findMany({
         where: {
           order: {
             status: { in: ['PAID', 'PREPARING'] },
-            paidAt: {
+            paidAt: fromDate && toDate ? {
               not: null,
               gte: fromDate,
               lte: toDate,
-            },
+            } : { not: null },
           },
           shopProduct: productCondition,
         },
@@ -99,8 +98,7 @@ export async function POST(
             status: { in: ['PAID', 'PREPARING'] },
           },
           data: {
-            status: 'SHIPPED',
-            shippedAt: now,
+            status: 'PREPARING',
           },
         })
         memberUpdatedCount = result.count
@@ -111,11 +109,11 @@ export async function POST(
         where: {
           guestOrder: {
             status: { in: ['PAID', 'PREPARING'] },
-            paidAt: {
+            paidAt: fromDate && toDate ? {
               not: null,
               gte: fromDate,
               lte: toDate,
-            },
+            } : { not: null },
           },
           shopProduct: productCondition,
         },
@@ -139,14 +137,13 @@ export async function POST(
             status: { in: ['PAID', 'PREPARING'] },
           },
           data: {
-            status: 'SHIPPED',
-            shippedAt: now,
+            status: 'PREPARING',
           },
         })
         guestUpdatedCount = result.count
       }
     } else if (orderIds) {
-      // 선택 발주완료: 선택된 주문만 SHIPPED로 변경
+      // 선택 발주완료: 선택된 주문만 PREPARING으로 변경
 
       // 회원 주문 업데이트
       if (orderIds.memberIds && orderIds.memberIds.length > 0) {
@@ -156,8 +153,7 @@ export async function POST(
             status: { in: ['PAID', 'PREPARING'] },
           },
           data: {
-            status: 'SHIPPED',
-            shippedAt: now,
+            status: 'PREPARING',
           },
         })
         memberUpdatedCount = result.count
@@ -171,8 +167,7 @@ export async function POST(
             status: { in: ['PAID', 'PREPARING'] },
           },
           data: {
-            status: 'SHIPPED',
-            shippedAt: now,
+            status: 'PREPARING',
           },
         })
         guestUpdatedCount = result.count
@@ -191,7 +186,7 @@ export async function POST(
       updatedCount: totalUpdatedCount,
       memberUpdatedCount,
       guestUpdatedCount,
-      message: `${totalUpdatedCount}건의 주문이 발주 완료(배송시작) 처리되었습니다.`,
+      message: `${totalUpdatedCount}건의 주문이 발주 완료(상품 준비) 처리되었습니다.`,
     })
   } catch (error) {
     console.error('발주 완료 처리 실패:', error)

@@ -397,7 +397,7 @@ export default function WholesaleOrdersPage() {
       const data = await res.json()
 
       if (data.success) {
-        toast.success(`${data.updatedCount}건의 주문이 발주 완료(배송시작) 처리되었습니다.`)
+        toast.success(`${data.updatedCount}건의 주문이 발주 완료(상품 준비) 처리되었습니다.`)
         setSelectedOrders(new Map())
         fetchSummary()
         if (selectedChannel) {
