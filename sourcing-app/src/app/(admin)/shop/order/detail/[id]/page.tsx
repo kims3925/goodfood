@@ -20,6 +20,7 @@ import {
   ImageOff,
   Building2,
   Banknote,
+  Trash2,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
@@ -175,6 +176,7 @@ export default function UnifiedOrderDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<string | null>(null)
 
   const loadOrder = useCallback(async () => {
@@ -269,6 +271,43 @@ export default function UnifiedOrderDetailPage() {
     return `${year}-${month}-${day} ${hour}:${minute}`
   }
 
+  // 외부 주문 판별 (주문번호가 'x'로 시작)
+  const isExternalOrder = (orderNumber: string) => {
+    return orderNumber.toLowerCase().startsWith('x')
+  }
+
+  // 외부 주문 삭제
+  const handleDeleteExternalOrder = async () => {
+    if (!order) return
+
+    setShowDeleteConfirm(false)
+    setIsUpdating(true)
+
+    try {
+      const endpoint = order.isGuestOrder
+        ? `/api/order/external/guest/${order.id}`
+        : `/api/order/external/member/${order.id}`
+
+      const res = await fetch(endpoint, {
+        method: 'DELETE',
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        toast.success('주문이 삭제되었습니다.')
+        router.push('/shop/order/list')
+      } else {
+        toast.error(data.error || '주문 삭제에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('주문 삭제 실패:', error)
+      toast.error('주문 삭제 중 오류가 발생했습니다.')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -306,21 +345,38 @@ export default function UnifiedOrderDetailPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-6 flex items-center gap-4">
-          <Button variant="ghost" onClick={() => router.push('/shop/order/list')}>
-            <ArrowLeft size={20} />
-          </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-gray-900">주문 상세</h1>
-              {order.isGuestOrder && (
-                <span className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-700 whitespace-nowrap">
-                  비회원
-                </span>
-              )}
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => router.push('/shop/order/list')}>
+              <ArrowLeft size={20} />
+            </Button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-gray-900">주문 상세</h1>
+                {order.isGuestOrder && (
+                  <span className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-700 whitespace-nowrap">
+                    비회원
+                  </span>
+                )}
+                {isExternalOrder(order.orderNumber) && (
+                  <span className="px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-700 whitespace-nowrap">
+                    외부 주문
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 font-mono">{order.orderNumber}</p>
             </div>
-            <p className="text-sm text-gray-500 font-mono">{order.orderNumber}</p>
           </div>
+          {isExternalOrder(order.orderNumber) && (
+            <Button
+              variant="danger"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isUpdating}
+            >
+              <Trash2 size={16} />
+              삭제
+            </Button>
+          )}
         </div>
 
         {/* 주문 정보 카드 */}
@@ -758,6 +814,19 @@ export default function UnifiedOrderDetailPage() {
         message="주문을 취소하시겠습니까? 이 작업은 되돌릴 수 없습니다."
         confirmText="주문 취소"
         cancelText="닫기"
+        variant="danger"
+        isLoading={isUpdating}
+      />
+
+      {/* 외부 주문 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteExternalOrder}
+        title="외부 주문 삭제"
+        message="이 외부 주문을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+        confirmText="삭제"
+        cancelText="취소"
         variant="danger"
         isLoading={isUpdating}
       />

@@ -15,6 +15,8 @@ import {
   Truck,
   XCircle,
   Plus,
+  Trash2,
+  Edit3,
 } from 'lucide-react'
 import Input from '@/components/ui/Input'
 import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
@@ -73,6 +75,12 @@ export default function UnifiedOrderListPage() {
 
   // 상태 필터
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
+
+  // 삭제 확인 모달
+  const [deleteModal, setDeleteModal] = useState<{ show: boolean; order: UnifiedOrder | null }>({
+    show: false,
+    order: null,
+  })
 
   // 상태별 카운트 (API에서 가져옴)
   const [statusCounts, setStatusCounts] = useState({
@@ -215,6 +223,53 @@ export default function UnifiedOrderListPage() {
         {statusLabel}
       </span>
     )
+  }
+
+  // 외부 주문 판별 (주문번호가 'x'로 시작)
+  const isExternalOrder = (orderNumber: string) => {
+    return orderNumber.toLowerCase().startsWith('x')
+  }
+
+  // 외부 주문 수정
+  const handleEditExternalOrder = (e: React.MouseEvent, orderNumber: string) => {
+    e.stopPropagation()
+    router.push(`/shop/order/external/edit/${orderNumber}`)
+  }
+
+  // 외부 주문 삭제 확인 모달 열기
+  const handleDeleteExternalOrder = (e: React.MouseEvent, order: UnifiedOrder) => {
+    e.stopPropagation()
+    setDeleteModal({ show: true, order })
+  }
+
+  // 외부 주문 삭제 실행
+  const confirmDeleteOrder = async () => {
+    const order = deleteModal.order
+    if (!order) return
+
+    setDeleteModal({ show: false, order: null })
+
+    try {
+      const endpoint = order.isGuestOrder
+        ? `/api/order/external/guest/${order.id}`
+        : `/api/order/external/member/${order.id}`
+
+      const res = await fetch(endpoint, {
+        method: 'DELETE',
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        toast.success('주문이 삭제되었습니다.')
+        fetchOrders()
+      } else {
+        toast.error(data.error || '주문 삭제에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('주문 삭제 실패:', error)
+      toast.error('주문 삭제 중 오류가 발생했습니다.')
+    }
   }
 
   return (
@@ -418,15 +473,16 @@ export default function UnifiedOrderListPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[4%] text-center">No.</TableHead>
-                  <TableHead className="w-[10%] text-center">출처</TableHead>
-                  <TableHead className="w-[10%] text-center">주문번호</TableHead>
-                  <TableHead className="w-[9%] text-center">고객명</TableHead>
+                  <TableHead className="w-[9%] text-center">출처</TableHead>
+                  <TableHead className="w-[9%] text-center">주문번호</TableHead>
+                  <TableHead className="w-[8%] text-center">고객명</TableHead>
                   <TableHead className="w-[7%] text-center">회원유형</TableHead>
-                  <TableHead className="w-[11%] text-center">전화번호</TableHead>
-                  <TableHead className="w-[20%] text-center">상품</TableHead>
-                  <TableHead className="w-[9%] text-center">금액</TableHead>
-                  <TableHead className="w-[9%] text-center">상태</TableHead>
-                  <TableHead className="w-[15%] text-center">주문일시</TableHead>
+                  <TableHead className="w-[10%] text-center">전화번호</TableHead>
+                  <TableHead className="w-[19%] text-center">상품</TableHead>
+                  <TableHead className="w-[8%] text-center">금액</TableHead>
+                  <TableHead className="w-[8%] text-center">상태</TableHead>
+                  <TableHead className="w-[12%] text-center">주문일시</TableHead>
+                  <TableHead className="w-[6%] text-center">작업</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -490,6 +546,26 @@ export default function UnifiedOrderListPage() {
                           {formatDate(order.createdAt)}
                         </span>
                       </TableCell>
+                      <TableCell className="text-center">
+                        {isExternalOrder(order.orderNumber) && (
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={(e) => handleEditExternalOrder(e, order.orderNumber)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="수정"
+                            >
+                              <Edit3 size={16} />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteExternalOrder(e, order)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="삭제"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -527,6 +603,33 @@ export default function UnifiedOrderListPage() {
         </div>
       </div>
 
+      {/* 삭제 확인 모달 */}
+      {deleteModal.show && deleteModal.order && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">주문 삭제 확인</h3>
+            <p className="text-gray-600 mb-6">
+              주문번호 <span className="font-semibold">{deleteModal.order.orderNumber}</span>을(를) 삭제하시겠습니까?
+              <br />
+              <span className="text-sm text-red-600 mt-2 block">이 작업은 되돌릴 수 없습니다.</span>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteModal({ show: false, order: null })}
+                className="flex-1 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={confirmDeleteOrder}
+                className="flex-1 py-2.5 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
