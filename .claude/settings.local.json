@@ -50,7 +50,8 @@
       "WebFetch(domain:developers.band.us)",
       "Bash(gh pr list:*)",
       "Bash(find . -name '*.md' -exec sed -i 's/\\r$//' {} +)",
-      "Bash(npm run dev:sourcing:*)"
+      "Bash(npm run dev:sourcing:*)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": []
