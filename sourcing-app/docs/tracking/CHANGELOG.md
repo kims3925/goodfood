@@ -21,6 +21,9 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260115-003 | Done | 2026-01-15 | - | Turbopack 활성화로 개발 서버 성능 개선 | Low | Claude |
+| TR-20260115-002 | Done | 2026-01-15 | - | 차트 렌더링 오류 및 CSS 파싱 오류 수정 | Low | Claude |
+| TR-20260115-001 | Done | 2026-01-15 | - | 외부 주문 추가에서 합배송 반영 가격 계산 | Medium | Claude |
 | TR-20260113-001 | Done | 2026-01-13 | - | 발주 이력 날짜별 필터링 버그 수정 | Low | Claude |
 | TR-20260112-007 | Done | 2026-01-12 | - | 소매밴드 발행 양식 상단 링크 제거 (제목 최상단 노출) | Low | Claude |
 | TR-20260112-006 | Done | 2026-01-12 | - | 토스페이먼츠 거래 API 스키마 변경 (tossPay → transfer/virtualAccount) | Low | Claude |

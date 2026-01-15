@@ -46,6 +46,8 @@ npm run test:headed       # 헤드 모드
 npm run lint
 ```
 
+**참고**: 개발 서버는 Turbopack을 사용하여 빠른 HMR과 컴파일 속도를 제공합니다.
+
 ## Prisma CLI
 
 **중요: db 폴더에서 `--schema prisma` 옵션 필수**
