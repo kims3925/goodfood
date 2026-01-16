@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
     const currentMemberOrders = await prisma.order.findMany({
       where: {
         shop: { userId: user.userId },
-        status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+        status: { in: ['PAID', 'PREPARING', 'SHIPPED', 'DELIVERED'] },
         orderedAt: { gte: start, lte: end },
       },
       include: {
@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
     const currentGuestOrders = await prisma.guestOrder.findMany({
       where: {
         shop: { userId: user.userId },
-        status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+        status: { in: ['PAID', 'PREPARING', 'SHIPPED', 'DELIVERED'] },
         orderedAt: { gte: start, lte: end },
       },
       include: {
@@ -179,7 +179,7 @@ export async function GET(request: NextRequest) {
     const previousMemberOrders = await prisma.order.findMany({
       where: {
         shop: { userId: user.userId },
-        status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+        status: { in: ['PAID', 'PREPARING', 'SHIPPED', 'DELIVERED'] },
         orderedAt: { gte: prevStart, lte: prevEnd },
       },
       include: {
@@ -214,7 +214,7 @@ export async function GET(request: NextRequest) {
     const previousGuestOrders = await prisma.guestOrder.findMany({
       where: {
         shop: { userId: user.userId },
-        status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] },
+        status: { in: ['PAID', 'PREPARING', 'SHIPPED', 'DELIVERED'] },
         orderedAt: { gte: prevStart, lte: prevEnd },
       },
       include: {
@@ -245,19 +245,34 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // 전체 회원 주문 상태 조회 (상태 분포용)
+    // 전체 회원 주문 상태 조회 (상태 분포 및 고객 수 계산용)
     const allMemberOrders = await prisma.order.findMany({
       where: {
         shop: { userId: user.userId },
         orderedAt: { gte: start, lte: end },
       },
+      include: {
+        shippingAddress: {
+          select: {
+            recipientName: true,
+            recipientPhone: true,
+          },
+        },
+      },
     })
 
-    // 전체 비회원 주문 상태 조회 (상태 분포용)
+    // 전체 비회원 주문 상태 조회 (상태 분포 및 고객 수 계산용)
     const allGuestOrders = await prisma.guestOrder.findMany({
       where: {
         shop: { userId: user.userId },
         orderedAt: { gte: start, lte: end },
+      },
+      select: {
+        id: true,
+        status: true,
+        guestName: true,
+        guestPhone: true,
+        orderedAt: true,
       },
     })
 
@@ -270,17 +285,82 @@ export async function GET(request: NextRequest) {
     const previousGuestRevenue = previousGuestOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0)
     const previousRevenue = previousMemberRevenue + previousGuestRevenue
 
-    const currentOrderCount = currentMemberOrders.length + currentGuestOrders.length
-    const previousOrderCount = previousMemberOrders.length + previousGuestOrders.length
+    // 주문 수: 전체 주문 - 취소된 주문
+    const currentOrderCount = allMemberOrders.filter(o => o.status !== 'CANCELLED').length +
+                              allGuestOrders.filter(o => o.status !== 'CANCELLED').length
 
-    // 고유 고객 수 (전화번호 기준 - 회원 + 비회원)
-    const currentMemberPhones = currentMemberOrders.map(o => o.shippingAddress?.recipientPhone).filter(Boolean)
-    const currentGuestPhones = currentGuestOrders.map(o => o.guestPhone).filter(Boolean)
-    const currentCustomers = new Set([...currentMemberPhones, ...currentGuestPhones]).size
+    // 이전 기간도 동일하게 계산 (전체 조회 필요)
+    const prevAllMemberOrders = await prisma.order.findMany({
+      where: {
+        shop: { userId: user.userId },
+        orderedAt: { gte: prevStart, lte: prevEnd },
+      },
+      include: {
+        shippingAddress: {
+          select: {
+            recipientName: true,
+            recipientPhone: true,
+          },
+        },
+      },
+    })
+    const prevAllGuestOrders = await prisma.guestOrder.findMany({
+      where: {
+        shop: { userId: user.userId },
+        orderedAt: { gte: prevStart, lte: prevEnd },
+      },
+      select: {
+        id: true,
+        status: true,
+        guestName: true,
+        guestPhone: true,
+        orderedAt: true,
+      },
+    })
+    const previousOrderCount = prevAllMemberOrders.filter(o => o.status !== 'CANCELLED').length +
+                               prevAllGuestOrders.filter(o => o.status !== 'CANCELLED').length
 
-    const previousMemberPhones = previousMemberOrders.map(o => o.shippingAddress?.recipientPhone).filter(Boolean)
-    const previousGuestPhones = previousGuestOrders.map(o => o.guestPhone).filter(Boolean)
-    const previousCustomers = new Set([...previousMemberPhones, ...previousGuestPhones]).size
+    // 고유 고객 수 (이름+전화번호 조합 기준 - 회원 + 비회원)
+    // 취소되지 않은 전체 주문의 고객 카운트
+    const currentMemberCustomers = allMemberOrders
+      .filter(o => o.status !== 'CANCELLED')
+      .map(o => {
+        const name = o.shippingAddress?.recipientName || ''
+        const phone = o.shippingAddress?.recipientPhone || ''
+        return name && phone ? `${name}-${phone}` : null
+      })
+      .filter(Boolean)
+
+    const currentGuestCustomers = allGuestOrders
+      .filter(o => o.status !== 'CANCELLED')
+      .map(o => {
+        const name = o.guestName || ''
+        const phone = o.guestPhone || ''
+        return name && phone ? `${name}-${phone}` : null
+      })
+      .filter(Boolean)
+
+    const currentCustomers = new Set([...currentMemberCustomers, ...currentGuestCustomers]).size
+
+    const previousMemberCustomers = prevAllMemberOrders
+      .filter(o => o.status !== 'CANCELLED')
+      .map(o => {
+        const name = o.shippingAddress?.recipientName || ''
+        const phone = o.shippingAddress?.recipientPhone || ''
+        return name && phone ? `${name}-${phone}` : null
+      })
+      .filter(Boolean)
+
+    const previousGuestCustomers = prevAllGuestOrders
+      .filter(o => o.status !== 'CANCELLED')
+      .map(o => {
+        const name = o.guestName || ''
+        const phone = o.guestPhone || ''
+        return name && phone ? `${name}-${phone}` : null
+      })
+      .filter(Boolean)
+
+    const previousCustomers = new Set([...previousMemberCustomers, ...previousGuestCustomers]).size
 
     // === 마진 계산 (회원 + 비회원) - Product 기반 배송비 사용 ===
     // 마진 = (판매금액 - 도매금액) - Product 기반 배송비
