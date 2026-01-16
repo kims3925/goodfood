@@ -349,6 +349,14 @@ export async function GET(request: NextRequest) {
       memberShippingFee += calculateOrderShippingFee(order.items)
       for (const item of order.items) {
         const unitPrice = Number(item.unitPrice)
+        const bundleShippingType = item.shopProduct?.product?.bundleShippingType || 'NONE'
+        const shippingFee = item.shopProduct?.product?.shippingFee || 0
+
+        // unitPrice에서 배송비를 제외한 basePrice 계산
+        // INCLUDED: unitPrice 그대로 (배송비 이미 포함)
+        // SEPARATE/NONE: unitPrice - shippingFee = basePrice
+        const basePrice = bundleShippingType === 'INCLUDED' ? unitPrice : unitPrice - shippingFee
+
         // 옵션이 있으면 variant.wholesalePrice, 없으면 product.wholesalePrice 사용
         let wholesalePrice = 0
         if (item.variant?.wholesalePrice) {
@@ -357,7 +365,7 @@ export async function GET(request: NextRequest) {
           wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
         }
 
-        memberProductMargin += (unitPrice - wholesalePrice) * item.quantity
+        memberProductMargin += (basePrice - wholesalePrice) * item.quantity
       }
     }
 
@@ -368,6 +376,12 @@ export async function GET(request: NextRequest) {
       guestShippingFee += calculateOrderShippingFee(order.items)
       for (const item of order.items) {
         const unitPrice = Number(item.unitPrice)
+        const bundleShippingType = item.shopProduct?.product?.bundleShippingType || 'NONE'
+        const shippingFee = item.shopProduct?.product?.shippingFee || 0
+
+        // unitPrice에서 배송비를 제외한 basePrice 계산
+        const basePrice = bundleShippingType === 'INCLUDED' ? unitPrice : unitPrice - shippingFee
+
         // 옵션이 있으면 variant.wholesalePrice, 없으면 product.wholesalePrice 사용
         let wholesalePrice = 0
         if (item.variant?.wholesalePrice) {
@@ -376,7 +390,7 @@ export async function GET(request: NextRequest) {
           wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
         }
 
-        guestProductMargin += (unitPrice - wholesalePrice) * item.quantity
+        guestProductMargin += (basePrice - wholesalePrice) * item.quantity
       }
     }
 
@@ -393,26 +407,34 @@ export async function GET(request: NextRequest) {
       prevShippingFee += calculateOrderShippingFee(order.items)
       for (const item of order.items) {
         const unitPrice = Number(item.unitPrice)
+        const bundleShippingType = item.shopProduct?.product?.bundleShippingType || 'NONE'
+        const shippingFee = item.shopProduct?.product?.shippingFee || 0
+        const basePrice = bundleShippingType === 'INCLUDED' ? unitPrice : unitPrice - shippingFee
+
         let wholesalePrice = 0
         if (item.variant?.wholesalePrice) {
           wholesalePrice = Number(item.variant.wholesalePrice)
         } else if (item.shopProduct?.product?.wholesalePrice) {
           wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
         }
-        prevProductMargin += (unitPrice - wholesalePrice) * item.quantity
+        prevProductMargin += (basePrice - wholesalePrice) * item.quantity
       }
     }
     for (const order of previousGuestOrders) {
       prevShippingFee += calculateOrderShippingFee(order.items)
       for (const item of order.items) {
         const unitPrice = Number(item.unitPrice)
+        const bundleShippingType = item.shopProduct?.product?.bundleShippingType || 'NONE'
+        const shippingFee = item.shopProduct?.product?.shippingFee || 0
+        const basePrice = bundleShippingType === 'INCLUDED' ? unitPrice : unitPrice - shippingFee
+
         let wholesalePrice = 0
         if (item.variant?.wholesalePrice) {
           wholesalePrice = Number(item.variant.wholesalePrice)
         } else if (item.shopProduct?.product?.wholesalePrice) {
           wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
         }
-        prevProductMargin += (unitPrice - wholesalePrice) * item.quantity
+        prevProductMargin += (basePrice - wholesalePrice) * item.quantity
       }
     }
     const prevTotalMargin = prevProductMargin - prevShippingFee
