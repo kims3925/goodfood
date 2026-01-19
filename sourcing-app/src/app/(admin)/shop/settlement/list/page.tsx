@@ -295,10 +295,10 @@ export default function SettlementListPage() {
 
     // 계좌이체
     if (method === 'TRANSFER' || method === 'BANK_TRANSFER') {
-      if (status === 'DONE') {
-        return { label: '이체완료', bgColor: 'bg-green-100', textColor: 'text-green-700', icon: Wallet }
+      if (status === 'CANCELED' || status === 'PARTIAL_CANCELED') {
+        return { label: '취소', bgColor: 'bg-red-100', textColor: 'text-red-700', icon: XCircle }
       }
-      return { label: '이체중', bgColor: 'bg-blue-100', textColor: 'text-blue-600', icon: Wallet }
+      return { label: '이체완료', bgColor: 'bg-green-100', textColor: 'text-green-700', icon: Wallet }
     }
 
     // 기타 결제 수단
