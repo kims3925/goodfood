@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     const { start, end, prevStart, prevEnd, days } = getDateRange(period, startDate, endDate)
 
     // 현재 기간 회원 주문 조회 (Product 배송비 정보 포함)
-    const currentMemberOrders = await prisma.order.findMany({
+    const currentMemberOrdersRaw = await prisma.order.findMany({
       where: {
         shop: { userId: user.userId },
         status: { in: ['PAID', 'PREPARING', 'SHIPPED', 'DELIVERED'] },
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
           include: {
             variant: {
               select: {
-                bundleUnit: true,
+                price: true,
                 wholesalePrice: true,
               },
             },
@@ -123,10 +123,7 @@ export async function GET(request: NextRequest) {
               include: {
                 product: {
                   select: {
-                    id: true,
-                    shippingFee: true,
-                    bundleMaxQty: true,
-                    bundleShippingType: true,
+                    price: true,
                     wholesalePrice: true,
                   },
                 },
@@ -137,9 +134,11 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { orderedAt: 'desc' },
     })
+    // 아이템이 없는 주문 제외 (상품 삭제 등으로 인한 데이터 정합성 문제 방지)
+    const currentMemberOrders = currentMemberOrdersRaw.filter(o => o.items.length > 0)
 
     // 현재 기간 비회원 주문 조회 (Product 배송비 정보 포함)
-    const currentGuestOrders = await prisma.guestOrder.findMany({
+    const currentGuestOrdersRaw = await prisma.guestOrder.findMany({
       where: {
         shop: { userId: user.userId },
         status: { in: ['PAID', 'PREPARING', 'SHIPPED', 'DELIVERED'] },
@@ -152,7 +151,7 @@ export async function GET(request: NextRequest) {
           include: {
             variant: {
               select: {
-                bundleUnit: true,
+                price: true,
                 wholesalePrice: true,
               },
             },
@@ -160,10 +159,7 @@ export async function GET(request: NextRequest) {
               include: {
                 product: {
                   select: {
-                    id: true,
-                    shippingFee: true,
-                    bundleMaxQty: true,
-                    bundleShippingType: true,
+                    price: true,
                     wholesalePrice: true,
                   },
                 },
@@ -174,9 +170,11 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { orderedAt: 'desc' },
     })
+    // 아이템이 없는 주문 제외
+    const currentGuestOrders = currentGuestOrdersRaw.filter(o => o.items.length > 0)
 
     // 이전 기간 회원 주문 조회 (비교용 - Product 배송비 정보 포함)
-    const previousMemberOrders = await prisma.order.findMany({
+    const previousMemberOrdersRaw = await prisma.order.findMany({
       where: {
         shop: { userId: user.userId },
         status: { in: ['PAID', 'PREPARING', 'SHIPPED', 'DELIVERED'] },
@@ -188,7 +186,7 @@ export async function GET(request: NextRequest) {
           include: {
             variant: {
               select: {
-                bundleUnit: true,
+                price: true,
                 wholesalePrice: true,
               },
             },
@@ -196,10 +194,7 @@ export async function GET(request: NextRequest) {
               include: {
                 product: {
                   select: {
-                    id: true,
-                    shippingFee: true,
-                    bundleMaxQty: true,
-                    bundleShippingType: true,
+                    price: true,
                     wholesalePrice: true,
                   },
                 },
@@ -209,9 +204,10 @@ export async function GET(request: NextRequest) {
         },
       },
     })
+    const previousMemberOrders = previousMemberOrdersRaw.filter(o => o.items.length > 0)
 
     // 이전 기간 비회원 주문 조회 (비교용 - Product 배송비 정보 포함)
-    const previousGuestOrders = await prisma.guestOrder.findMany({
+    const previousGuestOrdersRaw = await prisma.guestOrder.findMany({
       where: {
         shop: { userId: user.userId },
         status: { in: ['PAID', 'PREPARING', 'SHIPPED', 'DELIVERED'] },
@@ -223,7 +219,7 @@ export async function GET(request: NextRequest) {
           include: {
             variant: {
               select: {
-                bundleUnit: true,
+                price: true,
                 wholesalePrice: true,
               },
             },
@@ -231,10 +227,7 @@ export async function GET(request: NextRequest) {
               include: {
                 product: {
                   select: {
-                    id: true,
-                    shippingFee: true,
-                    bundleMaxQty: true,
-                    bundleShippingType: true,
+                    price: true,
                     wholesalePrice: true,
                   },
                 },
@@ -244,9 +237,10 @@ export async function GET(request: NextRequest) {
         },
       },
     })
+    const previousGuestOrders = previousGuestOrdersRaw.filter(o => o.items.length > 0)
 
     // 전체 회원 주문 상태 조회 (상태 분포 및 고객 수 계산용)
-    const allMemberOrders = await prisma.order.findMany({
+    const allMemberOrdersRaw = await prisma.order.findMany({
       where: {
         shop: { userId: user.userId },
         orderedAt: { gte: start, lte: end },
@@ -258,23 +252,30 @@ export async function GET(request: NextRequest) {
             recipientPhone: true,
           },
         },
+        items: { select: { id: true } },
       },
     })
+    const allMemberOrders = allMemberOrdersRaw.filter(o => o.items.length > 0)
 
     // 전체 비회원 주문 상태 조회 (상태 분포 및 고객 수 계산용)
-    const allGuestOrders = await prisma.guestOrder.findMany({
+    const allGuestOrdersRaw = await prisma.guestOrder.findMany({
       where: {
         shop: { userId: user.userId },
         orderedAt: { gte: start, lte: end },
       },
-      select: {
-        id: true,
-        status: true,
-        guestName: true,
-        guestPhone: true,
-        orderedAt: true,
+      include: {
+        items: { select: { id: true } },
       },
     })
+    const allGuestOrders = allGuestOrdersRaw
+      .filter(o => o.items.length > 0)
+      .map(o => ({
+        id: o.id,
+        status: o.status,
+        guestName: o.guestName,
+        guestPhone: o.guestPhone,
+        orderedAt: o.orderedAt,
+      }))
 
     // === KPI 통계 계산 (회원 + 비회원) ===
     const currentMemberRevenue = currentMemberOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0)
@@ -290,7 +291,7 @@ export async function GET(request: NextRequest) {
                               allGuestOrders.filter(o => o.status !== 'CANCELLED').length
 
     // 이전 기간도 동일하게 계산 (전체 조회 필요)
-    const prevAllMemberOrders = await prisma.order.findMany({
+    const prevAllMemberOrdersRaw = await prisma.order.findMany({
       where: {
         shop: { userId: user.userId },
         orderedAt: { gte: prevStart, lte: prevEnd },
@@ -302,21 +303,29 @@ export async function GET(request: NextRequest) {
             recipientPhone: true,
           },
         },
+        items: { select: { id: true } },
       },
     })
-    const prevAllGuestOrders = await prisma.guestOrder.findMany({
+    const prevAllMemberOrders = prevAllMemberOrdersRaw.filter(o => o.items.length > 0)
+
+    const prevAllGuestOrdersRaw = await prisma.guestOrder.findMany({
       where: {
         shop: { userId: user.userId },
         orderedAt: { gte: prevStart, lte: prevEnd },
       },
-      select: {
-        id: true,
-        status: true,
-        guestName: true,
-        guestPhone: true,
-        orderedAt: true,
+      include: {
+        items: { select: { id: true } },
       },
     })
+    const prevAllGuestOrders = prevAllGuestOrdersRaw
+      .filter(o => o.items.length > 0)
+      .map(o => ({
+        id: o.id,
+        status: o.status,
+        guestName: o.guestName,
+        guestPhone: o.guestPhone,
+        orderedAt: o.orderedAt,
+      }))
     const previousOrderCount = prevAllMemberOrders.filter(o => o.status !== 'CANCELLED').length +
                                prevAllGuestOrders.filter(o => o.status !== 'CANCELLED').length
 
@@ -362,74 +371,23 @@ export async function GET(request: NextRequest) {
 
     const previousCustomers = new Set([...previousMemberCustomers, ...previousGuestCustomers]).size
 
-    // === 마진 계산 (회원 + 비회원) - Product 기반 배송비 사용 ===
-    // 마진 = (판매금액 - 도매금액) - Product 기반 배송비
-
-    // Product 기반 배송비 계산 함수 (합배송 로직 적용)
-    const calculateOrderShippingFee = (items: any[]): number => {
-      // 상품별 배송비 정보 집계
-      const productShippingMap = new Map<number, {
-        shippingFee: number
-        bundleMaxQty: number
-        bundleShippingType: string
-        totalBundleUnits: number
-        itemCount: number
-      }>()
-
-      for (const item of items) {
-        const product = item.shopProduct?.product
-        if (!product) continue
-
-        const productId = product.id
-        const shippingFee = product.shippingFee || 0
-        const bundleMaxQty = product.bundleMaxQty || 1
-        const bundleShippingType = product.bundleShippingType || 'NONE'
-        const bundleUnit = item.variant?.bundleUnit || 1
-
-        if (!productShippingMap.has(productId)) {
-          productShippingMap.set(productId, {
-            shippingFee,
-            bundleMaxQty,
-            bundleShippingType,
-            totalBundleUnits: 0,
-            itemCount: 0,
-          })
-        }
-
-        const info = productShippingMap.get(productId)!
-        info.totalBundleUnits += item.quantity * bundleUnit
-        info.itemCount++
-      }
-
-      // 상품별 실제 배송비 계산
-      let totalShippingFee = 0
-      for (const [_, info] of productShippingMap) {
-        if (info.shippingFee > 0) {
-          if (info.bundleShippingType === 'INCLUDED') {
-            // 배송비 포함 상품: 배송비 계산하지 않음 (이미 소매가에 포함되어 있음)
-            continue
-          } else if (info.bundleShippingType === 'NONE') {
-            // 합배송 없음: 아이템 수 × 배송비
-            totalShippingFee += info.itemCount * info.shippingFee
-          } else {
-            // SEPARATE: 합배송 적용: ceil(총 배송단위 / 합배송 최대수량) × 배송비
-            const shippingCount = Math.ceil(info.totalBundleUnits / info.bundleMaxQty)
-            totalShippingFee += shippingCount * info.shippingFee
-          }
-        }
-      }
-
-      return totalShippingFee
-    }
+    // === 마진 계산 (회원 + 비회원) ===
+    // 마진 = (순수 소매가 - 도매가) × 수량
+    // 순수 소매가: variant.price 또는 product.price (배송비 제외)
 
     // 회원 주문 마진 계산
-    let memberProductMargin = 0  // 상품 마진 (판매가 - 도매가)
-    let memberShippingFee = 0    // Product 기반 배송비
+    let memberMargin = 0
     for (const order of currentMemberOrders) {
-      memberShippingFee += calculateOrderShippingFee(order.items)
       for (const item of order.items) {
-        const unitPrice = Number(item.unitPrice)
-        // 옵션이 있으면 variant.wholesalePrice, 없으면 product.wholesalePrice 사용
+        // 순수 소매가 (배송비 제외)
+        let retailPrice = 0
+        if (item.variant?.price) {
+          retailPrice = Number(item.variant.price)
+        } else if (item.shopProduct?.product?.price) {
+          retailPrice = Number(item.shopProduct.product.price)
+        }
+
+        // 도매가
         let wholesalePrice = 0
         if (item.variant?.wholesalePrice) {
           wholesalePrice = Number(item.variant.wholesalePrice)
@@ -437,18 +395,23 @@ export async function GET(request: NextRequest) {
           wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
         }
 
-        memberProductMargin += (unitPrice - wholesalePrice) * item.quantity
+        memberMargin += (retailPrice - wholesalePrice) * item.quantity
       }
     }
 
     // 비회원 주문 마진 계산
-    let guestProductMargin = 0
-    let guestShippingFee = 0
+    let guestMargin = 0
     for (const order of currentGuestOrders) {
-      guestShippingFee += calculateOrderShippingFee(order.items)
       for (const item of order.items) {
-        const unitPrice = Number(item.unitPrice)
-        // 옵션이 있으면 variant.wholesalePrice, 없으면 product.wholesalePrice 사용
+        // 순수 소매가 (배송비 제외)
+        let retailPrice = 0
+        if (item.variant?.price) {
+          retailPrice = Number(item.variant.price)
+        } else if (item.shopProduct?.product?.price) {
+          retailPrice = Number(item.shopProduct.product.price)
+        }
+
+        // 도매가
         let wholesalePrice = 0
         if (item.variant?.wholesalePrice) {
           wholesalePrice = Number(item.variant.wholesalePrice)
@@ -456,46 +419,53 @@ export async function GET(request: NextRequest) {
           wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
         }
 
-        guestProductMargin += (unitPrice - wholesalePrice) * item.quantity
+        guestMargin += (retailPrice - wholesalePrice) * item.quantity
       }
     }
 
-    // 총 마진 = 상품마진 - 배송비
-    const totalProductMargin = memberProductMargin + guestProductMargin
-    const totalShippingFee = memberShippingFee + guestShippingFee
-    const totalMargin = totalProductMargin - totalShippingFee
+    // 총 마진
+    const totalMargin = memberMargin + guestMargin
     const marginRate = currentRevenue > 0 ? Math.round((totalMargin / currentRevenue) * 1000) / 10 : 0
 
     // 이전 기간 마진 계산 (비교용)
-    let prevProductMargin = 0
-    let prevShippingFee = 0
+    let prevMargin = 0
     for (const order of previousMemberOrders) {
-      prevShippingFee += calculateOrderShippingFee(order.items)
       for (const item of order.items) {
-        const unitPrice = Number(item.unitPrice)
+        let retailPrice = 0
+        if (item.variant?.price) {
+          retailPrice = Number(item.variant.price)
+        } else if (item.shopProduct?.product?.price) {
+          retailPrice = Number(item.shopProduct.product.price)
+        }
+
         let wholesalePrice = 0
         if (item.variant?.wholesalePrice) {
           wholesalePrice = Number(item.variant.wholesalePrice)
         } else if (item.shopProduct?.product?.wholesalePrice) {
           wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
         }
-        prevProductMargin += (unitPrice - wholesalePrice) * item.quantity
+        prevMargin += (retailPrice - wholesalePrice) * item.quantity
       }
     }
     for (const order of previousGuestOrders) {
-      prevShippingFee += calculateOrderShippingFee(order.items)
       for (const item of order.items) {
-        const unitPrice = Number(item.unitPrice)
+        let retailPrice = 0
+        if (item.variant?.price) {
+          retailPrice = Number(item.variant.price)
+        } else if (item.shopProduct?.product?.price) {
+          retailPrice = Number(item.shopProduct.product.price)
+        }
+
         let wholesalePrice = 0
         if (item.variant?.wholesalePrice) {
           wholesalePrice = Number(item.variant.wholesalePrice)
         } else if (item.shopProduct?.product?.wholesalePrice) {
           wholesalePrice = Number(item.shopProduct.product.wholesalePrice)
         }
-        prevProductMargin += (unitPrice - wholesalePrice) * item.quantity
+        prevMargin += (retailPrice - wholesalePrice) * item.quantity
       }
     }
-    const prevTotalMargin = prevProductMargin - prevShippingFee
+    const prevTotalMargin = prevMargin
 
     const stats = {
       revenue: {
