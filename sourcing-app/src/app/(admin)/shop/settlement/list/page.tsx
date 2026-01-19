@@ -207,12 +207,13 @@ export default function SettlementListPage() {
   }, [fetchData])
 
   // 토스페이먼츠 거래 조회
-  const fetchTossTransactions = useCallback(async () => {
+  const fetchTossTransactions = useCallback(async (signal?: AbortSignal) => {
     setTossLoading(true)
     setTossError(null)
     try {
       const res = await fetch(
-        `/api/settlement/toss-transactions?year=${selectedYear}&month=${selectedMonth}`
+        `/api/settlement/toss-transactions?year=${selectedYear}&month=${selectedMonth}`,
+        { signal }
       )
       const result = await res.json()
 
@@ -222,17 +223,20 @@ export default function SettlementListPage() {
         setTossError(result.error || '거래 조회에 실패했습니다.')
       }
     } catch (error) {
-      if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('토스페이먼츠 거래 조회 실패:', error)
-        setTossError('거래 조회 중 오류가 발생했습니다.')
+      if (error instanceof Error && error.name === 'AbortError') {
+        return // 요청이 취소된 경우 무시
       }
+      console.error('토스페이먼츠 거래 조회 실패:', error)
+      setTossError('거래 조회 중 오류가 발생했습니다.')
     } finally {
       setTossLoading(false)
     }
   }, [selectedYear, selectedMonth])
 
   useEffect(() => {
-    fetchTossTransactions()
+    const controller = new AbortController()
+    fetchTossTransactions(controller.signal)
+    return () => controller.abort()
   }, [fetchTossTransactions])
 
   const formatPrice = (price: number | null) => {
@@ -517,7 +521,7 @@ export default function SettlementListPage() {
                   ))}
                 </select>
                 <button
-                  onClick={fetchTossTransactions}
+                  onClick={() => fetchTossTransactions()}
                   disabled={tossLoading}
                   className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
                 >
