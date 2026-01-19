@@ -261,8 +261,9 @@ export default function SettlementListPage() {
     textColor: string
     icon: typeof CreditCard
   } => {
+    // 결제 정보가 없는 경우 (외부 주문: 밴드 등) - 이체완료로 처리
     if (!method || !status) {
-      return { label: '정보없음', bgColor: 'bg-gray-100', textColor: 'text-gray-500', icon: AlertCircle }
+      return { label: '이체완료', bgColor: 'bg-green-100', textColor: 'text-green-700', icon: Wallet }
     }
 
     // 가상계좌 (현금입금)
