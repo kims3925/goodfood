@@ -41,7 +41,7 @@ export default function LoginPage() {
           return
         }
 
-        window.location.href = '/admin/settings/api'
+        window.location.href = '/sourcing/dashboard'
       } else {
         console.log('[로그인] 실패:', data.error)
         setError(data.error || '로그인에 실패했습니다.')
