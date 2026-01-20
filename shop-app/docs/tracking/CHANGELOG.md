@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260120-003 | Done | 2026-01-20 | - | 무통장입금 주문 웹훅 알림 추가 | Low | Claude |
 | TR-20260120-002 | Done | 2026-01-20 | - | 개발 서버 Turbopack → Webpack 전환 | Low | Claude |
 | TR-20260120-001 | Done | 2026-01-20 | - | 주문 외부 알림 (슬랙/디스코드 웹훅) 기능 추가 | Low | Claude |
 | TR-20260108-005 | Done | 2026-01-08 | REQ-ORDER-001 | 비회원 주문 조회 플로우 개선 | Low | Claude |
