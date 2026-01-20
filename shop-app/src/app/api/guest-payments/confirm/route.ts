@@ -16,6 +16,7 @@ import {
   getErrorDetails,
 } from '@/modules/payments/constants/toss-error-codes'
 import { calculateItemPrice } from '@/lib/price-calculator'
+import { sendPaymentCompletedWebhook } from '@/services/order-webhook.service'
 
 const Decimal = Prisma.Decimal
 
@@ -466,6 +467,20 @@ export async function POST(req: NextRequest) {
       )
 
       console.log(`비회원 결제 승인 성공: ${orderId}`)
+
+      // 외부 웹훅 알림 (슬랙/디스코드) - 결제 완료 시에만
+      if (tossResult.status !== 'WAITING_FOR_DEPOSIT') {
+        sendPaymentCompletedWebhook({
+          orderNumber: result.guestOrder.orderNumber,
+          customerName: result.guestOrder.guestName,
+          totalAmount: Number(result.guestOrder.totalAmount),
+          items: orderItems.map((item: any) => ({
+            name: item.productName,
+            quantity: item.quantity,
+          })),
+          paymentMethod: getPaymentMethodLabel(result.guestPayment.method),
+        })
+      }
 
       // 응답 생성
       const response = NextResponse.json({

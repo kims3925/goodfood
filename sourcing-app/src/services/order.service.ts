@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import prisma, { Prisma } from '@bandauto/db'
 import { calculateSellingPrice, type BundleShippingType } from '@/lib/price-calculator'
+import { sendExternalOrderWebhook } from '@/services/order-webhook.service'
 
 const Decimal = Prisma.Decimal
 
@@ -233,6 +234,17 @@ export const orderService = {
         : `[External Order] 외부 주문 생성 완료: ${order.orderNumber} (${orderItemsData.length}개 상품, 총 ${subtotal.toString()}원)`
 
       console.log(logMessage)
+
+      // 외부 웹훅 알림 (슬랙/디스코드)
+      sendExternalOrderWebhook({
+        orderNumber: order.orderNumber,
+        customerName: guestName,
+        totalAmount: Number(order.totalAmount),
+        items: orderItemsData.map((item) => ({
+          name: item.productName,
+          quantity: item.quantity,
+        })),
+      })
 
       return {
         id: order.id,

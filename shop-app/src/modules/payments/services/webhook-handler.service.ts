@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import prisma, { Prisma } from '@bandauto/db'
 import { getTossPaymentsService, TossPaymentResponse, PAYMENT_STATUS } from './toss-payments.service'
+import { sendPaymentCompletedWebhook } from '@/services/order-webhook.service'
 
 const Decimal = Prisma.Decimal
 
@@ -304,6 +305,7 @@ export class TossPaymentsWebhookHandler {
         where: { id: orderId },
         include: {
           user: true,
+          shippingAddress: true,
           items: {
             include: {
               shopProduct: {
@@ -323,6 +325,18 @@ export class TossPaymentsWebhookHandler {
 
       // 2. 관리자 알림
       await this.sendAdminNotification(orderId, '새로운 주문이 결제 완료되었습니다.')
+
+      // 3. 외부 웹훅 알림 (슬랙/디스코드)
+      sendPaymentCompletedWebhook({
+        orderNumber: order.orderNumber,
+        customerName: order.shippingAddress?.recipientName || order.user?.name || '고객',
+        totalAmount: Number(order.totalAmount),
+        items: order.items.map((item) => ({
+          name: item.productName,
+          quantity: item.quantity,
+        })),
+        paymentMethod: this.mapPaymentMethod(paymentData.method),
+      })
 
       console.log(`결제 완료 처리 완료: ${orderId}`)
 
