@@ -16,7 +16,7 @@ import {
   getErrorDetails,
 } from '@/modules/payments/constants/toss-error-codes'
 import { calculateItemPrice } from '@/lib/price-calculator'
-import { sendPaymentCompletedWebhook } from '@/services/order-webhook.service'
+import { sendPaymentCompletedWebhook, sendBankTransferOrderWebhook } from '@/services/order-webhook.service'
 
 const Decimal = Prisma.Decimal
 
@@ -468,8 +468,23 @@ export async function POST(req: NextRequest) {
 
       console.log(`비회원 결제 승인 성공: ${orderId}`)
 
-      // 외부 웹훅 알림 (슬랙/디스코드) - 결제 완료 시에만
-      if (tossResult.status !== 'WAITING_FOR_DEPOSIT') {
+      // 외부 웹훅 알림 (슬랙/디스코드)
+      if (tossResult.status === 'WAITING_FOR_DEPOSIT') {
+        // 무통장입금(가상계좌) - 주문 등록 알림
+        sendBankTransferOrderWebhook({
+          orderNumber: result.guestOrder.orderNumber,
+          customerName: result.guestOrder.guestName,
+          totalAmount: Number(result.guestOrder.totalAmount),
+          items: orderItems.map((item: any) => ({
+            name: item.productName,
+            quantity: item.quantity,
+          })),
+          bankName: tossResult.virtualAccount?.bank,
+          accountNumber: tossResult.virtualAccount?.accountNumber,
+          dueDate: tossResult.virtualAccount?.dueDate,
+        })
+      } else {
+        // 즉시 결제 완료 (카드, 계좌이체 등)
         sendPaymentCompletedWebhook({
           orderNumber: result.guestOrder.orderNumber,
           customerName: result.guestOrder.guestName,

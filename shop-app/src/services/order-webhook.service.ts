@@ -256,3 +256,33 @@ export async function sendPaymentCompletedWebhook(params: {
 
   await sendOrderWebhook(message)
 }
+
+/**
+ * 무통장입금(가상계좌) 주문 등록 시 웹훅 전송
+ */
+export async function sendBankTransferOrderWebhook(params: {
+  orderNumber: string
+  customerName: string
+  totalAmount: number
+  items: WebhookOrderItem[]
+  bankName?: string
+  accountNumber?: string
+  dueDate?: string
+}): Promise<void> {
+  const bankInfo = params.bankName && params.accountNumber
+    ? `${params.bankName} ${params.accountNumber}`
+    : '가상계좌'
+
+  const message: WebhookMessage = {
+    title: '주문이 등록되었습니다!',
+    orderNumber: params.orderNumber,
+    customerName: params.customerName,
+    totalAmount: params.totalAmount,
+    items: params.items,
+    paymentMethod: bankInfo,
+    paymentStatus: `입금대기${params.dueDate ? ` (${params.dueDate}까지)` : ''}`,
+    createdAt: new Date(),
+  }
+
+  await sendOrderWebhook(message)
+}
