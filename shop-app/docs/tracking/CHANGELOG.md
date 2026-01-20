@@ -21,6 +21,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260120-002 | Done | 2026-01-20 | - | 개발 서버 Turbopack → Webpack 전환 | Low | Claude |
+| TR-20260120-001 | Done | 2026-01-20 | - | 주문 외부 알림 (슬랙/디스코드 웹훅) 기능 추가 | Low | Claude |
 | TR-20260108-005 | Done | 2026-01-08 | REQ-ORDER-001 | 비회원 주문 조회 플로우 개선 | Low | Claude |
 | TR-20260108-004 | Done | 2026-01-08 | - | published_product → shop_product/channel_product 스키마 마이그레이션 | Medium | Claude |
 | TR-20260108-003 | Done | 2026-01-08 | - | 역할명 변경 (회원/매니저) | Low | Claude |
@@ -109,6 +111,100 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260120-002: 개발 서버 Turbopack → Webpack 전환
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-20 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 개발 서버 번들러를 Turbopack에서 Webpack으로 전환
+- Prisma 관련 Turbopack 정적 분석 경고 제거
+- 프로덕션 빌드는 기존과 동일 (항상 Webpack 사용)
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| package.json | Modified | dev 스크립트에서 --turbo 플래그 제거 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Build | Pass |
+
+### 롤백 계획
+1. package.json의 dev 스크립트에 --turbo 플래그 복원
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+
+---
+
+## TR-20260120-001: 주문 외부 알림 (슬랙/디스코드 웹훅) 기능 추가
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-20 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 주문 생성 및 결제 완료 시 슬랙 또는 디스코드 웹훅으로 알림 전송
+- `order-webhook.service.ts` 신규 생성 (슬랙 Block Kit / 디스코드 Embed 포맷 지원)
+- `createOrderFromCart()`, `createOrderFromItems()` 메서드에 웹훅 호출 추가
+- `handlePaymentCompleted()` 메서드에 결제 완료 웹훅 호출 추가
+- 환경변수로 웹훅 타입(slack/discord) 및 URL 설정
+
+### 환경변수 설정
+```env
+# 웹훅 설정 (둘 중 하나만 사용)
+ORDER_WEBHOOK_TYPE=slack  # 또는 discord
+ORDER_WEBHOOK_URL=https://hooks.slack.com/services/xxx
+```
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/services/order-webhook.service.ts | Added | 주문 웹훅 서비스 (슬랙/디스코드) |
+| src/modules/order/services/order.service.ts | Modified | 주문 생성 시 웹훅 호출 추가 |
+| src/modules/payments/services/webhook-handler.service.ts | Modified | 결제 완료 시 웹훅 호출 추가 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Unit | N/A |
+| Manual | Pending |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. 웹훅 호출 코드 제거
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: 주문 흐름
+- 참조: sourcing-app TR-20260120-001
+
+---
 
 ## TR-20260108-005: 비회원 주문 조회 플로우 개선
 

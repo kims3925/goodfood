@@ -21,6 +21,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260120-002 | Done | 2026-01-20 | - | 외부 주문 API 타입 에러 수정 | Low | Claude |
+| TR-20260120-001 | Done | 2026-01-20 | - | 외부 주문 웹훅 알림 (슬랙/디스코드) 기능 추가 | Low | Claude |
 | TR-20260119-001 | Done | 2026-01-19 | - | 대시보드 마진 계산을 순수 소매가 기반으로 수정 | Low | Claude |
 | TR-20260115-006 | Done | 2026-01-15 | - | 대시보드 마진 계산에 도매가 정보 추가 | Low | Claude |
 | TR-20260115-005 | Done | 2026-01-15 | - | 도매주문 발주완료 상태를 PREPARING으로 변경 | Low | Claude |
@@ -147,6 +149,102 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260120-002: 외부 주문 API 타입 에러 수정
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-20 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 외부 주문 조회 API에서 nullable 필드 타입 체크 추가
+- `guestOrder.shop`, `memberOrder.shop` null 체크 추가
+- `item.shopProduct.product` null 체크 추가 (OrderItem의 productName/thumbnailUrl 폴백)
+- 외부 회원 주문 삭제 시 `deletedAt` → `status: CANCELLED` 방식으로 변경
+  - Order 모델에 deletedAt 필드가 없어 기존 cancelledAt/status 필드 활용
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/api/order/external/[orderNumber]/route.ts | Modified | null 체크 추가 (6개 에러 수정) |
+| src/app/api/order/external/member/[id]/route.ts | Modified | deletedAt → 취소 처리로 변경 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| TypeCheck | Pass |
+| Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+
+---
+
+## TR-20260120-001: 외부 주문 웹훅 알림 (슬랙/디스코드) 기능 추가
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-20 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 외부 주문 생성 시 슬랙 또는 디스코드 웹훅으로 알림 전송
+- `order-webhook.service.ts` 신규 생성 (슬랙 Block Kit / 디스코드 Embed 포맷 지원)
+- `createExternalOrder()` 메서드에 웹훅 호출 추가
+- 환경변수로 웹훅 타입(slack/discord) 및 URL 설정
+
+### 환경변수 설정
+```env
+# 웹훅 설정 (둘 중 하나만 사용)
+ORDER_WEBHOOK_TYPE=slack  # 또는 discord
+ORDER_WEBHOOK_URL=https://hooks.slack.com/services/xxx
+```
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/services/order-webhook.service.ts | Added | 외부 주문 웹훅 서비스 (슬랙/디스코드) |
+| src/services/order.service.ts | Modified | 외부 주문 생성 시 웹훅 호출 추가 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Unit | N/A |
+| Manual | Pending |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. 웹훅 호출 코드 제거
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: 외부 주문 흐름
+- 참조: shop-app TR-20260120-001
+
+---
 
 ## TR-20260113-001: 발주 이력 날짜별 필터링 버그 수정
 
