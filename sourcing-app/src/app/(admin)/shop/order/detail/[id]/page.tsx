@@ -177,6 +177,7 @@ export default function UnifiedOrderDetailPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showStatusConfirm, setShowStatusConfirm] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<string | null>(null)
 
   const loadOrder = useCallback(async () => {
@@ -208,11 +209,11 @@ export default function UnifiedOrderDetailPage() {
 
   const handleStatusChange = (newStatus: string) => {
     if (!order) return
+    setPendingStatus(newStatus)
     if (newStatus === 'CANCELLED') {
-      setPendingStatus(newStatus)
       setShowCancelConfirm(true)
     } else {
-      confirmStatusChange(newStatus)
+      setShowStatusConfirm(true)
     }
   }
 
@@ -251,6 +252,7 @@ export default function UnifiedOrderDetailPage() {
     } finally {
       setIsUpdating(false)
       setShowCancelConfirm(false)
+      setShowStatusConfirm(false)
       setPendingStatus(null)
     }
   }
@@ -345,14 +347,14 @@ export default function UnifiedOrderDetailPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => router.push('/shop/order/list')}>
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Button variant="ghost" onClick={() => router.push('/shop/order/list')} className="flex-shrink-0">
               <ArrowLeft size={20} />
             </Button>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-gray-900">주문 상세</h1>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">주문 상세</h1>
                 {order.isGuestOrder && (
                   <span className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-700 whitespace-nowrap">
                     비회원
@@ -364,7 +366,7 @@ export default function UnifiedOrderDetailPage() {
                   </span>
                 )}
               </div>
-              <p className="text-sm text-gray-500 font-mono">{order.orderNumber}</p>
+              <p className="text-xs sm:text-sm text-gray-500 font-mono truncate">{order.orderNumber}</p>
             </div>
           </div>
           {isExternalOrder(order.orderNumber) && (
@@ -372,6 +374,7 @@ export default function UnifiedOrderDetailPage() {
               variant="danger"
               onClick={() => setShowDeleteConfirm(true)}
               disabled={isUpdating}
+              className="self-end sm:self-auto"
             >
               <Trash2 size={16} />
               삭제
@@ -388,42 +391,42 @@ export default function UnifiedOrderDetailPage() {
             </h2>
           </div>
           <div className="p-4">
-            <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="flex flex-wrap items-center gap-2 mb-4">
               {/* 1줄: 소매처 배지 (Shop) */}
-              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
-                <Store size={16} />
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs sm:text-sm font-medium bg-blue-100 text-blue-700">
+                <Store size={14} className="sm:w-4 sm:h-4" />
                 {order.shopName || '쇼핑몰 주문'}
               </span>
               {/* 2줄: 도매처 배지 (Channel, WHOLESALE) - 첫 번째 상품 기준 */}
               {order.items[0]?.channel?.kind === 'WHOLESALE' && (
-                <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium ${
+                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs sm:text-sm font-medium ${
                   CHANNEL_PLATFORM_CONFIG[order.items[0].channel.platform]?.bgColor || 'bg-gray-100'
                 } ${CHANNEL_PLATFORM_CONFIG[order.items[0].channel.platform]?.color || 'text-gray-700'}`}>
-                  <Package size={16} />
+                  <Package size={14} className="sm:w-4 sm:h-4" />
                   {order.items[0].channel.name}
                   <span className="text-xs opacity-75">(도매)</span>
                 </span>
               )}
               {/* 상태 배지 */}
-              <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium ${status.color}`}>
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs sm:text-sm font-medium ${status.color}`}>
                 {status.icon}
                 {order.statusLabel || status.label}
               </span>
               {/* 결제 방식 배지 */}
               {isBankTransfer && (
-                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 text-amber-700">
-                  <Building2 size={16} />
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs sm:text-sm font-medium bg-amber-100 text-amber-700">
+                  <Building2 size={14} className="sm:w-4 sm:h-4" />
                   무통장입금
                 </span>
               )}
               {order.paymentMethod === 'CARD' && (
-                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-indigo-100 text-indigo-700">
-                  <CreditCard size={16} />
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs sm:text-sm font-medium bg-indigo-100 text-indigo-700">
+                  <CreditCard size={14} className="sm:w-4 sm:h-4" />
                   카드결제
                 </span>
               )}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <p className="text-sm text-gray-500 mb-1">고객명</p>
                 <p className="font-medium text-gray-900">{order.customerName}</p>
@@ -451,9 +454,43 @@ export default function UnifiedOrderDetailPage() {
         {/* 주문 진행 상황 스테퍼 - 옵션 비교 */}
         {isShoppingMall && !['CANCELLED', 'REFUNDED'].includes(order.status) && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-            <div className="p-6">
-                {/* 스테퍼 */}
-                <div className="flex items-center justify-center mb-8 max-w-4xl mx-auto">
+            <div className="p-4 sm:p-6">
+                {/* 스테퍼 - 모바일: 세로, 데스크탑: 가로 */}
+                {/* 모바일 스테퍼 (세로) */}
+                <div className="flex flex-col gap-2 mb-6 sm:hidden">
+                  {ORDER_STEPS.map((step, index) => {
+                    const currentIndex = getStepIndex(order.status)
+                    const isCompleted = index < currentIndex
+                    const isCurrent = index === currentIndex
+                    const StepIcon = step.icon
+                    const dateValue = order[step.dateField as keyof UnifiedOrderDetail] as string | null
+
+                    return (
+                      <div key={step.key} className="flex items-center gap-3">
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            isCompleted
+                              ? 'bg-green-500 text-white'
+                              : isCurrent
+                              ? 'bg-blue-500 text-white ring-2 ring-blue-100'
+                              : 'bg-gray-200 text-gray-400'
+                          }`}
+                        >
+                          {isCompleted ? <CheckCircle size={18} /> : <StepIcon size={18} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium ${isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'}`}>
+                            {step.label}
+                          </p>
+                          <p className="text-xs text-gray-500">{dateValue ? formatDate(dateValue) : '-'}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* 데스크탑 스테퍼 (가로) */}
+                <div className="hidden sm:flex items-center justify-center mb-8 max-w-4xl mx-auto">
                   {ORDER_STEPS.map((step, index) => {
                     const currentIndex = getStepIndex(order.status)
                     const isCompleted = index < currentIndex
@@ -464,9 +501,9 @@ export default function UnifiedOrderDetailPage() {
                     return (
                       <div key={step.key} className={`flex items-center ${index < ORDER_STEPS.length - 1 ? 'flex-1' : ''}`}>
                         {/* 스텝 아이콘 & 라벨 */}
-                        <div className="flex flex-col items-center min-w-[100px]">
+                        <div className="flex flex-col items-center min-w-[80px] md:min-w-[100px]">
                           <div
-                            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                            className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all ${
                               isCompleted
                                 ? 'bg-green-500 text-white'
                                 : isCurrent
@@ -475,19 +512,19 @@ export default function UnifiedOrderDetailPage() {
                             }`}
                           >
                             {isCompleted ? (
-                              <CheckCircle size={24} />
+                              <CheckCircle size={20} className="md:w-6 md:h-6" />
                             ) : (
-                              <StepIcon size={24} />
+                              <StepIcon size={20} className="md:w-6 md:h-6" />
                             )}
                           </div>
                           <p
-                            className={`mt-2 text-sm font-medium ${
+                            className={`mt-2 text-xs md:text-sm font-medium ${
                               isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'
                             }`}
                           >
                             {step.label}
                           </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
+                          <p className="text-[10px] md:text-xs text-gray-500 mt-0.5">
                             {dateValue ? formatDate(dateValue) : '-'}
                           </p>
                         </div>
@@ -495,7 +532,7 @@ export default function UnifiedOrderDetailPage() {
                         {/* 연결선 */}
                         {index < ORDER_STEPS.length - 1 && (
                           <div
-                            className={`flex-1 h-1 mx-4 rounded ${
+                            className={`flex-1 h-1 mx-2 md:mx-4 rounded ${
                               index < currentIndex ? 'bg-green-500' : 'bg-gray-200'
                             }`}
                           />
@@ -506,7 +543,7 @@ export default function UnifiedOrderDetailPage() {
                 </div>
 
                 {/* 액션 버튼 */}
-                <div className="flex items-center justify-center gap-3 pt-4 border-t border-gray-100">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4 border-t border-gray-100">
                   {ORDER_STATUS_FLOW[order.status]?.next && (
                     <Button
                       variant="primary"
@@ -828,6 +865,22 @@ export default function UnifiedOrderDetailPage() {
         confirmText="삭제"
         cancelText="취소"
         variant="danger"
+        isLoading={isUpdating}
+      />
+
+      {/* 상태 변경 확인 모달 */}
+      <ConfirmModal
+        isOpen={showStatusConfirm}
+        onClose={() => {
+          setShowStatusConfirm(false)
+          setPendingStatus(null)
+        }}
+        onConfirm={() => confirmStatusChange()}
+        title="주문 상태 변경"
+        message={`주문 상태를 "${pendingStatus ? ORDER_STATUS_FLOW[order?.status || '']?.nextLabel || '변경' : ''}"(으)로 변경하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
+        confirmText="확인"
+        cancelText="취소"
+        variant="info"
         isLoading={isUpdating}
       />
     </div>
