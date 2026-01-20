@@ -60,11 +60,14 @@ export async function DELETE(
       )
     }
 
-    // Soft Delete
+    // Soft Delete (취소 처리로 대체)
     await prisma.order.update({
       where: { id: orderId },
       data: {
-        deletedAt: new Date(),
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+        cancelReason: '외부 주문 삭제',
+        cancelledBy: 'admin',
       },
     })
 

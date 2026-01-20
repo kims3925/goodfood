@@ -4,7 +4,7 @@
   "private": true,
   "description": "BandAuto Shop - 고객용 쇼핑몰",
   "scripts": {
-    "dev": "next dev --port 3000 --turbo",
+    "dev": "next dev --port 3000",
     "dev:https": "node server.js",
     "build": "next build",
     "start": "next start --port 3000",

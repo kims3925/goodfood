@@ -80,7 +80,7 @@ export async function GET(
           customerPhone: guestOrder.guestPhone,
           customerEmail: guestOrder.guestEmail,
           shopId: guestOrder.shopId,
-          shopName: guestOrder.shop.name,
+          shopName: guestOrder.shop?.name || '',
           shippingAddress: {
             recipientName: guestOrder.shippingAddress?.recipientName || '',
             recipientPhone: guestOrder.shippingAddress?.recipientPhone || '',
@@ -92,9 +92,9 @@ export async function GET(
           totalAmount: Number(guestOrder.totalAmount),
           items: guestOrder.items.map(item => ({
             id: item.id,
-            productName: item.shopProduct.product.name,
+            productName: item.shopProduct.product?.name || item.productName,
             optionSummary: item.variant?.optionSummary || null,
-            thumbnailUrl: item.shopProduct.product.thumbnailUrl,
+            thumbnailUrl: item.shopProduct.product?.thumbnailUrl || item.thumbnailUrl,
             quantity: item.quantity,
             unitPrice: Number(item.unitPrice),
           })),
@@ -158,7 +158,7 @@ export async function GET(
           customerPhone: memberOrder.user.phone,
           customerEmail: memberOrder.user.email,
           shopId: memberOrder.shopId,
-          shopName: memberOrder.shop.name,
+          shopName: memberOrder.shop?.name || '',
           shippingAddress: {
             recipientName: memberOrder.shippingAddress?.recipientName || '',
             recipientPhone: memberOrder.shippingAddress?.recipientPhone || '',
@@ -170,9 +170,9 @@ export async function GET(
           totalAmount: Number(memberOrder.totalAmount),
           items: memberOrder.items.map(item => ({
             id: item.id,
-            productName: item.shopProduct.product.name,
+            productName: item.shopProduct.product?.name || item.productName,
             optionSummary: item.variant?.optionSummary || null,
-            thumbnailUrl: item.shopProduct.product.thumbnailUrl,
+            thumbnailUrl: item.shopProduct.product?.thumbnailUrl || item.thumbnailUrl,
             quantity: item.quantity,
             unitPrice: Number(item.unitPrice),
           })),

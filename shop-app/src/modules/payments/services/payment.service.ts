@@ -22,6 +22,7 @@ import {
   BusinessLogicError,
 } from '@/modules/common/utils/src/errors/handlers'
 import { calculateItemPrice } from '@/lib/price-calculator'
+import { sendPaymentCompletedWebhook } from '@/services/order-webhook.service'
 
 const Decimal = Prisma.Decimal
 
@@ -278,6 +279,20 @@ export class PaymentService {
       })
 
       console.log(`결제 승인 성공: ${orderId}`)
+
+      // 외부 웹훅 알림 (슬랙/디스코드) - 결제 완료 시에만 (가상계좌 제외)
+      if (result.tossResult.status !== 'WAITING_FOR_DEPOSIT') {
+        sendPaymentCompletedWebhook({
+          orderNumber: result.order.orderNumber,
+          customerName: result.order.user?.name || '고객',
+          totalAmount: Number(result.order.totalAmount),
+          items: result.order.items.map((item: any) => ({
+            name: item.productName,
+            quantity: item.quantity,
+          })),
+          paymentMethod: this.getPaymentMethodLabel(result.payment.method),
+        })
+      }
 
       return {
         success: true,
