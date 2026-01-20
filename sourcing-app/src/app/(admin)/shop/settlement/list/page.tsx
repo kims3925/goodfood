@@ -148,7 +148,7 @@ const getTossDashboardUrl = () => {
   // 없으면 Merchant ID로 기본 URL 생성
   const merchantId = process.env.NEXT_PUBLIC_TOSS_MERCHANT_ID
   if (!merchantId) return null
-  return `https://dashboard.tosspayments.com/sales-reports?mid=${encodeURIComponent(merchantId)}`
+  return `https://dashboard.tosspayments.com/sales-reports/tm/1373850?mid=${encodeURIComponent(merchantId)}`
 }
 
 export default function SettlementListPage() {
