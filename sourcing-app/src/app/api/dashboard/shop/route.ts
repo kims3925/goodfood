@@ -523,6 +523,7 @@ export async function GET(request: NextRequest) {
     const statusColors: Record<string, string> = {
       PENDING: '#F59E0B',
       PAID: '#6366F1',
+      PREPARING: '#8B5CF6',
       SHIPPED: '#3B82F6',
       DELIVERED: '#10B981',
       CANCELLED: '#EF4444',
@@ -532,6 +533,7 @@ export async function GET(request: NextRequest) {
     const statusNames: Record<string, string> = {
       PENDING: '결제대기',
       PAID: '결제완료',
+      PREPARING: '상품준비중',
       SHIPPED: '배송중',
       DELIVERED: '배송완료',
       CANCELLED: '취소',
