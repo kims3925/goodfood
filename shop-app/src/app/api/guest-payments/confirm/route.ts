@@ -467,6 +467,7 @@ export async function POST(req: NextRequest) {
       )
 
       console.log(`비회원 결제 승인 성공: ${orderId}`)
+      console.log(`[OrderWebhook] tossResult.status: ${tossResult.status}, method: ${tossResult.method}`)
 
       // 외부 웹훅 알림 (슬랙/디스코드)
       if (tossResult.status === 'WAITING_FOR_DEPOSIT') {

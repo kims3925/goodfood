@@ -9,6 +9,7 @@ import { headers } from 'next/headers'
 import prisma, { Prisma } from '@bandauto/db'
 import { generateGuestAccessToken } from '@/lib/guest-token'
 import { calculateItemPrice } from '@/lib/price-calculator'
+import { sendBankTransferOrderWebhook } from '@/services/order-webhook.service'
 
 const Decimal = Prisma.Decimal
 
@@ -341,6 +342,20 @@ export async function POST(req: NextRequest) {
       customerInfo.phone,
       result.guestOrder.orderNumber
     )
+
+    // 외부 웹훅 알림 (슬랙/디스코드) - 무통장입금 주문
+    sendBankTransferOrderWebhook({
+      orderNumber: result.guestOrder.orderNumber,
+      customerName: result.guestOrder.guestName,
+      totalAmount: Number(result.guestOrder.totalAmount),
+      items: orderItems.map((item) => ({
+        name: item.productName,
+        quantity: item.quantity,
+      })),
+      bankName: shop.bankName!,
+      accountNumber: shop.bankAccount!,
+      dueDate: depositDeadline.toISOString(),
+    })
 
     return NextResponse.json({
       success: true,
