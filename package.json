@@ -23,7 +23,7 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx --ignore-path .gitignore",
     "typecheck": "npm run typecheck:shop && npm run typecheck:sourcing",
     "typecheck:shop": "cd shop-app && npx tsc --noEmit",
-    "typecheck:sourcing": "cd sourcing-app && NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit",
+    "typecheck:sourcing": "cd sourcing-app && npx tsc --noEmit",
     "test": "npx playwright test",
     "test:headed": "npx playwright test --headed",
     "test:ui": "npx playwright test --ui",
