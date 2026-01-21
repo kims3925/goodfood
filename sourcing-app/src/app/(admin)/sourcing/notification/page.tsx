@@ -412,37 +412,37 @@ export default function SourcingNotificationPage() {
         </div>
 
         {/* 통계 및 액션 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Bell size={24} className="text-blue-600" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+                <Bell size={20} className="sm:w-6 sm:h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">전체 알림</p>
-                <p className="text-2xl font-bold text-gray-900">{data?.stats.total || 0}건</p>
+                <p className="text-xs sm:text-sm text-gray-500">전체 알림</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{data?.stats.total || 0}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-red-100 rounded-lg">
-                <Mail size={24} className="text-red-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-red-100 rounded-lg">
+                <Mail size={20} className="sm:w-6 sm:h-6 text-red-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">읽지 않음</p>
-                <p className="text-2xl font-bold text-red-600">{data?.stats.unread || 0}건</p>
+                <p className="text-xs sm:text-sm text-gray-500">읽지 않음</p>
+                <p className="text-xl sm:text-2xl font-bold text-red-600">{data?.stats.unread || 0}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Calendar size={24} className="text-green-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+                <Calendar size={20} className="sm:w-6 sm:h-6 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">오늘 알림</p>
-                <p className="text-2xl font-bold text-green-600">{data?.stats.today || 0}건</p>
+                <p className="text-xs sm:text-sm text-gray-500">오늘 알림</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-600">{data?.stats.today || 0}</p>
               </div>
             </div>
           </div>
@@ -450,20 +450,20 @@ export default function SourcingNotificationPage() {
           <button
             onClick={() => handleMarkAsRead(selectedIds)}
             disabled={selectedIds.length === 0}
-            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 text-left transition-colors min-h-[44px] ${
               selectedIds.length > 0
                 ? 'hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
                 : 'opacity-50 cursor-not-allowed'
             }`}
           >
-            <div className="flex items-center gap-3">
-              <div className={`p-3 rounded-lg ${selectedIds.length > 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                <MailOpen size={24} className={selectedIds.length > 0 ? 'text-blue-600' : 'text-gray-400'} />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className={`p-2 sm:p-3 rounded-lg ${selectedIds.length > 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                <MailOpen size={20} className={`sm:w-6 sm:h-6 ${selectedIds.length > 0 ? 'text-blue-600' : 'text-gray-400'}`} />
               </div>
               <div>
-                <p className="text-sm text-gray-500">읽음 처리</p>
-                <p className={`text-lg font-bold ${selectedIds.length > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
-                  {selectedIds.length}개 선택됨
+                <p className="text-xs sm:text-sm text-gray-500">읽음 처리</p>
+                <p className={`text-base sm:text-lg font-bold ${selectedIds.length > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
+                  {selectedIds.length}개
                 </p>
               </div>
             </div>
@@ -472,20 +472,20 @@ export default function SourcingNotificationPage() {
           <button
             onClick={() => handleDelete(selectedIds)}
             disabled={selectedIds.length === 0}
-            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 text-left transition-colors min-h-[44px] ${
               selectedIds.length > 0
                 ? 'hover:border-red-300 hover:bg-red-50 cursor-pointer'
                 : 'opacity-50 cursor-not-allowed'
             }`}
           >
-            <div className="flex items-center gap-3">
-              <div className={`p-3 rounded-lg ${selectedIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
-                <Trash2 size={24} className={selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'} />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className={`p-2 sm:p-3 rounded-lg ${selectedIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
+                <Trash2 size={20} className={`sm:w-6 sm:h-6 ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`} />
               </div>
               <div>
-                <p className="text-sm text-gray-500">선택 삭제</p>
-                <p className={`text-lg font-bold ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                  {selectedIds.length}개 선택됨
+                <p className="text-xs sm:text-sm text-gray-500">선택 삭제</p>
+                <p className={`text-base sm:text-lg font-bold ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                  {selectedIds.length}개
                 </p>
               </div>
             </div>

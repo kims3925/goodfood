@@ -384,7 +384,7 @@ export default function ProductFormModal({
       title={isEditMode ? '상품 정보 수정' : '상품 등록'}
       size="2xl"
     >
-      <div className="flex flex-col h-[calc(80vh-8rem)]">
+      <div className="flex flex-col h-[calc(100vh-6rem)] sm:h-[calc(80vh-8rem)]">
         {/* 다중 상품 탭 - 편집 모드가 아닐 때만 표시 */}
         {!isEditMode && (
           <div className="mb-4">
@@ -502,10 +502,10 @@ export default function ProductFormModal({
         )}
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 mb-4">
+        <div className="flex border-b border-gray-200 mb-4 -mx-1">
           <button
             onClick={() => setActiveTab('basic')}
-            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+            className={`px-3 sm:px-4 py-3 sm:py-2 font-medium text-sm border-b-2 transition-colors min-h-[48px] sm:min-h-[40px] ${
               activeTab === 'basic'
                 ? 'border-purple-500 text-purple-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -515,7 +515,7 @@ export default function ProductFormModal({
           </button>
           <button
             onClick={() => setActiveTab('images')}
-            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors flex items-center gap-1 ${
+            className={`px-3 sm:px-4 py-3 sm:py-2 font-medium text-sm border-b-2 transition-colors flex items-center gap-1 min-h-[48px] sm:min-h-[40px] ${
               activeTab === 'images'
                 ? 'border-purple-500 text-purple-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -798,27 +798,27 @@ export default function ProductFormModal({
         </div>
 
         {/* Footer */}
-        <ModalFooter className="mt-4">
-          <div className="flex items-center justify-end w-full gap-2">
+        <ModalFooter className="mt-4 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-4 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end w-full gap-2 sm:gap-2">
             {currentProduct.error ? (
               <>
                 {onRetry && currentProduct.postId && (
                   <Button
                     variant="secondary"
                     onClick={() => onRetry(currentProduct.postId!)}
-                    className="bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100"
+                    className="bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100 min-h-[48px] sm:min-h-[40px] w-full sm:w-auto"
                   >
                     <RefreshCw size={16} />
                     AI 다시 시도
                   </Button>
                 )}
-                <Button variant="primary" disabled>
+                <Button variant="primary" disabled className="min-h-[48px] sm:min-h-[40px] w-full sm:w-auto">
                   <Save size={16} />
                   상품 등록 불가
                 </Button>
               </>
             ) : (
-              <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+              <Button variant="primary" onClick={handleSave} disabled={isSaving} className="min-h-[48px] sm:min-h-[40px] w-full sm:w-auto">
                 {isSaving ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

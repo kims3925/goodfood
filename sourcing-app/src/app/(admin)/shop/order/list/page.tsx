@@ -463,137 +463,227 @@ export default function UnifiedOrderListPage() {
             </div>
           </div>
 
-          {/* 테이블 */}
+          {/* 주문 목록 */}
           {loading ? (
             <div className="p-12">
               <Loading />
             </div>
+          ) : orders.length === 0 ? (
+            <div className="p-12 text-center text-gray-500">
+              주문이 없습니다.
+            </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[4%] text-center">No.</TableHead>
-                  <TableHead className="w-[9%] text-center">출처</TableHead>
-                  <TableHead className="w-[9%] text-center">주문번호</TableHead>
-                  <TableHead className="w-[8%] text-center">고객명</TableHead>
-                  <TableHead className="w-[7%] text-center">회원유형</TableHead>
-                  <TableHead className="w-[10%] text-center">전화번호</TableHead>
-                  <TableHead className="w-[19%] text-center">상품</TableHead>
-                  <TableHead className="w-[8%] text-center">금액</TableHead>
-                  <TableHead className="w-[8%] text-center">상태</TableHead>
-                  <TableHead className="w-[12%] text-center">주문일시</TableHead>
-                  <TableHead className="w-[6%] text-center">작업</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.length === 0 ? (
-                  <TableEmpty message="주문이 없습니다." />
-                ) : (
-                  orders.map((order, index) => (
-                    <TableRow
-                      key={`${order.source}-${order.isGuestOrder ? 'guest' : 'member'}-${order.id}`}
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/shop/order/detail/${order.orderNumber}?source=${order.source}`)}
-                    >
-                      <TableCell className="text-center text-gray-500">
-                        {(page - 1) * itemsPerPage + index + 1}
-                      </TableCell>
-                      <TableCell className="text-center">{getSourceBadge(order)}</TableCell>
-                      <TableCell className="text-center">
-                        <span className="font-mono text-sm text-gray-900">
+            <>
+              {/* 모바일: 카드 뷰 */}
+              <div className="lg:hidden p-3 space-y-3">
+                {orders.map((order) => (
+                  <div
+                    key={`mobile-${order.source}-${order.isGuestOrder ? 'guest' : 'member'}-${order.id}`}
+                    className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => router.push(`/shop/order/detail/${order.orderNumber}?source=${order.source}`)}
+                  >
+                    {/* 상단: 주문번호 + 상태 */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-mono text-sm font-medium text-gray-900">
                           {order.orderNumber}
                         </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="font-medium text-gray-900">{order.customerName}</span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {order.isGuestOrder ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
-                            비회원
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                            회원
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="text-gray-600 text-sm">
-                          {order.customerPhone ? formatPhoneNumber(order.customerPhone) : '-'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="font-medium text-gray-900 truncate max-w-[250px]">
-                          {order.productSummary}
-                        </div>
-                        {order.itemCount > 1 && (
-                          <div className="text-xs text-gray-500">
-                            총 {order.itemCount}개 상품
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="font-medium text-gray-900">
-                          {formatPrice(order.totalAmount)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {getStatusBadge(order.status, order.statusLabel)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="text-gray-600 text-sm">
+                        <span className="text-xs text-gray-500">
                           {formatDate(order.createdAt)}
                         </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {isExternalOrder(order.orderNumber) && (
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={(e) => handleEditExternalOrder(e, order.orderNumber)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                              title="수정"
-                            >
-                              <Edit3 size={16} />
-                            </button>
-                            <button
-                              onClick={(e) => handleDeleteExternalOrder(e, order)}
-                              className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                              title="삭제"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        )}
-                      </TableCell>
+                      </div>
+                      {getStatusBadge(order.status, order.statusLabel)}
+                    </div>
+
+                    {/* 출처 배지 */}
+                    <div className="flex items-center gap-2 mb-3">
+                      {getSourceBadge(order)}
+                      {order.isGuestOrder ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                          비회원
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                          회원
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 상품 정보 */}
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                        {order.productSummary}
+                      </p>
+                      {order.itemCount > 1 && (
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          총 {order.itemCount}개 상품
+                        </p>
+                      )}
+                    </div>
+
+                    {/* 하단: 고객 정보 + 금액 */}
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-900">{order.customerName}</span>
+                        <span className="text-xs text-gray-500">
+                          {order.customerPhone ? formatPhoneNumber(order.customerPhone) : '-'}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-bold text-gray-900">
+                          {formatPrice(order.totalAmount)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 외부 주문 액션 버튼 */}
+                    {isExternalOrder(order.orderNumber) && (
+                      <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-gray-100">
+                        <button
+                          onClick={(e) => handleEditExternalOrder(e, order.orderNumber)}
+                          className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Edit3 size={14} />
+                          수정
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteExternalOrder(e, order)}
+                          className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={14} />
+                          삭제
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* 데스크탑: 테이블 뷰 */}
+              <div className="hidden lg:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[4%] text-center">No.</TableHead>
+                      <TableHead className="w-[9%] text-center">출처</TableHead>
+                      <TableHead className="w-[9%] text-center">주문번호</TableHead>
+                      <TableHead className="w-[8%] text-center">고객명</TableHead>
+                      <TableHead className="w-[7%] text-center">회원유형</TableHead>
+                      <TableHead className="w-[10%] text-center">전화번호</TableHead>
+                      <TableHead className="w-[19%] text-center">상품</TableHead>
+                      <TableHead className="w-[8%] text-center">금액</TableHead>
+                      <TableHead className="w-[8%] text-center">상태</TableHead>
+                      <TableHead className="w-[12%] text-center">주문일시</TableHead>
+                      <TableHead className="w-[6%] text-center">작업</TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {orders.map((order, index) => (
+                      <TableRow
+                        key={`${order.source}-${order.isGuestOrder ? 'guest' : 'member'}-${order.id}`}
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => router.push(`/shop/order/detail/${order.orderNumber}?source=${order.source}`)}
+                      >
+                        <TableCell className="text-center text-gray-500">
+                          {(page - 1) * itemsPerPage + index + 1}
+                        </TableCell>
+                        <TableCell className="text-center">{getSourceBadge(order)}</TableCell>
+                        <TableCell className="text-center">
+                          <span className="font-mono text-sm text-gray-900">
+                            {order.orderNumber}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="font-medium text-gray-900">{order.customerName}</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {order.isGuestOrder ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                              비회원
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                              회원
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="text-gray-600 text-sm">
+                            {order.customerPhone ? formatPhoneNumber(order.customerPhone) : '-'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="font-medium text-gray-900 truncate max-w-[250px]">
+                            {order.productSummary}
+                          </div>
+                          {order.itemCount > 1 && (
+                            <div className="text-xs text-gray-500">
+                              총 {order.itemCount}개 상품
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="font-medium text-gray-900">
+                            {formatPrice(order.totalAmount)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {getStatusBadge(order.status, order.statusLabel)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="text-gray-600 text-sm">
+                            {formatDate(order.createdAt)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {isExternalOrder(order.orderNumber) && (
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={(e) => handleEditExternalOrder(e, order.orderNumber)}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                title="수정"
+                              >
+                                <Edit3 size={16} />
+                              </button>
+                              <button
+                                onClick={(e) => handleDeleteExternalOrder(e, order)}
+                                className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                title="삭제"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-              <p className="text-sm text-gray-600">
+            <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t border-gray-200 gap-3">
+              <p className="text-xs sm:text-sm text-gray-600">
                 총 {total}건 중 {(page - 1) * itemsPerPage + 1}-{Math.min(page * itemsPerPage, total)}건
               </p>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-2.5 sm:p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"
                 >
                   <ChevronLeft size={18} />
                 </button>
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-gray-600 min-w-[60px] text-center">
                   {page} / {totalPages}
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-2.5 sm:p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"
                 >
                   <ChevronRight size={18} />
                 </button>

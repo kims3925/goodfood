@@ -1,4 +1,4 @@
-import { SelectHTMLAttributes, forwardRef, useId } from 'react'
+import { SelectHTMLAttributes, forwardRef, useId, memo, useCallback } from 'react'
 import { AlertCircle, ChevronDown } from 'lucide-react'
 
 export interface SelectOption {
@@ -16,7 +16,7 @@ export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement
   onChange?: (value: string) => void
 }
 
-const Select = forwardRef<HTMLSelectElement, SelectProps>(
+const Select = memo(forwardRef<HTMLSelectElement, SelectProps>(
   ({
     className = '',
     label,
@@ -34,14 +34,14 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
     const widthClass = fullWidth ? 'w-full' : ''
     const errorClass = error ? 'border-error focus:ring-error' : 'border-border focus:ring-primary-color'
 
-    const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const handleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
       onChange?.(e.target.value)
-    }
+    }, [onChange])
 
     return (
       <div className={`${widthClass} ${className}`}>
         {label && (
-          <label htmlFor={selectId} className="block text-sm font-medium text-text-primary mb-2">
+          <label htmlFor={selectId} className="block text-sm font-medium text-text-primary mb-1.5 sm:mb-2">
             {label}
           </label>
         )}
@@ -55,11 +55,16 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
             className={`
               ${widthClass}
               px-3
-              py-2
+              min-h-[44px]
+              sm:min-h-[40px]
+              py-2.5
+              sm:py-2
               pr-10
               border
               ${errorClass}
               rounded-md
+              text-base
+              sm:text-sm
               focus:outline-none
               focus:ring-2
               focus:border-transparent
@@ -101,7 +106,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
       </div>
     )
   }
-)
+))
 
 Select.displayName = 'Select'
 

@@ -1026,63 +1026,63 @@ export default function ProductListPage() {
         </div>
 
         {/* 통계 및 액션 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <Package size={24} className="text-gray-600" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-gray-100 rounded-lg">
+                <Package size={20} className="sm:w-6 sm:h-6 text-gray-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">가공 상품</p>
-                <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
+                <p className="text-xs sm:text-sm text-gray-500">가공 상품</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{totalItems}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <CheckCircle size={24} className="text-green-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+                <CheckCircle size={20} className="sm:w-6 sm:h-6 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">발행완료</p>
-                <p className="text-2xl font-bold text-green-600">{products.filter(p => p.publishedProducts && p.publishedProducts.length > 0).length}</p>
+                <p className="text-xs sm:text-sm text-gray-500">발행완료</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-600">{products.filter(p => p.publishedProducts && p.publishedProducts.length > 0).length}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <Clock size={24} className="text-yellow-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-yellow-100 rounded-lg">
+                <Clock size={20} className="sm:w-6 sm:h-6 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">미발행</p>
-                <p className="text-2xl font-bold text-yellow-600">{products.filter(p => !p.publishedProducts || p.publishedProducts.length === 0).length}</p>
+                <p className="text-xs sm:text-sm text-gray-500">미발행</p>
+                <p className="text-xl sm:text-2xl font-bold text-yellow-600">{products.filter(p => !p.publishedProducts || p.publishedProducts.length === 0).length}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Boxes size={24} className="text-blue-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+                <Boxes size={20} className="sm:w-6 sm:h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">출처 채널</p>
-                <p className="text-2xl font-bold text-blue-600">{channels.length}</p>
+                <p className="text-xs sm:text-sm text-gray-500">출처 채널</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-600">{channels.length}</p>
               </div>
             </div>
           </div>
           {/* 상품 등록 카드 */}
           <button
             onClick={handleOpenCollectedProductModal}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left"
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left min-h-[44px]"
           >
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Plus size={24} className="text-blue-600" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+                <Plus size={20} className="sm:w-6 sm:h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">상품</p>
-                <p className="text-lg font-bold text-blue-600">등록하기</p>
+                <p className="text-xs sm:text-sm text-gray-500">상품</p>
+                <p className="text-base sm:text-lg font-bold text-blue-600">등록하기</p>
               </div>
             </div>
           </button>
@@ -1090,20 +1090,20 @@ export default function ProductListPage() {
           <button
             onClick={handleDeleteSelected}
             disabled={selectedProductIds.length === 0}
-            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 text-left transition-colors min-h-[44px] ${
               selectedProductIds.length > 0
                 ? 'hover:border-red-300 hover:bg-red-50 cursor-pointer'
                 : 'opacity-50 cursor-not-allowed'
             }`}
           >
-            <div className="flex items-center gap-3">
-              <div className={`p-3 rounded-lg ${selectedProductIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
-                <Trash2 size={24} className={selectedProductIds.length > 0 ? 'text-red-600' : 'text-gray-400'} />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className={`p-2 sm:p-3 rounded-lg ${selectedProductIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
+                <Trash2 size={20} className={`sm:w-6 sm:h-6 ${selectedProductIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`} />
               </div>
               <div>
-                <p className="text-sm text-gray-500">선택 삭제</p>
-                <p className={`text-lg font-bold ${selectedProductIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                  {selectedProductIds.length}개 선택됨
+                <p className="text-xs sm:text-sm text-gray-500">선택 삭제</p>
+                <p className={`text-base sm:text-lg font-bold ${selectedProductIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                  {selectedProductIds.length}개
                 </p>
               </div>
             </div>
@@ -1112,158 +1112,278 @@ export default function ProductListPage() {
 
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-              {/* 왼쪽: 출처 채널 필터 */}
-              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto">
-                <button
-                  onClick={() => { setSelectedChannelId(''); setCurrentPage(1) }}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-                    !selectedChannelId
-                      ? 'bg-white shadow-sm text-gray-900'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  전체
-                </button>
-                {channels.map((channel) => (
-                  <button
-                    key={channel.id}
-                    onClick={() => { setSelectedChannelId(channel.id.toString()); setCurrentPage(1) }}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                      selectedChannelId === channel.id.toString()
-                        ? 'bg-white shadow-sm text-purple-600'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    {channel.coverUrl ? (
-                      <img
-                        src={channel.coverUrl}
-                        alt={channel.name}
-                        className="w-5 h-5 rounded object-cover"
-                      />
-                    ) : (
-                      <Boxes size={14} />
-                    )}
-                    <span className="max-w-[100px] truncate">{channel.name}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* 오른쪽: 검색창 */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <div className="p-3 sm:p-4 border-b border-gray-200">
+            <div className="flex flex-col gap-3 sm:gap-4">
+              {/* 검색창 - 모바일에서 상단 배치 */}
+              <div className="relative w-full sm:w-auto sm:hidden">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                 <Input
                   type="text"
                   placeholder="상품명으로 검색..."
                   value={searchTerm}
                   onChange={(e) => { setSearchTerm(e.target.value); setQuery(e.target.value) }}
-                  className="pl-10 w-64"
+                  className="pl-10 w-full min-h-[44px]"
                 />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center justify-between">
+                {/* 왼쪽: 출처 채널 필터 */}
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto w-full sm:w-auto max-w-full scrollbar-thin">
+                  <button
+                    onClick={() => { setSelectedChannelId(''); setCurrentPage(1) }}
+                    className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap min-h-[36px] sm:min-h-[32px] ${
+                      !selectedChannelId
+                        ? 'bg-white shadow-sm text-gray-900'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    전체
+                  </button>
+                  {channels.map((channel) => (
+                    <button
+                      key={channel.id}
+                      onClick={() => { setSelectedChannelId(channel.id.toString()); setCurrentPage(1) }}
+                      className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors flex items-center gap-1 sm:gap-1.5 whitespace-nowrap min-h-[36px] sm:min-h-[32px] ${
+                        selectedChannelId === channel.id.toString()
+                          ? 'bg-white shadow-sm text-purple-600'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      {channel.coverUrl ? (
+                        <img
+                          src={channel.coverUrl}
+                          alt={channel.name}
+                          className="w-4 h-4 sm:w-5 sm:h-5 rounded object-cover"
+                        />
+                      ) : (
+                        <Boxes size={14} />
+                      )}
+                      <span className="max-w-[60px] sm:max-w-[100px] truncate">{channel.name}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* 오른쪽: 검색창 - 데스크톱 */}
+                <div className="relative hidden sm:block">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                  <Input
+                    type="text"
+                    placeholder="상품명으로 검색..."
+                    value={searchTerm}
+                    onChange={(e) => { setSearchTerm(e.target.value); setQuery(e.target.value) }}
+                    className="pl-10 w-64"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* 테이블 */}
+          {/* 테이블/카드 뷰 */}
           {isLoading ? (
             <div className="p-12">
               <Loading />
             </div>
+          ) : products.length === 0 ? (
+            <div className="p-12 text-center text-gray-500">
+              <Package size={48} className="mx-auto mb-4 text-gray-300" />
+              <p>등록된 상품이 없습니다.</p>
+            </div>
           ) : (
-            <Table className="table-fixed">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[4%]">
+            <>
+              {/* 모바일 카드 뷰 */}
+              <div className="lg:hidden">
+                {/* 전체 선택 헤더 */}
+                <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
+                  <label className="flex items-center gap-2 cursor-pointer min-h-[44px]">
                     <input
                       type="checkbox"
                       checked={selectAll}
                       onChange={handleToggleSelectAll}
-                      className="w-4 h-4 cursor-pointer"
+                      className="w-5 h-5 cursor-pointer rounded border-gray-300"
                     />
-                  </TableHead>
-                  <TableHead className="w-[42%]">상품명</TableHead>
-                  <TableHead className="w-[20%]">출처 채널</TableHead>
-                  <TableHead className="w-[13%]">상태</TableHead>
-                  <TableHead className="w-[21%]">생성일시</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {/* 데이터 행 */}
-                {products.map((product) => (
-                  <TableRow
-                    key={product.id}
-                    className="hover:bg-gray-50 cursor-pointer h-[72px]"
-                    onClick={() => router.push(`/product/detail/${product.id}`)}
-                  >
-                    <TableCell
-                      onClick={(e) => e.stopPropagation()}
+                    <span className="text-sm font-medium text-gray-700">전체 선택</span>
+                  </label>
+                  {selectedProductIds.length > 0 && (
+                    <span className="text-sm text-purple-600 font-medium">
+                      {selectedProductIds.length}개 선택됨
+                    </span>
+                  )}
+                </div>
+
+                {/* 카드 목록 */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3">
+                  {products.map((product) => (
+                    <div
+                      key={product.id}
+                      className={`bg-white border rounded-lg overflow-hidden transition-all ${
+                        selectedProductIds.includes(product.id)
+                          ? 'border-purple-500 ring-1 ring-purple-500'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={selectedProductIds.includes(product.id)}
-                        onChange={() => handleToggleSelection(product.id)}
-                        className="w-4 h-4 cursor-pointer"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        {product.thumbnailUrl ? (
-                          <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                            <Image
-                              src={product.thumbnailUrl}
-                              alt={product.name}
-                              fill
-                              sizes="56px"
-                              className="object-cover"
+                      <div
+                        className="p-3 cursor-pointer"
+                        onClick={() => router.push(`/product/detail/${product.id}`)}
+                      >
+                        <div className="flex gap-3">
+                          {/* 체크박스 */}
+                          <div
+                            className="flex items-start pt-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedProductIds.includes(product.id)}
+                              onChange={() => handleToggleSelection(product.id)}
+                              className="w-5 h-5 cursor-pointer rounded border-gray-300"
                             />
                           </div>
-                        ) : (
-                          <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                            <Package size={24} className="text-gray-400" />
-                          </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <div className="font-semibold text-gray-900 text-base truncate">{product.name}</div>
-                          {product.description && (
-                            <div className="text-sm text-gray-500 truncate mt-1">
-                              {product.description.substring(0, 60)}...
+
+                          {/* 이미지 */}
+                          {product.thumbnailUrl ? (
+                            <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                              <Image
+                                src={product.thumbnailUrl}
+                                alt={product.name}
+                                fill
+                                sizes="64px"
+                                className="object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                              <Package size={24} className="text-gray-400" />
                             </div>
                           )}
+
+                          {/* 상품 정보 */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-gray-900 text-sm line-clamp-2">
+                              {product.name}
+                            </h3>
+                            <p className="text-xs text-gray-500 mt-1 truncate">
+                              {product.channel?.name || '-'}
+                            </p>
+                            <div className="flex items-center justify-between mt-2">
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  product.isActive
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                {product.isActive ? '활성' : '비활성'}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {new Date(product.createdAt).toLocaleDateString('ko-KR')}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-gray-600 truncate">
-                        {product.channel?.name || '-'}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          product.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 데스크톱 테이블 뷰 */}
+              <div className="hidden lg:block">
+                <Table className="table-fixed">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[4%]">
+                        <input
+                          type="checkbox"
+                          checked={selectAll}
+                          onChange={handleToggleSelectAll}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </TableHead>
+                      <TableHead className="w-[42%]">상품명</TableHead>
+                      <TableHead className="w-[20%]">출처 채널</TableHead>
+                      <TableHead className="w-[13%]">상태</TableHead>
+                      <TableHead className="w-[21%]">생성일시</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {/* 데이터 행 */}
+                    {products.map((product) => (
+                      <TableRow
+                        key={product.id}
+                        className="hover:bg-gray-50 cursor-pointer h-[72px]"
+                        onClick={() => router.push(`/product/detail/${product.id}`)}
                       >
-                        {product.isActive ? '활성' : '비활성'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-gray-600 whitespace-nowrap">
-                        {new Date(product.createdAt).toLocaleString('ko-KR', {
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          hour12: false,
-                        }).replace(/\. /g, '-').replace(/\.$/, '').replace(/-(\d{2}:\d{2})$/, ' $1')}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                        <TableCell
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedProductIds.includes(product.id)}
+                            onChange={() => handleToggleSelection(product.id)}
+                            className="w-4 h-4 cursor-pointer"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            {product.thumbnailUrl ? (
+                              <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                                <Image
+                                  src={product.thumbnailUrl}
+                                  alt={product.name}
+                                  fill
+                                  sizes="56px"
+                                  className="object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                <Package size={24} className="text-gray-400" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-gray-900 text-base truncate">{product.name}</div>
+                              {product.description && (
+                                <div className="text-sm text-gray-500 truncate mt-1">
+                                  {product.description.substring(0, 60)}...
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-gray-600 truncate">
+                            {product.channel?.name || '-'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              product.isActive
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {product.isActive ? '활성' : '비활성'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-600 whitespace-nowrap">
+                            {new Date(product.createdAt).toLocaleString('ko-KR', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false,
+                            }).replace(/\. /g, '-').replace(/\.$/, '').replace(/-(\d{2}:\d{2})$/, ' $1')}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
 
           {/* Pagination */}

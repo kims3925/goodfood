@@ -681,59 +681,104 @@ export default function UnifiedOrderDetailPage() {
               </div>
               <div className="divide-y divide-gray-100">
                 {order.items.map((item) => (
-                  <div key={item.id} className="p-4 flex gap-4">
-                    {/* 상품 이미지 */}
-                    {item.thumbnailUrl ? (
-                      <Image
-                        src={item.thumbnailUrl}
-                        alt={item.productName}
-                        width={80}
-                        height={80}
-                        className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-20 h-20 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <ImageOff size={24} className="text-gray-400" />
-                      </div>
-                    )}
-
-                    {/* 상품 정보 */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-gray-900 mb-1">{item.productName}</h3>
-                      {/* 도매처(소싱 출처) 뱃지 */}
-                      {item.channel && (
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${CHANNEL_PLATFORM_CONFIG[item.channel.platform]?.bgColor || 'bg-gray-100'} ${CHANNEL_PLATFORM_CONFIG[item.channel.platform]?.color || 'text-gray-700'}`}>
-                            <Store size={12} />
-                            {item.channel.name}
-                          </span>
-                          {item.channel.kind === 'WHOLESALE' && (
-                            <span className="text-xs text-gray-400">도매</span>
-                          )}
+                  <div key={item.id} className="p-3 sm:p-4">
+                    {/* 모바일: 세로 레이아웃 */}
+                    <div className="flex gap-3 sm:hidden">
+                      {/* 상품 이미지 */}
+                      {item.thumbnailUrl ? (
+                        <Image
+                          src={item.thumbnailUrl}
+                          alt={item.productName}
+                          width={64}
+                          height={64}
+                          className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                          <ImageOff size={20} className="text-gray-400" />
                         </div>
                       )}
-                      {item.optionSummary && (
-                        <p className="text-sm text-gray-500 mb-1">{item.optionSummary}</p>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 text-sm line-clamp-2 mb-1">{item.productName}</h3>
+                        {item.channel && (
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${CHANNEL_PLATFORM_CONFIG[item.channel.platform]?.bgColor || 'bg-gray-100'} ${CHANNEL_PLATFORM_CONFIG[item.channel.platform]?.color || 'text-gray-700'}`}>
+                              <Store size={10} />
+                              {item.channel.name}
+                            </span>
+                          </div>
+                        )}
+                        {item.optionSummary && (
+                          <p className="text-xs text-gray-500">{item.optionSummary}</p>
+                        )}
+                      </div>
+                    </div>
+                    {/* 모바일: 가격 정보 */}
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 sm:hidden">
+                      <span className="text-xs text-gray-500">
+                        {formatPrice(item.unitPrice)} × {item.quantity}개
+                        {item.shippingFee > 0 && (
+                          <span className="ml-1 text-orange-600">+배송비 {formatPrice(item.shippingFee)}</span>
+                        )}
+                      </span>
+                      <span className="font-bold text-gray-900">{formatPrice(item.totalPrice)}</span>
                     </div>
 
-                    {/* 수량 및 가격 */}
-                    <div className="text-right flex-shrink-0">
-                      <p className="font-medium text-gray-900">{formatPrice(item.totalPrice)}</p>
-                      <p className="text-sm text-gray-500">
-                        {formatPrice(item.unitPrice)} x {item.quantity}개
-                      </p>
-                      {/* 배송비 정보 */}
-                      {item.shippingFee > 0 && (
-                        <p className="text-xs text-gray-400 mt-1">
-                          배송비 {formatPrice(item.shippingFee)}
-                          {item.bundleMaxQty > 1 && (
-                            <span className="ml-1">
-                              ({item.bundleMaxQty}개 합배송)
-                            </span>
-                          )}
-                        </p>
+                    {/* 데스크탑: 가로 레이아웃 */}
+                    <div className="hidden sm:flex gap-4">
+                      {/* 상품 이미지 */}
+                      {item.thumbnailUrl ? (
+                        <Image
+                          src={item.thumbnailUrl}
+                          alt={item.productName}
+                          width={80}
+                          height={80}
+                          className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                          <ImageOff size={24} className="text-gray-400" />
+                        </div>
                       )}
+
+                      {/* 상품 정보 */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 mb-1">{item.productName}</h3>
+                        {/* 도매처(소싱 출처) 뱃지 */}
+                        {item.channel && (
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${CHANNEL_PLATFORM_CONFIG[item.channel.platform]?.bgColor || 'bg-gray-100'} ${CHANNEL_PLATFORM_CONFIG[item.channel.platform]?.color || 'text-gray-700'}`}>
+                              <Store size={12} />
+                              {item.channel.name}
+                            </span>
+                            {item.channel.kind === 'WHOLESALE' && (
+                              <span className="text-xs text-gray-400">도매</span>
+                            )}
+                          </div>
+                        )}
+                        {item.optionSummary && (
+                          <p className="text-sm text-gray-500 mb-1">{item.optionSummary}</p>
+                        )}
+                      </div>
+
+                      {/* 수량 및 가격 */}
+                      <div className="text-right flex-shrink-0">
+                        <p className="font-medium text-gray-900">{formatPrice(item.totalPrice)}</p>
+                        <p className="text-sm text-gray-500">
+                          {formatPrice(item.unitPrice)} x {item.quantity}개
+                        </p>
+                        {/* 배송비 정보 */}
+                        {item.shippingFee > 0 && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            배송비 {formatPrice(item.shippingFee)}
+                            {item.bundleMaxQty > 1 && (
+                              <span className="ml-1">
+                                ({item.bundleMaxQty}개 합배송)
+                              </span>
+                            )}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

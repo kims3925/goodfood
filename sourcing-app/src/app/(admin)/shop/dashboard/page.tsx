@@ -118,14 +118,14 @@ const KPICard = ({ title, value, change, icon, gradient }: KPICardProps) => {
   const isPositive = change >= 0
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl p-6 text-white shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${gradient}`}
+      className={`relative overflow-hidden rounded-2xl p-4 sm:p-6 text-white shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${gradient}`}
     >
-      <div className="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full bg-white/10" />
-      <div className="absolute bottom-0 left-0 -mb-4 -ml-4 h-16 w-16 rounded-full bg-white/10" />
+      <div className="absolute top-0 right-0 -mt-4 -mr-4 h-16 w-16 sm:h-24 sm:w-24 rounded-full bg-white/10" />
+      <div className="absolute bottom-0 left-0 -mb-4 -ml-4 h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-white/10" />
 
       <div className="relative">
         <div className="flex items-center justify-between">
-          <div className="rounded-xl bg-white/20 p-3 backdrop-blur-sm">
+          <div className="rounded-xl bg-white/20 p-2 sm:p-3 backdrop-blur-sm">
             {icon}
           </div>
           <div className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
@@ -136,9 +136,9 @@ const KPICard = ({ title, value, change, icon, gradient }: KPICardProps) => {
           </div>
         </div>
 
-        <div className="mt-4">
-          <p className="text-sm font-medium text-white/80">{title}</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
+        <div className="mt-3 sm:mt-4">
+          <p className="text-xs sm:text-sm font-medium text-white/80">{title}</p>
+          <p className="mt-1 text-lg sm:text-2xl font-bold tracking-tight">{value}</p>
         </div>
       </div>
     </div>
@@ -245,15 +245,15 @@ export default function ShopDashboardPage() {
     <div className="space-y-6 pb-8">
       {/* Header */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           {/* 왼쪽: 헤더 텍스트 */}
-          <div className="w-48">
-            <h1 className="text-2xl font-bold text-gray-900">쇼핑몰 대시보드</h1>
-            <p className="mt-1 text-sm text-gray-500">실시간 판매 현황 및 통계</p>
+          <div className="w-full sm:w-48">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">쇼핑몰 대시보드</h1>
+            <p className="mt-1 text-xs sm:text-sm text-gray-500">실시간 판매 현황 및 통계</p>
           </div>
 
           {/* 가운데: 기간 필터 + 새로고침 */}
-          <div className="flex-1 flex items-center justify-center gap-3">
+          <div className="flex-1 flex items-center justify-start sm:justify-center gap-2 sm:gap-3 w-full sm:w-auto overflow-x-auto">
             <div className="flex rounded-xl bg-gray-100 p-1">
               {[
                 { value: 'today', label: '오늘' },
@@ -264,7 +264,7 @@ export default function ShopDashboardPage() {
                 <button
                   key={item.value}
                   onClick={() => handlePeriodChange(item.value as PeriodFilter)}
-                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                  className={`rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all min-h-[40px] sm:min-h-[36px] whitespace-nowrap ${
                     (item.value === 'custom' && isCustomDate) || (!isCustomDate && period === item.value)
                       ? 'bg-white text-gray-900 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900'
@@ -277,33 +277,33 @@ export default function ShopDashboardPage() {
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="rounded-xl bg-gray-100 p-2.5 text-gray-600 transition-colors hover:bg-gray-200 disabled:opacity-50"
+              className="rounded-xl bg-gray-100 p-2.5 min-w-[44px] min-h-[44px] sm:min-w-[40px] sm:min-h-[40px] flex items-center justify-center text-gray-600 transition-colors hover:bg-gray-200 disabled:opacity-50"
             >
               <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
             </button>
           </div>
 
-          {/* 오른쪽: 균형을 위한 빈 공간 */}
-          <div className="w-48" />
+          {/* 오른쪽: 균형을 위한 빈 공간 - 데스크톱만 */}
+          <div className="hidden sm:block w-48" />
         </div>
 
         {/* 직접선택 시 날짜 선택기 표시 */}
         {isCustomDate && (
-          <div className="flex justify-center">
-            <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
-              <Calendar size={16} className="text-gray-400" />
+          <div className="flex justify-start sm:justify-center">
+            <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 w-full sm:w-auto">
+              <Calendar size={16} className="text-gray-400 flex-shrink-0" />
               <input
                 type="date"
                 value={chartStartDate}
                 onChange={(e) => setChartStartDate(e.target.value)}
-                className="bg-transparent text-sm text-gray-700 outline-none w-32"
+                className="bg-transparent text-sm text-gray-700 outline-none w-full sm:w-32 min-h-[36px]"
               />
-              <span className="text-gray-400">~</span>
+              <span className="text-gray-400 flex-shrink-0">~</span>
               <input
                 type="date"
                 value={chartEndDate}
                 onChange={(e) => setChartEndDate(e.target.value)}
-                className="bg-transparent text-sm text-gray-700 outline-none w-32"
+                className="bg-transparent text-sm text-gray-700 outline-none w-full sm:w-32 min-h-[36px]"
               />
             </div>
           </div>
@@ -466,21 +466,21 @@ export default function ShopDashboardPage() {
               {recentOrders.map((order) => (
                 <div
                   key={order.id}
-                  className="flex items-center justify-between rounded-xl bg-gray-50 p-4 transition-colors hover:bg-gray-100"
+                  className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 p-3 sm:p-4 transition-colors hover:bg-gray-100"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                    <div className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full text-xs sm:text-sm font-semibold flex-shrink-0 ${
                       order.isGuest
                         ? 'bg-gray-200 text-gray-600'
                         : 'bg-indigo-100 text-indigo-600'
                     }`}>
                       {order.customer}
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-900">#{order.orderNumber}</p>
+                        <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">#{order.orderNumber}</p>
                         {order.isGuest && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-200 text-gray-600 rounded">
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-200 text-gray-600 rounded flex-shrink-0">
                             비회원
                           </span>
                         )}
@@ -488,8 +488,8 @@ export default function ShopDashboardPage() {
                       <p className="text-xs text-gray-500">{order.time}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-900">{formatCurrency(order.amount)}</p>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-xs sm:text-sm font-semibold text-gray-900">{formatCurrency(order.amount)}</p>
                     <StatusBadge status={order.status} />
                   </div>
                 </div>

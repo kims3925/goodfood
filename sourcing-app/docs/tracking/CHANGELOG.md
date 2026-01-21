@@ -21,6 +21,12 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260121-006 | Done | 2026-01-21 | - | 소싱 대시보드 수동 실행 버튼 모바일 개선 | Low | Claude |
+| TR-20260121-005 | Done | 2026-01-21 | - | 소싱 섹션 현황 카드 sm 브레이크포인트 추가 | Low | Claude |
+| TR-20260121-004 | Done | 2026-01-21 | - | 소싱 섹션 페이지 모바일 UI 개선 | Low | Claude |
+| TR-20260121-003 | Done | 2026-01-21 | - | 쇼핑몰 섹션 페이지 모바일 UI 개선 | Low | Claude |
+| TR-20260121-002 | Done | 2026-01-21 | - | 공통 UI 컴포넌트 모바일 반응형 개선 | Low | Claude |
+| TR-20260121-001 | Done | 2026-01-21 | - | 레이아웃 컴포넌트 모바일 반응형 개선 | Low | Claude |
 | TR-20260120-003 | Done | 2026-01-20 | - | 로그인 후 대시보드로 리다이렉트 변경 | Low | Claude |
 | TR-20260120-002 | Done | 2026-01-20 | - | 외부 주문 API 타입 에러 수정 | Low | Claude |
 | TR-20260120-001 | Done | 2026-01-20 | - | 외부 주문 웹훅 알림 (슬랙/디스코드) 기능 추가 | Low | Claude |
@@ -150,6 +156,95 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260121-003: 쇼핑몰 섹션 페이지 모바일 UI 개선
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-21 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 주문 목록 페이지: 모바일 카드 뷰 추가 (lg:hidden), 페이지네이션 터치 타겟 확보
+- 주문 상세 페이지: 상품 목록 모바일 레이아웃 최적화 (이미지, 정보, 가격 분리)
+- 정산 관리 페이지: 토스페이먼츠 현황 모바일 레이아웃 개선, 기간 선택 UI 터치 친화적 변경, 쇼핑몰 상세 모바일 카드 뷰 추가
+- CS 문의 목록: 모바일 카드 뷰 추가 (lg:hidden), 필터 버튼 터치 타겟 44px 확보, 통계 카드 그리드 반응형 개선
+- 발주 관리 페이지: 통계 카드 그리드 반응형 개선 (cols-2 sm:cols-3 md:cols-5), 도매처 카드 그리드 sm 브레이크포인트 추가
+- 리뷰 목록 페이지: 통계 카드 그리드 반응형 개선 (cols-2 sm:cols-2 md:cols-4)
+- 정산 이력 페이지: 통계 카드 그리드 반응형 개선 (cols-2 sm:cols-3 md:cols-3)
+- 회원 목록 페이지: 통계 카드 그리드 반응형 개선 (cols-2 sm:cols-3 md:cols-3)
+- 쇼핑몰 목록 페이지: 통계 카드 그리드 반응형 개선 (cols-2 sm:cols-3 md:cols-6)
+- 알림 페이지: 통계 카드 그리드 반응형 개선 (cols-2 sm:cols-3 md:cols-5)
+- 모든 페이지 min-h-[44px] 적용으로 터치 접근성 개선
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(admin)/shop/order/list/page.tsx | Modified | 모바일 카드 뷰 추가, 페이지네이션 개선 |
+| src/app/(admin)/shop/order/detail/[id]/page.tsx | Modified | 상품 목록 모바일 레이아웃 분리 |
+| src/app/(admin)/shop/settlement/list/page.tsx | Modified | 토스페이먼츠 헤더, 필터, 상세 목록 모바일 개선, 통계 카드 그리드 반응형 |
+| src/app/(admin)/shop/cs/inquiry/list/page.tsx | Modified | 모바일 카드 뷰 추가, 필터 터치 타겟 확보, 통계 카드 그리드 반응형 |
+| src/app/(admin)/shop/wholesale-orders/page.tsx | Modified | 통계 카드/도매처 카드 그리드 반응형 개선 |
+| src/app/(admin)/shop/reviews/list/page.tsx | Modified | 통계 카드 그리드 반응형 개선 |
+| src/app/(admin)/shop/settlement/history/page.tsx | Modified | 통계 카드 그리드 반응형 개선 |
+| src/app/(admin)/shop/user/list/page.tsx | Modified | 통계 카드 그리드 반응형 개선 |
+| src/app/(admin)/shop/store/list/page.tsx | Modified | 통계 카드 그리드 반응형 개선 |
+| src/app/(admin)/shop/notification/page.tsx | Modified | 통계 카드 그리드 반응형 개선 |
+
+---
+
+## TR-20260121-002: 공통 UI 컴포넌트 모바일 반응형 개선
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-21 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- Modal: 모바일에서 max-width를 화면 너비에 맞게 조정, 닫기 버튼 터치 타겟 44px 확보
+- Table: 반응형 패딩 및 폰트 크기 적용 (px-2 py-2 sm:px-4 sm:py-3)
+- Button: 모바일 터치 타겟 44px 이상 보장 (min-h-[44px])
+- Input: 최소 높이 44px, iOS 확대 방지를 위해 text-base 유지
+- Select: 최소 높이 44px, 반응형 패딩 적용
+- Pagination: 반응형 레이아웃, 버튼 터치 타겟 44px 확보
+- Vercel React Best Practices 적용: memo, useCallback 메모이제이션
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/components/ui/Modal.tsx | Modified | 반응형 max-width, 닫기 버튼 터치 타겟, fullScreenOnMobile prop |
+| src/components/ui/Table.tsx | Modified | 반응형 패딩, memo 적용 |
+| src/components/ui/Button.tsx | Modified | 터치 타겟 44px, memo 적용 |
+| src/components/ui/Input.tsx | Modified | 터치 타겟 44px, text-base 유지, memo 적용 |
+| src/components/ui/Select.tsx | Modified | 터치 타겟 44px, useCallback/memo 적용 |
+| src/components/ui/Pagination.tsx | Modified | 반응형 레이아웃, 터치 타겟 44px, memo/useCallback 적용 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| TypeCheck | Pass |
+| Build | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+
+---
 
 ## TR-20260120-002: 외부 주문 API 타입 에러 수정
 
@@ -2338,4 +2433,97 @@ uploadProgressEmitter (EventEmitter 싱글톤)
 ### 관련 항목
 - REQ-ID: -
 - Flow-ID: 구글 시트 연동
+
+---
+
+## TR-20260121-005: 소싱 섹션 현황 카드 sm 브레이크포인트 추가
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-21 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- notification 페이지: `grid-cols-1 md:grid-cols-5` → `grid-cols-2 sm:grid-cols-3 md:grid-cols-5`
+- user/list 페이지: `grid-cols-1 md:grid-cols-3` → `grid-cols-2 sm:grid-cols-3 md:grid-cols-3`
+- post/list 페이지: `grid-cols-1 md:grid-cols-4` → `grid-cols-2 sm:grid-cols-2 md:grid-cols-4`
+- collected-product/list 페이지: `grid-cols-1 md:grid-cols-4` → `grid-cols-2 sm:grid-cols-2 md:grid-cols-4`
+- 모든 현황 카드에 반응형 스타일 적용 (패딩, 간격, 아이콘 크기, 텍스트 크기)
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(admin)/sourcing/notification/page.tsx | Modified | 알림 현황 카드 sm 브레이크포인트 추가 |
+| src/app/(admin)/sourcing/user/list/page.tsx | Modified | 매니저 현황 카드 sm 브레이크포인트 추가 |
+| src/app/(admin)/sourcing/post/list/page.tsx | Modified | 게시물 현황/액션 카드 sm 브레이크포인트 추가 |
+| src/app/(admin)/sourcing/collected-product/list/page.tsx | Modified | 수집 상품 현황/액션 카드 sm 브레이크포인트 추가 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Lint | Pass |
+| Build | Pass |
+| Integration | N/A |
+
+### 롤백 계획
+1. git revert {commit-hash}
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: 소싱 UI
+
+---
+
+## TR-20260121-006: 소싱 대시보드 수동 실행 버튼 모바일 개선
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-21 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 5개 수동 실행 버튼 모바일 반응형 개선 (게시물 수집, AI 변환, 상품 등록, 발행, 전체 실행)
+- 패딩: `p-4` → `p-3 sm:p-4`
+- 아이콘 컨테이너: `w-10 h-10` → `w-8 h-8 sm:w-10 sm:h-10`
+- 아이콘 마진: `mb-3` → `mb-2 sm:mb-3`
+- 아이콘 크기: `size={20}` → `size={18} className="sm:w-5 sm:h-5"`
+- 제목 텍스트: `text-sm` → `text-xs sm:text-sm`
+- 설명 텍스트: `text-xs mt-1` → `text-[10px] sm:text-xs mt-0.5 sm:mt-1`
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/(admin)/sourcing/dashboard/page.tsx | Modified | 수동 실행 버튼 5개 모바일 반응형 적용 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Lint | Pass |
+| Build | Pass |
+| Integration | N/A |
+
+### 롤백 계획
+1. git revert {commit-hash}
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: 소싱 대시보드
 

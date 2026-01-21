@@ -516,62 +516,62 @@ export default function WholesaleOrdersPage() {
         </div>
 
         {/* 통계 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <Package size={24} className="text-gray-600" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-gray-100 rounded-lg flex-shrink-0">
+                <Package className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
               </div>
-              <div>
-                <p className="text-sm text-gray-500">전체 주문</p>
-                <p className="text-2xl font-bold text-gray-900">{totalSummary.totalOrders}건</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <ShoppingCart size={24} className="text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">총 수량</p>
-                <p className="text-2xl font-bold text-blue-600">{totalSummary.totalQuantity.toLocaleString()}개</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-gray-500">전체 주문</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900 truncate">{totalSummary.totalOrders}건</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Banknote size={24} className="text-green-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg flex-shrink-0">
+                <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
               </div>
-              <div>
-                <p className="text-sm text-gray-500">총 금액</p>
-                <p className="text-2xl font-bold text-green-600">{formatPrice(totalSummary.totalAmount)}</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-gray-500">총 수량</p>
+                <p className="text-lg sm:text-2xl font-bold text-blue-600 truncate">{totalSummary.totalQuantity.toLocaleString()}개</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Store size={24} className="text-purple-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-green-100 rounded-lg flex-shrink-0">
+                <Banknote className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
               </div>
-              <div>
-                <p className="text-sm text-gray-500">도매처</p>
-                <p className="text-2xl font-bold text-purple-600">{summaries.length}곳</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-gray-500">총 금액</p>
+                <p className="text-base sm:text-2xl font-bold text-green-600 truncate">{formatPrice(totalSummary.totalAmount)}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-purple-100 rounded-lg flex-shrink-0">
+                <Store className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-gray-500">도매처</p>
+                <p className="text-lg sm:text-2xl font-bold text-purple-600 truncate">{summaries.length}곳</p>
               </div>
             </div>
           </div>
           <button
             onClick={() => setShowScheduleModal(true)}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-gray-400 hover:bg-gray-50 transition-colors cursor-pointer text-left"
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:border-gray-400 hover:bg-gray-50 transition-colors cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <Clock size={24} className="text-gray-600" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-gray-100 rounded-lg flex-shrink-0">
+                <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
               </div>
-              <div>
-                <p className="text-sm text-gray-500">자동 발주</p>
-                <p className="text-lg font-bold text-gray-700">설정하기</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-gray-500">자동 발주</p>
+                <p className="text-base sm:text-lg font-bold text-gray-700">설정하기</p>
               </div>
             </div>
           </button>
@@ -593,7 +593,7 @@ export default function WholesaleOrdersPage() {
             <p className="text-gray-400 text-sm mt-1">결제 완료 상태의 주문만 표시됩니다.</p>
           </div>
         ) : !loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {summaries.map((summary) => (
               <div
                 key={summary.wholesaleChannelId}

@@ -1,12 +1,17 @@
-import { TableHTMLAttributes, TdHTMLAttributes, ThHTMLAttributes, forwardRef } from 'react'
+import { TableHTMLAttributes, TdHTMLAttributes, ThHTMLAttributes, forwardRef, memo } from 'react'
 
-export const Table = forwardRef<HTMLTableElement, TableHTMLAttributes<HTMLTableElement>>(
-  ({ className = '', children, ...props }, ref) => {
+interface TableWrapperProps extends TableHTMLAttributes<HTMLTableElement> {
+  /** 모바일에서 최소 너비 지정 (스크롤 유도) */
+  minWidth?: string
+}
+
+export const Table = memo(forwardRef<HTMLTableElement, TableWrapperProps>(
+  ({ className = '', children, minWidth, ...props }, ref) => {
     return (
-      <div className="w-full overflow-auto">
+      <div className="w-full overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
         <table
           ref={ref}
-          className={`w-full border-collapse ${className}`}
+          className={`w-full border-collapse ${minWidth ? minWidth : 'min-w-[600px] sm:min-w-0'} ${className}`}
           {...props}
         >
           {children}
@@ -14,11 +19,11 @@ export const Table = forwardRef<HTMLTableElement, TableHTMLAttributes<HTMLTableE
       </div>
     )
   }
-)
+))
 
 Table.displayName = 'Table'
 
-export const TableHeader = forwardRef<HTMLTableSectionElement, TableHTMLAttributes<HTMLTableSectionElement>>(
+export const TableHeader = memo(forwardRef<HTMLTableSectionElement, TableHTMLAttributes<HTMLTableSectionElement>>(
   ({ className = '', children, ...props }, ref) => {
     return (
       <thead
@@ -30,11 +35,11 @@ export const TableHeader = forwardRef<HTMLTableSectionElement, TableHTMLAttribut
       </thead>
     )
   }
-)
+))
 
 TableHeader.displayName = 'TableHeader'
 
-export const TableBody = forwardRef<HTMLTableSectionElement, TableHTMLAttributes<HTMLTableSectionElement>>(
+export const TableBody = memo(forwardRef<HTMLTableSectionElement, TableHTMLAttributes<HTMLTableSectionElement>>(
   ({ className = '', children, ...props }, ref) => {
     return (
       <tbody
@@ -46,11 +51,11 @@ export const TableBody = forwardRef<HTMLTableSectionElement, TableHTMLAttributes
       </tbody>
     )
   }
-)
+))
 
 TableBody.displayName = 'TableBody'
 
-export const TableRow = forwardRef<HTMLTableRowElement, TableHTMLAttributes<HTMLTableRowElement>>(
+export const TableRow = memo(forwardRef<HTMLTableRowElement, TableHTMLAttributes<HTMLTableRowElement>>(
   ({ className = '', children, ...props }, ref) => {
     return (
       <tr
@@ -62,39 +67,39 @@ export const TableRow = forwardRef<HTMLTableRowElement, TableHTMLAttributes<HTML
       </tr>
     )
   }
-)
+))
 
 TableRow.displayName = 'TableRow'
 
-export const TableHead = forwardRef<HTMLTableCellElement, ThHTMLAttributes<HTMLTableCellElement>>(
+export const TableHead = memo(forwardRef<HTMLTableCellElement, ThHTMLAttributes<HTMLTableCellElement>>(
   ({ className = '', children, ...props }, ref) => {
     return (
       <th
         ref={ref}
-        className={`px-4 py-3 text-left text-sm font-medium text-text-primary ${className}`}
+        className={`px-2 py-2 sm:px-4 sm:py-3 text-left text-xs sm:text-sm font-medium text-text-primary whitespace-nowrap ${className}`}
         {...props}
       >
         {children}
       </th>
     )
   }
-)
+))
 
 TableHead.displayName = 'TableHead'
 
-export const TableCell = forwardRef<HTMLTableCellElement, TdHTMLAttributes<HTMLTableCellElement>>(
+export const TableCell = memo(forwardRef<HTMLTableCellElement, TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className = '', children, ...props }, ref) => {
     return (
       <td
         ref={ref}
-        className={`px-4 py-3 text-left text-sm text-text-secondary ${className}`}
+        className={`px-2 py-2 sm:px-4 sm:py-3 text-left text-xs sm:text-sm text-text-secondary ${className}`}
         {...props}
       >
         {children}
       </td>
     )
   }
-)
+))
 
 TableCell.displayName = 'TableCell'
 

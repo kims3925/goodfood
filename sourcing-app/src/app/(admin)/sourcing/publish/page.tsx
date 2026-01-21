@@ -1511,59 +1511,59 @@ export default function PublishPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">발행</h1>
-          <p className="text-gray-600">
-            상품을 선택하여 채널, 쇼핑몰에 발행합니다. 셀을 클릭하여 선택하고 발행 버튼을 누르세요.
+        <div className="mb-4 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">발행</h1>
+          <p className="text-sm sm:text-base text-gray-600">
+            상품을 선택하여 채널, 쇼핑몰에 발행합니다.
           </p>
         </div>
 
         {/* 통계 및 액션 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <Package size={24} className="text-gray-600" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-gray-100 rounded-lg">
+                <Package size={20} className="sm:w-6 sm:h-6 text-gray-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">상품</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalProducts}</p>
+                <p className="text-xs sm:text-sm text-gray-500">상품</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.totalProducts}</p>
               </div>
             </div>
           </div>
           {/* 쇼핑몰 카드 */}
-          <div className="bg-white rounded-lg shadow-sm border-2 border-blue-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <ShoppingCart size={24} className="text-blue-600" />
+          <div className="bg-white rounded-lg shadow-sm border-2 border-blue-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+                <ShoppingCart size={20} className="sm:w-6 sm:h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-blue-600 font-medium">쇼핑몰</p>
-                <p className="text-2xl font-bold text-blue-700">{stats.totalShops}</p>
+                <p className="text-xs sm:text-sm text-blue-600 font-medium">쇼핑몰</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-700">{stats.totalShops}</p>
               </div>
             </div>
           </div>
           {/* 소매채널 카드 */}
-          <div className="bg-white rounded-lg shadow-sm border-2 border-green-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <BandIcon size={24} className="text-green-600" />
+          <div className="bg-white rounded-lg shadow-sm border-2 border-green-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+                <BandIcon size={20} className="text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-green-600 font-medium">소매채널</p>
-                <p className="text-2xl font-bold text-green-700">{stats.totalChannels}</p>
+                <p className="text-xs sm:text-sm text-green-600 font-medium">소매채널</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-700">{stats.totalChannels}</p>
               </div>
             </div>
           </div>
           {/* 발행 현황 카드 */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <CheckCircle size={24} className="text-green-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+                <CheckCircle size={20} className="sm:w-6 sm:h-6 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">발행됨</p>
-                <p className="text-2xl font-bold text-green-600">{stats.publishedCells}</p>
+                <p className="text-xs sm:text-sm text-gray-500">발행됨</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-600">{stats.publishedCells}</p>
               </div>
             </div>
           </div>
@@ -1571,20 +1571,20 @@ export default function PublishPage() {
           <button
             onClick={handlePublishSelected}
             disabled={selectedUnpublishedCount === 0 || isPublishing}
-            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 text-left transition-colors col-span-2 sm:col-span-1 min-h-[44px] ${
               selectedUnpublishedCount > 0 && !isPublishing
                 ? 'hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
                 : 'opacity-50 cursor-not-allowed'
             }`}
           >
-            <div className="flex items-center gap-3">
-              <div className={`p-3 rounded-lg ${selectedUnpublishedCount > 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                <Send size={24} className={selectedUnpublishedCount > 0 ? 'text-blue-600' : 'text-gray-400'} />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className={`p-2 sm:p-3 rounded-lg ${selectedUnpublishedCount > 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                <Send size={20} className={`sm:w-6 sm:h-6 ${selectedUnpublishedCount > 0 ? 'text-blue-600' : 'text-gray-400'}`} />
               </div>
               <div>
-                <p className="text-sm text-gray-500">선택 발행</p>
-                <p className={`text-lg font-bold ${selectedUnpublishedCount > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
-                  {selectedUnpublishedCount}개 선택됨
+                <p className="text-xs sm:text-sm text-gray-500">선택 발행</p>
+                <p className={`text-base sm:text-lg font-bold ${selectedUnpublishedCount > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
+                  {selectedUnpublishedCount}개
                 </p>
               </div>
             </div>
@@ -1592,35 +1592,58 @@ export default function PublishPage() {
         </div>
 
         {/* 컨트롤 영역 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="p-4 border-b border-gray-200 space-y-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 sm:mb-6">
+          <div className="p-3 sm:p-4 border-b border-gray-200 space-y-3 sm:space-y-4">
+            {/* 검색창 - 모바일에서 상단 */}
+            <div className="flex items-center gap-2 sm:hidden">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                <Input
+                  type="text"
+                  placeholder="상품 검색..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && loadProducts(true)}
+                  className="pl-10 w-full min-h-[44px]"
+                />
+              </div>
+              <button
+                onClick={() => loadProducts(true)}
+                disabled={isLoading}
+                className="p-2.5 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 min-w-[44px] min-h-[44px]"
+              >
+                <RefreshCw size={18} className={isLoading ? 'animate-spin text-gray-400' : 'text-gray-600'} />
+              </button>
+            </div>
+
             {/* 첫 번째 줄: 범례 + 검색 */}
-            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+            <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-start lg:items-center justify-between">
               {/* 왼쪽: 범례 */}
-              <div className="flex items-center gap-1">
-                <span className="text-sm text-gray-500 mr-2">범례:</span>
-                <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-green-100 text-green-700 flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded bg-green-500 flex items-center justify-center">
-                    <Check size={10} className="text-white" />
+              <div className="flex items-center gap-1 flex-wrap">
+                <span className="text-xs sm:text-sm text-gray-500 mr-1 sm:mr-2">범례:</span>
+                <span className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium bg-green-100 text-green-700 flex items-center gap-1 sm:gap-1.5">
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded bg-green-500 flex items-center justify-center">
+                    <Check size={8} className="sm:w-2.5 sm:h-2.5 text-white" />
                   </div>
                   발행됨
                 </span>
-                <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-gray-100 text-gray-700 flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded bg-gray-300" />
+                <span className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium bg-gray-100 text-gray-700 flex items-center gap-1 sm:gap-1.5">
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded bg-gray-300" />
                   미발행
                 </span>
-                <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-amber-100 text-amber-700 flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded bg-amber-200 border border-dashed border-amber-400" />
-                  가격미설정
+                <span className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium bg-amber-100 text-amber-700 flex items-center gap-1 sm:gap-1.5">
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded bg-amber-200 border border-dashed border-amber-400" />
+                  <span className="hidden sm:inline">가격미설정</span>
+                  <span className="sm:hidden">미설정</span>
                 </span>
-                <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-purple-100 text-purple-700 flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded bg-purple-500" />
+                <span className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium bg-purple-100 text-purple-700 flex items-center gap-1 sm:gap-1.5">
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded bg-purple-500" />
                   선택됨
                 </span>
               </div>
 
-              {/* 오른쪽: 검색 */}
-              <div className="flex items-center gap-2">
+              {/* 오른쪽: 검색 - 데스크톱 */}
+              <div className="hidden sm:flex items-center gap-2">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                   <Input
@@ -1645,13 +1668,13 @@ export default function PublishPage() {
             {/* 두 번째 줄: 도매밴드 필터 */}
             {wholesaleChannels.length > 0 && (
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm text-gray-500">도매밴드:</span>
+                <span className="text-xs sm:text-sm text-gray-500">도매밴드:</span>
                 <button
                   onClick={() => {
                     setSelectedWholesaleChannel(null)
                     setCurrentPage(1)
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-2.5 sm:px-3 py-1.5 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors min-h-[36px] sm:min-h-[32px] ${
                     selectedWholesaleChannel === null
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -1666,7 +1689,7 @@ export default function PublishPage() {
                       setSelectedWholesaleChannel(channel.id)
                       setCurrentPage(1)
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    className={`px-2.5 sm:px-3 py-1.5 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors min-h-[36px] sm:min-h-[32px] ${
                       selectedWholesaleChannel === channel.id
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

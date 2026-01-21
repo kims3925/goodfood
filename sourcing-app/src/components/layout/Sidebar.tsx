@@ -295,7 +295,7 @@ export default function Sidebar({
             className={`
               w-full flex items-center
               ${collapsed ? 'justify-center px-2' : 'justify-between px-4'}
-              py-2.5
+              py-3 min-h-[48px]
               transition-colors
               ${depth > 0 ? (collapsed ? '' : 'pl-8') : ''}
               ${childActive
@@ -332,7 +332,7 @@ export default function Sidebar({
                   onClick={() => setClickedItem(null)}
                   className={`
                     flex items-center gap-3
-                    px-4 py-2
+                    px-4 py-3 min-h-[44px]
                     text-sm font-medium
                     transition-colors
                     ${
@@ -364,13 +364,13 @@ export default function Sidebar({
           className={`
             flex items-center
             ${collapsed ? 'justify-center px-2' : 'gap-3 px-4'}
-            py-2.5
+            py-3 min-h-[48px]
             text-sm font-medium
             transition-colors
             ${depth > 0 ? (collapsed ? '' : 'pl-12') : ''}
             ${
               active
-                ? 'bg-primary-light text-primary-color border-r-2 border-primary-color'
+                ? 'bg-primary-light text-primary-color border-r-2 border-primary-color font-semibold'
                 : 'text-text-secondary hover:text-text-primary hover:bg-surface'
             }
           `}
@@ -402,6 +402,10 @@ export default function Sidebar({
         <div
           className="fixed inset-0 bg-black/50 z-20 lg:hidden"
           onClick={onClose}
+          role="button"
+          aria-label="메뉴 닫기"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Escape' && onClose?.()}
         />
       )}
 
@@ -425,7 +429,8 @@ export default function Sidebar({
             <h2 className="text-xl font-bold text-primary-color">BandAuto</h2>
             <button
               onClick={onClose}
-              className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface"
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface"
+              aria-label="메뉴 닫기"
             >
               <X size={20} />
             </button>
@@ -439,26 +444,28 @@ export default function Sidebar({
                 <button
                   onClick={() => onSectionChange('sourcing')}
                   className={`
-                    w-full flex items-center justify-center p-2 rounded-md transition-colors
+                    w-full flex items-center justify-center p-2 min-h-[44px] rounded-md transition-colors
                     ${currentSection === 'sourcing'
                       ? 'bg-primary-light text-primary-color'
                       : 'text-text-secondary hover:text-text-primary hover:bg-surface'
                     }
                   `}
                   title="소싱"
+                  aria-label="소싱 섹션"
                 >
                   <Package size={20} />
                 </button>
                 <button
                   onClick={() => onSectionChange('shop')}
                   className={`
-                    w-full flex items-center justify-center p-2 rounded-md transition-colors
+                    w-full flex items-center justify-center p-2 min-h-[44px] rounded-md transition-colors
                     ${currentSection === 'shop'
                       ? 'bg-primary-light text-primary-color'
                       : 'text-text-secondary hover:text-text-primary hover:bg-surface'
                     }
                   `}
                   title="쇼핑몰"
+                  aria-label="쇼핑몰 섹션"
                 >
                   <ShoppingBag size={20} />
                 </button>
@@ -469,12 +476,13 @@ export default function Sidebar({
                 <button
                   onClick={() => onSectionChange('sourcing')}
                   className={`
-                    flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors
+                    flex-1 flex items-center justify-center gap-2 py-3 px-3 min-h-[44px] rounded-md text-sm font-medium transition-colors
                     ${currentSection === 'sourcing'
                       ? 'bg-primary-light text-primary-color'
                       : 'text-text-secondary hover:text-text-primary hover:bg-surface'
                     }
                   `}
+                  aria-label="소싱 섹션"
                 >
                   <Package size={16} />
                   소싱
@@ -482,12 +490,13 @@ export default function Sidebar({
                 <button
                   onClick={() => onSectionChange('shop')}
                   className={`
-                    flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors
+                    flex-1 flex items-center justify-center gap-2 py-3 px-3 min-h-[44px] rounded-md text-sm font-medium transition-colors
                     ${currentSection === 'shop'
                       ? 'bg-primary-light text-primary-color'
                       : 'text-text-secondary hover:text-text-primary hover:bg-surface'
                     }
                   `}
+                  aria-label="쇼핑몰 섹션"
                 >
                   <ShoppingBag size={16} />
                   쇼핑몰

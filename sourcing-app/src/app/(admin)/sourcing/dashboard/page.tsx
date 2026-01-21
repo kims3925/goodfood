@@ -515,8 +515,8 @@ export default function AutomationDashboardPage() {
     <div className="space-y-6">
       {/* 날짜 필터 + 자동화 상태 (상단, 왼쪽 정렬) */}
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-start gap-3">
-          <div className="flex rounded-xl bg-gray-100 p-1">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-start gap-2 sm:gap-3">
+          <div className="flex rounded-xl bg-gray-100 p-1 overflow-x-auto w-full sm:w-auto">
             {[
               { value: 'today', label: '오늘' },
               { value: '7days', label: '7일' },
@@ -526,7 +526,7 @@ export default function AutomationDashboardPage() {
               <button
                 key={item.value}
                 onClick={() => handlePeriodChange(item.value as PeriodFilter)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                className={`rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all min-h-[40px] sm:min-h-[36px] whitespace-nowrap ${
                   (item.value === 'custom' && isCustomDate) || (!isCustomDate && period === item.value)
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
@@ -538,20 +538,20 @@ export default function AutomationDashboardPage() {
           </div>
           {/* 직접선택 시 날짜 선택기 표시 */}
           {isCustomDate && (
-            <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
-              <Calendar size={16} className="text-gray-400" />
+            <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 w-full sm:w-auto">
+              <Calendar size={16} className="text-gray-400 flex-shrink-0" />
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="bg-transparent text-sm text-gray-700 outline-none w-32"
+                className="bg-transparent text-sm text-gray-700 outline-none w-full sm:w-32 min-h-[36px]"
               />
-              <span className="text-gray-400">~</span>
+              <span className="text-gray-400 flex-shrink-0">~</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="bg-transparent text-sm text-gray-700 outline-none w-32"
+                className="bg-transparent text-sm text-gray-700 outline-none w-full sm:w-32 min-h-[36px]"
               />
             </div>
           )}
@@ -590,12 +590,12 @@ export default function AutomationDashboardPage() {
       {/* 자동화 섹션 */}
       <div className="space-y-6">
       {/* Quick Actions - 수동 실행 */}
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Play size={20} className="text-green-500" />
+      <Card className="p-4 sm:p-6">
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+          <Play size={18} className="sm:w-5 sm:h-5 text-green-500" />
           수동 실행
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
           {/* 게시물 수집 버튼 */}
           {(() => {
             const isThisRunning = runningWorkflow?.type === 'COLLECT'
@@ -604,7 +604,7 @@ export default function AutomationDashboardPage() {
               <button
                 onClick={() => handleExecute('collect')}
                 disabled={isExecuting || isOtherRunning || isCancelling || isThisRunning}
-                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                className={`group relative p-3 sm:p-4 rounded-xl border-2 transition-all ${
                   isThisRunning
                     ? 'border-green-400 bg-green-50'
                     : 'border-gray-200 bg-white hover:border-green-400 hover:shadow-lg'
@@ -618,21 +618,21 @@ export default function AutomationDashboardPage() {
                     </span>
                   </div>
                 )}
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mb-2 sm:mb-3 transition-colors ${
                   isThisRunning
                     ? 'bg-green-500'
                     : 'bg-green-100 group-hover:bg-green-500'
                 }`}>
                   {isThisRunning ? (
-                    <Loader2 size={20} className="text-white animate-spin" />
+                    <Loader2 size={18} className="sm:w-5 sm:h-5 text-white animate-spin" />
                   ) : (
-                    <Package size={20} className="text-green-600 group-hover:text-white transition-colors" />
+                    <Package size={18} className="sm:w-5 sm:h-5 text-green-600 group-hover:text-white transition-colors" />
                   )}
                 </div>
-                <p className={`font-medium text-sm ${isThisRunning ? 'text-green-700' : 'text-gray-900'}`}>
+                <p className={`font-medium text-xs sm:text-sm ${isThisRunning ? 'text-green-700' : 'text-gray-900'}`}>
                   {isThisRunning ? '실행 중' : '게시물 수집'}
                 </p>
-                <p className={`text-xs mt-1 ${isThisRunning ? 'text-green-500' : 'text-gray-500'}`}>
+                <p className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 ${isThisRunning ? 'text-green-500' : 'text-gray-500'}`}>
                   {isThisRunning ? '잠시만 기다려주세요' : '도매채널 게시물 수집'}
                 </p>
               </button>
@@ -647,7 +647,7 @@ export default function AutomationDashboardPage() {
               <button
                 onClick={() => handleExecute('transform')}
                 disabled={isExecuting || isOtherRunning || isCancelling || isThisRunning}
-                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                className={`group relative p-3 sm:p-4 rounded-xl border-2 transition-all ${
                   isThisRunning
                     ? 'border-yellow-400 bg-yellow-50'
                     : 'border-gray-200 bg-white hover:border-yellow-400 hover:shadow-lg'
@@ -661,21 +661,21 @@ export default function AutomationDashboardPage() {
                     </span>
                   </div>
                 )}
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mb-2 sm:mb-3 transition-colors ${
                   isThisRunning
                     ? 'bg-yellow-500'
                     : 'bg-yellow-100 group-hover:bg-yellow-500'
                 }`}>
                   {isThisRunning ? (
-                    <Loader2 size={20} className="text-white animate-spin" />
+                    <Loader2 size={18} className="sm:w-5 sm:h-5 text-white animate-spin" />
                   ) : (
-                    <Zap size={20} className="text-yellow-600 group-hover:text-white transition-colors" />
+                    <Zap size={18} className="sm:w-5 sm:h-5 text-yellow-600 group-hover:text-white transition-colors" />
                   )}
                 </div>
-                <p className={`font-medium text-sm ${isThisRunning ? 'text-yellow-700' : 'text-gray-900'}`}>
+                <p className={`font-medium text-xs sm:text-sm ${isThisRunning ? 'text-yellow-700' : 'text-gray-900'}`}>
                   {isThisRunning ? '실행 중' : 'AI 변환'}
                 </p>
-                <p className={`text-xs mt-1 ${isThisRunning ? 'text-yellow-500' : 'text-gray-500'}`}>
+                <p className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 ${isThisRunning ? 'text-yellow-500' : 'text-gray-500'}`}>
                   {isThisRunning ? '잠시만 기다려주세요' : '상품 정보 생성'}
                 </p>
               </button>
@@ -690,7 +690,7 @@ export default function AutomationDashboardPage() {
               <button
                 onClick={() => handleExecute('register')}
                 disabled={isExecuting || isOtherRunning || isCancelling || isThisRunning}
-                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                className={`group relative p-3 sm:p-4 rounded-xl border-2 transition-all ${
                   isThisRunning
                     ? 'border-orange-400 bg-orange-50'
                     : 'border-gray-200 bg-white hover:border-orange-400 hover:shadow-lg'
@@ -704,21 +704,21 @@ export default function AutomationDashboardPage() {
                     </span>
                   </div>
                 )}
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mb-2 sm:mb-3 transition-colors ${
                   isThisRunning
                     ? 'bg-orange-500'
                     : 'bg-orange-100 group-hover:bg-orange-500'
                 }`}>
                   {isThisRunning ? (
-                    <Loader2 size={20} className="text-white animate-spin" />
+                    <Loader2 size={18} className="sm:w-5 sm:h-5 text-white animate-spin" />
                   ) : (
-                    <ShoppingBag size={20} className="text-orange-600 group-hover:text-white transition-colors" />
+                    <ShoppingBag size={18} className="sm:w-5 sm:h-5 text-orange-600 group-hover:text-white transition-colors" />
                   )}
                 </div>
-                <p className={`font-medium text-sm ${isThisRunning ? 'text-orange-700' : 'text-gray-900'}`}>
+                <p className={`font-medium text-xs sm:text-sm ${isThisRunning ? 'text-orange-700' : 'text-gray-900'}`}>
                   {isThisRunning ? '실행 중' : '상품 등록'}
                 </p>
-                <p className={`text-xs mt-1 ${isThisRunning ? 'text-orange-500' : 'text-gray-500'}`}>
+                <p className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 ${isThisRunning ? 'text-orange-500' : 'text-gray-500'}`}>
                   {isThisRunning ? '잠시만 기다려주세요' : 'Product 생성'}
                 </p>
               </button>
@@ -733,7 +733,7 @@ export default function AutomationDashboardPage() {
               <button
                 onClick={() => handleExecute('publish')}
                 disabled={isExecuting || isOtherRunning || isCancelling || isThisRunning}
-                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                className={`group relative p-3 sm:p-4 rounded-xl border-2 transition-all ${
                   isThisRunning
                     ? 'border-blue-400 bg-blue-50'
                     : 'border-gray-200 bg-white hover:border-blue-400 hover:shadow-lg'
@@ -747,21 +747,21 @@ export default function AutomationDashboardPage() {
                     </span>
                   </div>
                 )}
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mb-2 sm:mb-3 transition-colors ${
                   isThisRunning
                     ? 'bg-blue-500'
                     : 'bg-blue-100 group-hover:bg-blue-500'
                 }`}>
                   {isThisRunning ? (
-                    <Loader2 size={20} className="text-white animate-spin" />
+                    <Loader2 size={18} className="sm:w-5 sm:h-5 text-white animate-spin" />
                   ) : (
-                    <Upload size={20} className="text-blue-600 group-hover:text-white transition-colors" />
+                    <Upload size={18} className="sm:w-5 sm:h-5 text-blue-600 group-hover:text-white transition-colors" />
                   )}
                 </div>
-                <p className={`font-medium text-sm ${isThisRunning ? 'text-blue-700' : 'text-gray-900'}`}>
+                <p className={`font-medium text-xs sm:text-sm ${isThisRunning ? 'text-blue-700' : 'text-gray-900'}`}>
                   {isThisRunning ? '실행 중' : '발행'}
                 </p>
-                <p className={`text-xs mt-1 ${isThisRunning ? 'text-blue-500' : 'text-gray-500'}`}>
+                <p className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 ${isThisRunning ? 'text-blue-500' : 'text-gray-500'}`}>
                   {isThisRunning ? '잠시만 기다려주세요' : '소매밴드 발행'}
                 </p>
               </button>
@@ -776,7 +776,7 @@ export default function AutomationDashboardPage() {
               <button
                 onClick={() => handleExecute('full')}
                 disabled={isExecuting || isOtherRunning || isCancelling || isThisRunning}
-                className={`group relative p-4 rounded-xl border-2 transition-all ${
+                className={`group relative p-3 sm:p-4 rounded-xl border-2 transition-all ${
                   isThisRunning
                     ? 'border-purple-400 bg-purple-50'
                     : 'border-purple-200 bg-gradient-to-br from-purple-50 to-white hover:border-purple-400 hover:shadow-lg'
@@ -790,21 +790,21 @@ export default function AutomationDashboardPage() {
                     </span>
                   </div>
                 )}
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mb-2 sm:mb-3 transition-colors ${
                   isThisRunning
                     ? 'bg-purple-500'
                     : 'bg-purple-100 group-hover:bg-purple-500'
                 }`}>
                   {isThisRunning ? (
-                    <Loader2 size={20} className="text-white animate-spin" />
+                    <Loader2 size={18} className="sm:w-5 sm:h-5 text-white animate-spin" />
                   ) : (
-                    <Play size={20} className="text-purple-600 group-hover:text-white transition-colors" />
+                    <Play size={18} className="sm:w-5 sm:h-5 text-purple-600 group-hover:text-white transition-colors" />
                   )}
                 </div>
-                <p className={`font-medium text-sm ${isThisRunning ? 'text-purple-700' : 'text-gray-900'}`}>
+                <p className={`font-medium text-xs sm:text-sm ${isThisRunning ? 'text-purple-700' : 'text-gray-900'}`}>
                   {isThisRunning ? '실행 중' : '전체 실행'}
                 </p>
-                <p className={`text-xs mt-1 ${isThisRunning ? 'text-purple-500' : 'text-gray-500'}`}>
+                <p className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 ${isThisRunning ? 'text-purple-500' : 'text-gray-500'}`}>
                   {isThisRunning ? '잠시만 기다려주세요' : '전체 파이프라인'}
                 </p>
               </button>
@@ -814,56 +814,65 @@ export default function AutomationDashboardPage() {
       </Card>
 
       {/* 자동화 상태 바 */}
-      <div className="flex items-center justify-start">
-        <div className={`inline-flex items-center gap-3 px-4 py-2.5 rounded-xl border ${
+      <div className="flex items-start sm:items-center justify-start">
+        <div className={`flex flex-col sm:flex-row sm:inline-flex items-start sm:items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 rounded-xl border w-full sm:w-auto ${
           config?.isEnabled
             ? 'bg-green-50 border-green-200'
             : 'bg-gray-50 border-gray-200'
         }`}>
-          {/* 상태 아이콘 */}
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-            config?.isEnabled
-              ? 'bg-green-500'
-              : 'bg-gray-300'
-          }`}>
-            {config?.isEnabled ? (
-              <Activity size={16} className="text-white" />
-            ) : (
-              <Pause size={16} className="text-white" />
-            )}
-          </div>
-
-          {/* 상태 텍스트 */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-900">자동화</span>
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            {/* 상태 아이콘 */}
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
               config?.isEnabled
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-200 text-gray-500'
+                ? 'bg-green-500'
+                : 'bg-gray-300'
             }`}>
-              {config?.isEnabled ? '활성' : '비활성'}
-            </span>
+              {config?.isEnabled ? (
+                <Activity size={16} className="text-white" />
+              ) : (
+                <Pause size={16} className="text-white" />
+              )}
+            </div>
+
+            {/* 상태 텍스트 */}
+            <div className="flex items-center gap-2 flex-1">
+              <span className="text-sm font-medium text-gray-900">자동화</span>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                config?.isEnabled
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-gray-200 text-gray-500'
+              }`}>
+                {config?.isEnabled ? '활성' : '비활성'}
+              </span>
+            </div>
+
+            {/* 설정 버튼 - 모바일에서 오른쪽 끝 */}
+            <Link href="/automation/settings" className="sm:hidden">
+              <button className="p-2 rounded-lg hover:bg-gray-200/50 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+                <Settings size={18} className="text-gray-500" />
+              </button>
+            </Link>
           </div>
 
-          {/* 다음 실행 정보 (활성화 시) */}
+          {/* 다음 실행 정보 (활성화 시) - 모바일에서 별도 줄 */}
           {config?.isEnabled && config?.selectedHours && config.selectedHours.length > 0 && (
-            <>
-              <span className="text-gray-300">|</span>
-              <div className="flex items-center gap-1.5 text-sm">
+            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto pl-10 sm:pl-0 text-sm">
+              <span className="hidden sm:inline text-gray-300">|</span>
+              <div className="flex items-center gap-1.5">
                 <Clock size={14} className="text-green-500" />
-                <span className="text-gray-600">다음</span>
+                <span className="text-gray-600 hidden sm:inline">다음</span>
                 <span className="font-semibold text-green-600">{calculateNextExecution(config.selectedHours).nextTime}</span>
                 <span className="text-gray-400 text-xs">({countdown || '계산 중...'})</span>
               </div>
-              <span className="text-gray-300">|</span>
+              <span className="hidden sm:inline text-gray-300">|</span>
               <span className="text-xs text-gray-500">
-                하루 <span className="font-medium text-gray-700">{config.selectedHours.length}</span>회
+                <span className="font-medium text-gray-700">{config.selectedHours.length}</span>회/일
               </span>
-            </>
+            </div>
           )}
 
-          {/* 설정 버튼 */}
-          <Link href="/automation/settings">
+          {/* 설정 버튼 - 데스크톱 */}
+          <Link href="/automation/settings" className="hidden sm:block">
             <button className="p-1.5 rounded-lg hover:bg-gray-200/50 transition-colors">
               <Settings size={16} className="text-gray-500" />
             </button>
@@ -1182,7 +1191,7 @@ export default function AutomationDashboardPage() {
           {runningWorkflow.type === 'FULL_PIPELINE' && (
             <div className="space-y-4">
               {/* 4단계 카드 그리드 */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                 {/* 1. 수집 */}
                 <div className={`rounded-xl border-2 transition-all overflow-hidden ${
                   runningWorkflow.stageProgress?.collection?.completed
