@@ -126,15 +126,15 @@ export default function ManagerListPage() {
         </div>
 
         {/* 통계 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <UserCog size={24} className="text-blue-600" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-3 sm:gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+                <UserCog size={20} className="sm:w-6 sm:h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">전체 매니저</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
+                <p className="text-xs sm:text-sm text-gray-500">전체 매니저</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-600">{stats.total}</p>
               </div>
             </div>
           </div>

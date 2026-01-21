@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { Download, Sparkles, ShoppingBag, Upload, X, Check, Loader2, AlertCircle, Clock } from 'lucide-react'
 
 // WorkflowStepLog 기반 단계 진행 정보

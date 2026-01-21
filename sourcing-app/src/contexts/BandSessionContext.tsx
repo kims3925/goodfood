@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 
 interface ChannelSessionStatus {
   id: number
@@ -106,14 +106,17 @@ export function BandSessionProvider({ children }: { children: React.ReactNode })
   // 세션이 정상인지 여부
   const isSessionHealthy = state.summary?.allValid ?? false
 
+  const contextValue = useMemo(
+    () => ({
+      ...state,
+      checkSession,
+      isSessionHealthy,
+    }),
+    [state, checkSession, isSessionHealthy]
+  )
+
   return (
-    <BandSessionContext.Provider
-      value={{
-        ...state,
-        checkSession,
-        isSessionHealthy,
-      }}
-    >
+    <BandSessionContext.Provider value={contextValue}>
       {children}
     </BandSessionContext.Provider>
   )

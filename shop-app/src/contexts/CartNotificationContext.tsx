@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo, ReactNode } from 'react'
 import { useShopUrl } from '@/hooks/useShopUrl'
 
 interface NotificationProduct {
@@ -35,7 +35,7 @@ export function CartNotificationProvider({ children }: { children: ReactNode }) 
   const { getApiPath } = useShopUrl()
   const [isVisible, setIsVisible] = useState(false)
   const [product, setProduct] = useState<NotificationProduct | null>(null)
-  const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [cartCount, setCartCount] = useState(0)
   const apiPathRef = useRef(getApiPath)
 
@@ -83,32 +83,35 @@ export function CartNotificationProvider({ children }: { children: ReactNode }) 
 
   const showNotification = useCallback((productInfo: NotificationProduct) => {
     // 기존 타이머가 있으면 제거
-    if (timeoutId) {
-      clearTimeout(timeoutId)
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
     }
 
     setProduct(productInfo)
     setIsVisible(true)
 
     // 3초 후 자동으로 숨기기
-    const newTimeoutId = setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       setIsVisible(false)
       setProduct(null)
     }, 3000)
-
-    setTimeoutId(newTimeoutId)
-  }, [timeoutId])
+  }, [])
 
   const hideNotification = useCallback(() => {
-    if (timeoutId) {
-      clearTimeout(timeoutId)
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
     }
     setIsVisible(false)
     setProduct(null)
-  }, [timeoutId])
+  }, [])
+
+  const contextValue = useMemo(
+    () => ({ isVisible, product, cartCount, showNotification, hideNotification, refreshCartCount }),
+    [isVisible, product, cartCount, showNotification, hideNotification, refreshCartCount]
+  )
 
   return (
-    <CartNotificationContext.Provider value={{ isVisible, product, cartCount, showNotification, hideNotification, refreshCartCount }}>
+    <CartNotificationContext.Provider value={contextValue}>
       {children}
     </CartNotificationContext.Provider>
   )

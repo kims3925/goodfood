@@ -480,7 +480,8 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
           <div className="flex items-center">
             <button
               onClick={onMenuClick}
-              className="p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface lg:hidden"
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface lg:hidden"
+              aria-label="메뉴 열기"
             >
               <Menu size={24} />
             </button>
@@ -492,8 +493,43 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
           </div>
 
           {/* Center - Real-time Stats */}
+          {/* Desktop: 전체 통계 */}
           <div className="hidden md:flex items-center gap-6">
             {renderStats()}
+          </div>
+          {/* Mobile: 간소화된 통계 (sm 이상 ~ md 미만) */}
+          <div className="hidden sm:flex md:hidden items-center gap-3">
+            {currentSection === 'sourcing' ? (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <Package size={14} className="text-green-600" />
+                  <span className="text-xs text-text-secondary">
+                    <span className="font-semibold text-text-primary">{sourcingStats.todayCollected}</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Zap size={14} className="text-yellow-600" />
+                  <span className="text-xs text-text-secondary">
+                    <span className="font-semibold text-text-primary">{sourcingStats.pendingAI}</span>
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <ClipboardList size={14} className="text-blue-600" />
+                  <span className="text-xs text-text-secondary">
+                    <span className="font-semibold text-text-primary">{shopStats.pendingOrders}</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Truck size={14} className="text-green-600" />
+                  <span className="text-xs text-text-secondary">
+                    <span className="font-semibold text-text-primary">{shopStats.shippingToday}</span>
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Right side */}
@@ -505,7 +541,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
             <div className="relative" ref={notificationRef}>
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface relative"
+                className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface relative"
               >
                 <Bell size={20} />
                 {unreadCount > 0 && (
@@ -516,7 +552,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
               </button>
 
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-border z-[9999]">
+                <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-[384px] bg-white rounded-lg shadow-xl border border-border z-[9999]">
                   <div className="p-3 border-b border-divider flex items-center justify-between">
                     <h3 className="font-semibold text-text-primary">알림</h3>
                     <div className="flex items-center gap-2">
@@ -599,7 +635,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-2 p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface"
+                  className="flex items-center justify-center gap-2 p-2 min-w-[44px] min-h-[44px] rounded-md text-text-secondary hover:text-text-primary hover:bg-surface"
                 >
                   <div className="w-8 h-8 rounded-full bg-primary-color flex items-center justify-center text-white font-semibold">
                     {user.name?.charAt(0) || user.email?.charAt(0) || 'U'}
@@ -607,7 +643,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
                 </button>
 
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-border">
+                  <div className="absolute right-0 mt-2 w-48 sm:w-56 bg-white rounded-lg shadow-lg border border-border">
                     <div className="p-4 border-b border-divider">
                       <p className="text-sm font-semibold text-text-primary">{user.name || '사용자'}</p>
                       <p className="text-xs text-text-secondary truncate">{user.email}</p>

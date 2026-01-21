@@ -437,37 +437,37 @@ export default function SettlementListPage() {
         </div>
 
         {/* 통계 및 액션 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <ShoppingBag size={24} className="text-blue-600" />
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+                <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
               </div>
-              <div>
-                <p className="text-sm text-gray-500">총 주문</p>
-                <p className="text-2xl font-bold text-gray-900">{data?.summary.totalItems || 0}건</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <DollarSign size={24} className="text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">총 매출</p>
-                <p className="text-2xl font-bold text-green-600">{formatPrice(data?.summary.totalAmount || 0)}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-500">총 주문</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{data?.summary.totalItems || 0}건</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Store size={24} className="text-purple-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+                <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
               </div>
-              <div>
-                <p className="text-sm text-gray-500">쇼핑몰</p>
-                <p className="text-2xl font-bold text-purple-600">{data?.summary.shopCount || 0}개</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-500">총 매출</p>
+                <p className="text-lg sm:text-2xl font-bold text-green-600 truncate">{formatPrice(data?.summary.totalAmount || 0)}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-purple-100 rounded-lg">
+                <Store className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-500">쇼핑몰</p>
+                <p className="text-xl sm:text-2xl font-bold text-purple-600 truncate">{data?.summary.shopCount || 0}개</p>
               </div>
             </div>
           </div>
@@ -475,15 +475,15 @@ export default function SettlementListPage() {
           <button
             onClick={fetchData}
             disabled={loading}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-gray-300 hover:bg-gray-50 transition-colors cursor-pointer text-left disabled:opacity-50"
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:border-gray-300 hover:bg-gray-50 transition-colors cursor-pointer text-left disabled:opacity-50 min-h-[44px]"
           >
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <RefreshCw size={24} className={`text-gray-600 ${loading ? 'animate-spin' : ''}`} />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-gray-100 rounded-lg">
+                <RefreshCw className={`w-5 h-5 sm:w-6 sm:h-6 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
               </div>
-              <div>
-                <p className="text-sm text-gray-500">데이터</p>
-                <p className="text-lg font-bold text-gray-600">새로고침</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-500">데이터</p>
+                <p className="text-base sm:text-lg font-bold text-gray-600">새로고침</p>
               </div>
             </div>
           </button>
@@ -492,21 +492,21 @@ export default function SettlementListPage() {
         {/* 토스페이먼츠 결제 현황 */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg mb-6 overflow-hidden">
           <div className="p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white/20 rounded-lg">
                   <CreditCard size={24} className="text-white" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white">토스페이먼츠 결제 현황</h2>
-                  <p className="text-blue-100 text-sm">PG사 연동 실시간 데이터</p>
+                  <h2 className="text-lg sm:text-xl font-bold text-white">토스페이먼츠 결제 현황</h2>
+                  <p className="text-blue-100 text-xs sm:text-sm">PG사 연동 실시간 데이터</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
-                  className="px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50"
+                  className="px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] sm:min-h-0"
                 >
                   {Array.from({ length: 3 }, (_, i) => new Date().getFullYear() - 1 + i).map((y) => (
                     <option key={y} value={y} className="text-gray-900">{y}년</option>
@@ -515,7 +515,7 @@ export default function SettlementListPage() {
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
-                  className="px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50"
+                  className="px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50 min-h-[44px] sm:min-h-0"
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
                     <option key={m} value={m} className="text-gray-900">{m}월</option>
@@ -524,7 +524,7 @@ export default function SettlementListPage() {
                 <button
                   onClick={() => fetchTossTransactions()}
                   disabled={tossLoading}
-                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                  className="p-2.5 sm:p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"
                 >
                   <RefreshCw size={20} className={`text-white ${tossLoading ? 'animate-spin' : ''}`} />
                 </button>
@@ -535,7 +535,7 @@ export default function SettlementListPage() {
                       href={tossDashboardUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                      className="p-2.5 sm:p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"
                       title="토스페이먼츠 대시보드"
                     >
                       <ExternalLink size={20} className="text-white" />
@@ -557,68 +557,63 @@ export default function SettlementListPage() {
                 </div>
               </div>
             ) : tossData ? (
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4">
                 {/* 총 결제 금액 */}
-                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+                <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <DollarSign size={18} className="text-green-300" />
-                    <span className="text-blue-100 text-sm">총 결제</span>
+                    <DollarSign className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-green-300" />
+                    <span className="text-blue-100 text-xs sm:text-sm">총 결제</span>
                   </div>
-                  <p className="text-2xl font-bold text-white">
-                    {tossData.summary.totalAmount.toLocaleString()}
-                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
+                  <p className="text-lg sm:text-2xl font-bold text-white whitespace-nowrap truncate">
+                    {tossData.summary.totalAmount.toLocaleString()}원
                   </p>
                   <p className="text-blue-200 text-xs mt-1">{tossData.summary.totalCount}건</p>
                 </div>
 
                 {/* 간편결제 */}
-                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+                <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Wallet size={18} className="text-cyan-300" />
-                    <span className="text-blue-100 text-sm">간편결제</span>
+                    <Wallet className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-cyan-300" />
+                    <span className="text-blue-100 text-xs sm:text-sm">간편결제</span>
                   </div>
-                  <p className="text-2xl font-bold text-white">
-                    {tossData.summary.easyPayAmount.toLocaleString()}
-                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
+                  <p className="text-lg sm:text-2xl font-bold text-white whitespace-nowrap truncate">
+                    {tossData.summary.easyPayAmount.toLocaleString()}원
                   </p>
                   <p className="text-blue-200 text-xs mt-1">{tossData.summary.easyPayCount}건</p>
                 </div>
 
                 {/* 카드 결제 */}
-                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+                <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <CreditCard size={18} className="text-purple-300" />
-                    <span className="text-blue-100 text-sm">카드</span>
+                    <CreditCard className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-purple-300" />
+                    <span className="text-blue-100 text-xs sm:text-sm">카드</span>
                   </div>
-                  <p className="text-2xl font-bold text-white">
-                    {tossData.summary.cardAmount.toLocaleString()}
-                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
+                  <p className="text-lg sm:text-2xl font-bold text-white whitespace-nowrap truncate">
+                    {tossData.summary.cardAmount.toLocaleString()}원
                   </p>
                   <p className="text-blue-200 text-xs mt-1">{tossData.summary.cardCount}건</p>
                 </div>
 
                 {/* 취소 */}
-                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+                <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <XCircle size={18} className="text-red-300" />
-                    <span className="text-blue-100 text-sm">취소</span>
+                    <XCircle className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-red-300" />
+                    <span className="text-blue-100 text-xs sm:text-sm">취소</span>
                   </div>
-                  <p className="text-2xl font-bold text-white">
-                    {tossData.summary.canceledAmount.toLocaleString()}
-                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
+                  <p className="text-lg sm:text-2xl font-bold text-white whitespace-nowrap truncate">
+                    {tossData.summary.canceledAmount.toLocaleString()}원
                   </p>
                   <p className="text-blue-200 text-xs mt-1">{tossData.summary.canceledCount}건</p>
                 </div>
 
                 {/* 매출 (총 결제 - 취소) */}
-                <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+                <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp size={18} className="text-yellow-300" />
-                    <span className="text-blue-100 text-sm">매출</span>
+                    <TrendingUp className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-yellow-300" />
+                    <span className="text-blue-100 text-xs sm:text-sm">매출</span>
                   </div>
-                  <p className="text-2xl font-bold text-white">
-                    {(tossData.summary.totalAmount - tossData.summary.canceledAmount).toLocaleString()}
-                    <span className="text-sm font-normal text-blue-200 ml-1">원</span>
+                  <p className="text-lg sm:text-2xl font-bold text-white whitespace-nowrap truncate">
+                    {(tossData.summary.totalAmount - tossData.summary.canceledAmount).toLocaleString()}원
                   </p>
                   <p className="text-blue-200 text-xs mt-1">{tossData.summary.totalCount - tossData.summary.canceledCount}건</p>
                 </div>
@@ -629,22 +624,24 @@ export default function SettlementListPage() {
 
         {/* 필터 영역 */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 p-4">
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             <div className="flex items-center gap-2">
-              <Calendar size={16} className="text-gray-400" />
+              <Calendar size={16} className="text-gray-400 flex-shrink-0" />
               <span className="text-sm text-gray-500">기간:</span>
+            </div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2 flex-1">
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2.5 sm:py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px] sm:min-h-0"
               />
-              <span className="text-gray-400">~</span>
+              <span className="text-gray-400 text-center hidden sm:block">~</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2.5 sm:py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px] sm:min-h-0"
               />
             </div>
             {(startDate || endDate) && (
@@ -653,7 +650,7 @@ export default function SettlementListPage() {
                   setStartDate('')
                   setEndDate('')
                 }}
-                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                className="text-sm text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1 px-3 py-2 hover:bg-gray-100 rounded-lg transition-colors min-h-[44px] sm:min-h-0"
               >
                 <X size={14} />
                 필터 초기화
@@ -720,8 +717,92 @@ export default function SettlementListPage() {
                   </div>
                 </div>
 
-                {/* 주문 목록 */}
-                <div className="overflow-x-auto">
+                {/* 주문 목록 - 모바일 카드 뷰 */}
+                <div className="lg:hidden p-3 space-y-3">
+                  {selectedShop.items.map((item) => {
+                    const paymentInfo = getPaymentStatusInfo(item.paymentMethod, item.paymentStatus)
+                    const PaymentIcon = paymentInfo.icon
+                    return (
+                      <div
+                        key={item.id}
+                        className={`rounded-lg border p-3 ${item.isSettled ? 'bg-green-50/50 border-green-200' : 'bg-white border-gray-200'}`}
+                      >
+                        {/* 상단: 주문번호 + 정산상태 */}
+                        <div className="flex items-center justify-between mb-2">
+                          {item.orderId ? (
+                            <a
+                              href={`/shop/order/detail/${item.orderNumber}?source=SHOPPING_MALL`}
+                              className="text-blue-600 hover:text-blue-800 text-sm font-mono flex items-center gap-1"
+                            >
+                              {item.orderNumber}
+                              <ExternalLink size={12} />
+                            </a>
+                          ) : (
+                            <span className="text-sm font-mono text-gray-900">{item.orderNumber}</span>
+                          )}
+                          {item.isSettled ? (
+                            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">완료</span>
+                          ) : (
+                            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-700">미정산</span>
+                          )}
+                        </div>
+
+                        {/* 상품 정보 */}
+                        <div className="flex items-start gap-2 mb-2">
+                          {item.thumbnailUrl ? (
+                            <img src={item.thumbnailUrl} alt={item.productName} className="w-12 h-12 rounded object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                              <Package size={16} className="text-gray-400" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 line-clamp-2">{item.productName}</p>
+                            <p className="text-xs text-gray-500">{item.customerName} · {item.quantity}개</p>
+                          </div>
+                        </div>
+
+                        {/* 배지들 */}
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${paymentInfo.bgColor} ${paymentInfo.textColor}`}>
+                            <PaymentIcon size={10} />
+                            {paymentInfo.label}
+                          </span>
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                            item.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
+                            item.status === 'SHIPPED' ? 'bg-blue-100 text-blue-700' :
+                            item.status === 'PAID' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {item.status === 'DELIVERED' ? '배송완료' :
+                              item.status === 'SHIPPED' ? '배송중' :
+                              item.status === 'PAID' ? '결제완료' :
+                              item.status === 'PENDING' ? '대기중' : item.status}
+                          </span>
+                          {item.marginRate !== null && (
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                              item.marginRate >= 30 ? 'bg-green-100 text-green-600' :
+                              item.marginRate >= 15 ? 'bg-blue-100 text-blue-600' :
+                              item.marginRate >= 0 ? 'bg-orange-100 text-orange-600' :
+                              'bg-red-100 text-red-600'
+                            }`}>
+                              마진 {item.marginRate}%
+                            </span>
+                          )}
+                        </div>
+
+                        {/* 하단: 금액 + 날짜 */}
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                          <span className="text-xs text-gray-500">{formatDate(item.orderedAt)}</span>
+                          <span className="font-bold text-gray-900">{formatPrice(item.totalPrice)}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* 주문 목록 - 데스크탑 테이블 뷰 */}
+                <div className="hidden lg:block overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>

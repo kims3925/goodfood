@@ -253,17 +253,18 @@ function ChannelListContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* 헤더 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">채널 관리</h1>
-          <p className="text-gray-600">
+        <div className="mb-4 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">채널 관리</h1>
+          <p className="text-sm sm:text-base text-gray-600">
             소싱(도매) 채널과 판매(소매) 채널을 통합 관리합니다.
           </p>
         </div>
 
-        {/* 통계 및 액션 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+        {/* 통계 및 액션 카드 - PC: 6열, 모바일: 2열 */}
+        {/* PC 버전 */}
+        <div className="hidden md:grid md:grid-cols-6 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-gray-100 rounded-lg">
@@ -347,15 +348,63 @@ function ChannelListContent() {
           </button>
         </div>
 
+        {/* 모바일 버전 - 통계 카드만 2열 */}
+        <div className="md:hidden grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-gray-100 rounded-lg">
+                <Globe size={20} className="text-gray-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">전체</p>
+                <p className="text-xl font-bold text-gray-900">{totalItems}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Boxes size={20} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">도매</p>
+                <p className="text-xl font-bold text-blue-600">{wholesaleCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <ShoppingCart size={20} className="text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">소매</p>
+                <p className="text-xl font-bold text-green-600">{retailCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Store size={20} className="text-purple-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">활성</p>
+                <p className="text-xl font-bold text-purple-600">{activeCount}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* 컨트롤 영역 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-20 md:mb-6">
+          <div className="p-3 md:p-4 border-b border-gray-200">
+            <div className="flex flex-col md:flex-row gap-3 md:gap-4 items-stretch md:items-center justify-between">
               {/* 왼쪽: 도매/소매 필터 */}
               <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                 <button
                   onClick={() => { setSelectedKind('ALL'); setCurrentPage(1) }}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-2.5 md:px-3 py-2 min-h-[40px] md:min-h-[36px] rounded-md text-xs md:text-sm font-medium transition-colors ${
                     selectedKind === 'ALL'
                       ? 'bg-white shadow-sm text-gray-900'
                       : 'text-gray-600 hover:text-gray-900'
@@ -365,7 +414,7 @@ function ChannelListContent() {
                 </button>
                 <button
                   onClick={() => { setSelectedKind('WHOLESALE'); setCurrentPage(1) }}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  className={`px-2.5 md:px-3 py-2 min-h-[40px] md:min-h-[36px] rounded-md text-xs md:text-sm font-medium transition-colors flex items-center gap-1 ${
                     selectedKind === 'WHOLESALE'
                       ? 'bg-white shadow-sm text-blue-600'
                       : 'text-gray-600 hover:text-gray-900'
@@ -376,7 +425,7 @@ function ChannelListContent() {
                 </button>
                 <button
                   onClick={() => { setSelectedKind('RETAIL'); setCurrentPage(1) }}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  className={`px-2.5 md:px-3 py-2 min-h-[40px] md:min-h-[36px] rounded-md text-xs md:text-sm font-medium transition-colors flex items-center gap-1 ${
                     selectedKind === 'RETAIL'
                       ? 'bg-white shadow-sm text-green-600'
                       : 'text-gray-600 hover:text-gray-900'
@@ -388,129 +437,215 @@ function ChannelListContent() {
               </div>
 
               {/* 검색창 */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <div className="relative w-full md:w-auto">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                 <Input
                   type="text"
                   placeholder="채널명으로 검색..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64"
+                  className="pl-10 w-full md:w-64 min-h-[44px] md:min-h-[40px]"
                 />
               </div>
             </div>
           </div>
 
-          {/* 테이블 */}
+          {/* 테이블/카드 뷰 */}
           {isLoading ? (
             <div className="p-12">
               <Loading />
             </div>
+          ) : channels.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              등록된 채널이 없습니다.
+            </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[4%]">
-                    <input
-                      type="checkbox"
-                      checked={selectAll}
-                      onChange={handleToggleSelectAll}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </TableHead>
-                  <TableHead className="w-[5%]">순서</TableHead>
-                  <TableHead className="w-[26%]">채널명</TableHead>
-                  <TableHead className="w-[12%]">플랫폼</TableHead>
-                  <TableHead className="w-[12%]">유형</TableHead>
-                  <TableHead className="w-[8%]">상태</TableHead>
-                  <TableHead className="w-[16%]">생성일</TableHead>
-                  <TableHead className="w-[16%]">수정일</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {channels.length === 0 ? (
-                  <TableEmpty message="등록된 채널이 없습니다." />
-                ) : (
-                  channels.map((channel, index) => (
-                    <TableRow
-                      key={channel.id}
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/channel/detail/${channel.id}`)}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+            <>
+              {/* 데스크탑: 테이블 뷰 */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[4%]">
+                        <input
+                          type="checkbox"
+                          checked={selectAll}
+                          onChange={handleToggleSelectAll}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </TableHead>
+                      <TableHead className="w-[5%]">순서</TableHead>
+                      <TableHead className="w-[26%]">채널명</TableHead>
+                      <TableHead className="w-[12%]">플랫폼</TableHead>
+                      <TableHead className="w-[12%]">유형</TableHead>
+                      <TableHead className="w-[8%]">상태</TableHead>
+                      <TableHead className="w-[16%]">생성일</TableHead>
+                      <TableHead className="w-[16%]">수정일</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {channels.map((channel, index) => (
+                      <TableRow
+                        key={channel.id}
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => router.push(`/channel/detail/${channel.id}`)}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(channel.id)}
+                            onChange={() => handleToggleSelection(channel.id)}
+                            className="w-4 h-4 cursor-pointer"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-gray-500 text-sm">
+                            {(currentPage - 1) * itemsPerPage + index + 1}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            {channel.coverUrl ? (
+                              <img
+                                src={channel.coverUrl}
+                                alt={channel.name}
+                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                <Store size={20} className="text-gray-400" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-gray-900">{channel.name}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-gray-600">{getPlatformLabel(channel.platform)}</span>
+                        </TableCell>
+                        <TableCell>{getKindBadge(channel.kind)}</TableCell>
+                        <TableCell>{getStatusBadge(channel.isActive)}</TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-600">
+                            {formatDateTimeKST(channel.createdAt)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-600">
+                            {formatDateTimeKST(channel.updatedAt)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* 모바일: 카드 뷰 */}
+              <div className="md:hidden divide-y divide-gray-100">
+                {/* 모바일 전체 선택 */}
+                <label className="px-4 py-3 bg-gray-50 flex items-center gap-3 cursor-pointer min-h-[48px]">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={handleToggleSelectAll}
+                    className="w-5 h-5 cursor-pointer rounded border-gray-300"
+                  />
+                  <span className="text-sm text-gray-600 flex-1">
+                    {selectAll ? '전체 해제' : '전체 선택'}
+                  </span>
+                  {selectedIds.length > 0 && (
+                    <span className="text-sm font-medium text-blue-600">
+                      {selectedIds.length}개 선택
+                    </span>
+                  )}
+                </label>
+                {channels.map((channel, index) => (
+                  <div
+                    key={channel.id}
+                    className={`p-4 hover:bg-gray-50 active:bg-gray-100 transition-colors ${
+                      selectedIds.includes(channel.id) ? 'bg-blue-50' : ''
+                    }`}
+                    onClick={() => router.push(`/channel/detail/${channel.id}`)}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* 체크박스 */}
+                      <div
+                        className="flex items-center justify-center min-w-[32px] min-h-[32px] -ml-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(channel.id)}
                           onChange={() => handleToggleSelection(channel.id)}
-                          className="w-4 h-4 cursor-pointer"
+                          className="w-5 h-5 cursor-pointer rounded border-gray-300"
                         />
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-gray-500 text-sm">
-                          {(currentPage - 1) * itemsPerPage + index + 1}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          {channel.coverUrl ? (
-                            <img
-                              src={channel.coverUrl}
-                              alt={channel.name}
-                              className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                              <Store size={20} className="text-gray-400" />
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-gray-900">{channel.name}</div>
-                          </div>
+                      </div>
+
+                      {/* 이미지 */}
+                      {channel.coverUrl ? (
+                        <img
+                          src={channel.coverUrl}
+                          alt={channel.name}
+                          className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                          <Store size={24} className="text-gray-400" />
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-gray-600">{getPlatformLabel(channel.platform)}</span>
-                      </TableCell>
-                      <TableCell>{getKindBadge(channel.kind)}</TableCell>
-                      <TableCell>{getStatusBadge(channel.isActive)}</TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {formatDateTimeKST(channel.createdAt)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {formatDateTimeKST(channel.updatedAt)}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      )}
+
+                      {/* 정보 */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-gray-900 truncate">{channel.name}</span>
+                          {getStatusBadge(channel.isActive)}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {getKindBadge(channel.kind)}
+                          <span className="text-xs text-gray-500">{getPlatformLabel(channel.platform)}</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {formatDateTimeKST(channel.createdAt).split(' ')[0]}
+                        </p>
+                      </div>
+
+                      {/* 순서 */}
+                      <span className="text-xs text-gray-400 flex-shrink-0">
+                        #{(currentPage - 1) * itemsPerPage + index + 1}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-              <p className="text-sm text-gray-600">
-                총 {totalItems}개 중 {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalItems)}개
+            <div className="flex items-center justify-between px-3 md:px-4 py-3 border-t border-gray-200">
+              <p className="text-xs md:text-sm text-gray-600">
+                <span className="hidden md:inline">총 {totalItems}개 중 </span>
+                {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalItems)}
+                <span className="md:hidden">/{totalItems}</span>
+                <span className="hidden md:inline">개</span>
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 md:gap-2">
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-1.5 md:p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronLeft size={18} />
                 </button>
-                <span className="text-sm text-gray-600">
+                <span className="text-xs md:text-sm text-gray-600 min-w-[60px] text-center">
                   {currentPage} / {totalPages}
                 </span>
                 <button
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-1.5 md:p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronRight size={18} />
                 </button>
@@ -518,6 +653,26 @@ function ChannelListContent() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* 모바일 하단 플로팅 액션 버튼 */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 flex gap-2 z-50">
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-lg font-medium active:bg-blue-700 transition-colors"
+        >
+          <Plus size={20} />
+          채널 등록
+        </button>
+        {selectedIds.length > 0 && (
+          <button
+            onClick={handleDeleteSelected}
+            className="flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-3 rounded-lg font-medium active:bg-red-700 transition-colors"
+          >
+            <Trash2 size={20} />
+            <span>{selectedIds.length}</span>
+          </button>
+        )}
       </div>
 
       {/* 삭제 확인 모달 */}

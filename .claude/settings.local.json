@@ -51,7 +51,11 @@
       "Bash(gh pr list:*)",
       "Bash(find . -name '*.md' -exec sed -i 's/\\r$//' {} +)",
       "Bash(npm run dev:sourcing:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(npm run typecheck:sourcing:*)",
+      "Bash(head:*)",
+      "Bash(grep:*)",
+      "Bash(# CLAUDE.md 파일들 크기 확인 echo \"\"=== CLAUDE.md 파일들 ===\"\" && find /Users/seong-wan/Desktop/ABC -name \"\"CLAUDE.md\"\" -exec wc -c {} \\\\;)"
     ],
     "deny": [],
     "ask": []

@@ -113,7 +113,7 @@ export default function StorePage() {
     return () => clearInterval(timer)
   }, [featuredProducts.length, totalSlides])
 
-  const formatPrice = (price: number) => price.toLocaleString()
+  const formatPrice = useCallback((price: number) => price.toLocaleString(), [])
   const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % totalSlides)
   const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + totalSlides) % totalSlides)
 

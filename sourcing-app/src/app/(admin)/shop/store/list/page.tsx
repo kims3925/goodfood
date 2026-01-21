@@ -237,71 +237,71 @@ function ShopListContent() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">쇼핑몰 관리</h1>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">쇼핑몰 관리</h1>
           <p className="text-gray-600">
             쇼핑몰의 도메인 및 정보를 관리합니다.
           </p>
         </div>
 
         {/* 통계 및 액션 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <Store size={24} className="text-gray-600" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-gray-100 rounded-lg">
+                <Store className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
               </div>
-              <div>
-                <p className="text-sm text-gray-500">전체 쇼핑몰</p>
-                <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Power size={24} className="text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">활성</p>
-                <p className="text-2xl font-bold text-green-600">{activeCount}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-500">전체 쇼핑몰</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{totalItems}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-orange-100 rounded-lg">
-                <PowerOff size={24} className="text-orange-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+                <Power className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
               </div>
-              <div>
-                <p className="text-sm text-gray-500">비활성</p>
-                <p className="text-2xl font-bold text-orange-600">{inactiveCount}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-500">활성</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-600 truncate">{activeCount}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Package size={24} className="text-purple-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-orange-100 rounded-lg">
+                <PowerOff className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
               </div>
-              <div>
-                <p className="text-sm text-gray-500">총 상품</p>
-                <p className="text-2xl font-bold text-purple-600">{totalProducts}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-500">비활성</p>
+                <p className="text-xl sm:text-2xl font-bold text-orange-600 truncate">{inactiveCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-purple-100 rounded-lg">
+                <Package className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-500">총 상품</p>
+                <p className="text-xl sm:text-2xl font-bold text-purple-600 truncate">{totalProducts}</p>
               </div>
             </div>
           </div>
           {/* 쇼핑몰 등록 카드 */}
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left"
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left min-h-[44px]"
           >
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Plus size={24} className="text-blue-600" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+                <Plus className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
               </div>
-              <div>
-                <p className="text-sm text-gray-500">쇼핑몰</p>
-                <p className="text-lg font-bold text-blue-600">등록하기</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-500">쇼핑몰</p>
+                <p className="text-base sm:text-lg font-bold text-blue-600">등록하기</p>
               </div>
             </div>
           </button>
@@ -309,19 +309,19 @@ function ShopListContent() {
           <button
             onClick={handleDeleteSelected}
             disabled={selectedIds.length === 0}
-            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left transition-colors ${
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 text-left transition-colors min-h-[44px] ${
               selectedIds.length > 0
                 ? 'hover:border-red-300 hover:bg-red-50 cursor-pointer'
                 : 'opacity-50 cursor-not-allowed'
             }`}
           >
-            <div className="flex items-center gap-3">
-              <div className={`p-3 rounded-lg ${selectedIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
-                <Trash2 size={24} className={selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'} />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className={`p-2 sm:p-3 rounded-lg ${selectedIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
+                <Trash2 className={`w-5 h-5 sm:w-6 sm:h-6 ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`} />
               </div>
-              <div>
-                <p className="text-sm text-gray-500">선택 삭제</p>
-                <p className={`text-lg font-bold ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-500">선택 삭제</p>
+                <p className={`text-base sm:text-lg font-bold truncate ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
                   {selectedIds.length}개 선택됨
                 </p>
               </div>
@@ -332,12 +332,12 @@ function ShopListContent() {
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-4 border-b border-gray-200">
-            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+            <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between w-full">
               {/* 왼쪽: 상태 필터 */}
-              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto">
                 <button
                   onClick={() => { setStatusFilter('ALL'); setCurrentPage(1) }}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-3 py-2 min-h-[40px] sm:min-h-[36px] rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                     statusFilter === 'ALL'
                       ? 'bg-white shadow-sm text-gray-900'
                       : 'text-gray-600 hover:text-gray-900'
@@ -347,7 +347,7 @@ function ShopListContent() {
                 </button>
                 <button
                   onClick={() => { setStatusFilter('ACTIVE'); setCurrentPage(1) }}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  className={`px-3 py-2 min-h-[40px] sm:min-h-[36px] rounded-md text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap ${
                     statusFilter === 'ACTIVE'
                       ? 'bg-white shadow-sm text-green-600'
                       : 'text-gray-600 hover:text-gray-900'
@@ -358,7 +358,7 @@ function ShopListContent() {
                 </button>
                 <button
                   onClick={() => { setStatusFilter('INACTIVE'); setCurrentPage(1) }}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                  className={`px-3 py-2 min-h-[40px] sm:min-h-[36px] rounded-md text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap ${
                     statusFilter === 'INACTIVE'
                       ? 'bg-white shadow-sm text-orange-600'
                       : 'text-gray-600 hover:text-gray-900'
@@ -370,14 +370,14 @@ function ShopListContent() {
               </div>
 
               {/* 검색창 */}
-              <div className="relative">
+              <div className="relative w-full lg:w-auto">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                 <Input
                   type="text"
                   placeholder="쇼핑몰명, 도메인으로 검색..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-80"
+                  className="pl-10 w-full lg:w-80"
                 />
               </div>
             </div>
@@ -485,7 +485,7 @@ function ShopListContent() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t border-gray-200 gap-3">
               <p className="text-sm text-gray-600">
                 총 {totalItems}개 중 {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalItems)}개
               </p>
@@ -493,17 +493,17 @@ function ShopListContent() {
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="min-w-[44px] min-h-[44px] sm:min-w-[36px] sm:min-h-[36px] p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                 >
                   <ChevronLeft size={18} />
                 </button>
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-gray-600 min-w-[60px] text-center">
                   {currentPage} / {totalPages}
                 </span>
                 <button
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="min-w-[44px] min-h-[44px] sm:min-w-[36px] sm:min-h-[36px] p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                 >
                   <ChevronRight size={18} />
                 </button>
