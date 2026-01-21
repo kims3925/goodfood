@@ -81,9 +81,10 @@ export default function Modal({
               <h2 className="text-xl font-semibold text-text-primary">{title}</h2>
               <button
                 onClick={onClose}
+                aria-label="닫기"
                 className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-surface transition-colors"
               >
-                <X size={20} />
+                <X size={20} aria-hidden="true" />
               </button>
             </div>
           )}

@@ -31,9 +31,10 @@ export default function Pagination({
         <button
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
+          aria-label="이전 페이지"
           className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          <ChevronLeft size={18} />
+          <ChevronLeft size={18} aria-hidden="true" />
         </button>
         <span className="text-sm text-gray-600 min-w-[80px] text-center">
           {currentPage} / {totalPages}
@@ -41,9 +42,10 @@ export default function Pagination({
         <button
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}
+          aria-label="다음 페이지"
           className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          <ChevronRight size={18} />
+          <ChevronRight size={18} aria-hidden="true" />
         </button>
       </div>
     </div>

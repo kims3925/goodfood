@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, ReactNode } from 'react'
+import { createContext, useContext, useMemo, ReactNode } from 'react'
 
 export interface ShopBankInfo {
   bankName: string
@@ -53,8 +53,13 @@ interface ShopProviderProps {
 }
 
 export function ShopProvider({ children, initialShop }: ShopProviderProps) {
+  const contextValue = useMemo(
+    () => ({ shop: initialShop, isLoading: false }),
+    [initialShop]
+  )
+
   return (
-    <ShopContext.Provider value={{ shop: initialShop, isLoading: false }}>
+    <ShopContext.Provider value={contextValue}>
       {children}
     </ShopContext.Provider>
   )

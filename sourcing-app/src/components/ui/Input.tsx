@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, forwardRef } from 'react'
+import { InputHTMLAttributes, forwardRef, useId } from 'react'
 import { AlertCircle } from 'lucide-react'
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -21,15 +21,17 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     rightIcon,
     ...props 
   }, ref) => {
+    const generatedId = useId()
+    const inputId = generatedId
     const widthClass = fullWidth ? 'w-full' : ''
     const errorClass = error ? 'border-error focus:ring-error' : 'border-border focus:ring-primary-color'
     const paddingLeft = leftIcon ? 'pl-10' : 'px-3'
     const paddingRight = rightIcon ? 'pr-10' : 'px-3'
-    
+
     return (
       <div className={`${widthClass} ${className}`}>
         {label && (
-          <label className="block text-sm font-medium text-text-primary mb-2">
+          <label htmlFor={inputId} className="block text-sm font-medium text-text-primary mb-2">
             {label}
           </label>
         )}
@@ -43,6 +45,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           
           <input
             ref={ref}
+            id={inputId}
             className={`
               ${widthClass}
               ${paddingLeft}

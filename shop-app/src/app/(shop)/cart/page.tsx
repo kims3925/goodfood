@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
@@ -147,9 +147,9 @@ export default function CartPage() {
     autoAddToCart()
   }, [isMounted, searchParams, loadCart, router, getApiPath, getPath])
 
-  const formatPrice = (price: number) => {
+  const formatPrice = useCallback((price: number) => {
     return price?.toLocaleString('ko-KR') || '0'
-  }
+  }, [])
 
   // 합배송 가격 계산 함수 (공통 모듈 사용)
   const calculateItemPrice = (item: CartItem, newQuantity: number) => {
@@ -348,12 +348,15 @@ export default function CartPage() {
   }
 
   // 선택된 항목만 계산
-  const selectedCartItems = cart?.items?.filter(item => selectedItems.includes(item.id)) || []
+  const selectedCartItems = useMemo(
+    () => cart?.items?.filter(item => selectedItems.includes(item.id)) || [],
+    [cart?.items, selectedItems]
+  )
 
   // 원래 금액 (할인 전)
   // - 배송비형: (원가 + 배송비) × 수량
   // - 할인형: 원가 × 수량 (배송비가 이미 포함된 가격)
-  const originalTotal = selectedCartItems.reduce((sum, item) => {
+  const originalTotal = useMemo(() => selectedCartItems.reduce((sum, item) => {
     const fee = item.shippingFee || 0
     const isBundleDiscount = item.isBundleDiscount || false
 
@@ -364,12 +367,12 @@ export default function CartPage() {
       // 배송비형: 원가 + 배송비
       return sum + (item.originalPrice + fee) * item.quantity
     }
-  }, 0)
+  }, 0), [selectedCartItems])
 
   // 합배송 할인액 계산 (bundleUnit 고려)
   // - 배송비형: 합배송으로 절약되는 배송비
   // - 할인형: 첫 번째 제외, 2번째부터 할인
-  const totalBundleDiscount = selectedCartItems.reduce((sum, item) => {
+  const totalBundleDiscount = useMemo(() => selectedCartItems.reduce((sum, item) => {
     const bundleUnit = item.bundleUnit || 1
     const isBundleDiscount = item.isBundleDiscount || false
 
@@ -390,7 +393,7 @@ export default function CartPage() {
       }
     }
     return sum
-  }, 0)
+  }, 0), [selectedCartItems])
 
   // 쿠폰 할인 (장바구니에서는 미적용, 주문서에서 적용)
   const couponDiscount = 0

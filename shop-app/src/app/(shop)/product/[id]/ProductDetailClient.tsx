@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
@@ -312,12 +312,12 @@ export default function ProductDetailClient() {
     }
   }
 
-  const formatPrice = (price: number | undefined | null) => {
+  const formatPrice = useCallback((price: number | undefined | null) => {
     if (price === undefined || price === null || isNaN(price)) {
       return '0'
     }
     return price.toLocaleString()
-  }
+  }, [])
 
   const handleQuantityChange = (type: 'increase' | 'decrease') => {
     if (type === 'increase') {
@@ -448,7 +448,7 @@ export default function ProductDetailClient() {
   const currentPrice = selectedVariant?.price || 0
 
   // 선택된 variant 가격으로 bundleOptions 동적 계산 (공통 모듈 사용)
-  const calculatedBundleOptions = (() => {
+  const calculatedBundleOptions = useMemo(() => {
     if (!product || !selectedVariant) return null
 
     const bundleMaxQty = product.bundleMaxQty || 1
@@ -509,7 +509,7 @@ export default function ProductDetailClient() {
       })
     }
     return options
-  })()
+  }, [product, selectedVariant])
 
   // 실제 사용할 bundleOptions (동적 계산 우선, 없으면 API에서 받은 것 사용)
   const activeBundleOptions = calculatedBundleOptions || product?.bundleOptions || null

@@ -1,4 +1,4 @@
-import { SelectHTMLAttributes, forwardRef } from 'react'
+import { SelectHTMLAttributes, forwardRef, useId } from 'react'
 import { AlertCircle, ChevronDown } from 'lucide-react'
 
 export interface SelectOption {
@@ -29,6 +29,8 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
     value,
     ...props
   }, ref) => {
+    const generatedId = useId()
+    const selectId = generatedId
     const widthClass = fullWidth ? 'w-full' : ''
     const errorClass = error ? 'border-error focus:ring-error' : 'border-border focus:ring-primary-color'
 
@@ -39,7 +41,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className={`${widthClass} ${className}`}>
         {label && (
-          <label className="block text-sm font-medium text-text-primary mb-2">
+          <label htmlFor={selectId} className="block text-sm font-medium text-text-primary mb-2">
             {label}
           </label>
         )}
@@ -47,6 +49,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <div className="relative">
           <select
             ref={ref}
+            id={selectId}
             value={value}
             onChange={handleChange}
             className={`
