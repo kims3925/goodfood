@@ -26,6 +26,7 @@ app/api/
 │   └── [id]/
 ├── product/                 # 상품
 │   ├── ai-generate/         # AI 상품 생성
+│   ├── deactivate/          # 일괄 비활성화 (TR-20260122-001)
 │   ├── publish/             # 상품 발행
 │   ├── validate-pricing/    # 가격 검증
 │   └── [id]/
@@ -1333,3 +1334,160 @@ interface UnifiedOrderItem {
 
 **변경 이역:**
 - TR-20260115-011: API 엔드포인트 추가
+
+---
+
+## GET /api/product/deactivate
+
+**설명:** 일괄 비활성화 대상 상품 미리보기 (TR-20260122-001)
+
+**인증:** Required
+
+**쿼리 파라미터:**
+
+| Param | Type | Default | 설명 |
+|-------|------|---------|------|
+| days | number | 90 | 기준 일수 (N일 전에 생성된 상품 조회) |
+
+**요청 예시:**
+
+```http
+GET /api/product/deactivate?days=3
+```
+
+**응답 스키마:**
+
+```typescript
+interface DeactivatePreviewResponse {
+  success: true
+  data: {
+    count: number           // 비활성화 대상 상품 수
+    products: Array<{       // 미리보기 (최대 100개)
+      id: number
+      name: string
+      thumbnailUrl: string | null
+      createdAt: string
+      channel: {
+        id: number
+        name: string
+      } | null
+    }>
+    cutoffDate: string      // 기준 날짜 (ISO 8601)
+    days: number            // 조회에 사용된 기간
+  }
+}
+```
+
+**응답 예시:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "count": 26,
+    "products": [
+      {
+        "id": 123,
+        "name": "상품명",
+        "thumbnailUrl": "https://...",
+        "createdAt": "2026-01-10T10:00:00.000Z",
+        "channel": {
+          "id": 1,
+          "name": "도매채널A"
+        }
+      }
+    ],
+    "cutoffDate": "2026-01-19T00:00:00.000Z",
+    "days": 3
+  }
+}
+```
+
+**에러:**
+
+| Code | HTTP | 설명 |
+|------|------|-----|
+| 401 | Unauthorized | 인증 필요 |
+| 500 | Internal Server Error | 조회 실패 |
+
+**변경 이력:**
+- TR-20260122-001: API 엔드포인트 추가
+
+---
+
+## POST /api/product/deactivate
+
+**설명:** 일괄 비활성화 실행 (Soft Delete) (TR-20260122-001)
+
+**인증:** Required
+
+**요청 바디:**
+
+```typescript
+interface DeactivateRequest {
+  days: number              // 기준 일수 (필수)
+  productIds?: number[]     // 특정 상품만 비활성화 (선택)
+}
+```
+
+**요청 예시:**
+
+```json
+{
+  "days": 3
+}
+```
+
+또는 특정 상품만:
+
+```json
+{
+  "days": 3,
+  "productIds": [123, 456, 789]
+}
+```
+
+**응답 스키마:**
+
+```typescript
+interface DeactivateResponse {
+  success: true
+  data: {
+    deactivatedCount: number  // 비활성화된 상품 수
+    cutoffDate: string        // 기준 날짜
+    days: number
+  }
+  message: string             // 결과 메시지
+}
+```
+
+**응답 예시:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "deactivatedCount": 26,
+    "cutoffDate": "2026-01-19T00:00:00.000Z",
+    "days": 3
+  },
+  "message": "26개 상품이 비활성화되었습니다."
+}
+```
+
+**에러:**
+
+| Code | HTTP | 설명 |
+|------|------|-----|
+| 400 | Bad Request | days 파라미터 누락 또는 유효하지 않음 |
+| 401 | Unauthorized | 인증 필요 |
+| 500 | Internal Server Error | 비활성화 실패 |
+
+**기능 설명:**
+- 지정된 기간(days) 이전에 생성된 상품을 Soft Delete 처리
+- `deletedAt` 필드에 현재 시각 설정, `isActive`를 false로 변경
+- 발행 여부와 관계없이 모든 활성 상품이 대상
+- productIds 지정 시 해당 상품만 비활성화
+
+**변경 이력:**
+- TR-20260122-001: API 엔드포인트 추가
