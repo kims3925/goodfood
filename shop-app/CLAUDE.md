@@ -39,8 +39,8 @@
 |-----|-----|
 | Framework | Next.js 14.2.3 (App Router) |
 | Language | TypeScript 5.9 |
-| ORM | Prisma 6.19 |
-| Database | MySQL (Prod) / SQLite (Dev) |
+| ORM | Prisma 6.2 |
+| Database | MariaDB |
 | Auth | NextAuth.js 4.24 (JWT) |
 | Payment | Toss Payments |
 | AI | Gemini / OpenAI |

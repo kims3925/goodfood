@@ -619,7 +619,7 @@ export default function PostsManagePage() {
           <div className="p-4 border-b border-gray-200">
             <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
               {/* 왼쪽: 소싱처 필터 */}
-              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto">
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto w-full lg:w-auto max-w-full min-w-0 scrollbar-hide lg:scrollbar-thin">
                 <button
                   onClick={() => handleChannelFilter(null)}
                   className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
@@ -672,40 +672,37 @@ export default function PostsManagePage() {
             </div>
           </div>
 
-          {/* 테이블 */}
+          {/* 목록 */}
           {isLoading ? (
             <div className="p-12">
               <Loading />
             </div>
+          ) : posts.length === 0 ? (
+            <div className="p-12 text-center text-gray-500">
+              수집된 게시물이 없습니다.
+            </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[4%]">
-                    <input
-                      type="checkbox"
-                      checked={selectAllPosts}
-                      onChange={handleToggleSelectAllPosts}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </TableHead>
-                  <TableHead className="w-[32%]">제목</TableHead>
-                  <TableHead className="w-[15%]">출처 밴드</TableHead>
-                  <TableHead className="w-[13%]">작성자</TableHead>
-                  <TableHead className="w-[18%]">생성일</TableHead>
-                  <TableHead className="w-[18%]">수정일</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {posts.length === 0 ? (
-                  <TableEmpty message="수집된 게시물이 없습니다." />
-                ) : (
-                  posts.map((post) => (
-                    <TableRow
-                      key={post.id}
-                      className="hover:bg-gray-50"
-                    >
-                      <TableCell className="w-[4%]">
+            <>
+              {/* 모바일: 카드 뷰 */}
+              <div className="lg:hidden p-3 space-y-3">
+                {/* 전체 선택 */}
+                <div className="flex items-center gap-2 px-1 pb-2 border-b border-gray-100">
+                  <input
+                    type="checkbox"
+                    checked={selectAllPosts}
+                    onChange={handleToggleSelectAllPosts}
+                    className="w-5 h-5 cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-600">전체 선택</span>
+                </div>
+                {posts.map((post) => (
+                  <div
+                    key={post.id}
+                    className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                  >
+                    {/* 상단: 체크박스 + 날짜 */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
                         <input
                           type="checkbox"
                           checked={selectedPostIds.includes(post.id)}
@@ -713,66 +710,155 @@ export default function PostsManagePage() {
                             e.stopPropagation()
                             handleTogglePostSelection(post.id)
                           }}
-                          onClick={(e) => e.stopPropagation()}
+                          className="w-5 h-5 cursor-pointer flex-shrink-0"
+                        />
+                        <div
+                          className="cursor-pointer"
+                          onClick={() => router.push(`/sourcing/post/detail/${post.id}`)}
+                        >
+                          <span className="text-xs text-gray-500">
+                            {formatDateTimeKST(post.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                      {/* 출처 밴드 배지 */}
+                      <div
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-purple-100 text-purple-700 cursor-pointer"
+                        onClick={() => router.push(`/sourcing/post/detail/${post.id}`)}
+                      >
+                        {post.channel.coverUrl ? (
+                          <img
+                            src={post.channel.coverUrl}
+                            alt={post.channel.name}
+                            className="w-4 h-4 rounded object-cover"
+                          />
+                        ) : (
+                          <Store size={12} />
+                        )}
+                        <span className="text-xs font-medium truncate max-w-[100px]">{post.channel.name}</span>
+                      </div>
+                    </div>
+
+                    {/* 제목 */}
+                    <div
+                      className="mb-3 cursor-pointer"
+                      onClick={() => router.push(`/sourcing/post/detail/${post.id}`)}
+                    >
+                      <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                        {post.title}
+                      </p>
+                    </div>
+
+                    {/* 하단: 작성자 */}
+                    <div
+                      className="flex items-center justify-between pt-3 border-t border-gray-100 cursor-pointer"
+                      onClick={() => router.push(`/sourcing/post/detail/${post.id}`)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">작성자</span>
+                        <span className="text-sm font-medium text-gray-900">{post.author || '-'}</span>
+                      </div>
+                      <ChevronRight size={16} className="text-gray-400" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 데스크톱: 테이블 뷰 */}
+              <div className="hidden lg:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[4%]">
+                        <input
+                          type="checkbox"
+                          checked={selectAllPosts}
+                          onChange={handleToggleSelectAllPosts}
                           className="w-4 h-4 cursor-pointer"
                         />
-                      </TableCell>
-                      <TableCell
-                        className="w-[32%] cursor-pointer"
-                        onClick={() => router.push(`/post/detail/${post.id}`)}
-                      >
-                        <div className="font-medium text-gray-900 truncate">
-                          {truncateText(post.title, 50)}
-                        </div>
-                      </TableCell>
-                      <TableCell
-                        className="w-[15%] cursor-pointer"
-                        onClick={() => router.push(`/post/detail/${post.id}`)}
-                      >
-                        <div className="flex items-center gap-2">
-                          {post.channel.coverUrl ? (
-                            <img
-                              src={post.channel.coverUrl}
-                              alt={post.channel.name}
-                              className="w-9 h-9 rounded-lg object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-9 h-9 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                              <span className="text-gray-400 text-xs">No</span>
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-gray-900 truncate text-sm">{post.channel.name}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell
-                        className="w-[13%] cursor-pointer"
-                        onClick={() => router.push(`/post/detail/${post.id}`)}
-                      >
-                        <span className="text-gray-600">{post.author || '-'}</span>
-                      </TableCell>
-                      <TableCell
-                        className="w-[18%] cursor-pointer"
-                        onClick={() => router.push(`/post/detail/${post.id}`)}
-                      >
-                        <span className="text-gray-600 text-sm">
-                          {formatDateTimeKST(post.createdAt)}
-                        </span>
-                      </TableCell>
-                      <TableCell
-                        className="w-[18%] cursor-pointer"
-                        onClick={() => router.push(`/post/detail/${post.id}`)}
-                      >
-                        <span className="text-gray-600 text-sm">
-                          {formatDateTimeKST(post.updatedAt)}
-                        </span>
-                      </TableCell>
+                      </TableHead>
+                      <TableHead className="w-[32%]">제목</TableHead>
+                      <TableHead className="w-[15%]">출처 밴드</TableHead>
+                      <TableHead className="w-[13%]">작성자</TableHead>
+                      <TableHead className="w-[18%]">생성일</TableHead>
+                      <TableHead className="w-[18%]">수정일</TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {posts.map((post) => (
+                      <TableRow
+                        key={post.id}
+                        className="hover:bg-gray-50"
+                      >
+                        <TableCell className="w-[4%]">
+                          <input
+                            type="checkbox"
+                            checked={selectedPostIds.includes(post.id)}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              handleTogglePostSelection(post.id)
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-4 h-4 cursor-pointer"
+                          />
+                        </TableCell>
+                        <TableCell
+                          className="w-[32%] cursor-pointer"
+                          onClick={() => router.push(`/sourcing/post/detail/${post.id}`)}
+                        >
+                          <div className="font-medium text-gray-900 truncate">
+                            {truncateText(post.title, 50)}
+                          </div>
+                        </TableCell>
+                        <TableCell
+                          className="w-[15%] cursor-pointer"
+                          onClick={() => router.push(`/sourcing/post/detail/${post.id}`)}
+                        >
+                          <div className="flex items-center gap-2">
+                            {post.channel.coverUrl ? (
+                              <img
+                                src={post.channel.coverUrl}
+                                alt={post.channel.name}
+                                className="w-9 h-9 rounded-lg object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                <span className="text-gray-400 text-xs">No</span>
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-gray-900 truncate text-sm">{post.channel.name}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell
+                          className="w-[13%] cursor-pointer"
+                          onClick={() => router.push(`/sourcing/post/detail/${post.id}`)}
+                        >
+                          <span className="text-gray-600">{post.author || '-'}</span>
+                        </TableCell>
+                        <TableCell
+                          className="w-[18%] cursor-pointer"
+                          onClick={() => router.push(`/sourcing/post/detail/${post.id}`)}
+                        >
+                          <span className="text-gray-600 text-sm">
+                            {formatDateTimeKST(post.createdAt)}
+                          </span>
+                        </TableCell>
+                        <TableCell
+                          className="w-[18%] cursor-pointer"
+                          onClick={() => router.push(`/sourcing/post/detail/${post.id}`)}
+                        >
+                          <span className="text-gray-600 text-sm">
+                            {formatDateTimeKST(post.updatedAt)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
 
           {/* Pagination */}

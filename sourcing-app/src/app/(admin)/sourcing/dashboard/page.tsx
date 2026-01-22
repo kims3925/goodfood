@@ -516,7 +516,7 @@ export default function AutomationDashboardPage() {
       {/* 날짜 필터 + 자동화 상태 (상단, 왼쪽 정렬) */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-start gap-2 sm:gap-3">
-          <div className="flex rounded-xl bg-gray-100 p-1 overflow-x-auto w-full sm:w-auto">
+          <div className="flex rounded-xl bg-gray-100 p-1 overflow-x-auto w-full sm:w-auto max-w-full min-w-0 scrollbar-hide sm:scrollbar-thin">
             {[
               { value: 'today', label: '오늘' },
               { value: '7days', label: '7일' },

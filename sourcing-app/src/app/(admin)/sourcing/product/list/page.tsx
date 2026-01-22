@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2, Package, Boxes, CheckCircle, Clock, ShoppingCart, AlertTriangle } from 'lucide-react'
+import { Plus, Search, Trash2, Package, Boxes, CheckCircle, Clock, ShoppingCart, AlertTriangle, Archive, Eye, ChevronDown, ChevronUp } from 'lucide-react'
 import Image from 'next/image'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -178,6 +178,20 @@ export default function ProductListPage() {
     shippingInfo: '',
   })
   const [isSubmittingManual, setIsSubmittingManual] = useState(false)
+
+  // 일괄 비활성화 관련 상태
+  const [showDeactivateSection, setShowDeactivateSection] = useState(false)
+  const [deactivateDays, setDeactivateDays] = useState<number>(3)
+  const [customDays, setCustomDays] = useState<string>('')
+  const [deactivatePreview, setDeactivatePreview] = useState<{
+    count: number
+    products: Array<{ id: number; name: string; thumbnailUrl: string | null; createdAt: string; channel?: { id: number; name: string } | null }>
+    cutoffDate: string
+    days: number
+  } | null>(null)
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false)
+  const [isDeactivating, setIsDeactivating] = useState(false)
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false)
 
   const loadChannels = useCallback(async () => {
     try {
@@ -406,6 +420,75 @@ export default function ProductListPage() {
     } finally {
       setIsSubmittingManual(false)
     }
+  }
+
+  // 일괄 비활성화 미리보기
+  const handleDeactivatePreview = async () => {
+    const days = customDays ? parseInt(customDays) : deactivateDays
+    if (!days || days < 1) {
+      toast.error('유효한 기간을 입력해주세요.')
+      return
+    }
+
+    setIsLoadingPreview(true)
+    try {
+      const response = await fetch(`/api/product/deactivate?days=${days}`)
+      const data = await response.json()
+
+      if (data.success) {
+        setDeactivatePreview(data.data)
+        if (data.data.count === 0) {
+          toast.info('비활성화 대상 상품이 없습니다.')
+        }
+      } else {
+        toast.error(data.error || '미리보기 조회에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('미리보기 조회 실패:', error)
+      toast.error('미리보기 조회 중 오류가 발생했습니다.')
+    } finally {
+      setIsLoadingPreview(false)
+    }
+  }
+
+  // 일괄 비활성화 실행
+  const handleDeactivateExecute = async () => {
+    const days = customDays ? parseInt(customDays) : deactivateDays
+    if (!days || days < 1) {
+      toast.error('유효한 기간을 입력해주세요.')
+      return
+    }
+
+    setIsDeactivating(true)
+    try {
+      const response = await fetch('/api/product/deactivate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days }),
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success(data.message || `${data.data.deactivatedCount}개 상품이 비활성화되었습니다.`)
+        setDeactivatePreview(null)
+        setShowDeactivateConfirm(false)
+        loadProducts()
+      } else {
+        toast.error(data.error || '일괄 비활성화에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('일괄 비활성화 실패:', error)
+      toast.error('일괄 비활성화 중 오류가 발생했습니다.')
+    } finally {
+      setIsDeactivating(false)
+    }
+  }
+
+  // 기간 선택 변경
+  const handleDaysChange = (days: number) => {
+    setDeactivateDays(days)
+    setCustomDays('')
+    setDeactivatePreview(null)
   }
 
   // 수집상품 개별 선택/해제
@@ -1110,6 +1193,175 @@ export default function ProductListPage() {
           </button>
         </div>
 
+        {/* 일괄 비활성화 섹션 */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+          {/* 헤더 (토글) */}
+          <button
+            onClick={() => setShowDeactivateSection(!showDeactivateSection)}
+            className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <Archive size={20} className="text-orange-600" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-gray-900">일괄 비활성화</h3>
+                <p className="text-sm text-gray-500">오래된 미발행 상품을 일괄 비활성화합니다</p>
+              </div>
+            </div>
+            {showDeactivateSection ? (
+              <ChevronUp size={20} className="text-gray-400" />
+            ) : (
+              <ChevronDown size={20} className="text-gray-400" />
+            )}
+          </button>
+
+          {/* 콘텐츠 (펼침) */}
+          {showDeactivateSection && (
+            <div className="border-t border-gray-200 p-4">
+              <div className="flex flex-col lg:flex-row gap-4">
+                {/* 왼쪽: 기간 선택 + 버튼 */}
+                <div className="lg:w-80 flex-shrink-0 space-y-4">
+                  {/* 기간 선택 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      기간 선택 (해당 기간 이전 생성)
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {[1, 2, 3].map((days) => (
+                        <button
+                          key={days}
+                          onClick={() => handleDaysChange(days)}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors min-h-[44px] ${
+                            deactivateDays === days && !customDays
+                              ? 'bg-orange-500 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          {days}일
+                        </button>
+                      ))}
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          placeholder="직접"
+                          value={customDays}
+                          onChange={(e) => {
+                            setCustomDays(e.target.value)
+                            setDeactivatePreview(null)
+                          }}
+                          className="w-20 min-h-[44px]"
+                          min={1}
+                        />
+                        <span className="text-sm text-gray-500">일</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 액션 버튼 */}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      onClick={handleDeactivatePreview}
+                      disabled={isLoadingPreview}
+                      className="min-h-[44px]"
+                    >
+                      <Eye size={16} className="mr-1" />
+                      {isLoadingPreview ? '조회 중...' : '미리보기'}
+                    </Button>
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        if (!deactivatePreview || deactivatePreview.count === 0) {
+                          toast.error('먼저 미리보기를 실행해주세요.')
+                          return
+                        }
+                        setShowDeactivateConfirm(true)
+                      }}
+                      disabled={!deactivatePreview || deactivatePreview.count === 0 || isDeactivating}
+                      className="min-h-[44px] bg-orange-500 hover:bg-orange-600"
+                    >
+                      <Archive size={16} className="mr-1" />
+                      {isDeactivating ? '처리 중...' : '비활성화'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 오른쪽: 미리보기 결과 */}
+                <div className="flex-1 min-w-0">
+                  {deactivatePreview ? (
+                    <div className="h-full p-3 bg-orange-50 rounded-lg border border-orange-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle size={16} className="text-orange-600 flex-shrink-0" />
+                        <span className="font-medium text-orange-800 text-sm">
+                          대상: {deactivatePreview.count}개
+                        </span>
+                        <span className="text-xs text-orange-600">
+                          ({new Date(deactivatePreview.cutoffDate).toLocaleDateString('ko-KR')} 이전)
+                        </span>
+                      </div>
+                      {deactivatePreview.products.length > 0 && (
+                        <div className="max-h-32 overflow-y-auto space-y-1">
+                          {deactivatePreview.products.slice(0, 8).map((product) => (
+                            <div key={product.id} className="flex items-center gap-2 p-1.5 bg-white rounded border border-orange-100">
+                              {product.thumbnailUrl ? (
+                                <Image
+                                  src={product.thumbnailUrl}
+                                  alt={product.name}
+                                  width={32}
+                                  height={32}
+                                  className="rounded object-cover flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
+                                  <Package size={14} className="text-gray-400" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-gray-900 truncate">{product.name}</p>
+                                <p className="text-xs text-gray-500 truncate">
+                                  {product.channel?.name || '채널 없음'} · {new Date(product.createdAt).toLocaleDateString('ko-KR')}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                          {deactivatePreview.count > 8 && (
+                            <p className="text-xs text-orange-600 text-center py-1">
+                              외 {deactivatePreview.count - 8}개 상품...
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="h-full p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center">
+                      <p className="text-sm text-gray-400">미리보기를 클릭하면 대상 상품이 표시됩니다</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 자동 비활성화 설정 (추후 지원) */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="flex items-center gap-3 opacity-50">
+                  <input
+                    type="checkbox"
+                    disabled
+                    className="w-5 h-5 rounded border-gray-300"
+                  />
+                  <div>
+                    <span className="text-sm text-gray-700">자동 비활성화 활성화</span>
+                    <span className="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">추후 지원</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-1 ml-8">
+                  설정된 기간 이상 된 미발행 상품을 매일 자동으로 비활성화합니다.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-3 sm:p-4 border-b border-gray-200">
@@ -1128,7 +1380,7 @@ export default function ProductListPage() {
 
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center justify-between">
                 {/* 왼쪽: 출처 채널 필터 */}
-                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto w-full sm:w-auto max-w-full scrollbar-thin">
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto w-full sm:w-auto max-w-full min-w-0 scrollbar-hide sm:scrollbar-thin">
                   <button
                     onClick={() => { setSelectedChannelId(''); setCurrentPage(1) }}
                     className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap min-h-[36px] sm:min-h-[32px] ${
@@ -1446,6 +1698,18 @@ export default function ProductListPage() {
         confirmText="삭제"
         variant="danger"
         isLoading={isDeleting}
+      />
+
+      {/* 일괄 비활성화 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDeactivateConfirm}
+        onClose={() => setShowDeactivateConfirm(false)}
+        onConfirm={handleDeactivateExecute}
+        title="일괄 비활성화"
+        message={`${deactivatePreview?.count || 0}개의 미발행 상품을 비활성화하시겠습니까? 비활성화된 상품은 쇼핑몰에서 더 이상 표시되지 않습니다.`}
+        confirmText="비활성화"
+        variant="danger"
+        isLoading={isDeactivating}
       />
 
       {/* 발행된 상품 삭제 차단 경고 모달 */}

@@ -334,7 +334,7 @@ function ShopListContent() {
           <div className="p-4 border-b border-gray-200">
             <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between w-full">
               {/* 왼쪽: 상태 필터 */}
-              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto">
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto w-full lg:w-auto max-w-full min-w-0 scrollbar-hide lg:scrollbar-thin">
                 <button
                   onClick={() => { setStatusFilter('ALL'); setCurrentPage(1) }}
                   className={`px-3 py-2 min-h-[40px] sm:min-h-[36px] rounded-md text-sm font-medium transition-colors whitespace-nowrap ${

@@ -41,9 +41,8 @@
 
 | 항목 | 값 |
 |-----|---|
-| ORM | Prisma 6.19 |
-| Database (Dev) | SQLite |
-| Database (Prod) | MySQL |
+| ORM | Prisma 6.2 |
+| Database | MariaDB |
 | Cache | Redis (Bull Queue) |
 
 ### 인프라

@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
     // Build where clause
     const where: any = {
       userId,
+      deletedAt: null, // Soft Delete 필터링
     }
 
     // 검색
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
 
     // 통계 계산 (탭과 무관하게 일정한 값)
     const allProducts = await prisma.product.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null }, // Soft Delete 필터링
       select: {
         id: true,
         shopProducts: {

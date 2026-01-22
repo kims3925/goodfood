@@ -361,8 +361,8 @@ export default function ShopNotificationPage() {
         </div>
 
         {/* 필터 영역 */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 p-4">
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 p-4 overflow-x-auto scrollbar-hide lg:scrollbar-thin">
+          <div className="flex flex-wrap items-center gap-3 lg:gap-4 min-w-max lg:min-w-0">
             {/* 쇼핑몰 필터 */}
             {data?.shops && data.shops.length > 1 && (
               <div className="flex items-center gap-2">
@@ -412,20 +412,20 @@ export default function ShopNotificationPage() {
             </div>
 
             {/* 날짜 범위 */}
-            <div className="flex items-center gap-2">
-              <Calendar size={16} className="text-gray-400" />
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <Calendar size={16} className="text-gray-400 flex-shrink-0" />
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => { setStartDate(e.target.value); setPage(1) }}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-2 lg:px-3 py-2 border border-gray-300 rounded-lg text-xs lg:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[40px]"
               />
               <span className="text-gray-400">~</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => { setEndDate(e.target.value); setPage(1) }}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-2 lg:px-3 py-2 border border-gray-300 rounded-lg text-xs lg:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[40px]"
               />
             </div>
 

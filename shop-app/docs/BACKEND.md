@@ -10,7 +10,7 @@
 |-----|-----|
 | Framework | Next.js 14.2.3 (App Router) |
 | Language | TypeScript 5.9 |
-| ORM | Prisma 6.19 |
+| ORM | Prisma 6.2 |
 | Auth | NextAuth.js 4.24 (JWT) |
 | Validation | Zod |
 

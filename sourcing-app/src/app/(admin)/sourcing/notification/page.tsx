@@ -493,8 +493,8 @@ export default function SourcingNotificationPage() {
         </div>
 
         {/* 필터 영역 */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 p-4">
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 p-4 overflow-x-auto scrollbar-hide lg:scrollbar-thin">
+          <div className="flex flex-wrap items-center gap-3 lg:gap-4 min-w-max lg:min-w-0">
             {/* 타입 필터 */}
             <div className="flex items-center gap-2">
               <Filter size={16} className="text-gray-400" />

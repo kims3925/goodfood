@@ -53,7 +53,7 @@
 | **Frontend** | Next.js 14 (App Router) | sourcing-app과 동일, SSR/SEO |
 | **Styling** | Tailwind CSS | 빠른 UI 개발, 일관된 디자인 |
 | **State** | Zustand | 가벼움, TypeScript 친화적 |
-| **Database** | MySQL 8.0 + Prisma | sourcing-app DB 공유 |
+| **Database** | MariaDB + Prisma | sourcing-app DB 공유 |
 | **Payment** | Toss Payments | 국내 최적화, 다양한 결제수단 |
 | **Auth** | JWT + httpOnly Cookie | 보안, 기존 방식 유지 |
 

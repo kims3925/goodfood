@@ -27,8 +27,10 @@ export async function GET(req: NextRequest) {
 
     // 기본 조건: 발행된 상품만 (shop_product 테이블을 통해)
     const where: any = {
+      deletedAt: null, // Soft Delete 필터링
       shopProducts: {
         some: {
+          deletedAt: null, // ShopProduct Soft Delete 필터링
           // shopId 기반 필터링 (우선)
           ...(currentShopId ? { shopId: currentShopId } : {}),
         },

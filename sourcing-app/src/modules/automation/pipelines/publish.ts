@@ -73,6 +73,7 @@ export async function runPublishPipeline(
   // 발행할 상품 조회
   const whereClause: any = {
     userId,
+    deletedAt: null, // Soft Delete 필터링
   }
 
   if (config.productIds?.length) {

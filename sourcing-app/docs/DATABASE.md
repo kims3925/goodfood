@@ -8,8 +8,8 @@
 
 | 환경 | 데이터베이스 | 설정 |
 |-----|------------|------|
-| Development | SQLite | `file:./dev.db` |
-| Production | MySQL 8.0 | AWS RDS |
+| Development | MariaDB | `mysql://user:pass@localhost:3306/bandauto` |
+| Production | MariaDB | AWS RDS |
 
 ### Prisma 설정
 

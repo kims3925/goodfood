@@ -831,27 +831,27 @@ export default function AutomationSettingsPage() {
       {/* Schedule Settings - 독립 섹션 */}
       <Card className={`overflow-hidden transition-all ${warningSections.includes('schedule') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasScheduleProblem ? 'ring-2 ring-red-300' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-200">
-                <Clock className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-200 flex-shrink-0">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-bold text-gray-900">실행 주기</h2>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900">실행 주기</h2>
                   {hasScheduleChanges && (
                     <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
                   )}
                   {config.selectedHours.length > 0 && (
-                    <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-violet-100 text-violet-700">
-                      {config.selectedHours.length}개 시간
+                    <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-violet-100 text-violet-700">
+                      {config.selectedHours.length}개
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-500">자동화가 실행될 시간을 선택하세요 (복수 선택 가능)</p>
+                <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">자동화가 실행될 시간을 선택하세요</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-end sm:self-auto">
               <button
                 onClick={() => {
                   if (config.selectedHours.length === 24) {
@@ -860,25 +860,25 @@ export default function AutomationSettingsPage() {
                     setConfig(prev => ({ ...prev, selectedHours: HOUR_OPTIONS.map(o => o.hour) }))
                   }
                 }}
-                className="text-sm text-violet-600 hover:text-violet-800 font-medium px-3 py-1.5 rounded-lg hover:bg-violet-50 transition-colors"
+                className="text-xs sm:text-sm text-violet-600 hover:text-violet-800 font-medium px-2 sm:px-3 py-1.5 rounded-lg hover:bg-violet-50 transition-colors"
               >
-                {config.selectedHours.length === 24 ? '전체 해제' : '전체 선택'}
+                {config.selectedHours.length === 24 ? '전체해제' : '전체선택'}
               </button>
               <Button
                 variant="primary"
                 size="sm"
                 onClick={() => handleSaveSection('schedule')}
                 disabled={savingSection === 'schedule' || !hasScheduleChanges}
-                className="flex items-center gap-2 text-sm px-4 shadow-md"
+                className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4 shadow-md"
               >
-                {savingSection === 'schedule' ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+                {savingSection === 'schedule' ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
                 저장
               </Button>
             </div>
           </div>
 
           {/* 24시간 버튼 그리드 */}
-          <div className="grid grid-cols-12 gap-1.5">
+          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1.5">
             {HOUR_OPTIONS.map((option) => {
               const isSelected = config.selectedHours.includes(option.hour)
               return (
@@ -930,22 +930,22 @@ export default function AutomationSettingsPage() {
       {/* Pipeline Range Settings */}
       <Card className={`overflow-hidden transition-all ${warningSections.includes('pipeline') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasPipelineProblem ? 'ring-2 ring-red-300' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
-                <Zap className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200 flex-shrink-0">
+                <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-bold text-gray-900">파이프라인 범위</h2>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900">파이프라인</h2>
                   {hasPipelineChanges && (
                     <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
                   )}
-                  <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-indigo-100 text-indigo-700">
-                    {[config.pipelineSteps.collection, config.pipelineSteps.transform, config.pipelineSteps.productCreate, config.pipelineSteps.publish].filter(Boolean).length}/4 단계
+                  <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-indigo-100 text-indigo-700">
+                    {[config.pipelineSteps.collection, config.pipelineSteps.transform, config.pipelineSteps.productCreate, config.pipelineSteps.publish].filter(Boolean).length}/4
                   </span>
                 </div>
-                <p className="text-sm text-gray-500">자동화가 실행될 파이프라인 단계를 선택하세요</p>
+                <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">자동화 파이프라인 단계를 선택하세요</p>
               </div>
             </div>
             <Button
@@ -953,14 +953,14 @@ export default function AutomationSettingsPage() {
               size="sm"
               onClick={() => handleSaveSection('pipeline')}
               disabled={savingSection === 'pipeline' || !hasPipelineChanges}
-              className="flex items-center gap-2 text-sm px-4 shadow-md"
+              className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4 shadow-md self-end sm:self-auto"
             >
-              {savingSection === 'pipeline' ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+              {savingSection === 'pipeline' ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
               저장
             </Button>
           </div>
 
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
             {/* 수집 단계 */}
             {(() => {
               // 수집을 해제하려면 변환이 해제되어 있어야 함
@@ -1172,20 +1172,20 @@ export default function AutomationSettingsPage() {
 
           {/* 파이프라인 흐름 표시 */}
           <div className="mt-4 p-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl border border-indigo-100">
-            <div className="flex items-center justify-center gap-2 text-sm">
-              <span className={`px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.collection ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm flex-wrap">
+              <span className={`px-2 sm:px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.collection ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
                 수집
               </span>
               <span className="text-indigo-400">→</span>
-              <span className={`px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.transform ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
+              <span className={`px-2 sm:px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.transform ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
                 변환
               </span>
               <span className="text-indigo-400">→</span>
-              <span className={`px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.productCreate ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
+              <span className={`px-2 sm:px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.productCreate ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
                 상품생성
               </span>
               <span className="text-indigo-400">→</span>
-              <span className={`px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.publish ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
+              <span className={`px-2 sm:px-3 py-1 rounded-lg font-medium ${config.pipelineSteps.publish ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
                 발행
               </span>
             </div>
@@ -1198,24 +1198,24 @@ export default function AutomationSettingsPage() {
         {/* Shop Selection Section */}
         <Card className={`overflow-hidden transition-all ${warningSections.includes('shop') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasShopProblem ? 'ring-2 ring-red-300' : ''}`}>
           <div className="p-4 pb-5 flex flex-col">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shadow-rose-200">
-                  <ShoppingBag className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg shadow-rose-200 flex-shrink-0">
+                  <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-gray-900">쇼핑몰 발행</h2>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base sm:text-lg font-bold text-gray-900">쇼핑몰 발행</h2>
                     {hasShopChanges && (
                       <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
                     )}
                     {config.shopIds.length > 0 && (
-                      <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-rose-100 text-rose-700">
+                      <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-rose-100 text-rose-700">
                         {config.shopIds.length}개
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500">상품이 발행될 쇼핑몰을 선택하세요</p>
+                  <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">상품이 발행될 쇼핑몰 선택</p>
                 </div>
               </div>
               <Button
@@ -1223,15 +1223,15 @@ export default function AutomationSettingsPage() {
                 size="sm"
                 onClick={() => handleSaveSection('shop')}
                 disabled={savingSection === 'shop' || !hasShopChanges}
-                className="flex items-center gap-2 text-sm px-4 shadow-md"
+                className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4 shadow-md self-end sm:self-auto"
               >
-                {savingSection === 'shop' ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+                {savingSection === 'shop' ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
                 저장
               </Button>
             </div>
 
             {shops.length > 0 ? (
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
                 {shops.map((shop) => {
                   const isSelected = config.shopIds.includes(shop.id)
                   return (
@@ -1424,33 +1424,33 @@ export default function AutomationSettingsPage() {
         {/* Collection Settings - Wholesale Channel Cards */}
       <Card className={`overflow-hidden transition-all ${warningSections.includes('collection') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasCollectionProblem ? 'ring-2 ring-red-300' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
-                <Download className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 flex-shrink-0">
+                <Download className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-bold text-gray-900">수집 설정</h2>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900">수집 설정</h2>
                   {hasCollectionChanges && (
                     <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
                   )}
                   {config.wholesaleChannelIds.length > 0 && (
-                    <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700">
+                    <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700">
                       {config.wholesaleChannelIds.length}개
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-500">게시물을 수집할 도매밴드를 선택하세요</p>
+                <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">도매밴드 선택</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-end sm:self-auto">
               {wholesaleChannels.length > CHANNELS_PER_PAGE && (
                 <button
                   onClick={() => setShowAllWholesale(!showAllWholesale)}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+                  className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 font-medium px-2 sm:px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
                 >
-                  {showAllWholesale ? '접기' : '전체보기'}
+                  {showAllWholesale ? '접기' : '전체'}
                 </button>
               )}
               <Button
@@ -1458,7 +1458,7 @@ export default function AutomationSettingsPage() {
                 size="sm"
                 onClick={() => handleSaveSection('collection')}
                 disabled={savingSection === 'collection' || !hasCollectionChanges}
-                className="flex items-center gap-2 text-sm px-4 shadow-md"
+                className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4 shadow-md"
               >
                 {savingSection === 'collection' ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
                 저장
@@ -1469,7 +1469,7 @@ export default function AutomationSettingsPage() {
         {wholesaleChannels.length > 0 ? (
           showAllWholesale ? (
             /* 전체보기 모드 */
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
               {wholesaleChannels.map((channel) => {
                 const isSelected = config.wholesaleChannelIds.includes(channel.id)
                 return (
@@ -1525,7 +1525,7 @@ export default function AutomationSettingsPage() {
             )}
 
             {/* Channel Cards */}
-            <div className="grid grid-cols-4 gap-4 overflow-hidden">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 overflow-hidden">
               {wholesaleChannels.slice(wholesaleStartIndex, wholesaleStartIndex + CHANNELS_PER_PAGE).map((channel) => {
                 const isSelected = config.wholesaleChannelIds.includes(channel.id)
                 return (
@@ -1630,33 +1630,33 @@ export default function AutomationSettingsPage() {
         {/* Publish Settings - Retail Channel Cards */}
       <Card className={`overflow-hidden transition-all ${warningSections.includes('publish') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasPublishProblem ? 'ring-2 ring-red-300' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-200">
-                <Upload className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-200 flex-shrink-0">
+                <Upload className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-bold text-gray-900">발행 설정</h2>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900">발행 설정</h2>
                   {hasPublishChanges && (
                     <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
                   )}
                   {config.retailChannelIds.length > 0 && (
-                    <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-green-100 text-green-700">
+                    <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-green-100 text-green-700">
                       {config.retailChannelIds.length}개
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-500">상품을 발행할 소매밴드를 선택하세요</p>
+                <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">소매밴드 선택</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-end sm:self-auto">
               {retailChannels.length > CHANNELS_PER_PAGE && (
                 <button
                   onClick={() => setShowAllRetail(!showAllRetail)}
-                  className="text-sm text-green-600 hover:text-green-800 font-medium px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors"
+                  className="text-xs sm:text-sm text-green-600 hover:text-green-800 font-medium px-2 sm:px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors"
                 >
-                  {showAllRetail ? '접기' : '전체보기'}
+                  {showAllRetail ? '접기' : '전체'}
                 </button>
               )}
               <Button
@@ -1664,7 +1664,7 @@ export default function AutomationSettingsPage() {
                 size="sm"
                 onClick={() => handleSaveSection('publish')}
                 disabled={savingSection === 'publish' || !hasPublishChanges}
-                className="flex items-center gap-2 text-sm px-4 shadow-md"
+                className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4 shadow-md"
               >
                 {savingSection === 'publish' ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
                 저장
@@ -1675,7 +1675,7 @@ export default function AutomationSettingsPage() {
         {retailChannels.length > 0 ? (
           showAllRetail ? (
             /* 전체보기 모드 */
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
               {retailChannels.map((channel) => {
                 const isSelected = config.retailChannelIds.includes(channel.id)
                 return (
@@ -1731,7 +1731,7 @@ export default function AutomationSettingsPage() {
             )}
 
             {/* Channel Cards */}
-            <div className="grid grid-cols-4 gap-4 overflow-hidden">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 overflow-hidden">
               {retailChannels.slice(retailStartIndex, retailStartIndex + CHANNELS_PER_PAGE).map((channel) => {
                 const isSelected = config.retailChannelIds.includes(channel.id)
                 return (

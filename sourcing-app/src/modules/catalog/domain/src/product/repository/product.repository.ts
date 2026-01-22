@@ -32,7 +32,7 @@ export class ProductRepository {
       limit = 20,
     } = params
 
-    const where: any = { userId }
+    const where: any = { userId, deletedAt: null } // Soft Delete 필터링
 
     if (channelId) {
       where.channelId = channelId
@@ -166,7 +166,7 @@ export class ProductRepository {
 
   async findByChannelId(channelId: number) {
     return prisma.product.findMany({
-      where: { channelId },
+      where: { channelId, deletedAt: null }, // Soft Delete 필터링
     })
   }
 

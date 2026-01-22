@@ -9,6 +9,7 @@ import { CartNotificationProvider, useCartNotification } from '@/contexts/CartNo
 import CartNotificationBubble from '@/components/cart/CartNotificationBubble'
 import { useShop } from '@/contexts/ShopContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
+import { usePresence } from '@/hooks/usePresence'
 import { formatPhoneNumber } from '@/modules/common/utils/src/helpers/phone'
 
 // 사업자등록번호 포맷팅 (XXX-XX-XXXXX 형식)
@@ -32,6 +33,9 @@ function StoreLayoutContent({
   const [searchQuery, setSearchQuery] = useState('')
   const [isCustomerServiceOpen, setIsCustomerServiceOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+
+  // 실시간 접속자 추적
+  usePresence()
 
   // Shop 정보
   const shopName = shop?.name || 'ABC마켓'
