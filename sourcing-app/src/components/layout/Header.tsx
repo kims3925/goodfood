@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check, AlertCircle, Info, Wifi, WifiOff, RefreshCw, Save } from 'lucide-react'
+import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check, AlertCircle, Info, Wifi, WifiOff, RefreshCw, Save, Users, Eye } from 'lucide-react'
 import { AppSection, getDefaultPathBySection } from '@/config/navigation'
 import { useBandSession } from '@/contexts/BandSessionContext'
 import { checkExtensionInstalled, saveSessionViaExtension } from '@/lib/band-extension'
@@ -249,6 +249,54 @@ const SessionIndicator = memo(function SessionIndicator() {
         </div>
       )}
     </div>
+  )
+})
+
+// 실시간 접속자 인디케이터 컴포넌트
+const VisitorIndicator = memo(function VisitorIndicator() {
+  const router = useRouter()
+  const [visitorCount, setVisitorCount] = useState<number | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchVisitorCount = async () => {
+      try {
+        const response = await fetch('/api/shop/visitors')
+        const data = await response.json()
+        if (data.success) {
+          setVisitorCount(data.data.stats.total)
+        }
+      } catch {
+        // 에러 시 null 유지
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchVisitorCount()
+    // 10초마다 갱신
+    const interval = setInterval(fetchVisitorCount, 10000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // 로딩 중이거나 데이터가 없으면 표시 안함
+  if (isLoading || visitorCount === null) {
+    return null
+  }
+
+  return (
+    <button
+      onClick={() => router.push('/shop/visitors')}
+      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-colors ${
+        visitorCount > 0
+          ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+      }`}
+      title="실시간 접속자 보기"
+    >
+      <Eye size={14} />
+      <span className="text-xs font-medium">{visitorCount}</span>
+    </button>
   )
 })
 
@@ -534,6 +582,9 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
 
           {/* Right side */}
           <div className="flex items-center gap-2">
+            {/* 실시간 접속자 */}
+            <VisitorIndicator />
+
             {/* Band Session Status */}
             <SessionIndicator />
 

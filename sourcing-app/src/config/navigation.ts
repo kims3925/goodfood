@@ -24,6 +24,7 @@ import {
   ScrollText,
   Lock,
   FileSpreadsheet,
+  Eye,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
@@ -115,7 +116,14 @@ export const shopMenuItems: MenuItem[] = [
   { label: '리뷰 관리', href: '/shop/reviews/list', icon: Star },
   { label: '쿠폰', href: '/shop/coupon/list', icon: Ticket },
   { label: '알림 관리', href: '/shop/notification', icon: Bell },
-  { label: '회원 관리', href: '/shop/user/list', icon: Users },
+  {
+    label: '회원 관리',
+    icon: Users,
+    children: [
+      { label: '회원 목록', href: '/shop/user/list', icon: Users },
+      { label: '실시간 접속자', href: '/shop/visitors', icon: Eye },
+    ],
+  },
   {
     label: '정책 관리',
     icon: Shield,
@@ -168,6 +176,7 @@ export const shopPathToMenuMap: Record<string, string> = {
   '/shop/wholesale-orders': '주문',
   '/shop/settlement': '정산',
   '/shop/user': '회원 관리',
+  '/shop/visitors': '회원 관리',
   '/shop/cs': '고객 문의',
   '/shop/reviews': '리뷰 관리',
   '/shop/coupon': '쿠폰',
