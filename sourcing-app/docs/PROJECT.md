@@ -46,9 +46,8 @@
 
 | 항목 | 값 |
 |-----|---|
-| ORM | Prisma 6.19 |
-| Database (Dev) | SQLite |
-| Database (Prod) | MySQL |
+| ORM | Prisma 6.2 |
+| Database | MariaDB |
 | Queue | Bull 4.16 (Redis) |
 | Excel | exceljs 4.4, xlsx 0.18 |
 

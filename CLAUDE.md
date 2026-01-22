@@ -63,7 +63,7 @@ npx prisma db pull --schema prisma    # DB에서 스키마 가져오기
 
 ### Prisma 스키마 구조
 - `db/prisma/schema.prisma`: generator, datasource, enum 정의
-- `db/prisma/models/*.prisma`: 모델 정의 (user, product, order, payment 등 24개)
+- `db/prisma/models/*.prisma`: 모델 정의 (user, product, order, payment 등 47개)
 - `--schema prisma` 옵션이 models/ 하위 파일도 자동 로드
 
 ## 기술 스택
@@ -72,8 +72,8 @@ npx prisma db pull --schema prisma    # DB에서 스키마 가져오기
 |-----|-----|
 | Framework | Next.js 14.2.3 (App Router) |
 | Language | TypeScript 5.9 |
-| ORM | Prisma 6.19 |
-| Database | MySQL (Prod) / SQLite (Dev) |
+| ORM | Prisma 6.2 |
+| Database | MariaDB |
 | Auth | NextAuth.js 4.24 (JWT) |
 | Payment | Toss Payments SDK |
 | AI | Google Gemini API |

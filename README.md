@@ -1,6 +1,18 @@
 # BandAuto - Modular E-commerce & Sourcing Platform
 
+> **Version 1.2.0** | Band 기반 소셜커머스 상품 소싱 및 판매 자동화 플랫폼
+
 BandAuto는 도매 밴드 상품 자동화부터 AI 상세페이지 생성, 토스페이먼츠 통합 쇼핑몰까지 제공하는 풀스택 자동화 플랫폼입니다.
+
+## 📊 프로젝트 현황
+
+| 항목 | Shop App | Sourcing App | 합계 |
+|------|----------|--------------|------|
+| API 엔드포인트 | 53개 | 95개 | **148개** |
+| 페이지 | 33개 | 59개 | **92개** |
+| 컴포넌트 | 3개 | 32개 | **35개** |
+| **Prisma 모델** | - | - | **47개** |
+| **스키마 라인** | - | - | **1,236줄** |
 
 ## 🌿 브랜치 전략
 
@@ -22,7 +34,7 @@ main                    # 프로덕션 브랜치 (안정 버전)
 ### 버전 태그
 
 - `v1.0.0` - 초기 릴리즈
-- `v1.1` - 기능 업데이트
+- `v1.2.0` - 현재 버전 (모바일 UI 개선, 정산 시스템 강화)
 
 ### 개발 워크플로우
 
@@ -51,7 +63,7 @@ git push origin hong
 bandauto/
 ├── shop-app/                # 고객용 쇼핑몰 앱 (포트 3000)
 │   ├── src/
-│   │   ├── app/             # Next.js App Router
+│   │   ├── app/             # Next.js App Router (33 pages)
 │   │   │   ├── (shop)/      # 쇼핑몰 페이지 그룹
 │   │   │   │   ├── product/ # 상품 목록/상세
 │   │   │   │   ├── cart/    # 장바구니
@@ -60,7 +72,7 @@ bandauto/
 │   │   │   │   ├── order/   # 주문 완료/조회
 │   │   │   │   ├── mypage/  # 마이페이지
 │   │   │   │   └── cs/      # 고객센터
-│   │   │   └── api/         # REST API (50개 엔드포인트)
+│   │   │   └── api/         # REST API (53개 엔드포인트)
 │   │   ├── components/      # 쇼핑몰 UI 컴포넌트
 │   │   ├── contexts/        # React Context
 │   │   ├── hooks/           # Custom Hooks
@@ -70,35 +82,42 @@ bandauto/
 │
 ├── sourcing-app/            # 관리자/워커 앱 (포트 3001)
 │   ├── src/
-│   │   ├── app/             # Next.js App Router
+│   │   ├── app/             # Next.js App Router (59 pages)
 │   │   │   ├── (admin)/     # 관리자 페이지 그룹
 │   │   │   │   ├── sourcing/# 소싱 관리
 │   │   │   │   │   ├── channel/         # 채널 관리
 │   │   │   │   │   ├── collected-product/# 수집 상품
 │   │   │   │   │   ├── product/         # 가공 상품
 │   │   │   │   │   ├── published-product/# 발행 상품
+│   │   │   │   │   ├── post/            # 게시글 관리
+│   │   │   │   │   ├── dashboard/       # 대시보드
+│   │   │   │   │   ├── publish/         # 발행 관리
 │   │   │   │   │   └── automation/      # 자동화 설정
 │   │   │   │   └── shop/    # 쇼핑몰 관리
 │   │   │   │       ├── order/           # 주문 관리
 │   │   │   │       ├── user/            # 회원 관리
 │   │   │   │       ├── settlement/      # 정산 관리
+│   │   │   │       ├── store/           # 스토어 관리
+│   │   │   │       ├── notification/    # 알림 관리
 │   │   │   │       ├── cs/              # CS 관리
 │   │   │   │       └── coupon/          # 쿠폰 관리
 │   │   │   ├── (auth)/      # 인증 페이지
-│   │   │   └── api/         # REST API (79개 엔드포인트)
-│   │   ├── components/      # 관리자 UI 컴포넌트
+│   │   │   └── api/         # REST API (95개 엔드포인트)
+│   │   ├── components/      # 관리자 UI 컴포넌트 (32개)
 │   │   ├── modules/         # 비즈니스 로직 모듈
 │   │   └── services/        # 서비스 레이어
 │   └── .env                 # 환경변수
 │
 ├── db/                      # 공유 데이터베이스 패키지
 │   ├── prisma/
-│   │   ├── schema.prisma    # Prisma 설정
-│   │   ├── models/          # 모델 정의 (44개 모델)
+│   │   ├── schema.prisma    # Prisma 설정 (generator, datasource)
+│   │   ├── models/          # 모델 정의 (47개 모델, 1,236줄)
 │   │   │   ├── user.prisma
 │   │   │   ├── product.prisma
 │   │   │   ├── order.prisma
 │   │   │   ├── payment.prisma
+│   │   │   ├── channel.prisma
+│   │   │   ├── settlement.prisma
 │   │   │   └── ...
 │   │   └── migrations/      # 마이그레이션 히스토리
 │   └── src/generated/       # Prisma Client 생성 위치
@@ -116,7 +135,7 @@ bandauto/
 - **핵심 기능**:
   - 상품 목록/상세 페이지 (옵션/변형 지원)
   - 장바구니 (회원/비회원 지원)
-  - 토스페이먼츠 결제 (카드, 가상계좌, 계좌이체)
+  - 토스페이먼츠 결제 (카드, 가상계좌, 계좌이체, 간편결제)
   - 주문 관리 및 주문 조회
   - 마이페이지 (주문내역, 배송조회, 1:1문의)
   - 회원 인증 (회원가입, 로그인, 소셜로그인)
@@ -133,13 +152,15 @@ bandauto/
     - AI 상품 가공 (Gemini - 게시글 → 상세페이지)
     - 상품 발행 (소매 밴드로 자동 업로드)
     - 자동화 파이프라인 (수집 → 가공 → 발행)
+    - 대시보드 (실시간 통계)
   - **쇼핑몰 관리**
     - 주문 관리 (주문확인, 배송처리, 취소/반품)
     - 회원 관리
-    - 정산 관리 (주문별/기간별 정산)
+    - 정산 관리 (쇼핑몰별/기간별 정산, 토스페이먼츠 연동)
     - CS 관리 (1:1문의, 리뷰 관리)
     - 쿠폰 관리
     - 스토어 설정
+    - 알림 관리
 
 ## 🚀 빠른 시작
 
@@ -169,7 +190,7 @@ npx prisma db push --schema prisma
 
 **db/.env**
 ```env
-DATABASE_URL="mysql://user:password@localhost:3306/bandauto"
+DATABASE_URL="mysql://user:password@localhost:3306/bandauto"  # MariaDB
 ```
 
 **shop-app/.env.local**
@@ -240,128 +261,145 @@ import { OrderService } from '@modules/order'             // ❌ ERROR (다른 �
 
 ### 개발
 ```bash
-npm run dev:shop      # E-commerce 앱 실행 (포트 3000)
+npm run dev:shop           # Shop 앱 실행 (포트 3000)
 npm run dev:sourcing       # Sourcing 앱 실행 (포트 3001)
 npm run dev:all            # 두 앱 동시 실행
 ```
 
 ### 빌드
 ```bash
-npm run build:shop    # E-commerce 앱 빌드
+npm run build:shop         # Shop 앱 빌드
 npm run build:sourcing     # Sourcing 앱 빌드
 npm run build:all          # 두 앱 모두 빌드
 ```
 
+### 타입체크
+```bash
+npm run typecheck          # 전체 타입체크
+npm run typecheck:shop     # Shop 앱만
+npm run typecheck:sourcing # Sourcing 앱만
+```
+
 ### 데이터베이스
 ```bash
-npx prisma studio          # 데이터베이스 GUI
-npx prisma db push         # 스키마 동기화
-npm run seed               # 테스트 데이터 생성
+cd db
+npx prisma studio --schema prisma      # 데이터베이스 GUI
+npx prisma db push --schema prisma     # 스키마 동기화
+npx prisma generate --schema prisma    # 클라이언트 생성
 ```
 
 ### 테스트
 ```bash
 npm test                   # E2E 테스트 (Playwright)
 npm run test:ui            # 테스트 UI 모드
+npm run test:headed        # 헤드 모드
 ```
 
 ## 🔧 기술 스택
 
 ### Frontend
-- **Framework**: Next.js 14.2.3 (App Router)
-- **Styling**: Tailwind CSS 3.4
-- **State**: Zustand 4.5
-- **Forms**: React Hook Form + Zod
-- **Payment**: 토스페이먼츠 SDK
+| 기술 | 버전 | 용도 |
+|------|------|------|
+| Next.js | 14.2.3 | App Router 프레임워크 |
+| TypeScript | 5.9.2 | 타입 안전성 |
+| Tailwind CSS | 3.4.1 | 스타일링 |
+| Zustand | 4.5.0 | 상태 관리 |
+| React Hook Form | - | 폼 관리 |
+| 토스페이먼츠 SDK | - | 결제 연동 |
 
 ### Backend
-- **Runtime**: Node.js (Next.js API Routes)
-- **Database**: SQLite (개발) / MySQL (프로덕션) + Prisma ORM 6.19
-- **AI**: Google Gemini API
-- **Automation**: Playwright 1.55
-- **Queue**: Bull 4.16
-- **Cache**: Redis 4.6
+| 기술 | 버전 | 용도 |
+|------|------|------|
+| Node.js | - | 런타임 |
+| Prisma ORM | 6.2.1 | 데이터베이스 ORM |
+| MariaDB | - | 데이터베이스 (개발/프로덕션) |
+| Google Gemini | - | AI 상품 가공 |
+| Playwright | 1.55.0 | 브라우저 자동화 |
+| Bull | 4.16.5 | 작업 큐 |
+| Redis | - | 캐시/큐 백엔드 |
+| NextAuth.js | 4.24 | 인증 |
 
-### Testing
-- **E2E**: Playwright 1.55
+### 인프라
+| 기술 | 용도 |
+|------|------|
+| AWS EC2 | 서버 호스팅 |
+| PM2 | 프로세스 관리 |
+| Jenkins | CI/CD |
 
 ## 🚀 구현된 API 엔드포인트
 
-Shop App에 **11개의 REST API**가 완전히 구현되어 있습니다:
+| 앱 | API 수 | 주요 기능 |
+|----|--------|----------|
+| **Shop App** | 53개 | 상품, 장바구니, 주문, 결제, 마이페이지, CS |
+| **Sourcing App** | 95개 | 채널, 수집, 가공, 발행, 정산, 자동화 |
 
-### 🛒 Cart API (5개)
-```
-GET    /api/cart              # 장바구니 조회
-POST   /api/cart              # 상품 추가
-DELETE /api/cart              # 장바구니 비우기
-PATCH  /api/cart/items/:id    # 수량 변경
-DELETE /api/cart/items/:id    # 아이템 삭제
-```
+### Shop App 주요 API
+- 🛒 Cart: 장바구니 CRUD
+- 📦 Orders: 주문 생성/조회/관리
+- 💳 Payments: 토스페이먼츠 결제/취소/웹훅
+- 👤 Mypage: 주문내역, 배송조회, 1:1문의
+- 🏠 Shop: 상품 목록/상세, 리뷰
 
-### 📦 Orders API (4개)
-```
-POST   /api/orders            # 주문 생성
-GET    /api/orders            # 주문 목록 조회
-GET    /api/orders/:id        # 주문 상세 조회
-PATCH  /api/orders/:id        # 주문 상태 업데이트 (관리자)
-```
+### Sourcing App 주요 API
+- 📡 Channel: 도매/소매 채널 관리
+- 📥 Collect: 상품 수집 자동화
+- 🤖 Transform: AI 상품 가공
+- 📤 Publish: 쇼핑몰/채널 발행
+- 💰 Settlement: 정산 관리 (토스페이먼츠 연동)
+- 🔔 Notification: 알림 관리
 
-### 💳 Payments API (3개)
-```
-POST   /api/payments/confirm  # 결제 승인
-POST   /api/payments/cancel   # 결제 취소
-POST   /api/payments/webhook  # 웹훅 수신
-```
-
-**자세한 API 문서**: [docs/api/README.md](./docs/api/README.md)
+**자세한 API 문서**: 각 앱의 `docs/API.md` 참조
 
 ## 📚 상세 문서
 
-프로젝트 전체 문서는 `docs/` 디렉토리에서 확인하세요:
-
-- **[프로젝트 개요](./docs/project/CLAUDE.md)** - 전체 시스템 가이드
-- **[API 문서](./docs/api/README.md)** - REST API 레퍼런스 (11개 엔드포인트)
-- **[데이터베이스 마이그레이션](./docs/migration/DB-MIGRATION-GUIDE.md)** - SQLite → MySQL 전환 가이드
-- **[마이그레이션 가이드](./docs/migration/)** - 구조 변경 히스토리
-- **[아키텍처 문서](./docs/architecture/)** - 시스템 설계 문서
+| 문서 | 설명 |
+|------|------|
+| [shop-app/docs/](./shop-app/docs/) | Shop App 문서 (API, DB, 배포) |
+| [sourcing-app/docs/](./sourcing-app/docs/) | Sourcing App 문서 (API, DB, 배포) |
+| [docs/project/](./docs/project/) | 프로젝트 전체 가이드 |
+| [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) | AWS 배포 가이드 |
 
 ## 🗄️ 데이터베이스 스키마
 
 ### 현재 데이터베이스
 
-- **개발 환경**: SQLite (`prisma/dev.db`)
-- **프로덕션**: MySQL 지원 (마이그레이션 가이드 참조)
-- **ORM**: Prisma 6.19
-- **마이그레이션**: [SQLite → MySQL 가이드](./docs/migration/DB-MIGRATION-GUIDE.md)
+- **개발/프로덕션**: MariaDB
+- **ORM**: Prisma 6.2.1
 
-### 데이터 모델 (총 20개)
+### 데이터 모델 (총 47개)
 
-**핵심 시스템:**
-- User, Customer, CustomerAddress
-- Product, ProductCategory, ProductImage
-- Order, OrderItem
+**사용자 & 인증:**
+- User, UserAddress, UserLoginLog, UserCoupon
 
-**도매/소매 관리:**
-- WholesaleBand, CollectedPost, PostImage
-- RetailBand, RetailSettings, RetailPost, RetailPostImage
-- SourcingSite
+**상품:**
+- Product, ProductVariant, ProductOption, ProductImage
 
-**결제 시스템:**
-- Payment, PaymentMethod, Refund
+**주문 & 결제:**
+- Order, OrderItem, Payment, RefundAccount
+- GuestOrder, GuestOrderItem, GuestPayment
 
 **쇼핑몰:**
-- Shop, ShopProduct, ShopSettings
-- Cart, CartItem
+- Shop, ShopTheme, ShopProduct, Cart, CartItem
 
-**AliExpress 통합:**
-- AliExpressSourcing, AliExpressProduct
-- AliExpressProductImage, AliExpressProductReview
+**채널 & 소싱:**
+- Channel, ChannelProduct
+- CollectedPost, CollectedPostImage, CollectedPostComment, CollectedProduct
 
-**API 설정:**
-- BandApiSettings, GeminiApiSettings
-- AutomationSettings
+**CS & 반품:**
+- Inquiry, InquiryReply, Review, ReturnRequest, GuestReturnRequest
 
-자세한 스키마는 `prisma/schema.prisma` 참조 (844 lines)
+**정산:**
+- Settlement, SettlementItem
+
+**자동화:**
+- AutomationConfig, WorkflowLog, WorkflowStepLog
+- SourcingApiConfig, AiApiConfig, AiPromptConfig, GoogleSheetConfig
+
+**기타:**
+- Coupon, Notification, Wishlist, ShippingAddress
+- PricingPolicy, TermsPolicy, PrivacyPolicy
+
+자세한 스키마는 `db/prisma/` 참조 (1,236 lines)
 
 ## 🔐 보안 및 환경변수
 
@@ -369,8 +407,7 @@ POST   /api/payments/webhook  # 웹훅 수신
 
 **공통 환경변수:**
 - `DATABASE_URL`: 데이터베이스 연결 문자열
-  - 개발: `file:../prisma/dev.db` (SQLite)
-  - 프로덕션: `mysql://user:pass@host:3306/bandauto` (MySQL)
+  - `mysql://user:pass@host:3306/bandauto` (MariaDB)
 - `NEXTAUTH_SECRET`: 세션 암호화 키
 - `NEXTAUTH_URL`: 앱 URL
 
@@ -388,47 +425,44 @@ POST   /api/payments/webhook  # 웹훅 수신
 
 ## 📊 개발 현황
 
-### ✅ 완료된 기능 (92%)
+### ✅ 완료된 기능
 
 **아키텍처 & 인프라:**
-- ✅ 2-App 모노레포 아키텍처 완성
-- ✅ 모듈 분리 및 src/ 통합 (DDD 패턴)
-- ✅ 공통 모듈 구조화 (`modules/common/`)
-- ✅ TypeScript 경로 별칭 설정 (`@/`, `@modules/*`, `@common/*`)
-- ✅ 독립 실행 환경 구축 (포트 3000, 3001)
+- ✅ 2-App 모노레포 아키텍처 (Shop + Sourcing)
+- ✅ 공유 DB 패키지 (@bandauto/db)
+- ✅ TypeScript 경로 별칭 (`@/`, `@modules/*`)
+- ✅ Turbopack 개발 서버
+- ✅ 반응형 모바일 UI (전체 페이지)
 
 **데이터베이스:**
-- ✅ Prisma 스키마 완전 구현 (20개 모델, 844 lines)
-- ✅ SQLite 개발 환경 구축
-- ✅ MySQL 마이그레이션 가이드 작성
-- ✅ 데이터베이스 마이그레이션 히스토리 관리
+- ✅ Prisma 스키마 (47개 모델, 1,236 lines)
+- ✅ MariaDB 개발/프로덕션 환경
+- ✅ 마이그레이션 히스토리 관리
 
 **백엔드 API:**
-- ✅ **REST API 완전 구현** (11개 엔드포인트)
-  - 🛒 Cart API (5개): 장바구니 CRUD
-  - 📦 Orders API (4개): 주문 생성/조회/관리
-  - 💳 Payments API (3개): 결제 승인/취소/웹훅
-- ✅ 서비스 레이어 완성 (Repository-Service 패턴)
-- ✅ NextAuth.js 인증 시스템
-- ✅ 세션 기반 장바구니 (비회원 지원)
+- ✅ Shop App REST API (53개 엔드포인트)
+- ✅ Sourcing App REST API (95개 엔드포인트)
+- ✅ NextAuth.js 인증 (JWT)
+- ✅ 토스페이먼츠 결제 연동 (카드, 가상계좌, 간편결제)
 
 **프론트엔드:**
-- ✅ 관리자 대시보드 (Sourcing App)
-- ✅ 도매 밴드 관리 시스템
-- ✅ AI 상품 분석 시스템 (Gemini)
-- ✅ 소매 밴드 자동화 시스템
+- ✅ 고객용 쇼핑몰 (Shop App) - 33 pages
+- ✅ 관리자 백오피스 (Sourcing App) - 59 pages
+- ✅ 모바일 최적화 UI
 
-**문서화:**
-- ✅ API 문서 (11개 엔드포인트 상세)
-- ✅ 데이터베이스 마이그레이션 가이드
-- ✅ 프로젝트 아키텍처 문서
-- ✅ README 최신화
+**자동화:**
+- ✅ Playwright 상품 수집
+- ✅ Gemini AI 상품 가공
+- ✅ 워크플로우 파이프라인
 
-### 🚧 진행 중 (8%)
-- 🚧 고객용 쇼핑몰 UI (상품 상세, 장바구니, 주문서 페이지)
-- 🚧 토스페이먼츠 API 키 설정 및 테스트
-- 🚧 프론트엔드-백엔드 연동 통합 테스트
-- 🚧 MySQL 프로덕션 환경 전환
+**정산:**
+- ✅ 쇼핑몰별 정산 관리
+- ✅ 토스페이먼츠 거래 내역 연동
+- ✅ 정산 현황 대시보드
+
+### 🚧 진행 중
+- 🚧 프로덕션 성능 최적화
+- 🚧 E2E 테스트 확장
 
 ## 🤝 기여 가이드
 
@@ -510,7 +544,7 @@ Playwright는 `headless: true`로 실행되므로 Xvfb 불필요.
 
 ```env
 # 필수
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="mysql://user:password@localhost:3306/bandauto"
 NEXTAUTH_SECRET="your-secret-key"
 NEXTAUTH_URL="http://your-domain:3001"
 

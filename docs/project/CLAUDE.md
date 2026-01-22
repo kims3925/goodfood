@@ -34,7 +34,7 @@ BandAuto는 도매 밴드의 상품을 자동으로 수집하여 AI로 상세페
 
 ### Backend
 - **Runtime**: Node.js (Next.js API Routes)
-- **Database**: SQLite with Prisma ORM (20개 모델)
+- **Database**: MariaDB with Prisma ORM
 - **AI**: Google Gemini API (`@google/generative-ai`)
 - **Payment**: 토스페이먼츠 API (결제, 취소, 환불)
 - **Queue**: Bull Queue (주문 처리 작업)

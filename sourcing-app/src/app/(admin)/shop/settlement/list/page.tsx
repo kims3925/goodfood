@@ -678,47 +678,50 @@ export default function SettlementListPage() {
               </div>
             )}
 
-            {/* 선택된 쇼핑몰 상세 */}
+            {/* 선택된 쇼핑몰 상세 - 모바일: 전체화면 오버레이 */}
             {selectedShop && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-4 border-b bg-blue-50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {selectedShop.logoUrl ? (
-                        <img
-                          src={selectedShop.logoUrl}
-                          alt={selectedShop.name}
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
-                      ) : selectedShop.coverUrl ? (
-                        <img
-                          src={selectedShop.coverUrl}
-                          alt={selectedShop.name}
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
-                          <Store size={20} className="text-white" />
+              <>
+                {/* 모바일 전체화면 오버레이 */}
+                <div className="lg:hidden fixed inset-0 z-50 bg-gray-50 overflow-hidden flex flex-col">
+                  {/* 헤더 */}
+                  <div className="flex-shrink-0 p-4 border-b bg-blue-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {selectedShop.logoUrl ? (
+                          <img
+                            src={selectedShop.logoUrl}
+                            alt={selectedShop.name}
+                            className="w-10 h-10 rounded-lg object-cover"
+                          />
+                        ) : selectedShop.coverUrl ? (
+                          <img
+                            src={selectedShop.coverUrl}
+                            alt={selectedShop.name}
+                            className="w-10 h-10 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
+                            <Store size={18} className="text-white" />
+                          </div>
+                        )}
+                        <div>
+                          <h3 className="text-base font-bold text-gray-900">{selectedShop.name}</h3>
+                          <p className="text-xs text-gray-600">
+                            {selectedShop.itemCount}건 | {formatPrice(selectedShop.totalAmount)}
+                          </p>
                         </div>
-                      )}
-                      <div>
-                        <h3 className="text-lg font-bold text-gray-900">{selectedShop.name} 주문 상세</h3>
-                        <p className="text-sm text-gray-600">
-                          총 {selectedShop.itemCount}건 | 매출 {formatPrice(selectedShop.totalAmount)}
-                        </p>
                       </div>
+                      <button
+                        onClick={() => setSelectedShop(null)}
+                        className="p-2 hover:bg-white/50 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                      >
+                        <X size={24} className="text-gray-500" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setSelectedShop(null)}
-                      className="p-2 hover:bg-white/50 rounded-lg transition-colors"
-                    >
-                      <X size={20} className="text-gray-500" />
-                    </button>
                   </div>
-                </div>
 
-                {/* 주문 목록 - 모바일 카드 뷰 */}
-                <div className="lg:hidden p-3 space-y-3">
+                  {/* 스크롤 가능한 주문 목록 */}
+                  <div className="flex-1 overflow-y-auto p-3 space-y-3">
                   {selectedShop.items.map((item) => {
                     const paymentInfo = getPaymentStatusInfo(item.paymentMethod, item.paymentStatus)
                     const PaymentIcon = paymentInfo.icon
@@ -799,10 +802,47 @@ export default function SettlementListPage() {
                       </div>
                     )
                   })}
+                  </div>
                 </div>
 
-                {/* 주문 목록 - 데스크탑 테이블 뷰 */}
-                <div className="hidden lg:block overflow-x-auto">
+                {/* 데스크톱용 기존 UI */}
+                <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  <div className="p-4 border-b bg-blue-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {selectedShop.logoUrl ? (
+                          <img
+                            src={selectedShop.logoUrl}
+                            alt={selectedShop.name}
+                            className="w-12 h-12 rounded-lg object-cover"
+                          />
+                        ) : selectedShop.coverUrl ? (
+                          <img
+                            src={selectedShop.coverUrl}
+                            alt={selectedShop.name}
+                            className="w-12 h-12 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
+                            <Store size={20} className="text-white" />
+                          </div>
+                        )}
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900">{selectedShop.name} 주문 상세</h3>
+                          <p className="text-sm text-gray-600">
+                            총 {selectedShop.itemCount}건 | 매출 {formatPrice(selectedShop.totalAmount)}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setSelectedShop(null)}
+                        className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+                      >
+                        <X size={20} className="text-gray-500" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
@@ -906,7 +946,8 @@ export default function SettlementListPage() {
                     </tbody>
                   </table>
                 </div>
-              </div>
+                </div>
+              </>
             )}
 
             {/* 미분류 주문 */}

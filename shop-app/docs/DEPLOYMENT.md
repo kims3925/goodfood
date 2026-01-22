@@ -9,7 +9,7 @@
 | 항목 | 기술 |
 |-----|-----|
 | Cloud | AWS EC2 |
-| Database | MySQL 8.0 (AWS RDS) |
+| Database | MariaDB (AWS RDS) |
 | Cache | Redis (Bull Queue) |
 | Process Manager | PM2 |
 | Reverse Proxy | Nginx |
@@ -216,7 +216,7 @@ pm2 reload all --update-env
 
 | 변수 | 설명 | 위치 |
 |-----|-----|-----|
-| DATABASE_URL | MySQL 연결 문자열 | db/.env |
+| DATABASE_URL | MariaDB 연결 문자열 | db/.env |
 | NEXTAUTH_SECRET | NextAuth 암호화 키 | shop-app, sourcing-app |
 | NEXTAUTH_URL | 인증 URL | shop-app, sourcing-app |
 | JWT_SECRET | JWT 서명 키 | shop-app |

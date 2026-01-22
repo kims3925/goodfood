@@ -848,9 +848,9 @@ export default function CollectedProductListPage() {
           <div className="p-4 border-b border-gray-200">
             <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
               {/* 왼쪽: 변환상태 필터 + 출처 채널 필터 */}
-              <div className="flex items-center gap-3 overflow-x-auto">
+              <div className="flex items-center gap-3 overflow-x-auto w-full lg:w-auto max-w-full min-w-0 scrollbar-hide lg:scrollbar-thin">
                 {/* 변환상태 필터 */}
-                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0">
                   <button
                     onClick={() => { setSelectedChannelId(''); setCurrentPage(1) }}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
@@ -900,122 +900,247 @@ export default function CollectedProductListPage() {
             </div>
           </div>
 
-          {/* 테이블 */}
+          {/* 목록 */}
           {isLoading ? (
             <div className="p-12">
               <Loading />
             </div>
+          ) : products.length === 0 ? (
+            <div className="p-12 text-center text-gray-500">
+              수집된 상품이 없습니다.
+            </div>
           ) : (
-            <Table className="table-fixed">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[4%]">
-                    <input
-                      type="checkbox"
-                      checked={selectAll}
-                      onChange={handleToggleSelectAll}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </TableHead>
-                  <TableHead className="w-[42%]">상품명 / 게시물</TableHead>
-                  <TableHead className="w-[20%]">출처 채널</TableHead>
-                  <TableHead className="w-[10%] text-center">변환상태</TableHead>
-                  <TableHead className="w-[16%] text-center">수집일시</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {/* 데이터 행 */}
+            <>
+              {/* 모바일: 카드 뷰 */}
+              <div className="lg:hidden p-3 space-y-3">
+                {/* 전체 선택 */}
+                <div className="flex items-center gap-2 px-1 pb-2 border-b border-gray-100">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={handleToggleSelectAll}
+                    className="w-5 h-5 cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-600">전체 선택</span>
+                </div>
                 {products.map((product) => (
-                  <TableRow
+                  <div
                     key={product.id}
-                    className="hover:bg-gray-50 cursor-pointer h-[72px]"
-                    onClick={() => router.push(`/collected-product/detail/${product.id}`)}
+                    className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
                   >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(product.id)}
-                        onChange={() => handleToggleSelection(product.id)}
-                        className="w-4 h-4 cursor-pointer"
-                      />
-                    </TableCell>
-                    <TableCell>
+                    {/* 상단: 체크박스 + 상태 배지 */}
+                    <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        {product.post?.images?.[0]?.url ? (
-                          <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                            <Image
-                              src={product.post.images[0].url}
-                              alt={product.name || product.post.title}
-                              fill
-                              sizes="56px"
-                              className="object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                            <Package size={24} className="text-gray-400" />
-                          </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <div className="font-semibold text-gray-900 text-base truncate">
-                            {product.name || '(상품명 미추출)'}
-                          </div>
-                          <div className="text-sm text-gray-500 truncate">
-                            {product.description || '-'}
-                          </div>
-                        </div>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(product.id)}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            handleToggleSelection(product.id)
+                          }}
+                          className="w-5 h-5 cursor-pointer flex-shrink-0"
+                        />
+                        <span className="text-xs text-gray-500">
+                          {new Date(product.createdAt).toLocaleDateString('ko-KR', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                          }).replace(/\. /g, '-').replace(/\.$/, '')}
+                        </span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {product.post?.channel?.coverUrl ? (
-                          <img
-                            src={product.post.channel.coverUrl}
-                            alt={product.post.channel.name}
-                            className="w-9 h-9 rounded-lg object-cover flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-9 h-9 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                            <span className="text-gray-400 text-xs">No</span>
-                          </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <div className="font-semibold text-gray-900 truncate text-sm">
-                            {product.post?.channel?.name || '-'}
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
                       {product.isConverted ? (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                          변환
+                          <CheckCircle size={12} className="mr-1" />
+                          변환완료
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
                           미변환
                         </span>
                       )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="text-sm text-gray-600 whitespace-nowrap">
-                        {new Date(product.createdAt).toLocaleDateString('ko-KR', {
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit',
-                        }).replace(/\. /g, '-').replace(/\.$/, '')}{' '}
-                        {new Date(product.createdAt).toLocaleTimeString('ko-KR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                          hour12: false,
-                        })}
-                      </span>
-                    </TableCell>
-                  </TableRow>
+                    </div>
+
+                    {/* 출처 채널 배지 */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-purple-100 text-purple-700 cursor-pointer"
+                        onClick={() => router.push(`/sourcing/collected-product/detail/${product.id}`)}
+                      >
+                        {product.post?.channel?.coverUrl ? (
+                          <img
+                            src={product.post.channel.coverUrl}
+                            alt={product.post.channel.name}
+                            className="w-4 h-4 rounded object-cover"
+                          />
+                        ) : (
+                          <Boxes size={12} />
+                        )}
+                        <span className="text-xs font-medium truncate max-w-[120px]">
+                          {product.post?.channel?.name || '-'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 상품 정보 */}
+                    <div
+                      className="flex items-start gap-3 mb-3 cursor-pointer"
+                      onClick={() => router.push(`/sourcing/collected-product/detail/${product.id}`)}
+                    >
+                      {product.post?.images?.[0]?.url ? (
+                        <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                          <Image
+                            src={product.post.images[0].url}
+                            alt={product.name || product.post.title}
+                            fill
+                            sizes="64px"
+                            className="object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                          <Package size={24} className="text-gray-400" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                          {product.name || '(상품명 미추출)'}
+                        </p>
+                        <p className="text-xs text-gray-500 line-clamp-1 mt-1">
+                          {product.description || '-'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 하단: 가격 정보 */}
+                    <div
+                      className="flex items-center justify-between pt-3 border-t border-gray-100 cursor-pointer"
+                      onClick={() => router.push(`/sourcing/collected-product/detail/${product.id}`)}
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-xs text-gray-500">도매가</span>
+                        <span className="text-sm font-bold text-gray-900">
+                          {product.wholesalePrice ? `${product.wholesalePrice.toLocaleString()}원` : '-'}
+                        </span>
+                      </div>
+                      <ChevronRight size={16} className="text-gray-400" />
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+
+              {/* 데스크톱: 테이블 뷰 */}
+              <div className="hidden lg:block">
+                <Table className="table-fixed">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[4%]">
+                        <input
+                          type="checkbox"
+                          checked={selectAll}
+                          onChange={handleToggleSelectAll}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </TableHead>
+                      <TableHead className="w-[42%]">상품명 / 게시물</TableHead>
+                      <TableHead className="w-[20%]">출처 채널</TableHead>
+                      <TableHead className="w-[10%] text-center">변환상태</TableHead>
+                      <TableHead className="w-[16%] text-center">수집일시</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {products.map((product) => (
+                      <TableRow
+                        key={product.id}
+                        className="hover:bg-gray-50 cursor-pointer h-[72px]"
+                        onClick={() => router.push(`/sourcing/collected-product/detail/${product.id}`)}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(product.id)}
+                            onChange={() => handleToggleSelection(product.id)}
+                            className="w-4 h-4 cursor-pointer"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            {product.post?.images?.[0]?.url ? (
+                              <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                                <Image
+                                  src={product.post.images[0].url}
+                                  alt={product.name || product.post.title}
+                                  fill
+                                  sizes="56px"
+                                  className="object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                <Package size={24} className="text-gray-400" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-gray-900 text-base truncate">
+                                {product.name || '(상품명 미추출)'}
+                              </div>
+                              <div className="text-sm text-gray-500 truncate">
+                                {product.description || '-'}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {product.post?.channel?.coverUrl ? (
+                              <img
+                                src={product.post.channel.coverUrl}
+                                alt={product.post.channel.name}
+                                className="w-9 h-9 rounded-lg object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                <span className="text-gray-400 text-xs">No</span>
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-gray-900 truncate text-sm">
+                                {product.post?.channel?.name || '-'}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {product.isConverted ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                              변환
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                              미변환
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="text-sm text-gray-600 whitespace-nowrap">
+                            {new Date(product.createdAt).toLocaleDateString('ko-KR', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                            }).replace(/\. /g, '-').replace(/\.$/, '')}{' '}
+                            {new Date(product.createdAt).toLocaleTimeString('ko-KR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: false,
+                            })}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
 
           {/* Pagination */}

@@ -21,6 +21,7 @@ import {
   X,
   Clock,
   StopCircle,
+  ChevronDown,
 } from 'lucide-react'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
@@ -106,6 +107,7 @@ export default function PublishPage() {
 
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
   const [isPublishing, setIsPublishing] = useState(false)
+  const [expandedProductId, setExpandedProductId] = useState<number | null>(null)
 
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -1702,14 +1704,206 @@ export default function PublishPage() {
             )}
           </div>
 
-          {/* 매트릭스 테이블 */}
+          {/* 목록 */}
           {isLoading || isLoadingChannels || isLoadingShops ? (
             <div className="p-12">
               <Loading />
             </div>
           ) : (
             <>
-            <div className="overflow-x-auto">
+            {/* 모바일: 카드 뷰 */}
+            <div className="lg:hidden p-3 space-y-2">
+              {products.length === 0 ? (
+                <div className="p-12 text-center text-gray-500">
+                  <Package size={48} className="mx-auto mb-4 text-gray-300" />
+                  상품이 없습니다.
+                </div>
+              ) : (
+                products.map((product) => {
+                  const priceSet = hasPrice(product.id)
+                  const isExpanded = expandedProductId === product.id
+                  // 발행 상태 계산
+                  let shopPublished = 0
+                  let channelPublished = 0
+                  let shopSelected = 0
+                  let channelSelected = 0
+
+                  groupedTargets.forEach(group => {
+                    group.items.forEach(item => {
+                      const published = isPublished(product.id, group.type, item.id)
+                      const selected = selectedCells.has(cellKey(product.id, group.type, item.id))
+                      if (group.type === 'shop') {
+                        if (published) shopPublished++
+                        if (selected) shopSelected++
+                      } else {
+                        if (published) channelPublished++
+                        if (selected) channelSelected++
+                      }
+                    })
+                  })
+
+                  const totalShops = groupedTargets.find(g => g.type === 'shop')?.items.length || 0
+                  const totalChannels = groupedTargets.find(g => g.type === 'channel')?.items.length || 0
+                  const hasSelection = shopSelected > 0 || channelSelected > 0
+
+                  return (
+                    <div
+                      key={product.id}
+                      className={`bg-white border rounded-xl overflow-hidden transition-all ${
+                        hasSelection ? 'border-purple-300 ring-1 ring-purple-200' : 'border-gray-200'
+                      }`}
+                    >
+                      {/* 상품 헤더 - 탭하면 펼침 */}
+                      <button
+                        onClick={() => setExpandedProductId(isExpanded ? null : product.id)}
+                        className="w-full p-3 flex items-center gap-3 text-left active:bg-gray-50"
+                      >
+                        {/* 썸네일 */}
+                        {product.thumbnailUrl ? (
+                          <img
+                            src={product.thumbnailUrl}
+                            alt=""
+                            className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            <Package size={20} className="text-gray-400" />
+                          </div>
+                        )}
+
+                        {/* 상품 정보 */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 line-clamp-1">
+                            {product.name}
+                          </p>
+
+                          {/* 상태 뱃지 */}
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            {!priceSet && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-medium">
+                                <AlertTriangle size={10} />
+                                가격미설정
+                              </span>
+                            )}
+                            {totalShops > 0 && (
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                shopPublished === totalShops
+                                  ? 'bg-blue-500 text-white'
+                                  : shopPublished > 0
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : 'bg-gray-100 text-gray-500'
+                              }`}>
+                                <ShoppingCart size={10} />
+                                {shopPublished}/{totalShops}
+                              </span>
+                            )}
+                            {totalChannels > 0 && (
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                channelPublished === totalChannels
+                                  ? 'bg-green-500 text-white'
+                                  : channelPublished > 0
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-gray-100 text-gray-500'
+                              }`}>
+                                <BandIcon size={10} />
+                                {channelPublished}/{totalChannels}
+                              </span>
+                            )}
+                            {hasSelection && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500 text-white text-[10px] font-medium">
+                                <Check size={10} />
+                                {shopSelected + channelSelected}개 선택
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 펼침 아이콘 */}
+                        <ChevronDown
+                          size={20}
+                          className={`text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+
+                      {/* 펼침 영역 - 발행 대상 선택 */}
+                      {isExpanded && (
+                        <div className="border-t border-gray-100 bg-gray-50 p-3 space-y-3">
+                          {groupedTargets.map((group) => (
+                            <div key={group.platform}>
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <div className={`p-1 rounded ${group.badgeColor} text-white`}>
+                                    {group.icon}
+                                  </div>
+                                  <span className={`text-xs font-semibold ${group.headerTextColor}`}>
+                                    {group.label}
+                                  </span>
+                                </div>
+                                {/* 전체선택 버튼 */}
+                                <button
+                                  onClick={() => {
+                                    const allSelected = group.items.every(item =>
+                                      selectedCells.has(cellKey(product.id, group.type, item.id))
+                                    )
+                                    group.items.forEach(item => {
+                                      const key = cellKey(product.id, group.type, item.id)
+                                      if (allSelected) {
+                                        setSelectedCells(prev => {
+                                          const next = new Set(prev)
+                                          next.delete(key)
+                                          return next
+                                        })
+                                      } else if (!isPublished(product.id, group.type, item.id)) {
+                                        setSelectedCells(prev => new Set(prev).add(key))
+                                      }
+                                    })
+                                  }}
+                                  className="text-[10px] text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-200"
+                                >
+                                  {group.items.every(item => selectedCells.has(cellKey(product.id, group.type, item.id)))
+                                    ? '전체해제'
+                                    : '전체선택'}
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                {group.items.map((item) => {
+                                  const published = isPublished(product.id, group.type, item.id)
+                                  const selected = selectedCells.has(cellKey(product.id, group.type, item.id))
+                                  return (
+                                    <button
+                                      key={`${group.type}-${item.id}`}
+                                      onClick={() => handleCellClick(product.id, group.type, item.id)}
+                                      disabled={published}
+                                      className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all min-h-[44px] ${
+                                        selected
+                                          ? 'bg-purple-500 text-white shadow-sm'
+                                          : published
+                                          ? 'bg-green-100 text-green-700 cursor-default'
+                                          : !priceSet
+                                          ? 'bg-amber-50 text-amber-700 border border-dashed border-amber-300'
+                                          : 'bg-white text-gray-700 border border-gray-200 active:bg-gray-100'
+                                      }`}
+                                    >
+                                      <span className="truncate">{item.name}</span>
+                                      {published && <Check size={14} className="flex-shrink-0 ml-1" />}
+                                      {selected && !published && <Check size={14} className="flex-shrink-0 ml-1" />}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* 데스크톱: 매트릭스 테이블 */}
+            <div className="hidden lg:block overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
                   {/* 그룹 헤더 (쇼핑몰 / 소매밴드 구분) */}
@@ -1828,12 +2022,12 @@ export default function PublishPage() {
               </table>
             </div>
 
-          {products.length === 0 && (
-            <div className="p-12 text-center text-gray-500">
-              <Package size={48} className="mx-auto mb-4 text-gray-300" />
-              상품이 없습니다.
-            </div>
-          )}
+              {products.length === 0 && (
+                <div className="hidden lg:flex p-12 text-center text-gray-500 flex-col items-center justify-center">
+                  <Package size={48} className="mx-auto mb-4 text-gray-300" />
+                  상품이 없습니다.
+                </div>
+              )}
 
           {/* 페이징 */}
           {totalPages > 1 && (
