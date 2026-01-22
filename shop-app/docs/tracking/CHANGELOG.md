@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260122-001 | Done | 2026-01-22 | - | Redis 기반 실시간 접속자 모니터링 추가 | Low | Claude |
 | TR-20260120-003 | Done | 2026-01-20 | - | 무통장입금 주문 웹훅 알림 추가 | Low | Claude |
 | TR-20260120-002 | Done | 2026-01-20 | - | 개발 서버 Turbopack → Webpack 전환 | Low | Claude |
 | TR-20260120-001 | Done | 2026-01-20 | - | 주문 외부 알림 (슬랙/디스코드 웹훅) 기능 추가 | Low | Claude |
@@ -112,6 +113,52 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260122-001: Redis 기반 실시간 접속자 모니터링 추가
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done |
+| Author | Claude |
+| Date | 2026-01-22 |
+| REQ-ID | - |
+| Risk | Low |
+
+### 변경 사항
+- 실시간 접속자 추적 기능 추가 (Redis Sorted Set 기반)
+- `/api/presence` API 엔드포인트 추가 (GET: 접속자 수 조회, POST: heartbeat 등록)
+- `usePresence` 커스텀 훅 추가 (30초마다 heartbeat 전송)
+- Shop 대시보드에서 실시간 접속자 수 확인 가능
+- 2분간 활동 없으면 자동 만료
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| src/app/api/presence/route.ts | Added | 접속자 API 엔드포인트 |
+| src/hooks/usePresence.ts | Added | 접속자 heartbeat 커스텀 훅 |
+| src/lib/redis.ts | Added/Modified | Redis 클라이언트 설정 |
+
+### 영향 분석
+- [ ] API Contract 변경
+- [ ] DB Schema 변경
+- [ ] Domain Logic 변경
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Unit | N/A |
+| Manual | Pass |
+
+### 롤백 계획
+1. git revert로 해당 커밋 롤백
+2. Redis 키 정리: `DEL shop:presence:*`
+
+### 관련 항목
+- REQ-ID: -
+- Flow-ID: -
+
+---
 
 ## TR-20260120-002: 개발 서버 Turbopack → Webpack 전환
 

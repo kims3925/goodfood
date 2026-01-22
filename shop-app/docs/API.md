@@ -58,7 +58,10 @@ app/api/
 │   ├── products/                # 상품 목록/상세
 │   ├── product-publish/[id]/    # 발행 상품 조회
 │   ├── sections/                # 메인 섹션
-│   └── settings/                # 쇼핑몰 설정
+│   ├── settings/                # 쇼핑몰 설정
+│   └── popular/                 # 인기상품 (TR-20260108-002)
+│
+├── presence/                    # 실시간 접속자 (TR-20260122-xxx)
 │
 ├── cs/                          # 고객 서비스
 │   └── inquiry/                 # 문의 등록
@@ -280,6 +283,14 @@ app/api/
 | GET | `/api/shop/products/[id]/reviews` | 상품 리뷰 | - |
 | GET | `/api/shop/sections` | 메인 섹션 | - |
 | GET | `/api/shop/settings` | 쇼핑몰 설정 | - |
+| GET | `/api/shop/popular` | 인기상품 목록 | - |
+
+### 실시간 접속자
+
+| Method | Path | 설명 | Auth |
+|--------|------|-----|------|
+| GET | `/api/presence` | 현재 접속자 수 조회 | - |
+| POST | `/api/presence` | 접속자 heartbeat 등록/갱신 | - |
 
 ---
 

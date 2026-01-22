@@ -139,6 +139,8 @@ bandauto/
 │   │   │       ├── ui-kit/
 │   │   │       └── utils/
 │   │   ├── hooks/                # Custom Hooks
+│   │   │   ├── usePresence.ts    # 실시간 접속자 추적
+│   │   │   └── useShopUrl.ts     # 쇼핑몰 URL 관리
 │   │   ├── lib/                  # 유틸리티/설정
 │   │   ├── services/             # 외부 서비스 연동
 │   │   ├── contexts/             # React Context
