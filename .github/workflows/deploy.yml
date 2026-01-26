@@ -37,6 +37,7 @@ jobs:
         run: cd sourcing-app && npm run build
         env:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
   deploy:
     name: Deploy to EC2
