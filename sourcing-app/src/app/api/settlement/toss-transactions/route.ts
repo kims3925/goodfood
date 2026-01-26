@@ -229,9 +229,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // 디버깅용: 어떤 method 값들이 있는지 로그
     summary.methodTypes = Array.from(methodSet)
-    console.log('토스페이먼츠 거래 method 값들:', summary.methodTypes)
 
     return NextResponse.json({
       success: true,

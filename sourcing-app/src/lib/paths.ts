@@ -11,6 +11,10 @@
 import fs from 'fs'
 import path from 'path'
 
+// 경고 로그 중복 출력 방지용 플래그
+let shopSettingsWarningLogged = false
+let extensionPathWarningLogged = false
+
 /**
  * shop-app 설정 파일 경로를 반환합니다.
  *
@@ -37,13 +41,15 @@ export function readShopSettings(): Record<string, unknown> | null {
 
   try {
     if (!fs.existsSync(settingsPath)) {
-      console.warn(`[paths] shop-settings.json 파일 없음: ${settingsPath}`)
+      if (!shopSettingsWarningLogged) {
+        console.warn(`[paths] shop-settings.json 파일 없음: ${settingsPath}`)
+        shopSettingsWarningLogged = true
+      }
       return null
     }
 
     const fileContent = fs.readFileSync(settingsPath, 'utf-8')
     const settings = JSON.parse(fileContent)
-    console.log(`[paths] shop-settings.json 로드 성공: ${settingsPath}`)
     return settings
   } catch (error) {
     console.error(`[paths] shop-settings.json 읽기 실패: ${settingsPath}`, error)
@@ -75,8 +81,9 @@ export function checkExtensionPath(): { exists: boolean; path: string } {
   const extensionPath = getExtensionPath()
   const exists = fs.existsSync(extensionPath)
 
-  if (!exists) {
+  if (!exists && !extensionPathWarningLogged) {
     console.warn(`[paths] band-session-extension 폴더 없음: ${extensionPath}`)
+    extensionPathWarningLogged = true
   }
 
   return { exists, path: extensionPath }

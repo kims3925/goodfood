@@ -80,7 +80,8 @@ export async function GET(request: NextRequest) {
  * POST /api/product/deactivate
  *
  * 일괄 비활성화 실행
- * - 지정된 기간(일) 이전에 생성된 미발행 상품을 Soft Delete
+ * - 지정된 기간(일) 이전에 생성된 상품을 비활성화 (isActive: false)
+ * - Soft Delete가 아닌 비활성화 상태로 변경하여 목록에서 계속 조회 가능
  *
  * Body:
  * - days: 기준 일수 (필수)
@@ -125,11 +126,10 @@ export async function POST(request: NextRequest) {
       whereCondition.id = { in: productIds }
     }
 
-    // Soft Delete 실행 (deletedAt 설정)
+    // 비활성화 실행 (isActive만 false로 변경, deletedAt은 설정하지 않음)
     const result = await prisma.product.updateMany({
       where: whereCondition,
       data: {
-        deletedAt: new Date(),
         isActive: false,
       },
     })
