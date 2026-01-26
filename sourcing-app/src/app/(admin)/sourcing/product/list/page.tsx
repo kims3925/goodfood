@@ -168,6 +168,9 @@ export default function ProductListPage() {
   // 모달 탭 상태 ('collected' | 'manual')
   const [modalTab, setModalTab] = useState<'collected' | 'manual'>('collected')
 
+  // 모달 내 도매처 필터 상태
+  const [modalChannelFilter, setModalChannelFilter] = useState<string>('')
+
   // 정책 자동 적용 관련 상태
   const [channelPolicyMap, setChannelPolicyMap] = useState<Map<number, { policyId: number; content: string } | null>>(new Map())
 
@@ -218,6 +221,7 @@ export default function ProductListPage() {
     setShowCollectedProductModal(true)
     setSelectedCollectedIds([])
     setModalTab('collected')
+    setModalChannelFilter('')
     setManualForm({
       name: '',
       description: '',
@@ -226,14 +230,22 @@ export default function ProductListPage() {
       shippingFee: '',
       shippingInfo: '',
     })
-    await loadCollectedProducts()
+    await loadCollectedProducts('')
   }
 
-  const loadCollectedProducts = async () => {
+  const loadCollectedProducts = async (channelId?: string) => {
     setIsLoadingCollected(true)
     try {
       // 가공상품으로 변환된 적 없는 오늘 수집상품만 조회
-      const response = await fetch('/api/collected-product?limit=1000&excludeConverted=true&todayOnly=true')
+      const params = new URLSearchParams({
+        limit: '1000',
+        excludeConverted: 'true',
+        todayOnly: 'true',
+      })
+      if (channelId) {
+        params.append('channelId', channelId)
+      }
+      const response = await fetch(`/api/collected-product?${params.toString()}`)
       const data = await response.json()
 
       if (data.success) {
@@ -245,6 +257,13 @@ export default function ProductListPage() {
     } finally {
       setIsLoadingCollected(false)
     }
+  }
+
+  // 모달 내 도매처 필터 변경 핸들러
+  const handleModalChannelFilterChange = async (channelId: string) => {
+    setModalChannelFilter(channelId)
+    setSelectedCollectedIds([])
+    await loadCollectedProducts(channelId)
   }
 
   const handleConvertToProduct = async () => {
@@ -1855,6 +1874,43 @@ export default function ProductListPage() {
                   <span className="font-medium">오늘 (KST 기준)</span> 수집된 상품만 표시됩니다.
                 </p>
               </div>
+
+              {/* 도매처 필터 */}
+              <div className="mb-3 flex items-center gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto scrollbar-hide">
+                <button
+                  onClick={() => handleModalChannelFilterChange('')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+                    !modalChannelFilter
+                      ? 'bg-white shadow-sm text-gray-900'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  전체
+                </button>
+                {channels.map((channel) => (
+                  <button
+                    key={channel.id}
+                    onClick={() => handleModalChannelFilterChange(channel.id.toString())}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                      modalChannelFilter === channel.id.toString()
+                        ? 'bg-white shadow-sm text-purple-600'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {channel.coverUrl ? (
+                      <img
+                        src={channel.coverUrl}
+                        alt={channel.name}
+                        className="w-5 h-5 rounded object-cover"
+                      />
+                    ) : (
+                      <Boxes size={14} />
+                    )}
+                    <span className="max-w-[100px] truncate">{channel.name}</span>
+                  </button>
+                ))}
+              </div>
+
               {isLoadingCollected ? (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
