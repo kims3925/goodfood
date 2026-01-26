@@ -67,8 +67,9 @@ jobs:
             cd shop-app && npm run build && cd ..
             cd sourcing-app && npm run build && cd ..
 
-            # Reload PM2 processes (zero-downtime)
-            pm2 reload all --update-env
+            # Restart PM2 processes
+            pm2 restart shop --update-env
+            pm2 restart sourcing --update-env
 
             # Show status
             pm2 status

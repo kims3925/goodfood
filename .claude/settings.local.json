@@ -60,7 +60,8 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(grepai search:*)",
       "Bash(# 패키지 버전 확인 echo \"\"=== 주요 패키지 버전 ===\"\" cd /Users/seong-wan/Desktop/ABC/bandauto echo \"\"Next.js:\"\" grep ''\"\"next\"\":'' package.json || grep ''\"\"next\"\":'' shop-app/package.json echo \"\"\"\" echo \"\"TypeScript:\"\" grep ''\"\"typescript\"\":'' package.json echo \"\"\"\" echo \"\"Prisma:\"\" grep ''\"\"@prisma/client\"\":'' db/package.json grep ''\"\"prisma\"\":'' db/package.json echo \"\"\"\" echo \"\"Playwright:\"\" grep ''\"\"@playwright/test\"\":'' package.json echo \"\"\"\" echo \"\"Tailwind:\"\" grep ''\"\"tailwindcss\"\":'' package.json echo \"\"\"\" echo \"\"Zustand:\"\" grep ''\"\"zustand\"\":'' shop-app/package.json || grep ''\"\"zustand\"\":'' sourcing-app/package.json echo \"\"\"\" echo \"\"Bull:\"\" grep ''\"\"bull\"\":'' sourcing-app/package.json echo \"\"\"\" echo \"\"=== 프로젝트 버전 ===\"\" grep ''\"\"version\"\":'' package.json)",
-      "Bash(# 추가 정보 확인 echo \"\"=== Shop App 페이지 수 ===\"\" find shop-app/src/app -name \"\"page.tsx\"\")"
+      "Bash(# 추가 정보 확인 echo \"\"=== Shop App 페이지 수 ===\"\" find shop-app/src/app -name \"\"page.tsx\"\")",
+      "Bash(npm run typecheck:shop:*)"
     ],
     "deny": [],
     "ask": []
