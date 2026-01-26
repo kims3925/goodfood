@@ -238,6 +238,7 @@ export class PaymentService {
           include: {
             items: true,
             user: true,
+            shippingAddress: true,
           },
         })
 
@@ -281,31 +282,39 @@ export class PaymentService {
       console.log(`결제 승인 성공: ${orderId}`)
 
       // 외부 웹훅 알림 (슬랙/디스코드)
+      const webhookItems = result.order.items.map((item: any) => ({
+        name: item.productName,
+        quantity: item.quantity,
+        options: item.optionSummary || undefined,
+      }))
+      const shippingAddr = result.order.shippingAddress
+      const fullAddress = shippingAddr?.addressDetail
+        ? `${shippingAddr.address} ${shippingAddr.addressDetail}`
+        : shippingAddr?.address
+
       if (result.tossResult.status === 'WAITING_FOR_DEPOSIT') {
         // 무통장입금(가상계좌) - 주문 등록 알림
         sendBankTransferOrderWebhook({
-          orderNumber: result.order.orderNumber,
           customerName: result.order.user?.name || '고객',
           totalAmount: Number(result.order.totalAmount),
-          items: result.order.items.map((item: any) => ({
-            name: item.productName,
-            quantity: item.quantity,
-          })),
+          items: webhookItems,
           bankName: result.tossResult.virtualAccount?.bank,
           accountNumber: result.tossResult.virtualAccount?.accountNumber,
           dueDate: result.tossResult.virtualAccount?.dueDate,
+          phone: shippingAddr?.recipientPhone || undefined,
+          address: fullAddress || undefined,
+          memo: shippingAddr?.deliveryMemo || undefined,
         })
       } else {
         // 즉시 결제 완료 (카드, 계좌이체 등)
         sendPaymentCompletedWebhook({
-          orderNumber: result.order.orderNumber,
           customerName: result.order.user?.name || '고객',
           totalAmount: Number(result.order.totalAmount),
-          items: result.order.items.map((item: any) => ({
-            name: item.productName,
-            quantity: item.quantity,
-          })),
+          items: webhookItems,
           paymentMethod: this.getPaymentMethodLabel(result.payment.method),
+          phone: shippingAddr?.recipientPhone || undefined,
+          address: fullAddress || undefined,
+          memo: shippingAddr?.deliveryMemo || undefined,
         })
       }
 

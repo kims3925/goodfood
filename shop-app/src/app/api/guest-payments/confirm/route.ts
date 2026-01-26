@@ -470,31 +470,38 @@ export async function POST(req: NextRequest) {
       console.log(`[OrderWebhook] tossResult.status: ${tossResult.status}, method: ${tossResult.method}`)
 
       // 외부 웹훅 알림 (슬랙/디스코드)
+      const webhookItems = orderItems.map((item: any) => ({
+        name: item.productName,
+        quantity: item.quantity,
+        options: item.optionSummary || undefined,
+      }))
+      const fullAddress = prepareData.shippingAddress.addressDetail
+        ? `${prepareData.shippingAddress.address} ${prepareData.shippingAddress.addressDetail}`
+        : prepareData.shippingAddress.address
+
       if (tossResult.status === 'WAITING_FOR_DEPOSIT') {
         // 무통장입금(가상계좌) - 주문 등록 알림
         sendBankTransferOrderWebhook({
-          orderNumber: result.guestOrder.orderNumber,
           customerName: result.guestOrder.guestName,
           totalAmount: Number(result.guestOrder.totalAmount),
-          items: orderItems.map((item: any) => ({
-            name: item.productName,
-            quantity: item.quantity,
-          })),
+          items: webhookItems,
           bankName: tossResult.virtualAccount?.bank,
           accountNumber: tossResult.virtualAccount?.accountNumber,
           dueDate: tossResult.virtualAccount?.dueDate,
+          phone: prepareData.shippingAddress.recipientPhone,
+          address: fullAddress,
+          memo: prepareData.shippingAddress.deliveryMemo,
         })
       } else {
         // 즉시 결제 완료 (카드, 계좌이체 등)
         sendPaymentCompletedWebhook({
-          orderNumber: result.guestOrder.orderNumber,
           customerName: result.guestOrder.guestName,
           totalAmount: Number(result.guestOrder.totalAmount),
-          items: orderItems.map((item: any) => ({
-            name: item.productName,
-            quantity: item.quantity,
-          })),
+          items: webhookItems,
           paymentMethod: getPaymentMethodLabel(result.guestPayment.method),
+          phone: prepareData.shippingAddress.recipientPhone,
+          address: fullAddress,
+          memo: prepareData.shippingAddress.deliveryMemo,
         })
       }
 

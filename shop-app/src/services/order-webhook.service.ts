@@ -10,18 +10,22 @@
 export interface WebhookOrderItem {
   name: string
   quantity: number
+  options?: string // 옵션 정보 (예: "색상: 블랙 / 사이즈: L")
 }
 
 export interface WebhookMessage {
   title: string
-  orderNumber: string
   customerName: string
   totalAmount: number
   items: WebhookOrderItem[]
   paymentMethod?: string
-  paymentStatus?: string
+  paymentStatus?: string // 결제상태 (무통장입금 등에서 사용)
   createdAt: Date
   isExternal?: boolean // 외부 주문 여부
+  // 추가 정보
+  phone?: string // 연락처
+  address?: string // 배송지 주소
+  memo?: string // 요청사항
 }
 
 type WebhookType = 'slack' | 'discord'
@@ -35,64 +39,99 @@ type WebhookType = 'slack' | 'discord'
  */
 function formatSlackMessage(message: WebhookMessage): object {
   const itemsList = message.items
-    .map((item) => `• ${item.name} x ${item.quantity}`)
+    .map((item) => {
+      const optionText = item.options ? ` (${item.options})` : ''
+      return `• ${item.name}${optionText} x ${item.quantity}`
+    })
     .join('\n')
 
   const orderType = message.isExternal ? '외부 주문' : '새로운 주문'
   const emoji = message.isExternal ? '📝' : '🛒'
 
-  return {
-    blocks: [
-      {
-        type: 'header',
-        text: {
-          type: 'plain_text',
-          text: `${emoji} ${message.title}`,
-          emoji: true,
-        },
+  const blocks: any[] = [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: `${emoji} ${message.title}`,
+        emoji: true,
       },
-      {
-        type: 'section',
-        fields: [
-          {
-            type: 'mrkdwn',
-            text: `*주문번호:*\n${message.orderNumber}`,
-          },
-          {
-            type: 'mrkdwn',
-            text: `*고객명:*\n${message.customerName}`,
-          },
-          {
-            type: 'mrkdwn',
-            text: `*결제금액:*\n${message.totalAmount.toLocaleString()}원`,
-          },
-          {
-            type: 'mrkdwn',
-            text: `*주문유형:*\n${orderType}`,
-          },
-        ],
-      },
-      {
-        type: 'section',
-        text: {
+    },
+    {
+      type: 'section',
+      fields: [
+        {
           type: 'mrkdwn',
-          text: `*📦 주문 상품:*\n${itemsList}`,
+          text: `*고객명:*\n${message.customerName}`,
         },
+        {
+          type: 'mrkdwn',
+          text: `*연락처:*\n${message.phone || '-'}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*결제금액:*\n${message.totalAmount.toLocaleString()}원`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*주문유형:*\n${orderType}`,
+        },
+      ],
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*📦 주문 상품:*\n${itemsList}`,
       },
-      {
-        type: 'context',
-        elements: [
-          {
-            type: 'mrkdwn',
-            text: `결제상태: ${message.paymentStatus || '대기'}${message.paymentMethod ? ` | 결제수단: ${message.paymentMethod}` : ''}`,
-          },
-        ],
+    },
+  ]
+
+  // 배송지 주소
+  if (message.address) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*🏠 배송지:*\n${message.address}`,
       },
-      {
-        type: 'divider',
-      },
-    ],
+    })
   }
+
+  // 요청사항
+  if (message.memo) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*📝 요청사항:*\n${message.memo}`,
+      },
+    })
+  }
+
+  // 결제수단 및 결제상태 (context)
+  const contextParts: string[] = []
+  if (message.paymentMethod) {
+    contextParts.push(`결제수단: ${message.paymentMethod}`)
+  }
+  if (message.paymentStatus) {
+    contextParts.push(`결제상태: ${message.paymentStatus}`)
+  }
+  if (contextParts.length > 0) {
+    blocks.push({
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: contextParts.join(' | '),
+        },
+      ],
+    })
+  }
+
+  blocks.push({ type: 'divider' })
+
+  return { blocks }
 }
 
 /**
@@ -100,7 +139,10 @@ function formatSlackMessage(message: WebhookMessage): object {
  */
 function formatDiscordMessage(message: WebhookMessage): object {
   const itemsList = message.items
-    .map((item) => `• ${item.name} x ${item.quantity}`)
+    .map((item) => {
+      const optionText = item.options ? ` (${item.options})` : ''
+      return `• ${item.name}${optionText} x ${item.quantity}`
+    })
     .join('\n')
 
   const orderType = message.isExternal ? '외부 주문' : '새로운 주문'
@@ -108,43 +150,76 @@ function formatDiscordMessage(message: WebhookMessage): object {
   // 외부 주문: 파란색, 일반 주문: 녹색
   const color = message.isExternal ? 0x3498db : 0x00ff00
 
+  const fields: any[] = [
+    {
+      name: '고객명',
+      value: message.customerName,
+      inline: true,
+    },
+    {
+      name: '연락처',
+      value: message.phone || '-',
+      inline: true,
+    },
+    {
+      name: '결제금액',
+      value: `${message.totalAmount.toLocaleString()}원`,
+      inline: true,
+    },
+    {
+      name: '주문유형',
+      value: orderType,
+      inline: true,
+    },
+    {
+      name: '📦 주문 상품',
+      value: itemsList || '상품 정보 없음',
+      inline: false,
+    },
+  ]
+
+  // 배송지 주소
+  if (message.address) {
+    fields.push({
+      name: '🏠 배송지',
+      value: message.address,
+      inline: false,
+    })
+  }
+
+  // 요청사항
+  if (message.memo) {
+    fields.push({
+      name: '📝 요청사항',
+      value: message.memo,
+      inline: false,
+    })
+  }
+
+  // 결제수단
+  if (message.paymentMethod) {
+    fields.push({
+      name: '결제수단',
+      value: message.paymentMethod,
+      inline: true,
+    })
+  }
+
+  // 결제상태 (무통장입금 등)
+  if (message.paymentStatus) {
+    fields.push({
+      name: '결제상태',
+      value: message.paymentStatus,
+      inline: true,
+    })
+  }
+
   return {
     embeds: [
       {
         title: message.title,
         color,
-        fields: [
-          {
-            name: '주문번호',
-            value: message.orderNumber,
-            inline: true,
-          },
-          {
-            name: '고객명',
-            value: message.customerName,
-            inline: true,
-          },
-          {
-            name: '결제금액',
-            value: `${message.totalAmount.toLocaleString()}원`,
-            inline: true,
-          },
-          {
-            name: '주문유형',
-            value: orderType,
-            inline: true,
-          },
-          {
-            name: '📦 주문 상품',
-            value: itemsList || '상품 정보 없음',
-            inline: false,
-          },
-          {
-            name: '결제상태',
-            value: `${message.paymentStatus || '대기'}${message.paymentMethod ? ` (${message.paymentMethod})` : ''}`,
-            inline: true,
-          },
-        ],
+        fields,
         timestamp: message.createdAt.toISOString(),
         footer: {
           text: 'BandAuto 주문 알림',
@@ -211,23 +286,26 @@ export async function sendOrderWebhook(message: WebhookMessage): Promise<void> {
  * 주문 생성 시 웹훅 전송
  */
 export async function sendOrderCreatedWebhook(params: {
-  orderNumber: string
   customerName: string
   totalAmount: number
   items: WebhookOrderItem[]
   isExternal?: boolean
+  phone?: string
+  address?: string
+  memo?: string
 }): Promise<void> {
   const message: WebhookMessage = {
     title: params.isExternal
       ? '외부 주문이 등록되었습니다!'
       : '새로운 주문이 접수되었습니다!',
-    orderNumber: params.orderNumber,
     customerName: params.customerName,
     totalAmount: params.totalAmount,
     items: params.items,
-    paymentStatus: params.isExternal ? '계좌이체 대기' : '결제 대기',
     createdAt: new Date(),
     isExternal: params.isExternal,
+    phone: params.phone,
+    address: params.address,
+    memo: params.memo,
   }
 
   await sendOrderWebhook(message)
@@ -237,21 +315,24 @@ export async function sendOrderCreatedWebhook(params: {
  * 결제 완료 시 웹훅 전송
  */
 export async function sendPaymentCompletedWebhook(params: {
-  orderNumber: string
   customerName: string
   totalAmount: number
   items: WebhookOrderItem[]
   paymentMethod: string
+  phone?: string
+  address?: string
+  memo?: string
 }): Promise<void> {
   const message: WebhookMessage = {
     title: '결제가 완료되었습니다!',
-    orderNumber: params.orderNumber,
     customerName: params.customerName,
     totalAmount: params.totalAmount,
     items: params.items,
     paymentMethod: params.paymentMethod,
-    paymentStatus: '결제완료',
     createdAt: new Date(),
+    phone: params.phone,
+    address: params.address,
+    memo: params.memo,
   }
 
   await sendOrderWebhook(message)
@@ -261,27 +342,31 @@ export async function sendPaymentCompletedWebhook(params: {
  * 무통장입금(가상계좌) 주문 등록 시 웹훅 전송
  */
 export async function sendBankTransferOrderWebhook(params: {
-  orderNumber: string
   customerName: string
   totalAmount: number
   items: WebhookOrderItem[]
   bankName?: string
   accountNumber?: string
   dueDate?: string
+  phone?: string
+  address?: string
+  memo?: string
 }): Promise<void> {
   const bankInfo = params.bankName && params.accountNumber
-    ? `${params.bankName} ${params.accountNumber}`
+    ? `${params.bankName} ${params.accountNumber}${params.dueDate ? ` (${params.dueDate}까지)` : ''}`
     : '가상계좌'
 
   const message: WebhookMessage = {
     title: '주문이 등록되었습니다!',
-    orderNumber: params.orderNumber,
     customerName: params.customerName,
     totalAmount: params.totalAmount,
     items: params.items,
     paymentMethod: bankInfo,
-    paymentStatus: `입금대기${params.dueDate ? ` (${params.dueDate}까지)` : ''}`,
+    paymentStatus: '입금대기',
     createdAt: new Date(),
+    phone: params.phone,
+    address: params.address,
+    memo: params.memo,
   }
 
   await sendOrderWebhook(message)

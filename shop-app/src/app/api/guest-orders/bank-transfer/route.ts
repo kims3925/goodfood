@@ -344,17 +344,24 @@ export async function POST(req: NextRequest) {
     )
 
     // 외부 웹훅 알림 (슬랙/디스코드) - 무통장입금 주문
+    const fullAddress = shippingAddress.addressDetail
+      ? `${shippingAddress.address} ${shippingAddress.addressDetail}`
+      : shippingAddress.address
+
     sendBankTransferOrderWebhook({
-      orderNumber: result.guestOrder.orderNumber,
       customerName: result.guestOrder.guestName,
       totalAmount: Number(result.guestOrder.totalAmount),
       items: orderItems.map((item) => ({
         name: item.productName,
         quantity: item.quantity,
+        options: item.optionSummary || undefined,
       })),
       bankName: shop.bankName!,
       accountNumber: shop.bankAccount!,
       dueDate: depositDeadline.toISOString(),
+      phone: shippingAddress.recipientPhone || customerInfo.phone,
+      address: fullAddress,
+      memo: shippingAddress.deliveryMemo,
     })
 
     return NextResponse.json({

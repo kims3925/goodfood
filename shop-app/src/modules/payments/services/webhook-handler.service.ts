@@ -327,15 +327,23 @@ export class TossPaymentsWebhookHandler {
       await this.sendAdminNotification(orderId, '새로운 주문이 결제 완료되었습니다.')
 
       // 3. 외부 웹훅 알림 (슬랙/디스코드)
+      const shippingAddr = order.shippingAddress
+      const fullAddress = shippingAddr?.addressDetail
+        ? `${shippingAddr.address} ${shippingAddr.addressDetail}`
+        : shippingAddr?.address
+
       sendPaymentCompletedWebhook({
-        orderNumber: order.orderNumber,
-        customerName: order.shippingAddress?.recipientName || order.user?.name || '고객',
+        customerName: shippingAddr?.recipientName || order.user?.name || '고객',
         totalAmount: Number(order.totalAmount),
         items: order.items.map((item) => ({
           name: item.productName,
           quantity: item.quantity,
+          options: item.optionSummary || undefined,
         })),
         paymentMethod: this.mapPaymentMethod(paymentData.method),
+        phone: shippingAddr?.recipientPhone || undefined,
+        address: fullAddress || undefined,
+        memo: shippingAddr?.deliveryMemo || undefined,
       })
 
       console.log(`결제 완료 처리 완료: ${orderId}`)
