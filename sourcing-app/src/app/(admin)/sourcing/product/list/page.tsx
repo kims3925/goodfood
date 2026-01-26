@@ -127,6 +127,9 @@ export default function ProductListPage() {
   const [totalItems, setTotalItems] = useState(0)
   const itemsPerPage = 10
 
+  // Stats states (전체 통계)
+  const [stats, setStats] = useState({ total: 0, published: 0, unpublished: 0 })
+
   // Modal states
   const [showPostSelectionModal, setShowPostSelectionModal] = useState(false)
   const [showPolicyModal, setShowPolicyModal] = useState(false)
@@ -527,6 +530,10 @@ export default function ProductListPage() {
         setTotalItems(data.total || 0)
         setTotalPages(Math.ceil((data.total || 0) / itemsPerPage))
         setCurrentPage(page)
+        // 전체 통계 설정
+        if (data.stats) {
+          setStats(data.stats)
+        }
       } else {
         toast.error('상품 목록을 불러오는데 실패했습니다.')
       }
@@ -1117,7 +1124,7 @@ export default function ProductListPage() {
               </div>
               <div>
                 <p className="text-xs sm:text-sm text-gray-500">가공 상품</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900">{totalItems}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.total}</p>
               </div>
             </div>
           </div>
@@ -1128,7 +1135,7 @@ export default function ProductListPage() {
               </div>
               <div>
                 <p className="text-xs sm:text-sm text-gray-500">발행완료</p>
-                <p className="text-xl sm:text-2xl font-bold text-green-600">{products.filter(p => p.publishedProducts && p.publishedProducts.length > 0).length}</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-600">{stats.published}</p>
               </div>
             </div>
           </div>
@@ -1139,7 +1146,7 @@ export default function ProductListPage() {
               </div>
               <div>
                 <p className="text-xs sm:text-sm text-gray-500">미발행</p>
-                <p className="text-xl sm:text-2xl font-bold text-yellow-600">{products.filter(p => !p.publishedProducts || p.publishedProducts.length === 0).length}</p>
+                <p className="text-xl sm:text-2xl font-bold text-yellow-600">{stats.unpublished}</p>
               </div>
             </div>
           </div>

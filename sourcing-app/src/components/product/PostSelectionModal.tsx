@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronRight, ChevronUp, AlertCircle, Package } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronUp, AlertCircle, Package, Info } from 'lucide-react'
 import Modal, { ModalFooter } from '../ui/Modal'
 import Button from '../ui/Button'
 import Loading from '../ui/Loading'
@@ -54,8 +54,8 @@ export default function PostSelectionModal({
       setIsLoading(true)
       setError(null)
 
-      // 게시물 목록 조회 (limit=0으로 전체 조회)
-      const response = await fetch('/api/post?limit=0')
+      // 게시물 목록 조회 (limit=0으로 전체 조회, todayOnly=true로 오늘 날짜만)
+      const response = await fetch('/api/post?limit=0&todayOnly=true')
       const data = await response.json()
 
       if (!data.success) {
@@ -219,6 +219,14 @@ export default function PostSelectionModal({
         </div>
       ) : (
         <div className="flex flex-col h-[calc(75vh-12rem)]">
+          {/* 오늘 날짜 안내 */}
+          <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+            <Info size={18} className="text-amber-600 flex-shrink-0" />
+            <p className="text-sm text-amber-800">
+              <span className="font-medium">오늘 (KST 기준)</span> 수집된 게시물만 표시됩니다.
+            </p>
+          </div>
+
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
             <p className="text-sm text-blue-800">
               💡 게시물을 선택하면 AI가 자동으로 상품 정보를 생성합니다.

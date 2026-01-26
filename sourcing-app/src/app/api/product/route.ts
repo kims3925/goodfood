@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
       total: result.total,
       page: result.page,
       limit: result.limit,
+      stats: result.stats,
     })
   } catch (error) {
     console.error('상품 목록 조회 실패:', error)

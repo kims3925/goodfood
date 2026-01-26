@@ -4,6 +4,7 @@ export interface PostListParams {
   channelId?: number
   page?: number
   limit?: number
+  todayOnly?: boolean // 오늘 날짜 게시물만 조회 (KST 기준)
 }
 
 export interface PostCreateInput {

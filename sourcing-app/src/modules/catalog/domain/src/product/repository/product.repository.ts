@@ -133,11 +133,37 @@ export class ProductRepository {
       }
     })
 
+    // 전체 통계 계산 (필터 조건에 맞는 전체 상품 대상)
+    const baseWhere = { userId, deletedAt: null }
+
+    // 발행완료 수: channelProducts가 1개 이상인 상품
+    const publishedCount = await prisma.product.count({
+      where: {
+        ...baseWhere,
+        channelProducts: {
+          some: {
+            channel: {
+              kind: ChannelKind.RETAIL,
+            },
+          },
+        },
+      },
+    })
+
+    // 미발행 수: 전체 - 발행완료
+    const totalAll = await prisma.product.count({ where: baseWhere })
+    const unpublishedCount = totalAll - publishedCount
+
     return {
       data: productsWithPublishStatus,
       total,
       page,
       limit,
+      stats: {
+        total: totalAll,
+        published: publishedCount,
+        unpublished: unpublishedCount,
+      },
     }
   }
 

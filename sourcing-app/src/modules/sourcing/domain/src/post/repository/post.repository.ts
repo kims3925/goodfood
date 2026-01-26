@@ -3,7 +3,27 @@ import type { PostListParams, PostUpdateInput, SavedPostImage } from '../types/p
 
 export class CollectedPostRepository {
   async findMany(params: PostListParams) {
-    const { userId, search = '', channelId, page = 1, limit = 10 } = params
+    const { userId, search = '', channelId, page = 1, limit = 10, todayOnly = false } = params
+
+    // 오늘 날짜 필터 (KST 기준)
+    let createdAtFilter = {}
+    if (todayOnly) {
+      const now = new Date()
+      // KST (UTC+9) 기준 오늘 시작/끝 시간 계산
+      const kstOffset = 9 * 60 * 60 * 1000
+      const kstNow = new Date(now.getTime() + kstOffset)
+      const kstToday = new Date(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate())
+      // UTC로 변환 (KST 00:00 -> UTC 15:00 전날)
+      const todayStartUTC = new Date(kstToday.getTime() - kstOffset)
+      const todayEndUTC = new Date(todayStartUTC.getTime() + 24 * 60 * 60 * 1000)
+
+      createdAtFilter = {
+        createdAt: {
+          gte: todayStartUTC,
+          lt: todayEndUTC,
+        },
+      }
+    }
 
     const where = {
       userId,
@@ -15,6 +35,7 @@ export class CollectedPostRepository {
           { author: { contains: search } },
         ],
       }),
+      ...createdAtFilter,
     }
 
     const total = await prisma.collectedPost.count({ where })
