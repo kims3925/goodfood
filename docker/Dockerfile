@@ -13,10 +13,11 @@ RUN apk add --no-cache libc6-compat openssl
 # Copy package files
 COPY package.json package-lock.json ./
 COPY db/package.json ./db/
+COPY db/prisma ./db/prisma
 COPY shop-app/package.json ./shop-app/
 COPY sourcing-app/package.json ./sourcing-app/
 
-# Install all dependencies
+# Install all dependencies (prisma generate runs via postinstall)
 RUN npm ci
 
 # ============================================
