@@ -9,13 +9,16 @@ export class CollectedPostRepository {
     let createdAtFilter = {}
     if (todayOnly) {
       const now = new Date()
-      // KST (UTC+9) 기준 오늘 시작/끝 시간 계산
+      // KST (UTC+9) 기준으로 오늘 날짜 문자열 추출
+      const kstDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }) // 'YYYY-MM-DD' format
+      const [year, month, day] = kstDateStr.split('-').map(Number)
+
+      // KST 자정을 UTC 타임스탬프로 변환 (KST 00:00 = UTC 15:00 전날)
       const kstOffset = 9 * 60 * 60 * 1000
-      const kstNow = new Date(now.getTime() + kstOffset)
-      const kstToday = new Date(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate())
-      // UTC로 변환 (KST 00:00 -> UTC 15:00 전날)
-      const todayStartUTC = new Date(kstToday.getTime() - kstOffset)
-      const todayEndUTC = new Date(todayStartUTC.getTime() + 24 * 60 * 60 * 1000)
+      const kstMidnightUTC = Date.UTC(year, month - 1, day) - kstOffset
+
+      const todayStartUTC = new Date(kstMidnightUTC)
+      const todayEndUTC = new Date(kstMidnightUTC + 24 * 60 * 60 * 1000)
 
       createdAtFilter = {
         createdAt: {

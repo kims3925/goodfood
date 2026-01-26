@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const excludeConverted = searchParams.get('excludeConverted') === 'true'
+    const todayOnly = searchParams.get('todayOnly') === 'true'
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const skip = (page - 1) * limit
@@ -35,6 +36,26 @@ export async function GET(request: NextRequest) {
     // 가공상품으로 변환된 상품 제외 (excludeConverted=true인 경우)
     if (excludeConverted) {
       where.isConverted = false
+    }
+
+    // 오늘 날짜 필터 (KST 기준)
+    if (todayOnly) {
+      const now = new Date()
+      // KST (UTC+9) 기준으로 오늘 날짜 문자열 추출
+      const kstDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }) // 'YYYY-MM-DD' format
+      const [year, month, day] = kstDateStr.split('-').map(Number)
+
+      // KST 자정을 UTC 타임스탬프로 변환 (KST 00:00 = UTC 15:00 전날)
+      const kstOffset = 9 * 60 * 60 * 1000
+      const kstMidnightUTC = Date.UTC(year, month - 1, day) - kstOffset
+
+      const todayStartUTC = new Date(kstMidnightUTC)
+      const todayEndUTC = new Date(kstMidnightUTC + 24 * 60 * 60 * 1000)
+
+      where.createdAt = {
+        gte: todayStartUTC,
+        lt: todayEndUTC,
+      }
     }
 
     if (search) {
@@ -63,7 +84,8 @@ export async function GET(request: NextRequest) {
       where.post = postFilter
     }
 
-    if (startDate || endDate) {
+    // todayOnly가 아닌 경우에만 startDate/endDate 필터 적용
+    if (!todayOnly && (startDate || endDate)) {
       where.createdAt = {}
       if (startDate) {
         where.createdAt.gte = new Date(startDate)

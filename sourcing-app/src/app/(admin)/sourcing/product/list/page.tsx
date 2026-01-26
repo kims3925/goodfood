@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2, Package, Boxes, CheckCircle, Clock, ShoppingCart, AlertTriangle, Archive, Eye, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Search, Trash2, Package, Boxes, CheckCircle, Clock, ShoppingCart, AlertTriangle, Archive, Eye, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import Image from 'next/image'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -232,8 +232,8 @@ export default function ProductListPage() {
   const loadCollectedProducts = async () => {
     setIsLoadingCollected(true)
     try {
-      // 가공상품으로 변환된 적 없는 수집상품만 조회
-      const response = await fetch('/api/collected-product?limit=1000&excludeConverted=true')
+      // 가공상품으로 변환된 적 없는 오늘 수집상품만 조회
+      const response = await fetch('/api/collected-product?limit=1000&excludeConverted=true&todayOnly=true')
       const data = await response.json()
 
       if (data.success) {
@@ -1817,9 +1817,9 @@ export default function ProductListPage() {
         isOpen={showCollectedProductModal}
         onClose={handleCloseCollectedProductModal}
         title="상품 등록"
-        size="2xl"
+        size="4xl"
       >
-        <div className="flex flex-col h-[calc(70vh-8rem)]">
+        <div className="flex flex-col h-[calc(80vh-8rem)]">
           {/* 탭 버튼 */}
           <div className="flex border-b border-gray-200 mb-4">
             <button
@@ -1848,6 +1848,13 @@ export default function ProductListPage() {
           {modalTab === 'collected' ? (
             // 수집상품 선택 탭
             <>
+              {/* 오늘 날짜 안내 */}
+              <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+                <Info size={18} className="text-amber-600 flex-shrink-0" />
+                <p className="text-sm text-amber-800">
+                  <span className="font-medium">오늘 (KST 기준)</span> 수집된 상품만 표시됩니다.
+                </p>
+              </div>
               {isLoadingCollected ? (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
