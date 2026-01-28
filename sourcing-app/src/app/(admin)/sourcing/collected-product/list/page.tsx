@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Package, Trash2, Plus, ChevronDown, ChevronRight, ChevronUp, Boxes, CheckCircle, AlertCircle, ExternalLink, RefreshCw, XCircle } from 'lucide-react'
+import { Search, Package, Trash2, Plus, ChevronDown, ChevronRight, ChevronUp, Boxes, CheckCircle, AlertCircle, ExternalLink, RefreshCw, XCircle, Info } from 'lucide-react'
 import Image from 'next/image'
 import Button from '@/components/ui/Button'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
@@ -493,7 +493,7 @@ export default function CollectedProductListPage() {
     const currentPolicyMap = policyMap || channelPolicyMap
 
     try {
-      const response = await fetch('/api/post?limit=100')
+      const response = await fetch('/api/post?limit=100&todayOnly=true')
 
       if (!response.ok) {
         throw new Error(`게시물 API 오류: ${response.status}`)
@@ -1362,6 +1362,14 @@ export default function CollectedProductListPage() {
         {/* Step 1: 게시물 선택 (다중 선택) */}
         {modalStep === 'select' && (
           <div className="flex flex-col h-[700px]">
+            {/* 오늘 날짜 안내 */}
+            <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+              <Info size={18} className="text-amber-600 flex-shrink-0" />
+              <p className="text-sm text-amber-800">
+                <span className="font-medium">오늘 (KST 기준)</span> 수집된 게시물만 표시됩니다.
+              </p>
+            </div>
+
             {/* 플랫폼 선택 탭 + 안내 메시지 - 고정 */}
             <div className="flex-shrink-0 pb-4">
               <div className="flex items-center justify-between mb-3">
