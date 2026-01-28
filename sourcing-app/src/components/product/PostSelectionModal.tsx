@@ -200,7 +200,7 @@ export default function PostSelectionModal({
       isOpen={isOpen}
       onClose={onClose}
       title="게시물 선택"
-      size="2xl"
+      size="4xl"
     >
       {isLoading ? (
         <div className="py-12">
@@ -218,7 +218,7 @@ export default function PostSelectionModal({
           </div>
         </div>
       ) : (
-        <div className="flex flex-col h-[calc(75vh-12rem)]">
+        <div className="flex flex-col h-[calc(85vh-12rem)]">
           {/* 오늘 날짜 안내 */}
           <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
             <Info size={18} className="text-amber-600 flex-shrink-0" />

@@ -86,7 +86,7 @@ export default function PolicySelectionModal({
       isOpen={isOpen}
       onClose={onClose}
       title="가격 정책 선택"
-      size="lg"
+      size="2xl"
     >
       {isLoading ? (
         <div className="py-12">

@@ -382,9 +382,9 @@ export default function ProductFormModal({
       isOpen={isOpen}
       onClose={onClose}
       title={isEditMode ? '상품 정보 수정' : '상품 등록'}
-      size="2xl"
+      size="4xl"
     >
-      <div className="flex flex-col h-[calc(100vh-6rem)] sm:h-[calc(80vh-8rem)]">
+      <div className="flex flex-col h-[calc(100vh-6rem)] sm:h-[calc(90vh-8rem)]">
         {/* 다중 상품 탭 - 편집 모드가 아닐 때만 표시 */}
         {!isEditMode && (
           <div className="mb-4">

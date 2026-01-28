@@ -509,7 +509,7 @@ export default function ChannelFormModal({
       isOpen={isOpen}
       onClose={onClose}
       title={isEditMode ? '채널 수정' : '채널 등록'}
-      size="2xl"
+      size="4xl"
     >
       <div className="space-y-6">
         {/* 채널 유형 선택 (등록 시에만) */}
@@ -699,7 +699,7 @@ export default function ChannelFormModal({
                   </div>
                 ) : (
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <div className="h-[calc(60vh-10rem)] overflow-y-auto">
+                    <div className="h-[calc(70vh-10rem)] overflow-y-auto">
                       {filteredBandList.map((band) => {
                         const isSelected = selectedBands.some((b) => b.bandKey === band.bandKey)
                         return (
@@ -856,7 +856,7 @@ export default function ChannelFormModal({
                   </div>
                 ) : (
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <div className="h-[calc(60vh-10rem)] overflow-y-auto">
+                    <div className="h-[calc(70vh-10rem)] overflow-y-auto">
                       {filteredBandList.map((band) => {
                         const isSelected = selectedBands.some((b) => b.bandKey === band.bandKey)
                         return (
