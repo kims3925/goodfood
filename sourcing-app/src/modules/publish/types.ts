@@ -135,6 +135,7 @@ export type PublishStage =
   | 'uploading'      // 이미지 업로드 중
   | 'entering'       // 내용 입력 중
   | 'submitting'     // 발행 제출 중
+  | 'commenting'     // 댓글 작성 중
   | 'completed'      // 완료
   | 'failed'         // 실패
   | 'skipped'        // 건너뜀

@@ -25,6 +25,7 @@ const STAGE_LABELS: Record<PublishStage, string> = {
   uploading: '이미지 업로드 중',
   entering: '내용 입력 중',
   submitting: '게시물 등록 중',
+  commenting: '댓글 작성 중',
   retrying: '재시도 중',
   completed: '완료',
   failed: '실패',
@@ -622,6 +623,88 @@ export class BandPostAutomation {
       const postKey = await this.extractNewPostKey(page, currentBandNo, beforePostKey)
 
       console.log(`[밴드자동화] 게시물 작성 성공: ${postKey}`)
+
+      // 7. 댓글 작성 (commentContent가 있는 경우)
+      const { commentContent } = params
+      if (commentContent) {
+        await reportStage('commenting')
+        console.log('[밴드자동화] 7단계: 댓글 작성')
+
+        try {
+          // 피드로 이동하여 방금 작성한 게시물(최신 글) 확인
+          await page.goto(`https://band.us/band/${currentBandNo}`, { waitUntil: 'load' })
+          await page.waitForTimeout(2000)
+
+          // 첫 번째(최신) 게시물의 댓글 버튼 클릭
+          const commentButtonSelectors = [
+            'article._postMainWrap:first-of-type button._commentMainBtn',
+            '.cCard:first-of-type button._commentMainBtn',
+          ]
+
+          let commentButtonClicked = false
+          for (const selector of commentButtonSelectors) {
+            const btn = await page.$(selector)
+            if (btn && await btn.isVisible()) {
+              await btn.click()
+              commentButtonClicked = true
+              console.log(`[밴드자동화] 댓글 버튼 클릭: ${selector}`)
+              break
+            }
+          }
+
+          if (!commentButtonClicked) {
+            console.warn('[밴드자동화] 댓글 버튼을 찾을 수 없음, 댓글 작성 건너뜀')
+          } else {
+            await page.waitForTimeout(1000)
+
+            // 댓글 입력
+            const commentInputSelectors = [
+              'textarea._messageTextArea',
+              'textarea.commentWrite',
+              'textarea[placeholder*="댓글"]',
+            ]
+
+            let inputFound = false
+            for (const selector of commentInputSelectors) {
+              const input = await page.$(selector)
+              if (input && await input.isVisible()) {
+                // 입력창 클릭 후 type()으로 입력 (이벤트 발생하여 버튼 활성화)
+                await input.click()
+                await page.waitForTimeout(300)
+                await input.type(commentContent, { delay: 10 })
+                inputFound = true
+                console.log(`[밴드자동화] 댓글 입력 완료: ${selector}`)
+                break
+              }
+            }
+
+            if (inputFound) {
+              // -active 클래스가 붙은 버튼이 나타날 때까지 대기 (최대 5초)
+              try {
+                await page.waitForSelector('button._sendMessageButton.-active', { timeout: 5000 })
+                console.log('[밴드자동화] 댓글 등록 버튼 활성화됨')
+              } catch {
+                console.warn('[밴드자동화] 버튼 활성화 대기 타임아웃')
+              }
+
+              // 댓글 등록 버튼 클릭
+              const submitBtn = await page.$('button._sendMessageButton.-active')
+              if (submitBtn && await submitBtn.isVisible()) {
+                await submitBtn.click()
+                console.log('[밴드자동화] 댓글 등록 완료')
+                await page.waitForTimeout(1000)
+              } else {
+                console.warn('[밴드자동화] 활성화된 댓글 등록 버튼을 찾을 수 없음')
+              }
+            } else {
+              console.warn('[밴드자동화] 댓글 입력창을 찾을 수 없음')
+            }
+          }
+        } catch (commentError: any) {
+          // 댓글 실패해도 게시물 발행은 성공이므로 에러 로그만 남김
+          console.error('[밴드자동화] 댓글 작성 실패 (게시물은 정상 발행됨):', commentError.message)
+        }
+      }
 
       // 완료 단계
       await reportStage('completed', { current: tempFiles.length, total: tempFiles.length })
@@ -3488,6 +3571,117 @@ export class BandPostAutomation {
       console.error('[밴드자동화] 게시물 삭제 실패:', error)
       await this.saveDebugScreenshot(page, 'delete-error')
       return { success: false, error: error.message || '게시물 삭제 중 오류가 발생했습니다.' }
+    }
+  }
+
+  /**
+   * 최신 게시물에 댓글 작성 (Playwright 사용)
+   * 밴드 피드에서 첫 번째(최신) 글에 댓글 작성
+   */
+  async createCommentOnLatestPost(
+    page: Page,
+    bandKey: string,
+    bandName: string,
+    commentContent: string
+  ): Promise<{ success: boolean; error?: string }> {
+    console.log(`[밴드자동화] 최신 글 댓글 작성 시작: bandName="${bandName}"`)
+
+    try {
+      // 1. 밴드 피드 페이지로 이동 (navigateToBand 사용)
+      await this.navigateToBand(page, bandKey, bandName)
+      await page.waitForTimeout(2000)
+
+      // 로그인 리다이렉트 확인
+      const currentUrl = page.url()
+      if (currentUrl.includes('signin') || currentUrl.includes('login')) {
+        return { success: false, error: '로그인이 필요합니다. 세션이 만료되었을 수 있습니다.' }
+      }
+
+      await this.saveDebugScreenshot(page, 'comment-feed-page')
+
+      // 2. 첫 번째(최신) 게시물의 댓글쓰기 버튼 찾기
+      // 첫 번째 article 내의 댓글쓰기 버튼 선택
+      const firstPostCommentButton = await page.$('article._postMainWrap:first-of-type button._commentMainBtn')
+
+      if (!firstPostCommentButton || !(await firstPostCommentButton.isVisible())) {
+        // 대안 셀렉터 시도
+        const altButton = await page.$('.cCard:first-of-type button._commentMainBtn')
+        if (!altButton || !(await altButton.isVisible())) {
+          await this.saveDebugScreenshot(page, 'comment-no-button')
+          return { success: false, error: '첫 번째 게시물의 댓글쓰기 버튼을 찾을 수 없습니다.' }
+        }
+        console.log('[밴드자동화] 첫 번째 게시물 댓글쓰기 버튼 클릭 (alt)')
+        await altButton.click()
+      } else {
+        console.log('[밴드자동화] 첫 번째 게시물 댓글쓰기 버튼 클릭')
+        await firstPostCommentButton.click()
+      }
+
+      await page.waitForTimeout(1000)
+
+      await this.saveDebugScreenshot(page, 'comment-input-opened')
+
+      // 4. 댓글 입력창 찾기 및 텍스트 입력
+      const commentInputSelectors = [
+        'textarea._messageTextArea',
+        'textarea.commentWrite',
+        'textarea[placeholder*="댓글"]',
+        'div._commentInputRegion textarea',
+      ]
+
+      let inputFound = false
+      for (const selector of commentInputSelectors) {
+        const input = await page.$(selector)
+        if (input && await input.isVisible()) {
+          console.log(`[밴드자동화] 댓글 입력창 발견: ${selector}`)
+          await input.fill(commentContent)
+          await page.waitForTimeout(500)
+          inputFound = true
+          break
+        }
+      }
+
+      if (!inputFound) {
+        await this.saveDebugScreenshot(page, 'comment-no-input')
+        return { success: false, error: '댓글 입력창을 찾을 수 없습니다.' }
+      }
+
+      await this.saveDebugScreenshot(page, 'comment-text-entered')
+
+      // 5. 댓글 등록 버튼 클릭
+      const submitButtonSelectors = [
+        'button._sendMessageButton',
+        'button.btnCommentSubmit',
+        'button:has-text("보내기")',
+        'button[type="submit"].btnCommentSubmit',
+      ]
+
+      let submitClicked = false
+      for (const selector of submitButtonSelectors) {
+        const submitButton = await page.$(selector)
+        if (submitButton && await submitButton.isVisible()) {
+          console.log(`[밴드자동화] 댓글 등록 버튼 클릭: ${selector}`)
+          await submitButton.click()
+          await page.waitForTimeout(2000)
+          submitClicked = true
+          break
+        }
+      }
+
+      if (!submitClicked) {
+        await this.saveDebugScreenshot(page, 'comment-no-submit')
+        return { success: false, error: '댓글 등록 버튼을 찾을 수 없습니다.' }
+      }
+
+      await this.saveDebugScreenshot(page, 'comment-submitted')
+
+      console.log(`[밴드자동화] 최신 글 댓글 작성 완료`)
+      return { success: true }
+
+    } catch (error: any) {
+      console.error('[밴드자동화] 댓글 작성 실패:', error)
+      await this.saveDebugScreenshot(page, 'comment-error')
+      return { success: false, error: error.message || '댓글 작성 중 오류가 발생했습니다.' }
     }
   }
 }

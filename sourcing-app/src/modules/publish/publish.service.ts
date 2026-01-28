@@ -319,6 +319,7 @@ export class PublishService {
             bandName: channel.name,
             content: postContent,
             imageUrls,
+            commentContent: orderLink ? `주문하기 👉 ${orderLink}` : undefined,
           })
 
           if (playwrightResult.success && playwrightResult.postKey) {
@@ -382,7 +383,7 @@ export class PublishService {
         console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
       }
 
-      // 7. ChannelProduct 레코드 생성 또는 복원 (soft-deleted 레코드가 있으면 복원)
+      // 7. ChannelProduct 레코드 생성 또는 복원 (soft-deleted 레코드가 있으면 복원, postKey 저장)
       const channelProduct = await prisma.channelProduct.upsert({
         where: {
           productId_channelId: { productId, channelId },
@@ -391,12 +392,14 @@ export class PublishService {
           // soft-deleted 레코드 복원
           deletedAt: null,
           publishedAt: new Date(),
+          postKey: postKey || undefined,
         },
         create: {
           userId,
           productId,
           channelId,
           publishedAt: new Date(),
+          postKey: postKey || undefined,
         },
       })
 
@@ -994,6 +997,7 @@ export class PublishService {
             bandName: channel.name,
             content: postContent,
             imageUrls,
+            commentContent: orderLink ? `주문하기 👉 ${orderLink}` : undefined,
             signal, // 취소 신호 전달
             // 진행률 콜백 전달
             onStageProgress: onStageProgress
@@ -1110,7 +1114,7 @@ export class PublishService {
         console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
       }
 
-      // 7. ChannelProduct 레코드 생성 또는 복원 (soft-deleted 레코드가 있으면 복원)
+      // 7. ChannelProduct 레코드 생성 또는 복원 (soft-deleted 레코드가 있으면 복원, postKey 저장)
       const channelProduct = await prisma.channelProduct.upsert({
         where: {
           productId_channelId: { productId, channelId },
@@ -1119,12 +1123,14 @@ export class PublishService {
           // soft-deleted 레코드 복원
           deletedAt: null,
           publishedAt: new Date(),
+          postKey: postKey || undefined,
         },
         create: {
           userId,
           productId,
           channelId,
           publishedAt: new Date(),
+          postKey: postKey || undefined,
         },
       })
 

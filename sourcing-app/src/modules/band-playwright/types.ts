@@ -19,6 +19,8 @@ export interface BandPublishParams {
   bandName: string      // 밴드 이름 (Band 홈에서 채널 찾기용)
   content: string
   imageUrls: string[]   // 상품 이미지 URL 목록
+  /** 발행 후 작성할 댓글 내용 (쇼핑몰 링크 등) */
+  commentContent?: string
   /** 단계별 진행 콜백 (실시간 상태 업데이트용) */
   onStageProgress?: BandStageProgressCallback
   /** 취소 신호 (발행 중단용) */
@@ -41,6 +43,7 @@ export interface BandBatchPublishParams {
     content: string
     imageUrls: string[]
     shopUrl?: string    // 쇼핑몰 상품 URL (타임아웃 시 폴백용)
+    commentContent?: string  // 발행 후 작성할 댓글 내용
   }[]
   /**
    * Band API 성공 직후 즉시 호출되는 콜백
