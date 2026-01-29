@@ -322,7 +322,10 @@ export async function POST(req: NextRequest) {
           method: 'BANK_TRANSFER',
           paymentKey,
           amount: new Decimal(totalAmount),
-          status: 'READY',  // TossPaymentStatus 기본값
+          status: 'WAITING_FOR_DEPOSIT',
+          virtualAccountBank: shop.bankName,
+          virtualAccountNumber: shop.bankAccount,
+          virtualAccountDueDate: depositDeadline,
         },
       })
 
