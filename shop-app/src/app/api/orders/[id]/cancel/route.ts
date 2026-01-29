@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
+import { sendOrderCancelledWebhook } from '@/services/order-webhook.service'
 
 const TOSS_SECRET_KEY = process.env.TOSS_PAYMENTS_SECRET_KEY || ''
 const TOSS_CANCEL_URL = 'https://api.tosspayments.com/v1/payments'
@@ -238,6 +239,21 @@ export async function POST(
     }
 
     console.log(`주문 취소 완료: ${order.orderNumber}`)
+
+    // 취소 웹훅 알림 전송 (비동기, 실패해도 무시)
+    sendOrderCancelledWebhook({
+      orderNumber: updatedOrder.orderNumber,
+      customerName: order.user?.name || '-',
+      totalAmount: Number(updatedOrder.totalAmount),
+      items: updatedOrder.items.map((item) => ({
+        name: item.productName,
+        quantity: item.quantity,
+        options: item.optionSummary || undefined,
+      })),
+      cancelReason: cancelReasonText,
+      cancelledBy: 'USER',
+      phone: order.user?.phone || undefined,
+    }).catch(() => {})
 
     return NextResponse.json({
       success: true,

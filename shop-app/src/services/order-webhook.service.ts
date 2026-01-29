@@ -26,6 +26,11 @@ export interface WebhookMessage {
   phone?: string // 연락처
   address?: string // 배송지 주소
   memo?: string // 요청사항
+  // 취소 관련
+  isCancellation?: boolean
+  orderNumber?: string
+  cancelReason?: string
+  cancelledBy?: string
 }
 
 type WebhookType = 'slack' | 'discord'
@@ -45,21 +50,30 @@ function formatSlackMessage(message: WebhookMessage): object {
     })
     .join('\n')
 
+  const isCancellation = message.isCancellation === true
   const orderType = message.isExternal ? '외부 주문' : '새로운 주문'
-  const emoji = message.isExternal ? '📝' : '🛒'
+  const emoji = isCancellation ? '❌' : message.isExternal ? '📝' : '🛒'
 
-  const blocks: any[] = [
-    {
-      type: 'header',
-      text: {
-        type: 'plain_text',
-        text: `${emoji} ${message.title}`,
-        emoji: true,
-      },
-    },
-    {
-      type: 'section',
-      fields: [
+  const sectionFields: any[] = isCancellation
+    ? [
+        {
+          type: 'mrkdwn',
+          text: `*주문번호:*\n${message.orderNumber || '-'}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*고객명:*\n${message.customerName}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*취소금액:*\n${message.totalAmount.toLocaleString()}원`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*취소사유:*\n${message.cancelReason || '-'}`,
+        },
+      ]
+    : [
         {
           type: 'mrkdwn',
           text: `*고객명:*\n${message.customerName}`,
@@ -76,13 +90,28 @@ function formatSlackMessage(message: WebhookMessage): object {
           type: 'mrkdwn',
           text: `*주문유형:*\n${orderType}`,
         },
-      ],
+      ]
+
+  const itemsLabel = isCancellation ? '📦 취소 상품:' : '📦 주문 상품:'
+
+  const blocks: any[] = [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: `${emoji} ${message.title}`,
+        emoji: true,
+      },
+    },
+    {
+      type: 'section',
+      fields: sectionFields,
     },
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*📦 주문 상품:*\n${itemsList}`,
+        text: `*${itemsLabel}*\n${itemsList}`,
       },
     },
   ]
@@ -109,13 +138,21 @@ function formatSlackMessage(message: WebhookMessage): object {
     })
   }
 
-  // 결제수단 및 결제상태 (context)
+  // context 정보
   const contextParts: string[] = []
-  if (message.paymentMethod) {
-    contextParts.push(`결제수단: ${message.paymentMethod}`)
-  }
-  if (message.paymentStatus) {
-    contextParts.push(`결제상태: ${message.paymentStatus}`)
+  if (isCancellation) {
+    const cancellerLabel = message.cancelledBy === 'GUEST' ? '비회원 고객' : '고객'
+    contextParts.push(`취소자: ${cancellerLabel}`)
+    if (message.phone) {
+      contextParts.push(`연락처: ${message.phone}`)
+    }
+  } else {
+    if (message.paymentMethod) {
+      contextParts.push(`결제수단: ${message.paymentMethod}`)
+    }
+    if (message.paymentStatus) {
+      contextParts.push(`결제상태: ${message.paymentStatus}`)
+    }
   }
   if (contextParts.length > 0) {
     blocks.push({
@@ -145,38 +182,72 @@ function formatDiscordMessage(message: WebhookMessage): object {
     })
     .join('\n')
 
+  const isCancellation = message.isCancellation === true
   const orderType = message.isExternal ? '외부 주문' : '새로운 주문'
 
-  // 외부 주문: 파란색, 일반 주문: 녹색
-  const color = message.isExternal ? 0x3498db : 0x00ff00
+  // 취소: 빨간색, 외부 주문: 파란색, 일반 주문: 녹색
+  const color = isCancellation ? 0xff0000 : message.isExternal ? 0x3498db : 0x00ff00
 
-  const fields: any[] = [
-    {
-      name: '고객명',
-      value: message.customerName,
-      inline: true,
-    },
-    {
-      name: '연락처',
-      value: message.phone || '-',
-      inline: true,
-    },
-    {
-      name: '결제금액',
-      value: `${message.totalAmount.toLocaleString()}원`,
-      inline: true,
-    },
-    {
-      name: '주문유형',
-      value: orderType,
-      inline: true,
-    },
-    {
-      name: '📦 주문 상품',
-      value: itemsList || '상품 정보 없음',
-      inline: false,
-    },
-  ]
+  const fields: any[] = isCancellation
+    ? [
+        {
+          name: '주문번호',
+          value: message.orderNumber || '-',
+          inline: true,
+        },
+        {
+          name: '고객명',
+          value: message.customerName,
+          inline: true,
+        },
+        {
+          name: '취소금액',
+          value: `${message.totalAmount.toLocaleString()}원`,
+          inline: true,
+        },
+        {
+          name: '취소사유',
+          value: message.cancelReason || '-',
+          inline: true,
+        },
+        {
+          name: '취소자',
+          value: message.cancelledBy === 'GUEST' ? '비회원 고객' : '고객',
+          inline: true,
+        },
+        {
+          name: '📦 취소 상품',
+          value: itemsList || '상품 정보 없음',
+          inline: false,
+        },
+      ]
+    : [
+        {
+          name: '고객명',
+          value: message.customerName,
+          inline: true,
+        },
+        {
+          name: '연락처',
+          value: message.phone || '-',
+          inline: true,
+        },
+        {
+          name: '결제금액',
+          value: `${message.totalAmount.toLocaleString()}원`,
+          inline: true,
+        },
+        {
+          name: '주문유형',
+          value: orderType,
+          inline: true,
+        },
+        {
+          name: '📦 주문 상품',
+          value: itemsList || '상품 정보 없음',
+          inline: false,
+        },
+      ]
 
   // 배송지 주소
   if (message.address) {
@@ -333,6 +404,34 @@ export async function sendPaymentCompletedWebhook(params: {
     phone: params.phone,
     address: params.address,
     memo: params.memo,
+  }
+
+  await sendOrderWebhook(message)
+}
+
+/**
+ * 주문 취소 시 웹훅 전송
+ */
+export async function sendOrderCancelledWebhook(params: {
+  orderNumber: string
+  customerName: string
+  totalAmount: number
+  items: WebhookOrderItem[]
+  cancelReason: string
+  cancelledBy: string
+  phone?: string
+}): Promise<void> {
+  const message: WebhookMessage = {
+    title: '주문이 취소되었습니다',
+    customerName: params.customerName,
+    totalAmount: params.totalAmount,
+    items: params.items,
+    createdAt: new Date(),
+    isCancellation: true,
+    orderNumber: params.orderNumber,
+    cancelReason: params.cancelReason,
+    cancelledBy: params.cancelledBy,
+    phone: params.phone,
   }
 
   await sendOrderWebhook(message)

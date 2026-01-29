@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { verifyGuestAccessToken, extractGuestTokenFromHeader } from '@/lib/guest-token'
+import { sendOrderCancelledWebhook } from '@/services/order-webhook.service'
 
 /**
  * POST /api/guest-orders/[id]/cancel
@@ -71,6 +72,7 @@ export async function POST(
       where: { id: orderId },
       include: {
         payment: true,
+        items: true,
       },
     })
 
@@ -152,6 +154,21 @@ export async function POST(
 
       return updatedOrder
     })
+
+    // 취소 웹훅 알림 전송 (비동기, 실패해도 무시)
+    sendOrderCancelledWebhook({
+      orderNumber: guestOrder.orderNumber,
+      customerName: guestOrder.guestName,
+      totalAmount: Number(guestOrder.totalAmount),
+      items: guestOrder.items.map((item) => ({
+        name: item.productName,
+        quantity: item.quantity,
+        options: item.optionSummary || undefined,
+      })),
+      cancelReason: reason,
+      cancelledBy: 'GUEST',
+      phone: guestOrder.guestPhone || undefined,
+    }).catch(() => {})
 
     return NextResponse.json({
       success: true,
