@@ -92,7 +92,13 @@ export async function GET(request: NextRequest) {
           },
           _count: {
             select: {
-              orders: true,
+              orders: {
+                where: {
+                  status: {
+                    notIn: ['CANCELLED', 'REFUNDED'],
+                  },
+                },
+              },
               inquiries: true,
               reviews: true,
             },
