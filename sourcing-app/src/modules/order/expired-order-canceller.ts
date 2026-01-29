@@ -25,12 +25,14 @@ export function startExpiredOrderCanceller(): void {
 }
 
 /**
- * 입금 기한 초과 주문 취소 실행
+ * 입금 기한 초과 주문 취소 실행 (회원 + 비회원)
  */
 async function cancelExpiredOrders(): Promise<void> {
   try {
     const now = new Date()
+    let cancelledCount = 0
 
+    // 1. 회원 주문 자동 취소
     const expiredOrders = await prisma.order.findMany({
       where: {
         status: CustomerOrderStatus.PENDING,
@@ -45,8 +47,6 @@ async function cancelExpiredOrders(): Promise<void> {
         payment: true,
       },
     })
-
-    if (expiredOrders.length === 0) return
 
     for (const order of expiredOrders) {
       try {
@@ -78,13 +78,61 @@ async function cancelExpiredOrders(): Promise<void> {
           })
         })
 
-        console.log(`[AutoCancel] 주문 ${order.orderNumber} 자동 취소 완료`)
+        cancelledCount++
+        console.log(`[AutoCancel] 회원 주문 ${order.orderNumber} 자동 취소 완료`)
       } catch (error) {
-        console.error(`[AutoCancel] 주문 ${order.orderNumber} 취소 실패:`, error)
+        console.error(`[AutoCancel] 회원 주문 ${order.orderNumber} 취소 실패:`, error)
       }
     }
 
-    console.log(`[AutoCancel] ${expiredOrders.length}개 주문 자동 취소됨`)
+    // 2. 비회원 주문 자동 취소
+    const expiredGuestOrders = await prisma.guestOrder.findMany({
+      where: {
+        status: CustomerOrderStatus.PENDING,
+        payment: {
+          method: 'BANK_TRANSFER',
+          virtualAccountDueDate: {
+            lt: now,
+          },
+        },
+      },
+      include: {
+        payment: true,
+      },
+    })
+
+    for (const guestOrder of expiredGuestOrders) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.guestOrder.update({
+            where: { id: guestOrder.id },
+            data: {
+              status: CustomerOrderStatus.CANCELLED,
+              cancelledAt: now,
+              cancelReason: '입금 기한 초과로 자동 취소',
+            },
+          })
+
+          if (guestOrder.payment) {
+            await tx.guestPayment.update({
+              where: { id: guestOrder.payment.id },
+              data: {
+                status: TossPaymentStatus.CANCELED,
+              },
+            })
+          }
+        })
+
+        cancelledCount++
+        console.log(`[AutoCancel] 비회원 주문 ${guestOrder.orderNumber} 자동 취소 완료`)
+      } catch (error) {
+        console.error(`[AutoCancel] 비회원 주문 ${guestOrder.orderNumber} 취소 실패:`, error)
+      }
+    }
+
+    if (cancelledCount > 0) {
+      console.log(`[AutoCancel] 총 ${cancelledCount}개 주문 자동 취소됨`)
+    }
   } catch (error) {
     console.error('[AutoCancel] 자동 취소 실행 실패:', error)
   }
