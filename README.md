@@ -1,6 +1,6 @@
 # BandAuto - Modular E-commerce & Sourcing Platform
 
-> **Version 1.2.0** | Band 기반 소셜커머스 상품 소싱 및 판매 자동화 플랫폼
+> **Version 1.1.0** | Band 기반 소셜커머스 상품 소싱 및 판매 자동화 플랫폼
 
 BandAuto는 도매 밴드 상품 자동화부터 AI 상세페이지 생성, 토스페이먼츠 통합 쇼핑몰까지 제공하는 풀스택 자동화 플랫폼입니다.
 
@@ -12,7 +12,7 @@ BandAuto는 도매 밴드 상품 자동화부터 AI 상세페이지 생성, 토�
 | 페이지 | 33개 | 59개 | **92개** |
 | 컴포넌트 | 3개 | 32개 | **35개** |
 | **Prisma 모델** | - | - | **47개** |
-| **스키마 라인** | - | - | **1,236줄** |
+| **스키마 라인** | - | - | **1,063줄** |
 
 ## 🌿 브랜치 전략
 
@@ -20,6 +20,8 @@ BandAuto는 도매 밴드 상품 자동화부터 AI 상세페이지 생성, 토�
 
 ```
 main                    # 프로덕션 브랜치 (안정 버전)
+├── release-1           # v1.0.0 릴리즈 브랜치 (완료)
+├── release-2           # v1.1.0 릴리즈 브랜치 (현재)
 ├── hong                # 개발자 브랜치 (홍)
 └── Lee                 # 개발자 브랜치 (이)
 ```
@@ -29,31 +31,41 @@ main                    # 프로덕션 브랜치 (안정 버전)
 | 브랜치 | 용도 | 배포 환경 |
 |--------|------|-----------|
 | `main` | 프로덕션 코드, 안정 버전만 머지 | Production |
+| `release-*` | 버전별 릴리즈 브랜치, 배포 전 검증 | Staging |
 | `hong`, `Lee` | 개발자별 작업 브랜치 | Local/Dev |
 
 ### 버전 태그
 
-- `v1.0.0` - 초기 릴리즈
-- `v1.2.0` - 현재 버전 (모바일 UI 개선, 정산 시스템 강화)
+| 태그 | 설명 |
+|------|------|
+| `v1.0.0` | 초기 릴리즈 |
+| `v1.1.0` | 무통장입금 자동 취소, 비회원 주문 처리 개선 |
 
 ### 개발 워크플로우
 
 ```bash
 # 1. 개발자 브랜치에서 작업
 git checkout hong
-git pull origin main
 # ... 작업 ...
-git commit -m "feat: 새 기능 추가"
+git commit -m "feat(sourcing): 새 기능 추가"
 git push origin hong
 
-# 2. main으로 PR 생성 후 머지
-# GitHub에서 PR 생성 및 코드 리뷰 후 머지
+# 2. release 브랜치로 머지 후 배포 검증
+git checkout release-2
+git merge hong
+git push origin release-2
+
+# 3. 검증 완료 후 main으로 머지
+git checkout main
+git merge release-2
+git push origin main
 ```
 
 ### 머지 규칙
 
-- **main ← 개발자 브랜치**: PR 리뷰 완료 후 머지
-- **main 직접 커밋 금지**: 반드시 PR 통해서
+- **release ← 개발자 브랜치**: 배포 전 검증용
+- **main ← release**: 검증 완료 후 머지
+- **main 직접 커밋 금지**
 
 ## 🏗️ 프로젝트 구조
 
@@ -63,16 +75,20 @@ git push origin hong
 bandauto/
 ├── shop-app/                # 고객용 쇼핑몰 앱 (포트 3000)
 │   ├── src/
-│   │   ├── app/             # Next.js App Router (33 pages)
+│   │   ├── app/             # Next.js App Router
 │   │   │   ├── (shop)/      # 쇼핑몰 페이지 그룹
-│   │   │   │   ├── product/ # 상품 목록/상세
-│   │   │   │   ├── cart/    # 장바구니
-│   │   │   │   ├── checkout/# 주문서 작성
-│   │   │   │   ├── payment/ # 결제 처리
-│   │   │   │   ├── order/   # 주문 완료/조회
-│   │   │   │   ├── mypage/  # 마이페이지
-│   │   │   │   └── cs/      # 고객센터
-│   │   │   └── api/         # REST API (53개 엔드포인트)
+│   │   │   │   ├── main/       # 메인 페이지
+│   │   │   │   ├── product/    # 상품 목록/상세
+│   │   │   │   ├── cart/       # 장바구니
+│   │   │   │   ├── checkout/   # 주문서 작성
+│   │   │   │   ├── payment/    # 결제 처리
+│   │   │   │   ├── order/      # 주문 완료/조회 (비회원 포함)
+│   │   │   │   ├── mypage/     # 마이페이지
+│   │   │   │   ├── cs/         # 고객센터
+│   │   │   │   ├── band/       # 밴드 연동
+│   │   │   │   ├── popular/    # 인기 상품
+│   │   │   │   └── auth/       # 인증 (로그인/회원가입)
+│   │   │   └── api/            # REST API
 │   │   ├── components/      # 쇼핑몰 UI 컴포넌트
 │   │   ├── contexts/        # React Context
 │   │   ├── hooks/           # Custom Hooks
@@ -82,49 +98,56 @@ bandauto/
 │
 ├── sourcing-app/            # 관리자/워커 앱 (포트 3001)
 │   ├── src/
-│   │   ├── app/             # Next.js App Router (59 pages)
+│   │   ├── app/             # Next.js App Router
 │   │   │   ├── (admin)/     # 관리자 페이지 그룹
-│   │   │   │   ├── sourcing/# 소싱 관리
-│   │   │   │   │   ├── channel/         # 채널 관리
-│   │   │   │   │   ├── collected-product/# 수집 상품
-│   │   │   │   │   ├── product/         # 가공 상품
-│   │   │   │   │   ├── published-product/# 발행 상품
-│   │   │   │   │   ├── post/            # 게시글 관리
-│   │   │   │   │   ├── dashboard/       # 대시보드
-│   │   │   │   │   ├── publish/         # 발행 관리
-│   │   │   │   │   └── automation/      # 자동화 설정
-│   │   │   │   └── shop/    # 쇼핑몰 관리
-│   │   │   │       ├── order/           # 주문 관리
-│   │   │   │       ├── user/            # 회원 관리
-│   │   │   │       ├── settlement/      # 정산 관리
-│   │   │   │       ├── store/           # 스토어 관리
-│   │   │   │       ├── notification/    # 알림 관리
-│   │   │   │       ├── cs/              # CS 관리
-│   │   │   │       └── coupon/          # 쿠폰 관리
-│   │   │   ├── (auth)/      # 인증 페이지
-│   │   │   └── api/         # REST API (95개 엔드포인트)
-│   │   ├── components/      # 관리자 UI 컴포넌트 (32개)
+│   │   │   │   ├── sourcing/   # 소싱 관리
+│   │   │   │   │   ├── automation/         # 자동화 설정
+│   │   │   │   │   ├── channel/            # 채널 관리
+│   │   │   │   │   ├── collected-product/  # 수집 상품
+│   │   │   │   │   ├── product/            # 가공 상품
+│   │   │   │   │   ├── post/               # 게시글 관리
+│   │   │   │   │   ├── publish/            # 발행 관리
+│   │   │   │   │   ├── dashboard/          # 대시보드
+│   │   │   │   │   ├── settings/           # 설정 (Google Sheets 등)
+│   │   │   │   │   ├── notification/       # 알림 관리
+│   │   │   │   │   └── user/               # 사용자 관리
+│   │   │   │   └── shop/       # 쇼핑몰 관리
+│   │   │   │       ├── order/              # 주문 관리 (외부 주문 포함)
+│   │   │   │       ├── wholesale-orders/   # 도매 주문
+│   │   │   │       ├── settlement/         # 정산 관리
+│   │   │   │       ├── user/               # 회원 관리
+│   │   │   │       ├── store/              # 스토어 관리
+│   │   │   │       ├── visitors/           # 방문자 통계
+│   │   │   │       ├── cs/                 # CS 관리
+│   │   │   │       ├── reviews/            # 리뷰 관리
+│   │   │   │       ├── coupon/             # 쿠폰 관리
+│   │   │   │       ├── notification/       # 알림 관리
+│   │   │   │       ├── dashboard/          # 쇼핑몰 대시보드
+│   │   │   │       └── policy/             # 약관 관리
+│   │   │   ├── (auth)/         # 인증 페이지
+│   │   │   └── api/            # REST API + cron jobs
+│   │   ├── components/      # 관리자 UI 컴포넌트
 │   │   ├── modules/         # 비즈니스 로직 모듈
+│   │   │   ├── auth/           # 인증
+│   │   │   ├── automation/     # 자동화 스케줄러/파이프라인
+│   │   │   ├── band-playwright/# Playwright 밴드 자동화
+│   │   │   ├── order/          # 주문 (자동 취소 스케줄러)
+│   │   │   ├── publish/        # 발행 서비스
+│   │   │   ├── sourcing/       # 소싱 도메인
+│   │   │   ├── transformation/ # AI 변환
+│   │   │   └── catalog/        # 카탈로그
 │   │   └── services/        # 서비스 레이어
 │   └── .env                 # 환경변수
 │
-├── db/                      # 공유 데이터베이스 패키지
+├── db/                      # 공유 데이터베이스 패키지 (@bandauto/db)
 │   ├── prisma/
-│   │   ├── schema.prisma    # Prisma 설정 (generator, datasource)
-│   │   ├── models/          # 모델 정의 (47개 모델, 1,236줄)
-│   │   │   ├── user.prisma
-│   │   │   ├── product.prisma
-│   │   │   ├── order.prisma
-│   │   │   ├── payment.prisma
-│   │   │   ├── channel.prisma
-│   │   │   ├── settlement.prisma
-│   │   │   └── ...
+│   │   ├── schema.prisma    # Prisma 설정 (generator, datasource, enum)
+│   │   ├── models/          # 모델 정의 (47개 모델)
 │   │   └── migrations/      # 마이그레이션 히스토리
-│   └── src/generated/       # Prisma Client 생성 위치
+│   └── src/                 # Prisma Client 및 타입 export
 │
-├── scripts/                 # 유틸리티 스크립트
 ├── docs/                    # 프로젝트 문서
-└── band-session-extension/  # Chrome 확장 프로그램
+└── band-session-extension/  # Chrome 확장 프로그램 (밴드 세션 관리)
 ```
 
 ## 🎯 2-App 아키텍처
@@ -154,13 +177,15 @@ bandauto/
     - 자동화 파이프라인 (수집 → 가공 → 발행)
     - 대시보드 (실시간 통계)
   - **쇼핑몰 관리**
-    - 주문 관리 (주문확인, 배송처리, 취소/반품)
+    - 주문 관리 (주문확인, 배송처리, 취소/반품, 외부 주문)
+    - 무통장입금 자동 취소 (입금 기한 초과 시 회원/비회원 주문 자동 취소)
     - 회원 관리
     - 정산 관리 (쇼핑몰별/기간별 정산, 토스페이먼츠 연동)
     - CS 관리 (1:1문의, 리뷰 관리)
     - 쿠폰 관리
     - 스토어 설정
     - 알림 관리
+    - 방문자 통계
 
 ## 🚀 빠른 시작
 
@@ -399,7 +424,7 @@ npm run test:headed        # 헤드 모드
 - Coupon, Notification, Wishlist, ShippingAddress
 - PricingPolicy, TermsPolicy, PrivacyPolicy
 
-자세한 스키마는 `db/prisma/` 참조 (1,236 lines)
+자세한 스키마는 `db/prisma/` 참조 (1,063 lines)
 
 ## 🔐 보안 및 환경변수
 
@@ -435,7 +460,7 @@ npm run test:headed        # 헤드 모드
 - ✅ 반응형 모바일 UI (전체 페이지)
 
 **데이터베이스:**
-- ✅ Prisma 스키마 (47개 모델, 1,236 lines)
+- ✅ Prisma 스키마 (47개 모델, 1,063 lines)
 - ✅ MariaDB 개발/프로덕션 환경
 - ✅ 마이그레이션 히스토리 관리
 
@@ -454,6 +479,8 @@ npm run test:headed        # 헤드 모드
 - ✅ Playwright 상품 수집
 - ✅ Gemini AI 상품 가공
 - ✅ 워크플로우 파이프라인
+- ✅ 밴드 발행 후 댓글로 쇼핑몰 링크 자동 작성
+- ✅ 무통장입금 기한 초과 주문 자동 취소 (회원/비회원)
 
 **정산:**
 - ✅ 쇼핑몰별 정산 관리
