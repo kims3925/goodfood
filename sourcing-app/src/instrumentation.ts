@@ -11,5 +11,9 @@ export async function register() {
 
     // 스케줄러 초기화
     await initializeScheduler()
+
+    // 무통장입금 기한 초과 주문 자동 취소 스케줄러
+    const { startExpiredOrderCanceller } = await import('@/modules/order/expired-order-canceller')
+    startExpiredOrderCanceller()
   }
 }

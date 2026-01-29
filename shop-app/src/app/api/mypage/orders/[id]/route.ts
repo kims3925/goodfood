@@ -145,6 +145,7 @@ export async function GET(
         shippedAt: order.shippedAt?.toISOString() || null,
         deliveredAt: order.deliveredAt?.toISOString() || null,
         cancelledAt: order.cancelledAt?.toISOString() || null,
+        cancelReason: order.cancelReason || null,
         customer: {
           name: order.user.name,
           email: order.user.email,
@@ -292,6 +293,7 @@ export async function GET(
       shippedAt: guestOrder.shippedAt?.toISOString() || null,
       deliveredAt: guestOrder.deliveredAt?.toISOString() || null,
       cancelledAt: guestOrder.cancelledAt?.toISOString() || null,
+      cancelReason: guestOrder.cancelReason || null,
       customer: {
         name: guestOrder.guestName,
         email: guestOrder.guestEmail,

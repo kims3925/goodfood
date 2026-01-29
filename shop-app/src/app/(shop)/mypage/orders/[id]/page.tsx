@@ -130,6 +130,7 @@ interface Order {
   shippedAt: string | null
   deliveredAt: string | null
   cancelledAt: string | null
+  cancelReason: string | null
   customer: {
     name: string
     email: string | null
@@ -455,6 +456,24 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 취소 정보 (취소된 경우) */}
+      {order.status === 'CANCELLED' && order.cancelledAt && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h2 className="text-lg font-bold text-red-800 mb-2">주문이 취소되었습니다</h2>
+              <div className="space-y-1 text-sm text-red-700">
+                <p><strong>취소일:</strong> {formatDate(order.cancelledAt)}</p>
+                {order.cancelReason && (
+                  <p><strong>취소 사유:</strong> {order.cancelReason}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 무통장입금 정보 (PENDING 상태이고 BANK_TRANSFER인 경우) */}
       {order.bankTransferInfo && order.status === 'PENDING' && (
