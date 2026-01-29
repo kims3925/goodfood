@@ -243,6 +243,7 @@ export const orderService = {
         items: orderItemsData.map((item) => ({
           name: item.productName,
           quantity: item.quantity,
+          options: item.optionSummary || undefined,
         })),
       })
 

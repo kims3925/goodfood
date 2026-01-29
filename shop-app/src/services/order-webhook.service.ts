@@ -40,8 +40,8 @@ type WebhookType = 'slack' | 'discord'
 function formatSlackMessage(message: WebhookMessage): object {
   const itemsList = message.items
     .map((item) => {
-      const optionText = item.options ? ` (${item.options})` : ''
-      return `• ${item.name}${optionText} x ${item.quantity}`
+      const line = `• ${item.name} x ${item.quantity}`
+      return item.options ? `${line}\n  └ 옵션: ${item.options}` : line
     })
     .join('\n')
 
@@ -140,8 +140,8 @@ function formatSlackMessage(message: WebhookMessage): object {
 function formatDiscordMessage(message: WebhookMessage): object {
   const itemsList = message.items
     .map((item) => {
-      const optionText = item.options ? ` (${item.options})` : ''
-      return `• ${item.name}${optionText} x ${item.quantity}`
+      const line = `• ${item.name} x ${item.quantity}`
+      return item.options ? `${line}\n  └ 옵션: ${item.options}` : line
     })
     .join('\n')
 

@@ -10,6 +10,7 @@
 export interface WebhookOrderItem {
   name: string
   quantity: number
+  options?: string
 }
 
 export interface WebhookMessage {
@@ -35,7 +36,10 @@ type WebhookType = 'slack' | 'discord'
  */
 function formatSlackMessage(message: WebhookMessage): object {
   const itemsList = message.items
-    .map((item) => `• ${item.name} x ${item.quantity}`)
+    .map((item) => {
+      const line = `• ${item.name} x ${item.quantity}`
+      return item.options ? `${line}\n  └ 옵션: ${item.options}` : line
+    })
     .join('\n')
 
   const orderType = message.isExternal ? '외부 주문' : '새로운 주문'
@@ -100,7 +104,10 @@ function formatSlackMessage(message: WebhookMessage): object {
  */
 function formatDiscordMessage(message: WebhookMessage): object {
   const itemsList = message.items
-    .map((item) => `• ${item.name} x ${item.quantity}`)
+    .map((item) => {
+      const line = `• ${item.name} x ${item.quantity}`
+      return item.options ? `${line}\n  └ 옵션: ${item.options}` : line
+    })
     .join('\n')
 
   const orderType = message.isExternal ? '외부 주문' : '새로운 주문'
