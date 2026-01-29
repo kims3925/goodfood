@@ -125,7 +125,7 @@ export default function ProductListPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  const itemsPerPage = 10
+  const itemsPerPage = 20
 
   // Stats states (전체 통계)
   const [stats, setStats] = useState({ total: 0, published: 0, unpublished: 0 })
