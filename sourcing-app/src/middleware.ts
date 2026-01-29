@@ -19,6 +19,7 @@ export async function middleware(request: NextRequest) {
     '/api/order/webhook',  // Google Forms 웹훅
     '/api/assets/',        // 이미지 등 정적 자산
     '/api/images/',        // 이미지 API
+    '/api/cron/',          // 스케줄러 내부 호출
   ]
 
   // Chrome Extension에서 band-session API 접근 허용 (PUT, POST 메서드)
