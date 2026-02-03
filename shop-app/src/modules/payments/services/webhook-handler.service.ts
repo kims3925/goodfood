@@ -305,6 +305,7 @@ export class TossPaymentsWebhookHandler {
         where: { id: orderId },
         include: {
           user: true,
+          shop: true,
           shippingAddress: true,
           items: {
             include: {
@@ -341,6 +342,7 @@ export class TossPaymentsWebhookHandler {
           options: item.optionSummary || undefined,
         })),
         paymentMethod: this.mapPaymentMethod(paymentData.method),
+        shopName: order.shop?.name || undefined,
         phone: shippingAddr?.recipientPhone || undefined,
         address: fullAddress || undefined,
         memo: shippingAddr?.deliveryMemo || undefined,

@@ -245,6 +245,7 @@ export const orderService = {
           quantity: item.quantity,
           options: item.optionSummary || undefined,
         })),
+        shopName: shop.name || undefined,
       })
 
       return {

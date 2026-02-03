@@ -238,6 +238,7 @@ export class PaymentService {
           include: {
             items: true,
             user: true,
+            shop: true,
             shippingAddress: true,
           },
         })
@@ -301,6 +302,7 @@ export class PaymentService {
           bankName: result.tossResult.virtualAccount?.bank,
           accountNumber: result.tossResult.virtualAccount?.accountNumber,
           dueDate: result.tossResult.virtualAccount?.dueDate,
+          shopName: result.order.shop?.name || undefined,
           phone: shippingAddr?.recipientPhone || undefined,
           address: fullAddress || undefined,
           memo: shippingAddr?.deliveryMemo || undefined,
@@ -312,6 +314,7 @@ export class PaymentService {
           totalAmount: Number(result.order.totalAmount),
           items: webhookItems,
           paymentMethod: this.getPaymentMethodLabel(result.payment.method),
+          shopName: result.order.shop?.name || undefined,
           phone: shippingAddr?.recipientPhone || undefined,
           address: fullAddress || undefined,
           memo: shippingAddr?.deliveryMemo || undefined,

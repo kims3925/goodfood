@@ -479,6 +479,10 @@ export async function POST(req: NextRequest) {
         ? `${prepareData.shippingAddress.address} ${prepareData.shippingAddress.addressDetail}`
         : prepareData.shippingAddress.address
 
+      const webhookShop = shopId
+        ? await prisma.shop.findUnique({ where: { id: shopId }, select: { name: true } })
+        : null
+
       if (tossResult.status === 'WAITING_FOR_DEPOSIT') {
         // 무통장입금(가상계좌) - 주문 등록 알림
         sendBankTransferOrderWebhook({
@@ -488,6 +492,7 @@ export async function POST(req: NextRequest) {
           bankName: tossResult.virtualAccount?.bank,
           accountNumber: tossResult.virtualAccount?.accountNumber,
           dueDate: tossResult.virtualAccount?.dueDate,
+          shopName: webhookShop?.name || undefined,
           phone: prepareData.shippingAddress.recipientPhone,
           address: fullAddress,
           memo: prepareData.shippingAddress.deliveryMemo,
@@ -499,6 +504,7 @@ export async function POST(req: NextRequest) {
           totalAmount: Number(result.guestOrder.totalAmount),
           items: webhookItems,
           paymentMethod: getPaymentMethodLabel(result.guestPayment.method),
+          shopName: webhookShop?.name || undefined,
           phone: prepareData.shippingAddress.recipientPhone,
           address: fullAddress,
           memo: prepareData.shippingAddress.deliveryMemo,

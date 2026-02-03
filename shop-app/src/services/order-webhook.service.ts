@@ -22,6 +22,7 @@ export interface WebhookMessage {
   paymentStatus?: string // 결제상태 (무통장입금 등에서 사용)
   createdAt: Date
   isExternal?: boolean // 외부 주문 여부
+  shopName?: string // 쇼핑몰명
   // 추가 정보
   phone?: string // 연락처
   address?: string // 배송지 주소
@@ -103,6 +104,17 @@ function formatSlackMessage(message: WebhookMessage): object {
         emoji: true,
       },
     },
+    ...(message.shopName
+      ? [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `*🏪 쇼핑몰:* ${message.shopName}`,
+            },
+          },
+        ]
+      : []),
     {
       type: 'section',
       fields: sectionFields,
@@ -285,6 +297,14 @@ function formatDiscordMessage(message: WebhookMessage): object {
     })
   }
 
+  if (message.shopName) {
+    fields.unshift({
+      name: '🏪 쇼핑몰',
+      value: message.shopName,
+      inline: false,
+    })
+  }
+
   return {
     embeds: [
       {
@@ -361,6 +381,7 @@ export async function sendOrderCreatedWebhook(params: {
   totalAmount: number
   items: WebhookOrderItem[]
   isExternal?: boolean
+  shopName?: string
   phone?: string
   address?: string
   memo?: string
@@ -374,6 +395,7 @@ export async function sendOrderCreatedWebhook(params: {
     items: params.items,
     createdAt: new Date(),
     isExternal: params.isExternal,
+    shopName: params.shopName,
     phone: params.phone,
     address: params.address,
     memo: params.memo,
@@ -390,6 +412,7 @@ export async function sendPaymentCompletedWebhook(params: {
   totalAmount: number
   items: WebhookOrderItem[]
   paymentMethod: string
+  shopName?: string
   phone?: string
   address?: string
   memo?: string
@@ -401,6 +424,7 @@ export async function sendPaymentCompletedWebhook(params: {
     items: params.items,
     paymentMethod: params.paymentMethod,
     createdAt: new Date(),
+    shopName: params.shopName,
     phone: params.phone,
     address: params.address,
     memo: params.memo,
@@ -419,6 +443,7 @@ export async function sendOrderCancelledWebhook(params: {
   items: WebhookOrderItem[]
   cancelReason: string
   cancelledBy: string
+  shopName?: string
   phone?: string
 }): Promise<void> {
   const message: WebhookMessage = {
@@ -431,6 +456,7 @@ export async function sendOrderCancelledWebhook(params: {
     orderNumber: params.orderNumber,
     cancelReason: params.cancelReason,
     cancelledBy: params.cancelledBy,
+    shopName: params.shopName,
     phone: params.phone,
   }
 
@@ -447,6 +473,7 @@ export async function sendBankTransferOrderWebhook(params: {
   bankName?: string
   accountNumber?: string
   dueDate?: string
+  shopName?: string
   phone?: string
   address?: string
   memo?: string
@@ -463,6 +490,7 @@ export async function sendBankTransferOrderWebhook(params: {
     paymentMethod: bankInfo,
     paymentStatus: '입금대기',
     createdAt: new Date(),
+    shopName: params.shopName,
     phone: params.phone,
     address: params.address,
     memo: params.memo,

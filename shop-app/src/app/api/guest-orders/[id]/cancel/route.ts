@@ -73,6 +73,7 @@ export async function POST(
       include: {
         payment: true,
         items: true,
+        shop: true,
       },
     })
 
@@ -167,6 +168,7 @@ export async function POST(
       })),
       cancelReason: reason,
       cancelledBy: 'GUEST',
+      shopName: guestOrder.shop?.name || undefined,
       phone: guestOrder.guestPhone || undefined,
     }).catch(() => {})
 

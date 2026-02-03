@@ -362,6 +362,7 @@ export async function POST(req: NextRequest) {
       bankName: shop.bankName!,
       accountNumber: shop.bankAccount!,
       dueDate: depositDeadline.toISOString(),
+      shopName: shop.name || undefined,
       phone: shippingAddress.recipientPhone || customerInfo.phone,
       address: fullAddress,
       memo: shippingAddress.deliveryMemo,

@@ -23,6 +23,7 @@ export interface WebhookMessage {
   paymentStatus?: string
   createdAt: Date
   isExternal?: boolean // 외부 주문 여부
+  shopName?: string // 쇼핑몰명
   // 취소 관련
   isCancellation?: boolean
   cancelReason?: string
@@ -105,6 +106,17 @@ function formatSlackMessage(message: WebhookMessage): object {
           emoji: true,
         },
       },
+      ...(message.shopName
+        ? [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `*🏪 쇼핑몰:* ${message.shopName}`,
+              },
+            },
+          ]
+        : []),
       {
         type: 'section',
         fields: sectionFields,
@@ -166,6 +178,14 @@ function formatDiscordMessage(message: WebhookMessage): object {
         { name: '📦 주문 상품', value: itemsList || '상품 정보 없음', inline: false },
         { name: '결제상태', value: `${message.paymentStatus || '대기'}${message.paymentMethod ? ` (${message.paymentMethod})` : ''}`, inline: true },
       ]
+
+  if (message.shopName) {
+    fields.unshift({
+      name: '🏪 쇼핑몰',
+      value: message.shopName,
+      inline: false,
+    })
+  }
 
   return {
     embeds: [
@@ -245,6 +265,7 @@ export async function sendOrderCancelledWebhook(params: {
   items: WebhookOrderItem[]
   cancelReason: string
   cancelledBy: string
+  shopName?: string
   phone?: string
 }): Promise<void> {
   const message: WebhookMessage = {
@@ -257,6 +278,7 @@ export async function sendOrderCancelledWebhook(params: {
     isCancellation: true,
     cancelReason: params.cancelReason,
     cancelledBy: params.cancelledBy,
+    shopName: params.shopName,
     phone: params.phone,
   }
 
@@ -271,6 +293,7 @@ export async function sendExternalOrderWebhook(params: {
   customerName: string
   totalAmount: number
   items: WebhookOrderItem[]
+  shopName?: string
 }): Promise<void> {
   const message: WebhookMessage = {
     title: '외부 주문이 등록되었습니다!',
@@ -281,6 +304,7 @@ export async function sendExternalOrderWebhook(params: {
     paymentStatus: '계좌이체 대기',
     createdAt: new Date(),
     isExternal: true,
+    shopName: params.shopName,
   }
 
   await sendOrderWebhook(message)
