@@ -625,7 +625,13 @@ export default function OrderDetailPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-gray-900 mb-1 line-clamp-2">
-                      {item.productName}
+                      {item.product ? (
+                        <Link href={getPath(`/products/${item.product.id}`)} className="hover:underline">
+                          {item.productName}
+                        </Link>
+                      ) : (
+                        item.productName
+                      )}
                     </h3>
                     {item.optionSummary && (
                       <p className="text-sm text-gray-500 mb-2">{item.optionSummary}</p>
