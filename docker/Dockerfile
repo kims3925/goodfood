@@ -58,7 +58,8 @@ RUN if [ "$APP_NAME" = "shop" ]; then \
       pnpm --filter shop-app build; \
     elif [ "$APP_NAME" = "sourcing" ]; then \
       pnpm --filter sourcing-app build; \
-    fi
+    fi && \
+    mkdir -p /app/${APP_NAME}-app/public
 
 # ============================================
 # Stage 3: Runner
@@ -74,6 +75,7 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=${APP_PORT}
 ENV HOSTNAME="0.0.0.0"
+ENV APP_NAME=${APP_NAME}
 
 RUN apk add --no-cache openssl
 
