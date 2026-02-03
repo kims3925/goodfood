@@ -35,6 +35,7 @@ services:
       retries: 3
 
   shop-app:
+    image: bandauto-shop:latest
     build:
       context: .
       dockerfile: docker/Dockerfile
@@ -64,6 +65,7 @@ services:
     restart: unless-stopped
 
   sourcing-app:
+    image: bandauto-sourcing:latest
     build:
       context: .
       dockerfile: docker/Dockerfile
