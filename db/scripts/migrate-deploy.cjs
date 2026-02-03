@@ -50,12 +50,12 @@ async function main() {
 
   // 1. Prisma 클라이언트 생성
   console.log('[1/3] Prisma 클라이언트 생성...')
-  run('npx prisma generate --schema prisma')
+  run('pnpm prisma generate --schema prisma')
 
   // 2. 마이그레이션 deploy 시도
   console.log('\n[2/3] 마이그레이션 적용 시도...')
 
-  const deploySuccess = run('npx prisma migrate deploy --schema prisma', {
+  const deploySuccess = run('pnpm prisma migrate deploy --schema prisma', {
     ignoreError: true,
     stdio: 'pipe',
   })
@@ -68,7 +68,7 @@ async function main() {
 
     for (const migration of migrations) {
       console.log(`  - Baseline 설정: ${migration}`)
-      run(`npx prisma migrate resolve --applied "${migration}" --schema prisma`, {
+      run(`pnpm prisma migrate resolve --applied "${migration}" --schema prisma`, {
         ignoreError: true,
         stdio: 'pipe',
       })
@@ -76,7 +76,7 @@ async function main() {
 
     // 다시 deploy 시도
     console.log('\n마이그레이션 재시도...')
-    run('npx prisma migrate deploy --schema prisma')
+    run('pnpm prisma migrate deploy --schema prisma')
   }
 
   console.log('\n[3/3] 완료!')
