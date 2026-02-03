@@ -46,9 +46,11 @@ COPY --from=deps /app/sourcing-app/node_modules ./sourcing-app/node_modules
 # 소스 전체 복사
 COPY . .
 
-# Prisma Client 생성
+# Prisma Client 생성 및 고정 위치로 복사
 WORKDIR /app/db
-RUN pnpm prisma generate --schema prisma
+RUN pnpm prisma generate --schema prisma && \
+    mkdir -p /app/prisma-client && \
+    cp -r $(find /app/node_modules/.pnpm -path "*/@prisma+client@*/node_modules/.prisma" -type d | head -1)/* /app/prisma-client/
 
 # 앱 빌드
 WORKDIR /app
@@ -78,10 +80,9 @@ RUN apk add --no-cache openssl
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Prisma 클라이언트 복사 (pnpm은 db/node_modules에 생성)
+# Prisma 스키마 및 클라이언트 복사
 COPY --from=builder /app/db/prisma ./db/prisma
-COPY --from=builder /app/db/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/db/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/prisma-client ./node_modules/.prisma
 
 # standalone 빌드 결과 복사
 COPY --from=builder --chown=nextjs:nodejs /app/${APP_NAME}-app/.next/standalone ./
