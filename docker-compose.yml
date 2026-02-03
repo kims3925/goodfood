@@ -45,7 +45,8 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - ./shop-app/.env.local
+      - path: ./shop-app/.env.local
+        required: false
     environment:
       DATABASE_URL: mysql://${DB_USER:-banduser}:${DB_PASSWORD}@mariadb:3306/${DB_NAME:-sourcing_db}
       REDIS_URL: redis://redis:6379
@@ -67,7 +68,8 @@ services:
     ports:
       - "3001:3001"
     env_file:
-      - ./sourcing-app/.env
+      - path: ./sourcing-app/.env
+        required: false
     environment:
       DATABASE_URL: mysql://${DB_USER:-banduser}:${DB_PASSWORD}@mariadb:3306/${DB_NAME:-sourcing_db}
       REDIS_URL: redis://redis:6379

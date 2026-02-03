@@ -78,10 +78,10 @@ RUN apk add --no-cache openssl
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Prisma 클라이언트 복사
+# Prisma 클라이언트 복사 (pnpm은 db/node_modules에 생성)
 COPY --from=builder /app/db/prisma ./db/prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/db/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/db/node_modules/@prisma ./node_modules/@prisma
 
 # standalone 빌드 결과 복사
 COPY --from=builder --chown=nextjs:nodejs /app/${APP_NAME}-app/.next/standalone ./
