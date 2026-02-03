@@ -1,51 +1,59 @@
-name: Deploy to EC2
+name: CI / Deploy
 
 on:
+  pull_request:
+    branches: [main]
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build and Test
+  ci:
+    name: Lint & Typecheck & Build
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
-      - name: Generate Prisma Client
-        run: cd db && npx prisma generate --schema prisma
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Typecheck (shop-app)
+        run: pnpm run typecheck:shop
 
       - name: Build shop-app
-        run: cd shop-app && npm run build
+        run: pnpm run build:shop
         env:
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          GUEST_TOKEN_SECRET: ${{ secrets.GUEST_TOKEN_SECRET }}
+          NEXTAUTH_SECRET: ci-dummy-secret
+          GUEST_TOKEN_SECRET: ci-dummy-secret
 
       - name: Build sourcing-app
-        run: cd sourcing-app && npm run build
+        run: pnpm run build:sourcing
         env:
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          NEXTAUTH_SECRET: ci-dummy-secret
+          JWT_SECRET: ci-dummy-secret
 
   deploy:
     name: Deploy to EC2
-    needs: build
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to EC2
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -54,22 +62,15 @@ jobs:
           script: |
             cd ~/bandauto
 
-            # Pull latest code
+            # 최신 코드 가져오기
             git pull origin main
 
-            # Install dependencies
-            npm ci
+            # Docker 이미지 빌드 & 컨테이너 재시작
+            docker compose build --no-cache
+            docker compose up -d
 
-            # Generate Prisma Client
-            cd db && npx prisma generate --schema prisma && cd ..
+            # Prisma 마이그레이션
+            docker compose exec -T shop-app sh -c "cd /app/db && npx prisma migrate deploy --schema prisma" || true
 
-            # Build apps
-            cd shop-app && npm run build && cd ..
-            cd sourcing-app && npm run build && cd ..
-
-            # Restart PM2 processes
-            pm2 restart shop --update-env
-            pm2 restart sourcing --update-env
-
-            # Show status
-            pm2 status
+            # 상태 확인
+            docker compose ps
