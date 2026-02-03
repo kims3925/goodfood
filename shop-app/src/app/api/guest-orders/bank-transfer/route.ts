@@ -387,6 +387,7 @@ export async function POST(req: NextRequest) {
         bankAccount: shop.bankAccount,
         accountHolder: shop.accountHolder,
         depositDeadline: depositDeadline.toISOString(),
+        orderedAt: new Date().toISOString(),
       },
       accessToken,
       expiresIn: 3600, // 1시간

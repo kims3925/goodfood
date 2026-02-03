@@ -18,6 +18,7 @@ function BankTransferCompleteContent() {
   const bankAccount = searchParams.get('bankAccount') || ''
   const accountHolder = searchParams.get('accountHolder') || ''
   const depositDeadline = searchParams.get('depositDeadline') || ''
+  const orderedAt = searchParams.get('orderedAt') || ''
   // 비회원 관련 파라미터
   const isGuest = searchParams.get('isGuest') === 'true'
   const accessToken = searchParams.get('accessToken') || ''
@@ -137,11 +138,20 @@ function BankTransferCompleteContent() {
 
               {/* 입금 기한 */}
               {depositDeadline && (
-                <div className="mt-4 flex items-center gap-2 text-blue-700 bg-blue-100 rounded-lg px-4 py-3">
-                  <Clock className="w-5 h-5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">입금 기한</p>
-                    <p className="text-xs">{formatDate(depositDeadline)}까지</p>
+                <div className="mt-4 bg-blue-100 rounded-lg px-4 py-3 space-y-2">
+                  {orderedAt && (
+                    <div className="flex items-center gap-2 text-blue-700">
+                      <Clock className="w-4 h-4 flex-shrink-0" />
+                      <p className="text-sm">주문 완료: {formatDate(orderedAt)}</p>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-blue-800">
+                    <Clock className="w-5 h-5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold">
+                        입금 기한: {formatDate(depositDeadline)}까지 (주문 후 3시간 이내)
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}

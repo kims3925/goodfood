@@ -484,6 +484,7 @@ export async function POST(req: NextRequest) {
         bankAccount: shop.bankAccount,
         accountHolder: shop.accountHolder,
         depositDeadline: depositDeadline.toISOString(),
+        orderedAt: new Date().toISOString(),
       },
       message: '무통장입금 주문이 완료되었습니다. 입금 확인 후 배송이 시작됩니다.',
     })

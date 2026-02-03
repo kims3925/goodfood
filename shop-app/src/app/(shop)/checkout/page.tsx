@@ -686,6 +686,7 @@ function CheckoutContent() {
             bankAccount: data.bankInfo.bankAccount,
             accountHolder: data.bankInfo.accountHolder,
             depositDeadline: data.bankInfo.depositDeadline,
+            orderedAt: data.bankInfo.orderedAt,
           })
 
           // 비회원인 경우 accessToken과 orderId도 전달
@@ -1417,7 +1418,7 @@ function CheckoutContent() {
                       <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                         <p className="text-sm font-medium text-blue-800 mb-1">입금기한</p>
                         <p className="text-sm text-blue-700">
-                          주문 완료일로부터 3일 이내
+                          주문 완료일로부터 3시간 이내
                         </p>
                       </div>
                       
