@@ -50,6 +50,10 @@ services:
     environment:
       DATABASE_URL: mysql://${DB_USER:-banduser}:${DB_PASSWORD}@mariadb:3306/${DB_NAME:-sourcing_db}
       REDIS_URL: redis://redis:6379
+      PRODUCT_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/product
+      POST_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/post
+      CHANNEL_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/channel
+      SHOP_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/shop
     volumes:
       - /home/ubuntu/assets:/home/ubuntu/assets
     depends_on:
@@ -75,6 +79,10 @@ services:
     environment:
       DATABASE_URL: mysql://${DB_USER:-banduser}:${DB_PASSWORD}@mariadb:3306/${DB_NAME:-sourcing_db}
       REDIS_URL: redis://redis:6379
+      PRODUCT_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/product
+      POST_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/post
+      CHANNEL_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/channel
+      SHOP_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/shop
     volumes:
       - /home/ubuntu/assets:/home/ubuntu/assets
     depends_on:
