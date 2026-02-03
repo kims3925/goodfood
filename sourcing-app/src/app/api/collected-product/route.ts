@@ -31,6 +31,10 @@ export async function GET(request: NextRequest) {
     // 조건 생성
     const where: any = {
       userId: currentUser.userId,
+      deletedAt: null,
+      post: {
+        deletedAt: null,
+      },
     }
 
     // 가공상품으로 변환된 상품 제외 (excludeConverted=true인 경우)
