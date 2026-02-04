@@ -49,7 +49,7 @@ services:
       - path: ./shop-app/.env.local
         required: false
     environment:
-      DATABASE_URL: mysql://${DB_USER:-banduser}:${DB_PASSWORD}@mariadb:3306/${DB_NAME:-sourcing_db}
+      DATABASE_URL: mysql://${DB_USER:-banduser}:${DB_PASSWORD}@mariadb:3306/${DB_NAME:-sourcing_db}?connection_limit=10&pool_timeout=30
       REDIS_URL: redis://redis:6379
       PRODUCT_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/product
       POST_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/post
@@ -76,7 +76,7 @@ services:
       - path: ./sourcing-app/.env
         required: false
     environment:
-      DATABASE_URL: mysql://${DB_USER:-banduser}:${DB_PASSWORD}@mariadb:3306/${DB_NAME:-sourcing_db}
+      DATABASE_URL: mysql://${DB_USER:-banduser}:${DB_PASSWORD}@mariadb:3306/${DB_NAME:-sourcing_db}?connection_limit=10&pool_timeout=30
       REDIS_URL: redis://redis:6379
       PRODUCT_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/product
       POST_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/post
