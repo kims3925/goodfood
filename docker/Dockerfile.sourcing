@@ -74,24 +74,17 @@ ENV APP_NAME=sourcing
 # sharp 설치 (이미지 최적화용)
 RUN npm install --omit=dev sharp
 
-# nextjs 사용자 생성 (Playwright 이미지의 기존 ID와 충돌 방지)
-RUN groupadd --system nodejs 2>/dev/null || true && \
-    id -u nextjs &>/dev/null || useradd --system --gid nodejs nextjs
-
-# Playwright 캐시 디렉토리 권한 설정
-RUN mkdir -p /home/nextjs/.cache && \
-    chown -R nextjs /home/nextjs 2>/dev/null || true
-
 # Prisma 스키마 및 클라이언트 복사
 COPY --from=builder /app/db/prisma ./db/prisma
 COPY --from=builder /app/prisma-client ./node_modules/.prisma
 
 # standalone 빌드 결과 복사
-COPY --from=builder --chown=nextjs:nodejs /app/sourcing-app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/sourcing-app/.next/static ./sourcing-app/.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/sourcing-app/public ./sourcing-app/public
+COPY --from=builder /app/sourcing-app/.next/standalone ./
+COPY --from=builder /app/sourcing-app/.next/static ./sourcing-app/.next/static
+COPY --from=builder /app/sourcing-app/public ./sourcing-app/public
 
-USER nextjs
+# Playwright 이미지의 기본 사용자(pwuser) 사용
+USER pwuser
 
 EXPOSE 3001
 
