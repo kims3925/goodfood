@@ -1,13 +1,17 @@
 # syntax=docker/dockerfile:1
 
 # ============================================
+# Sourcing App Dockerfile (Playwright 포함)
+# ============================================
+
+# ============================================
 # Stage 1: Dependencies
 # ============================================
-FROM node:20-alpine AS deps
+FROM node:20-bookworm AS deps
 
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat openssl
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 # pnpm 설치
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
@@ -25,16 +29,13 @@ RUN pnpm install --frozen-lockfile
 # ============================================
 # Stage 2: Builder
 # ============================================
-FROM node:20-alpine AS builder
+FROM node:20-bookworm AS builder
 
 WORKDIR /app
 
-ARG APP_NAME=shop
-ARG APP_PORT=3000
-
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache openssl
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # deps 스테이지에서 의존성 복사
@@ -52,47 +53,46 @@ RUN pnpm prisma generate --schema prisma && \
     mkdir -p /app/prisma-client && \
     cp -r $(find /app/node_modules/.pnpm -path "*/@prisma+client@*/node_modules/.prisma" -type d | head -1)/* /app/prisma-client/
 
-# 앱 빌드
+# sourcing-app 빌드
 WORKDIR /app
-RUN if [ "$APP_NAME" = "shop" ]; then \
-      pnpm --filter shop-app build; \
-    elif [ "$APP_NAME" = "sourcing" ]; then \
-      pnpm --filter sourcing-app build; \
-    fi && \
-    mkdir -p /app/${APP_NAME}-app/public
+RUN pnpm --filter sourcing-app build && \
+    mkdir -p /app/sourcing-app/public
 
 # ============================================
-# Stage 3: Runner (shop-app용 - alpine)
+# Stage 3: Runner (Playwright 포함)
 # ============================================
-FROM node:20-alpine AS runner
+FROM mcr.microsoft.com/playwright:v1.55.0-noble AS runner
 
 WORKDIR /app
-
-ARG APP_NAME=shop
-ARG APP_PORT=3000
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=${APP_PORT}
+ENV PORT=3001
 ENV HOSTNAME="0.0.0.0"
-ENV APP_NAME=${APP_NAME}
+ENV APP_NAME=sourcing
 
-RUN apk add --no-cache openssl
+# sharp 설치 (이미지 최적화용)
 RUN npm install --omit=dev sharp
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+
+# nextjs 사용자 생성
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs nextjs
+
+# Playwright 캐시 디렉토리 권한 설정
+RUN mkdir -p /home/nextjs/.cache && \
+    chown -R nextjs:nodejs /home/nextjs
 
 # Prisma 스키마 및 클라이언트 복사
 COPY --from=builder /app/db/prisma ./db/prisma
 COPY --from=builder /app/prisma-client ./node_modules/.prisma
 
 # standalone 빌드 결과 복사
-COPY --from=builder --chown=nextjs:nodejs /app/${APP_NAME}-app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/${APP_NAME}-app/.next/static ./${APP_NAME}-app/.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/${APP_NAME}-app/public ./${APP_NAME}-app/public
+COPY --from=builder --chown=nextjs:nodejs /app/sourcing-app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/sourcing-app/.next/static ./sourcing-app/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/sourcing-app/public ./sourcing-app/public
 
 USER nextjs
 
-EXPOSE ${APP_PORT}
+EXPOSE 3001
 
-CMD ["sh", "-c", "node ${APP_NAME}-app/server.js"]
+CMD ["node", "sourcing-app/server.js"]

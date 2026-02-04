@@ -68,10 +68,7 @@ services:
     image: bandauto-sourcing:latest
     build:
       context: .
-      dockerfile: docker/Dockerfile
-      args:
-        APP_NAME: sourcing
-        APP_PORT: 3001
+      dockerfile: docker/Dockerfile.sourcing
     container_name: bandauto-sourcing
     ports:
       - "3001:3001"
