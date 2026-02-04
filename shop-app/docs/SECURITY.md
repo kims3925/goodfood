@@ -213,7 +213,7 @@ const user = await prisma.$queryRawUnsafe(
 |-----|
 | `.env*` 파일 커밋 금지 |
 | 환경변수로만 주입 |
-| Jenkins Credentials 활용 |
+| 서버에서 직접 .env 파일 관리 |
 
 ### .gitignore 설정
 
@@ -223,28 +223,25 @@ const user = await prisma.$queryRawUnsafe(
 *.local
 ```
 
-### 배포 시 .env 백업/복원 보안 절차
+### 배포 시 환경변수 관리
 
-> **상세 내용:** [DEPLOYMENT.md](./DEPLOYMENT.md#1-env-파일-보호) 참조
-
-배포 파이프라인(cd-Jenkinsfile)에서 git reset 시 .env 파일 보호를 위한 보안 절차:
-
-#### 1. 안전한 백업 디렉토리 생성
+Docker Compose 배포 시 환경변수 파일은 서버에서 직접 관리:
 
 ```bash
-# 프로젝트 디렉토리 내 전용 백업 폴더 사용 (Jenkins 권한 문제 해결)
-ENV_BACKUP_DIR="${PROJECT_PATH}/.env-backup-$$"
-mkdir -p "$ENV_BACKUP_DIR"
-chmod 700 "$ENV_BACKUP_DIR"  # 소유자만 접근 가능
+# 환경변수 파일은 .gitignore에 포함
+# 서버에서 직접 생성 및 관리
+cp .env.example .env
+cp shop-app/.env.example shop-app/.env.local
+# 각 파일 편집...
 ```
 
 | 항목 | 설명 |
 |-----|-----|
-| 경로 | `${PROJECT_PATH}/.env-backup-$$` (프로젝트 내, 프로세스 ID 기반) |
-| 디렉토리 권한 | `chmod 700` (소유자만 rwx) |
-| `/tmp`, `/home/ubuntu` 미사용 이유 | 권한 문제 또는 다른 사용자 접근 가능 |
+| 관리 방식 | 서버에서 직접 .env 파일 생성/편집 |
+| Git | .gitignore로 커밋 방지 |
+| 배포 | docker-compose.yml의 env_file로 주입 |
 
-#### 2. 가드된 복사 (안전한 에러 처리)
+#### 환경변수 파일 권한
 
 ```bash
 # 파일 존재 시에만 복사, 실패해도 파이프라인 중단 방지

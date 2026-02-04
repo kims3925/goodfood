@@ -1,6 +1,7 @@
-# 배포 규칙
+# Sourcing App 배포 규칙
 
 > **관련 문서:** [SECURITY.md](./SECURITY.md) | [PROJECT.md](./PROJECT.md) | [CLAUDE.md](../CLAUDE.md)
+> **전체 배포 가이드:** [../../docs/DEPLOYMENT.md](../../docs/DEPLOYMENT.md)
 
 ---
 
@@ -8,221 +9,181 @@
 
 | 항목 | 기술 |
 |-----|-----|
-| Cloud | AWS EC2 |
-| Database | MariaDB (AWS RDS) |
-| Cache | Redis (Bull Queue) |
-| Process Manager | PM2 |
-| Reverse Proxy | Nginx |
-| CI/CD | Jenkins |
+| Container | Docker (Playwright 이미지) |
+| Orchestration | Docker Compose |
+| Database | MariaDB 10.11 (Docker) |
+| Cache | Redis 7 (Docker) |
+| Browser Automation | Playwright 1.58.1 |
+
+---
+
+## Docker 설정
+
+### Dockerfile 위치
+
+```
+docker/Dockerfile.sourcing
+```
+
+### 빌드 스테이지
+
+| 스테이지 | 베이스 이미지 | 역할 |
+|----------|---------------|------|
+| deps | node:20-bookworm | pnpm 의존성 설치 |
+| builder | node:20-bookworm | Prisma 생성 + Next.js standalone 빌드 |
+| runner | playwright:v1.58.1-noble | Playwright 브라우저 포함 실행 환경 |
+
+### 빌드 특징
+
+- **Playwright 이미지**: Chromium 브라우저 내장
+- **bookworm 베이스**: Playwright 호환성을 위해 Alpine 대신 Debian 사용
+- **root 실행**: 볼륨 마운트 접근 권한을 위해 root 사용자로 실행
 
 ---
 
 ## 환경 전략
 
-| 환경 | 용도 | URL | 브랜치 |
-|-----|-----|-----|-------|
-| Development | 로컬 개발 | localhost:3000, 3001 | feature/* |
-| Production | 운영 | https://snsauto.abcpharm.net | main |
+| 환경 | 용도 | URL |
+|-----|-----|-----|
+| Development | 로컬 개발 | localhost:3001 |
+| Production | 운영 | https://admin.yourdomain.com |
 
 ---
 
-## CI/CD 파이프라인
+## 배포 명령어
 
-### CI Pipeline (ci-Jenkinsfile)
-
-```text
-Push → Install → Prisma Generate → Build (parallel) → Success
-```
-
-### CD Pipeline (cd-Jenkinsfile)
-
-```text
-Checkout → Install → Prisma Generate → Build → Deploy
-```
-
-### 상세 단계
-
-| 단계 | 설명 | 실패 시 |
-|-----|-----|--------|
-| Checkout | 소스 코드 가져오기 | 차단 |
-| Install Dependencies | `npm ci --legacy-peer-deps` | 차단 |
-| Generate Prisma Client | `npx prisma generate --schema prisma` | 차단 |
-| Build Applications | shop-app, sourcing-app 병렬 빌드 | 차단 |
-| Deploy | PM2 재시작 | 롤백 |
-
----
-
-## 배포 프로세스
-
-### 1. .env 파일 보호
+### 개별 앱 배포
 
 ```bash
-# 배포 전 .env 백업
-cp .env /tmp/.env.backup
-cp db/.env /tmp/.env.db.backup
-cp shop-app/.env /tmp/.env.shop.backup
-cp sourcing-app/.env /tmp/.env.sourcing.backup
-
-# git reset 후 복원
-git reset --hard origin/main
-cp /tmp/.env.backup .env
-# ... (각 앱별 복원)
+# sourcing-app만 재빌드 및 재시작
+docker-compose up -d --build sourcing-app
 ```
 
-### 2. 의존성 관리
+### 로그 확인
 
 ```bash
-# package-lock.json 변경 시 재설치
-if [ "$OLD_CHECKSUM" != "$NEW_CHECKSUM" ]; then
-    rm -rf node_modules
-    npm ci --legacy-peer-deps
-fi
+docker-compose logs -f sourcing-app --tail=100
 ```
 
-### 3. PM2 프로세스 관리
+### 컨테이너 접속
 
 ```bash
-# 빌드 전 프로세스 중지 (파일 잠금 해제)
-sudo -u ubuntu pm2 stop shop-app sourcing-app shop sourcing
-
-# 프로세스 중지 확인 (최대 10초 대기)
-for i in 1 2 3 4 5; do
-    if ! pm2 list | grep -E 'shop|sourcing' | grep -q 'online'; then
-        break
-    fi
-    sleep 2
-done
-
-# 빌드 후 재시작
-sudo -u ubuntu pm2 reload all --update-env
-```
-
----
-
-## PM2 설정
-
-### 앱 구성
-
-| 앱 | 포트 | PM2 이름 |
-|---|-----|---------|
-| shop-app | 3000 | shop 또는 shop-app |
-| sourcing-app | 3001 | sourcing 또는 sourcing-app |
-
-### PM2 명령어
-
-```bash
-# 상태 확인
-pm2 status
-
-# 로그 확인
-pm2 logs shop
-pm2 logs sourcing
-
-# 재시작
-pm2 restart shop sourcing
-
-# 전체 재시작
-pm2 reload all --update-env
+docker-compose exec sourcing-app bash
 ```
 
 ---
 
 ## 환경 변수
 
-### 필수 환경 변수
+### 필수 환경 변수 (`sourcing-app/.env`)
 
-| 변수 | 설명 | 위치 |
-|-----|-----|-----|
-| DATABASE_URL | MariaDB 연결 문자열 | db/.env |
-| NEXTAUTH_SECRET | NextAuth 암호화 키 | shop-app, sourcing-app |
-| NEXTAUTH_URL | 인증 URL | shop-app, sourcing-app |
-| JWT_SECRET | JWT 서명 키 | shop-app |
-| GUEST_TOKEN_SECRET | 게스트 토큰 키 | shop-app |
-| TOSS_SECRET_KEY | Toss 결제 키 | shop-app |
-| BAND_CLIENT_ID | Band API 클라이언트 ID | sourcing-app |
-| BAND_CLIENT_SECRET | Band API 시크릿 | sourcing-app |
+| 변수 | 설명 |
+|-----|-----|
+| DATABASE_URL | MariaDB 연결 문자열 |
+| REDIS_URL | Redis 연결 URL |
+| NEXTAUTH_SECRET | NextAuth 암호화 키 |
+| NEXTAUTH_URL | 인증 URL |
+| BAND_CLIENT_ID | Band API 클라이언트 ID |
+| BAND_CLIENT_SECRET | Band API 시크릿 |
+| GEMINI_API_KEY | Google Gemini API 키 |
 
-### Jenkins Credentials
+### Docker Compose 환경 변수
 
-| Credential ID | 설명 |
-|--------------|-----|
-| nextauth-secret | NEXTAUTH_SECRET |
-| guest-secret | GUEST_TOKEN_SECRET |
-| jwt-secret | JWT_SECRET |
+docker-compose.yml에서 자동 주입:
+- `DATABASE_URL`: mariadb 서비스 연결
+- `REDIS_URL`: redis 서비스 연결
+- 이미지 저장 경로 (`*_IMAGE_STORAGE_PATH`)
+
+---
+
+## Playwright 관련
+
+### 브라우저 자동화 환경
+
+Playwright 이미지에 Chromium이 내장되어 있어 별도 설치 불필요.
+
+```bash
+# 컨테이너 내 브라우저 확인
+docker-compose exec sourcing-app npx playwright --version
+```
+
+### 헤드리스 모드
+
+프로덕션 환경에서는 항상 헤드리스 모드로 실행:
+- `PLAYWRIGHT_HEADLESS=true` (기본값)
 
 ---
 
 ## 빌드 명령어
 
-```bash
-# 전체 빌드
-npm run build
+### 로컬 빌드 테스트
 
-# 개별 앱 빌드
-npm run build:shop      # shop-app 빌드
-npm run build:sourcing  # sourcing-app 빌드
+```bash
+# 루트에서 실행
+npm run build:sourcing
 ```
 
-### 빌드 실패 시 재시도
+### Docker 빌드
 
 ```bash
-npm run build:shop || {
-    rm -rf shop-app/.next
-    npm run build:shop
-}
+# 전체 빌드
+docker-compose build sourcing-app
+
+# 캐시 없이 빌드
+docker-compose build --no-cache sourcing-app
 ```
 
 ---
 
 ## 헬스 체크
 
-| 체크 항목 | 방법 |
-|---------|-----|
-| 앱 실행 | PM2 status 확인 |
-| 웹 접근 | HTTP 응답 확인 |
-| DB 연결 | Prisma 연결 확인 |
+```bash
+# 컨테이너 상태
+docker-compose ps sourcing-app
+
+# HTTP 응답 확인
+curl -I http://localhost:3001
+
+# 로그 확인
+docker-compose logs sourcing-app --tail=50
+```
 
 ---
 
 ## 롤백 절차
 
-### 자동 롤백 조건
-
-| 증상 | 조치 |
-|-----|-----|
-| 빌드 실패 | 이전 빌드 유지 |
-| PM2 시작 실패 | 수동 개입 필요 |
-
-### 수동 롤백
+### 이전 버전으로 롤백
 
 ```bash
-# 이전 커밋으로 롤백
+# 1. 이전 커밋으로 복구
 git reset --hard HEAD~1
-npm ci --legacy-peer-deps
-cd db && npx prisma generate --schema prisma && cd ..
-npm run build
-pm2 reload all
+
+# 2. 재빌드 및 배포
+docker-compose up -d --build sourcing-app
 ```
 
 ---
 
 ## 배포 전 체크리스트
 
-- [ ] 모든 테스트 통과 (`npm run build` 성공)
-- [ ] 코드 리뷰 완료
-- [ ] DB 마이그레이션 테스트
-- [ ] 환경 변수 확인 (.env 파일)
-- [ ] 롤백 계획 수립
+- [ ] 로컬 빌드 성공 (`npm run build:sourcing`)
+- [ ] 환경 변수 확인 (`.env`)
+- [ ] DB 스키마 변경 여부 확인
+- [ ] Band API 연동 변경 시 테스트
 
 ---
 
 ## 배포 후 체크리스트
 
-- [ ] PM2 상태 확인 (`pm2 status`)
-- [ ] 웹사이트 접근 확인
-- [ ] 로그 모니터링 (`pm2 logs`)
-- [ ] 에러율 확인
-- [ ] 주요 기능 스모크 테스트
+- [ ] `docker-compose ps sourcing-app` 상태 확인
+- [ ] HTTP 접근 확인 (http://localhost:3001)
+- [ ] 로그 에러 확인
+- [ ] 주요 기능 테스트:
+  - [ ] 로그인
+  - [ ] 채널 목록
+  - [ ] 상품 수집 (Playwright)
+  - [ ] AI 가공 (Gemini)
+  - [ ] 발행
 
 ---
 
@@ -231,23 +192,41 @@ pm2 reload all
 ### 로그 확인
 
 ```bash
-# PM2 로그
-pm2 logs --lines 100
+# 실시간 로그
+docker-compose logs -f sourcing-app
 
-# 특정 앱 로그
-pm2 logs shop --lines 50
-pm2 logs sourcing --lines 50
+# 최근 에러만
+docker-compose logs sourcing-app 2>&1 | grep -i error
+
+# Playwright 관련 로그
+docker-compose logs sourcing-app 2>&1 | grep -i playwright
 ```
 
 ### 리소스 확인
 
 ```bash
-# PM2 모니터링
-pm2 monit
-
-# 시스템 리소스
-htop
+# 컨테이너 리소스 사용량 (Playwright는 메모리 사용량이 높을 수 있음)
+docker stats bandauto-sourcing
 ```
+
+---
+
+## 트러블슈팅
+
+### Playwright 관련
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| 브라우저 시작 실패 | 메모리 부족 | 컨테이너 메모리 증가 |
+| 타임아웃 | 네트워크 지연 | 타임아웃 값 조정 |
+| 스크린샷 저장 실패 | 볼륨 권한 | 볼륨 마운트 권한 확인 |
+
+### 일반 이슈
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| 컨테이너 재시작 반복 | DB 연결 실패 | mariadb 헬스체크 확인 |
+| 이미지 빌드 느림 | Playwright 이미지 용량 | 캐시 활용 |
 
 ---
 
@@ -257,6 +236,6 @@ htop
 |-----|-----|
 | 운영 DB 직접 수정 | 데이터 무결성 |
 | .env 파일 커밋 | 보안 |
-| force push to main | 히스토리 손실 |
 | 테스트 없이 배포 | 장애 위험 |
-| PM2 stop all 사용 | 다른 서비스 영향 |
+| Band API 키 하드코딩 | 보안 위험 |
+| Playwright 브라우저 수동 설치 | 이미지에 내장됨 |

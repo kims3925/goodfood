@@ -348,8 +348,7 @@ npm run test:headed        # 헤드 모드
 | 기술 | 용도 |
 |------|------|
 | AWS EC2 | 서버 호스팅 |
-| PM2 | 프로세스 관리 |
-| Jenkins | CI/CD |
+| Docker Compose | 컨테이너 오케스트레이션 |
 
 ## 🚀 구현된 API 엔드포인트
 
@@ -526,37 +525,33 @@ npx playwright install chromium
 # 4. 한글 폰트 설치
 sudo apt-get install -y fonts-noto-cjk
 
-# 5. PM2 설치 (프로세스 관리)
-sudo npm install -g pm2
+# 5. Docker 설치
+sudo apt-get install -y docker.io docker-compose
+sudo usermod -aG docker $USER
 
 # 6. 프로젝트 클론
 git clone https://github.com/ABC-Group-Tech/bandauto.git
 cd bandauto
 
-# 7. 의존성 설치
-npm install
+# 7. 환경변수 설정
+cp .env.example .env
+cp shop-app/.env.example shop-app/.env.local
+cp sourcing-app/.env.example sourcing-app/.env
+cp db/.env.example db/.env
+# 각 .env 파일 편집...
 
-# 8. 환경변수 설정
-cp sourcing-app/.env.example sourcing-app/.env.local
-# .env.local 편집...
-
-# 9. 데이터베이스 초기화
-cd db && npx prisma generate --schema prisma && npx prisma db push --schema prisma
-
-# 10. 빌드 및 실행
-cd ../sourcing-app && npm run build
-pm2 start ecosystem.config.js
+# 8. Docker Compose로 배포
+docker-compose up -d --build
 ```
 
-### PM2 관리 명령어
+### Docker Compose 관리 명령어
 
 ```bash
-pm2 status              # 상태 확인
-pm2 logs                # 로그 확인
-pm2 restart all         # 재시작
-pm2 stop all            # 중지
-pm2 save                # 현재 상태 저장
-pm2 startup             # 서버 재부팅 시 자동 시작 설정
+docker-compose ps                    # 상태 확인
+docker-compose logs -f               # 로그 확인
+docker-compose restart               # 재시작
+docker-compose down                  # 중지
+docker-compose up -d --build         # 재빌드 및 배포
 ```
 
 ### Playwright 관련 설정

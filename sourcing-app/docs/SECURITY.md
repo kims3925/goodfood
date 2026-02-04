@@ -224,7 +224,7 @@ const user = await prisma.$queryRawUnsafe(
 |-----|
 | `.env*` 파일 커밋 금지 |
 | 환경변수로만 주입 |
-| Jenkins Credentials 활용 |
+| 서버에서 직접 .env 파일 관리 |
 
 ### .gitignore 설정
 

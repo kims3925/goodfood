@@ -50,8 +50,7 @@
 | 항목 | 값 |
 |-----|---|
 | Cloud | AWS EC2 |
-| Process Manager | PM2 |
-| CI/CD | Jenkins |
+| Container | Docker Compose |
 | Reverse Proxy | Nginx |
 
 ### 환경

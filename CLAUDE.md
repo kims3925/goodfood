@@ -80,7 +80,7 @@ npx prisma db pull --schema prisma    # DB에서 스키마 가져오기
 | Automation | Playwright 1.55 |
 | State | Zustand 4.5 |
 | Queue | Bull 4.16 + Redis |
-| Deploy | AWS EC2, PM2, Jenkins |
+| Deploy | AWS EC2, Docker Compose |
 
 ## 핵심 원칙
 

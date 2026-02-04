@@ -1,334 +1,440 @@
-# Bandauto CI/CD 구현 계획서 (Jenkins)
+# BandAuto CI/CD 가이드 (Docker Compose)
+
+> **최종 업데이트:** 2026-02
+> **배포 방식:** Docker Compose
+
+---
 
 ## 개요
 
 | 항목 | 내용 |
 |------|------|
-| **프로젝트** | Bandauto Monorepo |
+| **프로젝트** | BandAuto Monorepo |
 | **배포 대상** | AWS EC2 |
-| **CI/CD 도구** | Jenkins |
-| **프로세스 관리** | PM2 |
+| **컨테이너** | Docker Compose |
 | **적용 앱** | shop-app, sourcing-app |
 
 ---
 
-## 1. 아키텍처 다이어그램
+## 1. 아키텍처
 
 ```
-┌─────────────┐     ┌──────────────────┐     ┌─────────────┐
-│   GitHub    │────▶│     Jenkins      │────▶│   AWS EC2   │
-│  (Webhook)  │     │   (빌드 & 배포)   │     │  (PM2 배포)  │
-└─────────────┘     └──────────────────┘     └─────────────┘
-       │                     │                      │
-       │                     ▼                      ▼
-  Push 트리거          ┌────────────┐         ┌───────────┐
-                      │ Jenkinsfile │         │ shop:3000 │
-                      │  Pipeline   │         │sourcing:3001│
-                      └────────────┘         └───────────┘
+┌─────────────┐     ┌──────────────────┐     ┌─────────────────────────┐
+│   GitHub    │────▶│   EC2 Server     │────▶│    Docker Compose       │
+│   (Push)    │     │  (git pull)      │     │                         │
+└─────────────┘     └──────────────────┘     │  ┌─────────────────┐   │
+                                              │  │   shop-app      │   │
+                                              │  │   :3000         │   │
+                                              │  └─────────────────┘   │
+                                              │  ┌─────────────────┐   │
+                                              │  │  sourcing-app   │   │
+                                              │  │   :3001         │   │
+                                              │  └─────────────────┘   │
+                                              │  ┌─────────────────┐   │
+                                              │  │    mariadb      │   │
+                                              │  │   :3306         │   │
+                                              │  └─────────────────┘   │
+                                              │  ┌─────────────────┐   │
+                                              │  │     redis       │   │
+                                              │  │   :6379         │   │
+                                              │  └─────────────────┘   │
+                                              └─────────────────────────┘
 ```
 
 ---
 
-## 2. Jenkins 설치 옵션
+## 2. Docker 이미지 구성
 
-### Option A: EC2에 Jenkins 직접 설치 (간단)
-- 기존 EC2에 Jenkins 설치
-- 같은 서버에서 빌드 & 배포
-- 소규모 프로젝트에 적합
+### 2.1 Shop App (`docker/Dockerfile`)
 
-### Option B: 별도 Jenkins 서버 (권장)
-- Jenkins 전용 EC2 인스턴스
-- 배포 대상 EC2와 분리
-- 확장성, 보안 우수
+| 스테이지 | 베이스 이미지 | 역할 |
+|----------|---------------|------|
+| deps | node:20-alpine | pnpm 의존성 설치 |
+| builder | node:20-alpine | Prisma 생성 + Next.js 빌드 |
+| runner | node:20-alpine | standalone 실행 |
 
-### Option C: Docker로 Jenkins 실행
-- 컨테이너 기반 Jenkins
-- 관리 용이, 이식성 좋음
+### 2.2 Sourcing App (`docker/Dockerfile.sourcing`)
 
----
-
-## 3. 구현 단계 (TODO)
-
-### Phase 1: Jenkins 서버 준비
-- [ ] Jenkins 설치 방식 결정 (Option A/B/C)
-- [ ] EC2에 Jenkins 설치
-- [ ] Jenkins 초기 설정 (관리자 계정)
-- [ ] 필수 플러그인 설치
-
-### Phase 2: Jenkins 플러그인 설치
-- [ ] NodeJS Plugin
-- [ ] Git Plugin
-- [ ] SSH Agent Plugin
-- [ ] Pipeline Plugin
-- [ ] GitHub Integration Plugin (Webhook용)
-
-### Phase 3: Jenkins 설정
-- [ ] NodeJS 도구 설정 (v20.x)
-- [ ] Git Credentials 등록
-- [ ] SSH Credentials 등록 (배포용)
-- [ ] GitHub Webhook 설정
-
-### Phase 4: Pipeline 생성
-- [ ] Jenkinsfile 프로젝트에 추가
-- [ ] Pipeline Job 생성
-- [ ] 테스트 빌드 실행
-
-### Phase 5: 검증
-- [ ] Push → 자동 빌드 확인
-- [ ] 배포 성공 확인
-- [ ] 롤백 테스트
+| 스테이지 | 베이스 이미지 | 역할 |
+|----------|---------------|------|
+| deps | node:20-bookworm | pnpm 의존성 설치 |
+| builder | node:20-bookworm | Prisma 생성 + Next.js 빌드 |
+| runner | playwright:v1.58.1-noble | Playwright 포함 실행 |
 
 ---
 
-## 4. Jenkins 설치 가이드 (EC2 Ubuntu)
+## 3. 배포 프로세스
 
-### 4.1 Java 설치
+### 3.1 수동 배포 (현재 방식)
+
 ```bash
-sudo apt update
-sudo apt install -y openjdk-17-jdk
-java -version
+# 1. 서버 SSH 접속
+ssh ubuntu@<EC2-IP>
+
+# 2. 프로젝트 디렉토리 이동
+cd ~/bandauto
+
+# 3. 코드 풀
+git pull origin main
+
+# 4. 이미지 빌드 및 배포
+docker-compose up -d --build
+
+# 5. 상태 확인
+docker-compose ps
+docker-compose logs -f --tail=50
 ```
 
-### 4.2 Jenkins 설치
+### 3.2 특정 앱만 배포
+
 ```bash
-# Jenkins 저장소 키 추가
-curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee \
-  /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+# shop-app만 재배포
+docker-compose up -d --build shop-app
 
-# Jenkins 저장소 추가
-echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
-  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
-  /etc/apt/sources.list.d/jenkins.list > /dev/null
-
-# Jenkins 설치
-sudo apt update
-sudo apt install -y jenkins
-
-# Jenkins 시작
-sudo systemctl start jenkins
-sudo systemctl enable jenkins
+# sourcing-app만 재배포
+docker-compose up -d --build sourcing-app
 ```
 
-### 4.3 초기 비밀번호 확인
+### 3.3 빌드 캐시 없이 배포 (문제 발생 시)
+
 ```bash
-sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+docker-compose build --no-cache
+docker-compose up -d
 ```
 
-### 4.4 방화벽 설정
+---
+
+## 4. 배포 스크립트
+
+### 4.1 전체 배포 스크립트
+
 ```bash
-# Jenkins 기본 포트: 8080
-sudo ufw allow 8080
+#!/bin/bash
+# scripts/deploy.sh
+
+set -e
+
+echo "=== Starting deployment ==="
+
+cd ~/bandauto
+
+echo ">>> Pulling latest code..."
+git fetch origin main
+git reset --hard origin/main
+
+echo ">>> Building and deploying..."
+docker-compose up -d --build
+
+echo ">>> Waiting for services to start..."
+sleep 10
+
+echo ">>> Checking status..."
+docker-compose ps
+
+echo "=== Deployment completed! ==="
 ```
 
-### 4.5 접속
-- 브라우저: `http://<EC2-IP>:8080`
-- 초기 비밀번호 입력 → 플러그인 설치 → 관리자 계정 생성
+### 4.2 롤백 스크립트
 
----
-
-## 5. Jenkins 필수 플러그인
-
-Jenkins 관리 → Plugins → Available plugins에서 설치:
-
-| 플러그인 | 용도 |
-|---------|------|
-| **NodeJS** | Node.js 빌드 환경 |
-| **Git** | Git 저장소 연동 |
-| **Pipeline** | Jenkinsfile 파이프라인 |
-| **SSH Agent** | SSH 키 관리 |
-| **GitHub Integration** | GitHub Webhook |
-| **Credentials Binding** | 인증 정보 관리 |
-
----
-
-## 6. Jenkins Credentials 설정
-
-### 6.1 SSH 키 등록 (배포용)
-1. Jenkins 관리 → Credentials → System → Global credentials
-2. **Add Credentials** 클릭
-3. Kind: **SSH Username with private key**
-4. 설정:
-   - ID: `ec2-ssh-key`
-   - Username: `ubuntu` (또는 `ec2-user`)
-   - Private Key: Enter directly → PEM 키 내용 붙여넣기
-
-### 6.2 GitHub 토큰 등록 (Private repo인 경우)
-1. **Add Credentials** 클릭
-2. Kind: **Username with password**
-3. 설정:
-   - ID: `github-token`
-   - Username: GitHub 사용자명
-   - Password: Personal Access Token
-
----
-
-## 7. NodeJS 도구 설정
-
-1. Jenkins 관리 → Tools
-2. **NodeJS installations** 섹션
-3. **Add NodeJS** 클릭
-4. 설정:
-   - Name: `NodeJS-20`
-   - Version: `NodeJS 20.x`
-   - ✅ Install automatically
-
----
-
-## 8. GitHub Webhook 설정
-
-### 8.1 Jenkins 측
-1. Jenkins Job → Configure → Build Triggers
-2. ✅ **GitHub hook trigger for GITScm polling** 체크
-
-### 8.2 GitHub 측
-1. GitHub 저장소 → Settings → Webhooks
-2. **Add webhook** 클릭
-3. 설정:
-   - Payload URL: `http://<Jenkins-IP>:8080/github-webhook/`
-   - Content type: `application/json`
-   - Events: **Just the push event**
-4. ✅ Active 체크 → **Add webhook**
-
----
-
-## 9. Pipeline Job 생성
-
-1. Jenkins 메인 → **New Item**
-2. 이름: `bandauto-deploy`
-3. 타입: **Pipeline** 선택
-4. Configure:
-   - ✅ GitHub hook trigger for GITScm polling
-   - Pipeline → Definition: **Pipeline script from SCM**
-   - SCM: Git
-   - Repository URL: `https://github.com/YOUR_USERNAME/bandauto.git`
-   - Branch: `*/main`
-   - Script Path: `Jenkinsfile`
-
----
-
-## 10. Jenkinsfile 설명
-
-```groovy
-pipeline {
-    agent any
-
-    tools {
-        nodejs 'NodeJS-20'  // Jenkins에서 설정한 NodeJS 이름
-    }
-
-    stages {
-        stage('Checkout')  // 코드 체크아웃
-        stage('Install')   // npm ci
-        stage('Prisma')    // Prisma 클라이언트 생성
-        stage('Build')     // shop-app, sourcing-app 빌드
-        stage('Deploy')    // EC2에 SSH 배포
-    }
-}
-```
-
----
-
-## 11. 배포 변수 설정
-
-Jenkinsfile에서 사용하는 변수들:
-
-```groovy
-environment {
-    EC2_HOST = 'your-ec2-ip'           // EC2 IP 주소
-    EC2_USER = 'ubuntu'                 // SSH 사용자
-    PROJECT_PATH = '/home/ubuntu/bandauto'  // 프로젝트 경로
-}
-```
-
-또는 Jenkins Credentials로 관리:
-1. Jenkins 관리 → Credentials
-2. Secret text로 각 값 등록
-3. Jenkinsfile에서 `credentials()` 함수로 참조
-
----
-
-## 12. 트러블슈팅
-
-### Jenkins가 시작되지 않음
 ```bash
-sudo systemctl status jenkins
-sudo journalctl -u jenkins -f
-```
+#!/bin/bash
+# scripts/rollback.sh
 
-### Node.js를 찾을 수 없음
-- Jenkins 관리 → Tools → NodeJS 설정 확인
-- Pipeline에서 `tools { nodejs 'NodeJS-20' }` 확인
+set -e
 
-### SSH 연결 실패
-```bash
-# Jenkins 서버에서 수동 테스트
-ssh -i /path/to/key.pem ubuntu@<EC2-IP>
+COMMIT=${1:-HEAD~1}
 
-# EC2 보안그룹에서 Jenkins IP 허용 확인
-```
+echo "=== Rolling back to $COMMIT ==="
 
-### Webhook이 동작하지 않음
-- Jenkins URL이 외부에서 접근 가능한지 확인
-- GitHub Webhook → Recent Deliveries에서 응답 확인
-- Jenkins 보안 설정 확인 (CSRF 등)
+cd ~/bandauto
 
-### 빌드 메모리 부족
-```bash
-# Jenkins JVM 메모리 설정
-sudo vim /etc/default/jenkins
-JAVA_ARGS="-Xmx2048m"
-sudo systemctl restart jenkins
+echo ">>> Resetting to $COMMIT..."
+git reset --hard $COMMIT
+
+echo ">>> Rebuilding and deploying..."
+docker-compose up -d --build
+
+echo ">>> Checking status..."
+docker-compose ps
+
+echo "=== Rollback completed! ==="
 ```
 
 ---
 
-## 13. 파일 구조 (완료 후)
+## 5. 환경 변수 관리
+
+### 5.1 파일 구조
 
 ```
 bandauto/
-├── Jenkinsfile              # Jenkins Pipeline 정의
-├── scripts/
-│   ├── deploy.sh            # 배포 스크립트
-│   └── rollback.sh          # 롤백 스크립트
-├── docs/
-│   └── CI_CD_PLAN.md        # 이 문서
-├── ecosystem.config.js      # PM2 설정
-└── ...
+├── .env                    # Docker Compose용 (DB 비밀번호 등)
+├── db/.env                 # Prisma DATABASE_URL
+├── shop-app/.env.local     # Shop 앱 환경 변수
+└── sourcing-app/.env       # Sourcing 앱 환경 변수
+```
+
+### 5.2 배포 시 환경 변수 보호
+
+```bash
+# .env 파일들은 .gitignore에 포함되어 있음
+# 서버에서 직접 관리
+
+# 환경 변수 백업 (선택사항)
+cp .env .env.backup
+cp shop-app/.env.local shop-app/.env.local.backup
+cp sourcing-app/.env sourcing-app/.env.backup
 ```
 
 ---
 
-## 14. 체크리스트 요약
+## 6. 헬스 체크
 
+### 6.1 서비스 상태 확인
+
+```bash
+# 컨테이너 상태
+docker-compose ps
+
+# 상세 상태
+docker inspect bandauto-shop --format='{{.State.Status}}'
+docker inspect bandauto-sourcing --format='{{.State.Status}}'
 ```
-[ ] Phase 1: Jenkins 서버 준비
-    [ ] Java 17 설치
-    [ ] Jenkins 설치 & 시작
-    [ ] 방화벽 8080 포트 열기
-    [ ] 초기 설정 완료
 
-[ ] Phase 2: 플러그인 설치
-    [ ] NodeJS Plugin
-    [ ] Git Plugin
-    [ ] Pipeline Plugin
-    [ ] SSH Agent Plugin
+### 6.2 헬스체크 상태
 
-[ ] Phase 3: 설정
-    [ ] NodeJS 도구 설정 (v20)
-    [ ] SSH Credentials 등록
-    [ ] GitHub Webhook 설정
+```bash
+# MariaDB 헬스체크
+docker inspect bandauto-mariadb --format='{{.State.Health.Status}}'
 
-[ ] Phase 4: Pipeline
-    [ ] Jenkinsfile 커밋
-    [ ] Pipeline Job 생성
-    [ ] 테스트 빌드
+# Redis 헬스체크
+docker inspect bandauto-redis --format='{{.State.Health.Status}}'
+```
 
-[ ] Phase 5: 검증
-    [ ] 자동 빌드 확인
-    [ ] 배포 성공 확인
+### 6.3 HTTP 응답 확인
+
+```bash
+# shop-app
+curl -I http://localhost:3000
+
+# sourcing-app
+curl -I http://localhost:3001
 ```
 
 ---
 
-*문서 작성일: 2025-12-15*
-*버전: 2.0 (Jenkins)*
+## 7. 로그 관리
+
+### 7.1 실시간 로그
+
+```bash
+# 전체 로그
+docker-compose logs -f
+
+# 특정 서비스 로그
+docker-compose logs -f shop-app
+docker-compose logs -f sourcing-app
+docker-compose logs -f mariadb
+```
+
+### 7.2 최근 로그
+
+```bash
+# 최근 100줄
+docker-compose logs --tail=100 shop-app
+
+# 에러만 필터링
+docker-compose logs shop-app 2>&1 | grep -i error
+```
+
+### 7.3 로그 파일 저장
+
+```bash
+# 로그를 파일로 저장
+docker-compose logs shop-app > logs/shop-app-$(date +%Y%m%d).log
+```
+
+---
+
+## 8. 트러블슈팅
+
+### 8.1 일반 이슈
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| 컨테이너 시작 실패 | DB 연결 대기 | `docker-compose logs` 확인 |
+| 502 Bad Gateway | 앱 미실행 | 컨테이너 상태 확인 |
+| 빌드 실패 | 메모리 부족 | 스왑 메모리 추가 |
+| 이미지 용량 부족 | 캐시 누적 | `docker system prune -a` |
+
+### 8.2 컨테이너 재시작
+
+```bash
+# 특정 서비스 재시작
+docker-compose restart shop-app
+
+# 전체 재시작
+docker-compose restart
+```
+
+### 8.3 컨테이너 내부 디버깅
+
+```bash
+# 컨테이너 내부 접속
+docker-compose exec shop-app sh
+docker-compose exec sourcing-app bash
+
+# 프로세스 확인
+docker-compose exec shop-app ps aux
+```
+
+### 8.4 이미지 정리
+
+```bash
+# 사용하지 않는 이미지 삭제
+docker image prune -a
+
+# 전체 정리 (볼륨 제외)
+docker system prune -a
+
+# 빌드 캐시 삭제
+docker builder prune
+```
+
+---
+
+## 9. 롤백 절차
+
+### 9.1 이전 커밋으로 롤백
+
+```bash
+# 1. 이전 커밋 확인
+git log --oneline -10
+
+# 2. 롤백
+git reset --hard <commit-hash>
+
+# 3. 재배포
+docker-compose up -d --build
+```
+
+### 9.2 긴급 롤백 (이미지 캐시 사용)
+
+```bash
+# 빌드 없이 기존 이미지로 재시작
+docker-compose down
+docker-compose up -d
+```
+
+---
+
+## 10. 모니터링
+
+### 10.1 리소스 사용량
+
+```bash
+# 실시간 리소스 모니터링
+docker stats
+
+# 특정 컨테이너만
+docker stats bandauto-shop bandauto-sourcing
+```
+
+### 10.2 디스크 사용량
+
+```bash
+# Docker 디스크 사용량
+docker system df
+
+# 상세 정보
+docker system df -v
+```
+
+---
+
+## 11. 보안 고려사항
+
+### 11.1 환경 변수 보호
+
+- `.env` 파일 절대 Git에 커밋하지 않음
+- 서버에서만 환경 변수 파일 관리
+- 정기적으로 시크릿 키 로테이션
+
+### 11.2 이미지 보안
+
+- 공식 베이스 이미지 사용
+- 최신 보안 패치 적용
+- 불필요한 패키지 제거
+
+### 11.3 네트워크 보안
+
+- 내부 네트워크로 DB/Redis 격리
+- 외부 노출 포트 최소화
+
+---
+
+## 12. 배포 체크리스트
+
+### 배포 전
+
+- [ ] 로컬에서 빌드 테스트 (`npm run build:all`)
+- [ ] 환경 변수 확인
+- [ ] DB 스키마 변경 여부 확인
+- [ ] 롤백 계획 수립
+
+### 배포 중
+
+- [ ] `git pull origin main`
+- [ ] `docker-compose up -d --build`
+- [ ] `docker-compose ps` 상태 확인
+
+### 배포 후
+
+- [ ] HTTP 접근 확인
+- [ ] 로그 에러 확인
+- [ ] 주요 기능 테스트
+
+---
+
+## 13. 자동화 CI/CD (향후 계획)
+
+### GitHub Actions 예시
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/bandauto
+            git pull origin main
+            docker-compose up -d --build
+```
+
+### 필요 사항
+
+- GitHub Secrets 설정:
+  - `EC2_HOST`: EC2 IP 주소
+  - `EC2_SSH_KEY`: SSH 프라이빗 키
+
+---
+
+## 변경 이력
+
+| 날짜 | 버전 | 변경 내용 |
+|------|------|----------|
+| 2026-02 | 2.0 | Docker Compose 기반으로 재작성 |
+| 2025-12 | 1.0 | 최초 작성 (Jenkins) |

@@ -161,14 +161,12 @@ describe('calculatePrice', () => {
 
 ## CI 통합 (도입 시)
 
-```groovy
-// Jenkinsfile 추가 단계
-stage('Test') {
-    steps {
-        sh 'npm run test'
-        sh 'npm run test:coverage'
-    }
-}
+```yaml
+# GitHub Actions 예시 (.github/workflows/test.yml)
+- name: Run Tests
+  run: |
+    npm run test
+    npm run test:coverage
 ```
 
 | 규칙 |

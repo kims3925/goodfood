@@ -1,6 +1,7 @@
-# 배포 규칙
+# Shop App 배포 규칙
 
 > **관련 문서:** [SECURITY.md](./SECURITY.md) | [PROJECT.md](./PROJECT.md) | [../CLAUDE.md](../CLAUDE.md)
+> **전체 배포 가이드:** [../../docs/DEPLOYMENT.md](../../docs/DEPLOYMENT.md)
 
 ---
 
@@ -8,304 +9,163 @@
 
 | 항목 | 기술 |
 |-----|-----|
-| Cloud | AWS EC2 |
-| Database | MariaDB (AWS RDS) |
-| Cache | Redis (Bull Queue) |
-| Process Manager | PM2 |
-| Reverse Proxy | Nginx |
-| CI/CD | Jenkins |
+| Container | Docker (node:20-alpine) |
+| Orchestration | Docker Compose |
+| Database | MariaDB 10.11 (Docker) |
+| Cache | Redis 7 (Docker) |
+| Reverse Proxy | Nginx (호스트) |
+
+---
+
+## Docker 설정
+
+### Dockerfile 위치
+
+```
+docker/Dockerfile
+```
+
+### 빌드 스테이지
+
+| 스테이지 | 베이스 이미지 | 역할 |
+|----------|---------------|------|
+| deps | node:20-alpine | pnpm 의존성 설치 |
+| builder | node:20-alpine | Prisma 생성 + Next.js standalone 빌드 |
+| runner | node:20-alpine | 프로덕션 실행 |
+
+### 빌드 특징
+
+- **Multi-stage 빌드**: 최종 이미지 경량화
+- **pnpm workspace**: 모노레포 의존성 관리
+- **standalone output**: Next.js 독립 실행 파일 생성
 
 ---
 
 ## 환경 전략
 
-| 환경 | 용도 | URL | 브랜치 |
-|-----|-----|-----|-------|
-| Development | 로컬 개발 | localhost:3000, 3001 | feature/* |
-| Production | 운영 | https://snsauto.abcpharm.net | main |
+| 환경 | 용도 | URL |
+|-----|-----|-----|
+| Development | 로컬 개발 | localhost:3000 |
+| Production | 운영 | https://shop.yourdomain.com |
 
 ---
 
-## CI/CD 파이프라인
+## 배포 명령어
 
-### CI Pipeline (ci-Jenkinsfile)
-
-> 브랜치 조건: `main`, `release-*`, PR만 빌드 실행
-
-```text
-Branch Check → Setup → Debug → Install → Prisma Generate → Lint → Typecheck → Build → Success
-```
-
-| 단계 | 설명 | 명령어 |
-|-----|-----|--------|
-| Branch Check | 빌드 대상 브랜치 필터링 | main, release-*, PR |
-| Setup | Node/npm 버전 확인 | `node -v && npm -v` |
-| Debug | Git 커밋, 패키지 정보 확인 | `git log -1`, package.json 검증 |
-| Install | 의존성 설치 | `npm ci` |
-| Prisma Generate | Prisma 클라이언트 생성 | `npx prisma generate --schema prisma` |
-| Lint | ESLint 검사 (조건부) | `npm run lint` |
-| Typecheck | TypeScript 타입 검사 (조건부) | `npm run typecheck` |
-| Build | 앱 순차 빌드 | `npm run build:shop` → `npm run build:sourcing` |
-
-### CD Pipeline (cd-Jenkinsfile)
-
-> **트리거 조건**: CI Pipeline (`bandauto-ci`) 성공 시에만 자동 실행
-> **최적화**: Jenkins 서버에서 중복 작업 제거 → 배포 시간 ~5분 단축
-
-```text
-CI Guard → Deploy (운영 서버에서 모든 작업 수행)
-```
-
-| 단계 | 설명 | 실행 위치 |
-|-----|-----|----------|
-| CI Guard | CI 성공 여부 확인 (수동 실행 시 경고) | Jenkins |
-| Deploy | 운영 서버에서 git pull, npm ci, prisma, 빌드, PM2 재시작 | 운영 서버 |
-
-> **참고**: `triggers { upstream(...) }` 설정으로 CI 성공 시에만 CD가 트리거됨.
-> Checkout, Install, Prisma Generate는 운영 서버 Deploy에서 수행하므로 Jenkins에서 제거.
-
-### Deploy 단계 상세
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                    Deploy Stage Flow                         │
-├─────────────────────────────────────────────────────────────┤
-│  1. .env 백업                                                │
-│     └─ 모든 .env, .env.local 파일을 보안 디렉토리에 백업     │
-│                                                              │
-│  2. Git Pull                                                 │
-│     └─ git fetch origin main && git reset --hard origin/main │
-│                                                              │
-│  3. .env 복원                                                │
-│     └─ 백업한 .env 파일들을 원래 위치로 복원                  │
-│                                                              │
-│  4. node_modules 무결성 체크                                 │
-│     ├─ node_modules 존재 여부 확인                           │
-│     ├─ package-lock.json 변경 여부 (체크섬 비교)             │
-│     ├─ 주요 패키지 존재 확인 (next, react, prisma)           │
-│     └─ 필요시 npm ci --legacy-peer-deps 재설치               │
-│                                                              │
-│  5. Prisma Generate & Migrate                                │
-│     ├─ npx prisma generate --schema prisma                   │
-│     ├─ 마이그레이션 상태 확인 (migrate status)               │
-│     └─ 펜딩 마이그레이션 적용 (migrate deploy)               │
-│                                                              │
-│  6. PM2 프로세스 중지                                        │
-│     └─ 파일 잠금 해제를 위해 빌드 전 중지                    │
-│                                                              │
-│  7. 앱 빌드                                                  │
-│     └─ npm run build:shop && npm run build:sourcing          │
-│                                                              │
-│  8. PM2 재시작                                               │
-│     └─ pm2 reload all --update-env                           │
-│                                                              │
-│  9. 검증                                                     │
-│     └─ pm2 status 확인                                       │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 실패 시 조치
-
-| 단계 | 실패 시 |
-|-----|--------|
-| CI Guard | 경고만 출력 (수동 실행 시) |
-| Deploy - git pull | 차단 |
-| Deploy - npm ci | 차단 |
-| Deploy - Prisma Migrate | 배포 중단 (스키마 드리프트 시 수동 개입 필요) |
-| Deploy - 빌드 | 롤백 |
-| Deploy - PM2 | 롤백 |
-
----
-
-## 배포 프로세스
-
-### 1. .env 파일 보호
+### 개별 앱 배포
 
 ```bash
-# 보안: 프로젝트 디렉토리 내 전용 백업 폴더 사용 (Jenkins 권한 문제 해결)
-ENV_BACKUP_DIR="${PROJECT_PATH}/.env-backup-$$"
-mkdir -p "$ENV_BACKUP_DIR"
-chmod 700 "$ENV_BACKUP_DIR"  # 소유자만 접근 가능
-
-# 배포 전 .env 백업
-cp .env "$ENV_BACKUP_DIR/.env.backup"
-cp db/.env "$ENV_BACKUP_DIR/.env.db.backup"
-cp shop-app/.env "$ENV_BACKUP_DIR/.env.shop.backup"
-cp sourcing-app/.env "$ENV_BACKUP_DIR/.env.sourcing.backup"
-
-# 백업 파일 권한 제한 (소유자만 읽기/쓰기)
-chmod 600 "$ENV_BACKUP_DIR"/.env.*
-
-# git reset 후 복원
-git reset --hard origin/main
-cp "$ENV_BACKUP_DIR/.env.backup" .env
-cp "$ENV_BACKUP_DIR/.env.db.backup" db/.env
-cp "$ENV_BACKUP_DIR/.env.shop.backup" shop-app/.env
-cp "$ENV_BACKUP_DIR/.env.sourcing.backup" sourcing-app/.env
-
-# 복원 후 임시 백업 삭제 (민감 정보 노출 방지)
-rm -rf "$ENV_BACKUP_DIR"
+# shop-app만 재빌드 및 재시작
+docker-compose up -d --build shop-app
 ```
 
-> **보안 주의사항:**
-> - `/tmp`는 모든 사용자가 접근 가능하므로 민감 정보 백업에 부적합
-> - 백업 디렉토리에 `chmod 700`, 백업 파일에 `chmod 600` 적용 필수
-> - 복원 완료 후 반드시 임시 백업 삭제
-
-### 2. 의존성 관리
+### 로그 확인
 
 ```bash
-# package-lock.json 변경 시 재설치
-if [ "$OLD_CHECKSUM" != "$NEW_CHECKSUM" ]; then
-    rm -rf node_modules
-    npm ci --legacy-peer-deps
-fi
+docker-compose logs -f shop-app --tail=100
 ```
 
-### 3. PM2 프로세스 관리
+### 컨테이너 접속
 
 ```bash
-# 빌드 전 프로세스 중지 (파일 잠금 해제)
-sudo -u ubuntu pm2 stop shop-app sourcing-app shop sourcing
-
-# 프로세스 중지 확인 (최대 10초 대기)
-for i in 1 2 3 4 5; do
-    if ! pm2 list | grep -E 'shop|sourcing' | grep -q 'online'; then
-        break
-    fi
-    sleep 2
-done
-
-# 빌드 후 재시작
-sudo -u ubuntu pm2 reload all --update-env
-```
-
----
-
-## PM2 설정
-
-### 앱 구성
-
-| 앱 | 포트 | PM2 이름 |
-|---|-----|---------|
-| shop-app | 3000 | shop 또는 shop-app |
-| sourcing-app | 3001 | sourcing 또는 sourcing-app |
-
-### PM2 명령어
-
-```bash
-# 상태 확인
-pm2 status
-
-# 로그 확인
-pm2 logs shop
-pm2 logs sourcing
-
-# 재시작
-pm2 restart shop sourcing
-
-# 전체 재시작
-pm2 reload all --update-env
+docker-compose exec shop-app sh
 ```
 
 ---
 
 ## 환경 변수
 
-### 필수 환경 변수
+### 필수 환경 변수 (`shop-app/.env.local`)
 
-| 변수 | 설명 | 위치 |
-|-----|-----|-----|
-| DATABASE_URL | MariaDB 연결 문자열 | db/.env |
-| NEXTAUTH_SECRET | NextAuth 암호화 키 | shop-app, sourcing-app |
-| NEXTAUTH_URL | 인증 URL | shop-app, sourcing-app |
-| JWT_SECRET | JWT 서명 키 | shop-app |
-| GUEST_TOKEN_SECRET | 게스트 토큰 키 | shop-app |
-| TOSS_SECRET_KEY | Toss 결제 키 | shop-app |
-| BAND_CLIENT_ID | Band API 클라이언트 ID | sourcing-app |
-| BAND_CLIENT_SECRET | Band API 시크릿 | sourcing-app |
+| 변수 | 설명 |
+|-----|-----|
+| DATABASE_URL | MariaDB 연결 문자열 |
+| REDIS_URL | Redis 연결 URL |
+| NEXTAUTH_SECRET | NextAuth 암호화 키 |
+| NEXTAUTH_URL | 인증 URL |
+| JWT_SECRET | JWT 서명 키 |
+| GUEST_TOKEN_SECRET | 게스트 토큰 키 |
+| TOSS_CLIENT_KEY | Toss 결제 클라이언트 키 |
+| TOSS_SECRET_KEY | Toss 결제 시크릿 키 |
 
-### Jenkins Credentials
+### Docker Compose 환경 변수
 
-| Credential ID | 설명 |
-|--------------|-----|
-| nextauth-secret | NEXTAUTH_SECRET |
-| guest-secret | GUEST_TOKEN_SECRET |
-| jwt-secret | JWT_SECRET |
+docker-compose.yml에서 자동 주입:
+- `DATABASE_URL`: mariadb 서비스 연결
+- `REDIS_URL`: redis 서비스 연결
+- 이미지 저장 경로 (`*_IMAGE_STORAGE_PATH`)
 
 ---
 
 ## 빌드 명령어
 
-```bash
-# 전체 빌드
-npm run build
+### 로컬 빌드 테스트
 
-# 개별 앱 빌드
-npm run build:shop      # shop-app 빌드
-npm run build:sourcing  # sourcing-app 빌드
+```bash
+# 루트에서 실행
+npm run build:shop
 ```
 
-### 빌드 실패 시 재시도
+### Docker 빌드
 
 ```bash
-npm run build:shop || {
-    rm -rf shop-app/.next
-    npm run build:shop
-}
+# 전체 빌드
+docker-compose build shop-app
+
+# 캐시 없이 빌드
+docker-compose build --no-cache shop-app
 ```
 
 ---
 
 ## 헬스 체크
 
-| 체크 항목 | 방법 |
-|---------|-----|
-| 앱 실행 | PM2 status 확인 |
-| 웹 접근 | HTTP 응답 확인 |
-| DB 연결 | Prisma 연결 확인 |
+```bash
+# 컨테이너 상태
+docker-compose ps shop-app
+
+# HTTP 응답 확인
+curl -I http://localhost:3000
+
+# 로그 확인
+docker-compose logs shop-app --tail=50
+```
 
 ---
 
 ## 롤백 절차
 
-### 자동 롤백 조건
-
-| 증상 | 조치 |
-|-----|-----|
-| 빌드 실패 | 이전 빌드 유지 |
-| PM2 시작 실패 | 수동 개입 필요 |
-
-### 수동 롤백
+### 이전 버전으로 롤백
 
 ```bash
-# 이전 커밋으로 롤백
+# 1. 이전 커밋으로 복구
 git reset --hard HEAD~1
-npm ci --legacy-peer-deps
-cd db && npx prisma generate --schema prisma && cd ..
-npm run build
-pm2 reload all
+
+# 2. 재빌드 및 배포
+docker-compose up -d --build shop-app
 ```
 
 ---
 
 ## 배포 전 체크리스트
 
-- [ ] 모든 테스트 통과 (`npm run build` 성공)
-- [ ] 코드 리뷰 완료
-- [ ] DB 마이그레이션 테스트
-- [ ] 환경 변수 확인 (.env 파일)
-- [ ] 롤백 계획 수립
+- [ ] 로컬 빌드 성공 (`npm run build:shop`)
+- [ ] 환경 변수 확인 (`.env.local`)
+- [ ] DB 스키마 변경 여부 확인
+- [ ] 결제 관련 변경 시 테스트 환경 검증
 
 ---
 
 ## 배포 후 체크리스트
 
-- [ ] PM2 상태 확인 (`pm2 status`)
-- [ ] 웹사이트 접근 확인
-- [ ] 로그 모니터링 (`pm2 logs`)
-- [ ] 에러율 확인
-- [ ] 주요 기능 스모크 테스트
+- [ ] `docker-compose ps shop-app` 상태 확인
+- [ ] HTTP 접근 확인 (http://localhost:3000)
+- [ ] 로그 에러 확인
+- [ ] 주요 기능 테스트:
+  - [ ] 로그인/회원가입
+  - [ ] 상품 목록/상세
+  - [ ] 장바구니
+  - [ ] 결제 (테스트 환경)
 
 ---
 
@@ -314,22 +174,18 @@ pm2 reload all
 ### 로그 확인
 
 ```bash
-# PM2 로그
-pm2 logs --lines 100
+# 실시간 로그
+docker-compose logs -f shop-app
 
-# 특정 앱 로그
-pm2 logs shop --lines 50
-pm2 logs sourcing --lines 50
+# 최근 에러만
+docker-compose logs shop-app 2>&1 | grep -i error
 ```
 
 ### 리소스 확인
 
 ```bash
-# PM2 모니터링
-pm2 monit
-
-# 시스템 리소스
-htop
+# 컨테이너 리소스 사용량
+docker stats bandauto-shop
 ```
 
 ---
@@ -340,6 +196,5 @@ htop
 |-----|-----|
 | 운영 DB 직접 수정 | 데이터 무결성 |
 | .env 파일 커밋 | 보안 |
-| force push to main | 히스토리 손실 |
 | 테스트 없이 배포 | 장애 위험 |
-| PM2 stop all 사용 | 다른 서비스 영향 |
+| 결제 키 하드코딩 | 보안 위험 |

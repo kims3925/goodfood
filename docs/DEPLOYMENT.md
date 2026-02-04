@@ -1,609 +1,292 @@
-# Bandauto v1.0.0 AWS 배포 가이드
+# BandAuto 배포 가이드
 
-## 현재 배포 상태
+> **현재 배포 방식:** Docker Compose
+> **최종 업데이트:** 2026-02
 
-| 항목 | 상태 | 비고 |
+---
+
+## 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Docker Compose 환경                        │
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │  shop-app   │  │sourcing-app │  │   mariadb   │        │
+│  │   :3000     │  │   :3001     │  │   :3306     │        │
+│  │  (alpine)   │  │ (playwright)│  │  (10.11)    │        │
+│  └─────────────┘  └─────────────┘  └─────────────┘        │
+│                                                             │
+│  ┌─────────────┐                                           │
+│  │    redis    │       볼륨: /home/ubuntu/assets           │
+│  │   :6379     │                                           │
+│  └─────────────┘                                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 서비스 구성
+
+| 서비스 | 이미지 | 포트 | 설명 |
+|--------|--------|------|------|
+| shop-app | bandauto-shop:latest | 3000 | 고객용 쇼핑몰 |
+| sourcing-app | bandauto-sourcing:latest | 3001 | 관리자 대시보드 (Playwright 포함) |
+| mariadb | mariadb:10.11 | 3306 | 메인 데이터베이스 |
+| redis | redis:7-alpine | 6379 | 캐시 및 큐 |
+
+---
+
+## Dockerfile 구조
+
+### Shop App (`docker/Dockerfile`)
+
+| 스테이지 | 베이스 이미지 | 역할 |
+|----------|---------------|------|
+| deps | node:20-alpine | pnpm 의존성 설치 |
+| builder | node:20-alpine | Prisma 생성 + Next.js 빌드 |
+| runner | node:20-alpine | 프로덕션 실행 (standalone) |
+
+### Sourcing App (`docker/Dockerfile.sourcing`)
+
+| 스테이지 | 베이스 이미지 | 역할 |
+|----------|---------------|------|
+| deps | node:20-bookworm | pnpm 의존성 설치 |
+| builder | node:20-bookworm | Prisma 생성 + Next.js 빌드 |
+| runner | playwright:v1.58.1-noble | Playwright 포함 실행 환경 |
+
+---
+
+## 배포 명령어
+
+### 전체 배포
+
+```bash
+# 이미지 빌드 및 컨테이너 시작
+docker-compose up -d --build
+
+# 로그 확인
+docker-compose logs -f
+```
+
+### 특정 앱만 재배포
+
+```bash
+# shop-app만 재빌드 및 재시작
+docker-compose up -d --build shop-app
+
+# sourcing-app만 재빌드 및 재시작
+docker-compose up -d --build sourcing-app
+```
+
+### 컨테이너 관리
+
+```bash
+# 상태 확인
+docker-compose ps
+
+# 로그 확인 (특정 서비스)
+docker-compose logs -f shop-app
+docker-compose logs -f sourcing-app
+
+# 컨테이너 중지
+docker-compose stop
+
+# 컨테이너 삭제 (볼륨 유지)
+docker-compose down
+
+# 컨테이너 + 볼륨 삭제 (주의: DB 데이터 삭제됨)
+docker-compose down -v
+```
+
+---
+
+## 환경 변수
+
+### 루트 `.env` (Docker Compose용)
+
+```env
+# Database
+DB_ROOT_PASSWORD=<root-password>
+DB_NAME=sourcing_db
+DB_USER=banduser
+DB_PASSWORD=<db-password>
+```
+
+### Shop App (`shop-app/.env.local`)
+
+```env
+DATABASE_URL=mysql://banduser:<password>@mariadb:3306/sourcing_db
+REDIS_URL=redis://redis:6379
+NEXTAUTH_URL=https://shop.yourdomain.com
+NEXTAUTH_SECRET=<secret>
+JWT_SECRET=<secret>
+GUEST_TOKEN_SECRET=<secret>
+TOSS_CLIENT_KEY=<key>
+TOSS_SECRET_KEY=<key>
+```
+
+### Sourcing App (`sourcing-app/.env`)
+
+```env
+DATABASE_URL=mysql://banduser:<password>@mariadb:3306/sourcing_db
+REDIS_URL=redis://redis:6379
+NEXTAUTH_URL=https://admin.yourdomain.com
+NEXTAUTH_SECRET=<secret>
+BAND_CLIENT_ID=<id>
+BAND_CLIENT_SECRET=<secret>
+GEMINI_API_KEY=<key>
+```
+
+---
+
+## 볼륨 마운트
+
+| 호스트 경로 | 컨테이너 경로 | 용도 |
+|-------------|---------------|------|
+| /home/ubuntu/assets | /home/ubuntu/assets | 상품/포스트/채널 이미지 |
+| mariadb_data (named) | /var/lib/mysql | DB 데이터 |
+| redis_data (named) | /data | Redis 데이터 |
+
+---
+
+## 배포 프로세스
+
+### 1. 코드 업데이트 후 배포
+
+```bash
+# 1. 코드 풀
+cd ~/bandauto
+git pull origin main
+
+# 2. 이미지 재빌드 및 배포
+docker-compose up -d --build
+```
+
+### 2. DB 스키마 변경 시
+
+```bash
+# 컨테이너 내부에서 Prisma 마이그레이션 실행
+docker-compose exec shop-app sh -c "cd /app/db && npx prisma db push --schema prisma"
+```
+
+### 3. 환경 변수 변경 시
+
+```bash
+# .env 파일 수정 후 컨테이너 재시작
+docker-compose up -d
+```
+
+---
+
+## 헬스 체크
+
+### 서비스 상태 확인
+
+```bash
+# 컨테이너 상태
+docker-compose ps
+
+# 헬스체크 상태
+docker inspect --format='{{.State.Health.Status}}' bandauto-mariadb
+docker inspect --format='{{.State.Health.Status}}' bandauto-redis
+```
+
+### 앱 접근 확인
+
+```bash
+# shop-app
+curl -I http://localhost:3000
+
+# sourcing-app
+curl -I http://localhost:3001
+```
+
+### 로그 확인
+
+```bash
+# 전체 로그
+docker-compose logs -f --tail=100
+
+# 특정 서비스 로그
+docker-compose logs -f shop-app --tail=50
+docker-compose logs -f sourcing-app --tail=50
+```
+
+---
+
+## 롤백 절차
+
+### 이전 이미지로 롤백
+
+```bash
+# 1. 현재 이미지 태그 확인
+docker images | grep bandauto
+
+# 2. 이전 커밋으로 복구
+git reset --hard HEAD~1
+
+# 3. 재빌드 및 배포
+docker-compose up -d --build
+```
+
+### 긴급 롤백 (이미지 캐시 사용)
+
+```bash
+# 빌드 없이 기존 이미지로 재시작
+docker-compose up -d
+```
+
+---
+
+## 트러블슈팅
+
+| 증상 | 원인 | 해결 |
 |------|------|------|
-| EC2 인스턴스 | ✅ 완료 | IP: `15.165.39.32` |
-| 서버 초기 설정 | ✅ 완료 | Node.js 20, PM2, Nginx |
-| MariaDB | ✅ 완료 | DB: `sourcing_db`, User: `banduser` |
-| 환경 변수 | ✅ 완료 | db/.env, shop-app/.env.local, sourcing-app/.env |
-| 로컬 빌드 테스트 | ✅ 완료 | 빌드 에러 모두 수정됨 |
-| GitHub 푸시 | ⏳ 대기 | release-1 브랜치로 푸시 필요 |
-| 서버 배포 | ⏳ 대기 | git pull 및 빌드 필요 |
-| PM2/Nginx 설정 | ⏳ 대기 | |
-| HTTP 테스트 | ⏳ 대기 | |
+| 컨테이너 시작 실패 | DB 연결 대기 | healthcheck 확인, 재시작 |
+| 502 Bad Gateway | 앱 미실행 | `docker-compose logs` 확인 |
+| 이미지 용량 부족 | 빌드 캐시 누적 | `docker system prune -a` |
+| 볼륨 권한 오류 | 호스트/컨테이너 UID 불일치 | Dockerfile에서 USER 확인 |
+
+### 디버깅 명령어
+
+```bash
+# 컨테이너 내부 접속
+docker-compose exec shop-app sh
+docker-compose exec sourcing-app bash
+
+# 실시간 리소스 사용량
+docker stats
+
+# 이미지 빌드 로그 상세
+docker-compose build --no-cache --progress=plain shop-app
+```
 
 ---
 
 ## 배포 체크리스트
 
-### Phase 1: AWS EC2 인스턴스 생성
-- [x] EC2 인스턴스 생성 (Ubuntu 22.04, t3.small, 서울 리전)
-- [x] 보안 그룹 설정 (22, 80 포트)
-- [x] 탄력적 IP 할당 및 연결 → `15.165.39.32`
-- [x] 키페어(.pem) 다운로드 및 안전한 곳에 보관
+### 배포 전
 
-### Phase 2: 서버 초기 설정
-- [x] SSH 접속 확인
-- [x] 시스템 업데이트 (`sudo apt update && sudo apt upgrade -y`)
-- [x] Git, build-essential 설치
+- [ ] 로컬에서 빌드 테스트 (`npm run build:all`)
+- [ ] 환경 변수 확인 (`.env` 파일들)
+- [ ] DB 스키마 변경 여부 확인
+- [ ] 롤백 계획 수립
 
-### Phase 3: Node.js 환경 설정
-- [x] Node.js 20 LTS 설치
-- [x] PM2 전역 설치
+### 배포 후
 
-### Phase 4: 데이터베이스 설정 (MariaDB)
-- [x] MariaDB 설치 (`sudo apt install mariadb-server`)
-- [x] 보안 설정 (`sudo mysql_secure_installation`)
-- [x] 데이터베이스 생성 (`sourcing_db`)
-- [x] 사용자 생성 및 권한 부여 (`banduser`)
-
-### Phase 5: 환경 변수 설정
-- [x] db/.env 생성 (MariaDB 연결 문자열)
-- [x] shop-app/.env.local 생성
-- [x] sourcing-app/.env 생성
-- [x] 이미지 저장 디렉토리 생성 (`~/assets/images/`)
-
-### Phase 6: 로컬 빌드 테스트 및 에러 수정
-- [x] TOSS_ERROR_CODES 상수 수정
-- [x] 더미 데이터 스크립트 삭제 (seed-settlement-*.ts)
-- [x] recipientPhone 프로퍼티 접근 수정
-- [x] Buffer 타입 에러 수정 (Uint8Array 래핑)
-- [x] orderTest 모델 관련 코드 삭제
-- [x] currentUser.id → currentUser.userId 수정
-- [x] BAND_UPLOAD_URL 상수 추가
-- [x] subdomain 프로퍼티 경로 수정
-- [x] shop-app 빌드 성공 ✅
-- [x] sourcing-app 빌드 성공 ✅
-
-### Phase 7: 프로젝트 배포
-- [ ] GitHub에 코드 푸시 (release-1 브랜치)
-- [ ] AWS 서버에서 git pull
-- [ ] 의존성 설치 (`npm install`)
-- [ ] Prisma 클라이언트 생성 및 DB 스키마 적용
-- [ ] shop-app 빌드
-- [ ] sourcing-app 빌드
-
-### Phase 8: PM2로 앱 실행
-- [ ] shop-app 실행 (포트 3000)
-- [ ] sourcing-app 실행 (포트 3001)
-- [ ] 자동 시작 설정 (`pm2 startup && pm2 save`)
-
-### Phase 9: Nginx 설정
-- [ ] Nginx 설정 파일 생성
-- [ ] 리버스 프록시 설정
-- [ ] 설정 활성화 및 Nginx 재시작
-
-### Phase 10: HTTP 테스트
-- [ ] shop-app 접속 확인 (`http://15.165.39.32:3000`)
-- [ ] sourcing-app 접속 확인 (`http://15.165.39.32:3001`)
-- [ ] 로그인/기본 기능 테스트
-
-### Phase 11: HTTPS 적용 (선택)
-- [ ] DNS A 레코드 설정
-- [ ] Certbot 설치
-- [ ] SSL 인증서 발급
-- [ ] 자동 갱신 테스트
+- [ ] `docker-compose ps` 상태 확인
+- [ ] 각 앱 HTTP 접근 확인
+- [ ] `docker-compose logs` 에러 확인
+- [ ] 주요 기능 스모크 테스트
 
 ---
 
-## 프로젝트 정보
-
-| 항목 | 값 |
-|------|-----|
-| shop-app | 고객용 쇼핑몰 (포트 3000) |
-| sourcing-app | 관리자 대시보드 (포트 3001) |
-| 데이터베이스 | MariaDB (Prisma ORM) |
-| 프레임워크 | Next.js 14.2.3 |
-| EC2 IP | 15.165.39.32 |
-| 브랜치 | release-1 |
-
----
-
-## 🚀 남은 배포 단계 빠른 명령어
-
-### 1. 로컬에서 GitHub 푸시
-```bash
-cd C:\Users\hsw48\Desktop\bandauto
-git add .
-git commit -m "fix: 빌드 에러 수정 및 테스트 코드 삭제"
-git push origin hong
-# 또는 release-1 브랜치로 푸시
-git push origin hong:release-1
-```
-
-### 2. AWS 서버 SSH 접속
-```bash
-ssh -i "your-key.pem" ubuntu@15.165.39.32
-```
-
-### 3. 서버에서 코드 풀 및 빌드
-```bash
-cd ~/bandauto
-git pull origin release-1
-
-# 의존성 설치
-npm install
-
-# Prisma 설정
-cd db
-npx prisma generate --schema prisma
-npx prisma db push --schema prisma
-cd ..
-
-# 빌드 (메모리 부족 시 스왑 추가 필요)
-cd shop-app && npm run build && cd ..
-cd sourcing-app && npm run build && cd ..
-```
-
-### 4. PM2로 앱 실행
-```bash
-cd ~/bandauto/shop-app
-pm2 start npm --name "shop-app" -- start
-
-cd ~/bandauto/sourcing-app
-pm2 start npm --name "sourcing-app" -- start
-
-pm2 status
-pm2 startup  # 출력된 명령어 실행
-pm2 save
-```
-
-### 5. Nginx 설정 (IP 직접 접속용)
-```bash
-sudo nano /etc/nginx/sites-available/bandauto
-```
-
-```nginx
-# 기본 서버 (shop-app)
-server {
-    listen 80 default_server;
-    server_name _;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-
-# sourcing-app (포트 3001 직접 접속)
-server {
-    listen 3001;
-    server_name _;
-
-    location / {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-```bash
-sudo ln -sf /etc/nginx/sites-available/bandauto /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t
-sudo systemctl restart nginx
-```
-
-### 6. 테스트
-- shop-app: http://15.165.39.32
-- sourcing-app: http://15.165.39.32:3001
-
----
-
-## Phase 1: AWS EC2 인스턴스 생성
-
-### 1.1 EC2 인스턴스 생성
-**왜?** 서버가 있어야 앱을 24시간 실행할 수 있습니다.
-
-| 설정 항목 | 권장값 | 이유 |
-|----------|--------|------|
-| 리전 | 서울 (ap-northeast-2) | 한국 사용자 대상이므로 가장 빠른 응답 |
-| AMI | Ubuntu 22.04 LTS | 안정적이고 문서가 많음 |
-| 인스턴스 타입 | t3.small (2GB RAM) | Next.js 빌드에 최소 2GB 필요 |
-| 스토리지 | 30GB gp3 | 소스코드 + 빌드 파일 + DB |
-| 키페어 | 새로 생성 (.pem 다운로드) | SSH 접속용 |
-
-### 1.2 보안 그룹 설정
-**왜?** 어떤 포트로 접속을 허용할지 방화벽 규칙을 정합니다.
-
-| 포트 | 용도 | 소스 |
-|------|------|------|
-| 22 | SSH 접속 | 내 IP만 (보안) |
-| 80 | HTTP | 전체 (0.0.0.0/0) |
-| 443 | HTTPS | 전체 (0.0.0.0/0) |
-
-### 1.3 탄력적 IP 할당
-**왜?** 서버를 재시작해도 IP가 바뀌지 않습니다. 도메인 연결에 필수입니다.
-
-1. EC2 콘솔 → 탄력적 IP → 할당
-2. 생성된 IP 선택 → 작업 → 연결
-3. 인스턴스 선택 후 연결
-
----
-
-## Phase 2: 서버 초기 설정
-
-### 2.1 SSH 접속
-```bash
-# Windows PowerShell에서
-ssh -i "your-key.pem" ubuntu@<EC2-퍼블릭-IP>
-
-# 권한 오류 시 (Windows)
-icacls your-key.pem /inheritance:r /grant:r "%username%:R"
-```
-
-### 2.2 시스템 업데이트
-**왜?** 보안 패치와 최신 패키지를 적용합니다.
-```bash
-sudo apt update && sudo apt upgrade -y
-```
-
-### 2.3 필수 도구 설치
-```bash
-# Git 설치 (소스코드 다운로드용)
-sudo apt install -y git
-
-# 빌드 도구 (일부 npm 패키지 컴파일용)
-sudo apt install -y build-essential
-```
-
----
-
-## Phase 3: Node.js 환경 설정
-
-### 3.1 Node.js 20 LTS 설치
-**왜?** Next.js 14는 Node.js 18+ 필요. 20 LTS가 가장 안정적입니다.
-```bash
-# NodeSource 저장소 추가
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-
-# Node.js 설치
-sudo apt install -y nodejs
-
-# 버전 확인
-node -v  # v20.x.x
-npm -v   # 10.x.x
-```
-
-### 3.2 PM2 설치
-**왜?** 앱을 백그라운드에서 실행하고, 서버 재시작 시 자동 복구합니다.
-```bash
-sudo npm install -g pm2
-```
-
----
-
-## Phase 4: 프로젝트 배포
-
-### 4.1 프로젝트 클론
-```bash
-cd ~
-git clone <your-repo-url> bandauto
-cd bandauto
-```
-
-### 4.2 환경 변수 설정
-**왜?** 프로덕션 환경에 맞는 설정값을 적용합니다.
-
-```bash
-# db/.env
-nano db/.env
-```
-```env
-# 형식: mysql://사용자:비밀번호@호스트:포트/데이터베이스
-DATABASE_URL="mysql://banduser:<비밀번호>@localhost:3306/sourcing_db"
-```
-> ⚠️ `<비밀번호>` 부분에 MariaDB 설정 시 지정한 실제 비밀번호를 입력하세요.
-
-```bash
-# shop-app/.env.local
-nano shop-app/.env.local
-```
-```env
-NEXTAUTH_URL=https://shop.yourdomain.com
-NEXTAUTH_SECRET=<랜덤문자열-32자-이상>
-# ... 기타 환경변수 (로컬 .env.local 참고)
-```
-
-```bash
-# sourcing-app/.env
-nano sourcing-app/.env
-```
-```env
-# ... 기타 환경변수 (로컬 .env 참고)
-```
-
-> **팁:** `openssl rand -base64 32` 명령으로 랜덤 시크릿 생성 가능
-
-### 4.3 의존성 설치 및 빌드
-**왜?** 로컬에서 node_modules는 올리지 않으므로 서버에서 다시 설치합니다.
-```bash
-# 루트에서 전체 의존성 설치
-npm install
-
-# db 패키지 - Prisma 클라이언트 생성
-cd db
-npx prisma generate --schema prisma
-npx prisma db push --schema prisma  # DB 스키마 적용
-cd ..
-
-# 각 앱 빌드 (메모리 부족 시 한 번에 하나씩)
-cd shop-app && npm run build && cd ..
-cd sourcing-app && npm run build && cd ..
-```
-
-> **주의:** t3.small에서 빌드 시 메모리 부족이 발생하면 스왑 메모리를 추가하세요:
-> ```bash
-> sudo fallocate -l 2G /swapfile
-> sudo chmod 600 /swapfile
-> sudo mkswap /swapfile
-> sudo swapon /swapfile
-> ```
-
----
-
-## Phase 5: PM2로 앱 실행
-
-### 5.1 앱 실행
-**왜?** 터미널을 닫아도 앱이 계속 실행됩니다.
-```bash
-# shop-app 실행
-cd ~/bandauto/shop-app
-pm2 start npm --name "shop-app" -- start
-
-# sourcing-app 실행
-cd ~/bandauto/sourcing-app
-pm2 start npm --name "sourcing-app" -- start
-
-# 상태 확인
-pm2 status
-```
-
-### 5.2 자동 시작 설정
-**왜?** 서버가 재부팅되어도 앱이 자동으로 시작됩니다.
-```bash
-pm2 startup
-# 출력되는 명령어 복사해서 실행
-pm2 save
-```
-
-### 5.3 PM2 유용한 명령어
-```bash
-pm2 status          # 앱 상태 확인
-pm2 logs            # 전체 로그
-pm2 logs shop-app   # 특정 앱 로그
-pm2 restart all     # 전체 재시작
-pm2 stop shop-app   # 특정 앱 중지
-pm2 monit           # 실시간 모니터링
-```
-
----
-
-## Phase 6: Nginx 리버스 프록시 설정
-
-### 6.1 Nginx 설치
-**왜?**
-1. 80/443 포트로 들어오는 요청을 내부 포트(3000, 3001)로 전달
-2. 정적 파일 캐싱으로 성능 향상
-3. HTTPS 인증서 관리
-
-```bash
-sudo apt install -y nginx
-```
-
-### 6.2 Nginx 설정 파일 생성
-**왜?** 도메인별로 어떤 앱으로 연결할지 정의합니다.
-
-```bash
-sudo nano /etc/nginx/sites-available/bandauto
-```
-
-```nginx
-# shop-app (고객용 쇼핑몰)
-server {
-    listen 80;
-    server_name shop.yourdomain.com;  # 실제 도메인으로 변경
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-
-# sourcing-app (관리자용)
-server {
-    listen 80;
-    server_name admin.yourdomain.com;  # 실제 도메인으로 변경
-
-    location / {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-### 6.3 설정 활성화
-```bash
-# 심볼릭 링크 생성
-sudo ln -s /etc/nginx/sites-available/bandauto /etc/nginx/sites-enabled/
-
-# 기본 설정 제거 (충돌 방지)
-sudo rm /etc/nginx/sites-enabled/default
-
-# 문법 검사
-sudo nginx -t
-
-# Nginx 재시작
-sudo systemctl restart nginx
-sudo systemctl enable nginx  # 부팅 시 자동 시작
-```
-
----
-
-## Phase 7: HTTP 테스트
-
-### 7.1 접속 테스트
-1. 브라우저에서 `http://<EC2-IP>` 접속 → shop-app 확인
-2. DNS 설정 전에는 IP로 직접 테스트
-
-### 7.2 문제 해결 체크리스트
-```bash
-# PM2 앱 상태 확인
-pm2 status
-pm2 logs shop-app --lines 50
-
-# Nginx 로그 확인
-sudo tail -f /var/log/nginx/error.log
-sudo tail -f /var/log/nginx/access.log
-
-# 포트 확인
-sudo netstat -tlnp | grep -E '80|3000|3001'
-
-# 방화벽 확인 (UFW 사용 시)
-sudo ufw status
-```
-
-### 7.3 일반적인 문제 해결
-
-| 증상 | 원인 | 해결 |
-|------|------|------|
-| 502 Bad Gateway | PM2 앱 미실행 | `pm2 restart all` |
-| 연결 거부 | 보안 그룹 미설정 | AWS 콘솔에서 포트 열기 |
-| 페이지 로드 느림 | 빌드 안됨 | `npm run build` 재실행 |
-
----
-
-## Phase 8: HTTPS 적용 (Let's Encrypt)
-
-### 8.1 DNS 설정 (필수)
-**왜?** Let's Encrypt는 IP가 아닌 도메인에만 인증서를 발급합니다.
-
-1. 도메인 관리 페이지 접속 (가비아, AWS Route53 등)
-2. DNS 레코드 추가:
-
-| 타입 | 호스트 | 값 |
-|------|--------|-----|
-| A | shop | <EC2 탄력적 IP> |
-| A | admin | <EC2 탄력적 IP> |
-
-3. DNS 전파 대기 (최대 48시간, 보통 10분 내외)
-4. 확인: `nslookup shop.yourdomain.com`
-
-### 8.2 Certbot 설치
-```bash
-sudo apt install -y certbot python3-certbot-nginx
-```
-
-### 8.3 인증서 발급 및 자동 설정
-**왜?** Certbot이 Nginx 설정을 자동으로 HTTPS로 수정해줍니다.
-```bash
-sudo certbot --nginx -d shop.yourdomain.com -d admin.yourdomain.com
-```
-- 이메일 입력
-- 약관 동의 (Y)
-- HTTP→HTTPS 리다이렉트 선택 (2번 권장)
-
-### 8.4 자동 갱신 테스트
-**왜?** Let's Encrypt 인증서는 90일마다 갱신 필요. Certbot이 자동화합니다.
-```bash
-sudo certbot renew --dry-run
-```
-
----
-
-## 배포 후 관리
-
-### 코드 업데이트 시
-```bash
-cd ~/bandauto
-git pull origin main
-
-# 의존성 변경 시
-npm install
-
-# DB 스키마 변경 시
-cd db && npx prisma db push --schema prisma && cd ..
-
-# 앱 재빌드
-cd shop-app && npm run build && cd ..
-cd sourcing-app && npm run build && cd ..
-
-# PM2 재시작
-pm2 restart all
-```
-
-### 로그 확인
-```bash
-pm2 logs                    # 전체 로그
-pm2 logs shop-app           # shop-app 로그
-sudo tail -f /var/log/nginx/error.log  # Nginx 에러 로그
-```
-
-### 서버 상태 확인
-```bash
-htop                        # CPU/메모리 사용량
-df -h                       # 디스크 사용량
-pm2 monit                   # PM2 실시간 모니터링
-```
-
-### 백업
-```bash
-# MariaDB 백업 (중요!)
-mysqldump -u banduser -p sourcing_db > ~/backups/sourcing_$(date +%Y%m%d).sql
-
-# 자동 백업 cron 설정 (매일 새벽 3시)
-crontab -e
-# 추가: 0 3 * * * mysqldump -u banduser -p<비밀번호> sourcing_db > ~/backups/sourcing_$(date +\%Y\%m\%d).sql
-```
-> ⚠️ cron에서 `-p` 뒤에 비밀번호를 직접 입력해야 합니다 (공백 없이 붙여서).
-
----
-
-## 예상 비용 (2024년 12월 기준)
-
-| 항목 | 월 비용 (USD) |
-|------|--------------|
-| EC2 t3.small (온디맨드) | ~$15 |
-| 탄력적 IP (사용 중) | $0 |
-| EBS 30GB gp3 | ~$2.5 |
-| 데이터 전송 (100GB) | ~$9 |
-| **합계** | **~$27/월** |
-
-> **절약 팁:** 예약 인스턴스(1년) 사용 시 약 30% 절감
-
----
-
-## 문제 발생 시 연락처
-
-- AWS 기술 지원: AWS 콘솔 → 지원
-- 커뮤니티: AWS 한국 사용자 모임, 생활코딩 등
+## 금지사항
+
+| 금지 | 이유 |
+|------|------|
+| `docker-compose down -v` 운영 환경 실행 | DB 데이터 삭제됨 |
+| 환경 변수 하드코딩 | 보안 위험 |
+| 운영 DB 직접 수정 | 데이터 무결성 |
+| 테스트 없이 배포 | 장애 위험 |

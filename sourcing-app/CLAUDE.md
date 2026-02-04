@@ -44,7 +44,7 @@
 | Auth | NextAuth.js 4.24 (JWT) |
 | Payment | Toss Payments |
 | AI | Gemini / OpenAI |
-| Deploy | AWS EC2, PM2, Jenkins |
+| Deploy | AWS EC2, Docker Compose |
 
 ---
 

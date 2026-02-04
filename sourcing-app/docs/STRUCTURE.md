@@ -118,8 +118,8 @@ bandauto/
 ├── scripts/                      # 빌드/배포 스크립트
 ├── docs/                         # 기존 문서
 ├── Claude_DOCS/                  # Claude AI 작업용 문서
-├── cd-Jenkinsfile                # CD 파이프라인
-├── ci-Jenkinsfile                # CI 파이프라인
+├── docker/                       # Docker 설정 파일
+├── docker-compose.yml            # Docker Compose 설정
 └── package.json                  # 루트 workspace 설정
 ```
 
