@@ -1,22 +1,7 @@
-# BandAuto 개발자 인수인계 가이드
+# BandAuto 인수인계 체크리스트
 
 > **최종 업데이트:** 2026-02
 > **대상:** 신규 개발자
-
----
-
-## 목차
-
-1. [프로젝트 개요](#1-프로젝트-개요)
-2. [아키텍처](#2-아키텍처)
-3. [로컬 환경 설정](#3-로컬-환경-설정)
-4. [코드 구조](#4-코드-구조)
-5. [핵심 비즈니스 로직](#5-핵심-비즈니스-로직)
-6. [데이터베이스](#6-데이터베이스)
-7. [개발 명령어](#7-개발-명령어)
-8. [배포 프로세스](#8-배포-프로세스)
-9. [문서 체계](#9-문서-체계)
-10. [인수인계 체크리스트](#10-인수인계-체크리스트)
 
 ---
 
@@ -98,45 +83,20 @@ bandauto/
 
 ---
 
-## 3. 로컬 환경 설정
+## 3. 접근 권한 확인
 
-### 3.1 사전 요구사항
+### 저장소 및 서버
 
-- Node.js 20+
-- pnpm 9+
-- Docker & Docker Compose
-- Git
+- [ ] GitHub 저장소 접근 권한
+- [ ] AWS EC2 SSH 접근 권한 (운영 서버)
 
-### 3.2 초기 설정
+### 외부 서비스 계정
 
-```bash
-# 1. 저장소 클론
-git clone <repo-url> bandauto
-cd bandauto
+- [ ] 토스페이먼츠 대시보드 (테스트/운영 키)
+- [ ] Google Cloud Console (Gemini API)
+- [ ] Band 개발자 센터 (OAuth 앱)
 
-# 2. 의존성 설치
-npm install
-
-# 3. 환경 변수 설정
-cp .env.example .env
-cp shop-app/.env.example shop-app/.env.local
-cp sourcing-app/.env.example sourcing-app/.env
-cp db/.env.example db/.env
-
-# 4. Docker로 DB/Redis 실행
-docker-compose up -d mariadb redis
-
-# 5. Prisma 클라이언트 생성
-cd db && npx prisma generate --schema prisma && cd ..
-
-# 6. DB 스키마 동기화
-cd db && npx prisma db push --schema prisma && cd ..
-
-# 7. 개발 서버 실행
-npm run dev:all
-```
-
-### 3.3 환경 변수 파일
+### 환경 변수 파일
 
 | 파일 | 용도 |
 |------|------|
@@ -145,7 +105,12 @@ npm run dev:all
 | `shop-app/.env.local` | Shop 앱 환경 변수 |
 | `sourcing-app/.env` | Sourcing 앱 환경 변수 |
 
-### 3.4 주요 환경 변수
+- [ ] `.env` 파일 전달받음
+- [ ] `db/.env` 파일 전달받음
+- [ ] `shop-app/.env.local` 파일 전달받음
+- [ ] `sourcing-app/.env` 파일 전달받음
+
+### 주요 환경 변수
 
 ```env
 # db/.env
@@ -167,9 +132,59 @@ BAND_CLIENT_SECRET=<secret>
 
 ---
 
-## 4. 코드 구조
+## 4. 로컬 환경 설정
 
-### 4.1 공통 폴더 구조
+### 사전 요구사항
+
+- Node.js 20+
+- pnpm 9+
+- Docker & Docker Compose
+- Git
+
+### 설정 체크리스트
+
+- [ ] Node.js 20+ 설치됨 (`node -v`)
+- [ ] pnpm 9+ 설치됨 (`pnpm -v`)
+- [ ] Docker 설치됨 (`docker -v`)
+- [ ] Docker Compose 설치됨 (`docker-compose -v`)
+
+### 초기 설정
+
+```bash
+# 1. 저장소 클론
+git clone <repo-url> bandauto
+cd bandauto
+
+# 2. 의존성 설치
+pnpm install
+
+# 3. 환경 변수 파일 복사 (전달받은 파일)
+
+# 4. Docker로 DB/Redis 실행
+docker-compose up -d mariadb redis
+
+# 5. Prisma 클라이언트 생성
+cd db && npx prisma generate --schema prisma && cd ..
+
+# 6. DB 스키마 동기화
+cd db && npx prisma db push --schema prisma && cd ..
+
+# 7. 개발 서버 실행
+pnpm run dev:all
+```
+
+- [ ] `pnpm install` 완료
+- [ ] `docker-compose up -d mariadb redis` 실행
+- [ ] Prisma 클라이언트 생성 완료
+- [ ] DB 스키마 동기화 완료
+- [ ] http://localhost:3000 (Shop) 접속 확인
+- [ ] http://localhost:3001 (Sourcing) 접속 확인
+
+---
+
+## 5. 코드 구조
+
+### 공통 폴더 구조
 
 각 앱은 동일한 구조를 따릅니다:
 
@@ -179,9 +194,6 @@ src/
 │   ├── (group)/   # Route Group
 │   └── api/       # API Routes
 ├── modules/       # 도메인 비즈니스 로직 ⭐ 핵심
-│   ├── auth/      # 인증 모듈
-│   ├── order/     # 주문 모듈
-│   └── ...
 ├── components/    # UI 컴포넌트
 ├── hooks/         # Custom Hooks
 ├── services/      # 외부 서비스 호출
@@ -189,7 +201,7 @@ src/
 └── types/         # TypeScript 타입
 ```
 
-### 4.2 Shop App 구조
+### Shop App 구조
 
 ```
 shop-app/src/
@@ -216,7 +228,7 @@ shop-app/src/
     └── cs/                  # 고객서비스
 ```
 
-### 4.3 Sourcing App 구조
+### Sourcing App 구조
 
 ```
 sourcing-app/src/
@@ -241,13 +253,13 @@ sourcing-app/src/
     └── order/               # 주문 관리
 ```
 
-### 4.4 DB 패키지 구조
+### DB 패키지 구조
 
 ```
 db/
 ├── prisma/
 │   ├── schema.prisma        # 메인 스키마 (generator, datasource, enum)
-│   └── models/              # 도메인별 모델 분리 (24개 파일)
+│   └── models/              # 도메인별 모델 분리
 │       ├── user.prisma
 │       ├── product.prisma
 │       ├── order.prisma
@@ -256,11 +268,18 @@ db/
     └── index.ts             # PrismaClient export
 ```
 
+### 코드 확인 체크리스트
+
+- [ ] `modules/` 폴더가 핵심 비즈니스 로직임을 이해함
+- [ ] Shop 앱 `src/modules/` 폴더 확인
+- [ ] Sourcing 앱 `src/modules/` 폴더 확인
+- [ ] `db/prisma/models/` 스키마 파일 확인
+
 ---
 
-## 5. 핵심 비즈니스 로직
+## 6. 핵심 비즈니스 로직
 
-### 5.1 Shop App 핵심 플로우
+### Shop App 플로우
 
 ```
 [인증] → [상품 조회] → [장바구니] → [결제] → [주문 완료]
@@ -274,7 +293,7 @@ db/
 | 주문 | order | `src/modules/order/` |
 | 비회원 주문 | guest-order | `src/modules/guest-order/` |
 
-### 5.2 Sourcing App 핵심 플로우
+### Sourcing App 플로우
 
 ```
 [채널 등록] → [상품 수집] → [AI 가공] → [발행] → [주문 관리]
@@ -290,12 +309,12 @@ db/
 | 자동화 | automation | 수집→가공→발행 파이프라인 |
 | 발행 | publish | 소매 밴드에 상품 게시 |
 
-### 5.3 핵심 모듈 상세
+### 핵심 모듈 상세
 
 #### band-playwright (상품 수집)
 
-```typescript
-// src/modules/band-playwright/
+```
+src/modules/band-playwright/
 ├── services/
 │   └── band-crawler.service.ts   # Playwright 크롤링 로직
 ├── types/
@@ -308,8 +327,8 @@ db/
 
 #### transformation (AI 가공)
 
-```typescript
-// src/modules/transformation/
+```
+src/modules/transformation/
 ├── services/
 │   └── gemini.service.ts         # Gemini API 호출
 ├── prompts/                       # AI 프롬프트 템플릿
@@ -322,8 +341,8 @@ db/
 
 #### payments (결제)
 
-```typescript
-// shop-app/src/modules/payments/
+```
+shop-app/src/modules/payments/
 ├── services/
 │   └── toss-payments.service.ts  # 토스페이먼츠 SDK
 ├── types/
@@ -334,11 +353,18 @@ db/
 - 결제 승인/취소/환불
 - 가상계좌 입금 확인
 
+### 비즈니스 로직 이해 체크리스트
+
+- [ ] Shop 앱 결제 플로우 이해함
+- [ ] Sourcing 앱 수집→가공→발행 플로우 이해함
+- [ ] Playwright 상품 수집 방식 이해함
+- [ ] Gemini AI 가공 방식 이해함
+
 ---
 
-## 6. 데이터베이스
+## 7. 데이터베이스
 
-### 6.1 Prisma CLI 사용법
+### Prisma CLI 사용법
 
 **중요: db 폴더에서 `--schema prisma` 옵션 필수**
 
@@ -361,7 +387,7 @@ npx prisma validate --schema prisma
 npx prisma migrate deploy --schema prisma
 ```
 
-### 6.2 주요 모델 관계
+### 주요 모델 관계
 
 ```
 User ─┬─ Order ─── OrderItem ─── Product
@@ -372,7 +398,7 @@ Channel ─── CollectedPost ─── CollectedProduct ─── ShopProduct
 Shop ─── ShopProduct ─── ProductVariant ─── ProductOption
 ```
 
-### 6.3 모델 파일 위치
+### 모델 파일 위치
 
 | 도메인 | 파일 | 주요 모델 |
 |--------|------|----------|
@@ -384,53 +410,65 @@ Shop ─── ShopProduct ─── ProductVariant ─── ProductOption
 | 수집 | `models/collected-product.prisma` | CollectedProduct |
 | 게시글 | `models/post.prisma` | CollectedPost, CollectedPostImage |
 
+### DB 확인 체크리스트
+
+- [ ] Prisma CLI 옵션 (`--schema prisma`) 이해함
+- [ ] `npx prisma studio --schema prisma`로 데이터 확인
+- [ ] 주요 모델 관계 이해함
+
 ---
 
-## 7. 개발 명령어
+## 8. 개발 명령어
 
 ### 개발 서버
 
 ```bash
-npm run dev:shop          # Shop 앱 (포트 3000)
-npm run dev:sourcing      # Sourcing 앱 (포트 3001)
-npm run dev:all           # 두 앱 동시 실행
+pnpm run dev:shop          # Shop 앱 (포트 3000)
+pnpm run dev:sourcing      # Sourcing 앱 (포트 3001)
+pnpm run dev:all           # 두 앱 동시 실행
 ```
 
 ### 빌드
 
 ```bash
-npm run build:shop        # Shop 앱 빌드
-npm run build:sourcing    # Sourcing 앱 빌드
-npm run build:all         # 전체 빌드
+pnpm run build:shop        # Shop 앱 빌드
+pnpm run build:sourcing    # Sourcing 앱 빌드
+pnpm run build:all         # 전체 빌드
 ```
 
 ### 타입체크
 
 ```bash
-npm run typecheck         # 전체
-npm run typecheck:shop    # Shop 앱
-npm run typecheck:sourcing # Sourcing 앱
+pnpm run typecheck         # 전체
+pnpm run typecheck:shop    # Shop 앱
+pnpm run typecheck:sourcing # Sourcing 앱
 ```
 
 ### 린트
 
 ```bash
-npm run lint              # 전체 린트
+pnpm run lint              # 전체 린트
 ```
 
 ### 테스트
 
 ```bash
-npm test                  # E2E 테스트 (Playwright)
-npm run test:ui           # 테스트 UI 모드
-npm run test:headed       # 헤드 모드
+pnpm test                  # E2E 테스트 (Playwright)
+pnpm run test:ui           # 테스트 UI 모드
+pnpm run test:headed       # 헤드 모드
 ```
+
+### 명령어 확인 체크리스트
+
+- [ ] `pnpm run dev:all` 실행 확인
+- [ ] `pnpm run typecheck` 실행 확인
+- [ ] `pnpm run build:all` 빌드 성공 확인
 
 ---
 
-## 8. 배포 프로세스
+## 9. 배포 프로세스
 
-### 현재 배포 방식: Docker Compose
+### 배포 방식: Docker Compose
 
 ### 배포 명령어
 
@@ -464,15 +502,63 @@ docker-compose ps
 docker-compose logs -f --tail=50
 ```
 
-### 상세 문서
+### Docker 파일 구조
 
-- [docs/DEPLOYMENT.md](./DEPLOYMENT.md) - 전체 배포 가이드
-- [shop-app/docs/DEPLOYMENT.md](../shop-app/docs/DEPLOYMENT.md)
-- [sourcing-app/docs/DEPLOYMENT.md](../sourcing-app/docs/DEPLOYMENT.md)
+```
+docker/
+├── Dockerfile.shop      # Shop 앱 (경량 Alpine 이미지)
+└── Dockerfile.sourcing  # Sourcing 앱 (Playwright 포함)
+```
+
+- Sourcing 앱은 Playwright가 필요해서 이미지 크기가 큼 (~1.5GB)
+- Shop 앱은 경량 Alpine 이미지 사용 (~150MB)
+
+### 배포 확인 체크리스트
+
+- [ ] Docker Compose 배포 방식 이해함
+- [ ] 배포 명령어 순서 이해함
+- [ ] 로그 확인 방법 이해함
 
 ---
 
-## 9. 문서 체계
+## 10. 핵심 규칙
+
+### 반드시 지켜야 할 규칙
+
+```
+1. Soft Delete 기본 - Hard Delete 금지
+2. 트랜잭션 필수 - 다중 테이블 변경 시
+3. 도메인 분리 - 비즈니스 로직을 UI 레이어에 작성 금지
+4. 앱 간 모듈 격리 - shop-app과 sourcing-app 간 직접 참조 금지
+5. 문서 먼저 - 기능 구현 시 docs 폴더 동기화 필수
+6. 불변성 - 객체 변경 금지, spread 연산자 사용
+```
+
+### 커밋 메시지 규칙
+
+```
+type(scope): 한 줄 요약
+
+type: feat, fix, refactor, perf, test, docs, chore
+scope: sourcing, shop, db, ci/cd
+```
+
+예시:
+```
+feat(shop): 장바구니 수량 변경 기능 추가
+fix(sourcing): 상품 수집 타임아웃 오류 수정
+refactor(db): Order 모델 관계 정리
+```
+
+### 규칙 확인 체크리스트
+
+- [ ] Soft Delete 규칙 이해함
+- [ ] 트랜잭션 사용 규칙 이해함
+- [ ] 커밋 메시지 규칙 이해함
+
+---
+
+## 11. 문서 체계
 
 ### 프로젝트 루트
 
@@ -509,77 +595,9 @@ docker-compose logs -f --tail=50
 4. 각 앱의 `docs/STRUCTURE.md` - 코드 구조
 5. 각 앱의 `docs/API.md` - API 명세
 
----
+### 문서 확인 체크리스트
 
-## 10. 인수인계 체크리스트
-
-### 환경 설정
-
-- [ ] 저장소 접근 권한 (GitHub/GitLab)
-- [ ] 환경 변수 파일 전달 (`.env` 파일들)
-- [ ] Docker 환경 실행 확인
-- [ ] 로컬 개발 서버 실행 확인 (`npm run dev:all`)
-- [ ] Prisma Studio 접근 확인
-
-### 외부 서비스 접근
-
-- [ ] 토스페이먼츠 테스트 키
-- [ ] Google Gemini API 키
-- [ ] Band 세션 정보 (Chrome Extension)
-- [ ] AWS/서버 SSH 접근 권한
-
-### 문서 확인
-
-- [ ] `CLAUDE.md` 숙지
+- [ ] `CLAUDE.md` 읽음
+- [ ] `shop-app/CLAUDE.md` 읽음
+- [ ] `sourcing-app/CLAUDE.md` 읽음
 - [ ] 각 앱 `docs/` 폴더 문서 확인
-- [ ] API 문서 (`API.md`) 확인
-
-### 코드 이해
-
-- [ ] `modules/` 폴더 비즈니스 로직 파악
-- [ ] Prisma 스키마 이해 (`db/prisma/models/`)
-- [ ] API 엔드포인트 확인 (`app/api/`)
-
-### 운영 지식
-
-- [ ] 배포 프로세스 (Docker Compose)
-- [ ] 로그 확인 방법 (`docker-compose logs`)
-- [ ] 장애 대응 절차
-
----
-
-## 핵심 원칙 (반드시 준수)
-
-```
-1. Soft Delete 기본 - Hard Delete 금지
-2. 트랜잭션 필수 - 다중 테이블 변경 시
-3. 도메인 분리 - 비즈니스 로직을 UI 레이어에 작성 금지
-4. 앱 간 모듈 격리 - shop-app과 sourcing-app 간 직접 참조 금지
-5. 문서 먼저 - 기능 구현 시 docs 폴더 동기화 필수
-6. 불변성 - 객체 변경 금지, spread 연산자 사용
-```
-
----
-
-## 커밋 메시지 규칙
-
-```
-type(scope): 한 줄 요약
-
-type: feat, fix, refactor, perf, test, docs, chore
-scope: sourcing, shop, db, ci/cd
-```
-
-예시:
-```
-feat(shop): 장바구니 수량 변경 기능 추가
-fix(sourcing): 상품 수집 타임아웃 오류 수정
-refactor(db): Order 모델 관계 정리
-```
-
----
-
-## 연락처 및 지원
-
-- 프로젝트 이슈: GitHub Issues
-- 기술 문서: 각 앱의 `docs/` 폴더 참조

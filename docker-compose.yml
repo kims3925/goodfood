@@ -38,7 +38,7 @@ services:
     image: bandauto-shop:latest
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: docker/Dockerfile.shop
       args:
         APP_NAME: shop
         APP_PORT: 3000
