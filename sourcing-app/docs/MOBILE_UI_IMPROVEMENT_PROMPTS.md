@@ -618,7 +618,7 @@ fix(sourcing): [Shop] 주문 목록 모바일 레이아웃 개선
 
 ```bash
 # 모든 터미널 공통
-cd /Users/seong-wan/Desktop/ABC/bandauto
+cd <프로젝트-경로>/bandauto
 npm run dev:sourcing  # 포트 3001에서 실행
 ```
 

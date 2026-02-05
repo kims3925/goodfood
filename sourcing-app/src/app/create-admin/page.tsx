@@ -3,26 +3,31 @@
 import { useState } from 'react'
 
 export default function CreateAdminPage() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState('')
 
   const handleCreateAdmin = async () => {
+    if (!email || !password) {
+      setStatus('error')
+      setMessage('이메일과 비밀번호를 입력해주세요.')
+      return
+    }
+
     setStatus('loading')
     try {
       const response = await fetch('/api/create-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'deca21@naver.com',
-          password: 'deca163656',
-        }),
+        body: JSON.stringify({ email, password }),
       })
 
       const data = await response.json()
 
       if (data.success) {
         setStatus('success')
-        setMessage('관리자 계정이 생성되었습니다. ID: deca21@naver.com')
+        setMessage(`관리자 계정이 생성되었습니다. ID: ${email}`)
       } else {
         setStatus('error')
         setMessage(data.error || '계정 생성에 실패했습니다.')
@@ -39,13 +44,28 @@ export default function CreateAdminPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">관리자 계정 생성</h1>
 
         <div className="space-y-4">
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">ID:</span> deca21@naver.com
-            </p>
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">Password:</span> deca163656
-            </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@example.com"
+              disabled={status === 'success'}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="비밀번호"
+              disabled={status === 'success'}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            />
           </div>
 
           <button
