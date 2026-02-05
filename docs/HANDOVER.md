@@ -571,21 +571,46 @@ refactor(db): Order 모델 관계 정리
 
 ### 앱별 문서
 
-각 앱(`shop-app/`, `sourcing-app/`)에 동일한 구조:
+**중요:** 각 앱은 독립적인 `docs/` 폴더를 가지며, 해당 앱에 대한 상세 문서가 포함되어 있습니다.
+
+```
+shop-app/
+├── CLAUDE.md              # Shop 앱 개발 규칙
+└── docs/                  # Shop 앱 상세 문서
+    ├── STRUCTURE.md
+    ├── API.md
+    ├── FRONTEND.md
+    └── ...
+
+sourcing-app/
+├── CLAUDE.md              # Sourcing 앱 개발 규칙
+└── docs/                  # Sourcing 앱 상세 문서
+    ├── STRUCTURE.md
+    ├── API.md
+    ├── FRONTEND.md
+    └── ...
+```
+
+각 앱의 `docs/` 폴더 구조:
 
 | 문서 | 내용 |
 |------|------|
-| `CLAUDE.md` | 앱별 개발 규칙 |
-| `docs/STRUCTURE.md` | 폴더 구조, 네이밍 규칙 |
-| `docs/API.md` | API 엔드포인트 문서 |
-| `docs/FRONTEND.md` | 프론트엔드 컴포넌트 가이드 |
-| `docs/BACKEND.md` | 백엔드 로직 가이드 |
-| `docs/DATABASE.md` | DB 스키마 설명 |
-| `docs/DEPLOYMENT.md` | 배포 규칙 |
-| `docs/SECURITY.md` | 보안 가이드 |
-| `docs/tracking/REQUIREMENTS.md` | 기능 요구사항 |
-| `docs/tracking/CHANGELOG.md` | 구현 이력 |
-| `docs/tracking/FLOW.md` | 비즈니스 플로우 |
+| `STRUCTURE.md` | 폴더 구조, 네이밍 규칙 |
+| `API.md` | API 엔드포인트 문서 |
+| `FRONTEND.md` | 프론트엔드 컴포넌트 가이드 |
+| `BACKEND.md` | 백엔드 로직 가이드 |
+| `DATABASE.md` | DB 스키마 설명 |
+| `DEPLOYMENT.md` | 배포 규칙 |
+| `SECURITY.md` | 보안 가이드 |
+| `TESTING.md` | 테스트 가이드 |
+| `PROJECT.md` | 프로젝트 스택 정보 |
+| `tracking/REQUIREMENTS.md` | 기능 요구사항 |
+| `tracking/CHANGELOG.md` | 구현 이력 |
+| `tracking/FLOW.md` | 비즈니스 플로우 |
+
+**앱별 문서 위치:**
+- Shop 앱: `shop-app/docs/`
+- Sourcing 앱: `sourcing-app/docs/`
 
 ### 문서 읽는 순서 (권장)
 
