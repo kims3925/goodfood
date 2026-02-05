@@ -505,6 +505,7 @@ export async function executeFullPipeline(
           channelIds: retailChannelIds,
           productIds: createdProductIds.length > 0 ? createdProductIds : undefined,  // 생성된 상품만 발행
           publishReadyOnly: true,
+          todayOnly: createdProductIds.length === 0,  // productIds가 없으면 오늘 생성된 상품만 발행
         })
 
         totalItems += publishResult.totalItems
@@ -951,6 +952,7 @@ export async function executeFullPipelineWithLock(
           channelIds: retailChannelIds,
           productIds: createdProductIds.length > 0 ? createdProductIds : undefined,  // 생성된 상품만 발행
           publishReadyOnly: true,
+          todayOnly: createdProductIds.length === 0,  // productIds가 없으면 오늘 생성된 상품만 발행
         })
 
         totalItems += publishResult.totalItems

@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260205-001 | Done | 2026-02-05 | - | 접속자 중복 카운트 개선 (Band 앱 → 브라우저 전환 시) | Low | Claude |
 | TR-20260122-001 | Done | 2026-01-22 | - | Redis 기반 실시간 접속자 모니터링 추가 | Low | Claude |
 | TR-20260120-003 | Done | 2026-01-20 | - | 무통장입금 주문 웹훅 알림 추가 | Low | Claude |
 | TR-20260120-002 | Done | 2026-01-20 | - | 개발 서버 Turbopack → Webpack 전환 | Low | Claude |

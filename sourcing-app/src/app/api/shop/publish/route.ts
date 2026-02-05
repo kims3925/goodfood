@@ -29,11 +29,24 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const channelId = searchParams.get('channelId')
+    const daysWithin = searchParams.get('daysWithin') // 최근 N일 필터
 
     // Build where clause
     const where: any = {
       userId,
       deletedAt: null, // Soft Delete 필터링
+      isActive: true, // 활성 상품만 조회
+    }
+
+    // 날짜 필터 (최근 N일)
+    if (daysWithin) {
+      const days = parseInt(daysWithin)
+      if (!isNaN(days) && days > 0) {
+        const cutoffDate = new Date()
+        cutoffDate.setDate(cutoffDate.getDate() - days)
+        cutoffDate.setHours(0, 0, 0, 0)
+        where.createdAt = { gte: cutoffDate }
+      }
     }
 
     // 검색
@@ -51,7 +64,7 @@ export async function GET(request: NextRequest) {
 
     // 통계 계산 (탭과 무관하게 일정한 값)
     const allProducts = await prisma.product.findMany({
-      where: { userId, deletedAt: null }, // Soft Delete 필터링
+      where: { userId, deletedAt: null, isActive: true }, // Soft Delete 필터링 + 활성 상품만
       select: {
         id: true,
         shopProducts: {

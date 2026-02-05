@@ -139,6 +139,12 @@ export interface PublishConfig {
   channelIds?: number[]
   productIds?: number[]
   publishReadyOnly?: boolean
+  /** 오늘 생성된 상품만 발행 (자동화 파이프라인용) */
+  todayOnly?: boolean
+  /** 특정 날짜 이후 생성된 상품만 발행 */
+  createdAfter?: Date
+  /** 최근 N일 이내 생성된 상품만 발행 */
+  daysWithin?: number
 }
 
 export interface PublishResult extends PipelineResult {

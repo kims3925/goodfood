@@ -1491,3 +1491,89 @@ interface DeactivateResponse {
 
 **변경 이력:**
 - TR-20260122-001: API 엔드포인트 추가
+
+---
+
+## GET /api/shop/publish
+
+**설명:** 발행 가능한 상품 목록 조회 (TR-20260205-001)
+
+**인증:** Required
+
+**쿼리 파라미터:**
+
+| Param | Type | Default | 설명 |
+|-------|------|---------|------|
+| page | number | 1 | 페이지 번호 |
+| limit | number | 20 | 페이지당 항목 수 |
+| search | string | - | 상품명 검색 |
+| channelId | number | - | 도매채널 ID 필터 |
+| daysWithin | number | - | 최근 N일 이내 등록된 상품만 조회 |
+
+**요청 예시:**
+
+```http
+GET /api/shop/publish?page=1&limit=20&daysWithin=1
+```
+
+**응답 스키마:**
+
+```typescript
+interface PublishProductsResponse {
+  success: true
+  data: Array<{
+    id: number
+    name: string
+    description: string | null
+    thumbnailUrl: string | null
+    price: number
+    wholesalePrice: number | null
+    channel: {
+      id: number
+      name: string
+    } | null
+    publishStatus: {
+      channel: boolean    // 소매밴드 발행 여부
+      shop: boolean       // 쇼핑몰 발행 여부
+    }
+    publishSummary: '미발행' | '부분발행' | '발행완료'
+    publishedChannels: Array<{
+      publishId: number
+      channelId: number | null
+      channelName: string | null
+      status: string
+      createdAt: string
+    }>
+    publishedShops: Array<{
+      publishId: number
+      shopId: number | null
+      shopName: string | null
+      subdomain: string | null
+      status: string
+      createdAt: string
+    }>
+    createdAt: string
+  }>
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
+  stats: {
+    total: number
+    published: number
+    unpublished: number
+    retailBandPublished: number
+    retailBandUnpublished: number
+  }
+}
+```
+
+**기능 설명:**
+- 활성 상태(`isActive: true`)인 상품만 조회
+- `daysWithin` 파라미터로 최근 N일 이내 등록된 상품만 필터링 (오래된 상품 제외)
+- 발행 페이지에서 기본값으로 오늘(1일) 설정하여 오래된 미발행 상품이 실수로 발행되는 것 방지
+
+**변경 이력:**
+- TR-20260205-001: `daysWithin` 파라미터 추가, `isActive` 필터 추가

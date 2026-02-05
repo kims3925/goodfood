@@ -74,6 +74,24 @@ export async function runPublishPipeline(
   const whereClause: any = {
     userId,
     deletedAt: null, // Soft Delete 필터링
+    isActive: true,  // 활성 상품만
+  }
+
+  // 날짜 필터 적용
+  if (config.todayOnly) {
+    // 오늘 생성된 상품만 (자동화 파이프라인용)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    whereClause.createdAt = { gte: today }
+  } else if (config.createdAfter) {
+    // 특정 날짜 이후 생성된 상품
+    whereClause.createdAt = { gte: config.createdAfter }
+  } else if (config.daysWithin) {
+    // 최근 N일 이내 생성된 상품
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - config.daysWithin)
+    cutoffDate.setHours(0, 0, 0, 0)
+    whereClause.createdAt = { gte: cutoffDate }
   }
 
   if (config.productIds?.length) {

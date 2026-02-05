@@ -26,7 +26,8 @@ const BOT_PATTERNS = [
 ]
 
 // 중복 방지 시간 (초) - 이 시간 내 같은 fingerprint 요청은 무시
-const DEDUP_WINDOW_SECONDS = 5
+// Band 앱 → 외부 브라우저 전환 등을 고려하여 60초로 설정
+const DEDUP_WINDOW_SECONDS = 60
 
 /**
  * 봇/크롤러 여부 확인
@@ -37,9 +38,10 @@ function isBot(userAgent: string | null): boolean {
 }
 
 /**
- * fingerprint 생성 (User-Agent + shopSlug + currentPage)
+ * fingerprint 생성 (User-Agent + shopSlug)
+ * currentPage는 제외하여 같은 쇼핑몰 내 페이지 이동은 같은 방문자로 처리
  */
-function createFingerprint(userAgent: string, shopSlug: string, currentPage: string): string {
+function createFingerprint(userAgent: string, shopSlug: string): string {
   // User-Agent의 핵심 부분만 추출 (버전 제외)
   const uaCore = userAgent
     .replace(/Chrome\/[\d.]+/g, 'Chrome')
@@ -47,7 +49,7 @@ function createFingerprint(userAgent: string, shopSlug: string, currentPage: str
     .replace(/Version\/[\d.]+/g, 'Version')
     .replace(/Mobile\/[\w]+/g, 'Mobile')
 
-  return `fp:${shopSlug}:${currentPage}:${Buffer.from(uaCore).toString('base64').slice(0, 32)}`
+  return `fp:${shopSlug}:${Buffer.from(uaCore).toString('base64').slice(0, 32)}`
 }
 
 /**
@@ -125,8 +127,8 @@ export async function POST(request: NextRequest) {
 
     const ua = userAgent || ''
 
-    // fingerprint 기반 중복 체크
-    const fingerprint = createFingerprint(ua, shopSlug, currentPage)
+    // fingerprint 기반 중복 체크 (같은 쇼핑몰 = 같은 방문자)
+    const fingerprint = createFingerprint(ua, shopSlug)
     const existingSessionId = await checkDuplicate(fingerprint)
 
     // 중복 요청이면 기존 세션 갱신

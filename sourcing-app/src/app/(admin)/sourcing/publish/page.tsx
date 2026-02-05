@@ -115,6 +115,9 @@ export default function PublishPage() {
   const [selectedWholesaleChannel, setSelectedWholesaleChannel] = useState<number | null>(null)
   const [wholesaleChannels, setWholesaleChannels] = useState<WholesaleChannel[]>([])
 
+  // 날짜 필터 (기본값: 오늘)
+  const [daysWithin, setDaysWithin] = useState<number | null>(1)
+
   // 페이징
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -272,6 +275,7 @@ export default function PublishPage() {
       })
       if (searchTerm) params.append('search', searchTerm)
       if (selectedWholesaleChannel) params.append('channelId', String(selectedWholesaleChannel))
+      if (daysWithin !== null) params.append('daysWithin', String(daysWithin))
 
       const response = await fetch(`/api/shop/publish?${params.toString()}`)
       const data = await response.json()
@@ -304,7 +308,7 @@ export default function PublishPage() {
       setIsLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- searchTerm은 Enter 키를 눌러야 적용됨
-  }, [currentPage, selectedWholesaleChannel])
+  }, [currentPage, selectedWholesaleChannel, daysWithin])
 
   // 페이지/필터 변경 시 상품 로드
   useEffect(() => {
@@ -1667,7 +1671,37 @@ export default function PublishPage() {
               </div>
             </div>
 
-            {/* 두 번째 줄: 도매밴드 필터 */}
+            {/* 두 번째 줄: 날짜 필터 */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs sm:text-sm text-gray-500 flex items-center gap-1">
+                <Clock size={14} />
+                등록일:
+              </span>
+              {[
+                { label: '오늘', value: 1 },
+                { label: '3일', value: 3 },
+                { label: '7일', value: 7 },
+                { label: '30일', value: 30 },
+                { label: '전체', value: null },
+              ].map((option) => (
+                <button
+                  key={option.label}
+                  onClick={() => {
+                    setDaysWithin(option.value)
+                    setCurrentPage(1)
+                  }}
+                  className={`px-2.5 sm:px-3 py-1.5 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors min-h-[36px] sm:min-h-[32px] ${
+                    daysWithin === option.value
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 세 번째 줄: 도매밴드 필터 */}
             {wholesaleChannels.length > 0 && (
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs sm:text-sm text-gray-500">도매밴드:</span>

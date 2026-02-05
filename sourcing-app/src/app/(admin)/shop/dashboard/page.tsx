@@ -380,7 +380,7 @@ export default function ShopDashboardPage() {
                       borderRadius: '12px',
                       boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                     }}
-                    formatter={(value: number) => [formatCurrency(value), '매출']}
+                    formatter={(value) => [formatCurrency(value as number), '매출']}
                   />
                   <Area
                     type="monotone"
@@ -427,7 +427,7 @@ export default function ShopDashboardPage() {
                         borderRadius: '8px',
                         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                       }}
-                      formatter={(value: number, name: string) => [`${value}건`, name]}
+                      formatter={(value, name) => [`${value}건`, name as string]}
                     />
                   </PieChart>
                 </ResponsiveContainer>
