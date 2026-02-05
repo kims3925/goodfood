@@ -568,6 +568,8 @@ refactor(db): Order 모델 관계 정리
 | `README.md` | 프로젝트 소개 |
 | `docs/DEPLOYMENT.md` | 배포 가이드 |
 | `docs/HANDOVER.md` | 인수인계 가이드 (현재 문서) |
+| `docs/EXTERNAL_SERVICES.md` | 외부 서비스 연동 가이드 (Band, Gemini, 토스페이먼츠) |
+| `docs/TROUBLESHOOTING.md` | 자주 발생하는 문제 해결 가이드 |
 
 ### 앱별 문서
 
