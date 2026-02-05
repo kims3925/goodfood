@@ -30,6 +30,7 @@ model AutomationConfig {
   retailChannelIds String?    @map("retail_channel_ids") @db.LongText
   shopIds          String?    @map("shop_ids") @db.LongText
   pipelineSteps    String?    @map("pipeline_steps") @db.LongText
+  collectionLimit  Int        @default(10) @map("collection_limit")
   user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([isEnabled])

@@ -87,6 +87,7 @@ interface AutomationConfig {
   retailChannelIds: number[]
   shopIds: number[]
   pipelineSteps: PipelineSteps
+  collectionLimit: number
 }
 
 // 00:00 ~ 23:00 시간 버튼 생성
@@ -181,7 +182,18 @@ const defaultConfig: AutomationConfig = {
     productCreate: true,
     publish: true,
   },
+  collectionLimit: 10,
 }
+
+// 수집 개수 옵션
+const COLLECTION_LIMIT_OPTIONS = [
+  { value: 10, label: '10개' },
+  { value: 20, label: '20개' },
+  { value: 30, label: '30개' },
+  { value: 50, label: '50개' },
+  { value: 100, label: '100개' },
+  { value: 0, label: '전체' },
+]
 
 export default function AutomationSettingsPage() {
   const toast = useToast()
@@ -230,7 +242,8 @@ export default function AutomationSettingsPage() {
     JSON.stringify([...(initialConfig.selectedHours || [])].sort())
 
   const hasCollectionChanges = JSON.stringify((config.wholesaleChannelIds || []).slice().sort()) !==
-    JSON.stringify((initialConfig.wholesaleChannelIds || []).slice().sort())
+    JSON.stringify((initialConfig.wholesaleChannelIds || []).slice().sort()) ||
+    config.collectionLimit !== initialConfig.collectionLimit
 
   const hasAiChanges = config.aiProvider !== initialConfig.aiProvider
 
@@ -529,6 +542,7 @@ export default function AutomationSettingsPage() {
             retailChannelIds: configData.data?.retailChannelIds || [],
             shopIds: configData.data?.shopIds || [],
             pipelineSteps: configData.data?.pipelineSteps || defaultConfig.pipelineSteps,
+            collectionLimit: configData.data?.collectionLimit ?? 10,
           }
           setConfig(loadedConfig)
           setInitialConfig(loadedConfig)
@@ -1464,6 +1478,23 @@ export default function AutomationSettingsPage() {
                 저장
               </Button>
             </div>
+          </div>
+
+          {/* 수집 개수 설정 */}
+          <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
+            <span className="text-sm font-medium text-gray-700">채널당 수집</span>
+            <select
+              value={config.collectionLimit}
+              onChange={(e) => setConfig(prev => ({ ...prev, collectionLimit: parseInt(e.target.value) }))}
+              className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              {COLLECTION_LIMIT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <span className="text-sm text-gray-500">최신 게시물</span>
           </div>
 
         {wholesaleChannels.length > 0 ? (

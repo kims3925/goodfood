@@ -56,6 +56,7 @@ export async function GET() {
             productCreate: true,
             publish: true,
           },
+          collectionLimit: 10,
         },
       })
     }
@@ -100,6 +101,7 @@ export async function GET() {
         retailChannelIds,
         shopIds,
         pipelineSteps,
+        collectionLimit: config.collectionLimit ?? 10,
       },
     })
   } catch (error) {
@@ -136,6 +138,7 @@ export async function POST(request: NextRequest) {
       retailChannelIds,
       shopIds,
       pipelineSteps,
+      collectionLimit,
     } = body
 
     // wholesaleChannelIds 또는 channelIds 둘 다 지원 (하위 호환성)
@@ -148,6 +151,7 @@ export async function POST(request: NextRequest) {
       productCreate: true,
       publish: true,
     }
+    const finalCollectionLimit = typeof collectionLimit === 'number' ? collectionLimit : 10
 
     // selectedHours가 있으면 해당 시간들로 cron expression 생성, 없으면 기존 cronInterval 사용
     let cronExpression: string | null = null
@@ -174,6 +178,7 @@ export async function POST(request: NextRequest) {
         retailChannelIds: JSON.stringify(finalRetailChannelIds),
         shopIds: JSON.stringify(finalShopIds),
         pipelineSteps: JSON.stringify(finalPipelineSteps),
+        collectionLimit: finalCollectionLimit,
         nextRunAt,
       },
       update: {
@@ -184,6 +189,7 @@ export async function POST(request: NextRequest) {
         retailChannelIds: JSON.stringify(finalRetailChannelIds),
         shopIds: JSON.stringify(finalShopIds),
         pipelineSteps: JSON.stringify(finalPipelineSteps),
+        collectionLimit: finalCollectionLimit,
         nextRunAt,
       },
     })
