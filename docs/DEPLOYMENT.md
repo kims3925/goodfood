@@ -39,7 +39,7 @@
 
 ## Dockerfile 구조
 
-### Shop App (`docker/Dockerfile`)
+### Shop App (`docker/Dockerfile.shop`)
 
 | 스테이지 | 베이스 이미지 | 역할 |
 |----------|---------------|------|

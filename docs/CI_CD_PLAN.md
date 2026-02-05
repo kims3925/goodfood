@@ -45,7 +45,7 @@
 
 ## 2. Docker 이미지 구성
 
-### 2.1 Shop App (`docker/Dockerfile`)
+### 2.1 Shop App (`docker/Dockerfile.shop`)
 
 | 스테이지 | 베이스 이미지 | 역할 |
 |----------|---------------|------|
