@@ -35,8 +35,14 @@ export async function checkCancellation(): Promise<boolean> {
     select: { status: true },
   })
 
-  // RUNNING이 아니면 취소된 것으로 간주 (FAILED = 취소됨)
-  return workflow?.status !== WorkflowStatus.RUNNING
+  // workflow가 없으면 취소로 처리하지 않음
+  if (!workflow) {
+    return false
+  }
+
+  // 명시적으로 FAILED 상태인 경우만 취소로 간주
+  // (사용자가 취소 버튼을 누르면 FAILED로 변경됨)
+  return workflow.status === WorkflowStatus.FAILED
 }
 
 /**
