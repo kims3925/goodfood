@@ -645,7 +645,7 @@ export default function AutomationSettingsPage() {
           sectionData = { shopIds: config.shopIds }
           break
         case 'collection':
-          sectionData = { wholesaleChannelIds: config.wholesaleChannelIds }
+          sectionData = { wholesaleChannelIds: config.wholesaleChannelIds, collectionLimit: config.collectionLimit }
           break
         case 'ai':
           sectionData = { aiProvider: config.aiProvider }
