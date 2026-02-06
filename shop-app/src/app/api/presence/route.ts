@@ -38,18 +38,27 @@ function isBot(userAgent: string | null): boolean {
 }
 
 /**
- * fingerprint 생성 (User-Agent + shopSlug)
- * currentPage는 제외하여 같은 쇼핑몰 내 페이지 이동은 같은 방문자로 처리
+ * 클라이언트 IP 추출
  */
-function createFingerprint(userAgent: string, shopSlug: string): string {
-  // User-Agent의 핵심 부분만 추출 (버전 제외)
-  const uaCore = userAgent
-    .replace(/Chrome\/[\d.]+/g, 'Chrome')
-    .replace(/Safari\/[\d.]+/g, 'Safari')
-    .replace(/Version\/[\d.]+/g, 'Version')
-    .replace(/Mobile\/[\w]+/g, 'Mobile')
+function getClientIp(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for')
+  if (forwarded) {
+    return forwarded.split(',')[0].trim()
+  }
+  const realIp = request.headers.get('x-real-ip')
+  if (realIp) return realIp
+  return 'unknown'
+}
 
-  return `fp:${shopSlug}:${Buffer.from(uaCore).toString('base64').slice(0, 32)}`
+/**
+ * fingerprint 생성 (IP + screenSize + shopSlug)
+ *
+ * Band 인앱 WebView → 외부 브라우저 전환 시 User-Agent가 달라지지만,
+ * IP와 화면 크기는 동일하므로 같은 방문자로 정확히 식별 가능
+ */
+function createFingerprint(ip: string, screenSize: string, shopSlug: string): string {
+  const raw = `${ip}:${screenSize}:${shopSlug}`
+  return `fp:${Buffer.from(raw).toString('base64').slice(0, 40)}`
 }
 
 /**
@@ -114,6 +123,7 @@ export async function POST(request: NextRequest) {
       productId,
       productName,
       device,
+      screenSize,
       referrer,
       startedAt,
     } = body
@@ -127,17 +137,16 @@ export async function POST(request: NextRequest) {
 
     const ua = userAgent || ''
 
-    // fingerprint 기반 중복 체크 (같은 쇼핑몰 = 같은 방문자)
-    const fingerprint = createFingerprint(ua, shopSlug)
+    // fingerprint 기반 중복 체크 (IP + 화면 크기로 동일 기기 식별)
+    const clientIp = getClientIp(request)
+    const fingerprint = createFingerprint(clientIp, screenSize || '0x0', shopSlug)
     const existingSessionId = await checkDuplicate(fingerprint)
 
     // 중복 요청이면 기존 세션 갱신
     const effectiveSessionId = existingSessionId || sessionId
 
-    // 새 세션이면 fingerprint 매핑 저장
-    if (!existingSessionId) {
-      await setFingerprintMapping(fingerprint, sessionId)
-    }
+    // fingerprint 매핑을 항상 갱신 (heartbeat마다 TTL 리셋)
+    await setFingerprintMapping(fingerprint, effectiveSessionId)
 
     const visitorInfo: VisitorInfo = {
       sessionId: effectiveSessionId,

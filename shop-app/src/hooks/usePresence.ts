@@ -11,6 +11,11 @@ interface UsePresenceOptions {
   productName?: string
 }
 
+function getScreenSize(): string {
+  if (typeof window === 'undefined') return '0x0'
+  return `${window.screen.width}x${window.screen.height}`
+}
+
 /**
  * 실시간 접속자 추적 훅
  *
@@ -69,6 +74,7 @@ export function usePresence(options: UsePresenceOptions = {}) {
           productId: options.productId,
           productName: options.productName,
           device: getDevice(),
+          screenSize: getScreenSize(),
           referrer: typeof document !== 'undefined' ? document.referrer : undefined,
           startedAt: startedAtRef.current,
         }),
