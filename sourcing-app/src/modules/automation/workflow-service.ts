@@ -24,12 +24,12 @@ export async function acquireExecutionLock(
   try {
     // 트랜잭션으로 원자적 Lock 획득
     const result = await prisma.$transaction(async (tx) => {
-      // 1. 기존 RUNNING 워크플로우 확인 (15분 이상 stuck 체크 포함)
+      // 1. 기존 RUNNING 워크플로우 확인 (stuck 체크 포함)
       const cutoffTime = new Date()
-      cutoffTime.setMinutes(cutoffTime.getMinutes() - 15)
+      cutoffTime.setMinutes(cutoffTime.getMinutes() - AUTO_CLEANUP_THRESHOLD_MINUTES)
 
       // 오래된 stuck 워크플로우 자동 정리
-      await tx.workflowLog.updateMany({
+      const staleCleanup = await tx.workflowLog.updateMany({
         where: {
           userId,
           status: WorkflowStatus.RUNNING,
@@ -38,9 +38,13 @@ export async function acquireExecutionLock(
         data: {
           status: WorkflowStatus.FAILED,
           completedAt: new Date(),
-          errorMessage: '워크플로우가 15분 이상 응답이 없어 자동 종료되었습니다.',
+          errorMessage: `워크플로우가 ${AUTO_CLEANUP_THRESHOLD_MINUTES}분 이상 응답이 없어 자동 종료되었습니다.`,
         },
       })
+
+      if (staleCleanup.count > 0) {
+        console.log(`[WorkflowService] acquireExecutionLock: ${staleCleanup.count}개의 stale 워크플로우 자동 정리 (userId: ${userId}, threshold: ${AUTO_CLEANUP_THRESHOLD_MINUTES}분)`)
+      }
 
       // 2. 현재 RUNNING 상태인 워크플로우 확인
       const existing = await tx.workflowLog.findFirst({
@@ -613,7 +617,7 @@ export async function getWorkflowLogsByType(
 }
 
 // 자동 정리 임계값 (분)
-const AUTO_CLEANUP_THRESHOLD_MINUTES = 15
+const AUTO_CLEANUP_THRESHOLD_MINUTES = 60
 
 /**
  * 실행 중인 워크플로우 확인

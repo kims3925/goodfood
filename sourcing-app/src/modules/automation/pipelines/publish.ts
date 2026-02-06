@@ -7,7 +7,7 @@
  */
 
 import prisma, { ChannelKind } from '@bandauto/db'
-import { getBatchContext, checkCancellation } from '../context'
+import { getBatchContext, checkCancellation, CancellationError } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
 import { publishService } from '@/modules/publish'
 import {
@@ -465,7 +465,7 @@ export async function runPublishPipeline(
       onProgress: workflowLogId ? async (current, total, productResult) => {
         // 취소 체크
         if (await checkCancellation()) {
-          throw new Error('CANCELLED')
+          throw new CancellationError()
         }
         // 개별 상품 결과 추가
         publishedProducts.push({
