@@ -108,12 +108,12 @@ export default function InquiryDetailPage({ params }: { params: { id: string } }
         setInquiry(data.inquiry)
       } else {
         toast.error(data.error || '문의를 불러오는데 실패했습니다')
-        router.push('/cs/inquiry')
+        router.push('/shop/cs/inquiry/list')
       }
     } catch (error) {
       console.error('Failed to load inquiry:', error)
       toast.error('문의를 불러오는데 실패했습니다')
-      router.push('/cs/inquiry')
+      router.push('/shop/cs/inquiry/list')
     } finally {
       setIsLoading(false)
     }
@@ -219,7 +219,7 @@ export default function InquiryDetailPage({ params }: { params: { id: string } }
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-8 flex items-center gap-4">
-          <Link href="/shop/cs/inquiry">
+          <Link href="/shop/cs/inquiry/list">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
               목록으로
@@ -458,7 +458,7 @@ export default function InquiryDetailPage({ params }: { params: { id: string } }
                 <div className="mt-4 flex justify-end gap-3">
                   <Button
                     variant="secondary"
-                    onClick={() => router.push('/cs/inquiry')}
+                    onClick={() => router.push('/shop/cs/inquiry/list')}
                   >
                     목록으로
                   </Button>
