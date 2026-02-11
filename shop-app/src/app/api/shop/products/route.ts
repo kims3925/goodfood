@@ -25,9 +25,10 @@ export async function GET(req: NextRequest) {
     const shopIdHeader = req.headers.get('x-shop-id')
     const currentShopId = shopIdHeader ? parseInt(shopIdHeader) : null
 
-    // 기본 조건: 발행된 상품만 (shop_product 테이블을 통해)
+    // 기본 조건: 발행된 활성 상품만 (shop_product 테이블을 통해)
     const where: any = {
       deletedAt: null, // Soft Delete 필터링
+      isActive: true, // 비활성 상품은 목록에서 제외
       shopProducts: {
         some: {
           deletedAt: null, // ShopProduct Soft Delete 필터링

@@ -118,17 +118,9 @@ export async function GET(
       )
     }
 
-    // Product 레벨에서 비활성화된 상품은 숨김 처리
+    // Product 레벨 활성화 상태
     // NOTE: Prisma 타입에 isActive가 없어 as any 사용. prisma generate 후 타입 안전성 확보 필요
     const isActive = (product as any).isActive ?? true
-
-    // 비활성화된 상품 접근 시 404 반환 (쇼핑몰에서 노출되지 않아야 함)
-    if (!isActive) {
-      return NextResponse.json(
-        { success: false, error: '상품을 찾을 수 없습니다' },
-        { status: 404 }
-      )
-    }
 
     // 판매자 정보 (추후 별도 필드로 관리)
     const sellerName = null
