@@ -48,6 +48,13 @@ export async function GET(
                 thumbnailUrl: true,
               },
             },
+            shop: {
+              select: {
+                id: true,
+                name: true,
+                subdomain: true,
+              },
+            },
           },
         },
         replies: {
@@ -69,9 +76,14 @@ export async function GET(
       )
     }
 
+    const { shopProduct, ...rest } = inquiry
     return NextResponse.json({
       success: true,
-      inquiry,
+      inquiry: {
+        ...rest,
+        product: shopProduct?.product || null,
+        shop: shopProduct?.shop || null,
+      },
     })
   } catch (error) {
     console.error('Failed to fetch inquiry detail:', error)

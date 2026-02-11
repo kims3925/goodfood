@@ -16,6 +16,7 @@ import {
   Package,
   Tag,
   ExternalLink,
+  Store,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Loading from '@/components/ui/Loading'
@@ -48,7 +49,12 @@ interface InquiryDetail {
     id: number
     name: string
     thumbnailUrl?: string
-  }
+  } | null
+  shop?: {
+    id: number
+    name: string
+    subdomain: string
+  } | null
   replies: Reply[]
 }
 
@@ -288,6 +294,18 @@ export default function InquiryDetailPage({ params }: { params: { id: string } }
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">문의 정보</h2>
               <div className="space-y-3">
+                {inquiry.shop && (
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-gray-600 flex items-center gap-2">
+                      <Store className="w-4 h-4" />
+                      쇼핑몰
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-700">
+                      <Store size={14} />
+                      {inquiry.shop.name}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center py-2 border-b border-gray-100">
                   <span className="text-gray-600 flex items-center gap-2">
                     <Tag className="w-4 h-4" />
@@ -333,13 +351,26 @@ export default function InquiryDetailPage({ params }: { params: { id: string } }
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">{inquiry.product.name}</p>
-                    <Link
-                      href={`/product/detail/${inquiry.product.id}`}
-                      className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 mt-1"
-                    >
-                      <ExternalLink size={12} />
-                      상품 상세
-                    </Link>
+                    <div className="flex flex-col gap-1 mt-1">
+                      <Link
+                        href={`/product/detail/${inquiry.product.id}`}
+                        className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+                      >
+                        <ExternalLink size={12} />
+                        상품 관리
+                      </Link>
+                      {inquiry.shop && (
+                        <a
+                          href={`${process.env.NEXT_PUBLIC_SHOP_BASE_URL || 'http://localhost:3000'}/${inquiry.shop.subdomain}/product/${inquiry.product.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
+                        >
+                          <Store size={12} />
+                          쇼핑몰에서 보기
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

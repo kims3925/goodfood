@@ -13,6 +13,7 @@ import {
   CreditCard,
   RotateCcw,
   Wallet,
+  Store,
 } from 'lucide-react'
 import Input from '@/components/ui/Input'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
@@ -33,6 +34,11 @@ interface Inquiry {
     name: string
     email: string
   }
+  shop: {
+    id: number
+    name: string
+    subdomain: string
+  } | null
 }
 
 const inquiryTypes = [
@@ -287,11 +293,19 @@ export default function InquiryManagementPage() {
                     className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
                     onClick={() => handleRowClick(inquiry.id)}
                   >
-                    {/* 상단: 문의유형 + 상태 */}
+                    {/* 상단: 쇼핑몰 + 문의유형 + 상태 */}
                     <div className="flex items-center justify-between mb-3">
-                      <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                        {getTypeLabel(inquiry.inquiryType)}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {inquiry.shop && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                            <Store size={10} />
+                            {inquiry.shop.name}
+                          </span>
+                        )}
+                        <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                          {getTypeLabel(inquiry.inquiryType)}
+                        </span>
+                      </div>
                       {getStatusBadge(inquiry.status)}
                     </div>
 
@@ -326,13 +340,14 @@ export default function InquiryManagementPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[5%]">순서</TableHead>
-                      <TableHead className="w-[10%]">문의유형</TableHead>
-                      <TableHead className="w-[35%]">제목</TableHead>
-                      <TableHead className="w-[15%]">고객</TableHead>
-                      <TableHead className="w-[10%]">상태</TableHead>
-                      <TableHead className="w-[8%] text-center">답변수</TableHead>
-                      <TableHead className="w-[17%]">등록일</TableHead>
+                      <TableHead className="w-[4%]">순서</TableHead>
+                      <TableHead className="w-[10%]">쇼핑몰</TableHead>
+                      <TableHead className="w-[8%]">문의유형</TableHead>
+                      <TableHead className="w-[30%]">제목</TableHead>
+                      <TableHead className="w-[13%]">고객</TableHead>
+                      <TableHead className="w-[9%]">상태</TableHead>
+                      <TableHead className="w-[7%] text-center">답변수</TableHead>
+                      <TableHead className="w-[14%]">등록일</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -346,6 +361,16 @@ export default function InquiryManagementPage() {
                           <span className="text-gray-500 text-sm">
                             {(currentPage - 1) * itemsPerPage + index + 1}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          {inquiry.shop ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                              <Store size={12} />
+                              {inquiry.shop.name}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">-</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
