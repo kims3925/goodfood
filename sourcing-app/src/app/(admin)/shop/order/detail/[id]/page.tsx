@@ -178,6 +178,7 @@ export default function UnifiedOrderDetailPage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showStatusConfirm, setShowStatusConfirm] = useState(false)
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<string | null>(null)
 
   const loadOrder = useCallback(async () => {
@@ -606,14 +607,24 @@ export default function UnifiedOrderDetailPage() {
                 )}
               </div>
               {order.status === 'CANCELLED' && (
-                <Button
-                  variant="secondary"
-                  onClick={() => handleStatusChange('REFUNDED')}
-                  disabled={isUpdating}
-                >
-                  <CheckCircle size={16} />
-                  환불 완료 처리
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="primary"
+                    onClick={() => setShowRestoreConfirm(true)}
+                    disabled={isUpdating}
+                  >
+                    <CreditCard size={16} />
+                    입금 확인 (주문 복구)
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleStatusChange('REFUNDED')}
+                    disabled={isUpdating}
+                  >
+                    <CheckCircle size={16} />
+                    환불 완료 처리
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -910,6 +921,22 @@ export default function UnifiedOrderDetailPage() {
         confirmText="삭제"
         cancelText="취소"
         variant="danger"
+        isLoading={isUpdating}
+      />
+
+      {/* 주문 복구 확인 모달 */}
+      <ConfirmModal
+        isOpen={showRestoreConfirm}
+        onClose={() => setShowRestoreConfirm(false)}
+        onConfirm={() => {
+          setShowRestoreConfirm(false)
+          confirmStatusChange('PREPARING')
+        }}
+        title="입금 확인 및 주문 복구"
+        message="취소된 주문을 복구하고 상품 준비 상태로 변경하시겠습니까? 입금이 확인된 경우에만 진행해주세요."
+        confirmText="입금 확인 및 복구"
+        cancelText="취소"
+        variant="info"
         isLoading={isUpdating}
       />
 

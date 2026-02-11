@@ -435,6 +435,12 @@ export async function PATCH(
           if (!order.paidAt) {
             updateData.paidAt = now
           }
+          // 취소 상태에서 복구하는 경우 취소 관련 필드 초기화
+          if (order.status === 'CANCELLED') {
+            updateData.cancelledAt = null
+            updateData.cancelledBy = null
+            updateData.cancelReason = null
+          }
           break
         case 'PREPARING':
           // paidAt이 없으면 설정 (중간 단계 채움)
@@ -442,8 +448,12 @@ export async function PATCH(
             updateData.paidAt = now
           }
           // preparingAt 설정
-          if (!order.preparingAt) {
-            updateData.preparingAt = now
+          updateData.preparingAt = now
+          // 취소 상태에서 복구하는 경우 취소 관련 필드 초기화
+          if (order.status === 'CANCELLED') {
+            updateData.cancelledAt = null
+            updateData.cancelledBy = null
+            updateData.cancelReason = null
           }
           break
         case 'SHIPPED':
@@ -610,13 +620,23 @@ export async function PATCH(
           if (!guestOrder.paidAt) {
             updateData.paidAt = now
           }
+          // 취소 상태에서 복구하는 경우 취소 관련 필드 초기화
+          if (guestOrder.status === 'CANCELLED') {
+            updateData.cancelledAt = null
+            updateData.cancelledBy = null
+            updateData.cancelReason = null
+          }
           break
         case 'PREPARING':
           if (!guestOrder.paidAt) {
             updateData.paidAt = now
           }
-          if (!guestOrder.preparingAt) {
-            updateData.preparingAt = now
+          updateData.preparingAt = now
+          // 취소 상태에서 복구하는 경우 취소 관련 필드 초기화
+          if (guestOrder.status === 'CANCELLED') {
+            updateData.cancelledAt = null
+            updateData.cancelledBy = null
+            updateData.cancelReason = null
           }
           break
         case 'SHIPPED':
