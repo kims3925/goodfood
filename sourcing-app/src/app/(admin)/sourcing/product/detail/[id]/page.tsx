@@ -1633,7 +1633,7 @@ export default function ProductDetailPage() {
                                   </div>
                                 </div>
                                 <a
-                                  href={`https://${sp.shop.subdomain}.bandauto.shop`}
+                                  href={`${process.env.NEXT_PUBLIC_SHOP_BASE_URL || 'http://localhost:3000'}/${sp.shop.subdomain}/product/${sp.id}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
