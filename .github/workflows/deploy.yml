@@ -70,7 +70,7 @@ jobs:
             docker compose up -d
 
             # Prisma 마이그레이션
-            docker compose exec -T shop-app sh -c "cd /app/db && npx prisma migrate deploy --schema prisma" || true
+            docker compose exec -T shop-app sh -c "cd /app/db && npx prisma@6 migrate deploy --schema prisma" || true
 
             # 상태 확인
             docker compose ps
