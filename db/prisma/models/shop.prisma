@@ -24,6 +24,7 @@ model Shop {
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   theme          ShopTheme?
   customers      User[]         @relation("ShopCustomers")
+  inquiries      Inquiry[]
   notifications  Notification[]
 
   @@index([userId])

@@ -71,12 +71,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { inquiryType, title, content, shopProductId, productId } = body
 
+    const shopIdHeader = request.headers.get('x-shop-id')
+    const shopId = shopIdHeader ? Number(shopIdHeader) : undefined
+
     const userId = Number(session.user.id)
     const inquiry = await inquiryService.createInquiry({
       userId,
       inquiryType,
       title,
       content,
+      shopId,
       shopProductId: shopProductId
         ? Number(shopProductId)
         : productId

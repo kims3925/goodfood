@@ -38,6 +38,13 @@ export async function GET(
             phone: true,
           },
         },
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            subdomain: true,
+          },
+        },
         shopProduct: {
           select: {
             id: true,
@@ -76,13 +83,13 @@ export async function GET(
       )
     }
 
-    const { shopProduct, ...rest } = inquiry
+    const { shop, shopProduct, ...rest } = inquiry
     return NextResponse.json({
       success: true,
       inquiry: {
         ...rest,
         product: shopProduct?.product || null,
-        shop: shopProduct?.shop || null,
+        shop: shop || shopProduct?.shop || null,
       },
     })
   } catch (error) {

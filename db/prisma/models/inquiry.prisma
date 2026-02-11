@@ -11,12 +11,15 @@ model Inquiry {
   repliedBy     Int?           @map("replied_by")
   createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamp(0)
+  shopId        Int?           @map("shop_id")
   shopProductId Int?           @map("shop_product_id")
+  shop          Shop?          @relation(fields: [shopId], references: [id])
   shopProduct   ShopProduct?   @relation(fields: [shopProductId], references: [id])
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   replies       InquiryReply[]
 
   @@index([userId])
+  @@index([shopId])
   @@index([shopProductId])
   @@index([status])
   @@index([userId, status])

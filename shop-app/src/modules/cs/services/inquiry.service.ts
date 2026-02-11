@@ -19,6 +19,7 @@ export interface CreateInquiryDTO {
   inquiryType: string
   title: string
   content: string
+  shopId?: number
   shopProductId?: number
 }
 
@@ -59,7 +60,7 @@ export class InquiryService {
    * 문의 생성
    */
   async createInquiry(data: CreateInquiryDTO): Promise<InquiryResponse> {
-    const { userId, inquiryType, title, content, shopProductId } = data
+    const { userId, inquiryType, title, content, shopId, shopProductId } = data
 
     // 입력 검증
     this.validateInquiryInput(title, content, inquiryType)
@@ -68,6 +69,7 @@ export class InquiryService {
     const inquiry = await prisma.inquiry.create({
       data: {
         userId,
+        shopId: shopId || null,
         shopProductId: shopProductId || null,
         inquiryType: inquiryType as InquiryType,
         title: title.trim(),

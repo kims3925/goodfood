@@ -39,6 +39,13 @@ export class InquiryRepository {
             email: true,
           },
         },
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            subdomain: true,
+          },
+        },
         shopProduct: {
           select: {
             shop: {
@@ -56,11 +63,9 @@ export class InquiryRepository {
       },
     })
 
-    return inquiries.map(({ replies, shopProduct, ...inquiry }) => ({
+    return inquiries.map(({ replies, shop, shopProduct, ...inquiry }) => ({
       ...inquiry,
-      shop: shopProduct?.shop
-        ? { id: shopProduct.shop.id, name: shopProduct.shop.name, subdomain: shopProduct.shop.subdomain }
-        : null,
+      shop: shop || shopProduct?.shop || null,
       replyCount: replies?.length || 0,
     }))
   }
