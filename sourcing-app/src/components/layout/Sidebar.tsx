@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -140,9 +140,40 @@ export default function Sidebar({
   const [expandedItems, setExpandedItems] = useState<string[]>([])
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [clickedItem, setClickedItem] = useState<string | null>(null)
+  const [pendingInquiryCount, setPendingInquiryCount] = useState(0)
+
+  // 미답변 문의 건수 조회
+  const fetchPendingInquiryCount = useCallback(async () => {
+    try {
+      const res = await fetch('/api/cs/inquiry/pending-count')
+      const data = await res.json()
+      if (data.success) {
+        setPendingInquiryCount(data.count)
+      }
+    } catch {
+      // 실패 시 무시
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchPendingInquiryCount()
+    const interval = setInterval(fetchPendingInquiryCount, 60_000)
+    return () => clearInterval(interval)
+  }, [fetchPendingInquiryCount])
 
   // 현재 섹션의 메뉴 아이템 (사용자 역할에 따라 필터링)
-  const menuItems = useMemo(() => getMenuBySectionAndRole(currentSection, userRole), [currentSection, userRole])
+  const baseMenuItems = useMemo(() => getMenuBySectionAndRole(currentSection, userRole), [currentSection, userRole])
+
+  // 동적 뱃지 적용
+  const menuItems = useMemo(() => {
+    if (currentSection !== 'shop' || pendingInquiryCount === 0) return baseMenuItems
+    return baseMenuItems.map(item => {
+      if (item.label === '고객 문의') {
+        return { ...item, badge: String(pendingInquiryCount) }
+      }
+      return item
+    })
+  }, [baseMenuItems, currentSection, pendingInquiryCount])
   const pathToMenuMap = useMemo(() => getPathToMenuMap(currentSection), [currentSection])
 
   // 경로에 따라 해당 메뉴 그룹 자동 확장
@@ -376,7 +407,14 @@ export default function Sidebar({
           `}
           title={collapsed ? item.label : undefined}
         >
-          {renderIcon(item)}
+          <span className="relative">
+            {renderIcon(item)}
+            {collapsed && item.badge && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 text-[10px] font-bold text-white bg-red-500 rounded-full flex items-center justify-center">
+                {Number(item.badge) > 9 ? '9+' : item.badge}
+              </span>
+            )}
+          </span>
           {!collapsed && <span>{item.label}</span>}
           {!collapsed && item.badge && (
             <span className="ml-auto px-2 py-0.5 text-xs font-semibold text-white bg-red-500 rounded-full">
@@ -387,8 +425,13 @@ export default function Sidebar({
 
         {/* collapsed 상태에서 호버 시 툴팁 */}
         {collapsed && isHovered && (
-          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 px-3 py-1.5 bg-gray-900 text-white text-sm rounded-md whitespace-nowrap">
+          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 px-3 py-1.5 bg-gray-900 text-white text-sm rounded-md whitespace-nowrap flex items-center gap-2">
             {item.label}
+            {item.badge && (
+              <span className="px-1.5 py-0.5 text-xs font-semibold bg-red-500 rounded-full">
+                {item.badge}
+              </span>
+            )}
           </div>
         )}
       </div>

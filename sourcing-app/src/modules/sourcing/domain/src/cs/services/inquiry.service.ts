@@ -14,6 +14,10 @@ export class InquiryService {
     return inquiry
   }
 
+  async getPendingCount(): Promise<number> {
+    return inquiryRepository.countPending()
+  }
+
   async addReply(inquiryId: number, data: InquiryReplyInput) {
     const inquiry = await inquiryRepository.findById(inquiryId)
     if (!inquiry) {

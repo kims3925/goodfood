@@ -39,14 +39,28 @@ export class InquiryRepository {
             email: true,
           },
         },
+        shopProduct: {
+          select: {
+            shop: {
+              select: {
+                id: true,
+                name: true,
+                subdomain: true,
+              },
+            },
+          },
+        },
         replies: {
           select: { id: true },
         },
       },
     })
 
-    return inquiries.map(({ replies, ...inquiry }) => ({
+    return inquiries.map(({ replies, shopProduct, ...inquiry }) => ({
       ...inquiry,
+      shop: shopProduct?.shop
+        ? { id: shopProduct.shop.id, name: shopProduct.shop.name, subdomain: shopProduct.shop.subdomain }
+        : null,
       replyCount: replies?.length || 0,
     }))
   }
@@ -66,6 +80,12 @@ export class InquiryRepository {
           orderBy: { createdAt: 'asc' },
         },
       },
+    })
+  }
+
+  async countPending(): Promise<number> {
+    return prisma.inquiry.count({
+      where: { status: 'PENDING' },
     })
   }
 
