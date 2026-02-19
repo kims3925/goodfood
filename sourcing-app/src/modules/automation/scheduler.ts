@@ -8,8 +8,8 @@ import prisma, { TriggerType, WorkflowType } from '@bandauto/db'
 import { executeFullPipelineWithLock } from './executor'
 import { acquireExecutionLock, getRunningWorkflow } from './workflow-service'
 
-// 활성 스케줄러 저장
-const activeSchedulers: Map<number, cron.ScheduledTask> = new Map()
+// 활성 스케줄러 저장 (사용자당 여러 cron task 지원)
+const activeSchedulers: Map<number, cron.ScheduledTask[]> = new Map()
 
 /**
  * 스케줄러 초기화
@@ -44,31 +44,26 @@ export async function initializeScheduler(): Promise<void> {
 }
 
 /**
- * 스케줄러 등록 (내부용, 로그 없음)
+ * 파이프 구분 cron expression을 개별 cron 배열로 분리
  */
-function registerSchedulerSilent(userId: number, cronExpression: string): void {
-  // 기존 스케줄러가 있으면 제거
-  const existing = activeSchedulers.get(userId)
-  if (existing) {
-    existing.stop()
-    activeSchedulers.delete(userId)
-  }
+function parseCronExpressions(cronExpression: string): string[] {
+  return cronExpression.split('|').map(c => c.trim()).filter(Boolean)
+}
 
-  // cron 표현식 유효성 검사
-  if (!cron.validate(cronExpression)) {
-    return
-  }
+/**
+ * 단일 cron task 생성 (공통 실행 로직)
+ */
+function createCronTask(userId: number, singleCron: string): cron.ScheduledTask | null {
+  if (!cron.validate(singleCron)) return null
 
-  const task = cron.schedule(cronExpression, async () => {
+  return cron.schedule(singleCron, async () => {
     console.log(`[Scheduler] 자동화 실행 시작 (user: ${userId})`)
 
     try {
-      // 자동화 설정 조회하여 pipelineSteps 가져오기
       const config = await prisma.automationConfig.findUnique({
         where: { userId },
       })
 
-      // pipelineSteps를 skip options로 변환
       let options: {
         skipCollection?: boolean
         skipTransform?: boolean
@@ -90,7 +85,6 @@ function registerSchedulerSilent(userId: number, cronExpression: string): void {
         }
       }
 
-      // Lock 기반 실행 (중복 실행 자동 방지)
       const result = await executeFullPipelineWithLock(userId, options, TriggerType.SCHEDULED)
 
       if (result) {
@@ -104,72 +98,50 @@ function registerSchedulerSilent(userId: number, cronExpression: string): void {
   }, {
     timezone: 'Asia/Seoul',
   } as any)
+}
 
-  activeSchedulers.set(userId, task)
+/**
+ * 스케줄러 등록 (내부용, 로그 없음)
+ */
+function registerSchedulerSilent(userId: number, cronExpression: string): void {
+  unregisterScheduler(userId)
+
+  const cronExpressions = parseCronExpressions(cronExpression)
+  const tasks: cron.ScheduledTask[] = []
+
+  for (const singleCron of cronExpressions) {
+    const task = createCronTask(userId, singleCron)
+    if (task) tasks.push(task)
+  }
+
+  if (tasks.length > 0) {
+    activeSchedulers.set(userId, tasks)
+  }
 }
 
 /**
  * 스케줄러 등록 (외부 호출용)
+ * 파이프(|) 구분 다중 cron expression 지원
  */
 export function registerScheduler(userId: number, cronExpression: string): void {
-  // 기존 스케줄러가 있으면 제거
   unregisterScheduler(userId)
 
-  // cron 표현식 유효성 검사
-  if (!cron.validate(cronExpression)) {
-    console.error(`[Scheduler] 잘못된 cron 표현식: ${cronExpression}`)
-    return
+  const cronExpressions = parseCronExpressions(cronExpression)
+  const tasks: cron.ScheduledTask[] = []
+
+  for (const singleCron of cronExpressions) {
+    if (!cron.validate(singleCron)) {
+      console.error(`[Scheduler] 잘못된 cron 표현식: ${singleCron}`)
+      continue
+    }
+    const task = createCronTask(userId, singleCron)
+    if (task) tasks.push(task)
   }
 
-  console.log(`[Scheduler] 스케줄러 등록 (user: ${userId})`)
-
-  const task = cron.schedule(cronExpression, async () => {
-    console.log(`[Scheduler] 자동화 실행 시작 (user: ${userId})`)
-
-    try {
-      // 자동화 설정 조회하여 pipelineSteps 가져오기
-      const config = await prisma.automationConfig.findUnique({
-        where: { userId },
-      })
-
-      // pipelineSteps를 skip options로 변환
-      let options: {
-        skipCollection?: boolean
-        skipTransform?: boolean
-        skipProductCreate?: boolean
-        skipPublish?: boolean
-      } | undefined = undefined
-
-      if (config?.pipelineSteps) {
-        try {
-          const pipelineSteps = JSON.parse(config.pipelineSteps)
-          options = {
-            skipCollection: !pipelineSteps.collection,
-            skipTransform: !pipelineSteps.transform,
-            skipProductCreate: !pipelineSteps.productCreate,
-            skipPublish: !pipelineSteps.publish,
-          }
-        } catch (e) {
-          console.error(`[Scheduler] pipelineSteps 파싱 실패:`, e)
-        }
-      }
-
-      // Lock 기반 실행 (중복 실행 자동 방지)
-      const result = await executeFullPipelineWithLock(userId, options, TriggerType.SCHEDULED)
-
-      if (result) {
-        console.log(`[Scheduler] 자동화 완료: ${result.overallStatus}`)
-      } else {
-        console.log(`[Scheduler] Lock 획득 실패 - 이미 실행 중인 작업이 있음`)
-      }
-    } catch (error) {
-      console.error(`[Scheduler] 자동화 실패:`, error)
-    }
-  }, {
-    timezone: 'Asia/Seoul',
-  } as any)
-
-  activeSchedulers.set(userId, task)
+  if (tasks.length > 0) {
+    activeSchedulers.set(userId, tasks)
+    console.log(`[Scheduler] 스케줄러 등록 (user: ${userId}, cron ${tasks.length}개)`)
+  }
 }
 
 /**
@@ -178,7 +150,9 @@ export function registerScheduler(userId: number, cronExpression: string): void 
 export function unregisterScheduler(userId: number): void {
   const existing = activeSchedulers.get(userId)
   if (existing) {
-    existing.stop()
+    for (const task of existing) {
+      task.stop()
+    }
     activeSchedulers.delete(userId)
     console.log(`[Scheduler] Unregistered scheduler for user ${userId}`)
   }
@@ -205,8 +179,10 @@ export async function updateScheduler(userId: number): Promise<void> {
  */
 export function stopAllSchedulers(): void {
   console.log('[Scheduler] Stopping all schedulers...')
-  for (const [userId, task] of activeSchedulers) {
-    task.stop()
+  for (const [userId, tasks] of activeSchedulers) {
+    for (const task of tasks) {
+      task.stop()
+    }
     console.log(`[Scheduler] Stopped scheduler for user ${userId}`)
   }
   activeSchedulers.clear()

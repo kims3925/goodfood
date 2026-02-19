@@ -287,30 +287,34 @@ export const INTERVAL_LABELS: Record<CronInterval, string> = {
   'custom': '지정 시간',
 }
 
-// 선택된 시간들을 cron expression으로 변환
+// 선택된 시간들을 cron expression으로 변환 (하위 호환)
 export function selectedHoursToCron(hours: number[]): string {
-  if (hours.length === 0) return '0 * * * *' // 기본값: 매 시간
-  if (hours.length === 24) return '0 * * * *' // 전체 선택 = 매 시간
+  if (hours.length === 0) return '0 * * * *'
+  if (hours.length === 24) return '0 * * * *'
 
   const sortedHours = [...hours].sort((a, b) => a - b)
   return `0 ${sortedHours.join(',')} * * *`
 }
 
-// cron expression에서 선택된 시간들 추출
+// cron expression에서 선택된 시간들 추출 (하위 호환)
 export function cronToSelectedHours(cron: string | null): number[] {
   if (!cron) return []
+
+  // 파이프 구분 다중 cron인 경우 scheduleTimes에서 시간만 추출
+  if (cron.includes('|')) {
+    const times = cronsToScheduleTimes(cron)
+    return [...new Set(times.map(t => parseInt(t.split(':')[0])))].sort((a, b) => a - b)
+  }
 
   const parts = cron.split(' ')
   if (parts.length !== 5) return []
 
   const hourPart = parts[1]
 
-  // 매 시간 (24시간 전체)
   if (hourPart === '*') {
     return Array.from({ length: 24 }, (_, i) => i)
   }
 
-  // N시간마다 (*/3 등)
   if (hourPart.startsWith('*/')) {
     const interval = parseInt(hourPart.substring(2))
     const hours: number[] = []
@@ -320,16 +324,92 @@ export function cronToSelectedHours(cron: string | null): number[] {
     return hours
   }
 
-  // 콤마로 구분된 시간들 (0,3,6,9 등)
   if (hourPart.includes(',')) {
     return hourPart.split(',').map(h => parseInt(h)).filter(h => !isNaN(h))
   }
 
-  // 단일 시간
   const singleHour = parseInt(hourPart)
   if (!isNaN(singleHour)) {
     return [singleHour]
   }
 
   return []
+}
+
+/**
+ * "HH:MM" 시간 배열을 파이프 구분 다중 cron expression으로 변환
+ * 같은 분 그룹끼리 묶어 cron 수를 최소화
+ *
+ * @example
+ * scheduleTimesToCrons(["11:00", "14:00", "16:30"])
+ * // → "0 11,14 * * *|30 16 * * *"
+ */
+export function scheduleTimesToCrons(times: string[]): string {
+  if (times.length === 0) return '0 * * * *'
+
+  // 분 기준으로 그룹핑
+  const minuteGroups: Record<number, number[]> = {}
+  for (const time of times) {
+    const [h, m] = time.split(':').map(Number)
+    if (isNaN(h) || isNaN(m)) continue
+    if (!minuteGroups[m]) {
+      minuteGroups[m] = []
+    }
+    minuteGroups[m].push(h)
+  }
+
+  // 각 분 그룹별 cron expression 생성
+  const crons = Object.entries(minuteGroups)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([minute, hours]) => {
+      const sortedHours = [...hours].sort((a, b) => a - b)
+      return `${minute} ${sortedHours.join(',')} * * *`
+    })
+
+  return crons.join('|')
+}
+
+/**
+ * 파이프 구분 다중 cron expression에서 "HH:MM" 시간 배열 추출
+ *
+ * @example
+ * cronsToScheduleTimes("0 11,14 * * *|30 16 * * *")
+ * // → ["11:00", "14:00", "16:30"]
+ */
+export function cronsToScheduleTimes(cronExpr: string | null): string[] {
+  if (!cronExpr) return []
+
+  const cronParts = cronExpr.split('|')
+  const times: string[] = []
+
+  for (const singleCron of cronParts) {
+    const parts = singleCron.trim().split(' ')
+    if (parts.length !== 5) continue
+
+    const minutePart = parts[0]
+    const hourPart = parts[1]
+
+    // 분 파싱
+    const minute = minutePart === '*' ? -1 : parseInt(minutePart)
+
+    // 매 시간인 경우 스킵 (전체 선택으로 간주하지 않음)
+    if (hourPart === '*' || hourPart.startsWith('*/')) continue
+
+    // 시간 파싱
+    const hours = hourPart.includes(',')
+      ? hourPart.split(',').map(h => parseInt(h)).filter(h => !isNaN(h))
+      : [parseInt(hourPart)].filter(h => !isNaN(h))
+
+    for (const h of hours) {
+      const m = minute === -1 ? 0 : minute
+      times.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`)
+    }
+  }
+
+  // 시간순 정렬
+  return times.sort((a, b) => {
+    const [ah, am] = a.split(':').map(Number)
+    const [bh, bm] = b.split(':').map(Number)
+    return ah !== bh ? ah - bh : am - bm
+  })
 }

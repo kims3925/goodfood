@@ -20,7 +20,7 @@ model AutomationConfig {
   id               Int        @id @default(autoincrement())
   userId           Int        @unique @map("user_id")
   isEnabled        Boolean    @default(false) @map("is_enabled")
-  cronExpression   String?    @map("cron_expression") @db.VarChar(50)
+  cronExpression   String?    @map("cron_expression") @db.VarChar(500)
   aiProvider       AiProvider @default(GEMINI) @map("ai_provider")
   lastRunAt        DateTime?  @map("last_run_at") @db.Timestamp(0)
   nextRunAt        DateTime?  @map("next_run_at") @db.Timestamp(0)

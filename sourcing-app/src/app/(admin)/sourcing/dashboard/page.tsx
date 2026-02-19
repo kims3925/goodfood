@@ -71,7 +71,8 @@ interface AutomationStats {
 interface AutomationConfig {
   isEnabled: boolean
   cronInterval: string
-  selectedHours: number[]
+  scheduleTimes: string[]  // "HH:MM" 형식
+  selectedHours: number[]  // 하위 호환 (차트 하이라이트용)
   lastRunAt: string | null
   nextRunAt: string | null
   retailChannelIds: number[]
@@ -190,34 +191,84 @@ const getDaysAgo = (days: number) => {
   return date
 }
 
-// 선택된 시간 요약
-const getSelectedHoursSummary = (selectedHours: number[] | undefined): string => {
-  if (!selectedHours || selectedHours.length === 0) return '설정 안됨'
-  if (selectedHours.length === 24) return '매 시간 (24회/일)'
-
-  const sortedHours = [...selectedHours].sort((a, b) => a - b)
+// 시간 요약 (scheduleTimes 우선, selectedHours 폴백)
+const getScheduleSummary = (config: AutomationConfig | null): string => {
+  const times = config?.scheduleTimes
+  if (times && times.length > 0) {
+    const sorted = [...times].sort()
+    if (sorted.length <= 3) return sorted.join(', ')
+    return `${sorted.length}개 시간대`
+  }
+  const hours = config?.selectedHours
+  if (!hours || hours.length === 0) return '설정 안됨'
+  if (hours.length === 24) return '매 시간 (24회/일)'
+  const sortedHours = [...hours].sort((a, b) => a - b)
   if (sortedHours.length <= 3) {
     return sortedHours.map(h => `${h.toString().padStart(2, '0')}:00`).join(', ')
   }
   return `${sortedHours.length}개 시간대`
 }
 
-// 다음 실행까지 남은 시간을 계산하는 함수
-const calculateNextExecution = (selectedHours: number[] | undefined): { countdown: string; nextTime: string } => {
-  if (!selectedHours || selectedHours.length === 0) {
+// 다음 실행까지 남은 시간을 계산하는 함수 (scheduleTimes 우선)
+const calculateNextExecution = (config: AutomationConfig | null): { countdown: string; nextTime: string } => {
+  const times = config?.scheduleTimes
+  const hours = config?.selectedHours
+
+  // scheduleTimes가 있으면 사용
+  if (times && times.length > 0) {
+    const now = new Date()
+    const currentHour = now.getHours()
+    const currentMinute = now.getMinutes()
+
+    const sorted = [...times].sort()
+    let nextTime: string | null = null
+    let isToday = true
+
+    for (const time of sorted) {
+      const [h, m] = time.split(':').map(Number)
+      if (h > currentHour || (h === currentHour && m > currentMinute)) {
+        nextTime = time
+        break
+      }
+    }
+
+    if (!nextTime) {
+      nextTime = sorted[0]
+      isToday = false
+    }
+
+    const [nh, nm] = nextTime.split(':').map(Number)
+    const nextDate = new Date()
+    if (!isToday) nextDate.setDate(nextDate.getDate() + 1)
+    nextDate.setHours(nh, nm, 0, 0)
+
+    const diffMs = nextDate.getTime() - now.getTime()
+    const diffMinutes = Math.floor(diffMs / (1000 * 60))
+    const h = Math.floor(diffMinutes / 60)
+    const m = diffMinutes % 60
+
+    let countdown = ''
+    if (h > 0 && m > 0) countdown = `${h}시간 ${m}분`
+    else if (h > 0) countdown = `${h}시간`
+    else if (m > 0) countdown = `${m}분`
+    else countdown = '곧 실행'
+
+    return { countdown, nextTime }
+  }
+
+  // 폴백: selectedHours 사용
+  if (!hours || hours.length === 0) {
     return { countdown: '', nextTime: '' }
   }
 
   const now = new Date()
   const currentHour = now.getHours()
   const currentMinute = now.getMinutes()
-
-  const sortedHours = [...selectedHours].sort((a, b) => a - b)
+  const sortedHours = [...hours].sort((a, b) => a - b)
 
   let nextHour: number | null = null
   let isToday = true
 
-  // 오늘 남은 시간 중 가장 가까운 것 찾기
   for (const hour of sortedHours) {
     if (hour > currentHour || (hour === currentHour && currentMinute < 1)) {
       nextHour = hour
@@ -225,38 +276,27 @@ const calculateNextExecution = (selectedHours: number[] | undefined): { countdow
     }
   }
 
-  // 오늘 남은 시간이 없으면 내일 첫 번째 시간
   if (nextHour === null) {
     nextHour = sortedHours[0]
     isToday = false
   }
 
-  // 남은 시간 계산
   const nextDate = new Date()
-  if (!isToday) {
-    nextDate.setDate(nextDate.getDate() + 1)
-  }
+  if (!isToday) nextDate.setDate(nextDate.getDate() + 1)
   nextDate.setHours(nextHour, 0, 0, 0)
 
   const diffMs = nextDate.getTime() - now.getTime()
   const diffMinutes = Math.floor(diffMs / (1000 * 60))
-  const hours = Math.floor(diffMinutes / 60)
-  const minutes = diffMinutes % 60
+  const h = Math.floor(diffMinutes / 60)
+  const m = diffMinutes % 60
 
   let countdown = ''
-  if (hours > 0 && minutes > 0) {
-    countdown = `${hours}시간 ${minutes}분`
-  } else if (hours > 0) {
-    countdown = `${hours}시간`
-  } else if (minutes > 0) {
-    countdown = `${minutes}분`
-  } else {
-    countdown = '곧 실행'
-  }
+  if (h > 0 && m > 0) countdown = `${h}시간 ${m}분`
+  else if (h > 0) countdown = `${h}시간`
+  else if (m > 0) countdown = `${m}분`
+  else countdown = '곧 실행'
 
-  const nextTime = `${nextHour.toString().padStart(2, '0')}:00`
-
-  return { countdown, nextTime }
+  return { countdown, nextTime: `${nextHour.toString().padStart(2, '0')}:00` }
 }
 
 export default function AutomationDashboardPage() {
@@ -389,22 +429,24 @@ export default function AutomationDashboardPage() {
     }
   }
 
-  // 카운트다운 타이머 - selectedHours 기반으로 클라이언트에서 계산
+  // 카운트다운 타이머 - scheduleTimes/selectedHours 기반으로 클라이언트에서 계산
   useEffect(() => {
-    if (!config?.selectedHours || config.selectedHours.length === 0 || !config?.isEnabled) {
+    const hasTimes = (config?.scheduleTimes && config.scheduleTimes.length > 0) ||
+      (config?.selectedHours && config.selectedHours.length > 0)
+    if (!hasTimes || !config?.isEnabled) {
       setCountdown('')
       return
     }
 
     const updateCountdown = () => {
-      const { countdown: newCountdown } = calculateNextExecution(config.selectedHours)
+      const { countdown: newCountdown } = calculateNextExecution(config)
       setCountdown(newCountdown)
     }
 
     updateCountdown()
     const timer = setInterval(updateCountdown, 1000)
     return () => clearInterval(timer)
-  }, [config?.selectedHours, config?.isEnabled])
+  }, [config?.scheduleTimes, config?.selectedHours, config?.isEnabled])
 
   const handleExecute = async (type: 'collect' | 'transform' | 'register' | 'publish' | 'full') => {
     if (isExecuting || runningWorkflow) return
@@ -855,18 +897,18 @@ export default function AutomationDashboardPage() {
           </div>
 
           {/* 다음 실행 정보 (활성화 시) - 모바일에서 별도 줄 */}
-          {config?.isEnabled && config?.selectedHours && config.selectedHours.length > 0 && (
+          {config?.isEnabled && ((config?.scheduleTimes && config.scheduleTimes.length > 0) || (config?.selectedHours && config.selectedHours.length > 0)) && (
             <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto pl-10 sm:pl-0 text-sm">
               <span className="hidden sm:inline text-gray-300">|</span>
               <div className="flex items-center gap-1.5">
                 <Clock size={14} className="text-green-500" />
                 <span className="text-gray-600 hidden sm:inline">다음</span>
-                <span className="font-semibold text-green-600">{calculateNextExecution(config.selectedHours).nextTime}</span>
+                <span className="font-semibold text-green-600">{calculateNextExecution(config).nextTime}</span>
                 <span className="text-gray-400 text-xs">({countdown || '계산 중...'})</span>
               </div>
               <span className="hidden sm:inline text-gray-300">|</span>
               <span className="text-xs text-gray-500">
-                <span className="font-medium text-gray-700">{config.selectedHours.length}</span>회/일
+                <span className="font-medium text-gray-700">{config.scheduleTimes?.length || config.selectedHours?.length || 0}</span>회/일
               </span>
             </div>
           )}

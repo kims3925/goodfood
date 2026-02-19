@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLeft, ChevronRight, Clock, Download, Upload, Zap, Settings2, ShoppingBag, AlertTriangle, ExternalLink, Settings, Info } from 'lucide-react'
+import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLeft, ChevronRight, Clock, Download, Upload, Zap, Settings2, ShoppingBag, AlertTriangle, ExternalLink, Settings, Info, Plus, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
@@ -80,7 +80,7 @@ interface PipelineWorkflow {
 interface AutomationConfig {
   isEnabled: boolean
   cronInterval: string
-  selectedHours: number[]
+  scheduleTimes: string[]  // "HH:MM" 형식 (예: ["11:00", "16:30"])
   collectFromAllChannels: boolean
   wholesaleChannelIds: number[]
   aiProvider: string
@@ -90,56 +90,69 @@ interface AutomationConfig {
   collectionLimit: number
 }
 
-// 00:00 ~ 23:00 시간 버튼 생성
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => ({
-  hour: i,
-  label: `${i.toString().padStart(2, '0')}:00`,
-}))
+// 12시간제 → 24시간제 변환
+const to24Hour = (hour12: number, amPm: 'AM' | 'PM'): number => {
+  if (amPm === 'AM') return hour12 === 12 ? 0 : hour12
+  return hour12 === 12 ? 12 : hour12 + 12
+}
+
+// 24시간제 "HH:MM"을 "오전/오후 H:MM" 형식으로 표시
+const formatTimeDisplay = (time: string): string => {
+  const [h, m] = time.split(':').map(Number)
+  const amPm = h < 12 ? '오전' : '오후'
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+  return `${amPm} ${h12}:${m.toString().padStart(2, '0')}`
+}
+
+// "HH:MM" 시간 문자열 정렬
+const sortTimes = (times: string[]): string[] =>
+  [...times].sort((a, b) => {
+    const [ah, am] = a.split(':').map(Number)
+    const [bh, bm] = b.split(':').map(Number)
+    return ah !== bh ? ah - bh : am - bm
+  })
 
 // 다음 실행까지 남은 시간을 계산하는 함수
-const getNextExecutionInfo = (selectedHours: number[]): { text: string; remainingText: string } => {
-  if (selectedHours.length === 0) {
-    return { text: '실행 시간을 선택해주세요', remainingText: '' }
+const getNextExecutionInfo = (scheduleTimes: string[]): { text: string; remainingText: string } => {
+  if (scheduleTimes.length === 0) {
+    return { text: '실행 시간을 입력해주세요', remainingText: '' }
   }
 
   const now = new Date()
   const currentHour = now.getHours()
   const currentMinute = now.getMinutes()
 
-  const sortedHours = [...selectedHours].sort((a, b) => a - b)
+  const sorted = sortTimes(scheduleTimes)
 
-  let nextHour: number | null = null
+  let nextTime: string | null = null
   let isToday = true
 
-  // 오늘 남은 시간 중 가장 가까운 것 찾기
-  // 현재 시간이 14:30이면 14시는 이미 지났으므로 다음 시간을 찾아야 함
-  for (const hour of sortedHours) {
-    // 해당 시간이 현재 시간보다 크거나, 같은 시간이지만 아직 정각이 안 됐으면
-    if (hour > currentHour || (hour === currentHour && currentMinute < 1)) {
-      nextHour = hour
+  for (const time of sorted) {
+    const [h, m] = time.split(':').map(Number)
+    if (h > currentHour || (h === currentHour && m > currentMinute)) {
+      nextTime = time
       break
     }
   }
 
-  // 오늘 남은 시간이 없으면 내일 첫 번째 시간
-  if (nextHour === null) {
-    nextHour = sortedHours[0]
+  if (!nextTime) {
+    nextTime = sorted[0]
     isToday = false
   }
 
-  // 남은 시간 계산
+  const [nextH, nextM] = nextTime.split(':').map(Number)
   const nextDate = new Date()
   if (!isToday) {
     nextDate.setDate(nextDate.getDate() + 1)
   }
-  nextDate.setHours(nextHour, 0, 0, 0)
+  nextDate.setHours(nextH, nextM, 0, 0)
 
   const diffMs = nextDate.getTime() - now.getTime()
   const diffMinutes = Math.floor(diffMs / (1000 * 60))
   const hours = Math.floor(diffMinutes / 60)
   const minutes = diffMinutes % 60
 
-  const timeText = `${isToday ? '오늘' : '내일'} ${nextHour.toString().padStart(2, '0')}:00`
+  const timeText = `${isToday ? '오늘' : '내일'} ${nextTime}`
 
   let remainingText = ''
   if (hours > 0 && minutes > 0) {
@@ -156,21 +169,20 @@ const getNextExecutionInfo = (selectedHours: number[]): { text: string; remainin
 }
 
 // 선택된 시간 요약
-const getSelectedHoursSummary = (selectedHours: number[]): string => {
-  if (selectedHours.length === 0) return '선택된 시간 없음'
-  if (selectedHours.length === 24) return '매 시간 (24회/일)'
+const getScheduleTimesSummary = (scheduleTimes: string[]): string => {
+  if (scheduleTimes.length === 0) return '설정된 시간 없음'
 
-  const sortedHours = [...selectedHours].sort((a, b) => a - b)
-  if (sortedHours.length <= 4) {
-    return sortedHours.map(h => `${h.toString().padStart(2, '0')}:00`).join(', ')
+  const sorted = sortTimes(scheduleTimes)
+  if (sorted.length <= 4) {
+    return sorted.join(', ')
   }
-  return `${sortedHours.length}개 시간 선택됨`
+  return `${sorted.length}개 시간 설정됨`
 }
 
 const defaultConfig: AutomationConfig = {
   isEnabled: false,
   cronInterval: 'custom',
-  selectedHours: [],
+  scheduleTimes: [],
   collectFromAllChannels: true,
   wholesaleChannelIds: [],
   aiProvider: 'GEMINI',
@@ -214,6 +226,11 @@ export default function AutomationSettingsPage() {
   const [warningPhase, setWarningPhase] = useState<'idle' | 'shake' | 'fading'>('idle')
   const [nextExecution, setNextExecution] = useState<{ text: string; remainingText: string }>({ text: '', remainingText: '' })
 
+  // 시간 입력 상태
+  const [timeAmPm, setTimeAmPm] = useState<'AM' | 'PM'>('AM')
+  const [timeHour, setTimeHour] = useState('')
+  const [timeMinute, setTimeMinute] = useState('')
+
   // 쇼핑몰 미연결 경고 모달
   const [showShopConnectionWarning, setShowShopConnectionWarning] = useState(false)
   const [unconnectedChannels, setUnconnectedChannels] = useState<Channel[]>([])
@@ -238,8 +255,8 @@ export default function AutomationSettingsPage() {
   const CHANNELS_PER_PAGE = 4
 
   // 섹션별 변경 여부 확인 (isEnabled는 버튼으로 변경하므로 제외)
-  const hasScheduleChanges = JSON.stringify([...(config.selectedHours || [])].sort()) !==
-    JSON.stringify([...(initialConfig.selectedHours || [])].sort())
+  const hasScheduleChanges = JSON.stringify(sortTimes(config.scheduleTimes || [])) !==
+    JSON.stringify(sortTimes(initialConfig.scheduleTimes || []))
 
   const hasCollectionChanges = JSON.stringify((config.wholesaleChannelIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.wholesaleChannelIds || []).slice().sort()) ||
@@ -259,7 +276,7 @@ export default function AutomationSettingsPage() {
   const hasUnsavedChanges = hasScheduleChanges || hasCollectionChanges || hasAiChanges || hasPublishChanges || hasShopChanges || hasPipelineChanges
 
   // 필수 설정 누락 여부 (설정이 아예 안 된 경우)
-  const isScheduleMissing = config.selectedHours.length === 0
+  const isScheduleMissing = config.scheduleTimes.length === 0
   const isShopMissing = config.shopIds.length === 0
   const isCollectionMissing = config.wholesaleChannelIds.length === 0
   const isAiMissing = !config.aiProvider
@@ -349,7 +366,7 @@ export default function AutomationSettingsPage() {
     const missingSections: string[] = []
 
     // 실행 시간 선택 확인
-    if (config.selectedHours.length === 0) {
+    if (config.scheduleTimes.length === 0) {
       missingSections.push('schedule')
     }
 
@@ -494,7 +511,7 @@ export default function AutomationSettingsPage() {
   // 다음 실행 시간 실시간 업데이트 (1분마다)
   useEffect(() => {
     const updateNextExecution = () => {
-      setNextExecution(getNextExecutionInfo(config.selectedHours))
+      setNextExecution(getNextExecutionInfo(config.scheduleTimes))
     }
 
     // 초기 계산
@@ -504,7 +521,7 @@ export default function AutomationSettingsPage() {
     const interval = setInterval(updateNextExecution, 60000)
 
     return () => clearInterval(interval)
-  }, [config.selectedHours])
+  }, [config.scheduleTimes])
 
   // 파이프라인 상태 폴링 (5초마다)
   useEffect(() => {
@@ -537,7 +554,7 @@ export default function AutomationSettingsPage() {
           const loadedConfig = {
             ...defaultConfig,
             ...configData.data,
-            selectedHours: configData.data?.selectedHours || [],
+            scheduleTimes: configData.data?.scheduleTimes || (configData.data?.selectedHours || []).map((h: number) => `${h.toString().padStart(2, '0')}:00`),
             wholesaleChannelIds: configData.data?.wholesaleChannelIds || [],
             retailChannelIds: configData.data?.retailChannelIds || [],
             shopIds: configData.data?.shopIds || [],
@@ -639,7 +656,7 @@ export default function AutomationSettingsPage() {
 
       switch (section) {
         case 'schedule':
-          sectionData = { selectedHours: config.selectedHours }
+          sectionData = { scheduleTimes: config.scheduleTimes }
           break
         case 'shop':
           sectionData = { shopIds: config.shopIds }
@@ -814,7 +831,7 @@ export default function AutomationSettingsPage() {
                             <span className="w-1 h-1 bg-green-200 rounded-full" />
                           </>
                         )}
-                        <span>{getSelectedHoursSummary(config.selectedHours)}</span>
+                        <span>{getScheduleTimesSummary(config.scheduleTimes)}</span>
                       </span>
                     )
                     : '아래 설정을 완료하고 자동화를 시작하세요'
@@ -856,28 +873,16 @@ export default function AutomationSettingsPage() {
                   {hasScheduleChanges && (
                     <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
                   )}
-                  {config.selectedHours.length > 0 && (
+                  {config.scheduleTimes.length > 0 && (
                     <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-violet-100 text-violet-700">
-                      {config.selectedHours.length}개
+                      {config.scheduleTimes.length}개
                     </span>
                   )}
                 </div>
-                <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">자동화가 실행될 시간을 선택하세요</p>
+                <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">자동화가 실행될 시간을 입력하세요</p>
               </div>
             </div>
             <div className="flex items-center gap-2 self-end sm:self-auto">
-              <button
-                onClick={() => {
-                  if (config.selectedHours.length === 24) {
-                    setConfig(prev => ({ ...prev, selectedHours: [] }))
-                  } else {
-                    setConfig(prev => ({ ...prev, selectedHours: HOUR_OPTIONS.map(o => o.hour) }))
-                  }
-                }}
-                className="text-xs sm:text-sm text-violet-600 hover:text-violet-800 font-medium px-2 sm:px-3 py-1.5 rounded-lg hover:bg-violet-50 transition-colors"
-              >
-                {config.selectedHours.length === 24 ? '전체해제' : '전체선택'}
-              </button>
               <Button
                 variant="primary"
                 size="sm"
@@ -891,33 +896,149 @@ export default function AutomationSettingsPage() {
             </div>
           </div>
 
-          {/* 24시간 버튼 그리드 */}
-          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1.5">
-            {HOUR_OPTIONS.map((option) => {
-              const isSelected = config.selectedHours.includes(option.hour)
-              return (
+          {/* 시간 입력 */}
+          <div className="space-y-3">
+            {/* 시간 입력 행 */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* AM/PM 선택 */}
+              <div className="flex h-10 rounded-lg border-2 border-gray-200 overflow-hidden">
                 <button
-                  key={option.hour}
-                  onClick={() => {
-                    setConfig(prev => ({
-                      ...prev,
-                      selectedHours: prev.selectedHours.includes(option.hour)
-                        ? prev.selectedHours.filter(h => h !== option.hour)
-                        : [...prev.selectedHours, option.hour]
-                    }))
-                  }}
-                  className={`
-                    relative group py-2 rounded-lg border-2 transition-all duration-200 text-center text-sm font-medium
-                    ${isSelected
-                      ? 'border-violet-500 bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-md shadow-violet-200'
-                      : 'border-gray-200 text-gray-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600'
-                    }
-                  `}
+                  onClick={() => setTimeAmPm('AM')}
+                  className={`px-3 text-sm font-bold transition-colors ${
+                    timeAmPm === 'AM'
+                      ? 'bg-violet-500 text-white'
+                      : 'bg-white text-gray-500 hover:bg-gray-50'
+                  }`}
                 >
-                  {option.label}
+                  오전
                 </button>
-              )
-            })}
+                <button
+                  onClick={() => setTimeAmPm('PM')}
+                  className={`px-3 text-sm font-bold transition-colors border-l border-gray-200 ${
+                    timeAmPm === 'PM'
+                      ? 'bg-violet-500 text-white'
+                      : 'bg-white text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  오후
+                </button>
+              </div>
+
+              {/* 시 입력 */}
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min={1}
+                  max={12}
+                  placeholder="시"
+                  value={timeHour}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (v === '') { setTimeHour(''); return }
+                    const n = parseInt(v)
+                    if (n >= 1 && n <= 12) setTimeHour(v)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const h24 = to24Hour(parseInt(timeHour) || 0, timeAmPm)
+                      const m = parseInt(timeMinute) || 0
+                      const value = `${h24.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
+                      if (timeHour && !config.scheduleTimes.includes(value)) {
+                        setConfig(prev => ({ ...prev, scheduleTimes: [...prev.scheduleTimes, value] }))
+                        setTimeHour('')
+                        setTimeMinute('')
+                      }
+                    }
+                  }}
+                  className="w-14 h-10 px-2 text-center rounded-lg border-2 border-gray-200 text-sm font-medium text-gray-700 bg-white focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className="text-gray-400 font-bold text-lg">:</span>
+                {/* 분 입력 */}
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  placeholder="분"
+                  value={timeMinute}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (v === '') { setTimeMinute(''); return }
+                    const n = parseInt(v)
+                    if (n >= 0 && n <= 59) setTimeMinute(v)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const h24 = to24Hour(parseInt(timeHour) || 0, timeAmPm)
+                      const m = parseInt(timeMinute) || 0
+                      const value = `${h24.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
+                      if (timeHour && !config.scheduleTimes.includes(value)) {
+                        setConfig(prev => ({ ...prev, scheduleTimes: [...prev.scheduleTimes, value] }))
+                        setTimeHour('')
+                        setTimeMinute('')
+                      }
+                    }
+                  }}
+                  className="w-14 h-10 px-2 text-center rounded-lg border-2 border-gray-200 text-sm font-medium text-gray-700 bg-white focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+
+              {/* 추가 버튼 */}
+              <button
+                onClick={() => {
+                  const h24 = to24Hour(parseInt(timeHour) || 0, timeAmPm)
+                  const m = parseInt(timeMinute) || 0
+                  const value = `${h24.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
+                  if (timeHour && !config.scheduleTimes.includes(value)) {
+                    setConfig(prev => ({ ...prev, scheduleTimes: [...prev.scheduleTimes, value] }))
+                    setTimeHour('')
+                    setTimeMinute('')
+                  }
+                }}
+                disabled={!timeHour}
+                className="h-10 px-4 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white text-sm font-medium hover:from-violet-600 hover:to-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm flex items-center gap-1.5"
+              >
+                <Plus size={16} />
+                추가
+              </button>
+
+              {config.scheduleTimes.length > 0 && (
+                <button
+                  onClick={() => setConfig(prev => ({ ...prev, scheduleTimes: [] }))}
+                  className="text-xs text-gray-400 hover:text-red-500 font-medium px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                >
+                  전체삭제
+                </button>
+              )}
+            </div>
+
+            {/* 추가된 시간 태그 목록 */}
+            {config.scheduleTimes.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {sortTimes(config.scheduleTimes).map(time => (
+                  <span
+                    key={time}
+                    className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white text-sm font-medium shadow-sm shadow-violet-200"
+                  >
+                    {formatTimeDisplay(time)}
+                    <button
+                      onClick={() => {
+                        setConfig(prev => ({
+                          ...prev,
+                          scheduleTimes: prev.scheduleTimes.filter(t => t !== time)
+                        }))
+                      }}
+                      className="p-0.5 rounded-md hover:bg-white/20 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="py-6 text-center text-sm text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+                실행할 시간을 추가해주세요
+              </div>
+            )}
           </div>
 
           {/* 다음 실행 시간 미리보기 */}
@@ -934,7 +1055,7 @@ export default function AutomationSettingsPage() {
                 )}
               </div>
               <span className="text-violet-600 text-xs">
-                {getSelectedHoursSummary(config.selectedHours)}
+                {getScheduleTimesSummary(config.scheduleTimes)}
               </span>
             </div>
           </div>
