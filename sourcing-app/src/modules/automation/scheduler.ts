@@ -57,12 +57,18 @@ function createCronTask(userId: number, singleCron: string): cron.ScheduledTask 
   if (!cron.validate(singleCron)) return null
 
   return cron.schedule(singleCron, async () => {
-    console.log(`[Scheduler] 자동화 실행 시작 (user: ${userId})`)
-
     try {
       const config = await prisma.automationConfig.findUnique({
         where: { userId },
       })
+
+      if (!config?.isEnabled) {
+        console.log(`[Scheduler] 자동화 비활성화 상태 - 실행 건너뜀 (user: ${userId})`)
+        unregisterScheduler(userId)
+        return
+      }
+
+      console.log(`[Scheduler] 자동화 실행 시작 (user: ${userId})`)
 
       let options: {
         skipCollection?: boolean
