@@ -224,10 +224,14 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     console.log('[Band Session] Alarm 트리거: autoSaveSession');
     autoSaveSession();
   }
+  if (alarm.name === 'periodicSave') {
+    console.log('[Band Session] Alarm 트리거: periodicSave (1시간 주기)');
+    autoSaveSession();
+  }
 });
 
 /**
- * 확장 프로그램 시작 시 마지막 저장 시간 복원
+ * 확장 프로그램 시작 시 마지막 저장 시간 복원 + 주기 알람 등록
  */
 chrome.storage.local.get(['lastAutoSaveTime'], (result) => {
   if (result.lastAutoSaveTime) {
@@ -235,6 +239,10 @@ chrome.storage.local.get(['lastAutoSaveTime'], (result) => {
     console.log('[Band Session] 마지막 저장 시간 복원:', new Date(lastAutoSaveTime).toLocaleString());
   }
 });
+
+// 1시간마다 자동 저장 알람 등록 (Chrome 재시작 시에도 유지)
+chrome.alarms.create('periodicSave', { periodInMinutes: 60 });
+console.log('[Band Session] 주기 알람 등록: 1시간마다 자동 저장');
 
 /**
  * 웹 앱에서 보낸 메시지 처리 (externally_connectable)
