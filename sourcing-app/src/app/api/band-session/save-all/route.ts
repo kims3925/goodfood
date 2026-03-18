@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         data: {
           channelCount: updateResult.count,
           channels: retailChannels.map(c => ({ id: c.id, name: c.name })),
-          expiresAt: expiresAt.toISOString(),
+          expiresAt: expiresAt?.toISOString() ?? null,
         },
       },
       { headers: corsHeaders }
