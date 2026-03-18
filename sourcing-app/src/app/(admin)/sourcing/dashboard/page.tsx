@@ -446,7 +446,7 @@ export default function AutomationDashboardPage() {
     updateCountdown()
     const timer = setInterval(updateCountdown, 1000)
     return () => clearInterval(timer)
-  }, [config?.scheduleTimes, config?.selectedHours, config?.isEnabled])
+  }, [config])
 
   const handleExecute = async (type: 'collect' | 'transform' | 'register' | 'publish' | 'full') => {
     if (isExecuting || runningWorkflow) return
