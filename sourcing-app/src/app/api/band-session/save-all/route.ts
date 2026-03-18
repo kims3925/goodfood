@@ -77,9 +77,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 14일 만료 시간 설정
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + 14)
+    // band_session 쿠키의 실제 만료일 사용 (없으면 30일 fallback)
+    const cookies: Array<{ name: string; expires: number }> = JSON.parse(cookieString)
+    const bandSessionCookie = cookies.find(c => c.name === 'band_session')
+    const expiresAt = bandSessionCookie && bandSessionCookie.expires > 0
+      ? new Date(bandSessionCookie.expires * 1000)
+      : (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d })()
+
 
     // 모든 소매 채널에 세션 저장
     const updateResult = await prisma.channel.updateMany({
