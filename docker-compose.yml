@@ -82,8 +82,10 @@ services:
       POST_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/post
       CHANNEL_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/channel
       SHOP_IMAGE_STORAGE_PATH: /home/ubuntu/assets/images/shop
+      EXTENSION_PATH: /home/ubuntu/bandauto/band-session-extension
     volumes:
       - /home/ubuntu/assets:/home/ubuntu/assets
+      - /home/ubuntu/bandauto/band-session-extension:/home/ubuntu/bandauto/band-session-extension:ro
     depends_on:
       mariadb:
         condition: service_healthy
