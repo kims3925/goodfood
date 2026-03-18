@@ -9,7 +9,7 @@ export type BandStageProgressCallback = (progress: Omit<PublishDetailedProgress,
 
 export interface BandSession {
   cookies: string
-  expiresAt: Date
+  expiresAt: Date | null
   isValid: boolean
 }
 

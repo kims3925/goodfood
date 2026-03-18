@@ -77,12 +77,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // band_session 쿠키의 실제 만료일 사용 (없으면 30일 fallback)
+    // band_session 쿠키의 실제 만료일 사용 (세션 쿠키면 null)
     const cookies: Array<{ name: string; expires: number }> = JSON.parse(cookieString)
     const bandSessionCookie = cookies.find(c => c.name === 'band_session')
     const expiresAt = bandSessionCookie && bandSessionCookie.expires > 0
       ? new Date(bandSessionCookie.expires * 1000)
-      : (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d })()
+      : null
 
 
     // 모든 소매 채널에 세션 저장

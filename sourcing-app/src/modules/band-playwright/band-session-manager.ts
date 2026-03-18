@@ -27,7 +27,17 @@ export class BandSessionManager {
     }
 
     // 기존 세션 유효성 확인
-    if (channel.bandSessionCookie && channel.sessionExpiresAt) {
+    if (channel.bandSessionCookie) {
+      // sessionExpiresAt이 null이면 세션 쿠키 → 만료 체크 없이 유효로 처리
+      if (!channel.sessionExpiresAt) {
+        console.log(`[BandSessionManager] Using session cookie (no expiry) for channel ${channelId}`)
+        return {
+          cookies: channel.bandSessionCookie,
+          expiresAt: null,
+          isValid: true,
+        }
+      }
+
       const now = new Date()
       const expiresAt = new Date(channel.sessionExpiresAt)
 
