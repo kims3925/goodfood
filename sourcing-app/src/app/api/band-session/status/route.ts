@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     const channelStatuses = channels.map((channel) => {
       const hasSession = !!channel.bandSessionCookie
       const expiresAt = channel.sessionExpiresAt
-      let isValid = hasSession && expiresAt ? new Date(expiresAt) > now : false
+      let isValid = hasSession && (!expiresAt || new Date(expiresAt) > now)
 
       // 실제 검증 결과 적용 (세션 만료 시 모두 만료)
       if (sessionVerified && sessionActuallyValid === false) {
