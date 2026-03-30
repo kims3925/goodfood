@@ -58,16 +58,7 @@ export async function GET(request: NextRequest) {
           sessionActuallyValid = await sessionManager.testSession(channelWithSession.id)
           sessionVerified = true
           verifiedAt = new Date().toISOString()
-
-          // 세션이 실제로 만료된 경우 모든 채널의 세션 무효화
-          if (!sessionActuallyValid) {
-            console.log('[Band Session] Session expired - invalidating all channels')
-            for (const channel of channels) {
-              if (channel.bandSessionCookie) {
-                await sessionManager.invalidateSession(channel.id)
-              }
-            }
-          }
+          // 세션 무효화는 testSession 내부에서 해당 채널에 대해서만 처리
         } catch (error: any) {
           console.error(`[Band Session] Verify failed:`, error.message)
         }

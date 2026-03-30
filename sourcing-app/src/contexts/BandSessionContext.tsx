@@ -52,8 +52,8 @@ export function BandSessionProvider({ children }: { children: React.ReactNode })
     try {
       setState((prev) => ({ ...prev, isLoading: true, error: null }))
 
-      // verify=true로 실제 Band 로그인 상태 확인
-      const response = await fetch('/api/band-session/status?verify=true')
+      // DB 기반 세션 상태 확인 (Playwright 검증 제거 - 자동 실행 시 세션 삭제 방지)
+      const response = await fetch('/api/band-session/status')
       const data = await response.json()
 
       if (!data.success) {

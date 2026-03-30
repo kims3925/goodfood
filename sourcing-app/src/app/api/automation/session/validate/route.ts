@@ -102,9 +102,10 @@ export async function POST(request: NextRequest) {
     const now = new Date()
     const channelSessionInfos: ChannelSessionInfo[] = channels.map((channel) => {
       const hasSession = !!channel.bandSessionCookie
+      // sessionExpiresAt이 null이면 만료일 없는 세션 쿠키 → 만료되지 않음
       const isExpired = channel.sessionExpiresAt
         ? new Date(channel.sessionExpiresAt) <= now
-        : true
+        : false
 
       return {
         id: channel.id,

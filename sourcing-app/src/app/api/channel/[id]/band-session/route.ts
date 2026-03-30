@@ -57,7 +57,8 @@ export async function GET(
 
     const hasSession = !!channel.bandSessionCookie
     const expiresAt = channel.sessionExpiresAt
-    const isValid = hasSession && expiresAt ? new Date(expiresAt) > new Date() : false
+    // expiresAt이 null이면 만료일 없는 세션 쿠키 → 유효로 처리
+    const isValid = hasSession && (!expiresAt || new Date(expiresAt) > new Date())
 
     return NextResponse.json({
       success: true,
