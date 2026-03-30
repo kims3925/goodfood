@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check, AlertCircle, Info, Wifi, WifiOff, RefreshCw, Save, Users, Eye } from 'lucide-react'
+import Link from 'next/link'
+import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check, AlertCircle, Info, Wifi, WifiOff, RefreshCw, Save, Users, Eye, Chrome } from 'lucide-react'
 import { AppSection, getDefaultPathBySection } from '@/config/navigation'
 import { useBandSession } from '@/contexts/BandSessionContext'
 import { checkExtensionInstalled, saveSessionViaExtension } from '@/lib/band-extension'
@@ -145,6 +146,18 @@ const SessionIndicator = memo(function SessionIndicator() {
 
   return (
     <div className="relative flex items-center gap-1">
+      {/* 확장 프로그램 설치 버튼 (Extension 미설치 시) */}
+      {!extensionAvailable && summary.total > 0 && (
+        <Link
+          href="/sourcing/guide/band-session"
+          className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors"
+          title="Band Session Helper 확장 프로그램 설치 가이드"
+        >
+          <Chrome size={12} />
+          <span>확장 설치</span>
+        </Link>
+      )}
+
       {/* 세션 저장 버튼 (Extension 설치 시만 표시) */}
       {extensionAvailable && (
         <button

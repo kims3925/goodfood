@@ -1,6 +1,6 @@
 'use client'
 
-import { X, AlertTriangle, ExternalLink, RefreshCw } from 'lucide-react'
+import { X, AlertTriangle, ExternalLink, RefreshCw, Chrome } from 'lucide-react'
 import Link from 'next/link'
 
 interface InvalidChannel {
@@ -95,6 +95,13 @@ export default function SessionMissingModal({
           >
             닫기
           </button>
+          <Link
+            href="/sourcing/guide/band-session"
+            className="flex-1 px-4 py-3 bg-violet-500 hover:bg-violet-600 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+          >
+            <Chrome className="w-4 h-4" />
+            설치 가이드
+          </Link>
           {onRetry && (
             <button
               onClick={onRetry}

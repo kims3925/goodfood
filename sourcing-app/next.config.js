@@ -2,8 +2,8 @@
 const path = require('path')
 
 const nextConfig = {
-  // Docker 배포를 위한 standalone 모드
-  output: 'standalone',
+  // Docker 배포 시에만 standalone 모드 (로컬 Windows 환경에서는 심링크 권한 오류 방지)
+  output: process.env.STANDALONE === 'true' ? 'standalone' : undefined,
 
   // 보안 헤더 설정
   async headers() {
