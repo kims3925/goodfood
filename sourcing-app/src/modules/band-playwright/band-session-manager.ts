@@ -29,35 +29,34 @@ export class BandSessionManager {
     // 기존 세션 유효성 확인
     // bandSessionCookie가 존재하면 유효한 것으로 간주 (sessionExpiresAt는 보조 지표)
     if (channel.bandSessionCookie) {
-      // sessionExpiresAt이 null이면 세션 쿠키 → 만료 체크 없이 유효로 처리
-      if (!channel.sessionExpiresAt) {
-        console.log(`[BandSessionManager] Using session cookie (no expiry) for channel ${channelId}`)
-        return {
-          cookies: channel.bandSessionCookie,
-          expiresAt: null,
-          isValid: true,
-        }
-      }
-
       const now = new Date()
 
-      // sessionExpiresAt이 있고 만료된 경우에만 무효로 처리
-      if (channel.sessionExpiresAt) {
-        const expiresAt = new Date(channel.sessionExpiresAt)
-        if (expiresAt <= now) {
-          console.error(`[BandSessionManager] Session expired for channel ${channelId} (expired at ${expiresAt.toISOString()})`)
-          throw new BandPlaywrightError(
-            '세션이 만료되었습니다. 채널 설정에서 쿠키를 다시 등록해주세요.',
-            BandPlaywrightErrorCode.SESSION_EXPIRED
-          )
-        }
+      // 자동 복구: sessionExpiresAt이 null이면 14일 후로 자동 설정
+      let expiresAt: Date
+      if (!channel.sessionExpiresAt) {
+        expiresAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
+        console.log(`[BandSessionManager] sessionExpiresAt 자동 복구: channelId=${channelId}, expiresAt=${expiresAt.toISOString()}`)
+        await prisma.channel.update({
+          where: { id: channelId },
+          data: { sessionExpiresAt: expiresAt },
+        })
+      } else {
+        expiresAt = new Date(channel.sessionExpiresAt)
       }
 
-      // sessionExpiresAt이 null이거나 아직 만료 전인 경우 - 유효한 세션으로 처리
-      console.log(`[BandSessionManager] Using existing session for channel ${channelId}${channel.sessionExpiresAt ? '' : ' (no expiry set)'}`)
+      // 만료된 경우 무효로 처리
+      if (expiresAt <= now) {
+        console.error(`[BandSessionManager] Session expired for channel ${channelId} (expired at ${expiresAt.toISOString()})`)
+        throw new BandPlaywrightError(
+          '세션이 만료되었습니다. 채널 설정에서 쿠키를 다시 등록해주세요.',
+          BandPlaywrightErrorCode.SESSION_EXPIRED
+        )
+      }
+
+      console.log(`[BandSessionManager] Using existing session for channel ${channelId}`)
       return {
         cookies: channel.bandSessionCookie,
-        expiresAt: channel.sessionExpiresAt ? new Date(channel.sessionExpiresAt) : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 만료일 없으면 14일 후로 설정
+        expiresAt,
         isValid: true,
       }
     }
