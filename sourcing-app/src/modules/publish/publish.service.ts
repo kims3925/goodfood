@@ -950,9 +950,9 @@ export class PublishService {
       let publishMethod: 'playwright' | 'api' = 'api'
       let imageCount = 0
 
+      // sessionExpiresAt이 null이면 세션쿠키(만료일 없음) → 유효로 처리
       const hasValidSession = channelSession?.bandSessionCookie &&
-        channelSession.sessionExpiresAt &&
-        new Date(channelSession.sessionExpiresAt) > new Date()
+        (!channelSession.sessionExpiresAt || new Date(channelSession.sessionExpiresAt) > new Date())
 
       // Playwright 발행 시도 (세션 유효하고 이미지 있을 때)
       // 소매밴드 발행은 Playwright로만 진행 - 이미지 업로드 실패 시 재시도
