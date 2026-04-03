@@ -27,6 +27,7 @@ import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
+import KakaoOrderButton from '@/components/order/KakaoOrderButton'
 
 type OrderSource = 'SHOPPING_MALL' | 'GOOGLE_FORM'
 
@@ -112,6 +113,10 @@ interface UnifiedOrderDetail {
   refundAccount: RefundAccountInfo | null
   cancelReason: string | null
   cancelledBy: string | null
+  // 도매 발주 상태
+  wholesaleOrderStatus: string | null
+  wholesaleChannelId: number | null
+  wholesaleOrderedAt: string | null
 }
 
 import { CHANNEL_PLATFORM_CONFIG } from '@/lib/channel-utils'
@@ -837,6 +842,37 @@ export default function UnifiedOrderDetailPage() {
                       <p className="text-sm text-gray-500 mb-1">배송 메모</p>
                       <p className="text-gray-900">{order.shippingAddress.deliveryMemo}</p>
                     </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 카톡 발주 */}
+            {isShoppingMall && (
+              <KakaoOrderButton
+                orderNumber={order.orderNumber}
+                items={order.items}
+                shippingAddress={order.shippingAddress}
+                orderStatus={order.status}
+              />
+            )}
+
+            {/* 발주 상태 표시 */}
+            {order.wholesaleOrderStatus && (
+              <div className={`rounded-lg p-3 border ${
+                order.wholesaleOrderStatus === 'ORDERED' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <CheckCircle size={16} className={
+                    order.wholesaleOrderStatus === 'ORDERED' ? 'text-green-600' : 'text-blue-600'
+                  } />
+                  <span className="text-sm font-medium text-gray-900">
+                    {order.wholesaleOrderStatus === 'ORDERED' ? '도매 발주 완료' : '도매처 확인'}
+                  </span>
+                  {order.wholesaleOrderedAt && (
+                    <span className="text-xs text-gray-500">
+                      {formatDate(order.wholesaleOrderedAt)}
+                    </span>
                   )}
                 </div>
               </div>

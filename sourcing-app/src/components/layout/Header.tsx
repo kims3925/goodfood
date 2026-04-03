@@ -478,6 +478,18 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
 
   // 현재 섹션에 따른 통계 표시
   const renderStats = () => {
+    if (currentSection === 'admin') {
+      return (
+        <>
+          <div className="flex items-center gap-2">
+            <Users size={16} className="text-indigo-600" />
+            <span className="text-sm text-text-secondary">
+              플랫폼 관리 모드
+            </span>
+          </div>
+        </>
+      )
+    }
     if (currentSection === 'sourcing') {
       return (
         <>

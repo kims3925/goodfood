@@ -36,6 +36,13 @@ import {
   CreditCard,
   Shield,
   Lock,
+  MonitorDot,
+  UserCog,
+  Network,
+  Server,
+  BarChart3,
+  Workflow,
+  Activity,
 } from 'lucide-react'
 import {
   AppSection,
@@ -45,6 +52,7 @@ import {
   getMenuBySectionAndRole,
   getPathToMenuMap,
   getSectionLabel,
+  getAvailableSections,
 } from '@/config/navigation'
 
 interface SidebarProps {
@@ -481,71 +489,58 @@ export default function Sidebar({
 
           {/* Section tabs */}
           <div className={`border-b border-border ${collapsed ? 'px-1 py-2' : 'px-2 py-3'}`}>
-            {collapsed ? (
-              // Collapsed: 아이콘만 표시
-              <div className="flex flex-col gap-1">
-                <button
-                  onClick={() => onSectionChange('sourcing')}
-                  className={`
-                    w-full flex items-center justify-center p-2 min-h-[44px] rounded-md transition-colors
-                    ${currentSection === 'sourcing'
-                      ? 'bg-primary-light text-primary-color'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-                    }
-                  `}
-                  title="소싱"
-                  aria-label="소싱 섹션"
-                >
-                  <Package size={20} />
-                </button>
-                <button
-                  onClick={() => onSectionChange('shop')}
-                  className={`
-                    w-full flex items-center justify-center p-2 min-h-[44px] rounded-md transition-colors
-                    ${currentSection === 'shop'
-                      ? 'bg-primary-light text-primary-color'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-                    }
-                  `}
-                  title="쇼핑몰"
-                  aria-label="쇼핑몰 섹션"
-                >
-                  <ShoppingBag size={20} />
-                </button>
-              </div>
-            ) : (
-              // Expanded: 탭 버튼
-              <div className="flex gap-1">
-                <button
-                  onClick={() => onSectionChange('sourcing')}
-                  className={`
-                    flex-1 flex items-center justify-center gap-2 py-3 px-3 min-h-[44px] rounded-md text-sm font-medium transition-colors
-                    ${currentSection === 'sourcing'
-                      ? 'bg-primary-light text-primary-color'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-                    }
-                  `}
-                  aria-label="소싱 섹션"
-                >
-                  <Package size={16} />
-                  소싱
-                </button>
-                <button
-                  onClick={() => onSectionChange('shop')}
-                  className={`
-                    flex-1 flex items-center justify-center gap-2 py-3 px-3 min-h-[44px] rounded-md text-sm font-medium transition-colors
-                    ${currentSection === 'shop'
-                      ? 'bg-primary-light text-primary-color'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-                    }
-                  `}
-                  aria-label="쇼핑몰 섹션"
-                >
-                  <ShoppingBag size={16} />
-                  쇼핑몰
-                </button>
-              </div>
-            )}
+            {(() => {
+              const sections = getAvailableSections(userRole)
+              const sectionIcons: Record<AppSection, React.ReactNode> = {
+                sourcing: collapsed ? <Package size={20} /> : <Package size={16} />,
+                shop: collapsed ? <ShoppingBag size={20} /> : <ShoppingBag size={16} />,
+                admin: collapsed ? <MonitorDot size={20} /> : <MonitorDot size={16} />,
+              }
+              if (collapsed) {
+                return (
+                  <div className="flex flex-col gap-1">
+                    {sections.map(section => (
+                      <button
+                        key={section}
+                        onClick={() => onSectionChange(section)}
+                        className={`
+                          w-full flex items-center justify-center p-2 min-h-[44px] rounded-md transition-colors
+                          ${currentSection === section
+                            ? 'bg-primary-light text-primary-color'
+                            : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                          }
+                        `}
+                        title={getSectionLabel(section)}
+                        aria-label={`${getSectionLabel(section)} 섹션`}
+                      >
+                        {sectionIcons[section]}
+                      </button>
+                    ))}
+                  </div>
+                )
+              }
+              return (
+                <div className="flex gap-1">
+                  {sections.map(section => (
+                    <button
+                      key={section}
+                      onClick={() => onSectionChange(section)}
+                      className={`
+                        flex-1 flex items-center justify-center gap-1.5 py-3 px-2 min-h-[44px] rounded-md text-sm font-medium transition-colors
+                        ${currentSection === section
+                          ? 'bg-primary-light text-primary-color'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                        }
+                      `}
+                      aria-label={`${getSectionLabel(section)} 섹션`}
+                    >
+                      {sectionIcons[section]}
+                      {getSectionLabel(section)}
+                    </button>
+                  ))}
+                </div>
+              )
+            })()}
           </div>
 
           {/* Menu items */}

@@ -60,6 +60,8 @@ app/api/
 │   ├── google-sheets/       # 구글 시트 설정 (TR-20260112-003)
 │   │   └── test/
 │   └── prompt/              # 프롬프트 설정
+├── dashboard/               # 대시보드
+│   └── pipeline/            # 파이프라인 통합 대시보드
 ├── admin/                   # 관리자
 │   ├── notifications/       # 알림
 │   ├── reviews/             # 리뷰 관리
@@ -1577,3 +1579,102 @@ interface PublishProductsResponse {
 
 **변경 이력:**
 - TR-20260205-001: `daysWithin` 파라미터 추가, `isActive` 필터 추가
+
+---
+
+### GET /api/dashboard/pipeline
+
+파이프라인 통합 대시보드 데이터를 조회합니다. 소싱 자동화, 주문/발주, 정산 현황을 한 화면에서 통합 관리합니다.
+
+**인증:** 필수 (JWT)
+
+**쿼리 파라미터:**
+
+| Param | Type | Default | 설명 |
+|-------|------|---------|------|
+| period | string | month | 조회 기간 ("week", "month", "quarter") |
+| year | number | 현재년도 | 조회 연도 |
+| month | number | 현재월 | 조회 월 (1-12) |
+
+**요청 예시:**
+
+```http
+GET /api/dashboard/pipeline?period=month&year=2026&month=3
+```
+
+**응답 스키마:**
+
+```typescript
+interface PipelineDashboardResponse {
+  success: true
+  data: {
+    period: {
+      start: string      // ISO 8601 시작일
+      end: string        // ISO 8601 종료일
+    }
+    sourcing: {
+      automated: number  // 자동화 실행 횟수
+      collected: number  // 수집한 상품 수
+      published: number  // 발행한 상품 수
+      success: number    // 성공 건수
+      failed: number     // 실패 건수
+    }
+    orders: {
+      total: number      // 총 주문 수
+      pending: number    // 발주 대기 수
+      completed: number  // 발주 완료 수
+      amount: number     // 총 주문 금액
+    }
+    settlement: {
+      totalAmount: number       // 총 결제액
+      completeAmount: number    // 완료된 결제액
+      pendingAmount: number     // 대기 중인 결제액
+      transactionCount: number  // 거래 건수
+    }
+  }
+}
+```
+
+**응답 예시:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "period": {
+      "start": "2026-03-01T00:00:00.000Z",
+      "end": "2026-03-31T23:59:59.999Z"
+    },
+    "sourcing": {
+      "automated": 12,
+      "collected": 145,
+      "published": 120,
+      "success": 1740,
+      "failed": 15
+    },
+    "orders": {
+      "total": 450,
+      "pending": 85,
+      "completed": 365,
+      "amount": 4500000
+    },
+    "settlement": {
+      "totalAmount": 4500000,
+      "completeAmount": 4200000,
+      "pendingAmount": 300000,
+      "transactionCount": 450
+    }
+  }
+}
+```
+
+**에러:**
+
+| Code | HTTP | 설명 |
+|------|------|-----|
+| 401 | Unauthorized | 인증 필요 |
+| 422 | Unprocessable Entity | year/month 파라미터 유효하지 않음 |
+| 500 | Internal Server Error | 조회 실패 |
+
+**변경 이력:**
+- TR-20260318-001: API 엔드포인트 추가

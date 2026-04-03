@@ -1,8 +1,8 @@
 import '@/styles/globals.css'
 
 export const metadata = {
-  title: '소싱 자동화 관리 시스템',
-  description: '상품 소싱 및 자동화 관리 도구',
+  title: 'SNS AUTO - 소셜커머스 자동화 플랫폼',
+  description: 'Band 기반 상품 소싱, AI 가공, 멀티 쇼핑몰 운영 자동화',
 }
 
 export default function RootLayout({

@@ -51,8 +51,8 @@ const nextConfig = {
       { source: '/settlement/:path*', destination: '/shop/settlement/:path*', permanent: true },
       { source: '/user/:path*', destination: '/shop/user/:path*', permanent: true },
       { source: '/cs/:path*', destination: '/shop/cs/:path*', permanent: true },
-      // 기본 리다이렉트
-      { source: '/', destination: '/sourcing/automation/settings', permanent: false },
+      // 기본 리다이렉트 (루트는 랜딩페이지로 사용하므로 제거)
+      // 로그인 후 기본 이동 경로는 login 페이지에서 처리
     ]
   },
   webpack: (config, { isServer }) => {
@@ -78,7 +78,27 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: '*.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.pstatic.net',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.band.us',
+      },
+      {
+        protocol: 'https',
+        hostname: 'snsauto.abcpharm.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'shop.abcpharm.net',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
       },
     ],
   },

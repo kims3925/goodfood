@@ -165,6 +165,13 @@ enum NotificationType {
   INFO
 }
 
+// 도매 발주 상태
+enum WholesaleOrderStatus {
+  PENDING    // 발주 대기
+  ORDERED    // 발주 완료 (카톡 등으로 전달)
+  CONFIRMED  // 도매처 확인
+}
+
 // 합배송 타입
 enum BundleShippingType {
   NONE      // 합배송 없음

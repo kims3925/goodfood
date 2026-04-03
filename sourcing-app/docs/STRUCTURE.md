@@ -58,6 +58,7 @@ bandauto/
 │   ├── src/
 │   │   ├── app/                  # Next.js App Router
 │   │   │   ├── (admin)/          # 인증 필요 라우트
+│   │   │   │   ├── pipeline/     # 파이프라인 통합 대시보드
 │   │   │   │   ├── sourcing/     # 소싱 관련 페이지
 │   │   │   │   │   └── user/     # 매니저 관리
 │   │   │   │   └── shop/         # 쇼핑몰 관리 페이지
@@ -66,6 +67,7 @@ bandauto/
 │   │   ├── components/           # UI 컴포넌트
 │   │   │   ├── layout/           # 레이아웃 (Header, Sidebar)
 │   │   │   ├── ui/               # 공통 UI (Button, Modal)
+│   │   │   ├── dashboard/        # 대시보드 컴포넌트
 │   │   │   ├── product/          # 상품 관련 컴포넌트
 │   │   │   ├── shop/             # 쇼핑몰 관련 컴포넌트
 │   │   │   ├── automation/       # 자동화 대시보드 컴포넌트

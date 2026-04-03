@@ -27,6 +27,7 @@ export class BandSessionManager {
     }
 
     // 기존 세션 유효성 확인
+    // bandSessionCookie가 존재하면 유효한 것으로 간주 (sessionExpiresAt는 보조 지표)
     if (channel.bandSessionCookie) {
       // sessionExpiresAt이 null이면 세션 쿠키 → 만료 체크 없이 유효로 처리
       if (!channel.sessionExpiresAt) {
@@ -39,22 +40,32 @@ export class BandSessionManager {
       }
 
       const now = new Date()
-      const expiresAt = new Date(channel.sessionExpiresAt)
 
-      if (expiresAt > now) {
-        console.log(`[BandSessionManager] Using existing session for channel ${channelId}`)
-        return {
-          cookies: channel.bandSessionCookie,
-          expiresAt,
-          isValid: true,
+      // sessionExpiresAt이 있고 만료된 경우에만 무효로 처리
+      if (channel.sessionExpiresAt) {
+        const expiresAt = new Date(channel.sessionExpiresAt)
+        if (expiresAt <= now) {
+          console.error(`[BandSessionManager] Session expired for channel ${channelId} (expired at ${expiresAt.toISOString()})`)
+          throw new BandPlaywrightError(
+            '세션이 만료되었습니다. 채널 설정에서 쿠키를 다시 등록해주세요.',
+            BandPlaywrightErrorCode.SESSION_EXPIRED
+          )
         }
+      }
+
+      // sessionExpiresAt이 null이거나 아직 만료 전인 경우 - 유효한 세션으로 처리
+      console.log(`[BandSessionManager] Using existing session for channel ${channelId}${channel.sessionExpiresAt ? '' : ' (no expiry set)'}`)
+      return {
+        cookies: channel.bandSessionCookie,
+        expiresAt: channel.sessionExpiresAt ? new Date(channel.sessionExpiresAt) : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 만료일 없으면 14일 후로 설정
+        isValid: true,
       }
     }
 
-    // 세션 없거나 만료됨
-    console.error(`[BandSessionManager] No valid session for channel ${channelId}`)
+    // 세션 없음
+    console.error(`[BandSessionManager] No session cookie for channel ${channelId}`)
     throw new BandPlaywrightError(
-      '세션이 만료되었습니다. 채널 설정에서 쿠키를 다시 등록해주세요.',
+      '세션이 없습니다. 채널 설정에서 쿠키를 등록해주세요.',
       BandPlaywrightErrorCode.SESSION_EXPIRED
     )
   }

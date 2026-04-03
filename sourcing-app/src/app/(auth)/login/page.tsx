@@ -41,7 +41,12 @@ export default function LoginPage() {
           return
         }
 
-        window.location.href = '/sourcing/dashboard'
+        // ADMIN은 어드민 대시보드로, 그 외는 매니저 대시보드로
+        if (data.user?.role === 'ADMIN') {
+          window.location.href = '/admin/dashboard'
+        } else {
+          window.location.href = '/sourcing/dashboard'
+        }
       } else {
         console.log('[로그인] 실패:', data.error)
         setError(data.error || '로그인에 실패했습니다.')
@@ -63,7 +68,7 @@ export default function LoginPage() {
             <LogIn className="w-8 h-8 text-blue-600" />
           </div>
           <h1 className="text-3xl font-bold text-gray-800">로그인</h1>
-          <p className="text-gray-600 mt-2">BandAuto 소싱앱</p>
+          <p className="text-gray-600 mt-2">SNS AUTO 매니저 대시보드</p>
         </div>
 
         {/* 에러 메시지 */}
@@ -121,9 +126,14 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* 관리자 문의 안내 */}
-        <p className="text-center text-gray-500 text-sm mt-8">
-          계정 문의: 관리자에게 연락하세요
+        <p className="text-center text-gray-500 text-sm mt-6">
+          계정이 없으신가요?{' '}
+          <a href="/register" className="text-blue-600 font-medium hover:underline">
+            회원가입
+          </a>
+        </p>
+        <p className="text-center text-gray-400 text-xs mt-3">
+          <a href="/" className="hover:text-gray-600">홈으로 돌아가기</a>
         </p>
       </div>
     </div>

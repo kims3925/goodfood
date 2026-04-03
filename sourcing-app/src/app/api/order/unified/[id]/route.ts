@@ -208,6 +208,10 @@ export async function GET(
           } : null,
           cancelReason: order.cancelReason || null,
           cancelledBy: order.cancelledBy || null,
+          // 도매 발주 상태
+          wholesaleOrderStatus: order.wholesaleOrderStatus || null,
+          wholesaleChannelId: order.wholesaleChannelId || null,
+          wholesaleOrderedAt: order.wholesaleOrderedAt?.toISOString() || null,
         }
 
         return NextResponse.json({
@@ -345,6 +349,10 @@ export async function GET(
         } : null,
         cancelReason: guestOrder.cancelReason || null,
         cancelledBy: guestOrder.cancelledBy || null,
+        // 도매 발주 상태
+        wholesaleOrderStatus: guestOrder.wholesaleOrderStatus || null,
+        wholesaleChannelId: guestOrder.wholesaleChannelId || null,
+        wholesaleOrderedAt: guestOrder.wholesaleOrderedAt?.toISOString() || null,
       }
 
       return NextResponse.json({

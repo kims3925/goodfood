@@ -58,6 +58,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Health Check API는 건너뜀
+  if (pathname === '/api/health') {
+    return NextResponse.next()
+  }
+
   // NextAuth API는 shop context 없이도 허용
   // NextAuth 콜백 URL은 /api/auth/... 형태로 고정되어 있음
   if (pathname.startsWith('/api/auth')) {
@@ -186,17 +191,15 @@ async function fetchShopBySlug(
     const host = request.headers.get('host') || 'localhost:3000'
     const baseUrl = `${protocol}://${host}`
 
-    // 프로덕션 환경에서는 INTERNAL_API_KEY 필수
     const internalKey = process.env.INTERNAL_API_KEY
-    if (!internalKey && process.env.NODE_ENV === 'production') {
-      console.error('INTERNAL_API_KEY is required in production')
+    if (!internalKey) {
+      console.error('INTERNAL_API_KEY is not configured')
       return null
     }
-    const apiKey = internalKey || 'dev-internal-key'
 
     const res = await fetch(`${baseUrl}/api/internal/shop/${slug}`, {
       headers: {
-        'x-internal-key': apiKey,
+        'x-internal-key': internalKey,
       },
       cache: 'no-store',
     })

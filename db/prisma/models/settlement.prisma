@@ -18,6 +18,7 @@ model Settlement {
   @@index([userId])
   @@index([shopId])
   @@index([status])
+  @@index([settledAt])
   @@index([periodStart, periodEnd])
   @@index([userId, shopId])
   @@map("settlement")

@@ -56,10 +56,24 @@ const nextConfig = {
         protocol: 'http',
         hostname: '*.lvh.me',
       },
-      // 임시: 모든 HTTPS 호스트 허용 (배포 전 특정 도메인으로 변경 필요)
+      // Band 이미지 (phinf.pstatic.net 등)
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: '*.pstatic.net',
+      },
+      // 운영 도메인
+      {
+        protocol: 'https',
+        hostname: 'snsauto.abcpharm.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'shop.abcpharm.net',
+      },
+      // Band API 이미지
+      {
+        protocol: 'https',
+        hostname: '*.band.us',
       },
     ],
   },

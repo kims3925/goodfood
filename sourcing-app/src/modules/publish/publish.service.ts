@@ -294,9 +294,12 @@ export class PublishService {
       let imageCount = 0
 
       // Playwright 세션 유효성 확인
-      // sessionExpiresAt이 null이면 세션쿠키(만료일 없음) → 유효로 처리
-      const hasValidSession = channelSession?.bandSessionCookie &&
-        (!channelSession.sessionExpiresAt || new Date(channelSession.sessionExpiresAt) > new Date())
+      // bandSessionCookie가 존재하면 유효한 것으로 간주 (sessionExpiresAt는 보조 지표)
+      // - sessionExpiresAt이 null인 경우에도 쿠키가 있으면 시도 (배포 시점 차이로 null일 수 있음)
+      // - sessionExpiresAt이 있고 만료된 경우에만 무효로 처리
+      const hasValidSession = !!channelSession?.bandSessionCookie &&
+        (channelSession.sessionExpiresAt === null ||
+         new Date(channelSession.sessionExpiresAt) > new Date())
 
       // 6-1. Playwright 발행 시도 (세션이 유효하고 이미지가 있는 경우)
       // 소매밴드 발행은 Playwright로만 진행 - 이미지 업로드 실패 시 재시도
@@ -950,9 +953,10 @@ export class PublishService {
       let publishMethod: 'playwright' | 'api' = 'api'
       let imageCount = 0
 
-      // sessionExpiresAt이 null이면 세션쿠키(만료일 없음) → 유효로 처리
-      const hasValidSession = channelSession?.bandSessionCookie &&
-        (!channelSession.sessionExpiresAt || new Date(channelSession.sessionExpiresAt) > new Date())
+      // bandSessionCookie가 존재하면 유효한 것으로 간주 (sessionExpiresAt는 보조 지표)
+      const hasValidSession = !!channelSession?.bandSessionCookie &&
+        (channelSession.sessionExpiresAt === null ||
+         new Date(channelSession.sessionExpiresAt) > new Date())
 
       // Playwright 발행 시도 (세션 유효하고 이미지 있을 때)
       // 소매밴드 발행은 Playwright로만 진행 - 이미지 업로드 실패 시 재시도

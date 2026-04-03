@@ -69,7 +69,10 @@ export async function GET(request: NextRequest) {
     const channelStatuses = channels.map((channel) => {
       const hasSession = !!channel.bandSessionCookie
       const expiresAt = channel.sessionExpiresAt
-      let isValid = hasSession && (!expiresAt || new Date(expiresAt) > now)
+      // 쿠키가 있으면 유효한 것으로 간주 (sessionExpiresAt는 보조 지표)
+      // - sessionExpiresAt이 null인 경우에도 쿠키가 있으면 유효 (배포 시점 차이로 null일 수 있음)
+      // - sessionExpiresAt이 있고 만료된 경우에만 무효로 처리
+      let isValid = hasSession && (expiresAt === null || new Date(expiresAt) > now)
 
       // 실제 검증 결과 적용 (세션 만료 시 모두 만료)
       if (sessionVerified && sessionActuallyValid === false) {

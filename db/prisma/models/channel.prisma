@@ -19,6 +19,8 @@ model Channel {
   pricingPolicies   PricingPolicy[]
   products          Product[]
   channelProducts   ChannelProduct[]
+  wholesaleOrders      Order[]        @relation("OrderWholesaleChannel")
+  wholesaleGuestOrders GuestOrder[]   @relation("GuestOrderWholesaleChannel")
 
   @@unique([userId, channelKey])
   @@index([userId])

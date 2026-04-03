@@ -16,20 +16,28 @@ model Order {
   cancelledBy     String?             @map("cancelled_by") @db.VarChar(20)
   createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamp(0)
-  shopId          Int?                @map("shop_id")
-  shop            Shop?               @relation(fields: [shopId], references: [id])
-  user            User                @relation(fields: [userId], references: [id])
-  items           OrderItem[]
-  payment         Payment?
-  shippingAddress ShippingAddress?
-  refundAccount   RefundAccount?
+  shopId                Int?                  @map("shop_id")
+  wholesaleOrderStatus  WholesaleOrderStatus? @map("wholesale_order_status")
+  wholesaleChannelId    Int?                  @map("wholesale_channel_id")
+  wholesaleOrderedAt    DateTime?             @map("wholesale_ordered_at") @db.Timestamp(0)
+  shop                  Shop?                 @relation(fields: [shopId], references: [id])
+  wholesaleChannel      Channel?              @relation("OrderWholesaleChannel", fields: [wholesaleChannelId], references: [id])
+  user                  User                  @relation(fields: [userId], references: [id])
+  items                 OrderItem[]
+  payment               Payment?
+  shippingAddress       ShippingAddress?
+  refundAccount         RefundAccount?
 
   @@index([userId])
   @@index([shopId])
   @@index([orderNumber])
   @@index([status])
   @@index([orderedAt])
+  @@index([paidAt])
+  @@index([deliveredAt])
   @@index([userId, status])
+  @@index([shopId, status])
+  @@index([wholesaleOrderStatus])
   @@map("order")
 }
 

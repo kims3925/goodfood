@@ -6,7 +6,7 @@ import Header from '@/components/layout/Header'
 import Sidebar from '@/components/layout/Sidebar'
 import { ToastProvider } from '@/components/ui/Toast'
 import { BandSessionProvider } from '@/contexts/BandSessionContext'
-import { AppSection, UserRole, getSectionFromPath, getDefaultPathBySection } from '@/config/navigation'
+import { AppSection, UserRole, getSectionFromPath, getDefaultPathBySection, getAvailableSections } from '@/config/navigation'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
 const CURRENT_SECTION_KEY = 'current-section'

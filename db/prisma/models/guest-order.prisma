@@ -19,17 +19,25 @@ model GuestOrder {
   cancelledBy     String?             @map("cancelled_by") @db.VarChar(20)
   createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamp(0)
-  shop            Shop?               @relation(fields: [shopId], references: [id])
-  items           GuestOrderItem[]
-  payment         GuestPayment?
-  shippingAddress ShippingAddress?
-  refundAccount   RefundAccount?
+  wholesaleOrderStatus  WholesaleOrderStatus? @map("wholesale_order_status")
+  wholesaleChannelId    Int?                  @map("wholesale_channel_id")
+  wholesaleOrderedAt    DateTime?             @map("wholesale_ordered_at") @db.Timestamp(0)
+  shop                  Shop?                 @relation(fields: [shopId], references: [id])
+  wholesaleChannel      Channel?              @relation("GuestOrderWholesaleChannel", fields: [wholesaleChannelId], references: [id])
+  items                 GuestOrderItem[]
+  payment               GuestPayment?
+  shippingAddress       ShippingAddress?
+  refundAccount         RefundAccount?
 
   @@index([shopId])
   @@index([orderNumber])
   @@index([status])
   @@index([guestPhone])
   @@index([orderedAt])
+  @@index([paidAt])
+  @@index([deliveredAt])
+  @@index([shopId, status])
+  @@index([wholesaleOrderStatus])
   @@map("guest_order")
 }
 

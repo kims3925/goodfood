@@ -1,0 +1,149 @@
+// ─── 에이전트 관리 모델 ───
+// 17개 AI 에이전트 통합 관리를 위한 스키마
+
+enum AgentLayer {
+  CORE
+  BUSINESS
+  INTELLIGENCE
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+  MAINTENANCE
+}
+
+enum TaskStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum TaskPriority {
+  CRITICAL
+  HIGH
+  NORMAL
+  LOW
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+  CRITICAL
+}
+
+model AgentDefinition {
+  id            String        @id @default(cuid())
+  name          String        @unique
+  displayName   String
+  layer         AgentLayer
+  icon          String
+  description   String        @db.Text
+  status        AgentStatus   @default(INACTIVE)
+  config        Json
+  priority      Int           @default(5)
+  maxConcurrent Int           @default(5)
+  retryPolicy   Json
+  schedule      String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  tasks         AgentTask[]
+  logs          AgentLog[]
+  kpiRecords    AgentKpiRecord[]
+  workflowSteps AgentWorkflowStep[]
+
+  @@index([layer, status])
+  @@index([name])
+  @@map("agent_definitions")
+}
+
+model AgentTask {
+  id          String        @id @default(cuid())
+  agentId     String
+  agent       AgentDefinition @relation(fields: [agentId], references: [id])
+  eventType   String
+  payload     Json
+  status      TaskStatus    @default(QUEUED)
+  priority    TaskPriority  @default(NORMAL)
+  result      Json?
+  error       String?       @db.Text
+  startedAt   DateTime?
+  completedAt DateTime?
+  duration    Int?
+  retryCount  Int           @default(0)
+  createdAt   DateTime      @default(now())
+
+  @@index([agentId, status])
+  @@index([eventType, createdAt])
+  @@index([status, priority, createdAt])
+  @@map("agent_tasks")
+}
+
+model AgentLog {
+  id        String   @id @default(cuid())
+  agentId   String
+  agent     AgentDefinition @relation(fields: [agentId], references: [id])
+  level     LogLevel @default(INFO)
+  message   String   @db.Text
+  metadata  Json?
+  taskId    String?
+  createdAt DateTime @default(now())
+
+  @@index([agentId, level, createdAt])
+  @@index([taskId])
+  @@map("agent_logs")
+}
+
+model AgentKpiRecord {
+  id        String   @id @default(cuid())
+  agentId   String
+  agent     AgentDefinition @relation(fields: [agentId], references: [id])
+  metric    String
+  value     Float
+  target    Float
+  period    String
+  date      DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([agentId, metric, period, date])
+  @@index([agentId, metric, date])
+  @@map("agent_kpi_records")
+}
+
+model AgentWorkflow {
+  id             String   @id @default(cuid())
+  name           String
+  triggerEvent   String
+  isActive       Boolean  @default(true)
+  config         Json
+  executionCount Int      @default(0)
+  lastExecuted   DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  steps          AgentWorkflowStep[]
+
+  @@index([triggerEvent, isActive])
+  @@map("agent_workflows")
+}
+
+model AgentWorkflowStep {
+  id         String   @id @default(cuid())
+  workflowId String
+  workflow   AgentWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  agentId    String
+  agent      AgentDefinition @relation(fields: [agentId], references: [id])
+  order      Int
+  isParallel Boolean  @default(false)
+  config     Json?
+
+  @@index([workflowId, order])
+  @@map("agent_workflow_steps")
+}
