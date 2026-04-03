@@ -82,10 +82,10 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // sessionExpiresAt이 null이면 세션쿠키(만료일 없음) → 유효로 처리
     const hasValidSession =
       channelSession?.bandSessionCookie &&
-      channelSession.sessionExpiresAt &&
-      new Date(channelSession.sessionExpiresAt) > new Date()
+      (!channelSession.sessionExpiresAt || new Date(channelSession.sessionExpiresAt) > new Date())
 
     if (!hasValidSession) {
       return NextResponse.json(
