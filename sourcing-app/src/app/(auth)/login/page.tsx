@@ -41,9 +41,11 @@ export default function LoginPage() {
           return
         }
 
-        // ADMIN은 어드민 대시보드로, 그 외는 매니저 대시보드로
-        if (data.user?.role === 'ADMIN') {
-          window.location.href = '/admin/dashboard'
+        // redirect 파라미터가 있으면 해당 경로로, 없으면 매니저 대시보드로
+        const params = new URLSearchParams(window.location.search)
+        const redirect = params.get('redirect')
+        if (redirect && redirect !== '/login' && redirect !== '/') {
+          window.location.href = redirect
         } else {
           window.location.href = '/sourcing/dashboard'
         }

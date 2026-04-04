@@ -44,7 +44,8 @@ const nextConfig = {
       { source: '/publish', destination: '/sourcing/publish', permanent: true },
       { source: '/automation/:path*', destination: '/sourcing/automation/:path*', permanent: true },
       { source: '/policy/:path*', destination: '/sourcing/policy/:path*', permanent: true },
-      { source: '/admin/settings/:path*', destination: '/sourcing/settings/:path*', permanent: true },
+      // 주의: /admin/* 경로는 어드민 패널이 사용하므로 리다이렉트하지 않음
+      // (기존 /admin/settings → /sourcing/settings 리다이렉트 제거)
       // 쇼핑몰 관련 리다이렉트
       { source: '/order/:path*', destination: '/shop/order/:path*', permanent: true },
       { source: '/wholesale-orders', destination: '/shop/wholesale-orders', permanent: true },
