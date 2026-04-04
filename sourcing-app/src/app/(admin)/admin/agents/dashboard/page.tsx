@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   LayoutDashboard,
   Bot,
@@ -10,6 +10,12 @@ import {
   RefreshCw,
   Loader2,
   AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Pause,
+  Wrench,
+  ArrowUpRight,
 } from 'lucide-react'
 import AgentCard, { type Agent } from '@/components/admin/agents/AgentCard'
 import AgentLayerSection from '@/components/admin/agents/AgentLayerSection'
@@ -23,144 +29,126 @@ interface KpiSummary {
   todayTasks: number
   avgResponseTime: string
   kpiAchievement: number
+  errorAgents: number
+}
+
+interface DashboardAlert {
+  agentName: string
+  type: 'error' | 'kpi_miss' | 'high_latency'
+  message: string
 }
 
 interface DashboardData {
   kpiSummary: KpiSummary
   agents: Agent[]
+  alerts: DashboardAlert[]
 }
 
 const REFRESH_INTERVAL = 30_000
 
-const sampleData: DashboardData = {
-  kpiSummary: {
-    activeAgents: 8,
-    totalAgents: 12,
-    todayTasks: 156,
-    avgResponseTime: '1.2s',
-    kpiAchievement: 87,
-  },
-  agents: [
-    {
-      id: 'orchestrator',
-      name: 'orchestrator',
-      displayName: '오케스트레이터',
-      layer: 'CORE',
-      icon: 'Workflow',
-      status: 'ACTIVE',
-      description: '에이전트 간 작업 조율 및 워크플로우 관리',
-      config: { kpiTargets: [{ label: '워크플로우 성공률', current: 95, target: 100 }] },
-    },
-    {
-      id: 'scheduler',
-      name: 'scheduler',
-      displayName: '스케줄러',
-      layer: 'CORE',
-      icon: 'Clock',
-      status: 'ACTIVE',
-      description: '작업 스케줄링 및 큐 관리',
-      config: { kpiTargets: [{ label: '스케줄 정시율', current: 98, target: 100 }] },
-    },
-    {
-      id: 'health-monitor',
-      name: 'health-monitor',
-      displayName: '헬스 모니터',
-      layer: 'CORE',
-      icon: 'HeartPulse',
-      status: 'ACTIVE',
-      description: '시스템 상태 모니터링 및 알림',
-      config: { kpiTargets: [{ label: '가동률', current: 99, target: 100 }] },
-    },
-    {
-      id: 'sourcing-agent',
-      name: 'sourcing-agent',
-      displayName: '소싱 에이전트',
-      layer: 'BUSINESS',
-      icon: 'Package',
-      status: 'ACTIVE',
-      description: '도매밴드 상품 수집 및 AI 가공 자동화',
-      config: { kpiTargets: [{ label: '수집 목표 달성률', current: 85, target: 100 }] },
-    },
-    {
-      id: 'order-agent',
-      name: 'order-agent',
-      displayName: '주문 에이전트',
-      layer: 'BUSINESS',
-      icon: 'ShoppingCart',
-      status: 'ACTIVE',
-      description: '주문 접수, 상태 변경, 배송 연동',
-      config: { kpiTargets: [{ label: '주문 처리율', current: 92, target: 100 }] },
-    },
-    {
-      id: 'cs-agent',
-      name: 'cs-agent',
-      displayName: 'CS 에이전트',
-      layer: 'BUSINESS',
-      icon: 'MessageSquare',
-      status: 'INACTIVE',
-      description: '고객 문의 자동 분류 및 응답',
-      config: { kpiTargets: [{ label: '응답률', current: 60, target: 100 }] },
-    },
-    {
-      id: 'settlement-agent',
-      name: 'settlement-agent',
-      displayName: '정산 에이전트',
-      layer: 'BUSINESS',
-      icon: 'Calculator',
-      status: 'ACTIVE',
-      description: '판매자 정산 자동 처리',
-      config: {},
-    },
-    {
-      id: 'price-optimizer',
-      name: 'price-optimizer',
-      displayName: '가격 최적화',
-      layer: 'INTELLIGENCE',
-      icon: 'TrendingUp',
-      status: 'ACTIVE',
-      description: '경쟁사 분석 기반 가격 자동 조정',
-      config: { kpiTargets: [{ label: '마진 목표 달성률', current: 78, target: 100 }] },
-    },
-    {
-      id: 'demand-predictor',
-      name: 'demand-predictor',
-      displayName: '수요 예측',
-      layer: 'INTELLIGENCE',
-      icon: 'BarChart3',
-      status: 'ACTIVE',
-      description: 'AI 기반 수요 예측 및 재고 권장',
-      config: { kpiTargets: [{ label: '예측 정확도', current: 82, target: 90 }] },
-    },
-    {
-      id: 'content-generator',
-      name: 'content-generator',
-      displayName: '콘텐츠 생성',
-      layer: 'INTELLIGENCE',
-      icon: 'Sparkles',
-      status: 'ERROR',
-      description: 'AI 상품 설명 및 이미지 자동 생성',
-      config: {},
-    },
-  ],
+// 17개 실제 에이전트 시드 데이터
+const SEED_AGENTS: Agent[] = [
+  // CORE (8)
+  { id: '1', name: 'orchestrator', displayName: 'Orchestrator Agent', layer: 'CORE', icon: 'Brain', status: 'INACTIVE', description: '중앙 이벤트 라우팅, 워크플로우 관리, 에이전트 조율', config: { kpiTargets: [{ label: '이벤트 지연', current: 0, target: 500 }] } },
+  { id: '2', name: 'content', displayName: 'Content Agent', layer: 'CORE', icon: 'PenTool', status: 'INACTIVE', description: '콘텐츠 자동 생성 (프로필, 링크, 상품 설명)', config: { kpiTargets: [{ label: 'AI 활용률', current: 0, target: 60 }] } },
+  { id: '3', name: 'analytics', displayName: 'Analytics Agent', layer: 'CORE', icon: 'BarChart2', status: 'INACTIVE', description: '클릭/방문/전환 데이터 수집 및 분석', config: { kpiTargets: [{ label: '데이터 정확도', current: 0, target: 99 }] } },
+  { id: '4', name: 'revenue', displayName: 'Revenue Agent', layer: 'CORE', icon: 'DollarSign', status: 'INACTIVE', description: '수익 최적화, 가격 전략, 업셀 유도', config: { kpiTargets: [{ label: '월 수익 성장률', current: 0, target: 15 }] } },
+  { id: '5', name: 'growth', displayName: 'Growth Agent', layer: 'CORE', icon: 'TrendingUp', status: 'INACTIVE', description: '사용자 성장, 이탈 방지, 리텐션 관리', config: { kpiTargets: [{ label: '이탈률', current: 0, target: 5 }] } },
+  { id: '6', name: 'support', displayName: 'Support Agent', layer: 'CORE', icon: 'Headphones', status: 'INACTIVE', description: '고객 문의 자동 응답, 티켓 관리', config: { kpiTargets: [{ label: '자동 해결률', current: 0, target: 70 }] } },
+  { id: '7', name: 'moderation', displayName: 'Moderation Agent', layer: 'CORE', icon: 'Shield', status: 'INACTIVE', description: '스팸, 사기, 유해 콘텐츠 차단', config: { kpiTargets: [{ label: '차단률', current: 0, target: 99 }] } },
+  { id: '8', name: 'notification', displayName: 'Notification Agent', layer: 'CORE', icon: 'Bell', status: 'INACTIVE', description: '멀티채널 알림 통합 (이메일, 푸시, SMS, 카카오)', config: { kpiTargets: [{ label: '이메일 오픈율', current: 0, target: 25 }] } },
+  // BUSINESS (4)
+  { id: '9', name: 'commerce', displayName: 'Commerce Agent', layer: 'BUSINESS', icon: 'ShoppingBag', status: 'INACTIVE', description: '쇼핑몰 운영 자동화 (상품, 주문, 배송)', config: { kpiTargets: [{ label: '주문 처리시간', current: 0, target: 60 }] } },
+  { id: '10', name: 'affiliate', displayName: 'Affiliate Agent', layer: 'BUSINESS', icon: 'Link2', status: 'INACTIVE', description: '제휴 마케팅 자동화 (쿠팡, 아마존)', config: { kpiTargets: [{ label: '월 제휴 수익', current: 0, target: 50000 }] } },
+  { id: '11', name: 'sourcing', displayName: 'Sourcing Agent', layer: 'BUSINESS', icon: 'Package', status: 'INACTIVE', description: '도매 상품 자동 수집, 변환, 등록', config: { kpiTargets: [{ label: '자동화율', current: 0, target: 70 }] } },
+  { id: '12', name: 'finance', displayName: 'Finance Agent', layer: 'BUSINESS', icon: 'CreditCard', status: 'INACTIVE', description: '결제, 정산, 출금, 세금 관리', config: { kpiTargets: [{ label: '결제 성공률', current: 0, target: 98 }] } },
+  // INTELLIGENCE (5)
+  { id: '13', name: 'recommendation', displayName: 'Recommendation Agent', layer: 'INTELLIGENCE', icon: 'Target', status: 'INACTIVE', description: '개인화 추천, A/B 테스트 엔진', config: { kpiTargets: [{ label: '추천 CTR', current: 0, target: 20 }] } },
+  { id: '14', name: 'funnel', displayName: 'Funnel Agent', layer: 'INTELLIGENCE', icon: 'GitMerge', status: 'INACTIVE', description: '전환 퍼널 분석, CTA 최적화', config: { kpiTargets: [{ label: '퍼널 전환율', current: 0, target: 8 }] } },
+  { id: '15', name: 'brand', displayName: 'Brand Agent', layer: 'INTELLIGENCE', icon: 'Palette', status: 'INACTIVE', description: '브랜드 전략, 스타일, 콘텐츠 방향', config: { kpiTargets: [{ label: '브랜드 일관성', current: 0, target: 80 }] } },
+  { id: '16', name: 'seo', displayName: 'SEO Agent', layer: 'INTELLIGENCE', icon: 'Search', status: 'INACTIVE', description: '검색 노출, 메타태그, 사이트맵, 구조화 데이터', config: { kpiTargets: [{ label: '검색 트래픽 성장', current: 0, target: 15 }] } },
+  { id: '17', name: 'design', displayName: 'Design Agent', layer: 'INTELLIGENCE', icon: 'Figma', status: 'INACTIVE', description: '테마/레이아웃 생성, OG/썸네일, UI 시스템', config: { kpiTargets: [{ label: '테마 채택률', current: 0, target: 60 }] } },
+]
+
+const defaultSummary: KpiSummary = {
+  activeAgents: 0,
+  totalAgents: 17,
+  todayTasks: 0,
+  avgResponseTime: '-',
+  kpiAchievement: 0,
+  errorAgents: 0,
 }
 
 export default function AgentDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/agents/dashboard')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
-      setData(json)
-      setError(null)
+      const [dashRes, agentsRes] = await Promise.allSettled([
+        fetch('/api/admin/agents/dashboard'),
+        fetch('/api/admin/agents'),
+      ])
+
+      let summary = { ...defaultSummary }
+      let agents: Agent[] = [...SEED_AGENTS]
+      let alerts: DashboardAlert[] = []
+
+      // 대시보드 통계
+      if (dashRes.status === 'fulfilled' && dashRes.value.ok) {
+        const dash = await dashRes.value.json()
+        if (dash.overview) {
+          summary = {
+            activeAgents: dash.overview.activeAgents || 0,
+            totalAgents: dash.overview.totalAgents || 17,
+            todayTasks: dash.overview.tasksToday || 0,
+            avgResponseTime: dash.overview.avgLatency ? `${dash.overview.avgLatency}ms` : '-',
+            kpiAchievement: dash.overview.kpiAchievement || 0,
+            errorAgents: dash.overview.errorAgents || 0,
+          }
+        }
+        if (dash.alerts) alerts = dash.alerts
+      }
+
+      // 에이전트 목록 (DB에 있으면 병합)
+      if (agentsRes.status === 'fulfilled' && agentsRes.value.ok) {
+        const agentsData = await agentsRes.value.json()
+        const dbAgents: Agent[] = agentsData.agents || []
+        if (dbAgents.length > 0) {
+          // DB 에이전트로 시드 데이터 업데이트
+          agents = SEED_AGENTS.map(seed => {
+            const db = dbAgents.find((a: Agent) => a.name === seed.name)
+            if (db) {
+              return {
+                ...seed,
+                id: db.id,
+                status: db.status,
+                config: db.config?.kpiTargets ? db.config : seed.config,
+              }
+            }
+            return seed
+          })
+          // DB에만 있는 에이전트 추가
+          for (const db of dbAgents) {
+            if (!agents.find(a => a.name === db.name)) {
+              agents.push(db)
+            }
+          }
+          summary.activeAgents = agents.filter(a => a.status === 'ACTIVE').length
+          summary.errorAgents = agents.filter(a => a.status === 'ERROR').length
+          summary.totalAgents = agents.length
+        }
+      }
+
+      setData({ kpiSummary: summary, agents, alerts })
     } catch {
-      // Fallback to sample data in development
-      setData(sampleData)
-      setError(null)
+      // Fallback
+      setData({
+        kpiSummary: defaultSummary,
+        agents: SEED_AGENTS,
+        alerts: [],
+      })
     } finally {
       setLoading(false)
       setLastRefresh(new Date())
@@ -182,145 +170,165 @@ export default function AgentDashboardPage() {
       ? `/api/admin/agents/${agentId}/stop`
       : `/api/admin/agents/${agentId}/start`
 
+    // Optimistic update
+    setData(prev => {
+      if (!prev) return prev
+      const newStatus = agent.status === 'ACTIVE' ? 'INACTIVE' as const : 'ACTIVE' as const
+      return {
+        ...prev,
+        agents: prev.agents.map(a =>
+          a.id === agentId ? { ...a, status: newStatus } : a
+        ),
+        kpiSummary: {
+          ...prev.kpiSummary,
+          activeAgents: prev.kpiSummary.activeAgents + (newStatus === 'ACTIVE' ? 1 : -1),
+        },
+      }
+    })
+
     try {
       await fetch(endpoint, { method: 'POST' })
-      setData(prev => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          agents: prev.agents.map(a =>
-            a.id === agentId
-              ? { ...a, status: a.status === 'ACTIVE' ? 'INACTIVE' as const : 'ACTIVE' as const }
-              : a
-          ),
-        }
-      })
     } catch {
-      // Optimistic update fallback
-      setData(prev => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          agents: prev.agents.map(a =>
-            a.id === agentId
-              ? { ...a, status: a.status === 'ACTIVE' ? 'INACTIVE' as const : 'ACTIVE' as const }
-              : a
-          ),
-        }
-      })
+      // 실패 시 원복
+      fetchDashboard()
     }
-  }, [data])
+  }, [data, fetchDashboard])
 
   const layers: AgentLayer[] = ['CORE', 'BUSINESS', 'INTELLIGENCE']
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <LayoutDashboard className="w-6 h-6 text-indigo-600" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">에이전트 대시보드</h1>
-              <p className="text-gray-600">전체 에이전트 현황을 한눈에 확인합니다</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-indigo-100 rounded-lg">
+            <LayoutDashboard className="w-6 h-6 text-indigo-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">에이전트 대시보드</h1>
+            <p className="text-sm text-gray-500">17개 에이전트 현황을 한눈에 확인합니다</p>
           </div>
         </div>
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
         </div>
       </div>
     )
   }
 
-  if (error && !data) {
-    return (
-      <div className="space-y-6">
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <LayoutDashboard className="w-6 h-6 text-indigo-600" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">에이전트 대시보드</h1>
-              <p className="text-gray-600">전체 에이전트 현황을 한눈에 확인합니다</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-          <p className="text-sm text-red-700 mb-3">{error}</p>
-          <button
-            onClick={fetchDashboard}
-            className="px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm hover:bg-red-200 transition-colors"
-          >
-            다시 시도
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const summary = data?.kpiSummary ?? defaultSummary
+  const agents = data?.agents ?? SEED_AGENTS
+  const alerts = data?.alerts ?? []
 
-  const summary = data?.kpiSummary
-  const agents = data?.agents ?? []
+  const statusCounts = {
+    active: agents.filter(a => a.status === 'ACTIVE').length,
+    inactive: agents.filter(a => a.status === 'INACTIVE').length,
+    error: agents.filter(a => a.status === 'ERROR').length,
+    maintenance: agents.filter(a => a.status === 'MAINTENANCE').length,
+  }
 
   const kpiCards = [
     {
       label: '활성 에이전트',
-      value: `${summary?.activeAgents ?? 0}/${summary?.totalAgents ?? 0}`,
+      value: `${statusCounts.active}/${agents.length}`,
       icon: Bot,
       color: 'text-green-600',
       bg: 'bg-green-50',
+      detail: statusCounts.error > 0 ? `${statusCounts.error}개 오류` : '모두 정상',
+      detailColor: statusCounts.error > 0 ? 'text-red-500' : 'text-green-500',
     },
     {
-      label: '오늘 작업',
-      value: `${summary?.todayTasks ?? 0}건`,
+      label: '오늘 태스크',
+      value: `${summary.todayTasks}`,
       icon: ListChecks,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
+      detail: '처리 완료',
+      detailColor: 'text-blue-500',
     },
     {
-      label: '평균 응답 시간',
-      value: summary?.avgResponseTime ?? '-',
+      label: '평균 응답시간',
+      value: summary.avgResponseTime,
       icon: Clock,
       color: 'text-purple-600',
       bg: 'bg-purple-50',
+      detail: 'latency',
+      detailColor: 'text-purple-500',
     },
     {
       label: 'KPI 달성률',
-      value: `${summary?.kpiAchievement ?? 0}%`,
+      value: `${summary.kpiAchievement}%`,
       icon: TrendingUp,
-      color: summary && summary.kpiAchievement >= 80 ? 'text-green-600' : 'text-yellow-600',
-      bg: summary && summary.kpiAchievement >= 80 ? 'bg-green-50' : 'bg-yellow-50',
+      color: summary.kpiAchievement >= 80 ? 'text-green-600' : summary.kpiAchievement >= 50 ? 'text-yellow-600' : 'text-red-600',
+      bg: summary.kpiAchievement >= 80 ? 'bg-green-50' : summary.kpiAchievement >= 50 ? 'bg-yellow-50' : 'bg-red-50',
+      detail: summary.kpiAchievement >= 80 ? '목표 달성' : '개선 필요',
+      detailColor: summary.kpiAchievement >= 80 ? 'text-green-500' : 'text-yellow-500',
     },
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <LayoutDashboard className="w-6 h-6 text-indigo-600" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">에이전트 대시보드</h1>
-              <p className="text-gray-600">전체 에이전트 현황을 한눈에 확인합니다</p>
-            </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-indigo-100 rounded-lg">
+            <LayoutDashboard className="w-6 h-6 text-indigo-600" />
           </div>
-          <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">에이전트 대시보드</h1>
+            <p className="text-sm text-gray-500">17개 에이전트 현황을 한눈에 확인합니다</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">
+            {lastRefresh.toLocaleTimeString('ko-KR')}
+          </span>
+          <button
+            onClick={fetchDashboard}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <RefreshCw size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Alerts */}
+      {alerts.length > 0 && (
+        <div className="space-y-2">
+          {alerts.slice(0, 3).map((alert, i) => (
+            <div key={i} className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-3">
+              <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+              <span className="text-sm text-red-700 flex-1">
+                <strong>{alert.agentName}</strong>: {alert.message}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Status Bar */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <div className="flex items-center gap-6 flex-wrap">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-green-500" />
+            <span className="text-sm text-gray-600">활성 <strong className="text-green-600">{statusCounts.active}</strong></span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Pause size={16} className="text-gray-400" />
+            <span className="text-sm text-gray-600">비활성 <strong className="text-gray-500">{statusCounts.inactive}</strong></span>
+          </div>
+          <div className="flex items-center gap-2">
+            <XCircle size={16} className="text-red-500" />
+            <span className="text-sm text-gray-600">오류 <strong className="text-red-600">{statusCounts.error}</strong></span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Wrench size={16} className="text-yellow-500" />
+            <span className="text-sm text-gray-600">유지보수 <strong className="text-yellow-600">{statusCounts.maintenance}</strong></span>
+          </div>
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className={`inline-block w-2 h-2 rounded-full ${statusCounts.active > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
             <span className="text-xs text-gray-400">
-              마지막 갱신: {lastRefresh.toLocaleTimeString('ko-KR')}
+              {statusCounts.active > 0 ? '시스템 가동 중' : '모든 에이전트 비활성'}
             </span>
-            <button
-              onClick={fetchDashboard}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              title="새로고침"
-            >
-              <RefreshCw size={16} />
-            </button>
           </div>
         </div>
       </div>
@@ -330,7 +338,7 @@ export default function AgentDashboardPage() {
         {kpiCards.map((card) => {
           const Icon = card.icon
           return (
-            <div key={card.label} className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+            <div key={card.label} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm text-gray-500">{card.label}</span>
                 <div className={`p-2 rounded-lg ${card.bg}`}>
@@ -338,13 +346,14 @@ export default function AgentDashboardPage() {
                 </div>
               </div>
               <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+              <p className={`text-xs mt-1 ${card.detailColor}`}>{card.detail}</p>
             </div>
           )
         })}
       </div>
 
       {/* Layer Sections */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {layers.map((layer) => {
           const layerAgents = agents.filter(a => a.layer === layer)
           return (

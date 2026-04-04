@@ -1,202 +1,298 @@
 'use client'
 
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Package, Bot, Upload, Send, TrendingUp, Clock } from 'lucide-react'
+import {
+  Bot,
+  Activity,
+  ShoppingBag,
+  Users,
+  Server,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle2,
+  ArrowRight,
+  RefreshCw,
+  Loader2,
+  Zap,
+  Package,
+  CreditCard,
+  Clock,
+} from 'lucide-react'
 
-export default function AdminDashboard() {
+interface PlatformStats {
+  agents: { total: number; active: number; error: number }
+  tasks: { today: number; completed: number; failed: number }
+  orders: { today: number; pending: number; revenue: number }
+  users: { total: number; activeToday: number }
+  system: { uptime: string; dbStatus: string; redisStatus: string }
+}
+
+const defaultStats: PlatformStats = {
+  agents: { total: 17, active: 0, error: 0 },
+  tasks: { today: 0, completed: 0, failed: 0 },
+  orders: { today: 0, pending: 0, revenue: 0 },
+  users: { total: 0, activeToday: 0 },
+  system: { uptime: '-', dbStatus: 'unknown', redisStatus: 'unknown' },
+}
+
+export default function AdminOverviewPage() {
   const router = useRouter()
+  const [stats, setStats] = useState<PlatformStats>(defaultStats)
+  const [loading, setLoading] = useState(true)
+  const [lastRefresh, setLastRefresh] = useState(new Date())
 
-  const workflowSteps = [
+  const fetchStats = useCallback(async () => {
+    try {
+      const [dashRes, healthRes] = await Promise.allSettled([
+        fetch('/api/admin/agents/dashboard'),
+        fetch('/api/health'),
+      ])
+
+      const newStats = { ...defaultStats }
+
+      if (dashRes.status === 'fulfilled' && dashRes.value.ok) {
+        const dash = await dashRes.value.json()
+        if (dash.overview) {
+          newStats.agents = {
+            total: dash.overview.totalAgents || 17,
+            active: dash.overview.activeAgents || 0,
+            error: dash.overview.errorAgents || 0,
+          }
+          newStats.tasks = {
+            today: dash.overview.tasksToday || 0,
+            completed: dash.overview.tasksCompleted || 0,
+            failed: dash.overview.tasksFailed || 0,
+          }
+        }
+      }
+
+      if (healthRes.status === 'fulfilled' && healthRes.value.ok) {
+        const health = await healthRes.value.json()
+        newStats.system = {
+          uptime: health.uptime || '-',
+          dbStatus: health.db || 'connected',
+          redisStatus: health.redis || 'connected',
+        }
+      }
+
+      setStats(newStats)
+    } catch {
+      // 기본값 유지
+    } finally {
+      setLoading(false)
+      setLastRefresh(new Date())
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchStats()
+    const timer = setInterval(fetchStats, 60_000)
+    return () => clearInterval(timer)
+  }, [fetchStats])
+
+  const quickLinks = [
     {
-      step: 1,
-      title: '도매밴드 수집',
-      description: '도매 밴드에서 상품 정보를 자동으로 수집합니다',
-      icon: <Package className="w-6 h-6" />,
-      status: 'active',
-      count: 45,
-      href: '/automation/collect',
-      color: 'green'
+      label: '에이전트 대시보드',
+      description: '17개 에이전트 현황 및 관리',
+      href: '/admin/agents/dashboard',
+      icon: Bot,
+      color: 'bg-indigo-500',
     },
     {
-      step: 2,
-      title: 'AI 상세페이지 생성',
-      description: 'AI가 자동으로 매력적인 상품 설명을 생성합니다',
-      icon: <Bot className="w-6 h-6" />,
-      status: 'processing',
-      count: 12,
-      href: '/products/ai-generate',
-      color: 'yellow'
+      label: '실시간 모니터링',
+      description: '이벤트 스트림 및 상태 확인',
+      href: '/admin/agents/monitor',
+      icon: Activity,
+      color: 'bg-green-500',
     },
     {
-      step: 3,
-      title: '소매밴드 포스팅',
-      description: '결제링크와 함께 소매밴드에 자동 발행합니다',
-      icon: <Send className="w-6 h-6" />,
-      status: 'pending',
-      count: 0,
-      href: '/retail/publish',
-      color: 'purple'
-    }
+      label: 'KPI 대시보드',
+      description: '에이전트 성과 분석',
+      href: '/admin/agents/kpi',
+      icon: TrendingUp,
+      color: 'bg-purple-500',
+    },
+    {
+      label: '사용자 관리',
+      description: '사용자 목록 및 권한 관리',
+      href: '/admin/users/list',
+      icon: Users,
+      color: 'bg-blue-500',
+    },
+    {
+      label: '시스템 상태',
+      description: '서비스 헬스체크 및 리소스',
+      href: '/admin/system/status',
+      icon: Server,
+      color: 'bg-gray-600',
+    },
+    {
+      label: '워크플로우',
+      description: '이벤트 기반 자동화 관리',
+      href: '/admin/agents/workflows',
+      icon: Zap,
+      color: 'bg-yellow-500',
+    },
   ]
 
-  const recentActivities = [
-    { time: '5분 전', action: '도매밴드에서 10개 상품 수집 완료', type: 'collect' },
-    { time: '12분 전', action: 'AI 상세페이지 5개 생성 완료', type: 'ai' },
-    { time: '30분 전', action: '쇼핑몰 엑셀 업로드 완료 (15개)', type: 'upload' },
-    { time: '1시간 전', action: '소매밴드 3개 게시물 발행', type: 'publish' },
+  const overviewCards = [
+    {
+      label: '에이전트',
+      value: `${stats.agents.active}/${stats.agents.total}`,
+      sub: stats.agents.error > 0 ? `${stats.agents.error}개 오류` : '정상 가동',
+      icon: Bot,
+      color: stats.agents.error > 0 ? 'text-red-600' : 'text-green-600',
+      bg: stats.agents.error > 0 ? 'bg-red-50' : 'bg-green-50',
+    },
+    {
+      label: '오늘 태스크',
+      value: `${stats.tasks.today}`,
+      sub: `완료 ${stats.tasks.completed} / 실패 ${stats.tasks.failed}`,
+      icon: Zap,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50',
+    },
+    {
+      label: '주문',
+      value: `${stats.orders.today}`,
+      sub: `대기 ${stats.orders.pending}건`,
+      icon: ShoppingBag,
+      color: 'text-purple-600',
+      bg: 'bg-purple-50',
+    },
+    {
+      label: '시스템',
+      value: stats.system.dbStatus === 'connected' ? '정상' : '점검필요',
+      sub: `DB: ${stats.system.dbStatus === 'connected' ? '연결됨' : '끊김'}`,
+      icon: Server,
+      color: stats.system.dbStatus === 'connected' ? 'text-green-600' : 'text-red-600',
+      bg: stats.system.dbStatus === 'connected' ? 'bg-green-50' : 'bg-red-50',
+    },
   ]
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800'
-      case 'processing': return 'bg-yellow-100 text-yellow-800 animate-pulse'
-      case 'ready': return 'bg-blue-100 text-blue-800'
-      case 'pending': return 'bg-gray-100 text-gray-600'
-      default: return 'bg-gray-100 text-gray-600'
-    }
-  }
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'active': return '활성'
-      case 'processing': return '처리중'
-      case 'ready': return '준비됨'
-      case 'pending': return '대기'
-      default: return '대기'
-    }
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl">
       {/* Page Header */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h1 className="text-2xl font-bold text-gray-900">자동화 워크플로우</h1>
-        <p className="mt-2 text-gray-600">도매밴드 수집부터 소매밴드 발행까지 전 과정을 자동화합니다</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">플랫폼 현황</h1>
+          <p className="text-sm text-gray-500 mt-1">BandAuto 전체 시스템 상태를 한눈에 확인합니다</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">
+            {lastRefresh.toLocaleTimeString('ko-KR')}
+          </span>
+          <button
+            onClick={fetchStats}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <RefreshCw size={16} />
+          </button>
+        </div>
       </div>
 
-      {/* Workflow Progress */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-lg font-semibold mb-4">워크플로우 진행 상황</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {workflowSteps.map((step, index) => (
-            <div
-              key={step.step}
-              className="relative cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => router.push(step.href)}
-            >
-              <div className="p-6 border-2 border-gray-200 rounded-lg hover:border-primary-color">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`p-3 rounded-full bg-${step.color}-100`}>
-                    {step.icon}
-                  </div>
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(step.status)}`}>
-                    {getStatusText(step.status)}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-gray-900">
-                    Step {step.step}: {step.title}
-                  </h3>
-                  <p className="text-sm text-gray-600">{step.description}</p>
-                  {step.count > 0 && (
-                    <div className="pt-2">
-                      <span className="text-2xl font-bold text-primary-color">{step.count}</span>
-                      <span className="text-sm text-gray-600 ml-1">개 처리중</span>
-                    </div>
-                  )}
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {overviewCards.map(card => {
+          const Icon = card.icon
+          return (
+            <div key={card.label} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-gray-500">{card.label}</span>
+                <div className={`p-2 rounded-lg ${card.bg}`}>
+                  <Icon className={`w-4 h-4 ${card.color}`} />
                 </div>
               </div>
-              {index < workflowSteps.length - 1 && (
-                <div className="hidden lg:block absolute top-1/2 -right-2 transform -translate-y-1/2">
-                  <ArrowRight className="w-4 h-4 text-gray-400" />
+              <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+              <p className="text-xs text-gray-400 mt-1">{card.sub}</p>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Alerts */}
+      {stats.agents.error > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-red-800">
+              {stats.agents.error}개 에이전트에서 오류가 발생했습니다
+            </p>
+            <p className="text-xs text-red-600 mt-0.5">에이전트 대시보드에서 확인하세요</p>
+          </div>
+          <button
+            onClick={() => router.push('/admin/agents/dashboard')}
+            className="ml-auto px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 transition-colors"
+          >
+            확인하기
+          </button>
+        </div>
+      )}
+
+      {/* Quick Links */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">빠른 이동</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {quickLinks.map(link => {
+            const Icon = link.icon
+            return (
+              <button
+                key={link.label}
+                onClick={() => router.push(link.href)}
+                className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all text-left group"
+              >
+                <div className="flex items-start gap-4">
+                  <div className={`p-2.5 rounded-lg ${link.color} flex-shrink-0`}>
+                    <Icon className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-gray-900">{link.label}</h3>
+                      <ArrowRight size={14} className="text-gray-300 group-hover:text-indigo-500 transition-colors" />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{link.description}</p>
+                  </div>
                 </div>
-              )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Layer Summary */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">에이전트 레이어 현황</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {[
+            { layer: 'CORE', label: '코어 레이어', count: 8, color: 'border-blue-200 bg-blue-50', textColor: 'text-blue-700', desc: '인프라 및 시스템 운영' },
+            { layer: 'BUSINESS', label: '비즈니스 레이어', count: 4, color: 'border-green-200 bg-green-50', textColor: 'text-green-700', desc: '상거래 및 비즈니스 운영' },
+            { layer: 'INTELLIGENCE', label: '인텔리전스 레이어', count: 5, color: 'border-purple-200 bg-purple-50', textColor: 'text-purple-700', desc: 'AI 분석 및 최적화' },
+          ].map(layer => (
+            <div key={layer.layer} className={`rounded-xl border-2 p-5 ${layer.color}`}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className={`text-sm font-semibold ${layer.textColor}`}>{layer.label}</h3>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${layer.color} ${layer.textColor} font-medium`}>
+                  {layer.count}개
+                </span>
+              </div>
+              <p className="text-xs text-gray-500">{layer.desc}</p>
+              <button
+                onClick={() => router.push('/admin/agents/registry')}
+                className={`mt-3 text-xs ${layer.textColor} hover:underline flex items-center gap-1`}
+              >
+                상세보기 <ArrowRight size={12} />
+              </button>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Stats and Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Today's Stats */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">오늘의 실적</h2>
-            <TrendingUp className="w-5 h-5 text-green-600" />
-          </div>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm text-gray-600">총 수집 상품</span>
-              <span className="text-xl font-bold text-gray-900">156</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm text-gray-600">AI 생성 완료</span>
-              <span className="text-xl font-bold text-gray-900">89</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm text-gray-600">쇼핑몰 업로드</span>
-              <span className="text-xl font-bold text-gray-900">67</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm text-gray-600">밴드 발행 완료</span>
-              <span className="text-xl font-bold text-gray-900">45</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">최근 활동</h2>
-            <Clock className="w-5 h-5 text-blue-600" />
-          </div>
-          <div className="space-y-3">
-            {recentActivities.map((activity, index) => (
-              <div key={index} className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg">
-                <div className={`w-2 h-2 mt-2 rounded-full ${
-                  activity.type === 'collect' ? 'bg-green-500' :
-                  activity.type === 'ai' ? 'bg-yellow-500' :
-                  activity.type === 'upload' ? 'bg-blue-500' :
-                  'bg-purple-500'
-                }`}></div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-900">{activity.action}</p>
-                  <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-lg font-semibold mb-4">빠른 실행</h2>
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => router.push('/automation/collect')}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            도매밴드 수집 시작
-          </button>
-          <button
-            onClick={() => router.push('/products/ai-generate')}
-            className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
-          >
-            AI 컨텐츠 생성
-          </button>
-          <button
-            onClick={() => router.push('/retail/publish')}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            소매밴드 발행
-          </button>
-          <button
-            onClick={() => router.push('/automation/workflow')}
-            className="px-4 py-2 bg-primary-color text-white rounded-lg hover:bg-primary-dark transition-colors"
-          >
-            전체 워크플로우 실행
-          </button>
         </div>
       </div>
     </div>

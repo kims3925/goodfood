@@ -93,6 +93,18 @@ export default function AdminLayout({
     return null
   }
 
+  // /admin 경로는 자체 독립 레이아웃(admin/layout.tsx)을 사용하므로
+  // 상위 Header/Sidebar를 렌더링하지 않음
+  if (pathname.startsWith('/admin')) {
+    return (
+      <ToastProvider>
+        <BandSessionProvider>
+          {children}
+        </BandSessionProvider>
+      </ToastProvider>
+    )
+  }
+
   return (
     <ToastProvider>
       <BandSessionProvider>
