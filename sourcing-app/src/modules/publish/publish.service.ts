@@ -286,7 +286,7 @@ export class PublishService {
       const postContent = buildPostContent(toProductForPublish(product), { orderLink })
 
       // 이미지 URL 추출 (최대 20개)
-      const imageUrls = (product.images?.map(img => img.url) || []).slice(0, 20)
+      const imageUrls = (product.images?.map(img => img.url).filter((url): url is string => !!url && url.length > 0) || []).slice(0, 20)
 
       // 6. 발행 방식 결정 및 실행
       let postKey: string | undefined
@@ -946,7 +946,7 @@ export class PublishService {
 
       // 5. 게시물 내용 생성
       const postContent = buildPostContent(toProductForPublish(product), { orderLink })
-      const imageUrls = (product.images?.map(img => img.url) || []).slice(0, 20)
+      const imageUrls = (product.images?.map(img => img.url).filter((url): url is string => !!url && url.length > 0) || []).slice(0, 20)
 
       // 6. 발행 방식 결정 및 실행
       let postKey: string | undefined
