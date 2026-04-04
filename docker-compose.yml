@@ -4,6 +4,11 @@ services:
     container_name: bandauto-mariadb
     ports:
       - "3306:3306"
+    command: >
+      --wait_timeout=300
+      --interactive_timeout=300
+      --net_read_timeout=60
+      --net_write_timeout=60
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME:-sourcing_db}
