@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Package, Trash2, Plus, ChevronDown, ChevronRight, ChevronUp, Boxes, CheckCircle, AlertCircle, ExternalLink, RefreshCw, XCircle, Info } from 'lucide-react'
+import { Search, Package, Trash2, Plus, ChevronDown, ChevronRight, ChevronUp, Boxes, CheckCircle, AlertCircle, ExternalLink, RefreshCw, XCircle, Info, Sparkles, Upload } from 'lucide-react'
 import Image from 'next/image'
 import Button from '@/components/ui/Button'
 import Modal, { ModalFooter } from '@/components/ui/Modal'
@@ -772,6 +772,24 @@ export default function CollectedProductListPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 퀵 액션 버튼 */}
+        <div className="flex flex-wrap gap-3 mb-4">
+          <button
+            onClick={handleOpenRegisterModal}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm shadow-sm"
+          >
+            <Sparkles size={18} />
+            AI로 상품가공하기
+          </button>
+          <button
+            onClick={() => router.push('/sourcing/product/list')}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm shadow-sm"
+          >
+            <Upload size={18} />
+            가공상품 등록
+          </button>
+        </div>
+
         {/* 헤더 */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">수집상품 관리</h1>
