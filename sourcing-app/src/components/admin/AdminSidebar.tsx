@@ -208,7 +208,7 @@ export default function AdminSidebar({ collapsed, onToggleCollapse }: AdminSideb
             </div>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
-                <div className="text-sm font-bold text-white">17</div>
+                <div className="text-sm font-bold text-white">10</div>
                 <div className="text-[10px] text-gray-500">전체</div>
               </div>
               <div>

@@ -29,7 +29,7 @@ interface PlatformStats {
 }
 
 const defaultStats: PlatformStats = {
-  agents: { total: 17, active: 0, error: 0 },
+  agents: { total: 10, active: 0, error: 0 },
   tasks: { today: 0, completed: 0, failed: 0 },
   orders: { today: 0, pending: 0, revenue: 0 },
   users: { total: 0, activeToday: 0 },
@@ -94,7 +94,7 @@ export default function AdminOverviewPage() {
   const quickLinks = [
     {
       label: '에이전트 대시보드',
-      description: '17개 에이전트 현황 및 관리',
+      description: '10개 자율운영 에이전트 현황',
       href: '/admin/agents/dashboard',
       icon: Bot,
       color: 'bg-indigo-500',
@@ -271,11 +271,12 @@ export default function AdminOverviewPage() {
       {/* Layer Summary */}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 mb-3">에이전트 레이어 현황</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { layer: 'CORE', label: '코어 레이어', count: 8, color: 'border-blue-200 bg-blue-50', textColor: 'text-blue-700', desc: '인프라 및 시스템 운영' },
-            { layer: 'BUSINESS', label: '비즈니스 레이어', count: 4, color: 'border-green-200 bg-green-50', textColor: 'text-green-700', desc: '상거래 및 비즈니스 운영' },
-            { layer: 'INTELLIGENCE', label: '인텔리전스 레이어', count: 5, color: 'border-purple-200 bg-purple-50', textColor: 'text-purple-700', desc: 'AI 분석 및 최적화' },
+            { layer: 'COMMAND', label: 'Command Layer', count: 1, color: 'border-red-200 bg-red-50', textColor: 'text-red-700', desc: '전체 조율, 장애복구, 리포트' },
+            { layer: 'SOURCING', label: 'Sourcing Layer', count: 3, color: 'border-blue-200 bg-blue-50', textColor: 'text-blue-700', desc: '수집 → AI가공 → 발행 파이프라인' },
+            { layer: 'COMMERCE', label: 'Commerce Layer', count: 3, color: 'border-green-200 bg-green-50', textColor: 'text-green-700', desc: '주문, 결제/정산, 고객지원' },
+            { layer: 'INFRA', label: 'Infra Layer', count: 3, color: 'border-purple-200 bg-purple-50', textColor: 'text-purple-700', desc: '세션관리, 모니터링, 데이터분석' },
           ].map(layer => (
             <div key={layer.layer} className={`rounded-xl border-2 p-5 ${layer.color}`}>
               <div className="flex items-center justify-between mb-2">

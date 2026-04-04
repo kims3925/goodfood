@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import AgentCard, { type Agent } from './AgentCard'
 
-type AgentLayer = 'CORE' | 'BUSINESS' | 'INTELLIGENCE'
+type AgentLayer = 'COMMAND' | 'SOURCING' | 'COMMERCE' | 'INFRA' | string
 
 interface AgentLayerSectionProps {
   layer: AgentLayer
@@ -12,7 +12,12 @@ interface AgentLayerSectionProps {
   onToggle: (agentId: string) => void
 }
 
-const LAYER_META: Record<AgentLayer, { label: string; color: string; bgColor: string }> = {
+const LAYER_META: Record<string, { label: string; color: string; bgColor: string }> = {
+  COMMAND: { label: 'Command Layer', color: 'text-red-700', bgColor: 'bg-red-50' },
+  SOURCING: { label: 'Sourcing Layer', color: 'text-blue-700', bgColor: 'bg-blue-50' },
+  COMMERCE: { label: 'Commerce Layer', color: 'text-green-700', bgColor: 'bg-green-50' },
+  INFRA: { label: 'Infra Layer', color: 'text-purple-700', bgColor: 'bg-purple-50' },
+  // 하위 호환
   CORE: { label: 'Core Layer', color: 'text-blue-700', bgColor: 'bg-blue-50' },
   BUSINESS: { label: 'Business Layer', color: 'text-green-700', bgColor: 'bg-green-50' },
   INTELLIGENCE: { label: 'Intelligence Layer', color: 'text-purple-700', bgColor: 'bg-purple-50' },
@@ -20,7 +25,7 @@ const LAYER_META: Record<AgentLayer, { label: string; color: string; bgColor: st
 
 export default function AgentLayerSection({ layer, agents, onToggle }: AgentLayerSectionProps) {
   const [expanded, setExpanded] = useState(true)
-  const meta = LAYER_META[layer]
+  const meta = LAYER_META[layer] || LAYER_META.INFRA
 
   const handleToggleExpand = useCallback(() => {
     setExpanded((prev) => !prev)

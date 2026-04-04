@@ -21,7 +21,7 @@ import AgentCard, { type Agent } from '@/components/admin/agents/AgentCard'
 import AgentLayerSection from '@/components/admin/agents/AgentLayerSection'
 import RealtimeEventFeed from '@/components/admin/agents/RealtimeEventFeed'
 
-type AgentLayer = 'CORE' | 'BUSINESS' | 'INTELLIGENCE'
+type AgentLayer = 'COMMAND' | 'SOURCING' | 'COMMERCE' | 'INFRA'
 
 interface KpiSummary {
   activeAgents: number
@@ -46,33 +46,27 @@ interface DashboardData {
 
 const REFRESH_INTERVAL = 30_000
 
-// 17개 실제 에이전트 시드 데이터
+// 10개 자율운영 AI 에이전트 시드 데이터 (4 Layer)
 const SEED_AGENTS: Agent[] = [
-  // CORE (8)
-  { id: '1', name: 'orchestrator', displayName: 'Orchestrator Agent', layer: 'CORE', icon: 'Brain', status: 'INACTIVE', description: '중앙 이벤트 라우팅, 워크플로우 관리, 에이전트 조율', config: { kpiTargets: [{ label: '이벤트 지연', current: 0, target: 500 }] } },
-  { id: '2', name: 'content', displayName: 'Content Agent', layer: 'CORE', icon: 'PenTool', status: 'INACTIVE', description: '콘텐츠 자동 생성 (프로필, 링크, 상품 설명)', config: { kpiTargets: [{ label: 'AI 활용률', current: 0, target: 60 }] } },
-  { id: '3', name: 'analytics', displayName: 'Analytics Agent', layer: 'CORE', icon: 'BarChart2', status: 'INACTIVE', description: '클릭/방문/전환 데이터 수집 및 분석', config: { kpiTargets: [{ label: '데이터 정확도', current: 0, target: 99 }] } },
-  { id: '4', name: 'revenue', displayName: 'Revenue Agent', layer: 'CORE', icon: 'DollarSign', status: 'INACTIVE', description: '수익 최적화, 가격 전략, 업셀 유도', config: { kpiTargets: [{ label: '월 수익 성장률', current: 0, target: 15 }] } },
-  { id: '5', name: 'growth', displayName: 'Growth Agent', layer: 'CORE', icon: 'TrendingUp', status: 'INACTIVE', description: '사용자 성장, 이탈 방지, 리텐션 관리', config: { kpiTargets: [{ label: '이탈률', current: 0, target: 5 }] } },
-  { id: '6', name: 'support', displayName: 'Support Agent', layer: 'CORE', icon: 'Headphones', status: 'INACTIVE', description: '고객 문의 자동 응답, 티켓 관리', config: { kpiTargets: [{ label: '자동 해결률', current: 0, target: 70 }] } },
-  { id: '7', name: 'moderation', displayName: 'Moderation Agent', layer: 'CORE', icon: 'Shield', status: 'INACTIVE', description: '스팸, 사기, 유해 콘텐츠 차단', config: { kpiTargets: [{ label: '차단률', current: 0, target: 99 }] } },
-  { id: '8', name: 'notification', displayName: 'Notification Agent', layer: 'CORE', icon: 'Bell', status: 'INACTIVE', description: '멀티채널 알림 통합 (이메일, 푸시, SMS, 카카오)', config: { kpiTargets: [{ label: '이메일 오픈율', current: 0, target: 25 }] } },
-  // BUSINESS (4)
-  { id: '9', name: 'commerce', displayName: 'Commerce Agent', layer: 'BUSINESS', icon: 'ShoppingBag', status: 'INACTIVE', description: '쇼핑몰 운영 자동화 (상품, 주문, 배송)', config: { kpiTargets: [{ label: '주문 처리시간', current: 0, target: 60 }] } },
-  { id: '10', name: 'affiliate', displayName: 'Affiliate Agent', layer: 'BUSINESS', icon: 'Link2', status: 'INACTIVE', description: '제휴 마케팅 자동화 (쿠팡, 아마존)', config: { kpiTargets: [{ label: '월 제휴 수익', current: 0, target: 50000 }] } },
-  { id: '11', name: 'sourcing', displayName: 'Sourcing Agent', layer: 'BUSINESS', icon: 'Package', status: 'INACTIVE', description: '도매 상품 자동 수집, 변환, 등록', config: { kpiTargets: [{ label: '자동화율', current: 0, target: 70 }] } },
-  { id: '12', name: 'finance', displayName: 'Finance Agent', layer: 'BUSINESS', icon: 'CreditCard', status: 'INACTIVE', description: '결제, 정산, 출금, 세금 관리', config: { kpiTargets: [{ label: '결제 성공률', current: 0, target: 98 }] } },
-  // INTELLIGENCE (5)
-  { id: '13', name: 'recommendation', displayName: 'Recommendation Agent', layer: 'INTELLIGENCE', icon: 'Target', status: 'INACTIVE', description: '개인화 추천, A/B 테스트 엔진', config: { kpiTargets: [{ label: '추천 CTR', current: 0, target: 20 }] } },
-  { id: '14', name: 'funnel', displayName: 'Funnel Agent', layer: 'INTELLIGENCE', icon: 'GitMerge', status: 'INACTIVE', description: '전환 퍼널 분석, CTA 최적화', config: { kpiTargets: [{ label: '퍼널 전환율', current: 0, target: 8 }] } },
-  { id: '15', name: 'brand', displayName: 'Brand Agent', layer: 'INTELLIGENCE', icon: 'Palette', status: 'INACTIVE', description: '브랜드 전략, 스타일, 콘텐츠 방향', config: { kpiTargets: [{ label: '브랜드 일관성', current: 0, target: 80 }] } },
-  { id: '16', name: 'seo', displayName: 'SEO Agent', layer: 'INTELLIGENCE', icon: 'Search', status: 'INACTIVE', description: '검색 노출, 메타태그, 사이트맵, 구조화 데이터', config: { kpiTargets: [{ label: '검색 트래픽 성장', current: 0, target: 15 }] } },
-  { id: '17', name: 'design', displayName: 'Design Agent', layer: 'INTELLIGENCE', icon: 'Figma', status: 'INACTIVE', description: '테마/레이아웃 생성, OG/썸네일, UI 시스템', config: { kpiTargets: [{ label: '테마 채택률', current: 0, target: 60 }] } },
+  // COMMAND (1)
+  { id: '1', name: 'commander', displayName: '🧠 Commander', layer: 'COMMAND', icon: 'Brain', status: 'INACTIVE', description: '전체 에이전트 조율, 이벤트 라우팅, 장애 자동복구, 운영 리포트', config: { kpiTargets: [{ label: '이벤트 지연', current: 0, target: 500 }, { label: '자동복구율', current: 0, target: 95 }] } },
+  // SOURCING (3)
+  { id: '2', name: 'collector', displayName: '📦 Collector', layer: 'SOURCING', icon: 'Package', status: 'INACTIVE', description: '도매 밴드 상품 자동 수집, 중복 필터링, 신규 상품 감지', config: { kpiTargets: [{ label: '일일 수집량', current: 0, target: 50 }] } },
+  { id: '3', name: 'transformer', displayName: '✨ Transformer', layer: 'SOURCING', icon: 'Sparkles', status: 'INACTIVE', description: 'Gemini AI 도매→소매 변환: 상품명, 설명, 옵션, 가격 자동 생성', config: { kpiTargets: [{ label: '변환 성공률', current: 0, target: 90 }] } },
+  { id: '4', name: 'publisher', displayName: '🚀 Publisher', layer: 'SOURCING', icon: 'Send', status: 'INACTIVE', description: '소매밴드/쇼핑몰 발행, Playwright 이미지 업로드, Band API 폴백', config: { kpiTargets: [{ label: '발행 성공률', current: 0, target: 95 }] } },
+  // COMMERCE (3)
+  { id: '5', name: 'orderbot', displayName: '📝 OrderBot', layer: 'COMMERCE', icon: 'ClipboardList', status: 'INACTIVE', description: '주문 관리, 도매 발주 연동, 배송 추적, 미결제 자동취소', config: { kpiTargets: [{ label: '처리 지연', current: 0, target: 1 }] } },
+  { id: '6', name: 'payment-guard', displayName: '💳 PaymentGuard', layer: 'COMMERCE', icon: 'CreditCard', status: 'INACTIVE', description: '토스페이먼츠 결제, 환불, 정산 자동화, Google Sheets 동기', config: { kpiTargets: [{ label: '결제 성공률', current: 0, target: 98 }] } },
+  { id: '7', name: 'supportbot', displayName: '🎧 SupportBot', layer: 'COMMERCE', icon: 'Headphones', status: 'INACTIVE', description: '1:1 문의 자동 응답, 반품/교환 처리, FAQ 기반 자동화', config: { kpiTargets: [{ label: '자동 응답률', current: 0, target: 70 }] } },
+  // INFRA (3)
+  { id: '8', name: 'session-keeper', displayName: '🔐 SessionKeeper', layer: 'INFRA', icon: 'Shield', status: 'INACTIVE', description: 'Band 세션 모니터링, 자동 복구, Docker 헬스체크, DB 연결 감시', config: { kpiTargets: [{ label: '가동률', current: 0, target: 99.9 }] } },
+  { id: '9', name: 'watcher', displayName: '📡 Watcher', layer: 'INFRA', icon: 'Radio', status: 'INACTIVE', description: '시스템 모니터링, KPI 추적, 이상탐지, 관리자 알림(카카오/이메일)', config: { kpiTargets: [{ label: '감지 시간', current: 0, target: 1 }] } },
+  { id: '10', name: 'analyst', displayName: '📊 Analyst', layer: 'INFRA', icon: 'BarChart3', status: 'INACTIVE', description: '매출/전환 분석, 상품 성과 평가, 가격 최적화 제안, 운영 리포트', config: { kpiTargets: [{ label: '데이터 정확도', current: 0, target: 99 }] } },
 ]
 
 const defaultSummary: KpiSummary = {
   activeAgents: 0,
-  totalAgents: 17,
+  totalAgents: 10,
   todayTasks: 0,
   avgResponseTime: '-',
   kpiAchievement: 0,
@@ -194,7 +188,7 @@ export default function AgentDashboardPage() {
     }
   }, [data, fetchDashboard])
 
-  const layers: AgentLayer[] = ['CORE', 'BUSINESS', 'INTELLIGENCE']
+  const layers: AgentLayer[] = ['COMMAND', 'SOURCING', 'COMMERCE', 'INFRA']
 
   if (loading) {
     return (
@@ -205,7 +199,7 @@ export default function AgentDashboardPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">에이전트 대시보드</h1>
-            <p className="text-sm text-gray-500">17개 에이전트 현황을 한눈에 확인합니다</p>
+            <p className="text-sm text-gray-500">10개 자율운영 에이전트 현황</p>
           </div>
         </div>
         <div className="flex items-center justify-center py-20">
@@ -275,7 +269,7 @@ export default function AgentDashboardPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">에이전트 대시보드</h1>
-            <p className="text-sm text-gray-500">17개 에이전트 현황을 한눈에 확인합니다</p>
+            <p className="text-sm text-gray-500">10개 자율운영 에이전트 현황</p>
           </div>
         </div>
         <div className="flex items-center gap-3">

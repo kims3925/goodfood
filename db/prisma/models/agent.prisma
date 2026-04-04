@@ -1,10 +1,11 @@
 // ─── 에이전트 관리 모델 ───
-// 17개 AI 에이전트 통합 관리를 위한 스키마
+// 10개 자율운영 AI 에이전트 · 4개 레이어 · 완전 자동화 운영 시스템
 
 enum AgentLayer {
-  CORE
-  BUSINESS
-  INTELLIGENCE
+  COMMAND        // 전체 조율 (Commander)
+  SOURCING       // 상품 소싱 파이프라인 (Collector → Transformer → Publisher)
+  COMMERCE       // 주문/결제/CS (OrderBot, PaymentGuard, SupportBot)
+  INFRA          // 인프라+인텔리전스 (SessionKeeper, Watcher, Analyst)
 }
 
 enum AgentStatus {
@@ -50,6 +51,7 @@ model AgentDefinition {
   maxConcurrent Int           @default(5)
   retryPolicy   Json
   schedule      String?
+  aiModel       String?       // claude-opus, claude-sonnet, claude-haiku
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   deletedAt     DateTime?

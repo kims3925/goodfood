@@ -5,7 +5,7 @@ import * as LucideIcons from 'lucide-react'
 import StatusToggle from './StatusToggle'
 import MiniKpi from './MiniKpi'
 
-type AgentLayer = 'CORE' | 'BUSINESS' | 'INTELLIGENCE'
+type AgentLayer = 'COMMAND' | 'SOURCING' | 'COMMERCE' | 'INFRA' | string
 type AgentStatus = 'ACTIVE' | 'INACTIVE' | 'ERROR' | 'STARTING'
 
 interface KpiTarget {
@@ -34,7 +34,12 @@ interface AgentCardProps {
   compact?: boolean
 }
 
-const LAYER_COLORS: Record<AgentLayer, { bg: string; text: string; border: string }> = {
+const LAYER_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  COMMAND: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' },
+  SOURCING: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200' },
+  COMMERCE: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200' },
+  INFRA: { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200' },
+  // 하위 호환
   CORE: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200' },
   BUSINESS: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200' },
   INTELLIGENCE: { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200' },
@@ -54,7 +59,7 @@ function getIcon(iconName: string) {
 }
 
 const AgentCard = memo(function AgentCard({ agent, onToggle, compact = false }: AgentCardProps) {
-  const layerStyle = LAYER_COLORS[agent.layer]
+  const layerStyle = LAYER_COLORS[agent.layer] || LAYER_COLORS.INFRA
   const statusColor = STATUS_COLORS[agent.status]
   const IconComponent = getIcon(agent.icon)
   const kpiTargets = agent.config.kpiTargets ?? []
