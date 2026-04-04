@@ -30,6 +30,7 @@ export class CollectedPostRepository {
 
     const where = {
       userId,
+      deletedAt: null,
       ...(channelId && { channelId }),
       ...(search && {
         OR: [
@@ -95,7 +96,7 @@ export class CollectedPostRepository {
 
   async findById(id: number) {
     return prisma.collectedPost.findFirst({
-      where: { id },
+      where: { id, deletedAt: null },
       include: {
         channel: {
           select: {
