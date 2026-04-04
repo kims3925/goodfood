@@ -172,25 +172,13 @@ export class PublishService {
       })
 
       // Playwright 세션 정보 별도 조회 (bandSessionCookie, sessionExpiresAt)
-      let channelSession = await prisma.channel.findFirst({
+      const channelSession = await prisma.channel.findFirst({
         where: { id: channelId },
         select: {
           bandSessionCookie: true,
           sessionExpiresAt: true,
         },
       })
-
-      // 자동 복구: 쿠키는 있지만 sessionExpiresAt이 null인 경우 14일 후로 자동 설정
-      if (channelSession?.bandSessionCookie && !channelSession.sessionExpiresAt) {
-        const autoExpiresAt = new Date()
-        autoExpiresAt.setDate(autoExpiresAt.getDate() + 14)
-        console.log(`[PublishService] sessionExpiresAt 자동 복구: channelId=${channelId}, expiresAt=${autoExpiresAt.toISOString()}`)
-        await prisma.channel.update({
-          where: { id: channelId },
-          data: { sessionExpiresAt: autoExpiresAt },
-        })
-        channelSession = { ...channelSession, sessionExpiresAt: autoExpiresAt }
-      }
 
       if (!channel) {
         return {
@@ -820,25 +808,13 @@ export class PublishService {
         },
       })
 
-      let channelSession = await prisma.channel.findFirst({
+      const channelSession = await prisma.channel.findFirst({
         where: { id: channelId },
         select: {
           bandSessionCookie: true,
           sessionExpiresAt: true,
         },
       })
-
-      // 자동 복구: 쿠키는 있지만 sessionExpiresAt이 null인 경우 14일 후로 자동 설정
-      if (channelSession?.bandSessionCookie && !channelSession.sessionExpiresAt) {
-        const autoExpiresAt = new Date()
-        autoExpiresAt.setDate(autoExpiresAt.getDate() + 14)
-        console.log(`[PublishService] sessionExpiresAt 자동 복구: channelId=${channelId}, expiresAt=${autoExpiresAt.toISOString()}`)
-        await prisma.channel.update({
-          where: { id: channelId },
-          data: { sessionExpiresAt: autoExpiresAt },
-        })
-        channelSession = { ...channelSession, sessionExpiresAt: autoExpiresAt }
-      }
 
       if (!channel) {
         return {
