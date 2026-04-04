@@ -66,7 +66,7 @@ jobs:
             cd ~/bandauto
 
             # GitHub PAT로 인증하여 최신 코드 가져오기
-            git remote set-url origin "https://${GHCR_PAT}@github.com/ABC-Group-Tech/bandauto.git"
+            git remote set-url origin "https://x-access-token:${GHCR_PAT}@github.com/ABC-Group-Tech/bandauto.git"
             git pull origin main
             # 보안: pull 후 토큰 제거
             git remote set-url origin "https://github.com/ABC-Group-Tech/bandauto.git"
