@@ -36,9 +36,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // 랜딩페이지(/)는 공개
+  if (pathname === '/') {
+    return NextResponse.next()
+  }
+
   // 공개 경로는 통과
   if (publicPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next()
+  }
+
+  // /admin 정확 경로 → /admin/dashboard로 리다이렉트
+  if (pathname === '/admin') {
+    return NextResponse.redirect(new URL('/admin/dashboard', request.url))
   }
 
   // 쿠키에서 토큰 확인
@@ -61,9 +71,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // sourcing-app은 ADMIN 또는 SOURCING_USER만 접근 가능
+  // sourcing-app은 ADMIN 또는 MANAGER만 접근 가능
   if (!ALLOWED_ROLES.includes(payload.role)) {
     return NextResponse.redirect(new URL('/forbidden', request.url))
+  }
+
+  // /admin/* 경로는 ADMIN 역할만 접근 가능
+  if (pathname.startsWith('/admin') && payload.role !== 'ADMIN') {
+    return NextResponse.redirect(new URL('/sourcing/dashboard', request.url))
   }
 
   return NextResponse.next()
