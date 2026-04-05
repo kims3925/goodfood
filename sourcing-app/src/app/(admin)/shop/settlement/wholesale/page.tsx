@@ -72,6 +72,7 @@ export default function SettlementPage() {
       }
     }
     loadChannels()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 채널 선택 시 정산서 타입 자동 변경

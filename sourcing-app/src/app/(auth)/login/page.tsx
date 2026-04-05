@@ -277,15 +277,21 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-gray-500 text-sm mt-6">
-          계정이 없으신가요?{' '}
-          <a href="/register" className="text-blue-600 font-medium hover:underline">
-            판매관리자 등록
+        {/* 하단 링크 */}
+        <div className="mt-6 text-center space-y-3">
+          <p className="text-sm text-gray-600">
+            계정이 없으신가요?{' '}
+            <a href="/register" className="text-blue-600 hover:underline font-medium">
+              판매관리자 등록
+            </a>
+          </p>
+          <a
+            href="/"
+            className="text-sm text-gray-500 hover:text-gray-700 inline-block"
+          >
+            홈으로 돌아가기
           </a>
-        </p>
-        <p className="text-center text-gray-400 text-xs mt-3">
-          <a href="/" className="hover:text-gray-600">홈으로 돌아가기</a>
-        </p>
+        </div>
       </div>
     </div>
   )
