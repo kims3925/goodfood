@@ -265,7 +265,7 @@ export default function SourcingConditionsPage() {
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <Target className="w-10 h-10 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">등록된 소싱조건이 없습니다.</p>
-            <p className="text-xs text-gray-400 mt-1">위 "조건 추가" 버튼을 눌러 소싱조건을 설정하세요.</p>
+            <p className="text-xs text-gray-400 mt-1">위 &quot;조건 추가&quot; 버튼을 눌러 소싱조건을 설정하세요.</p>
           </div>
         ) : (
           conditions.map(cond => (
