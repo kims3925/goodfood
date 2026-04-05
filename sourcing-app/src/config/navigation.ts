@@ -265,10 +265,13 @@ export function getMenuBySectionAndRole(section: AppSection, userRole: UserRole)
 }
 
 // 사용자 역할에 따라 접근 가능한 섹션 목록
+// 어드민 패널은 독립 레이아웃으로 분리되었으므로 매니저 섹션 탭에서 제외
+// ADMIN 사용자는 Header의 어드민 패널 바로가기 버튼으로 접근
 export function getAvailableSections(userRole: UserRole): AppSection[] {
-  const sections: AppSection[] = ['sourcing', 'shop']
-  if (userRole === 'ADMIN') {
-    sections.push('admin')
-  }
-  return sections
+  return ['sourcing', 'shop']
+}
+
+// ADMIN 역할 확인 (Header에서 어드민 패널 링크 표시용)
+export function isAdminUser(userRole: UserRole): boolean {
+  return userRole === 'ADMIN'
 }

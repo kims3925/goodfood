@@ -113,6 +113,7 @@ export default function AdminLayout({
             onMenuClick={() => setSidebarOpen(!sidebarOpen)}
             currentSection={currentSection}
             onSectionChange={handleSectionChange}
+            userRole={userRole}
           />
 
           <div className="flex h-[calc(100vh-4rem)]">

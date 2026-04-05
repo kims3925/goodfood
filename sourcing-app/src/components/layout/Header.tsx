@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check, AlertCircle, Info, Wifi, WifiOff, RefreshCw, Save, Users, Eye, Chrome } from 'lucide-react'
+import { Menu, Bell, Zap, Package, Upload, LogIn, LogOut, ClipboardList, Truck, Calculator, ShoppingCart, XCircle, RotateCcw, MessageSquare, Wallet, Check, AlertCircle, Info, Wifi, WifiOff, RefreshCw, Save, Users, Eye, Chrome, Cpu } from 'lucide-react'
 import { AppSection, getDefaultPathBySection } from '@/config/navigation'
 import { useBandSession } from '@/contexts/BandSessionContext'
 import { checkExtensionInstalled, saveSessionViaExtension } from '@/lib/band-extension'
@@ -45,6 +45,7 @@ interface HeaderProps {
   onMenuClick?: () => void
   currentSection: AppSection
   onSectionChange: (section: AppSection) => void
+  userRole?: string
 }
 
 // 알림 타입 (Shop + Sourcing)
@@ -313,7 +314,7 @@ const VisitorIndicator = memo(function VisitorIndicator() {
   )
 })
 
-export default function Header({ onMenuClick, currentSection, onSectionChange }: HeaderProps) {
+export default function Header({ onMenuClick, currentSection, onSectionChange, userRole }: HeaderProps) {
   const router = useRouter()
   const [user, setUser] = useState<{ email: string; name?: string | null } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -478,18 +479,6 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
 
   // 현재 섹션에 따른 통계 표시
   const renderStats = () => {
-    if (currentSection === 'admin') {
-      return (
-        <>
-          <div className="flex items-center gap-2">
-            <Users size={16} className="text-indigo-600" />
-            <span className="text-sm text-text-secondary">
-              플랫폼 관리 모드
-            </span>
-          </div>
-        </>
-      )
-    }
     if (currentSection === 'sourcing') {
       return (
         <>
@@ -607,6 +596,17 @@ export default function Header({ onMenuClick, currentSection, onSectionChange }:
 
           {/* Right side */}
           <div className="flex items-center gap-2">
+            {/* 어드민 패널 바로가기 (ADMIN 역할만) */}
+            {userRole === 'ADMIN' && (
+              <Link
+                href="/admin"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors"
+              >
+                <Cpu size={14} />
+                어드민
+              </Link>
+            )}
+
             {/* 실시간 접속자 */}
             <VisitorIndicator />
 
