@@ -33,6 +33,7 @@ ARG APP_NAME=shop
 ARG APP_PORT=3000
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV STANDALONE=true
 
 RUN apk add --no-cache openssl
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
