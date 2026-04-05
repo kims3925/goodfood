@@ -6,7 +6,17 @@ import { hashPassword } from '@/modules/auth/auth.service'
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, password } = await request.json()
+    const body = await request.json()
+    const {
+      name,
+      email,
+      password,
+      phone,
+      sellerType,
+      companyName,
+      businessNumber,
+      onlineSalesNumber,
+    } = body
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -18,6 +28,13 @@ export async function POST(request: NextRequest) {
     if (password.length < 8) {
       return NextResponse.json(
         { success: false, error: '비밀번호는 8자 이상이어야 합니다.' },
+        { status: 400 }
+      )
+    }
+
+    if (sellerType === 'SELLER' && !companyName) {
+      return NextResponse.json(
+        { success: false, error: '판매자 등록 시 회사명/상호는 필수입니다.' },
         { status: 400 }
       )
     }
@@ -40,7 +57,12 @@ export async function POST(request: NextRequest) {
         email,
         password: hashedPassword,
         name,
+        phone: phone || null,
         role: 'MANAGER',
+        sellerType: sellerType || null,
+        companyName: companyName || null,
+        businessNumber: businessNumber || null,
+        onlineSalesNumber: onlineSalesNumber || null,
         signupCompletedAt: new Date(),
       },
     })
@@ -52,6 +74,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         name: user.name,
         role: user.role,
+        sellerType: sellerType || null,
       },
     })
   } catch (error) {
