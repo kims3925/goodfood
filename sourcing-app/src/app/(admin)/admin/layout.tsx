@@ -32,7 +32,7 @@ export default function AdminPanelLayout({
         }
 
         if (data.user.role !== 'ADMIN') {
-          router.replace('/sourcing/dashboard')
+          router.replace(`/login?redirect=${encodeURIComponent(pathname)}&admin=1`)
           return
         }
 
