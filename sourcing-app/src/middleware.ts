@@ -2,106 +2,104 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyToken } from '@/modules/auth/auth.service'
 
-// sourcing-app에 접근 가능한 역할
+// sourcing-appì ì ê·¼ ê°ë¥í ì­í 
 const ALLOWED_ROLES = ['ADMIN', 'MANAGER']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // 인증이 필요 없는 경로
+  // ì¸ì¦ì´ íì ìë ê²½ë¡
   const publicPaths = [
     '/login',
     '/register',
     '/forbidden',
-    '/create-admin',       // 관리자 계정 생성
-    '/api/create-admin',   // 관리자 계정 생성 API
+    '/create-admin',       // ê´ë¦¬ì ê³ì  ìì±
+    '/api/create-admin',   // ê´ë¦¬ì ê³ì  ìì± API
     '/api/auth/login',
     '/api/auth/register',
     '/api/auth/logout',
-    '/api/order/webhook',  // Google Forms 웹훅
-    '/api/assets/',        // 이미지 등 정적 자산
-    '/api/images/',        // 이미지 API
-    '/api/cron/',          // 스케줄러 내부 호출
-    '/api/extension/download', // 확장 프로그램 다운로드
-    '/api/health',         // 헬스체크
+    '/api/order/webhook',  // Google Forms ì¹í
+    '/api/assets/',        // ì´ë¯¸ì§ ë± ì ì  ìì°
+    '/api/images/',        // ì´ë¯¸ì§ API
+    '/api/cron/',          // ì¤ì¼ì¤ë¬ ë´ë¶ í¸ì¶
+    '/api/extension/download', // íì¥ íë¡ê·¸ë¨ ë¤ì´ë¡ë
+    '/api/health',         // í¬ì¤ì²´í¬
   ]
 
-  // Chrome Extension에서 band-session API 접근 허용 (PUT, POST 메서드)
+  // Chrome Extensionìì band-session API ì ê·¼ íì© (PUT, POST ë©ìë)
   if (pathname.includes('/band-session') && (request.method === 'PUT' || request.method === 'POST')) {
     return NextResponse.next()
   }
 
-  // CORS preflight 요청 허용
+  // CORS preflight ìì²­ íì©
   if (request.method === 'OPTIONS') {
     return NextResponse.next()
   }
 
-  // 랜딩페이지(/)는 공개
+  // ëë©íì´ì§(/)ë ê³µê°
   if (pathname === '/') {
     return NextResponse.next()
   }
 
-  // 공개 경로는 통과
+  // ê³µê° ê²½ë¡ë íµê³¼
   if (publicPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next()
   }
 
-  // 쿠키에서 토큰 확인
+  // ì¿ í¤ìì í í° íì¸
   const token = request.cookies.get('auth-token')?.value
 
-  // /admin 또는 /admin/* 경로 처리
+  // /admin/loginì ê³µê° ê²½ë¡ (ì´ëë¯¼ ì ì© ë¡ê·¸ì¸ íì´ì§)
+  if (pathname === '/admin/login') {
+    return NextResponse.next()
+  }
+
+  // /admin ëë /admin/* ê²½ë¡ ì²ë¦¬
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     if (!token) {
-      // 비로그인 → 로그인 페이지로 (redirect=/admin/dashboard)
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('redirect', '/admin/dashboard')
-      return NextResponse.redirect(loginUrl)
+      // ë¹ë¡ê·¸ì¸ â ì´ëë¯¼ ë¡ê·¸ì¸ íì´ì§ë¡
+      return NextResponse.redirect(new URL('/admin/login', request.url))
     }
 
     const adminPayload = await verifyToken(token)
 
     if (!adminPayload) {
-      // 토큰 무효 → 로그인 페이지로
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('redirect', '/admin/dashboard')
-      return NextResponse.redirect(loginUrl)
+      // í í° ë¬´í¨ â ì´ëë¯¼ ë¡ê·¸ì¸ íì´ì§ë¡
+      return NextResponse.redirect(new URL('/admin/login', request.url))
     }
 
     if (adminPayload.role !== 'ADMIN') {
-      // ADMIN이 아닌 역할 → 로그인 페이지로 (ADMIN 계정으로 재로그인 유도)
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('redirect', '/admin/dashboard')
-      loginUrl.searchParams.set('admin', '1')
-      return NextResponse.redirect(loginUrl)
+      // ADMINì´ ìë ì­í  â ì´ëë¯¼ ë¡ê·¸ì¸ íì´ì§ë¡
+      return NextResponse.redirect(new URL('/admin/login', request.url))
     }
 
-    // ADMIN 역할 → /admin 정확 경로면 /admin/dashboard로 리다이렉트
+    // ADMIN ì­í  â /admin ì í ê²½ë¡ë©´ /admin/dashboardë¡ ë¦¬ë¤ì´ë í¸
     if (pathname === '/admin') {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     }
 
-    // /admin/* 하위 경로는 그대로 진행
+    // /admin/* íì ê²½ë¡ë ê·¸ëë¡ ì§í
     return NextResponse.next()
   }
 
   if (!token) {
-    // 로그인이 안 되어있으면 로그인 페이지로 리다이렉트
+    // ë¡ê·¸ì¸ì´ ì ëì´ìì¼ë©´ ë¡ê·¸ì¸ íì´ì§ë¡ ë¦¬ë¤ì´ë í¸
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
-  // 토큰 검증
+  // í í° ê²ì¦
   const payload = await verifyToken(token)
 
   if (!payload) {
-    // 토큰이 유효하지 않으면 로그인 페이지로 리다이렉트
+    // í í°ì´ ì í¨íì§ ìì¼ë© ë¡ê·¸ì¸ íì´ì§ë¡ ë¦¬ë¤ì´ë í¸
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
-  // sourcing-app은 ADMIN 또는 MANAGER만 접근 가능
+  // sourcing-appì ADMIN ëë MANAGERë§ ì ê·¼ ê°ë¥
   if (!ALLOWED_ROLES.includes(payload.role)) {
     return NextResponse.redirect(new URL('/forbidden', request.url))
   }
@@ -109,7 +107,7 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next()
 }
 
-// 미들웨어를 적용할 경로 설정
+// ë¯¸ë¤ì¨ì´ë¥¼ ì ì©í  ê²½ë¡ ì¤ì 
 export const config = {
   matcher: [
     /*
@@ -121,4 +119,4 @@ export const config = {
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
-}
+}ï¿½
