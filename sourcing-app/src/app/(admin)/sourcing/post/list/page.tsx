@@ -73,9 +73,9 @@ interface AvailablePost {
 
 const PLATFORM_OPTIONS: { value: ChannelPlatform; label: string }[] = [
   { value: 'BAND', label: '밴드' },
-  { value: 'NAVER_CAFE', label: '네이버 카페' },
-  { value: 'ALIEXPRESS', label: '알리익스프레스' },
 ]
+
+type AddMode = 'BAND' | 'URL' | 'MANUAL' | 'SETTINGS'
 
 export default function PostsManagePage() {
   const router = useRouter()
@@ -125,6 +125,27 @@ export default function PostsManagePage() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
   const [failedCount, setFailedCount] = useState(0)
+
+  // 추가 모드 상태
+  const [addMode, setAddMode] = useState<AddMode>('BAND')
+
+  // URL 수집 폼
+  const [urlInput, setUrlInput] = useState('')
+  const [urlSubmitting, setUrlSubmitting] = useState(false)
+  const [urlResult, setUrlResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  // 직접 등록 폼
+  const [manualForm, setManualForm] = useState({
+    title: '',
+    content: '',
+    price: '',
+    images: [] as string[],
+    channelId: '',
+  })
+
+  // 조건 설정
+  const [filterDays, setFilterDays] = useState(1)
+  const [filterSearch, setFilterSearch] = useState('')
 
   // 채널 목록 로드
   const loadChannels = useCallback(async () => {
@@ -571,6 +592,21 @@ export default function PostsManagePage() {
 
         {/* 통계 및 액션 카드 */}
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          {/* 게시물 추가 카드 (첫 번째) */}
+          <button
+            onClick={handleOpenAddModal}
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left min-h-[44px]"
+          >
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+                <Plus size={20} className="sm:w-6 sm:h-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs sm:text-sm text-gray-500">게시물</p>
+                <p className="text-base sm:text-lg font-bold text-blue-600">추가하기</p>
+              </div>
+            </div>
+          </button>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="p-2 sm:p-3 bg-gray-100 rounded-lg">
@@ -588,26 +624,11 @@ export default function PostsManagePage() {
                 <Store size={20} className="sm:w-6 sm:h-6 text-purple-600" />
               </div>
               <div>
-                <p className="text-xs sm:text-sm text-gray-500">도매밴드 수</p>
+                <p className="text-xs sm:text-sm text-gray-500">소싱처 수</p>
                 <p className="text-xl sm:text-2xl font-bold text-purple-600">{channels.length}</p>
               </div>
             </div>
           </div>
-          {/* 게시물 추가 카드 */}
-          <button
-            onClick={handleOpenAddModal}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left min-h-[44px]"
-          >
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
-                <Plus size={20} className="sm:w-6 sm:h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">게시물</p>
-                <p className="text-base sm:text-lg font-bold text-blue-600">추가하기</p>
-              </div>
-            </div>
-          </button>
           {/* 게시물 삭제 카드 */}
           <button
             onClick={handleDeleteSelectedPosts}
@@ -930,35 +951,230 @@ export default function PostsManagePage() {
         }
       >
         <div className="space-y-4">
-          {/* 플랫폼 선택 탭 */}
+          {/* 수집 방법 선택 탭 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              플랫폼 선택
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {PLATFORM_OPTIONS.map((option) => (
+            <div className="flex gap-2 border-b border-gray-200 pb-0">
+              {[
+                { mode: 'BAND' as AddMode, label: '밴드', icon: '📱' },
+                { mode: 'URL' as AddMode, label: 'URL로 수집', icon: '🔗' },
+                { mode: 'MANUAL' as AddMode, label: '직접 등록', icon: '✏️' },
+                { mode: 'SETTINGS' as AddMode, label: '조건 설정', icon: '⚙️' },
+              ].map(tab => (
                 <button
-                  key={option.value}
+                  key={tab.mode}
                   type="button"
-                  onClick={() => handlePlatformSelect(option.value)}
-                  disabled={isLoadingPosts}
-                  className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                    selectedPlatform === option.value
-                      ? 'border-purple-500 bg-purple-500 text-white'
-                      : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                  } ${isLoadingPosts ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={() => {
+                    setAddMode(tab.mode)
+                    if (tab.mode === 'BAND') handlePlatformSelect('BAND')
+                  }}
+                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                    addMode === tab.mode
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
                 >
-                  {option.label}
+                  {tab.icon} {tab.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* 오늘 날짜 안내 */}
+          {/* URL 수집 모드 */}
+          {addMode === 'URL' && (
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">상품 URL 입력</label>
+                <p className="text-xs text-gray-500 mb-3">밴드 게시물 URL을 입력하면 자동으로 수집합니다.</p>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={urlInput}
+                    onChange={e => setUrlInput(e.target.value)}
+                    placeholder="https://band.us/band/..."
+                    className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <Button
+                    variant="primary"
+                    onClick={async () => {
+                      if (!urlInput.trim()) return
+                      setUrlSubmitting(true)
+                      setUrlResult(null)
+                      try {
+                        const res = await fetch('/api/post/collect-url', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ url: urlInput.trim() }),
+                        })
+                        const data = await res.json()
+                        if (data.success) {
+                          setUrlResult({ success: true, message: '게시물이 수집되었습니다.' })
+                          setUrlInput('')
+                          loadPosts()
+                        } else {
+                          setUrlResult({ success: false, message: data.error || '수집에 실패했습니다.' })
+                        }
+                      } catch {
+                        setUrlResult({ success: false, message: '네트워크 오류' })
+                      } finally {
+                        setUrlSubmitting(false)
+                      }
+                    }}
+                    disabled={urlSubmitting || !urlInput.trim()}
+                  >
+                    {urlSubmitting ? '수집 중...' : '수집하기'}
+                  </Button>
+                </div>
+                {urlResult && (
+                  <div className={`mt-3 px-4 py-2 rounded-lg text-sm ${
+                    urlResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                  }`}>
+                    {urlResult.message}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 직접 등록 모드 */}
+          {addMode === 'MANUAL' && (
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">소싱처 선택 *</label>
+                <select
+                  value={manualForm.channelId}
+                  onChange={e => setManualForm(p => ({ ...p, channelId: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm"
+                >
+                  <option value="">소싱처를 선택하세요</option>
+                  {channels.map(ch => (
+                    <option key={ch.id} value={ch.id}>{ch.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">상품명 *</label>
+                <input
+                  type="text"
+                  value={manualForm.title}
+                  onChange={e => setManualForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder="상품명을 입력하세요"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">상품 설명 *</label>
+                <textarea
+                  value={manualForm.content}
+                  onChange={e => setManualForm(p => ({ ...p, content: e.target.value }))}
+                  placeholder="상품 상세 설명을 입력하세요"
+                  rows={5}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">가격</label>
+                <input
+                  type="number"
+                  value={manualForm.price}
+                  onChange={e => setManualForm(p => ({ ...p, price: e.target.value }))}
+                  placeholder="0"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm"
+                />
+              </div>
+              <Button
+                variant="primary"
+                className="w-full"
+                onClick={async () => {
+                  if (!manualForm.channelId || !manualForm.title || !manualForm.content) {
+                    toast.error('소싱처, 상품명, 설명은 필수입니다.')
+                    return
+                  }
+                  try {
+                    const res = await fetch('/api/post', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        channelId: parseInt(manualForm.channelId),
+                        externalId: `manual_${Date.now()}`,
+                        title: manualForm.title,
+                        content: manualForm.content,
+                        author: '직접등록',
+                      }),
+                    })
+                    const data = await res.json()
+                    if (data.success) {
+                      toast.success('게시물이 등록되었습니다.')
+                      setManualForm({ title: '', content: '', price: '', images: [], channelId: '' })
+                      loadPosts()
+                      setShowAddModal(false)
+                    } else {
+                      toast.error(data.error || '등록에 실패했습니다.')
+                    }
+                  } catch {
+                    toast.error('네트워크 오류')
+                  }
+                }}
+              >
+                게시물 직접 등록
+              </Button>
+            </div>
+          )}
+
+          {/* 조건 설정 모드 */}
+          {addMode === 'SETTINGS' && (
+            <div className="space-y-4 py-4">
+              <div className="bg-gray-50 rounded-lg p-5 space-y-4">
+                <h4 className="text-sm font-semibold text-gray-900">수집 조건 설정</h4>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">수집 기간</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">최근</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={30}
+                      value={filterDays}
+                      onChange={e => setFilterDays(Number(e.target.value))}
+                      className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-sm text-center"
+                    />
+                    <span className="text-sm text-gray-600">일</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">밴드 수집 시 해당 기간 내 게시물만 가져옵니다.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">상품 검색 키워드</label>
+                  <input
+                    type="text"
+                    value={filterSearch}
+                    onChange={e => setFilterSearch(e.target.value)}
+                    placeholder="키워드를 입력하세요 (예: 해산물, 전복)"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">입력한 키워드가 포함된 게시물만 수집합니다.</p>
+                </div>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    toast.success(`조건 저장: 최근 ${filterDays}일${filterSearch ? `, 키워드: ${filterSearch}` : ''}`)
+                    setAddMode('BAND')
+                    loadPostsByPlatform('BAND')
+                  }}
+                >
+                  조건 저장 후 밴드 수집으로 이동
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* 밴드 수집 모드 */}
+          {addMode === 'BAND' && (
+          <>
+          {/* 날짜 안내 */}
           <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
             <AlertCircle size={20} className="text-blue-600 flex-shrink-0" />
             <p className="text-sm text-blue-800">
-              <span className="font-medium">오늘 (KST 기준)</span> 작성된 게시물만 표시됩니다.
+              <span className="font-medium">최근 {filterDays}일</span> 작성된 게시물을 표시합니다.
+              {filterSearch && <span className="ml-1">(키워드: {filterSearch})</span>}
             </p>
           </div>
 
@@ -968,9 +1184,7 @@ export default function PostsManagePage() {
               <div className="h-full flex flex-col items-center justify-center">
                 <Loading />
                 <p className="text-center text-gray-600 mt-4">
-                  {selectedPlatform === 'BAND' && '밴드 게시물을 불러오는 중...'}
-                  {selectedPlatform === 'NAVER_CAFE' && '네이버 카페 게시물을 불러오는 중...'}
-                  {selectedPlatform === 'ALIEXPRESS' && '알리익스프레스 상품을 불러오는 중...'}
+                  밴드 게시물을 불러오는 중...
                 </p>
               </div>
             ) : apiError ? (
@@ -1175,6 +1389,8 @@ export default function PostsManagePage() {
               </div>
             )}
           </div>
+          </>
+          )}
 
         </div>
       </Modal>

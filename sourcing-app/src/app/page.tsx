@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Zap, ShoppingBag, BarChart3, Bot, Shield, Rocket, Package, Send, CreditCard, Headphones, Store, ChevronRight, PlayCircle } from 'lucide-react'
+import { ArrowRight, Zap, ShoppingBag, BarChart3, Bot, Shield, Rocket, Package, Send, CreditCard, Headphones, Store, ChevronRight, PlayCircle, Calculator, Truck, FileSpreadsheet } from 'lucide-react'
 
 export default function LandingPage() {
   const router = useRouter()
@@ -11,8 +11,8 @@ export default function LandingPage() {
       id: 'sourcing',
       icon: <Package className="w-7 h-7" />,
       title: '자동 상품 수집',
-      subtitle: 'Playwright 기반 밴드 크롤링',
-      description: '도매 밴드 채널에서 상품 게시글을 자동으로 수집합니다. 이미지, 가격, 옵션 정보를 자동 추출하고 중복을 필터링합니다. 1시간~6시간 주기로 스케줄 수집이 가능합니다.',
+      subtitle: '실시간 소싱 정보 반영',
+      description: '소싱처 채널에서 상품 게시글을 자동으로 수집합니다. 이미지, 가격, 옵션 정보를 자동 추출하고 중복을 필터링합니다. URL 수집, 직접 등록도 지원합니다.',
       color: 'blue',
       screenshot: '/images/landing/feature-sourcing.svg',
     },
@@ -20,8 +20,8 @@ export default function LandingPage() {
       id: 'ai',
       icon: <Bot className="w-7 h-7" />,
       title: 'AI 상품 가공',
-      subtitle: 'Gemini AI 자동 변환',
-      description: '수집된 도매 상품을 Gemini AI가 소매용으로 자동 변환합니다. 상품명 최적화, 상세 설명 생성, 옵션/가격 자동 설정까지 원클릭으로 완성됩니다.',
+      subtitle: 'AI 자동 변환',
+      description: '수집된 상품을 AI가 내 설정에 맞게 소매용으로 자동 변환합니다. 상품명 최적화, 상세 설명 생성, 옵션/가격 자동 설정까지 원클릭으로 완성됩니다.',
       color: 'purple',
       screenshot: '/images/landing/feature-ai.svg',
     },
@@ -30,7 +30,7 @@ export default function LandingPage() {
       icon: <Send className="w-7 h-7" />,
       title: '소매밴드 자동 발행',
       subtitle: '이미지 포함 자동 게시',
-      description: '가공된 상품을 소매 밴드에 이미지와 함께 자동 발행합니다. Playwright로 이미지를 업로드하고, 결제 링크를 포함한 게시글을 자동으로 작성합니다.',
+      description: '가공된 상품을 소매 밴드와 쇼핑몰에 이미지와 함께 자동 발행합니다. 결제 링크가 포함된 게시글을 자동으로 작성하고 쇼핑몰에도 동시 등록됩니다.',
       color: 'green',
       screenshot: '/images/landing/feature-publish.svg',
     },
@@ -46,11 +46,20 @@ export default function LandingPage() {
     {
       id: 'order',
       icon: <CreditCard className="w-7 h-7" />,
-      title: '주문/정산 자동화',
-      subtitle: '토스페이먼츠 연동',
-      description: '주문 접수부터 결제 확인, 도매 발주, 배송 추적, 정산까지 전 과정을 자동으로 처리합니다. 미결제 주문은 24시간 후 자동 취소됩니다.',
+      title: '주문 · 발주 자동화',
+      subtitle: '주문부터 도매 발주까지',
+      description: '고객 주문 접수부터 결제 확인, 도매처 발주 연동, 배송 추적까지 전 과정을 자동으로 처리합니다. 미결제 주문은 24시간 후 자동 취소됩니다.',
       color: 'red',
       screenshot: '/images/landing/feature-order.svg',
+    },
+    {
+      id: 'settlement',
+      icon: <Calculator className="w-7 h-7" />,
+      title: '정산 자동화',
+      subtitle: '매출/마진/수수료 자동 계산',
+      description: '토스페이먼츠 거래 데이터를 기반으로 쇼핑몰별 매출, 마진, 수수료를 자동 정산합니다. 도매 정산서 생성과 Google Sheets 연동을 지원합니다.',
+      color: 'orange',
+      screenshot: '/images/landing/feature-settlement.svg',
     },
     {
       id: 'dashboard',
@@ -60,6 +69,15 @@ export default function LandingPage() {
       description: '매출 추이, 주문 상태, 상품별 성과, 쇼핑몰별 매출을 실시간으로 모니터링합니다. 기간별 비교 분석과 마진율 계산도 자동으로 제공됩니다.',
       color: 'indigo',
       screenshot: '/images/landing/feature-dashboard.svg',
+    },
+    {
+      id: 'manager',
+      icon: <Store className="w-7 h-7" />,
+      title: '판매관리자 관리',
+      subtitle: '매니저 계정/권한 관리',
+      description: '매니저 계정을 추가하고 담당자 정보, 비밀번호를 관리합니다. SaaS 형태로 여러 판매관리자가 독립적으로 운영할 수 있습니다.',
+      color: 'teal',
+      screenshot: '/images/landing/feature-manager.svg',
     },
   ]
 
@@ -108,11 +126,12 @@ export default function LandingPage() {
             AI 기반 소셜커머스 자동화 플랫폼
           </div>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
-            밴드 상품 소싱부터<br />
-            <span className="text-blue-600">판매까지 완전 자동화</span>
+            밴드 상품 소싱부터 판매,<br />
+            <span className="text-blue-600">발주, 정산까지 완전 자동화</span>
           </h2>
           <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed">
-            도매 밴드에서 상품을 자동 수집하고, AI가 소매용으로 가공한 후,<br className="hidden sm:block" />
+            소싱처에서 간단히 상품을 자동 수집하고,<br className="hidden sm:block" />
+            AI가 내 설정에 맞게 소매용으로 가공한 후,<br className="hidden sm:block" />
             소매 밴드와 자체 쇼핑몰에 원클릭으로 발행하세요.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -148,26 +167,19 @@ export default function LandingPage() {
               </div>
               <div className="aspect-[16/9] bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center p-8">
                 <div className="text-center">
-                  <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
-                    {[
-                      { label: '수집', value: '156', color: 'text-green-400' },
-                      { label: 'AI 가공', value: '89', color: 'text-yellow-400' },
-                      { label: '발행', value: '45', color: 'text-blue-400' },
-                    ].map(stat => (
-                      <div key={stat.label} className="bg-gray-700/50 rounded-lg p-3 sm:p-4">
-                        <p className="text-xs text-gray-400">{stat.label}</p>
-                        <p className={`text-xl sm:text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-center gap-3 text-gray-500 text-sm">
-                    <span className="flex items-center gap-1"><Package size={14} /> 수집</span>
-                    <ChevronRight size={14} />
-                    <span className="flex items-center gap-1"><Bot size={14} /> AI가공</span>
-                    <ChevronRight size={14} />
-                    <span className="flex items-center gap-1"><Send size={14} /> 발행</span>
-                    <ChevronRight size={14} />
-                    <span className="flex items-center gap-1"><ShoppingBag size={14} /> 판매</span>
+                  <p className="text-sm text-gray-400 mb-4 font-medium">모든 절차 완전 자동화</p>
+                  <div className="flex items-center justify-center gap-2 sm:gap-3 text-gray-400 text-xs sm:text-sm flex-wrap">
+                    <span className="flex items-center gap-1 bg-gray-700/60 px-3 py-1.5 rounded-lg text-green-400"><Package size={14} /> 상품수집</span>
+                    <ChevronRight size={14} className="text-gray-600" />
+                    <span className="flex items-center gap-1 bg-gray-700/60 px-3 py-1.5 rounded-lg text-yellow-400"><Bot size={14} /> AI가공</span>
+                    <ChevronRight size={14} className="text-gray-600" />
+                    <span className="flex items-center gap-1 bg-gray-700/60 px-3 py-1.5 rounded-lg text-blue-400"><Send size={14} /> 발행</span>
+                    <ChevronRight size={14} className="text-gray-600" />
+                    <span className="flex items-center gap-1 bg-gray-700/60 px-3 py-1.5 rounded-lg text-purple-400"><ShoppingBag size={14} /> 판매</span>
+                    <ChevronRight size={14} className="text-gray-600" />
+                    <span className="flex items-center gap-1 bg-gray-700/60 px-3 py-1.5 rounded-lg text-orange-400"><Truck size={14} /> 발주</span>
+                    <ChevronRight size={14} className="text-gray-600" />
+                    <span className="flex items-center gap-1 bg-gray-700/60 px-3 py-1.5 rounded-lg text-red-400"><Calculator size={14} /> 정산</span>
                   </div>
                 </div>
               </div>
@@ -321,4 +333,6 @@ const colorMap: Record<string, {
   yellow: { bg: 'bg-yellow-100', text: 'text-yellow-600', border: 'border-yellow-200', headerBg: 'bg-yellow-600', screenshotBg: 'bg-yellow-50' },
   red: { bg: 'bg-red-100', text: 'text-red-600', border: 'border-red-200', headerBg: 'bg-red-600', screenshotBg: 'bg-red-50' },
   indigo: { bg: 'bg-indigo-100', text: 'text-indigo-600', border: 'border-indigo-200', headerBg: 'bg-indigo-600', screenshotBg: 'bg-indigo-50' },
+  orange: { bg: 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200', headerBg: 'bg-orange-600', screenshotBg: 'bg-orange-50' },
+  teal: { bg: 'bg-teal-100', text: 'text-teal-600', border: 'border-teal-200', headerBg: 'bg-teal-600', screenshotBg: 'bg-teal-50' },
 }
