@@ -15,6 +15,7 @@ interface AgentLayerSectionProps {
 const LAYER_META: Record<string, { label: string; color: string; bgColor: string }> = {
   COMMAND: { label: 'Command Layer', color: 'text-red-700', bgColor: 'bg-red-50' },
   SOURCING: { label: 'Sourcing Layer', color: 'text-blue-700', bgColor: 'bg-blue-50' },
+  OPERATIONS: { label: 'Operations Layer', color: 'text-orange-700', bgColor: 'bg-orange-50' },
   COMMERCE: { label: 'Commerce Layer', color: 'text-green-700', bgColor: 'bg-green-50' },
   INFRA: { label: 'Infra Layer', color: 'text-purple-700', bgColor: 'bg-purple-50' },
   // 하위 호환

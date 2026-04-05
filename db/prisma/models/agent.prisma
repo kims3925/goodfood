@@ -1,11 +1,12 @@
 // ─── 에이전트 관리 모델 ───
-// 10개 자율운영 AI 에이전트 · 4개 레이어 · 완전 자동화 운영 시스템
+// 11개 자율운영 AI 에이전트 · 5개 레이어 · 완전 자동화 운영 시스템
 
 enum AgentLayer {
   COMMAND        // 전체 조율 (Commander)
-  SOURCING       // 상품 소싱 파이프라인 (Collector → Transformer → Publisher)
-  COMMERCE       // 주문/결제/CS (OrderBot, PaymentGuard, SupportBot)
-  INFRA          // 인프라+인텔리전스 (SessionKeeper, Watcher, Analyst)
+  SOURCING       // 소싱+상품관리 (Sourcing Agent, Product Manager)
+  OPERATIONS     // 마케팅+고객소통 (Marketing Agent, Customer Agent)
+  COMMERCE       // 주문/배송/정산 (Order, Shipping, Settlement)
+  INFRA          // 인프라+분석 (SessionKeeper, Watcher, Analyst)
 }
 
 enum AgentStatus {
@@ -148,4 +149,27 @@ model AgentWorkflowStep {
 
   @@index([workflowId, order])
   @@map("agent_workflow_steps")
+}
+
+// ─── 소싱조건 설정 모델 ───
+model SourcingCondition {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @map("user_id")
+  name             String   @db.VarChar(100)
+  categories       Json     // 카테고리 배열 ["수산","축산",...]
+  minPrice         Int?     @map("min_price")
+  maxPrice         Int?     @map("max_price")
+  minMarginRate    Float?   @map("min_margin_rate")
+  includeKeywords  Json?    @map("include_keywords")
+  excludeKeywords  Json?    @map("exclude_keywords")
+  channelIds       Json?    @map("channel_ids")
+  prioritySourcing Boolean  @default(false) @map("priority_sourcing")
+  maxDailyCount    Int?     @map("max_daily_count")
+  schedule         String?  @db.VarChar(50)
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([userId, isActive])
+  @@map("sourcing_conditions")
 }

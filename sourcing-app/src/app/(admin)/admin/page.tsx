@@ -29,7 +29,7 @@ interface PlatformStats {
 }
 
 const defaultStats: PlatformStats = {
-  agents: { total: 10, active: 0, error: 0 },
+  agents: { total: 11, active: 0, error: 0 },
   tasks: { today: 0, completed: 0, failed: 0 },
   orders: { today: 0, pending: 0, revenue: 0 },
   users: { total: 0, activeToday: 0 },
@@ -271,12 +271,13 @@ export default function AdminOverviewPage() {
       {/* Layer Summary */}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 mb-3">에이전트 레이어 현황</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
-            { layer: 'COMMAND', label: 'Command Layer', count: 1, color: 'border-red-200 bg-red-50', textColor: 'text-red-700', desc: '전체 조율, 장애복구, 리포트' },
-            { layer: 'SOURCING', label: 'Sourcing Layer', count: 3, color: 'border-blue-200 bg-blue-50', textColor: 'text-blue-700', desc: '수집 → AI가공 → 발행 파이프라인' },
-            { layer: 'COMMERCE', label: 'Commerce Layer', count: 3, color: 'border-green-200 bg-green-50', textColor: 'text-green-700', desc: '주문, 결제/정산, 고객지원' },
-            { layer: 'INFRA', label: 'Infra Layer', count: 3, color: 'border-purple-200 bg-purple-50', textColor: 'text-purple-700', desc: '세션관리, 모니터링, 데이터분석' },
+            { layer: 'COMMAND', label: 'Command', count: 1, color: 'border-red-200 bg-red-50', textColor: 'text-red-700', desc: '전체 조율, 장애복구' },
+            { layer: 'SOURCING', label: 'Sourcing', count: 2, color: 'border-blue-200 bg-blue-50', textColor: 'text-blue-700', desc: '소싱+상품관리' },
+            { layer: 'OPERATIONS', label: 'Operations', count: 2, color: 'border-orange-200 bg-orange-50', textColor: 'text-orange-700', desc: '마케팅+고객소통' },
+            { layer: 'COMMERCE', label: 'Commerce', count: 3, color: 'border-green-200 bg-green-50', textColor: 'text-green-700', desc: '주문/배송/정산' },
+            { layer: 'INFRA', label: 'Infra', count: 3, color: 'border-purple-200 bg-purple-50', textColor: 'text-purple-700', desc: '모니터링+분석' },
           ].map(layer => (
             <div key={layer.layer} className={`rounded-xl border-2 p-5 ${layer.color}`}>
               <div className="flex items-center justify-between mb-2">

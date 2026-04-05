@@ -74,6 +74,7 @@ export const sourcingMenuItems: MenuItem[] = [
     icon: Zap,
     children: [
       { label: '자동화 설정', href: '/sourcing/automation/settings', icon: Cog },
+      { label: '소싱조건 설정', href: '/sourcing/automation/sourcing-conditions', icon: Target },
       { label: '실행 로그', href: '/sourcing/automation/logs', icon: History },
     ],
   },

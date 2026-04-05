@@ -37,6 +37,7 @@ interface AgentCardProps {
 const LAYER_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   COMMAND: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' },
   SOURCING: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200' },
+  OPERATIONS: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200' },
   COMMERCE: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200' },
   INFRA: { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200' },
   // 하위 호환

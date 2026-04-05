@@ -3,153 +3,164 @@ import { PrismaClient } from '../src/generated'
 const prisma = new PrismaClient()
 
 /**
- * BandAuto 자율운영 AI 에이전트팀 시드 데이터
- * 10개 에이전트 · 4개 레이어 · 사람 없이 플랫폼 완전 운영
+ * BandAuto 자율운영 AI 에이전트팀 v3
+ * 11개 에이전트 · 5개 레이어 · 소싱~발행~주문~배송~정산 완전 자동화
  */
 const AGENT_SEEDS = [
-  // ── COMMAND Layer (1) ──
+  // ── COMMAND (1) ──
   {
     name: "commander",
     displayName: "🧠 Commander",
     layer: "COMMAND" as const,
     icon: "Brain",
-    description: "전체 에이전트 조율, 이벤트 라우팅, 장애 자동복구, 일일/주간 운영 리포트 생성",
+    description: "전체 에이전트 오케스트레이션, 이벤트 라우팅, 장애 자동복구, 운영 리포트",
     priority: 1,
     maxConcurrent: 30,
     aiModel: "claude-opus",
     retryPolicy: { maxRetries: 5, backoff: "exponential", delays: [1000, 2000, 4000, 8000, 16000] },
-    schedule: "*/1 * * * *", // 1분마다 헬스체크
+    schedule: "*/1 * * * *",
     config: {
       kpiTargets: { event_latency_ms: 500, auto_recovery_rate: 95 },
-      routing: { maxConcurrent: 30, defaultTimeout: 30000 },
-      report: { daily: "0 23 * * *", weekly: "0 23 * * 0" },
+      skills: ["orchestrate", "auto-recover", "daily-report", "event-route"],
+      report: { daily: "0 21 * * *" },
     },
   },
 
-  // ── SOURCING Layer (3) ──
+  // ── SOURCING (2) ──
   {
-    name: "collector",
-    displayName: "📦 Collector",
+    name: "sourcing-agent",
+    displayName: "📦 Sourcing Agent",
     layer: "SOURCING" as const,
     icon: "Package",
-    description: "도매 밴드 채널에서 상품 게시글 자동 수집, 중복 필터링, 신규 상품 감지",
+    description: "카테고리/조건 기반 소싱, 잘팔리는 상품 우선 소싱, AI 변환, 발행, 소싱처 추적관리 및 자동 발주처 변경",
     priority: 2,
     maxConcurrent: 3,
-    aiModel: "claude-haiku",
+    aiModel: "claude-sonnet",
     retryPolicy: { maxRetries: 3, backoff: "exponential", delays: [5000, 10000, 20000] },
-    schedule: "0 */1 * * *", // 1시간마다 수집
+    schedule: "0 9,15 * * *",
     config: {
-      kpiTargets: { daily_collect_count: 50, duplicate_rate_max: 5 },
-      pipeline: { timeout: 1800000 },
-      channels: ["band"],
-      intervals: { default: "1h", peak: "30m", off: "6h" },
+      kpiTargets: { daily_collect_count: 50, transform_success_rate: 90, publish_success_rate: 95, supplier_track_rate: 100 },
+      skills: ["category-sourcing", "priority-sourcing", "collect-posts", "ai-transform", "publish", "publish-report", "supplier-track", "supplier-switch"],
     },
   },
   {
-    name: "transformer",
-    displayName: "✨ Transformer",
+    name: "product-manager",
+    displayName: "📋 Product Manager",
     layer: "SOURCING" as const,
-    icon: "Sparkles",
-    description: "Gemini AI로 도매 상품을 소매용으로 변환: 상품명, 설명, 옵션, 가격 자동 생성",
+    icon: "ClipboardCheck",
+    description: "상품 품절/변동 감지 시 즉시 쇼핑몰·소매밴드 삭제/변경 반영, 가격 동기화",
     priority: 2,
     maxConcurrent: 5,
-    aiModel: "claude-sonnet",
-    retryPolicy: { maxRetries: 3, backoff: "exponential", delays: [2000, 4000, 8000] },
-    schedule: "0 */1 * * *", // 1시간마다 대기큐 처리
+    aiModel: "claude-haiku",
+    retryPolicy: { maxRetries: 3, backoff: "linear", delays: [2000, 4000, 6000] },
+    schedule: "*/5 * * * *",
     config: {
-      kpiTargets: { transform_success_rate: 90, avg_process_time_sec: 30 },
-      gemini: { model: "gemini-pro", maxTokens: 4000 },
-      pricing: { minMargin: 30 },
-    },
-  },
-  {
-    name: "publisher",
-    displayName: "🚀 Publisher",
-    layer: "SOURCING" as const,
-    icon: "Send",
-    description: "소매밴드/쇼핑몰 발행, Playwright 이미지 업로드, Band API 폴백, 세션 관리",
-    priority: 2,
-    maxConcurrent: 2,
-    aiModel: "claude-sonnet",
-    retryPolicy: { maxRetries: 3, backoff: "exponential", delays: [3000, 6000, 12000] },
-    schedule: "0 */2 * * *", // 2시간마다 발행
-    config: {
-      kpiTargets: { publish_success_rate: 95, session_valid_rate: 99 },
-      playwright: { timeout: 60000, imageUploadRetries: 3 },
-      channels: { retail: true, shop: true },
+      kpiTargets: { stock_reflect_time_min: 5, price_sync_rate: 100, change_alert_rate: 100 },
+      skills: ["stock-monitor", "price-sync", "product-sync", "discontinue", "change-alert"],
     },
   },
 
-  // ── COMMERCE Layer (3) ──
+  // ── OPERATIONS (2) ──
   {
-    name: "orderbot",
-    displayName: "📝 OrderBot",
-    layer: "COMMERCE" as const,
-    icon: "ClipboardList",
-    description: "주문 상태 관리, 도매 발주 연동, 배송 추적, 미결제 자동취소 (24h)",
-    priority: 2,
-    maxConcurrent: 10,
-    aiModel: "claude-haiku",
-    retryPolicy: { maxRetries: 3, backoff: "exponential", delays: [1000, 2000, 4000] },
-    schedule: "0 9 * * *", // 매일 9시 미결제 주문 정리
+    name: "marketing-agent",
+    displayName: "📢 Marketing Agent",
+    layer: "OPERATIONS" as const,
+    icon: "Megaphone",
+    description: "소매밴드 공지 자동발송, 카카오톡채널 광고, 프로모션 관리",
+    priority: 3,
+    maxConcurrent: 3,
+    aiModel: "claude-sonnet",
+    retryPolicy: { maxRetries: 2, backoff: "linear", delays: [3000, 6000] },
+    schedule: "40 9 * * *",
     config: {
-      kpiTargets: { order_process_delay_min: 1, auto_cancel_rate: 100 },
-      orderStates: ["PENDING", "PAID", "PREPARING", "SHIPPED", "DELIVERED"],
-      autoCancelHours: 24,
-      carriers: ["cj", "hanjin", "lotte"],
+      kpiTargets: { notice_send_rate: 100, ad_click_rate: 2 },
+      skills: ["band-notice", "kakao-ad", "promotion", "content-gen"],
+      notice: { times: ["09:40", "12:00", "16:30"] },
     },
   },
   {
-    name: "payment-guard",
-    displayName: "💳 PaymentGuard",
-    layer: "COMMERCE" as const,
-    icon: "CreditCard",
-    description: "토스페이먼츠 결제 처리, 환불, 웹훅 처리, 정산 자동화, Google Sheets 동기",
-    priority: 1,
-    maxConcurrent: 5,
-    aiModel: "claude-haiku",
-    retryPolicy: { maxRetries: 5, backoff: "exponential", delays: [1000, 2000, 4000, 8000, 16000] },
-    schedule: "0 0 1 * *", // 매월 1일 정산
-    config: {
-      kpiTargets: { payment_success_rate: 98, settlement_error_rate: 0 },
-      toss: { webhookPath: "/api/payments/webhook" },
-      settlement: { period: "monthly", sheetsSync: true },
-    },
-  },
-  {
-    name: "supportbot",
-    displayName: "🎧 SupportBot",
-    layer: "COMMERCE" as const,
-    icon: "Headphones",
-    description: "1:1 문의 자동 응답, 반품/교환 처리, 리뷰 관리, FAQ 기반 자동화",
+    name: "customer-agent",
+    displayName: "👤 Customer Agent",
+    layer: "OPERATIONS" as const,
+    icon: "MessageCircle",
+    description: "카톡/댓글/문자/1:1창 소통 전반 관리, FAQ 자동응답",
     priority: 3,
     maxConcurrent: 5,
     aiModel: "claude-sonnet",
     retryPolicy: { maxRetries: 2, backoff: "linear", delays: [1000, 2000] },
+    schedule: "*/5 * * * *",
     config: {
-      kpiTargets: { auto_response_rate: 70, avg_response_time_min: 5 },
-      escalation: { confidenceThreshold: 70, repeatThreshold: 3 },
-      faq: { enabled: true },
+      kpiTargets: { auto_response_rate: 70, avg_response_time_min: 10 },
+      skills: ["auto-reply", "inquiry-route", "return-exchange", "sms-kakao"],
     },
   },
 
-  // ── INFRA Layer (3) ──
+  // ── COMMERCE (3) ──
+  {
+    name: "order-agent",
+    displayName: "📝 Order Agent",
+    layer: "COMMERCE" as const,
+    icon: "ClipboardList",
+    description: "주문 접수, 결제 관리, 소싱처 발주(각 양식), 미결제 자동취소",
+    priority: 2,
+    maxConcurrent: 10,
+    aiModel: "claude-haiku",
+    retryPolicy: { maxRetries: 3, backoff: "exponential", delays: [1000, 2000, 4000] },
+    schedule: "*/10 * * * *",
+    config: {
+      kpiTargets: { order_process_delay_hour: 1, wholesale_order_success_rate: 99 },
+      skills: ["order-receive", "payment-manage", "wholesale-order", "order-status"],
+      autoCancelHours: 24,
+    },
+  },
+  {
+    name: "shipping-agent",
+    displayName: "🚚 Shipping Agent",
+    layer: "COMMERCE" as const,
+    icon: "Truck",
+    description: "배송 진행사항 관리, 송장번호 등록, 배송 상태 추적 및 알림",
+    priority: 3,
+    maxConcurrent: 5,
+    aiModel: "claude-haiku",
+    retryPolicy: { maxRetries: 3, backoff: "linear", delays: [2000, 4000, 6000] },
+    schedule: "0 */1 * * *",
+    config: {
+      kpiTargets: { tracking_register_rate: 100, delivery_complete_rate: 98 },
+      skills: ["tracking-register", "delivery-monitor", "delay-alert", "delivery-complete"],
+    },
+  },
+  {
+    name: "settlement-agent",
+    displayName: "💰 Settlement Agent",
+    layer: "COMMERCE" as const,
+    icon: "Coins",
+    description: "도매밴드 정산, 관리소매밴드 정산, 매출/수익 정산 자동화",
+    priority: 3,
+    maxConcurrent: 2,
+    aiModel: "claude-haiku",
+    retryPolicy: { maxRetries: 2, backoff: "linear", delays: [3000, 6000] },
+    schedule: "0 9 * * 1",
+    config: {
+      kpiTargets: { settlement_accuracy: 100, settlement_cycle: 7 },
+      skills: ["wholesale-settle", "retail-settle", "revenue-report", "google-sheets-sync"],
+    },
+  },
+
+  // ── INFRA (3) ──
   {
     name: "session-keeper",
-    displayName: "🔐 SessionKeeper",
+    displayName: "🔐 Session Keeper",
     layer: "INFRA" as const,
     icon: "Shield",
-    description: "Band 세션 유효성 모니터링, 자동 복구, Docker 컨테이너 헬스체크, DB 연결 감시",
+    description: "Band 세션 모니터링, 자동 복구, Docker 헬스체크, DB 연결 감시",
     priority: 1,
     maxConcurrent: 3,
     aiModel: "claude-haiku",
     retryPolicy: { maxRetries: 5, backoff: "exponential", delays: [1000, 2000, 4000, 8000, 16000] },
-    schedule: "*/5 * * * *", // 5분마다 헬스체크
+    schedule: "*/5 * * * *",
     config: {
-      kpiTargets: { uptime_percent: 99.9, session_valid_rate: 99 },
-      healthcheck: { interval: "5m", endpoints: ["/api/health"] },
-      session: { autoRecovery: true, maxExpiryDays: 14 },
-      docker: { watchContainers: ["bandauto-sourcing", "bandauto-shop"] },
+      kpiTargets: { uptime_percent: 99.9, session_recovery_time_min: 2 },
+      skills: ["session-monitor", "health-check", "auto-restart"],
     },
   },
   {
@@ -157,16 +168,15 @@ const AGENT_SEEDS = [
     displayName: "📡 Watcher",
     layer: "INFRA" as const,
     icon: "Radio",
-    description: "전체 시스템 모니터링, KPI 추적, 이상탐지, 관리자 알림(카카오톡/이메일)",
+    description: "시스템 모니터링, KPI 추적, 이상탐지, 관리자 알림",
     priority: 2,
     maxConcurrent: 3,
     aiModel: "claude-haiku",
     retryPolicy: { maxRetries: 3, backoff: "linear", delays: [500, 1000, 1500] },
-    schedule: "0 */6 * * *", // 6시간마다 KPI 갱신
+    schedule: "*/1 * * * *",
     config: {
-      kpiTargets: { alert_detect_time_min: 1, false_positive_rate_max: 5 },
-      alerts: { channels: ["kakao", "email"], escalation: { criticalDelayMin: 5 } },
-      anomaly: { zScoreThreshold: 3.0, minSamples: 50 },
+      kpiTargets: { alert_detect_time_min: 1, alert_accuracy: 99 },
+      skills: ["system-monitor", "anomaly-detect", "alert-notify"],
     },
   },
   {
@@ -174,23 +184,22 @@ const AGENT_SEEDS = [
     displayName: "📊 Analyst",
     layer: "INFRA" as const,
     icon: "BarChart3",
-    description: "매출/전환/트래픽 분석, 상품 성과 평가, 가격 최적화 제안, 운영 리포트",
+    description: "매출/전환 분석, 상품 성과 평가, 가격 최적화, 운영 리포트",
     priority: 3,
     maxConcurrent: 2,
     aiModel: "claude-opus",
     retryPolicy: { maxRetries: 2, backoff: "linear", delays: [2000, 4000] },
-    schedule: "0 0 * * *", // 매일 자정 일간 분석
+    schedule: "0 8 * * *",
     config: {
-      kpiTargets: { data_accuracy: 99, price_optimization_revenue_impact: 10 },
-      reports: { daily: true, weekly: true, monthly: true },
-      pricing: { strategy: "competitive", adjustFrequency: "weekly" },
+      kpiTargets: { data_accuracy: 99, report_cycle_days: 7 },
+      skills: ["sales-analysis", "product-ranking", "price-optimize", "weekly-report"],
     },
   },
 ]
 
 async function seedAgents() {
-  console.log('🤖 자율운영 AI 에이전트팀 시드 데이터 삽입...')
-  console.log('   10개 에이전트 · 4개 레이어 · 완전 자동화 운영\n')
+  console.log('🤖 자율운영 AI 에이전트팀 v3 시드 데이터 삽입...')
+  console.log('   11개 에이전트 · 5개 레이어 · 완전 자동화 운영\n')
 
   for (const seed of AGENT_SEEDS) {
     await prisma.agentDefinition.upsert({
@@ -209,22 +218,20 @@ async function seedAgents() {
       },
       create: seed,
     })
-    console.log(`  ✅ ${seed.displayName} [${seed.layer}] — ${seed.aiModel}`)
+    console.log(`  ✅ ${seed.displayName} [${seed.layer}]`)
   }
 
-  // 기존 17개 에이전트 중 삭제된 것들 soft delete
+  // 기존 에이전트 중 삭제된 것들 soft delete
   const validNames = AGENT_SEEDS.map(s => s.name)
   const deprecated = await prisma.agentDefinition.findMany({
     where: { name: { notIn: validNames }, deletedAt: null },
   })
-  if (deprecated.length > 0) {
-    for (const agent of deprecated) {
-      await prisma.agentDefinition.update({
-        where: { id: agent.id },
-        data: { deletedAt: new Date(), status: 'INACTIVE' },
-      })
-      console.log(`  🗑️ ${agent.displayName} (deprecated → soft deleted)`)
-    }
+  for (const agent of deprecated) {
+    await prisma.agentDefinition.update({
+      where: { id: agent.id },
+      data: { deletedAt: new Date(), status: 'INACTIVE' },
+    })
+    console.log(`  🗑️ ${agent.displayName} (deprecated)`)
   }
 
   const count = await prisma.agentDefinition.count({ where: { deletedAt: null } })
