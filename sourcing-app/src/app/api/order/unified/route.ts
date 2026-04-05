@@ -88,8 +88,9 @@ export async function GET(request: NextRequest) {
     if (!source || source === 'ALL' || source === 'SHOPPING_MALL') {
       try {
         // 먼저 현재 사용자의 ShopProduct ID 목록을 조회
+        // 주문 연결 상품은 soft delete 여부와 관계없이 모두 포함 (주문 이력 보존)
         const userShopProducts = await prisma.shopProduct.findMany({
-          where: { userId: user.userId, deletedAt: null },
+          where: { userId: user.userId },
           select: { id: true },
         })
         const shopProductIds = userShopProducts.map(pp => pp.id)
