@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" fill="none">
+  <rect width="480" height="360" rx="12" fill="#F0FDFA"/>
+  <!-- Header -->
+  <rect x="20" y="20" width="440" height="36" rx="8" fill="#CCFBF1"/>
+  <text x="170" y="44" font-size="12" fill="#134E4A" font-family="Arial" font-weight="bold">판매관리자 관리</text>
+  <!-- Manager cards -->
+  <rect x="20" y="70" width="215" height="130" rx="10" fill="white" stroke="#99F6E4" stroke-width="1.5"/>
+  <circle cx="56" cy="110" r="24" fill="#CCFBF1"/>
+  <text x="47" y="116" font-size="16" fill="#0D9488">👤</text>
+  <text x="92" y="100" font-size="11" fill="#134E4A" font-family="Arial" font-weight="bold">관리자 (나)</text>
+  <text x="92" y="116" font-size="9" fill="#9CA3AF" font-family="Arial">jins3925@naver.com</text>
+  <rect x="92" y="124" width="44" height="16" rx="8" fill="#0D9488"/>
+  <text x="99" y="136" font-size="8" fill="white" font-family="Arial" font-weight="bold">ADMIN</text>
+  <rect x="32" y="155" width="80" height="24" rx="6" fill="#F0FDFA" stroke="#99F6E4"/>
+  <text x="42" y="171" font-size="8" fill="#0D9488" font-family="Arial">내 정보 수정</text>
+  <rect x="120" y="155" width="80" height="24" rx="6" fill="#F0FDFA" stroke="#99F6E4"/>
+  <text x="127" y="171" font-size="8" fill="#0D9488" font-family="Arial">비밀번호 변경</text>
+  <!-- Manager 2 -->
+  <rect x="245" y="70" width="215" height="130" rx="10" fill="white" stroke="#99F6E4" stroke-width="1.5"/>
+  <circle cx="281" cy="110" r="24" fill="#CCFBF1"/>
+  <text x="272" y="116" font-size="16" fill="#0D9488">👩</text>
+  <text x="317" y="100" font-size="11" fill="#134E4A" font-family="Arial" font-weight="bold">장해정</text>
+  <text x="317" y="116" font-size="9" fill="#9CA3AF" font-family="Arial">catricia2022@gmail.com</text>
+  <rect x="317" y="124" width="56" height="16" rx="8" fill="#3B82F6"/>
+  <text x="322" y="136" font-size="8" fill="white" font-family="Arial" font-weight="bold">MANAGER</text>
+  <rect x="257" y="155" width="80" height="24" rx="6" fill="#F0FDFA" stroke="#99F6E4"/>
+  <text x="270" y="171" font-size="8" fill="#0D9488" font-family="Arial">권한 관리</text>
+  <rect x="345" y="155" width="80" height="24" rx="6" fill="#FEE2E2" stroke="#FECACA"/>
+  <text x="363" y="171" font-size="8" fill="#DC2626" font-family="Arial">비활성화</text>
+  <!-- Add manager -->
+  <rect x="20" y="214" width="440" height="60" rx="10" fill="white" stroke="#99F6E4" stroke-width="1.5" stroke-dasharray="6 3"/>
+  <text x="195" y="240" font-size="20" fill="#99F6E4">+</text>
+  <text x="215" y="250" font-size="10" fill="#0D9488" font-family="Arial">매니저 추가</text>
+  <!-- Invite form preview -->
+  <rect x="20" y="288" width="440" height="52" rx="10" fill="white" stroke="#99F6E4" stroke-width="1.5"/>
+  <rect x="32" y="300" width="140" height="28" rx="6" fill="#F0FDFA" stroke="#99F6E4"/>
+  <text x="44" y="318" font-size="8" fill="#9CA3AF" font-family="Arial">이메일 입력</text>
+  <rect x="180" y="300" width="120" height="28" rx="6" fill="#F0FDFA" stroke="#99F6E4"/>
+  <text x="192" y="318" font-size="8" fill="#9CA3AF" font-family="Arial">비밀번호 설정</text>
+  <rect x="308" y="300" width="120" height="28" rx="6" fill="#F0FDFA" stroke="#99F6E4"/>
+  <text x="320" y="318" font-size="8" fill="#9CA3AF" font-family="Arial">비밀번호 확인</text>
+  <rect x="380" y="296" width="72" height="36" rx="8" fill="#0D9488"/>
+  <text x="393" y="318" font-size="9" fill="white" font-family="Arial" font-weight="bold">초대하기</text>
+</svg>

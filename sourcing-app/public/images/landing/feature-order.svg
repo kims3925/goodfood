@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" fill="none">
+  <rect width="480" height="360" rx="12" fill="#FEF2F2"/>
+  <!-- Header -->
+  <rect x="20" y="20" width="440" height="36" rx="8" fill="#FEE2E2"/>
+  <text x="170" y="44" font-size="12" fill="#991B1B" font-family="Arial" font-weight="bold">주문 · 발주 관리</text>
+  <!-- Order flow -->
+  <rect x="20" y="70" width="90" height="70" rx="8" fill="white" stroke="#FECACA" stroke-width="1.5"/>
+  <text x="40" y="98" font-size="9" fill="#DC2626" font-family="Arial" font-weight="bold">주문접수</text>
+  <text x="45" y="118" font-size="18" fill="#DC2626">📋</text>
+  <text x="115" y="108" font-size="14" fill="#FECACA">→</text>
+  <rect x="130" y="70" width="90" height="70" rx="8" fill="white" stroke="#FECACA" stroke-width="1.5"/>
+  <text x="145" y="98" font-size="9" fill="#DC2626" font-family="Arial" font-weight="bold">결제확인</text>
+  <text x="155" y="118" font-size="18" fill="#DC2626">💳</text>
+  <text x="225" y="108" font-size="14" fill="#FECACA">→</text>
+  <rect x="240" y="70" width="90" height="70" rx="8" fill="white" stroke="#FECACA" stroke-width="1.5"/>
+  <text x="255" y="98" font-size="9" fill="#DC2626" font-family="Arial" font-weight="bold">도매발주</text>
+  <text x="265" y="118" font-size="18" fill="#DC2626">📦</text>
+  <text x="335" y="108" font-size="14" fill="#FECACA">→</text>
+  <rect x="350" y="70" width="110" height="70" rx="8" fill="white" stroke="#FECACA" stroke-width="1.5"/>
+  <text x="370" y="98" font-size="9" fill="#DC2626" font-family="Arial" font-weight="bold">배송추적</text>
+  <text x="385" y="118" font-size="18" fill="#DC2626">🚚</text>
+  <!-- Order list table -->
+  <rect x="20" y="158" width="440" height="182" rx="10" fill="white" stroke="#FECACA" stroke-width="1.5"/>
+  <rect x="20" y="158" width="440" height="32" rx="10" fill="#FEE2E2"/>
+  <rect x="20" y="180" width="440" height="10" fill="#FEE2E2"/>
+  <text x="36" y="178" font-size="9" fill="#991B1B" font-family="Arial" font-weight="bold">주문번호</text>
+  <text x="140" y="178" font-size="9" fill="#991B1B" font-family="Arial" font-weight="bold">고객명</text>
+  <text x="230" y="178" font-size="9" fill="#991B1B" font-family="Arial" font-weight="bold">금액</text>
+  <text x="320" y="178" font-size="9" fill="#991B1B" font-family="Arial" font-weight="bold">상태</text>
+  <text x="400" y="178" font-size="9" fill="#991B1B" font-family="Arial" font-weight="bold">발주</text>
+  <!-- Row 1 -->
+  <text x="36" y="212" font-size="9" fill="#374151" font-family="Arial">ORD-20260405-001</text>
+  <text x="140" y="212" font-size="9" fill="#374151" font-family="Arial">김*석</text>
+  <text x="230" y="212" font-size="9" fill="#374151" font-family="Arial" font-weight="bold">₩45,900</text>
+  <rect x="320" y="200" width="48" height="18" rx="9" fill="#DCFCE7"/>
+  <text x="328" y="213" font-size="8" fill="#166534" font-family="Arial">결제완료</text>
+  <rect x="400" y="200" width="40" height="18" rx="9" fill="#3B82F6"/>
+  <text x="407" y="213" font-size="8" fill="white" font-family="Arial">발주</text>
+  <!-- Row 2 -->
+  <rect x="20" y="224" width="440" height="1" fill="#FEE2E2"/>
+  <text x="36" y="248" font-size="9" fill="#374151" font-family="Arial">ORD-20260405-002</text>
+  <text x="140" y="248" font-size="9" fill="#374151" font-family="Arial">이*주</text>
+  <text x="230" y="248" font-size="9" fill="#374151" font-family="Arial" font-weight="bold">₩32,000</text>
+  <rect x="320" y="236" width="48" height="18" rx="9" fill="#DBEAFE"/>
+  <text x="328" y="249" font-size="8" fill="#1E40AF" font-family="Arial">배송중</text>
+  <rect x="400" y="236" width="40" height="18" rx="9" fill="#22C55E"/>
+  <text x="407" y="249" font-size="8" fill="white" font-family="Arial">완료</text>
+  <!-- Row 3 -->
+  <rect x="20" y="260" width="440" height="1" fill="#FEE2E2"/>
+  <text x="36" y="284" font-size="9" fill="#374151" font-family="Arial">ORD-20260404-015</text>
+  <text x="140" y="284" font-size="9" fill="#374151" font-family="Arial">최*의</text>
+  <text x="230" y="284" font-size="9" fill="#374151" font-family="Arial" font-weight="bold">₩78,500</text>
+  <rect x="320" y="272" width="48" height="18" rx="9" fill="#FEF3C7"/>
+  <text x="325" y="285" font-size="8" fill="#92400E" font-family="Arial">상품준비</text>
+  <rect x="400" y="272" width="40" height="18" rx="9" fill="#F59E0B"/>
+  <text x="407" y="285" font-size="8" fill="white" font-family="Arial">대기</text>
+  <!-- Row 4 -->
+  <rect x="20" y="296" width="440" height="1" fill="#FEE2E2"/>
+  <text x="36" y="320" font-size="9" fill="#9CA3AF" font-family="Arial">ORD-20260404-012</text>
+  <text x="140" y="320" font-size="9" fill="#9CA3AF" font-family="Arial">한*연</text>
+  <text x="230" y="320" font-size="9" fill="#9CA3AF" font-family="Arial">₩15,000</text>
+  <rect x="320" y="308" width="48" height="18" rx="9" fill="#F3F4F6"/>
+  <text x="325" y="321" font-size="8" fill="#6B7280" font-family="Arial">자동취소</text>
+</svg>

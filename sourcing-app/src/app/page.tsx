@@ -225,7 +225,7 @@ export default function LandingPage() {
                     </p>
                   </div>
 
-                  {/* Screenshot Placeholder */}
+                  {/* Feature Illustration */}
                   <div className="flex-1 w-full max-w-xl">
                     <div className={`rounded-2xl border-2 ${colors.border} overflow-hidden shadow-lg`}>
                       <div className={`${colors.headerBg} px-4 py-2 flex items-center gap-2`}>
@@ -236,19 +236,12 @@ export default function LandingPage() {
                         </div>
                         <span className="text-xs text-white/60">{feature.subtitle}</span>
                       </div>
-                      <div className={`aspect-[4/3] ${colors.screenshotBg} flex items-center justify-center p-8`}>
-                        <div className="text-center">
-                          <div className={`inline-flex items-center justify-center w-16 h-16 ${colors.bg} ${colors.text} rounded-2xl mb-4 opacity-60`}>
-                            {feature.icon}
-                          </div>
-                          <p className={`text-sm font-medium ${colors.text} opacity-60`}>
-                            {feature.title} 화면
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            스크린샷 준비 중
-                          </p>
-                        </div>
-                      </div>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={feature.screenshot}
+                        alt={`${feature.title} 기능 화면`}
+                        className="w-full aspect-[4/3] object-cover"
+                      />
                     </div>
                   </div>
                 </div>

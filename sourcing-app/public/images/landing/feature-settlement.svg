@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" fill="none">
+  <rect width="480" height="360" rx="12" fill="#FFF7ED"/>
+  <!-- Header -->
+  <rect x="20" y="20" width="440" height="36" rx="8" fill="#FFEDD5"/>
+  <text x="185" y="44" font-size="12" fill="#9A3412" font-family="Arial" font-weight="bold">정산 자동화</text>
+  <!-- Summary cards -->
+  <rect x="20" y="68" width="140" height="70" rx="8" fill="white" stroke="#FED7AA" stroke-width="1.5"/>
+  <text x="36" y="90" font-size="9" fill="#9CA3AF" font-family="Arial">총 매출</text>
+  <text x="36" y="116" font-size="16" fill="#EA580C" font-family="Arial" font-weight="bold">₩2,450,000</text>
+  <rect x="170" y="68" width="140" height="70" rx="8" fill="white" stroke="#FED7AA" stroke-width="1.5"/>
+  <text x="186" y="90" font-size="9" fill="#9CA3AF" font-family="Arial">도매 원가</text>
+  <text x="186" y="116" font-size="16" fill="#374151" font-family="Arial" font-weight="bold">₩1,650,000</text>
+  <rect x="320" y="68" width="140" height="70" rx="8" fill="white" stroke="#BBF7D0" stroke-width="2"/>
+  <text x="336" y="90" font-size="9" fill="#9CA3AF" font-family="Arial">순이익</text>
+  <text x="336" y="116" font-size="16" fill="#16A34A" font-family="Arial" font-weight="bold">₩800,000</text>
+  <text x="420" y="116" font-size="10" fill="#16A34A" font-family="Arial">32.6%</text>
+  <!-- Bar chart -->
+  <rect x="20" y="152" width="220" height="188" rx="10" fill="white" stroke="#FED7AA" stroke-width="1.5"/>
+  <text x="36" y="175" font-size="10" fill="#9A3412" font-family="Arial" font-weight="bold">쇼핑몰별 매출</text>
+  <!-- Bars -->
+  <rect x="36" y="194" width="140" height="20" rx="4" fill="#EA580C"/>
+  <text x="42" y="208" font-size="8" fill="white" font-family="Arial">장터 쇼핑몰</text>
+  <text x="150" y="208" font-size="8" fill="white" font-family="Arial" font-weight="bold">₩980K</text>
+  <rect x="36" y="222" width="110" height="20" rx="4" fill="#F97316"/>
+  <text x="42" y="236" font-size="8" fill="white" font-family="Arial">해양수산</text>
+  <text x="118" y="236" font-size="8" fill="white" font-family="Arial" font-weight="bold">₩720K</text>
+  <rect x="36" y="250" width="80" height="20" rx="4" fill="#FB923C"/>
+  <text x="42" y="264" font-size="8" fill="white" font-family="Arial">자산어보</text>
+  <text x="90" y="264" font-size="8" fill="white" font-family="Arial" font-weight="bold">₩450K</text>
+  <rect x="36" y="278" width="50" height="20" rx="4" fill="#FDBA74"/>
+  <text x="42" y="292" font-size="8" fill="#9A3412" font-family="Arial">가족</text>
+  <text x="62" y="292" font-size="8" fill="#9A3412" font-family="Arial" font-weight="bold">₩300K</text>
+  <!-- Settlement table -->
+  <rect x="252" y="152" width="208" height="188" rx="10" fill="white" stroke="#FED7AA" stroke-width="1.5"/>
+  <text x="268" y="175" font-size="10" fill="#9A3412" font-family="Arial" font-weight="bold">도매 정산서</text>
+  <rect x="264" y="188" width="184" height="22" rx="4" fill="#FFEDD5"/>
+  <text x="272" y="203" font-size="8" fill="#9A3412" font-family="Arial" font-weight="bold">소싱처</text>
+  <text x="340" y="203" font-size="8" fill="#9A3412" font-family="Arial" font-weight="bold">원가</text>
+  <text x="400" y="203" font-size="8" fill="#9A3412" font-family="Arial" font-weight="bold">수수료</text>
+  <text x="272" y="228" font-size="8" fill="#374151" font-family="Arial">가족함께수산</text>
+  <text x="340" y="228" font-size="8" fill="#374151" font-family="Arial">₩850K</text>
+  <text x="400" y="228" font-size="8" fill="#374151" font-family="Arial">₩42K</text>
+  <rect x="264" y="236" width="184" height="1" fill="#FED7AA"/>
+  <text x="272" y="256" font-size="8" fill="#374151" font-family="Arial">해양수산</text>
+  <text x="340" y="256" font-size="8" fill="#374151" font-family="Arial">₩520K</text>
+  <text x="400" y="256" font-size="8" fill="#374151" font-family="Arial">₩26K</text>
+  <rect x="264" y="264" width="184" height="1" fill="#FED7AA"/>
+  <text x="272" y="284" font-size="8" fill="#374151" font-family="Arial">자산어보</text>
+  <text x="340" y="284" font-size="8" fill="#374151" font-family="Arial">₩280K</text>
+  <text x="400" y="284" font-size="8" fill="#374151" font-family="Arial">₩14K</text>
+  <!-- Google Sheets badge -->
+  <rect x="264" y="300" width="120" height="24" rx="12" fill="#16A34A"/>
+  <text x="278" y="316" font-size="9" fill="white" font-family="Arial" font-weight="bold">📊 Sheets 동기</text>
+</svg>
