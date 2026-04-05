@@ -1,45 +1,52 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" fill="none">
   <rect width="480" height="360" rx="12" fill="#F5F3FF"/>
   <!-- Before card -->
-  <rect x="20" y="20" width="200" height="320" rx="10" fill="white" stroke="#DDD6FE" stroke-width="1.5"/>
-  <text x="40" y="50" font-size="11" fill="#7C3AED" font-family="Arial" font-weight="bold">도매 원본</text>
-  <rect x="32" y="64" width="176" height="90" rx="6" fill="#EDE9FE"/>
-  <rect x="32" y="166" width="140" height="12" rx="3" fill="#6D28D9"/>
-  <rect x="32" y="186" width="176" height="8" rx="2" fill="#DDD6FE"/>
-  <rect x="32" y="200" width="160" height="8" rx="2" fill="#DDD6FE"/>
-  <rect x="32" y="214" width="120" height="8" rx="2" fill="#DDD6FE"/>
-  <rect x="32" y="240" width="60" height="20" rx="4" fill="#F3F4F6"/>
-  <text x="42" y="254" font-size="9" fill="#6B7280" font-family="Arial">₩15,000</text>
+  <rect x="16" y="20" width="200" height="320" rx="10" fill="white" stroke="#DDD6FE" stroke-width="1.5"/>
+  <text x="36" y="46" font-size="11" fill="#7C3AED" font-family="Arial" font-weight="bold">📥 도매 원본</text>
+  <rect x="28" y="58" width="176" height="80" rx="6" fill="#EDE9FE"/>
+  <text x="88" y="105" font-size="28" fill="#7C3AED">🐙</text>
+  <text x="28" y="155" font-size="11" fill="#6D28D9" font-family="Arial" font-weight="bold">통영산 활문어 1kg</text>
+  <text x="28" y="174" font-size="9" fill="#A78BFA" font-family="Arial">산지직송 통영 자연산 문어</text>
+  <text x="28" y="190" font-size="9" fill="#A78BFA" font-family="Arial">당일 조업, 신선도 최상급</text>
+  <text x="28" y="206" font-size="9" fill="#A78BFA" font-family="Arial">택배 발송 가능</text>
+  <rect x="28" y="222" width="70" height="22" rx="4" fill="#F3F4F6"/>
+  <text x="36" y="237" font-size="10" fill="#6B7280" font-family="Arial">₩25,000</text>
+  <text x="28" y="268" font-size="8" fill="#D1D5DB" font-family="Arial">옵션 정보 없음</text>
+  <text x="28" y="284" font-size="8" fill="#D1D5DB" font-family="Arial">카테고리 미지정</text>
+  <text x="28" y="300" font-size="8" fill="#D1D5DB" font-family="Arial">배송비 정보 없음</text>
+  <rect x="28" y="312" width="60" height="18" rx="4" fill="#FEF3C7"/>
+  <text x="35" y="325" font-size="8" fill="#92400E" font-family="Arial">미가공</text>
   <!-- Arrow -->
-  <g transform="translate(230, 150)">
-    <circle cx="10" cy="10" r="20" fill="#7C3AED"/>
-    <text x="2" y="16" font-size="14" fill="white" font-family="Arial" font-weight="bold">AI</text>
+  <g transform="translate(222, 150)">
+    <circle cx="16" cy="16" r="22" fill="#7C3AED"/>
+    <text x="6" y="22" font-size="13" fill="white" font-family="Arial" font-weight="bold">AI</text>
   </g>
   <!-- After card -->
-  <rect x="270" y="20" width="200" height="320" rx="10" fill="white" stroke="#A78BFA" stroke-width="2"/>
-  <text x="290" y="50" font-size="11" fill="#7C3AED" font-family="Arial" font-weight="bold">AI 가공 완료</text>
-  <rect x="282" y="64" width="176" height="90" rx="6" fill="#EDE9FE"/>
-  <!-- Sparkle icons -->
-  <circle cx="440" cy="74" r="8" fill="#A78BFA"/>
-  <text x="436" y="78" font-size="10" fill="white">✨</text>
-  <rect x="282" y="166" width="160" height="12" rx="3" fill="#6D28D9"/>
-  <rect x="282" y="186" width="176" height="8" rx="2" fill="#C4B5FD"/>
-  <rect x="282" y="200" width="176" height="8" rx="2" fill="#C4B5FD"/>
-  <rect x="282" y="214" width="176" height="8" rx="2" fill="#C4B5FD"/>
-  <rect x="282" y="228" width="140" height="8" rx="2" fill="#C4B5FD"/>
-  <!-- Price tags -->
-  <rect x="282" y="250" width="80" height="24" rx="6" fill="#7C3AED"/>
-  <text x="292" y="266" font-size="10" fill="white" font-family="Arial" font-weight="bold">₩29,900</text>
-  <rect x="370" y="250" width="60" height="24" rx="6" fill="#EDE9FE"/>
-  <text x="378" y="266" font-size="9" fill="#7C3AED" font-family="Arial">배송비별도</text>
+  <rect x="264" y="20" width="200" height="320" rx="10" fill="white" stroke="#A78BFA" stroke-width="2"/>
+  <text x="284" y="46" font-size="11" fill="#7C3AED" font-family="Arial" font-weight="bold">✨ AI 가공 완료</text>
+  <rect x="276" y="58" width="176" height="80" rx="6" fill="#EDE9FE"/>
+  <text x="336" y="105" font-size="28" fill="#7C3AED">🐙</text>
+  <circle cx="438" cy="68" r="10" fill="#A78BFA"/>
+  <text x="433" y="73" font-size="12" fill="white">✓</text>
+  <text x="276" y="155" font-size="11" fill="#6D28D9" font-family="Arial" font-weight="bold">싱싱한 통영산 활 문어 1kg</text>
+  <text x="276" y="174" font-size="8" fill="#8B5CF6" font-family="Arial">🏷 수산물 &gt; 연체류 &gt; 문어</text>
+  <text x="276" y="190" font-size="8" fill="#A78BFA" font-family="Arial">통영 앞바다에서 당일 조업한 자연산</text>
+  <text x="276" y="204" font-size="8" fill="#A78BFA" font-family="Arial">활문어입니다. 최상급 신선도를</text>
+  <text x="276" y="218" font-size="8" fill="#A78BFA" font-family="Arial">자랑하며, 회/숙회/볶음 등 다양한</text>
+  <text x="276" y="232" font-size="8" fill="#A78BFA" font-family="Arial">요리에 활용할 수 있습니다.</text>
+  <!-- Price -->
+  <rect x="276" y="244" width="80" height="22" rx="6" fill="#7C3AED"/>
+  <text x="284" y="259" font-size="10" fill="white" font-family="Arial" font-weight="bold">₩45,900</text>
+  <text x="362" y="259" font-size="9" fill="#A78BFA" font-family="Arial">배송비 3,000원</text>
   <!-- Options -->
-  <rect x="282" y="286" width="50" height="20" rx="4" fill="#F5F3FF" stroke="#DDD6FE"/>
-  <text x="290" y="300" font-size="8" fill="#7C3AED" font-family="Arial">1kg</text>
-  <rect x="338" y="286" width="50" height="20" rx="4" fill="#F5F3FF" stroke="#DDD6FE"/>
-  <text x="346" y="300" font-size="8" fill="#7C3AED" font-family="Arial">2kg</text>
-  <rect x="394" y="286" width="50" height="20" rx="4" fill="#7C3AED"/>
-  <text x="402" y="300" font-size="8" fill="white" font-family="Arial">3kg</text>
-  <!-- Status badge -->
-  <rect x="282" y="316" width="90" height="20" rx="10" fill="#22C55E"/>
-  <text x="295" y="330" font-size="9" fill="white" font-family="Arial" font-weight="bold">변환 완료 ✓</text>
+  <text x="276" y="280" font-size="8" fill="#6D28D9" font-family="Arial" font-weight="bold">옵션:</text>
+  <rect x="276" y="286" width="44" height="18" rx="4" fill="#F5F3FF" stroke="#DDD6FE"/>
+  <text x="283" y="299" font-size="7" fill="#7C3AED" font-family="Arial">소 (800g)</text>
+  <rect x="324" y="286" width="44" height="18" rx="4" fill="#7C3AED"/>
+  <text x="331" y="299" font-size="7" fill="white" font-family="Arial">중 (1kg)</text>
+  <rect x="372" y="286" width="44" height="18" rx="4" fill="#F5F3FF" stroke="#DDD6FE"/>
+  <text x="379" y="299" font-size="7" fill="#7C3AED" font-family="Arial">대 (1.5kg)</text>
+  <!-- Status -->
+  <rect x="276" y="314" width="90" height="20" rx="10" fill="#22C55E"/>
+  <text x="289" y="328" font-size="9" fill="white" font-family="Arial" font-weight="bold">변환 완료 ✓</text>
 </svg>

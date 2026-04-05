@@ -1,48 +1,62 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" fill="none">
   <rect width="480" height="360" rx="12" fill="#F0FDF4"/>
   <!-- Band app frame -->
-  <rect x="30" y="20" width="200" height="320" rx="16" fill="white" stroke="#BBF7D0" stroke-width="2"/>
-  <rect x="30" y="20" width="200" height="40" rx="16" fill="#16A34A"/>
-  <rect x="30" y="44" width="200" height="16" fill="#16A34A"/>
-  <text x="90" y="45" font-size="12" fill="white" font-family="Arial" font-weight="bold">Band</text>
-  <!-- Band post -->
-  <rect x="42" y="70" width="176" height="250" rx="8" fill="#F0FDF4"/>
-  <rect x="52" y="80" width="156" height="100" rx="6" fill="#BBF7D0"/>
+  <rect x="24" y="16" width="200" height="328" rx="16" fill="white" stroke="#BBF7D0" stroke-width="2"/>
+  <rect x="24" y="16" width="200" height="36" rx="16" fill="#16A34A"/>
+  <rect x="24" y="40" width="200" height="12" fill="#16A34A"/>
+  <text x="82" y="40" font-size="11" fill="white" font-family="Arial" font-weight="bold">📱 Band</text>
+  <!-- Band post content -->
+  <rect x="36" y="60" width="176" height="260" rx="6" fill="#F0FDF4"/>
   <!-- Image grid -->
-  <rect x="56" y="84" width="72" height="44" rx="3" fill="#86EFAC"/>
-  <rect x="132" y="84" width="72" height="44" rx="3" fill="#86EFAC"/>
-  <rect x="56" y="132" width="72" height="44" rx="3" fill="#86EFAC"/>
-  <rect x="132" y="132" width="72" height="44" rx="3" fill="#86EFAC"/>
-  <text x="80" y="110" font-size="8" fill="#166534">IMG</text>
-  <text x="156" y="110" font-size="8" fill="#166534">IMG</text>
-  <!-- Post content -->
-  <rect x="52" y="192" width="140" height="10" rx="2" fill="#166534"/>
-  <rect x="52" y="208" width="156" height="6" rx="2" fill="#BBF7D0"/>
-  <rect x="52" y="220" width="156" height="6" rx="2" fill="#BBF7D0"/>
-  <rect x="52" y="232" width="120" height="6" rx="2" fill="#BBF7D0"/>
-  <!-- Order link -->
-  <rect x="52" y="252" width="156" height="30" rx="6" fill="#16A34A"/>
-  <text x="85" y="272" font-size="10" fill="white" font-family="Arial" font-weight="bold">주문하기 →</text>
+  <rect x="40" y="66" width="82" height="56" rx="4" fill="#BBF7D0"/>
+  <text x="65" y="100" font-size="22" fill="#16A34A">🐙</text>
+  <rect x="126" y="66" width="82" height="56" rx="4" fill="#BBF7D0"/>
+  <text x="153" y="100" font-size="22" fill="#16A34A">🦐</text>
+  <rect x="40" y="126" width="82" height="56" rx="4" fill="#BBF7D0"/>
+  <text x="67" y="160" font-size="22" fill="#16A34A">🐟</text>
+  <rect x="126" y="126" width="82" height="56" rx="4" fill="#BBF7D0"/>
+  <text x="152" y="160" font-size="22" fill="#16A34A">📦</text>
+  <!-- Post text -->
+  <text x="40" y="200" font-size="10" fill="#166534" font-family="Arial" font-weight="bold">싱싱한 통영산 활 문어 1kg</text>
+  <text x="40" y="214" font-size="8" fill="#4ADE80" font-family="Arial">통영 앞바다 당일 조업 자연산</text>
+  <text x="40" y="228" font-size="8" fill="#4ADE80" font-family="Arial">활문어! 최상급 신선도 보장</text>
+  <text x="40" y="244" font-size="10" fill="#166534" font-family="Arial" font-weight="bold">💰 ₩45,900</text>
+  <!-- Order link button -->
+  <rect x="40" y="260" width="168" height="32" rx="8" fill="#16A34A"/>
+  <text x="72" y="281" font-size="11" fill="white" font-family="Arial" font-weight="bold">🛒 주문하기 →</text>
+  <!-- Comment -->
+  <rect x="40" y="298" width="168" height="18" rx="4" fill="#DCFCE7"/>
+  <text x="46" y="311" font-size="7" fill="#166534" font-family="Arial">💬 주문하기 👉 shop.abcpharm.net/...</text>
   <!-- Arrow -->
-  <g transform="translate(240, 160)">
-    <rect width="30" height="30" rx="15" fill="#16A34A"/>
-    <text x="8" y="21" font-size="16" fill="white">→</text>
+  <g transform="translate(232, 165)">
+    <rect width="26" height="26" rx="13" fill="#16A34A"/>
+    <text x="6" y="19" font-size="14" fill="white">→</text>
   </g>
   <!-- Shop frame -->
-  <rect x="280" y="20" width="180" height="320" rx="10" fill="white" stroke="#BBF7D0" stroke-width="2"/>
-  <rect x="280" y="20" width="180" height="36" rx="10" fill="#F0FDF4"/>
-  <rect x="280" y="46" width="180" height="10" fill="#F0FDF4"/>
-  <text x="320" y="44" font-size="10" fill="#16A34A" font-family="Arial" font-weight="bold">🛒 내 쇼핑몰</text>
+  <rect x="268" y="16" width="196" height="328" rx="12" fill="white" stroke="#BBF7D0" stroke-width="2"/>
+  <rect x="268" y="16" width="196" height="32" rx="12" fill="#F0FDF4"/>
+  <rect x="268" y="40" width="196" height="8" fill="#F0FDF4"/>
+  <text x="310" y="38" font-size="10" fill="#16A34A" font-family="Arial" font-weight="bold">🛒 장터 쇼핑몰</text>
   <!-- Shop product -->
-  <rect x="292" y="66" width="156" height="90" rx="6" fill="#DCFCE7"/>
-  <rect x="292" y="168" width="120" height="10" rx="2" fill="#166534"/>
-  <rect x="292" y="184" width="80" height="8" rx="2" fill="#BBF7D0"/>
-  <rect x="292" y="204" width="70" height="20" rx="4" fill="#16A34A"/>
-  <text x="302" y="218" font-size="9" fill="white" font-family="Arial" font-weight="bold">₩29,900</text>
-  <!-- Toss Pay button -->
-  <rect x="292" y="240" width="156" height="36" rx="8" fill="#3B82F6"/>
-  <text x="325" y="264" font-size="11" fill="white" font-family="Arial" font-weight="bold">결제하기</text>
+  <rect x="280" y="56" width="172" height="90" rx="6" fill="#DCFCE7"/>
+  <text x="345" y="110" font-size="32" fill="#16A34A">🐙</text>
+  <text x="280" y="162" font-size="10" fill="#166534" font-family="Arial" font-weight="bold">싱싱한 통영산 활 문어</text>
+  <text x="280" y="178" font-size="9" fill="#6B7280" font-family="Arial">통영 앞바다 당일조업 자연산</text>
+  <!-- Price -->
+  <rect x="280" y="192" width="80" height="24" rx="6" fill="#16A34A"/>
+  <text x="290" y="209" font-size="11" fill="white" font-family="Arial" font-weight="bold">₩45,900</text>
+  <!-- Options -->
+  <text x="280" y="234" font-size="8" fill="#374151" font-family="Arial" font-weight="bold">옵션 선택</text>
+  <rect x="280" y="240" width="50" height="18" rx="4" fill="#F0FDF4" stroke="#BBF7D0"/>
+  <text x="290" y="253" font-size="7" fill="#16A34A" font-family="Arial">소 800g</text>
+  <rect x="334" y="240" width="50" height="18" rx="4" fill="#16A34A"/>
+  <text x="344" y="253" font-size="7" fill="white" font-family="Arial">중 1kg</text>
+  <rect x="388" y="240" width="50" height="18" rx="4" fill="#F0FDF4" stroke="#BBF7D0"/>
+  <text x="396" y="253" font-size="7" fill="#16A34A" font-family="Arial">대 1.5kg</text>
+  <!-- Toss button -->
+  <rect x="280" y="270" width="172" height="36" rx="8" fill="#3B82F6"/>
+  <text x="322" y="293" font-size="12" fill="white" font-family="Arial" font-weight="bold">💳 결제하기</text>
   <!-- Success badge -->
-  <rect x="310" y="296" width="120" height="28" rx="14" fill="#16A34A"/>
-  <text x="325" y="315" font-size="10" fill="white" font-family="Arial" font-weight="bold">발행 완료 ✓</text>
+  <rect x="310" y="318" width="110" height="22" rx="11" fill="#16A34A"/>
+  <text x="323" y="334" font-size="9" fill="white" font-family="Arial" font-weight="bold">✓ 동시 발행 완료</text>
 </svg>
