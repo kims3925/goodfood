@@ -73,8 +73,8 @@ export default function RegisterPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
             <UserPlus className="w-8 h-8 text-blue-600" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-800">회원가입</h1>
-          <p className="text-gray-600 mt-2">SNS AUTO 매니저 계정 만들기</p>
+          <h1 className="text-3xl font-bold text-gray-800">판매관리자 등록</h1>
+          <p className="text-gray-600 mt-2">BandAuto 판매관리자 계정 만들기</p>
         </div>
 
         {/* 에러 메시지 */}

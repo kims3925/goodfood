@@ -11,10 +11,12 @@ export async function middleware(request: NextRequest) {
   // 인증이 필요 없는 경로
   const publicPaths = [
     '/login',
+    '/register',
     '/forbidden',
     '/create-admin',       // 관리자 계정 생성
     '/api/create-admin',   // 관리자 계정 생성 API
     '/api/auth/login',
+    '/api/auth/register',
     '/api/auth/logout',
     '/api/order/webhook',  // Google Forms 웹훅
     '/api/assets/',        // 이미지 등 정적 자산

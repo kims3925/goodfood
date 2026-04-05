@@ -70,7 +70,7 @@ export default function LoginPage() {
             <LogIn className="w-8 h-8 text-blue-600" />
           </div>
           <h1 className="text-3xl font-bold text-gray-800">로그인</h1>
-          <p className="text-gray-600 mt-2">SNS AUTO 매니저 대시보드</p>
+          <p className="text-gray-600 mt-2">BandAuto 판매관리자</p>
         </div>
 
         {/* 에러 메시지 */}
@@ -131,7 +131,7 @@ export default function LoginPage() {
         <p className="text-center text-gray-500 text-sm mt-6">
           계정이 없으신가요?{' '}
           <a href="/register" className="text-blue-600 font-medium hover:underline">
-            회원가입
+            판매관리자 등록
           </a>
         </p>
         <p className="text-center text-gray-400 text-xs mt-3">
