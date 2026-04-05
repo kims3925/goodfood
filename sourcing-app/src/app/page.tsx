@@ -1,147 +1,270 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Zap, ShoppingBag, BarChart3, Bot, Shield, Rocket } from 'lucide-react'
+import { ArrowRight, Zap, ShoppingBag, BarChart3, Bot, Shield, Rocket, Package, Send, CreditCard, Headphones, Store, ChevronRight, PlayCircle } from 'lucide-react'
 
 export default function LandingPage() {
   const router = useRouter()
 
+  const features = [
+    {
+      id: 'sourcing',
+      icon: <Package className="w-7 h-7" />,
+      title: '자동 상품 수집',
+      subtitle: 'Playwright 기반 밴드 크롤링',
+      description: '도매 밴드 채널에서 상품 게시글을 자동으로 수집합니다. 이미지, 가격, 옵션 정보를 자동 추출하고 중복을 필터링합니다. 1시간~6시간 주기로 스케줄 수집이 가능합니다.',
+      color: 'blue',
+      screenshot: '/images/landing/feature-sourcing.svg',
+    },
+    {
+      id: 'ai',
+      icon: <Bot className="w-7 h-7" />,
+      title: 'AI 상품 가공',
+      subtitle: 'Gemini AI 자동 변환',
+      description: '수집된 도매 상품을 Gemini AI가 소매용으로 자동 변환합니다. 상품명 최적화, 상세 설명 생성, 옵션/가격 자동 설정까지 원클릭으로 완성됩니다.',
+      color: 'purple',
+      screenshot: '/images/landing/feature-ai.svg',
+    },
+    {
+      id: 'publish',
+      icon: <Send className="w-7 h-7" />,
+      title: '소매밴드 자동 발행',
+      subtitle: '이미지 포함 자동 게시',
+      description: '가공된 상품을 소매 밴드에 이미지와 함께 자동 발행합니다. Playwright로 이미지를 업로드하고, 결제 링크를 포함한 게시글을 자동으로 작성합니다.',
+      color: 'green',
+      screenshot: '/images/landing/feature-publish.svg',
+    },
+    {
+      id: 'shop',
+      icon: <ShoppingBag className="w-7 h-7" />,
+      title: '멀티 쇼핑몰 운영',
+      subtitle: '여러 쇼핑몰 동시 관리',
+      description: '여러 개의 자체 쇼핑몰을 동시에 운영할 수 있습니다. 상품 발행 시 쇼핑몰에도 자동 등록되며, 토스페이먼츠 결제와 연동됩니다.',
+      color: 'yellow',
+      screenshot: '/images/landing/feature-shop.svg',
+    },
+    {
+      id: 'order',
+      icon: <CreditCard className="w-7 h-7" />,
+      title: '주문/정산 자동화',
+      subtitle: '토스페이먼츠 연동',
+      description: '주문 접수부터 결제 확인, 도매 발주, 배송 추적, 정산까지 전 과정을 자동으로 처리합니다. 미결제 주문은 24시간 후 자동 취소됩니다.',
+      color: 'red',
+      screenshot: '/images/landing/feature-order.svg',
+    },
+    {
+      id: 'dashboard',
+      icon: <BarChart3 className="w-7 h-7" />,
+      title: '실시간 대시보드',
+      subtitle: '매출/주문/파이프라인 현황',
+      description: '매출 추이, 주문 상태, 상품별 성과, 쇼핑몰별 매출을 실시간으로 모니터링합니다. 기간별 비교 분석과 마진율 계산도 자동으로 제공됩니다.',
+      color: 'indigo',
+      screenshot: '/images/landing/feature-dashboard.svg',
+    },
+  ]
+
+  const steps = [
+    { num: '01', title: '회원가입 & 채널 연결', desc: '이메일로 가입 후, 도매/소매 밴드 채널을 연결하세요.' },
+    { num: '02', title: '자동 수집 & AI 가공', desc: '도매 상품이 자동 수집되고, AI가 소매용으로 가공합니다.' },
+    { num: '03', title: '발행 & 판매 시작', desc: '소매밴드와 쇼핑몰에 발행하면 바로 판매가 시작됩니다.' },
+  ]
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-50 border-b border-gray-100">
+      <header className="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-md z-50 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <h1 className="text-2xl font-bold text-blue-600">SNS AUTO</h1>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Zap size={18} className="text-white" />
+              </div>
+              <h1 className="text-xl font-bold text-gray-900">BandAuto</h1>
+            </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push('/login')}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
               >
                 로그인
               </button>
               <button
-                onClick={() => router.push('/register')}
-                className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                onClick={() => router.push('/login')}
+                className="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
               >
-                무료 시작하기
+                판매관리자
+                <ArrowRight size={14} className="inline ml-1" />
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm font-medium mb-6">
-            <Zap size={14} />
+      {/* Hero Section */}
+      <section className="pt-28 pb-16 sm:pt-36 sm:pb-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-blue-50 to-white">
+        <div className="max-w-5xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium mb-6">
+            <Bot size={14} />
             AI 기반 소셜커머스 자동화 플랫폼
           </div>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
             밴드 상품 소싱부터<br />
             <span className="text-blue-600">판매까지 완전 자동화</span>
           </h2>
-          <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
-            도매 밴드에서 상품을 자동 수집하고, AI가 가공한 후,
+          <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed">
+            도매 밴드에서 상품을 자동 수집하고, AI가 소매용으로 가공한 후,<br className="hidden sm:block" />
             소매 밴드와 자체 쇼핑몰에 원클릭으로 발행하세요.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
-              onClick={() => router.push('/register')}
-              className="w-full sm:w-auto px-8 py-3.5 text-base font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-200"
+              onClick={() => router.push('/login')}
+              className="w-full sm:w-auto px-8 py-4 text-base font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-200 hover:shadow-xl"
             >
-              무료로 시작하기
+              <Store size={18} />
+              판매관리자 시작하기
               <ArrowRight size={18} />
             </button>
-            <button
-              onClick={() => router.push('/login')}
-              className="w-full sm:w-auto px-8 py-3.5 text-base font-semibold text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+            <a
+              href="#features"
+              className="w-full sm:w-auto px-8 py-4 text-base font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
             >
-              로그인
-            </button>
+              <PlayCircle size={18} />
+              기능 살펴보기
+            </a>
+          </div>
+        </div>
+
+        {/* Hero Screenshot */}
+        <div className="max-w-5xl mx-auto mt-16">
+          <div className="bg-gray-900 rounded-2xl shadow-2xl p-2 sm:p-3">
+            <div className="bg-gray-800 rounded-xl overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-700/50 border-b border-gray-700">
+                <div className="flex gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
+                </div>
+                <span className="text-xs text-gray-400 ml-2">snsauto.abcpharm.net</span>
+              </div>
+              <div className="aspect-[16/9] bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center p-8">
+                <div className="text-center">
+                  <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+                    {[
+                      { label: '수집', value: '156', color: 'text-green-400' },
+                      { label: 'AI 가공', value: '89', color: 'text-yellow-400' },
+                      { label: '발행', value: '45', color: 'text-blue-400' },
+                    ].map(stat => (
+                      <div key={stat.label} className="bg-gray-700/50 rounded-lg p-3 sm:p-4">
+                        <p className="text-xs text-gray-400">{stat.label}</p>
+                        <p className={`text-xl sm:text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-center gap-3 text-gray-500 text-sm">
+                    <span className="flex items-center gap-1"><Package size={14} /> 수집</span>
+                    <ChevronRight size={14} />
+                    <span className="flex items-center gap-1"><Bot size={14} /> AI가공</span>
+                    <ChevronRight size={14} />
+                    <span className="flex items-center gap-1"><Send size={14} /> 발행</span>
+                    <ChevronRight size={14} />
+                    <span className="flex items-center gap-1"><ShoppingBag size={14} /> 판매</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section className="py-20 bg-gray-50">
+      {/* Features Section */}
+      <section id="features" className="py-20 sm:py-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold text-gray-900 mb-4">
-              모든 것을 한 곳에서 관리하세요
+            <h3 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+              핵심 기능 소개
             </h3>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              상품 소싱, AI 가공, 발행, 주문 관리, 정산까지 통합 매니저 대시보드에서 운영하세요.
+              소싱부터 판매까지, 모든 과정을 자동화합니다.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <FeatureCard
-              icon={<Bot className="w-6 h-6" />}
-              title="AI 상품 가공"
-              description="Gemini AI가 수집된 상품의 제목, 설명, 카테고리, 가격을 자동으로 최적화합니다."
-              color="blue"
-            />
-            <FeatureCard
-              icon={<Zap className="w-6 h-6" />}
-              title="자동 수집 파이프라인"
-              description="도매 밴드 게시물을 Playwright로 자동 수집하고 스케줄링으로 운영합니다."
-              color="yellow"
-            />
-            <FeatureCard
-              icon={<ShoppingBag className="w-6 h-6" />}
-              title="멀티 쇼핑몰 운영"
-              description="여러 개의 쇼핑몰을 동시에 운영하고, 상품을 한 번에 발행할 수 있습니다."
-              color="green"
-            />
-            <FeatureCard
-              icon={<BarChart3 className="w-6 h-6" />}
-              title="실시간 대시보드"
-              description="주문 현황, 정산, 파이프라인 상태를 실시간으로 모니터링하세요."
-              color="purple"
-            />
-            <FeatureCard
-              icon={<Shield className="w-6 h-6" />}
-              title="토스페이먼츠 결제"
-              description="카드, 계좌이체, 간편결제를 안전하게 처리하고 웹훅으로 실시간 동기화합니다."
-              color="red"
-            />
-            <FeatureCard
-              icon={<Rocket className="w-6 h-6" />}
-              title="에이전트 자동화"
-              description="AI 에이전트팀이 소싱, 쇼핑몰, DB, DevOps를 자율적으로 운영합니다."
-              color="indigo"
-            />
+          <div className="space-y-20 sm:space-y-28">
+            {features.map((feature, index) => {
+              const isReversed = index % 2 === 1
+              const colors = colorMap[feature.color] || colorMap.blue
+              return (
+                <div
+                  key={feature.id}
+                  className={`flex flex-col ${isReversed ? 'lg:flex-row-reverse' : 'lg:flex-row'} items-center gap-8 lg:gap-16`}
+                >
+                  {/* Text */}
+                  <div className="flex-1 max-w-lg">
+                    <div className={`inline-flex items-center justify-center w-14 h-14 ${colors.bg} ${colors.text} rounded-2xl mb-5`}>
+                      {feature.icon}
+                    </div>
+                    <h4 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+                      {feature.title}
+                    </h4>
+                    <p className={`text-sm font-medium ${colors.text} mb-4`}>
+                      {feature.subtitle}
+                    </p>
+                    <p className="text-gray-600 leading-relaxed text-base">
+                      {feature.description}
+                    </p>
+                  </div>
+
+                  {/* Screenshot Placeholder */}
+                  <div className="flex-1 w-full max-w-xl">
+                    <div className={`rounded-2xl border-2 ${colors.border} overflow-hidden shadow-lg`}>
+                      <div className={`${colors.headerBg} px-4 py-2 flex items-center gap-2`}>
+                        <div className="flex gap-1.5">
+                          <div className="w-2.5 h-2.5 rounded-full bg-white/30" />
+                          <div className="w-2.5 h-2.5 rounded-full bg-white/30" />
+                          <div className="w-2.5 h-2.5 rounded-full bg-white/30" />
+                        </div>
+                        <span className="text-xs text-white/60">{feature.subtitle}</span>
+                      </div>
+                      <div className={`aspect-[4/3] ${colors.screenshotBg} flex items-center justify-center p-8`}>
+                        <div className="text-center">
+                          <div className={`inline-flex items-center justify-center w-16 h-16 ${colors.bg} ${colors.text} rounded-2xl mb-4 opacity-60`}>
+                            {feature.icon}
+                          </div>
+                          <p className={`text-sm font-medium ${colors.text} opacity-60`}>
+                            {feature.title} 화면
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            스크린샷 준비 중
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>
 
       {/* How it works */}
-      <section className="py-20">
+      <section className="py-20 bg-gray-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold text-gray-900 mb-4">
+            <h3 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               3단계로 시작하세요
             </h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <StepCard
-              step="01"
-              title="회원가입"
-              description="이메일과 비밀번호만으로 빠르게 가입하세요."
-            />
-            <StepCard
-              step="02"
-              title="채널 연결"
-              description="도매 밴드 채널과 소매 밴드 채널을 연결하세요."
-            />
-            <StepCard
-              step="03"
-              title="자동화 시작"
-              description="파이프라인 설정 후 자동 수집-가공-발행을 시작하세요."
-            />
+            {steps.map((step) => (
+              <div key={step.num} className="text-center bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-600 text-white rounded-2xl text-xl font-bold mb-4">
+                  {step.num}
+                </div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-2">{step.title}</h4>
+                <p className="text-gray-600 text-sm leading-relaxed">{step.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -149,17 +272,18 @@ export default function LandingPage() {
       {/* CTA */}
       <section className="py-20 bg-blue-600">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h3 className="text-3xl font-bold text-white mb-4">
+          <h3 className="text-3xl sm:text-4xl font-bold text-white mb-4">
             지금 바로 시작하세요
           </h3>
-          <p className="text-lg text-blue-100 mb-8">
-            복잡한 소셜커머스 운영을 AI와 자동화로 간단하게 만들어 드립니다.
+          <p className="text-lg text-blue-100 mb-8 max-w-2xl mx-auto">
+            복잡한 밴드 소싱과 쇼핑몰 운영을 AI 자동화로 간단하게 만들어 드립니다.
           </p>
           <button
-            onClick={() => router.push('/register')}
-            className="px-8 py-3.5 text-base font-semibold text-blue-600 bg-white rounded-xl hover:bg-blue-50 transition-colors shadow-lg"
+            onClick={() => router.push('/login')}
+            className="px-10 py-4 text-base font-semibold text-blue-600 bg-white rounded-xl hover:bg-blue-50 transition-colors shadow-lg inline-flex items-center gap-2"
           >
-            무료로 시작하기
+            <Store size={18} />
+            판매관리자 시작하기
           </button>
         </div>
       </section>
@@ -168,12 +292,17 @@ export default function LandingPage() {
       <footer className="py-12 bg-gray-900 text-gray-400">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div>
-              <h4 className="text-lg font-bold text-white">SNS AUTO</h4>
-              <p className="text-sm mt-1">Band 기반 소셜커머스 자동화 플랫폼</p>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Zap size={16} className="text-white" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-white">BandAuto</h4>
+                <p className="text-xs">Band 기반 소셜커머스 자동화 플랫폼</p>
+              </div>
             </div>
-            <div className="text-sm">
-              <p>관리자: skkim3925@gmail.com</p>
+            <div className="text-sm text-center md:text-right">
+              <p>ABC Group Tech</p>
             </div>
           </div>
         </div>
@@ -182,45 +311,14 @@ export default function LandingPage() {
   )
 }
 
-const colorMap: Record<string, { bg: string; text: string }> = {
-  blue: { bg: 'bg-blue-100', text: 'text-blue-600' },
-  yellow: { bg: 'bg-yellow-100', text: 'text-yellow-600' },
-  green: { bg: 'bg-green-100', text: 'text-green-600' },
-  purple: { bg: 'bg-purple-100', text: 'text-purple-600' },
-  red: { bg: 'bg-red-100', text: 'text-red-600' },
-  indigo: { bg: 'bg-indigo-100', text: 'text-indigo-600' },
-}
-
-function FeatureCard({ icon, title, description, color }: {
-  icon: React.ReactNode
-  title: string
-  description: string
-  color: string
-}) {
-  const colors = colorMap[color] || colorMap.blue
-  return (
-    <div className="bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-lg transition-shadow">
-      <div className={`inline-flex items-center justify-center w-12 h-12 ${colors.bg} ${colors.text} rounded-xl mb-4`}>
-        {icon}
-      </div>
-      <h4 className="text-lg font-semibold text-gray-900 mb-2">{title}</h4>
-      <p className="text-gray-600 text-sm leading-relaxed">{description}</p>
-    </div>
-  )
-}
-
-function StepCard({ step, title, description }: {
-  step: string
-  title: string
-  description: string
-}) {
-  return (
-    <div className="text-center">
-      <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-600 text-white rounded-2xl text-xl font-bold mb-4">
-        {step}
-      </div>
-      <h4 className="text-lg font-semibold text-gray-900 mb-2">{title}</h4>
-      <p className="text-gray-600 text-sm">{description}</p>
-    </div>
-  )
+const colorMap: Record<string, {
+  bg: string; text: string; border: string;
+  headerBg: string; screenshotBg: string
+}> = {
+  blue: { bg: 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-200', headerBg: 'bg-blue-600', screenshotBg: 'bg-blue-50' },
+  purple: { bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200', headerBg: 'bg-purple-600', screenshotBg: 'bg-purple-50' },
+  green: { bg: 'bg-green-100', text: 'text-green-600', border: 'border-green-200', headerBg: 'bg-green-600', screenshotBg: 'bg-green-50' },
+  yellow: { bg: 'bg-yellow-100', text: 'text-yellow-600', border: 'border-yellow-200', headerBg: 'bg-yellow-600', screenshotBg: 'bg-yellow-50' },
+  red: { bg: 'bg-red-100', text: 'text-red-600', border: 'border-red-200', headerBg: 'bg-red-600', screenshotBg: 'bg-red-50' },
+  indigo: { bg: 'bg-indigo-100', text: 'text-indigo-600', border: 'border-indigo-200', headerBg: 'bg-indigo-600', screenshotBg: 'bg-indigo-50' },
 }
