@@ -46,13 +46,43 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // /admin 정확 경로 → /admin/dashboard로 리다이렉트
-  if (pathname === '/admin') {
-    return NextResponse.redirect(new URL('/admin/dashboard', request.url))
-  }
-
   // 쿠키에서 토큰 확인
   const token = request.cookies.get('auth-token')?.value
+
+  // /admin 또는 /admin/* 경로 처리
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+    if (!token) {
+      // 비로그인 → 로그인 페이지로 (redirect=/admin/dashboard)
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', '/admin/dashboard')
+      return NextResponse.redirect(loginUrl)
+    }
+
+    const adminPayload = await verifyToken(token)
+
+    if (!adminPayload) {
+      // 토큰 무효 → 로그인 페이지로
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', '/admin/dashboard')
+      return NextResponse.redirect(loginUrl)
+    }
+
+    if (adminPayload.role !== 'ADMIN') {
+      // ADMIN이 아닌 역할 → 로그인 페이지로 (ADMIN 계정으로 재로그인 유도)
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', '/admin/dashboard')
+      loginUrl.searchParams.set('admin', '1')
+      return NextResponse.redirect(loginUrl)
+    }
+
+    // ADMIN 역할 → /admin 정확 경로면 /admin/dashboard로 리다이렉트
+    if (pathname === '/admin') {
+      return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+    }
+
+    // /admin/* 하위 경로는 그대로 진행
+    return NextResponse.next()
+  }
 
   if (!token) {
     // 로그인이 안 되어있으면 로그인 페이지로 리다이렉트
@@ -74,11 +104,6 @@ export async function middleware(request: NextRequest) {
   // sourcing-app은 ADMIN 또는 MANAGER만 접근 가능
   if (!ALLOWED_ROLES.includes(payload.role)) {
     return NextResponse.redirect(new URL('/forbidden', request.url))
-  }
-
-  // /admin/* 경로는 ADMIN 역할만 접근 가능
-  if (pathname.startsWith('/admin') && payload.role !== 'ADMIN') {
-    return NextResponse.redirect(new URL('/sourcing/dashboard', request.url))
   }
 
   return NextResponse.next()
