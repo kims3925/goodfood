@@ -830,6 +830,48 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
           </button>
         </div>
 
+        {/* 액션 바 (고정) */}
+        <div className="bg-gray-900 rounded-2xl px-5 py-3 mb-6 flex items-center gap-3 flex-wrap">
+          {selectedIds.length > 0 ? (
+            <span className="text-sm font-medium text-gray-300">
+              {selectedIds.length}개 선택됨
+            </span>
+          ) : (
+            <span className="text-sm text-gray-400">
+              상품을 선택해주세요
+            </span>
+          )}
+          <div className="w-px h-5 bg-gray-600" />
+          {selectedIds.length > 0 && (
+            <button
+              onClick={() => { setSelectedIds([]); setSelectAll(false) }}
+              className="text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              선택 해제
+            </button>
+          )}
+          <button
+            onClick={() => {
+              if (selectedIds.length === 0) { toast.error('먼저 상품을 선택해주세요.'); return }
+              handleDeleteSelected()
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium text-white transition-colors"
+          >
+            <Trash2 size={15} />
+            삭제
+          </button>
+          <button
+            onClick={() => {
+              if (selectedIds.length === 0) { toast.error('먼저 상품을 선택해주세요.'); return }
+              handleOpenRegisterModal()
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white transition-colors"
+          >
+            <Sparkles size={15} />
+            AI로 가공하기
+          </button>
+        </div>
+
         {/* 컨트롤 영역 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-4 border-b border-gray-200">
@@ -1139,38 +1181,6 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
             onPageChange={handlePageChange}
           />
         </div>
-
-      {/* Floating Action Bar */}
-      {selectedIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-          <div className="flex items-center gap-3 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl">
-            <span className="text-sm font-medium text-gray-300">
-              {selectedIds.length}개 선택됨
-            </span>
-            <div className="w-px h-5 bg-gray-600" />
-            <button
-              onClick={() => { setSelectedIds([]); setSelectAll(false) }}
-              className="text-sm text-gray-400 hover:text-white transition-colors"
-            >
-              선택 해제
-            </button>
-            <button
-              onClick={handleDeleteSelected}
-              className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium transition-colors"
-            >
-              <Trash2 size={15} />
-              삭제
-            </button>
-            <button
-              onClick={handleOpenRegisterModal}
-              className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium transition-colors"
-            >
-              <Sparkles size={15} />
-              AI로 가공하기
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* 삭제 확인 모달 */}
       <ConfirmModal
