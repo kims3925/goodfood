@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2, Package, Boxes, CheckCircle, Clock, ShoppingCart, AlertTriangle, Archive, Eye, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { Plus, Search, Trash2, Package, Boxes, CheckCircle, Clock, ShoppingCart, AlertTriangle, Archive, Eye, ChevronDown, ChevronUp, Info, Send, ExternalLink } from 'lucide-react'
 import Image from 'next/image'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -156,6 +156,10 @@ export default function ProcessedProductTab({ onStatsLoaded }: ProcessedProductT
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // 자동발행 상태
+  const [isAutoPublishing, setIsAutoPublishing] = useState(false)
+  const [showAutoPublishConfirm, setShowAutoPublishConfirm] = useState(false)
 
   // 발행된 상품 삭제 차단 모달 states
   const [showPublishedWarning, setShowPublishedWarning] = useState(false)
@@ -1107,6 +1111,68 @@ export default function ProcessedProductTab({ onStatsLoaded }: ProcessedProductT
     setShowDeleteConfirm(true)
   }
 
+  // 선택 상품 자동발행 (등록된 소매채널 전체에 발행)
+  const handleAutoPublish = () => {
+    if (selectedProductIds.length === 0) return
+    setShowAutoPublishConfirm(true)
+  }
+
+  const confirmAutoPublish = async () => {
+    setShowAutoPublishConfirm(false)
+    setIsAutoPublishing(true)
+
+    let successCount = 0
+    let failCount = 0
+
+    try {
+      const channelRes = await fetch('/api/channel?kind=RETAIL&limit=100')
+      const channelData = await channelRes.json()
+      const retailChannels: { id: number }[] = channelData.success ? channelData.data : []
+
+      if (retailChannels.length === 0) {
+        toast.error('등록된 소매 채널이 없습니다. 채널 관리에서 소매채널을 추가해주세요.')
+        setIsAutoPublishing(false)
+        return
+      }
+
+      for (const productId of selectedProductIds) {
+        for (const channel of retailChannels) {
+          try {
+            const res = await fetch('/api/publish/template/publish', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ productId, channelId: channel.id }),
+            })
+            const data = await res.json()
+            if (data.success || data.publishId) {
+              successCount++
+            } else {
+              failCount++
+            }
+          } catch {
+            failCount++
+          }
+        }
+      }
+    } catch {
+      toast.error('자동발행 중 오류가 발생했습니다.')
+    } finally {
+      setIsAutoPublishing(false)
+      setSelectedProductIds([])
+      setSelectAll(false)
+      loadProducts()
+      if (successCount > 0) toast.success(`${successCount}건 자동발행이 완료되었습니다.`)
+      if (failCount > 0) toast.error(`${failCount}건 발행에 실패했습니다.`)
+    }
+  }
+
+  // 선택 상품 수동발행 → 가공상품발행 페이지로 이동
+  const handleManualPublish = () => {
+    if (selectedProductIds.length === 0) return
+    const ids = selectedProductIds.join(',')
+    router.push(`/sourcing/publish?productIds=${ids}`)
+  }
+
   const getStatusBadge = (status: string) => {
     const statusMap: { [key: string]: { label: string; color: string } } = {
       COLLECTED: { label: '수집', color: 'bg-gray-100 text-gray-800' },
@@ -1190,28 +1256,6 @@ export default function ProcessedProductTab({ onStatsLoaded }: ProcessedProductT
               <div>
                 <p className="text-xs sm:text-sm text-gray-500">상품</p>
                 <p className="text-base sm:text-lg font-bold text-blue-600">등록하기</p>
-              </div>
-            </div>
-          </button>
-          {/* 선택 삭제 카드 */}
-          <button
-            onClick={handleDeleteSelected}
-            disabled={selectedProductIds.length === 0}
-            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 text-left transition-colors min-h-[44px] ${
-              selectedProductIds.length > 0
-                ? 'hover:border-red-300 hover:bg-red-50 cursor-pointer'
-                : 'opacity-50 cursor-not-allowed'
-            }`}
-          >
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className={`p-2 sm:p-3 rounded-lg ${selectedProductIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
-                <Trash2 size={20} className={`sm:w-6 sm:h-6 ${selectedProductIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`} />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">선택 삭제</p>
-                <p className={`text-base sm:text-lg font-bold ${selectedProductIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                  {selectedProductIds.length}개
-                </p>
               </div>
             </div>
           </button>
@@ -1704,7 +1748,59 @@ export default function ProcessedProductTab({ onStatsLoaded }: ProcessedProductT
         </div>
       )}
 
-      {/* 삭제 확인 모달 */}
+      {/* Floating Action Bar */}
+      {selectedProductIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className="flex items-center gap-3 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl">
+            <span className="text-sm font-medium text-gray-300">
+              {selectedProductIds.length}개 선택됨
+            </span>
+            <div className="w-px h-5 bg-gray-600" />
+            <button
+              onClick={() => { setSelectedProductIds([]); setSelectAll(false) }}
+              className="text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              선택 해제
+            </button>
+            <button
+              onClick={handleDeleteSelected}
+              disabled={isAutoPublishing}
+              className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              <Trash2 size={15} />
+              삭제
+            </button>
+            <button
+              onClick={handleAutoPublish}
+              disabled={isAutoPublishing}
+              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              <Send size={15} />
+              {isAutoPublishing ? '발행 중...' : '자동발행하기'}
+            </button>
+            <button
+              onClick={handleManualPublish}
+              disabled={isAutoPublishing}
+              className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              <ExternalLink size={15} />
+              수동발행하기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 자동발행 ��인 모달 */}
+      <ConfirmModal
+        isOpen={showAutoPublishConfirm}
+        onClose={() => setShowAutoPublishConfirm(false)}
+        onConfirm={confirmAutoPublish}
+        title="자동발행하기"
+        message={`선택한 ${selectedProductIds.length}�� 상품을 등록된 모든 소매 채널에 자동으로 발행합니다.`}
+        confirmText="발행 시작"
+      />
+
+      {/* ��제 확인 모달 */}
       <ConfirmModal
         isOpen={showDeleteConfirm}
         onClose={() => {

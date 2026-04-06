@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Store,
   Search,
@@ -95,6 +95,7 @@ interface Product {
 export default function PublishPage() {
   const toast = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -310,10 +311,33 @@ export default function PublishPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- searchTerm은 Enter 키를 눌러야 적용됨
   }, [currentPage, selectedWholesaleChannel, daysWithin])
 
-  // 페이지/필터 변경 시 상품 로드
+  // 페이지/필터 변경 시 상품 로���
   useEffect(() => {
     loadProducts()
   }, [loadProducts])
+
+  // URL productIds 파라미터로 상품 사전 선택
+  useEffect(() => {
+    const productIdsParam = searchParams.get('productIds')
+    if (productIdsParam && products.length > 0 && channels.length > 0) {
+      const preselectedIds = productIdsParam.split(',').map(Number).filter(Boolean)
+      if (preselectedIds.length > 0) {
+        // 로드된 상품 중 preselectedIds에 해당하는 것의 모든 채널 셀을 선택
+        const newCells = new Set<string>()
+        for (const product of products) {
+          if (preselectedIds.includes(product.id)) {
+            for (const channel of channels) {
+              newCells.add(`${product.id}-${channel.id}`)
+            }
+          }
+        }
+        if (newCells.size > 0) {
+          setSelectedCells(newCells)
+        }
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, channels])
 
   // 플랫폼별 채널 그룹 (Shop 포함)
   const groupedTargets = useMemo(() => {

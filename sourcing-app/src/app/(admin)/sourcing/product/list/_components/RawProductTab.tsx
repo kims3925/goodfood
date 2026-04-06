@@ -828,28 +828,6 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
               </div>
             </div>
           </button>
-          {/* 선택 삭제 카드 */}
-          <button
-            onClick={handleDeleteSelected}
-            disabled={selectedIds.length === 0}
-            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 text-left transition-colors min-h-[44px] ${
-              selectedIds.length > 0
-                ? 'hover:border-red-300 hover:bg-red-50 cursor-pointer'
-                : 'opacity-50 cursor-not-allowed'
-            }`}
-          >
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className={`p-2 sm:p-3 rounded-lg ${selectedIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
-                <Trash2 size={20} className={`sm:w-6 sm:h-6 ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`} />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">선택 삭제</p>
-                <p className={`text-base sm:text-lg font-bold ${selectedIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                  {selectedIds.length}개
-                </p>
-              </div>
-            </div>
-          </button>
         </div>
 
         {/* 컨트롤 영역 */}
@@ -1161,6 +1139,38 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
             onPageChange={handlePageChange}
           />
         </div>
+
+      {/* Floating Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className="flex items-center gap-3 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl">
+            <span className="text-sm font-medium text-gray-300">
+              {selectedIds.length}개 선택됨
+            </span>
+            <div className="w-px h-5 bg-gray-600" />
+            <button
+              onClick={() => { setSelectedIds([]); setSelectAll(false) }}
+              className="text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              선택 해제
+            </button>
+            <button
+              onClick={handleDeleteSelected}
+              className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Trash2 size={15} />
+              삭제
+            </button>
+            <button
+              onClick={handleOpenRegisterModal}
+              className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Sparkles size={15} />
+              AI로 가공하기
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 삭제 확인 모달 */}
       <ConfirmModal
