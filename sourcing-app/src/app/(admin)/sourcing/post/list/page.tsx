@@ -1483,7 +1483,7 @@ export default function PostsManagePage() {
         title="AI로 가공하기"
         message={`선택한 ${selectedPostIds.length}개 게시물을 AI로 가공합니다. 가공 완료 후 가공상품 탭으로 이동합니다.`}
         confirmText="가공 시작"
-        variant="primary"
+        variant="info"
       />
 
       {/* 삭제 확인 모달 */}

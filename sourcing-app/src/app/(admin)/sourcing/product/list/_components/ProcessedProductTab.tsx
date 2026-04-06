@@ -1790,13 +1790,13 @@ export default function ProcessedProductTab({ onStatsLoaded }: ProcessedProductT
         </div>
       )}
 
-      {/* 자동발행 ��인 모달 */}
+      {/* 자동발행 확인 모달 */}
       <ConfirmModal
         isOpen={showAutoPublishConfirm}
         onClose={() => setShowAutoPublishConfirm(false)}
         onConfirm={confirmAutoPublish}
         title="자동발행하기"
-        message={`선택한 ${selectedProductIds.length}�� 상품을 등록된 모든 소매 채널에 자동으로 발행합니다.`}
+        message={`선택한 ${selectedProductIds.length}개 상품을 등록된 모든 소매 채널에 자동으로 발행합니다.`}
         confirmText="발행 시작"
       />
 
