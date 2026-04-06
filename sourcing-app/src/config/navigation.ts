@@ -63,7 +63,7 @@ export const sourcingMenuItems: MenuItem[] = [
     label: '소싱',
     icon: Package,
     children: [
-      { label: '게시물 수집', href: '/sourcing/post/list', icon: FileText },
+      { label: '소싱작업', href: '/sourcing/post/list', icon: FileText },
       { label: '가공 상품', href: '/sourcing/product/list?tab=raw', icon: Package },
       { label: '가공상품 발행', href: '/sourcing/publish', icon: Upload },
     ],
