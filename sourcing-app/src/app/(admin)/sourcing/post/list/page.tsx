@@ -105,6 +105,11 @@ export default function PostsManagePage() {
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // AI 가공 진행 상태
+  const [isAiProcessing, setIsAiProcessing] = useState(false)
+  const [aiProgress, setAiProgress] = useState({ current: 0, total: 0, failed: 0 })
+  const [showAiConfirm, setShowAiConfirm] = useState(false)
+
   // 게시물 추가 모달 관련 상태
   const [selectedPlatform, setSelectedPlatform] = useState<ChannelPlatform>('BAND')
   const [availablePosts, setAvailablePosts] = useState<AvailablePost[]>([])
@@ -539,6 +544,56 @@ export default function PostsManagePage() {
   }
 
 
+  // 선택한 게시물 일괄 AI 가공
+  const handleAiProcess = () => {
+    if (selectedPostIds.length === 0) return
+    setShowAiConfirm(true)
+  }
+
+  const confirmAiProcess = async () => {
+    setShowAiConfirm(false)
+    setIsAiProcessing(true)
+    setAiProgress({ current: 0, total: selectedPostIds.length, failed: 0 })
+
+    let successCount = 0
+    let failCount = 0
+
+    for (let i = 0; i < selectedPostIds.length; i++) {
+      const postId = selectedPostIds[i]
+      setAiProgress(prev => ({ ...prev, current: i + 1 }))
+
+      try {
+        const response = await fetch('/api/product/ai-generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postId }),
+        })
+        const data = await response.json()
+        if (data.success) {
+          successCount++
+        } else {
+          failCount++
+          setAiProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
+        }
+      } catch {
+        failCount++
+        setAiProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
+      }
+    }
+
+    setIsAiProcessing(false)
+    setSelectedPostIds([])
+    setSelectAllPosts(false)
+    loadPosts()
+
+    if (successCount > 0) toast.success(`${successCount}개 상품이 AI 가공되었습니다.`)
+    if (failCount > 0) toast.error(`${failCount}개 가공에 실패했습니다.`)
+
+    if (successCount > 0) {
+      router.push('/sourcing/product/list?tab=processed')
+    }
+  }
+
   const truncateText = (text: string, maxLength: number = 20) => {
     if (text.length > maxLength) {
       return text.substring(0, maxLength) + '...'
@@ -583,23 +638,8 @@ export default function PostsManagePage() {
           </p>
         </div>
 
-        {/* 통계 및 액션 카드 */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          {/* AI로가공하기 카드 */}
-          <button
-            onClick={() => router.push('/sourcing/product/list?tab=raw&openRegister=true')}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:border-purple-300 hover:bg-purple-50 transition-colors cursor-pointer text-left min-h-[44px]"
-          >
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-purple-100 rounded-lg">
-                <Package size={20} className="sm:w-6 sm:h-6 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">AI로</p>
-                <p className="text-base sm:text-lg font-bold text-purple-600">가공하기</p>
-              </div>
-            </div>
-          </button>
+        {/* 통계 카드 */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="p-2 sm:p-3 bg-gray-100 rounded-lg">
@@ -622,28 +662,6 @@ export default function PostsManagePage() {
               </div>
             </div>
           </div>
-          {/* 게시물 삭제 카드 */}
-          <button
-            onClick={handleDeleteSelectedPosts}
-            disabled={selectedPostIds.length === 0}
-            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 text-left transition-colors min-h-[44px] ${
-              selectedPostIds.length > 0
-                ? 'hover:border-red-300 hover:bg-red-50 cursor-pointer'
-                : 'opacity-50 cursor-not-allowed'
-            }`}
-          >
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className={`p-2 sm:p-3 rounded-lg ${selectedPostIds.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
-                <Trash2 size={20} className={`sm:w-6 sm:h-6 ${selectedPostIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`} />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">선택 삭제</p>
-                <p className={`text-base sm:text-lg font-bold ${selectedPostIds.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                  {selectedPostIds.length}개
-                </p>
-              </div>
-            </div>
-          </button>
         </div>
 
         {/* 컨트롤 영역 */}
@@ -903,6 +921,40 @@ export default function PostsManagePage() {
           />
         </div>
       </div>
+
+      {/* Floating Action Bar — 선택 시 등장 */}
+      {selectedPostIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className="flex items-center gap-3 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl">
+            <span className="text-sm font-medium text-gray-300">
+              {selectedPostIds.length}개 선택됨
+            </span>
+            <div className="w-px h-5 bg-gray-600" />
+            <button
+              onClick={() => { setSelectedPostIds([]); setSelectAllPosts(false) }}
+              className="text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              선택 해제
+            </button>
+            <button
+              onClick={handleDeleteSelectedPosts}
+              disabled={isAiProcessing}
+              className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              <Trash2 size={15} />
+              삭제
+            </button>
+            <button
+              onClick={handleAiProcess}
+              disabled={isAiProcessing}
+              className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              <Package size={15} />
+              AI로 가공하기
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 추가 모달 */}
       <Modal
@@ -1441,6 +1493,40 @@ export default function PostsManagePage() {
         variant="danger"
         isLoading={isDeleting}
       />
+
+      {/* AI 가공 확인 모달 */}
+      <ConfirmModal
+        isOpen={showAiConfirm}
+        onClose={() => setShowAiConfirm(false)}
+        onConfirm={confirmAiProcess}
+        title="AI로 가공하기"
+        message={`선택한 ${selectedPostIds.length}개 게시물을 AI로 가공합니다. 가공 완료 후 가공상품 탭으로 이동합니다.`}
+        confirmText="가공 시작"
+      />
+
+      {/* AI 가공 진행 오버레이 */}
+      {isAiProcessing && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-8 w-80 text-center shadow-2xl">
+            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Package size={24} className="text-purple-600 animate-pulse" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">AI 가공 중...</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              {aiProgress.current} / {aiProgress.total} 처리 중
+              {aiProgress.failed > 0 && (
+                <span className="text-red-500 ml-2">({aiProgress.failed}개 실패)</span>
+              )}
+            </p>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${aiProgress.total > 0 ? (aiProgress.current / aiProgress.total) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
