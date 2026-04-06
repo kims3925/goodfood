@@ -6,6 +6,7 @@ model Channel {
   channelKey        String           @map("channel_key") @db.VarChar(255)
   name              String           @db.VarChar(255)
   coverUrl          String?          @map("cover_url") @db.VarChar(500)
+  sortOrder         Int              @default(0) @map("sort_order")
   isActive          Boolean          @default(true) @map("is_active")
   deletedAt         DateTime?        @map("deleted_at") @db.Timestamp(0)
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamp(0)

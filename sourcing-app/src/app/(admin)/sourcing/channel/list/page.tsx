@@ -12,6 +12,9 @@ import {
   Globe,
   ShoppingCart,
   Boxes,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -37,6 +40,7 @@ interface Channel {
   channelKey: string
   name: string
   coverUrl: string | null
+  sortOrder: number
   isActive: boolean
   accountHolder: string | null
   bankAccount: string | null
@@ -76,6 +80,41 @@ function ChannelListContent() {
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+
+  // 순서 변경
+  const [isReordering, setIsReordering] = useState(false)
+
+  const handleMoveChannel = async (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= channels.length) return
+
+    const newChannels = [...channels]
+    const temp = newChannels[index]
+    newChannels[index] = newChannels[targetIndex]
+    newChannels[targetIndex] = temp
+    setChannels(newChannels)
+
+    // API 호출로 순서 저장
+    setIsReordering(true)
+    try {
+      const orderedIds = newChannels.map(c => c.id)
+      const res = await fetch('/api/channel/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        toast.error('순서 변경에 실패했습니다.')
+        loadChannels()
+      }
+    } catch {
+      toast.error('순서 변경에 실패했습니다.')
+      loadChannels()
+    } finally {
+      setIsReordering(false)
+    }
+  }
 
   // UTC+9 시간 포맷 함수 (hydration 안전)
   const formatDateTimeKST = (dateString: string) => {
@@ -498,10 +537,28 @@ function ChannelListContent() {
                             className="w-4 h-4 cursor-pointer"
                           />
                         </TableCell>
-                        <TableCell>
-                          <span className="text-gray-500 text-sm">
-                            {(currentPage - 1) * itemsPerPage + index + 1}
-                          </span>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-1">
+                            <div className="flex flex-col">
+                              <button
+                                onClick={() => handleMoveChannel(index, 'up')}
+                                disabled={index === 0 || isReordering}
+                                className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed"
+                              >
+                                <ArrowUp size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleMoveChannel(index, 'down')}
+                                disabled={index === channels.length - 1 || isReordering}
+                                className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed"
+                              >
+                                <ArrowDown size={14} />
+                              </button>
+                            </div>
+                            <span className="text-gray-400 text-xs ml-1">
+                              {(currentPage - 1) * itemsPerPage + index + 1}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-3">
@@ -612,9 +669,23 @@ function ChannelListContent() {
                       </div>
 
                       {/* 순서 */}
-                      <span className="text-xs text-gray-400 flex-shrink-0">
-                        #{(currentPage - 1) * itemsPerPage + index + 1}
-                      </span>
+                      <div className="flex flex-col items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => handleMoveChannel(index, 'up')}
+                          disabled={index === 0 || isReordering}
+                          className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-20"
+                        >
+                          <ArrowUp size={14} />
+                        </button>
+                        <span className="text-xs text-gray-400">#{(currentPage - 1) * itemsPerPage + index + 1}</span>
+                        <button
+                          onClick={() => handleMoveChannel(index, 'down')}
+                          disabled={index === channels.length - 1 || isReordering}
+                          className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-20"
+                        >
+                          <ArrowDown size={14} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -37,6 +37,7 @@ export class ChannelRepository {
         },
       },
       orderBy: [
+        { sortOrder: 'asc' },
         { kind: 'asc' },
         { createdAt: 'desc' },
       ],
