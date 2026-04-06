@@ -5,6 +5,90 @@ import { getCurrentUser } from '@/modules/auth/auth.service'
 import { transformPostToProduct } from '@/modules/transformation'
 import { settingsService } from '@/modules/config/domain/src/settings'
 import prisma, { AiProvider } from '@bandauto/db'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import fs from 'fs'
+import path from 'path'
+
+function expandHomePath(p: string): string {
+  if (p.startsWith('~/')) return path.join(process.env.HOME || '/home/ubuntu', p.slice(2))
+  return p
+}
+
+/**
+ * Gemini Vision으로 이미지에 가격 텍스트가 포함되어 있는지 판별
+ */
+async function hasImagePriceText(apiKey: string, imageBuffer: Buffer, mimeType: string): Promise<boolean> {
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [
+          {
+            inlineData: {
+              mimeType,
+              data: imageBuffer.toString('base64'),
+            },
+          },
+          {
+            text: '이 이미지에 상품 가격 정보(숫자+원, ₩, 공급가, 판매가 등 금액 텍스트)가 포함되어 있나요? "YES" 또는 "NO"로만 답해주세요.',
+          },
+        ],
+      }],
+    })
+
+    const answer = result.response.text().trim().toUpperCase()
+    return answer.includes('YES')
+  } catch (error) {
+    console.error('[Image Price Check] Error:', error)
+    return false // 에러 시 삭제하지 않음 (안전하게)
+  }
+}
+
+/**
+ * 게시물 이미지 중 가격 텍스트가 포함된 이미지를 삭제
+ */
+async function filterPriceImages(apiKey: string, postId: number): Promise<number> {
+  const images = await prisma.collectedPostImage.findMany({
+    where: { postId },
+    orderBy: { sortOrder: 'asc' },
+  })
+
+  if (images.length === 0) return 0
+
+  const storagePath = process.env.POST_IMAGE_STORAGE_PATH || 'assets/images/post'
+  const imagesDir = expandHomePath(storagePath)
+  let deletedCount = 0
+
+  for (const image of images) {
+    // URL에서 파일명 추출
+    const parts = image.url.split('/')
+    const fileName = parts[parts.length - 1]
+    const filePath = path.join(imagesDir, fileName)
+
+    // 파일이 존재하면 읽기
+    if (!fs.existsSync(filePath)) continue
+
+    const buffer = fs.readFileSync(filePath)
+    const ext = path.extname(fileName).toLowerCase()
+    const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg'
+
+    const hasPrice = await hasImagePriceText(apiKey, buffer, mimeType)
+
+    if (hasPrice) {
+      // DB에서 이미지 레코드 삭제
+      await prisma.collectedPostImage.delete({ where: { id: image.id } })
+      // 파일도 삭제
+      try { fs.unlinkSync(filePath) } catch { /* ignore */ }
+      deletedCount++
+      console.log(`[Image Price Filter] 가격 이미지 삭제: ${fileName} (postId: ${postId})`)
+    }
+  }
+
+  return deletedCount
+}
 
 // =============================================
 // MODEL-SPECIFIC RATE LIMITS
@@ -263,6 +347,16 @@ export async function POST(request: NextRequest) {
         const options = samePriceVariants.map(v => v.optionSummary || '기본').join(', ')
         console.log(`[AI Product Generation] 참고: ${samePriceVariants.length}개 옵션의 도매가와 소매가 동일 (${options}) - 가격 정책에 따른 정상 결과일 수 있음`)
       }
+    }
+
+    // 가격 이미지 필터링 (가격 텍스트가 포함된 이미지 삭제)
+    try {
+      const deletedImages = await filterPriceImages(aiConfig.apiKey, postId)
+      if (deletedImages > 0) {
+        console.log(`[AI Product Generation] 가격 이미지 ${deletedImages}개 삭제 (postId: ${postId})`)
+      }
+    } catch (filterError) {
+      console.error('[AI Product Generation] 이미지 필터링 실패 (무시):', filterError)
     }
 
     // Update AI config usage (총 사용량 + 일일 사용량)
