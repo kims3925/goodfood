@@ -31,6 +31,10 @@ export class CollectedPostRepository {
     const where = {
       userId,
       deletedAt: null,
+      // AI 미가공 게시물만 조회 (collectedProducts가 없는 게시물)
+      collectedProducts: {
+        none: {},
+      },
       ...(channelId && { channelId }),
       ...(search && {
         OR: [

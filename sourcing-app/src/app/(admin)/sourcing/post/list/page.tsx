@@ -564,46 +564,28 @@ export default function PostsManagePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 퀵 액션 버튼 */}
-        <div className="flex flex-wrap gap-3 mb-4">
-          <button
-            onClick={handleOpenAddModal}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm shadow-sm"
-          >
-            <Plus size={18} />
-            게시물 수집하기
-          </button>
-          <button
-            onClick={() => router.push('/sourcing/collected-product/list')}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm shadow-sm"
-          >
-            <Package size={18} />
-            수집상품 등록하기
-          </button>
-        </div>
-
         {/* 헤더 */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">수집 게시물 관리</h1>
           <p className="text-gray-600">
-            도매채널에서 수집한 게시물을 관리합니다.
+            소싱처에서 수집한 게시물중 AI가공이 안된 상품을 관리합니다.
           </p>
         </div>
 
         {/* 통계 및 액션 카드 */}
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          {/* 게시물 추가 카드 (첫 번째) */}
+          {/* AI로 상품가공하기 카드 */}
           <button
-            onClick={handleOpenAddModal}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left min-h-[44px]"
+            onClick={() => router.push('/sourcing/product/list?tab=raw&openRegister=true')}
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:border-purple-300 hover:bg-purple-50 transition-colors cursor-pointer text-left min-h-[44px]"
           >
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
-                <Plus size={20} className="sm:w-6 sm:h-6 text-blue-600" />
+              <div className="p-2 sm:p-3 bg-purple-100 rounded-lg">
+                <FileText size={20} className="sm:w-6 sm:h-6 text-purple-600" />
               </div>
               <div>
-                <p className="text-xs sm:text-sm text-gray-500">게시물</p>
-                <p className="text-base sm:text-lg font-bold text-blue-600">추가하기</p>
+                <p className="text-xs sm:text-sm text-gray-500">AI 상품가공</p>
+                <p className="text-base sm:text-lg font-bold text-purple-600">시작하기</p>
               </div>
             </div>
           </button>
@@ -613,7 +595,7 @@ export default function PostsManagePage() {
                 <FileText size={20} className="sm:w-6 sm:h-6 text-gray-600" />
               </div>
               <div>
-                <p className="text-xs sm:text-sm text-gray-500">전체 게시물</p>
+                <p className="text-xs sm:text-sm text-gray-500">미가공 소싱 게시물</p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900">{totalItems}</p>
               </div>
             </div>

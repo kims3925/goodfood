@@ -5,7 +5,7 @@ import {
   Package,
   FileText,
   Upload,
-  Database,
+
   ClipboardList,
   Truck,
   Cog,
@@ -64,8 +64,7 @@ export const sourcingMenuItems: MenuItem[] = [
     icon: Package,
     children: [
       { label: '게시물 수집', href: '/sourcing/post/list', icon: FileText },
-      { label: '수집 상품', href: '/sourcing/collected-product/list', icon: Database },
-      { label: '가공 상품', href: '/sourcing/product/list', icon: Package },
+      { label: '가공 상품', href: '/sourcing/product/list?tab=raw', icon: Package },
       { label: '가공상품 발행', href: '/sourcing/publish', icon: Upload },
     ],
   },
