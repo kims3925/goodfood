@@ -43,6 +43,7 @@ function StoreLayoutContent({
   const contactPhone = shop?.contactPhone || '1234-5678'
   const ownerName = shop?.ownerName
   const businessNumber = shop?.businessNumber
+  const bankInfo = shop?.bankInfo
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -272,6 +273,21 @@ function StoreLayoutContent({
 
       </header>
 
+      {/* 무통장입금 계좌 안내 배너 */}
+      {bankInfo && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="kurly-container">
+            <div className="flex items-center justify-center gap-2 py-2 text-xs sm:text-sm text-amber-800">
+              <span className="font-medium">무통장입금</span>
+              <span className="text-amber-400">|</span>
+              <span className="font-bold">{bankInfo.bankName} {bankInfo.bankAccount}</span>
+              <span className="text-amber-400">|</span>
+              <span>예금주: {bankInfo.accountHolder}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content - 모바일에서 하단 네비 공간 확보 */}
       <main className="flex-1 flex flex-col">
         {children}
@@ -348,7 +364,18 @@ function StoreLayoutContent({
               </ul>
             </div>
           </div>
-          <div className="mt-4 md:mt-8 pt-4 md:pt-8 border-t border-gray-200 text-center text-xs md:text-sm text-gray-500">
+          {/* 무통장입금 안내 */}
+          {bankInfo && (
+            <div className="mt-4 md:mt-6 pt-4 border-t border-gray-200">
+              <div className="text-center">
+                <p className="text-xs md:text-sm font-medium text-gray-700 mb-1">무통장입금 안내</p>
+                <p className="text-xs md:text-sm text-gray-600">
+                  {bankInfo.bankName} <span className="font-bold text-gray-800">{bankInfo.bankAccount}</span> (예금주: {bankInfo.accountHolder})
+                </p>
+              </div>
+            </div>
+          )}
+          <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-gray-200 text-center text-xs md:text-sm text-gray-500">
             <p>
               {shopName}
               {ownerName && <span> | 대표: {ownerName}</span>}
