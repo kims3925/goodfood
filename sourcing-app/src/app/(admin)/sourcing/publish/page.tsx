@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Store,
@@ -92,7 +92,7 @@ interface Product {
   publishedShops: PublishedShop[]
 }
 
-export default function PublishPage() {
+function PublishPageContent() {
   const toast = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -2807,5 +2807,13 @@ export default function PublishPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function PublishPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loading /></div>}>
+      <PublishPageContent />
+    </Suspense>
   )
 }
