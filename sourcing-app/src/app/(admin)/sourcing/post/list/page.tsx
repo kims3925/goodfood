@@ -1475,6 +1475,17 @@ export default function PostsManagePage() {
         </div>
       )}
 
+      {/* AI 가공 확인 모달 */}
+      <ConfirmModal
+        isOpen={showAiConfirm}
+        onClose={() => setShowAiConfirm(false)}
+        onConfirm={confirmAiProcess}
+        title="AI로 가공하기"
+        message={`선택한 ${selectedPostIds.length}개 게시물을 AI로 가공합니다. 가공 완료 후 가공상품 탭으로 이동합니다.`}
+        confirmText="가공 시작"
+        variant="primary"
+      />
+
       {/* 삭제 확인 모달 */}
       <ConfirmModal
         isOpen={showDeleteConfirm}
@@ -1493,40 +1504,7 @@ export default function PostsManagePage() {
         variant="danger"
         isLoading={isDeleting}
       />
-
-      {/* AI 가공 확인 모달 */}
-      <ConfirmModal
-        isOpen={showAiConfirm}
-        onClose={() => setShowAiConfirm(false)}
-        onConfirm={confirmAiProcess}
-        title="AI로 가공하기"
-        message={`선택한 ${selectedPostIds.length}개 게시물을 AI로 가공합니다. 가공 완료 후 가공상품 탭으로 이동합니다.`}
-        confirmText="가공 시작"
-      />
-
-      {/* AI 가공 진행 오버레이 */}
-      {isAiProcessing && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-xl p-8 w-80 text-center shadow-2xl">
-            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Package size={24} className="text-purple-600 animate-pulse" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">AI 가공 중...</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              {aiProgress.current} / {aiProgress.total} 처리 중
-              {aiProgress.failed > 0 && (
-                <span className="text-red-500 ml-2">({aiProgress.failed}개 실패)</span>
-              )}
-            </p>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${aiProgress.total > 0 ? (aiProgress.current / aiProgress.total) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
+                   
