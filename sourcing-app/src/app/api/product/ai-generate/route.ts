@@ -248,37 +248,20 @@ export async function POST(request: NextRequest) {
       variantCount: draft.variants.length,
     })
 
-    // 가격 정책 적용 검증 (정책이 설정된 경우에만)
-    let pricePolicyWarning: string | undefined
+    // 가격 정책 적용 로깅 (경고만, 실패 처리하지 않음)
+    // 가격 정책에서 "판매가 그대로 사용" 등의 조건이 있을 수 있으므로
+    // wholesalePrice === price 인 경우도 정책에 따른 정상 결과일 수 있음
     if (policyContent && draft.variants && draft.variants.length > 0) {
-      const unpricedVariants = draft.variants.filter(v =>
+      const samePriceVariants = draft.variants.filter(v =>
         v.wholesalePrice !== undefined &&
         v.wholesalePrice !== null &&
         v.price !== undefined &&
         v.wholesalePrice === v.price
       )
 
-      if (unpricedVariants.length > 0) {
-        const failedOptions = unpricedVariants.map(v => v.optionSummary || '기본').join(', ')
-        pricePolicyWarning = `가격 정책 미적용: ${unpricedVariants.length}개 옵션의 도매가와 소매가가 동일합니다. (${failedOptions})`
-
-        console.log('[AI Product Generation] Price policy validation failed:', pricePolicyWarning)
-
-        // 가격 정책 미적용 시 실패로 처리
-        return NextResponse.json(
-          {
-            success: false,
-            error: pricePolicyWarning,
-            code: 'PRICE_POLICY_NOT_APPLIED',
-            draft,  // draft도 함께 반환하여 사용자가 확인할 수 있게
-            unpricedVariants: unpricedVariants.map(v => ({
-              optionSummary: v.optionSummary,
-              wholesalePrice: v.wholesalePrice,
-              price: v.price,
-            })),
-          },
-          { status: 400 }
-        )
+      if (samePriceVariants.length > 0) {
+        const options = samePriceVariants.map(v => v.optionSummary || '기본').join(', ')
+        console.log(`[AI Product Generation] 참고: ${samePriceVariants.length}개 옵션의 도매가와 소매가 동일 (${options}) - 가격 정책에 따른 정상 결과일 수 있음`)
       }
     }
 
