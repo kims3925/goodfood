@@ -141,6 +141,11 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
 
+  // 선택 상품 일괄 AI 가공 상태
+  const [isDirectAiProcessing, setIsDirectAiProcessing] = useState(false)
+  const [directAiProgress, setDirectAiProgress] = useState({ current: 0, total: 0, failed: 0 })
+  const [showDirectAiConfirm, setShowDirectAiConfirm] = useState(false)
+
   // Delete confirm modal states
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
@@ -376,6 +381,110 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
       setIsDeleting(false)
       setShowDeleteConfirm(false)
       setDeleteTargetId(null)
+    }
+  }
+
+  // =============================================
+  // 선택 상품 직접 AI 가공 (모달 없이)
+  // =============================================
+
+  const handleDirectAiProcess = () => {
+    if (selectedIds.length === 0) return
+    setShowDirectAiConfirm(true)
+  }
+
+  const confirmDirectAiProcess = async () => {
+    setShowDirectAiConfirm(false)
+    setIsDirectAiProcessing(true)
+
+    // 선택된 수집상품에서 postId 추출
+    const selectedProducts = products.filter(p => selectedIds.includes(p.id))
+    const total = selectedProducts.length
+    setDirectAiProgress({ current: 0, total, failed: 0 })
+
+    let successCount = 0
+    let failCount = 0
+
+    // 채널별 정책 조회
+    const policyMap = new Map<number, string>()
+    try {
+      const policyRes = await fetch('/api/policy?limit=100')
+      const policyData = await policyRes.json()
+      if (policyData.success) {
+        for (const p of policyData.data) {
+          if (p.isActive && !policyMap.has(p.channelId)) {
+            policyMap.set(p.channelId, p.content)
+          }
+        }
+      }
+    } catch {
+      // 정책 없이 진행
+    }
+
+    for (let i = 0; i < selectedProducts.length; i++) {
+      const cp = selectedProducts[i]
+      const channelId = cp.post?.channel?.id
+      const policyContent = channelId ? policyMap.get(channelId) : undefined
+
+      setDirectAiProgress(prev => ({ ...prev, current: i + 1 }))
+
+      try {
+        // AI 생성
+        const aiRes = await fetch('/api/product/ai-generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postId: cp.postId, policyContent }),
+        })
+        const aiData = await aiRes.json()
+
+        if (aiData.success) {
+          const draft = aiData.draft
+          // collected-product 저장
+          const saveRes = await fetch('/api/collected-product', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              postId: cp.postId,
+              name: draft.name,
+              description: draft.description,
+              price: draft.price,
+              currency: 'KRW',
+              rawMetadata: {
+                ...draft,
+                shipping: {
+                  shippingFee: draft.shippingFee ?? null,
+                  shippingInfo: draft.shippingInfo ?? null,
+                },
+              },
+            }),
+          })
+          const saveData = await saveRes.json()
+          if (saveData.success) {
+            successCount++
+          } else {
+            failCount++
+            setDirectAiProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
+          }
+        } else {
+          failCount++
+          setDirectAiProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
+        }
+      } catch {
+        failCount++
+        setDirectAiProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
+      }
+    }
+
+    setIsDirectAiProcessing(false)
+    setSelectedIds([])
+    setSelectAll(false)
+    loadProducts()
+
+    if (successCount > 0) toast.success(`${successCount}개 상품이 AI 가공되었습니다.`)
+    if (failCount > 0) toast.error(`${failCount}개 가공에 실패했습니다.`)
+
+    if (successCount > 0 && onSwitchToProcessed) {
+      onSwitchToProcessed()
     }
   }
 
@@ -863,9 +972,10 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
           <button
             onClick={() => {
               if (selectedIds.length === 0) { toast.error('먼저 상품을 선택해주세요.'); return }
-              handleOpenRegisterModal()
+              handleDirectAiProcess()
             }}
-            className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white transition-colors"
+            disabled={isDirectAiProcessing}
+            className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
           >
             <Sparkles size={15} />
             AI로 가공하기
@@ -1181,6 +1291,41 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
             onPageChange={handlePageChange}
           />
         </div>
+
+      {/* AI 가공 확인 모달 */}
+      <ConfirmModal
+        isOpen={showDirectAiConfirm}
+        onClose={() => setShowDirectAiConfirm(false)}
+        onConfirm={confirmDirectAiProcess}
+        title="AI로 가공하기"
+        message={`선택한 ${selectedIds.length}개 수집상품을 AI로 가공합니다. 완료 후 가공완료 탭으로 이동합니다.`}
+        confirmText="가공 시작"
+        variant="info"
+      />
+
+      {/* AI 가공 진행 오버레이 */}
+      {isDirectAiProcessing && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-8 w-80 text-center shadow-2xl">
+            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Package size={24} className="text-purple-600 animate-pulse" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">AI 가공 중...</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              {directAiProgress.current} / {directAiProgress.total} 처리 중
+              {directAiProgress.failed > 0 && (
+                <span className="text-red-500 ml-2">({directAiProgress.failed}개 실패)</span>
+              )}
+            </p>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${directAiProgress.total > 0 ? (directAiProgress.current / directAiProgress.total) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 삭제 확인 모달 */}
       <ConfirmModal
