@@ -241,9 +241,13 @@ function PublishPageContent() {
       const data = await response.json()
       if (data.success) {
         setChannels((data.data as Channel[]).filter((ch) => ch.isActive))
+      } else {
+        console.error('채널 조회 응답 실패:', data.error)
+        toast.error('소매채널 목록을 불러오지 못했습니다.')
       }
     } catch (error) {
       console.error('채널 조회 실패:', error)
+      toast.error('소매채널 목록을 불러오지 못했습니다.')
     } finally {
       setIsLoadingChannels(false)
     }
@@ -399,7 +403,8 @@ function PublishPageContent() {
       if (group) group.items.push(ch)
     })
 
-    return groups.filter((g) => g.items.length > 0)
+    // '쇼핑몰'과 '소매밴드' 그룹은 항상 표시, '기타 채널'은 아이템이 있을 때만 표시
+    return groups.filter((g) => g.platform === 'SHOP' || g.platform === 'BAND' || g.items.length > 0)
   }, [channels, shops])
 
   // 총 타겟 수 (채널 + Shop)
@@ -1898,6 +1903,7 @@ function PublishPageContent() {
                                   </span>
                                 </div>
                                 {/* 전체선택 버튼 */}
+                                {group.items.length > 0 && (
                                 <button
                                   onClick={() => {
                                     const allSelected = group.items.every(item =>
@@ -1922,33 +1928,40 @@ function PublishPageContent() {
                                     ? '전체해제'
                                     : '전체선택'}
                                 </button>
+                                )}
                               </div>
 
                               <div className="grid grid-cols-2 gap-2">
-                                {group.items.map((item) => {
-                                  const published = isPublished(product.id, group.type, item.id)
-                                  const selected = selectedCells.has(cellKey(product.id, group.type, item.id))
-                                  return (
-                                    <button
-                                      key={`${group.type}-${item.id}`}
-                                      onClick={() => handleCellClick(product.id, group.type, item.id)}
-                                      disabled={published}
-                                      className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all min-h-[44px] ${
-                                        selected
-                                          ? 'bg-purple-500 text-white shadow-sm'
-                                          : published
-                                          ? 'bg-green-100 text-green-700 cursor-default'
-                                          : !priceSet
-                                          ? 'bg-amber-50 text-amber-700 border border-dashed border-amber-300'
-                                          : 'bg-white text-gray-700 border border-gray-200 active:bg-gray-100'
-                                      }`}
-                                    >
-                                      <span className="truncate">{item.name}</span>
-                                      {published && <Check size={14} className="flex-shrink-0 ml-1" />}
-                                      {selected && !published && <Check size={14} className="flex-shrink-0 ml-1" />}
-                                    </button>
-                                  )
-                                })}
+                                {group.items.length > 0 ? (
+                                  group.items.map((item) => {
+                                    const published = isPublished(product.id, group.type, item.id)
+                                    const selected = selectedCells.has(cellKey(product.id, group.type, item.id))
+                                    return (
+                                      <button
+                                        key={`${group.type}-${item.id}`}
+                                        onClick={() => handleCellClick(product.id, group.type, item.id)}
+                                        disabled={published}
+                                        className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all min-h-[44px] ${
+                                          selected
+                                            ? 'bg-purple-500 text-white shadow-sm'
+                                            : published
+                                            ? 'bg-green-100 text-green-700 cursor-default'
+                                            : !priceSet
+                                            ? 'bg-amber-50 text-amber-700 border border-dashed border-amber-300'
+                                            : 'bg-white text-gray-700 border border-gray-200 active:bg-gray-100'
+                                        }`}
+                                      >
+                                        <span className="truncate">{item.name}</span>
+                                        {published && <Check size={14} className="flex-shrink-0 ml-1" />}
+                                        {selected && !published && <Check size={14} className="flex-shrink-0 ml-1" />}
+                                      </button>
+                                    )
+                                  })
+                                ) : (
+                                  <p className="col-span-2 text-xs text-gray-400 py-2 text-center">
+                                    등록된 {group.label}이 없습니다
+                                  </p>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -1972,7 +1985,7 @@ function PublishPageContent() {
                     {groupedTargets.map((group, groupIndex) => (
                       <th
                         key={group.platform}
-                        colSpan={group.items.length}
+                        colSpan={Math.max(group.items.length, 1)}
                         className={`border-b-2 border-gray-300 p-3 text-center ${group.headerBgColor} ${
                           groupIndex < groupedTargets.length - 1 ? 'border-r-2' : ''
                         }`}
@@ -1993,22 +2006,35 @@ function PublishPageContent() {
                   <tr>
                     <th className="sticky left-0 z-20 bg-gray-50 border-b border-r-2 border-gray-300 p-2" />
                     {groupedTargets.map((group, groupIndex) =>
-                      group.items.map((item, itemIndex) => (
+                      group.items.length > 0 ? (
+                        group.items.map((item, itemIndex) => (
+                          <th
+                            key={`${group.type}-${item.id}`}
+                            className={`border-b border-gray-200 p-1.5 min-w-[80px] cursor-pointer transition-colors ${group.cellBgColor} hover:opacity-80 ${
+                              groupIndex < groupedTargets.length - 1 && itemIndex === group.items.length - 1
+                                ? 'border-r-2 border-gray-300'
+                                : ''
+                            }`}
+                            onClick={() => handleSelectColumn(group.type, item.id)}
+                            title={`${item.name} 전체 선택/해제`}
+                          >
+                            <div className={`text-xs font-medium truncate max-w-[80px] mx-auto ${group.headerTextColor}`} title={item.name}>
+                              {item.name.length > 8 ? item.name.slice(0, 8) + '...' : item.name}
+                            </div>
+                          </th>
+                        ))
+                      ) : (
                         <th
-                          key={`${group.type}-${item.id}`}
-                          className={`border-b border-gray-200 p-1.5 min-w-[80px] cursor-pointer transition-colors ${group.cellBgColor} hover:opacity-80 ${
-                            groupIndex < groupedTargets.length - 1 && itemIndex === group.items.length - 1
-                              ? 'border-r-2 border-gray-300'
-                              : ''
+                          key={`${group.type}-empty`}
+                          className={`border-b border-gray-200 p-1.5 min-w-[80px] ${group.cellBgColor} ${
+                            groupIndex < groupedTargets.length - 1 ? 'border-r-2 border-gray-300' : ''
                           }`}
-                          onClick={() => handleSelectColumn(group.type, item.id)}
-                          title={`${item.name} 전체 선택/해제`}
                         >
-                          <div className={`text-xs font-medium truncate max-w-[80px] mx-auto ${group.headerTextColor}`} title={item.name}>
-                            {item.name.length > 8 ? item.name.slice(0, 8) + '...' : item.name}
+                          <div className={`text-xs text-gray-400 mx-auto`}>
+                            없음
                           </div>
                         </th>
-                      ))
+                      )
                     )}
                   </tr>
                 </thead>
@@ -2034,6 +2060,7 @@ function PublishPageContent() {
                         </div>
                       </td>
                       {groupedTargets.map((group, groupIndex) =>
+                        group.items.length > 0 ? (
                         group.items.map((item, itemIndex) => {
                           const published = isPublished(product.id, group.type, item.id)
                           const selected = selectedCells.has(cellKey(product.id, group.type, item.id))
@@ -2073,6 +2100,16 @@ function PublishPageContent() {
                             </td>
                           )
                         })
+                        ) : (
+                          <td
+                            key={`${group.type}-empty-${product.id}`}
+                            className={`border-b border-gray-200 p-1 text-center ${group.cellBgColor} ${
+                              groupIndex < groupedTargets.length - 1 ? 'border-r-2 border-gray-300' : ''
+                            }`}
+                          >
+                            <div className="w-8 h-8 rounded bg-gray-100 mx-auto" />
+                          </td>
+                        )
                       )}
                     </tr>
                   ))}

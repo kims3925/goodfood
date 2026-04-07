@@ -82,8 +82,8 @@ jobs:
             # 컨테이너 정상 기동 대기 (10초)
             sleep 10
 
-            # Prisma 마이그레이션
-            docker compose exec -T shop-app sh -c "cd /app/db && npx prisma@6 migrate deploy --schema prisma" || true
+            # Prisma 스키마 동기화 (db push: 새 컬럼 추가 등 스키마 변경 자동 적용)
+            docker compose exec -T sourcing-app sh -c "cd /app/db && npx prisma@6 db push --schema prisma" || true
 
             # 상태 확인
             docker compose ps
