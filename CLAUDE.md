@@ -82,6 +82,110 @@ npx prisma db pull --schema prisma    # DB에서 스키마 가져오기
 | Queue | Bull 4.16 + Redis |
 | Deploy | AWS EC2, Docker Compose |
 
+## 에이전트 시스템
+
+11개의 자율 AI 에이전트가 소싱·발행·주문·정산·CS 등 운영 전 과정을 자동화합니다.
+
+### 아키텍처
+
+```
+sourcing-app/src/modules/agents/
+├── AgentBase.ts          # 추상 베이스 클래스 (log, emitEvent, recordKpi)
+├── EventBus.ts           # Redis Pub/Sub 이벤트 버스
+├── AgentRegistry.ts      # 싱글톤 에이전트 레지스트리
+├── TaskQueue.ts          # Bull Queue 래퍼
+├── WorkflowEngine.ts     # DAG 워크플로우 엔진
+├── AgentScheduler.ts     # Cron 스케줄러
+├── KpiCollector.ts       # KPI 집계
+├── types.ts              # 타입 정의 (AgentLayer, AgentEvent, AgentResult 등)
+└── implementations/      # 에이전트 구현체
+    ├── CommanderAgent.ts        # COMMAND — 오케스트레이터
+    ├── SourcingAgent.ts         # SOURCING — 도매밴드 자동 수집
+    ├── ProductManagerAgent.ts   # SOURCING — 가격검증/이미지감지/재발행
+    ├── MarketingAgent.ts        # OPERATIONS — 베스트셀러 공지 자동 게시
+    ├── CustomerAgent.ts         # OPERATIONS — 댓글 자동 분류/AI 응대
+    ├── OrderAgent.ts            # COMMERCE — 주문 처리/자동 취소
+    ├── ShippingAgent.ts         # COMMERCE — 배송 추적/지연 감지
+    ├── SettlementAgent.ts       # COMMERCE — 정산 자동화
+    ├── SessionKeeperAgent.ts    # INFRA — Band 세션 만료 감지/갱신
+    ├── WatcherAgent.ts          # INFRA — 시스템 이상 감지
+    └── AnalystAgent.ts          # INFRA — 매출·통계 분석
+```
+
+### 에이전트 레이어 (5개)
+
+| 레이어 | 에이전트 | 역할 |
+|--------|---------|------|
+| COMMAND | Commander | 전체 조율, 워크플로우 실행, 장애 복구 |
+| SOURCING | SourcingAgent, ProductManager | 상품 수집, 가격검증, 재발행 |
+| OPERATIONS | MarketingAgent, CustomerAgent | 마케팅 공지, 고객 응대 |
+| COMMERCE | OrderAgent, ShippingAgent, SettlementAgent | 주문·배송·정산 |
+| INFRA | SessionKeeper, WatcherAgent, AnalystAgent | 세션·감시·분석 |
+
+### 에이전트 구현 패턴
+
+```typescript
+// 모든 에이전트는 AgentBase를 상속
+export class MyAgent extends AgentBase {
+  readonly name = 'my-agent'              // DB AgentDefinition.name과 일치
+  readonly layer = AgentLayer.SOURCING
+
+  getSubscribedEvents(): string[] {
+    return ['event.type1', 'schedule.my.task']
+  }
+
+  async handleEvent(event: AgentEvent): Promise<AgentResult> {
+    const start = Date.now()
+    try {
+      await this.log('INFO', `처리 시작: ${event.type}`)
+      // 비즈니스 로직
+      await this.recordKpi('metric_name', value)
+      return { success: true, data: {}, duration: Date.now() - start }
+    } catch (error: any) {
+      await this.log('ERROR', error.message)
+      return { success: false, error: error.message, duration: Date.now() - start }
+    }
+  }
+
+  async onSchedule(): Promise<void> { /* cron 실행 */ }
+}
+
+export const myAgent = new MyAgent()
+```
+
+### 에이전트 등록
+
+- 구현 후 `sourcing-app/src/instrumentation.ts`에 등록 필수
+- DB에 AgentDefinition 레코드 필요 → `POST /api/admin/agents/seed`로 삽입
+
+### 에이전트 관련 DB 모델
+
+- `AgentDefinition` — 에이전트 정의 (name, layer, status, config, schedule)
+- `AgentTask` — 태스크 추적 (QUEUED→RUNNING→COMPLETED/FAILED)
+- `AgentLog` — 로그 (DEBUG/INFO/WARN/ERROR/CRITICAL)
+- `AgentKpiRecord` — KPI 지표 (일별)
+- `AgentWorkflow` / `AgentWorkflowStep` — 워크플로우 정의
+
+### 에이전트 관리 API
+
+| 엔드포인트 | 설명 |
+|-----------|------|
+| `POST /api/admin/agents/seed` | 11개 에이전트 DB 등록 (upsert) |
+| `GET /api/admin/agents` | 에이전트 목록 조회 |
+| `PUT /api/admin/agents/[id]` | 에이전트 설정 변경 |
+| `POST /api/admin/agents/[id]/start` | 에이전트 시작 |
+| `POST /api/admin/agents/[id]/stop` | 에이전트 중지 |
+| `POST /api/admin/agents/[id]/restart` | 에이전트 재시작 |
+| `GET /api/admin/agents/dashboard` | 대시보드 요약 |
+| `GET /api/admin/agents/logs` | 로그 조회 |
+| `GET /api/admin/agents/tasks` | 태스크 조회 |
+| `GET /api/admin/agents/kpi` | KPI 조회 |
+
+### 에이전트 대시보드
+
+- URL: `/sourcing/admin/agents`
+- 페이지: dashboard, registry, monitor, logs, tasks, kpi, workflows, settings
+
 ## 핵심 원칙
 
 1. **Soft Delete 기본** - Hard Delete 금지

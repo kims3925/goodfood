@@ -60,6 +60,47 @@
 
 ---
 
+## 에이전트 시스템
+
+11개 자율 AI 에이전트 (`sourcing-app/src/modules/agents/implementations/`)가 운영을 자동화합니다.
+
+### 에이전트 목록
+
+| 레이어 | 에이전트 | 파일 | 스케줄 | 역할 |
+|--------|---------|------|--------|------|
+| COMMAND | Commander | `CommanderAgent.ts` | — | 전체 조율, 워크플로우, 장애 복구 |
+| SOURCING | SourcingAgent | `SourcingAgent.ts` | 매 1시간 | 도매밴드 자동 수집 |
+| SOURCING | ProductManager | `ProductManagerAgent.ts` | 매일 02시 | 가격검증, 이미지감지, 재발행 |
+| OPERATIONS | MarketingAgent | `MarketingAgent.ts` | 11/13/17시 | 베스트셀러 공지 자동 게시 |
+| OPERATIONS | CustomerAgent | `CustomerAgent.ts` | 30분 주기 | 댓글 자동 분류/AI 응대 |
+| COMMERCE | OrderAgent | `OrderAgent.ts` | 10분 주기 | 주문 처리/무통장 자동 취소 |
+| COMMERCE | ShippingAgent | `ShippingAgent.ts` | 2시간 주기 | 배송 추적/지연 감지 |
+| COMMERCE | SettlementAgent | `SettlementAgent.ts` | 매일 01시 | 정산 자동화 |
+| INFRA | SessionKeeper | `SessionKeeperAgent.ts` | 6시간 주기 | Band 세션 만료 감지/갱신 |
+| INFRA | WatcherAgent | `WatcherAgent.ts` | 5분 주기 | 시스템 이상 감지 |
+| INFRA | AnalystAgent | `AnalystAgent.ts` | 매일 06시 | 매출·통계 분석 |
+
+### 에이전트 구현 규칙
+
+- `AgentBase` 상속, `name`은 DB `AgentDefinition.name`과 일치
+- `getSubscribedEvents()` / `handleEvent()` / `onSchedule()` 구현
+- 에러: `this.log('ERROR', ...)` + `this.emitEvent('[name].error', ...)`
+- KPI: `this.recordKpi(metric, value, target, period)`
+- 등록: `instrumentation.ts`에 import + `registry.register()` + `agent.start()`
+- Seed: `POST /api/admin/agents/seed`로 DB 레코드 삽입
+
+### 핵심 인프라
+
+| 모듈 | 역할 |
+|------|------|
+| `EventBus.ts` | Redis Pub/Sub — 에이전트 간 이벤트 통신 |
+| `AgentRegistry.ts` | 싱글톤 에이전트 인스턴스 관리 |
+| `TaskQueue.ts` | Bull Queue — 태스크 큐잉/재시도 |
+| `WorkflowEngine.ts` | DAG 워크플로우 실행 |
+| `AgentScheduler.ts` | Cron 스케줄링 |
+
+---
+
 ## Prisma CLI 규칙
 
 ```bash
