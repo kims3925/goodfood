@@ -28,10 +28,23 @@ export interface AiResponse {
   provider: AiProvider
 }
 
+export interface AiImagePart {
+  base64: string
+  mimeType: string
+}
+
 export abstract class BaseAiClient {
   constructor(protected config: AiClientConfig) {}
 
   abstract generateContent(prompt: string): Promise<AiResponse>
+
+  /** 이미지와 텍스트를 함께 전송 (Vision) - 서브클래스에서 필요 시 오버라이드 */
+  async generateContentWithImages(
+    _prompt: string,
+    _images: AiImagePart[]
+  ): Promise<AiResponse> {
+    throw new Error(`${this.constructor.name}은 이미지 분석을 지원하지 않습니다.`)
+  }
 }
 
 // =============================================
@@ -46,6 +59,38 @@ export class GeminiClient extends BaseAiClient {
     super(config)
     this.client = new GoogleGenerativeAI(config.apiKey)
     this.timeout = config.timeout ?? 120000 // default 120 seconds
+  }
+
+  /** Gemini Vision: 이미지 + 텍스트 분석 */
+  async generateContentWithImages(prompt: string, images: AiImagePart[]): Promise<AiResponse> {
+    try {
+      const model = this.client.getGenerativeModel({
+        model: this.config.model || 'gemini-2.5-flash',
+      })
+
+      const parts: any[] = images.map((img) => ({
+        inlineData: { data: img.base64, mimeType: img.mimeType },
+      }))
+      parts.push({ text: prompt })
+
+      const result = await model.generateContent({ contents: [{ role: 'user', parts }] })
+      const response = await result.response
+      const text = response.text()
+
+      return {
+        content: text,
+        tokensUsed: response.usageMetadata?.totalTokenCount,
+        model: this.config.model,
+        provider: AiProvider.GEMINI,
+      }
+    } catch (error: any) {
+      if (error instanceof ProductTransformationError) throw error
+      throw new ProductTransformationError(
+        `Gemini Vision 오류: ${error.message}`,
+        TransformationErrorCode.AI_API_ERROR,
+        { originalError: error }
+      )
+    }
   }
 
   async generateContent(prompt: string): Promise<AiResponse> {
