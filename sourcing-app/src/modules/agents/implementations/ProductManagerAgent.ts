@@ -242,56 +242,128 @@ export class ProductManagerAgent extends AgentBase {
   }
 
   // ══════════════════════════════════════════════════
-  //  SKILL 1: 가격정책 검증
+  //  SKILL 1: 가격정책 검증 (도매밴드 채널별 독립 적용)
   // ══════════════════════════════════════════════════
 
   /**
-   * 발행 상품들을 대상으로 가격정책 위반 여부 검사
-   * - 채널별 PricingPolicy.content 파싱
-   * - 각 variant의 wholesalePrice vs 실제 price 비교
+   * 발행 상품들을 대상으로 가격정책 위반 여부를 검사합니다.
+   *
+   * 핵심 원칙:
+   *  - 가격정책은 상품의 소싱 출처인 **도매밴드 채널(product.channelId)** 기준으로 적용
+   *  - 도매밴드마다 서로 다른 마진 규칙을 가질 수 있으므로
+   *    채널별로 PricingPolicy를 별도 로드하여 적용
+   *  - 소매채널(ChannelProduct)의 정책은 검증 기준으로 사용하지 않음
+   *
+   * 검증 흐름:
+   *  1. products를 도매채널 ID 기준으로 그룹핑
+   *  2. 각 도매채널의 활성 PricingPolicy 로드 (DB에 없으면 스킵)
+   *  3. PricingPolicy.content 파싱 → 마진 규칙 추출
+   *  4. variant.wholesalePrice 기준 기대 판매가 계산
+   *  5. variant.price와 비교 → 허용 오차(±100원) 초과 시 위반 기록
    */
   async validateProductPricing(products: any[]): Promise<PriceViolation[]> {
     const violations: PriceViolation[] = []
 
+    // ─── Step 1: 도매채널 ID 목록 수집 ───
+    const wholesaleChannelIds = [
+      ...new Set(
+        products
+          .map((p) => p.channelId as number | null)
+          .filter((id): id is number => id !== null && id !== undefined)
+      ),
+    ]
+
+    if (wholesaleChannelIds.length === 0) {
+      await this.log('WARN', '도매채널이 없는 상품만 존재 — 가격정책 검증 불가')
+      return violations
+    }
+
+    // ─── Step 2: 도매채널별 활성 PricingPolicy 일괄 로드 ───
+    // 채널당 여러 정책이 있을 수 있으나, 동시에 활성(isActive=true)인 정책 1개 기준 적용
+    // (복수 정책이 있으면 가장 최근에 생성된 정책 우선)
+    const policies = await prisma.pricingPolicy.findMany({
+      where: {
+        channelId: { in: wholesaleChannelIds },
+        isActive: true,
+        channel: {
+          kind: 'WHOLESALE', // 도매채널 정책만 조회 (소매채널 혼입 방지)
+          deletedAt: null,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    // channelId → 정책 맵 (채널당 첫 번째 = 가장 최신 정책만 사용)
+    const policyByChannelId = new Map<number, typeof policies[number]>()
+    for (const policy of policies) {
+      if (!policyByChannelId.has(policy.channelId)) {
+        policyByChannelId.set(policy.channelId, policy)
+      }
+    }
+
+    await this.log(
+      'INFO',
+      `도매채널 ${wholesaleChannelIds.length}개 중 가격정책 보유 ${policyByChannelId.size}개 채널`,
+      { channelIds: wholesaleChannelIds, policiedChannelIds: [...policyByChannelId.keys()] }
+    )
+
+    // ─── Step 3~5: 상품별 검증 ───
     for (const product of products) {
-      // 채널에 연결된 가격정책 가져오기
-      const policy =
-        product.channel?.pricingPolicies?.[0] ??
-        // 소매채널에 발행된 경우 채널의 정책도 확인
-        product.channelProducts?.[0]?.channel?.pricingPolicies?.[0]
+      const wholesaleChannelId = product.channelId as number | null
 
-      if (!policy) continue // 정책 없으면 검증 불가 → 스킵
+      if (!wholesaleChannelId) {
+        // 도매채널 정보 없는 상품 → 검증 불가, 경고 로그만 기록
+        await this.log('WARN', `상품 ${product.id}(${product.name})에 도매채널 정보 없음 — 가격정책 검증 스킵`)
+        continue
+      }
 
+      const policy = policyByChannelId.get(wholesaleChannelId)
+
+      if (!policy) {
+        // 해당 도매채널에 등록된 활성 정책 없음 → 검증 불가
+        await this.log(
+          'WARN',
+          `도매채널 ${wholesaleChannelId}에 활성 가격정책 없음 — 상품 ${product.id} 검증 스킵`
+        )
+        continue
+      }
+
+      // 채널별 마진 규칙 파싱
       const rules = parsePricingPolicyRules(policy.content)
-      if (rules.length === 0) continue
+      if (rules.length === 0) {
+        await this.log('WARN', `채널 ${wholesaleChannelId} 정책(${policy.name}) 파싱 결과 규칙 없음`)
+        continue
+      }
 
+      // 제외 조건 파싱 (예: "40,000원 이상 제외")
       const excludeAbove = parseExcludeAbove(policy.content)
 
+      // variant 단위 가격 검증
       for (const variant of product.variants ?? []) {
         const wholesale = Number(variant.wholesalePrice ?? 0)
-        const actual = variant.price
+        const actual = Number(variant.price ?? 0)
 
         if (!wholesale || !actual) continue
 
         const expected = calcExpectedPrice(wholesale, rules, excludeAbove)
-        if (expected === null) continue // 제외 대상
+
+        if (expected === null) {
+          // 제외 조건 대상 (예: 도매가 40,000원 이상) → 정상, 스킵
+          continue
+        }
 
         const diff = Math.abs(actual - expected)
         if (diff > PRICE_TOLERANCE) {
           const violationType: PriceViolation['violationType'] =
-            actual === wholesale
-              ? 'NO_MARGIN_APPLIED'
-              : actual > expected + PRICE_TOLERANCE
-              ? 'WRONG_MARGIN'
-              : 'WRONG_MARGIN'
+            actual === wholesale ? 'NO_MARGIN_APPLIED' : 'WRONG_MARGIN'
 
           violations.push({
             productId: product.id,
             productName: product.name,
-            channelId: product.channelId ?? null,
-            channelName: product.channel?.name ?? null,
+            channelId: wholesaleChannelId,
+            channelName: product.channel?.name ?? `채널 ${wholesaleChannelId}`,
             variantId: variant.id,
-            optionSummary: variant.optionSummary,
+            optionSummary: variant.optionSummary ?? null,
             wholesalePrice: wholesale,
             actualPrice: actual,
             expectedPrice: expected,
@@ -300,6 +372,17 @@ export class ProductManagerAgent extends AgentBase {
           })
         }
       }
+    }
+
+    if (violations.length > 0) {
+      await this.log('WARN', `가격정책 위반 ${violations.length}건 감지`, {
+        byChannel: Object.fromEntries(
+          wholesaleChannelIds.map((cid) => [
+            cid,
+            violations.filter((v) => v.channelId === cid).length,
+          ])
+        ),
+      })
     }
 
     return violations
