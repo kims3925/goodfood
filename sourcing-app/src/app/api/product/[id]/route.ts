@@ -243,9 +243,14 @@ export async function PATCH(
     }
 
     // 소유권 확인과 업데이트를 원자적으로 수행 (TOCTOU 방지)
+    // isActive: true 로 활성화할 때 soft-deleted 상품도 함께 복원 (deletedAt: null)
+    const updateData: Record<string, unknown> = { isActive }
+    if (isActive === true) {
+      updateData.deletedAt = null
+    }
     const updateResult = await prisma.product.updateMany({
       where: { id, userId },
-      data: { isActive },
+      data: updateData,
     })
 
     if (updateResult.count === 0) {
