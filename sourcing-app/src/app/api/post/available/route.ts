@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
     const platformParam = searchParams.get('platform') as ChannelPlatform | null
     const platform = platformParam || ChannelPlatform.BAND
     const todayOnly = searchParams.get('todayOnly') === 'true'
+    const daysParam = searchParams.get('days')
+    const searchQuery = searchParams.get('search') || ''
+    const days = daysParam ? parseInt(daysParam) : (todayOnly ? 1 : 0)
 
     // 현재 BAND만 지원
     if (platform !== ChannelPlatform.BAND) {
@@ -154,29 +157,34 @@ export async function GET(request: NextRequest) {
 
     const totalAvailable = filteredPosts.length
 
-    // 오늘 게시물만 필터링 (todayOnly=true인 경우)
-    if (todayOnly) {
-      // KST(UTC+9) 기준으로 오늘 날짜 계산
-      const kstOffset = 9 * 60 * 60 * 1000 // UTC+9
+    // 기간 필터링 (days 파라미터 또는 todayOnly)
+    if (days > 0) {
+      const kstOffset = 9 * 60 * 60 * 1000
       const now = new Date()
       const kstNow = new Date(now.getTime() + kstOffset)
 
-      // KST 기준 오늘 00:00:00 ~ 23:59:59
-      const todayStart = Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()) - kstOffset
-      const todayEnd = todayStart + 24 * 60 * 60 * 1000
+      // KST 기준 N일 전 00:00:00
+      const startDate = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate() - (days - 1)) - kstOffset)
+      const startMs = startDate.getTime()
 
       filteredPosts = filteredPosts.filter((post) => {
         if (!post.created_at) return false
-
-        // Band API created_at 값 확인 - 초 단위인지 밀리초 단위인지 자동 판단
-        // 초 단위: 10자리 (1700000000), 밀리초 단위: 13자리 (1700000000000)
         const postTime = post.created_at
         const postTimeMs = postTime > 9999999999999 ? postTime : (postTime > 9999999999 ? postTime : postTime * 1000)
-
-        return postTimeMs >= todayStart && postTimeMs < todayEnd
+        return postTimeMs >= startMs
       })
 
-      console.log(`[Post Available] 전체: ${totalAvailable}개, 오늘(KST): ${filteredPosts.length}개`)
+      console.log(`[Post Available] 전체: ${totalAvailable}개, 최근 ${days}일: ${filteredPosts.length}개`)
+    }
+
+    // 키워드 필터링
+    if (searchQuery) {
+      const keyword = searchQuery.toLowerCase()
+      filteredPosts = filteredPosts.filter((post) =>
+        post.title.toLowerCase().includes(keyword) ||
+        post.content.toLowerCase().includes(keyword)
+      )
+      console.log(`[Post Available] 키워드 "${searchQuery}" 필터 후: ${filteredPosts.length}개`)
     }
 
     return NextResponse.json({

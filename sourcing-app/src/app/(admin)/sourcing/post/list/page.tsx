@@ -265,7 +265,9 @@ export default function PostsManagePage() {
     setExpandedBandKeys([])
 
     try {
-      const params = new URLSearchParams({ platform, todayOnly: 'true' })
+      const params = new URLSearchParams({ platform })
+      if (filterDays) params.set('days', filterDays.toString())
+      if (filterSearch) params.set('search', filterSearch)
 
       const response = await fetch(`/api/post/available?${params}`)
       const data = await response.json()
@@ -282,7 +284,7 @@ export default function PostsManagePage() {
     } finally {
       setIsLoadingPosts(false)
     }
-  }, [])
+  }, [filterDays, filterSearch])
 
   // 플랫폼 선택 핸들러
   const handlePlatformSelect = (platform: ChannelPlatform) => {
@@ -1338,7 +1340,6 @@ export default function PostsManagePage() {
                 { mode: 'BAND' as AddMode, label: '밴드', icon: '📱' },
                 { mode: 'URL' as AddMode, label: 'URL로 수집', icon: '🔗' },
                 { mode: 'MANUAL' as AddMode, label: '직접 등록', icon: '✏️' },
-                { mode: 'SETTINGS' as AddMode, label: '조건 설정', icon: '⚙️' },
               ].map(tab => (
                 <button
                   key={tab.mode}
@@ -1500,62 +1501,45 @@ export default function PostsManagePage() {
             </div>
           )}
 
-          {/* 조건 설정 모드 */}
-          {addMode === 'SETTINGS' && (
-            <div className="space-y-4 py-4">
-              <div className="bg-gray-50 rounded-lg p-5 space-y-4">
-                <h4 className="text-sm font-semibold text-gray-900">수집 조건 설정</h4>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">수집 기간</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">최근</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={30}
-                      value={filterDays}
-                      onChange={e => setFilterDays(Number(e.target.value))}
-                      className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-sm text-center"
-                    />
-                    <span className="text-sm text-gray-600">일</span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">밴드 수집 시 해당 기간 내 게시물만 가져옵니다.</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">상품 검색 키워드</label>
-                  <input
-                    type="text"
-                    value={filterSearch}
-                    onChange={e => setFilterSearch(e.target.value)}
-                    placeholder="키워드를 입력하세요 (예: 해산물, 전복)"
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">입력한 키워드가 포함된 게시물만 수집합니다.</p>
-                </div>
-                <Button
-                  variant="primary"
-                  onClick={() => {
-                    toast.success(`조건 저장: 최근 ${filterDays}일${filterSearch ? `, 키워드: ${filterSearch}` : ''}`)
-                    setAddMode('BAND')
-                    loadPostsByPlatform('BAND')
-                  }}
-                >
-                  조건 저장 후 밴드 수집으로 이동
-                </Button>
-              </div>
-            </div>
-          )}
-
           {/* 밴드 수집 모드 */}
           {addMode === 'BAND' && (
           <>
-          {/* 날짜 안내 */}
-          <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <AlertCircle size={20} className="text-blue-600 flex-shrink-0" />
-            <p className="text-sm text-blue-800">
-              <span className="font-medium">최근 {filterDays}일</span> 작성된 게시물을 표시합니다.
-              {filterSearch && <span className="ml-1">(키워드: {filterSearch})</span>}
-            </p>
+          {/* 수집 조건 설정 + 조회 */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="flex flex-wrap items-end gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">수집 기간</label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm text-gray-500">최근</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={filterDays}
+                    onChange={e => setFilterDays(Number(e.target.value))}
+                    className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center"
+                  />
+                  <span className="text-sm text-gray-500">일</span>
+                </div>
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-xs font-medium text-gray-600 mb-1">상품 검색 키워드</label>
+                <input
+                  type="text"
+                  value={filterSearch}
+                  onChange={e => setFilterSearch(e.target.value)}
+                  placeholder="키워드 입력 (예: 해산물, 전복)"
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+              <button
+                onClick={() => loadPostsByPlatform('BAND')}
+                disabled={isLoadingPosts}
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isLoadingPosts ? '조회 중...' : '조회'}
+              </button>
+            </div>
           </div>
 
           {/* 게시물 목록 영역 - 고정 높이 */}
