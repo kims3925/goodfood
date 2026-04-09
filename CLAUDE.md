@@ -186,6 +186,60 @@ export const myAgent = new MyAgent()
 - URL: `/sourcing/admin/agents`
 - 페이지: dashboard, registry, monitor, logs, tasks, kpi, workflows, settings
 
+## 상품 파이프라인
+
+```
+Band 게시물 수집 (post/list)
+    ↓ AI 가공 (Gemini) — confirmAiProcess()
+Product 생성 (product/list 미발행 탭)
+    ↓ 상품발행하기 (소매밴드/쇼핑몰)
+ChannelProduct / ShopProduct (product/list 발행완료 탭, publish 페이지)
+```
+
+### 주요 페이지 및 역할
+
+| 페이지 | URL | 역할 |
+|--------|-----|------|
+| 수집상품리스트 | `/sourcing/post/list` | 소싱된 게시물 목록, AI 가공 실행 |
+| 가공상품 | `/sourcing/product/list` | AI 가공된 상품 관리 (미발행/발행완료 탭) |
+| 발행 | `/sourcing/publish` | 발행된 상품 재발행/삭제 관리 |
+| 쇼핑몰 관리 | `/shop/store/list` | 쇼핑몰 CRUD + 바로가기 버튼 |
+
+### 가공상품 페이지 탭 구조
+
+- **미발행** (`?tab=unpublished`): 소매밴드에 아직 발행되지 않은 상품
+- **발행완료** (`?tab=published`): 소매밴드에 발행 완료된 상품
+- API: `GET /api/product?publishStatus=unpublished|published`
+- 필터: `channelProducts` (RETAIL) 유무로 판별
+
+### AI 가공 플로우 (post/list → product/list)
+
+1. 게시물 선택 → "AI로 가공하기" 클릭
+2. 채널별 가격정책 자동 적용 (`/api/policy`)
+3. `POST /api/product/ai-generate` → AI draft 생성
+4. `POST /api/product` → Product DB 저장 (postId 포함)
+5. Product 생성 시 CollectedProduct의 `isConverted=true` 자동 업데이트
+6. post/list에서 해당 게시물 자동 제거 (필터: `collectedProducts: { none: {} }`)
+7. product/list 미발행 탭 맨위에 표시 (`orderBy: createdAt desc`)
+
+### 상품 발행 플로우
+
+- **ProcessedProductTab**: "상품발행하기" 버튼 → 발행 방식 선택 모달
+  - 자동발행: 등록된 모든 소매밴드에 일괄 발행 (`/api/publish/template/publish`)
+  - 수동발행: `/sourcing/publish?productIds=...` 이동
+
+### 상품 복원
+
+- `PATCH /api/product/[id]` — `isActive=true` 설정 시 `deletedAt=null`도 자동 복원
+- `POST /api/product/restore` — productId로 소프트 삭제 상품 복원
+
+### AgentScheduler (cron 스케줄)
+
+`instrumentation.ts`에서 에이전트 등록 후 AgentScheduler로 cron 스케줄 활성화:
+- DB `AgentDefinition.schedule` 필드에서 cron expression 로드
+- `scheduler.register()` → `scheduler.startAll()`
+- Seed API 호출 필수: `POST /api/admin/agents/seed`
+
 ## 핵심 원칙
 
 1. **Soft Delete 기본** - Hard Delete 금지

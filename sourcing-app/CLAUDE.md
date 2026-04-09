@@ -101,6 +101,54 @@
 
 ---
 
+## 상품 파이프라인
+
+```
+Band 게시물 수집 → post/list (수집상품리스트)
+    ↓ AI 가공 (confirmAiProcess)
+Product 생성 → product/list (가공상품 — 미발행/발행완료 탭)
+    ↓ 상품발행하기
+ChannelProduct/ShopProduct → publish (발행 관리)
+```
+
+### 페이지 구조
+
+| 페이지 | URL | 역할 |
+|--------|-----|------|
+| 수집상품리스트 | `/sourcing/post/list` | 소싱 게시물 관리, AI 가공 실행 |
+| 가공상품 | `/sourcing/product/list` | 미발행(`?tab=unpublished`) / 발행완료(`?tab=published`) 탭 |
+| 발행 관리 | `/sourcing/publish` | 발행 상품 재발행/삭제, 페이지크기 선택(20/50/100) |
+| 쇼핑몰 관리 | `/shop/store/list` | 쇼핑몰 CRUD + 바로가기 버튼 |
+
+### AI 가공 플로우
+
+1. post/list에서 게시물 선택 → "AI로 가공하기"
+2. 채널별 가격정책 자동 매핑 (`/api/policy`)
+3. AI draft 생성 → Product DB 저장 (`POST /api/product`)
+4. CollectedProduct `isConverted=true` 자동 업데이트
+5. post/list에서 해당 게시물 제거 (필터: `collectedProducts: { none: {} }`)
+6. product/list 미발행 탭 맨위에 표시 (`createdAt desc`)
+7. viewMode 전환으로 가공 결과 즉시 확인 (리다이렉트 없음)
+
+### 발행 방식
+
+- **ProcessedProductTab**: "상품발행하기" 버튼 → 자동/수동 선택 모달
+  - 자동발행: 모든 소매밴드에 일괄 발행
+  - 수동발행: `/sourcing/publish?productIds=...` 이동
+- **publish 페이지**: 체크박스 선택 → 재발행/삭제 툴바
+
+### 상품 복원 API
+
+- `PATCH /api/product/[id]`: `isActive=true` 시 `deletedAt=null` 자동 복원
+- `POST /api/product/restore`: productId로 소프트 삭제 상품 복원
+
+### PUT /api/product/[id] 확장
+
+- `name`, `price`, `description` + `shippingFee`, `wholesalePrice`, `variants[]` 수정 지원
+- variants는 트랜잭션으로 동시 업데이트
+
+---
+
 ## Prisma CLI 규칙
 
 ```bash
