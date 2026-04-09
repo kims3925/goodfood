@@ -130,7 +130,7 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }:
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  const itemsPerPage = 20
+  const [itemsPerPage, setItemsPerPage] = useState<20 | 50 | 100>(20)
 
   // Stats states (전체 통계)
   const [stats, setStats] = useState({ total: 0, published: 0, unpublished: 0 })
@@ -158,9 +158,25 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }:
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // 수정 모달 상태
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    wholesalePrice: '',
+    price: '',
+    shippingFee: '',
+    variants: [] as Array<{ id: number; optionSummary: string; price: number; wholesalePrice: number | null }>,
+  })
+  const [isEditSaving, setIsEditSaving] = useState(false)
+
   // 자동발행 상태
   const [isAutoPublishing, setIsAutoPublishing] = useState(false)
   const [showAutoPublishConfirm, setShowAutoPublishConfirm] = useState(false)
+
+  // 발행 방식 선택 모달
+  const [showPublishMethodModal, setShowPublishMethodModal] = useState(false)
 
   // 발행된 상품 삭제 차단 모달 states
   const [showPublishedWarning, setShowPublishedWarning] = useState(false)
@@ -1181,6 +1197,110 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }:
     router.push(`/sourcing/publish?productIds=${ids}`)
   }
 
+  // 수정 모달 열기
+  const openEditModal = (product: Product) => {
+    setEditingProduct(product)
+    setEditForm({
+      name: product.name || '',
+      description: product.description || '',
+      wholesalePrice: product.wholesalePrice != null ? String(product.wholesalePrice) : '',
+      price: product.price != null ? String(product.price) : '',
+      shippingFee: '',
+      variants: product.variants?.map(v => ({
+        id: v.id,
+        optionSummary: (v as any).optionSummary || '',
+        price: v.price,
+        wholesalePrice: (v as any).wholesalePrice ?? null,
+      })) || [],
+    })
+    setShowEditModal(true)
+  }
+
+  // 수정 저장만
+  const handleEditSave = async () => {
+    if (!editingProduct) return
+    setIsEditSaving(true)
+    try {
+      const res = await fetch(`/api/product/${editingProduct.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editForm.name,
+          description: editForm.description,
+          wholesalePrice: editForm.wholesalePrice ? Number(editForm.wholesalePrice) : undefined,
+          price: editForm.price ? Number(editForm.price) : undefined,
+          shippingFee: editForm.shippingFee ? Number(editForm.shippingFee) : undefined,
+          variants: editForm.variants.map(v => ({
+            id: v.id,
+            price: v.price,
+            wholesalePrice: v.wholesalePrice,
+            optionSummary: v.optionSummary,
+          })),
+        }),
+      })
+      if (!res.ok) throw new Error('수정 실패')
+      toast.success('상품이 수정되었습니다.')
+      setShowEditModal(false)
+      setEditingProduct(null)
+      loadProducts()
+    } catch (err) {
+      toast.error('상품 수정에 실패했습니다.')
+    } finally {
+      setIsEditSaving(false)
+    }
+  }
+
+  // 수정발행: 저장 → 기존 발행 삭제 → 재발행
+  const handleEditAndRepublish = async () => {
+    if (!editingProduct) return
+    setIsEditSaving(true)
+    try {
+      // Step 1: 수정 저장
+      const saveRes = await fetch(`/api/product/${editingProduct.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editForm.name,
+          description: editForm.description,
+          wholesalePrice: editForm.wholesalePrice ? Number(editForm.wholesalePrice) : undefined,
+          price: editForm.price ? Number(editForm.price) : undefined,
+          shippingFee: editForm.shippingFee ? Number(editForm.shippingFee) : undefined,
+          variants: editForm.variants.map(v => ({
+            id: v.id,
+            price: v.price,
+            wholesalePrice: v.wholesalePrice,
+            optionSummary: v.optionSummary,
+          })),
+        }),
+      })
+      if (!saveRes.ok) throw new Error('수정 저장 실패')
+
+      // Step 2: 기존 발행 삭제 (soft-delete)
+      await fetch(`/api/shop/publish?productId=${editingProduct.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      // Step 3: 재발행 (발행 API 호출)
+      const publishRes = await fetch('/api/shop/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ productIds: [editingProduct.id] }),
+      })
+      if (!publishRes.ok) throw new Error('재발행 실패')
+
+      toast.success('수정발행이 완료되었습니다.')
+      setShowEditModal(false)
+      setEditingProduct(null)
+      loadProducts()
+    } catch (err: any) {
+      toast.error(err.message || '수정발행에 실패했습니다.')
+    } finally {
+      setIsEditSaving(false)
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     const statusMap: { [key: string]: { label: string; color: string } } = {
       COLLECTED: { label: '수집', color: 'bg-gray-100 text-gray-800' },
@@ -1204,84 +1324,29 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }:
 
   return (
     <>
-        {/* 통계 및 액션 카드 */}
-
-        {/* 통계 및 액션 카드 */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-gray-100 rounded-lg">
-                <Package size={20} className="sm:w-6 sm:h-6 text-gray-600" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">가공 상품</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.total}</p>
-              </div>
+        {/* 페이지 크기 선택 툴바 */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">상품보기</span>
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+              {([20, 50, 100] as const).map((size) => (
+                <button
+                  key={size}
+                  onClick={() => {
+                    setItemsPerPage(size)
+                    setCurrentPage(1)
+                  }}
+                  className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                    itemsPerPage === size
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {size}개
+                </button>
+              ))}
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
-                <CheckCircle size={20} className="sm:w-6 sm:h-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">발행완료</p>
-                <p className="text-xl sm:text-2xl font-bold text-green-600">{stats.published}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-yellow-100 rounded-lg">
-                <Clock size={20} className="sm:w-6 sm:h-6 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">미발행</p>
-                <p className="text-xl sm:text-2xl font-bold text-yellow-600">{stats.unpublished}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
-                <Boxes size={20} className="sm:w-6 sm:h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">출처 채널</p>
-                <p className="text-xl sm:text-2xl font-bold text-blue-600">{channels.length}</p>
-              </div>
-            </div>
-          </div>
-          {/* 가공상품발행하기 카드 */}
-          <button
-            onClick={() => setShowPostSelectionModal(true)}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:border-purple-300 hover:bg-purple-50 transition-colors cursor-pointer text-left min-h-[44px]"
-          >
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-purple-100 rounded-lg">
-                <Plus size={20} className="sm:w-6 sm:h-6 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">가공상품</p>
-                <p className="text-base sm:text-lg font-bold text-purple-600">발행하기</p>
-              </div>
-            </div>
-          </button>
-          {/* 수집상품 등록 카드 */}
-          <button
-            onClick={handleOpenCollectedProductModal}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left min-h-[44px]"
-          >
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
-                <Plus size={20} className="sm:w-6 sm:h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">수집상품</p>
-                <p className="text-base sm:text-lg font-bold text-blue-600">등록하기</p>
-              </div>
-            </div>
-          </button>
         </div>
 
         {/* 일괄 비활성화 섹션 */}
@@ -1487,24 +1552,13 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }:
           <button
             onClick={() => {
               if (selectedProductIds.length === 0) { toast.error('먼저 상품을 선택해주세요.'); return }
-              handleAutoPublish()
+              setShowPublishMethodModal(true)
             }}
             disabled={isAutoPublishing}
             className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
           >
             <Send size={15} />
-            {isAutoPublishing ? '발행 중...' : '자동발행하기'}
-          </button>
-          <button
-            onClick={() => {
-              if (selectedProductIds.length === 0) { toast.error('먼저 상품을 선택해주세요.'); return }
-              handleManualPublish()
-            }}
-            disabled={isAutoPublishing}
-            className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-          >
-            <ExternalLink size={15} />
-            수동발행하기
+            {isAutoPublishing ? '발행 중...' : '상품발행하기'}
           </button>
         </div>
 
@@ -1678,6 +1732,15 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }:
                             </div>
                           </div>
                         </div>
+                        {/* 수정 버튼 */}
+                        <div className="pt-2 border-t border-gray-100 mt-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => openEditModal(product)}
+                            className="w-full px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium transition-colors"
+                          >
+                            수정
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1697,10 +1760,11 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }:
                           className="w-4 h-4 cursor-pointer"
                         />
                       </TableHead>
-                      <TableHead className="w-[42%]">상품명</TableHead>
-                      <TableHead className="w-[20%]">출처 채널</TableHead>
-                      <TableHead className="w-[13%]">상태</TableHead>
-                      <TableHead className="w-[21%]">생성일시</TableHead>
+                      <TableHead className="w-[36%]">상품명</TableHead>
+                      <TableHead className="w-[18%]">출처 채널</TableHead>
+                      <TableHead className="w-[12%]">상태</TableHead>
+                      <TableHead className="w-[18%]">생성일시</TableHead>
+                      <TableHead className="w-[12%]">작업</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1776,6 +1840,14 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }:
                             }).replace(/\. /g, '-').replace(/\.$/, '').replace(/-(\d{2}:\d{2})$/, ' $1')}
                           </span>
                         </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => openEditModal(product)}
+                            className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium transition-colors"
+                          >
+                            수정
+                          </button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1827,12 +1899,67 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }:
       )}
 
 
+      {/* 발행 방식 선택 모달 */}
+      {showPublishMethodModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">상품발행하기</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              선택한 {selectedProductIds.length}개 상품의 발행 방식을 선택하세요.
+            </p>
+
+            <button
+              onClick={() => {
+                setShowPublishMethodModal(false)
+                handleAutoPublish()
+              }}
+              className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors mb-3 text-left"
+            >
+              <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                <Send size={18} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">자동발행</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  등록된 모든 소매밴드에 자동으로 일괄 발행합니다.
+                </p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => {
+                setShowPublishMethodModal(false)
+                handleManualPublish()
+              }}
+              className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition-colors mb-5 text-left"
+            >
+              <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
+                <ExternalLink size={18} className="text-purple-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">수동발행</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  채널을 직접 선택하여 발행 상세 설정이 가능합니다.
+                </p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setShowPublishMethodModal(false)}
+              className="w-full py-2.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 자동발행 확인 모달 */}
       <ConfirmModal
         isOpen={showAutoPublishConfirm}
         onClose={() => setShowAutoPublishConfirm(false)}
         onConfirm={confirmAutoPublish}
-        title="자동발행하기"
+        title="자동발행 확인"
         message={`선택한 ${selectedProductIds.length}개 상품을 등록된 모든 소매 채널에 자동으로 발행합니다.`}
         confirmText="발행 시작"
       />
@@ -2257,6 +2384,71 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }:
           )}
         </div>
       </Modal>
-    </>
-  )
-}
+
+      {/* 수정 모달 */}
+      {showEditModal && editingProduct && (
+        <Modal
+          isOpen={showEditModal}
+          onClose={() => { setShowEditModal(false); setEditingProduct(null) }}
+          title="상품 수정"
+          size="lg"
+        >
+          <div className="space-y-4 p-4">
+            {/* 상품명 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">상품명</label>
+              <Input
+                type="text"
+                value={editForm.name}
+                onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="상품명"
+              />
+            </div>
+
+            {/* 상품 설명 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">상품 설명</label>
+              <textarea
+                value={editForm.description}
+                onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="상품 설명"
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* 가격 정보 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">도매가 (원)</label>
+                <Input
+                  type="number"
+                  value={editForm.wholesalePrice}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, wholesalePrice: e.target.value }))}
+                  placeholder="도매가"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">판매가 (원)</label>
+                <Input
+                  type="number"
+                  value={editForm.price}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, price: e.target.value }))}
+                  placeholder="판매가"
+                />
+              </div>
+            </div>
+
+            {/* 배송비 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">배송비 (원, 0=무료)</label>
+              <Input
+                type="number"
+                value={editForm.shippingFee}
+                onChange={(e) => setEditForm(prev => ({ ...prev, shippingFee: e.target.value }))}
+                placeholder="0"
+              />
+            </div>
+
+            {/* 옵션별 가격 */}
+            {

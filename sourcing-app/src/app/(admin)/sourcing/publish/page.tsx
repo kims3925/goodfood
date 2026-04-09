@@ -123,7 +123,13 @@ function PublishPageContent() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalProducts, setTotalProducts] = useState(0)
-  const pageSize = 20
+
+  // 한 페이지 진열 개수 (20/50/100)
+  const [pageSize, setPageSize] = useState<20 | 50 | 100>(20)
+
+  // 상품(행) 단위 선택 (기존 셀 단위 selectedCells와 별도)
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([])
+  const [selectAllProducts, setSelectAllProducts] = useState(false)
 
   // 가격 미설정 상품 경고 모달
   const [showPriceWarning, setShowPriceWarning] = useState(false)
@@ -313,7 +319,7 @@ function PublishPageContent() {
       setIsLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- searchTerm은 Enter 키를 눌러야 적용됨
-  }, [currentPage, selectedWholesaleChannel, daysWithin])
+  }, [currentPage, pageSize, selectedWholesaleChannel, daysWithin])
 
   // 페이지/필터 변경 시 상품 로���
   useEffect(() => {
@@ -1506,41 +1512,111 @@ function PublishPageContent() {
     setUnpublishResult({ status: 'idle', message: '' })
   }
 
+  /**
+   * 선택한 상품을 재발행 (새 발행으로 등록 → 최상단 노출)
+   * 1. 기존 ShopProduct soft-delete (DELETE /api/shop/publish?productId=xxx)
+   * 2. 새 ShopProduct 생성 (POST /api/shop/publish) → publishedAt=now → 최상단
+   */
+  const handleRepublishSelected = async () => {
+    if (selectedProductIds.length === 0) {
+      toast.error('재발행할 상품을 선택해주세요.')
+      return
+    }
+    if (!confirm(`선택한 ${selectedProductIds.length}개 상품을 재발행합니다.\n기존 발행 정보는 삭제되고 새로운 발행으로 등록됩니다.`)) {
+      return
+    }
+
+    setIsPublishing(true)
+    let successCount = 0
+    let failCount = 0
+
+    for (const productId of selectedProductIds) {
+      try {
+        // Step 1: 기존 발행 레코드 삭제 (productId 기준)
+        const deleteRes = await fetch(`/api/shop/publish?productId=${productId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        })
+        if (!deleteRes.ok) {
+          console.warn(`재발행 - 기존 발행 삭제 실패 (productId=${productId})`)
+        }
+
+        // Step 2: 등록된 모든 쇼핑몰에 재발행
+        let allShopsOk = true
+        for (const shop of shops) {
+          const res = await fetch('/api/shop/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ productIds: [productId], shopId: shop.id }),
+          })
+          if (!res.ok) allShopsOk = false
+        }
+
+        if (allShopsOk) successCount++
+        else failCount++
+      } catch {
+        failCount++
+      }
+    }
+
+    setIsPublishing(false)
+    setSelectedProductIds([])
+    setSelectAllProducts(false)
+
+    if (successCount > 0) {
+      toast.success(`${successCount}개 상품이 재발행되었습니다.`)
+      loadProducts()
+    }
+    if (failCount > 0) {
+      toast.error(`${failCount}개 재발행에 실패했습니다.`)
+    }
+  }
+
+  /**
+   * 선택한 상품의 발행 레코드를 삭제 (soft-delete)
+   * DELETE /api/shop/publish?productId=xxx
+   */
+  const handleDeleteSelected = async () => {
+    if (selectedProductIds.length === 0) {
+      toast.error('삭제할 상품을 선택해주세요.')
+      return
+    }
+    if (!confirm(`선택한 ${selectedProductIds.length}개 상품의 발행을 취소하시겠습니까?\n쇼핑몰에서 상품이 숨겨집니다.`)) {
+      return
+    }
+
+    let successCount = 0
+    let failCount = 0
+
+    for (const productId of selectedProductIds) {
+      try {
+        const res = await fetch(`/api/shop/publish?productId=${productId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        })
+        if (res.ok) successCount++
+        else failCount++
+      } catch {
+        failCount++
+      }
+    }
+
+    setSelectedProductIds([])
+    setSelectAllProducts(false)
+
+    if (successCount > 0) {
+      toast.success(`${successCount}개 발행이 취소되었습니다.`)
+      loadProducts()
+    }
+    if (failCount > 0) {
+      toast.error(`${failCount}개 삭제에 실패했습니다.`)
+    }
+  }
+
   const formatPrice = (price: number | null) => (!price ? '-' : `₩${price.toLocaleString()}`)
 
   const selectedUnpublishedCount = selectedCells.size
-
-  // 통계 계산
-  const stats = useMemo(() => {
-    const totalProducts = products.length
-    const totalTargets = channels.length + shops.length
-    const totalCells = products.length * totalTargets
-    let publishedCells = 0
-
-    products.forEach((product) => {
-      // Shop 발행 카운트
-      shops.forEach((shop) => {
-        if (isPublished(product.id, 'shop', shop.id)) {
-          publishedCells++
-        }
-      })
-      // 채널 발행 카운트
-      channels.forEach((channel) => {
-        if (isPublished(product.id, 'channel', channel.id)) {
-          publishedCells++
-        }
-      })
-    })
-
-    return {
-      totalProducts,
-      totalTargets,
-      totalShops: shops.length,
-      totalChannels: channels.length,
-      publishedCells,
-      unpublishedCells: totalCells - publishedCells,
-    }
-  }, [products, channels, shops, isPublished])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1553,76 +1629,64 @@ function PublishPageContent() {
           </p>
         </div>
 
-        {/* 통계 및 액션 카드 */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-4 sm:mb-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-gray-100 rounded-lg">
-                <Package size={20} className="sm:w-6 sm:h-6 text-gray-600" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">상품</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.totalProducts}</p>
-              </div>
+        {/* 툴바: 한페이지 진열개수 + 재발행 + 삭제 */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          {/* 한 페이지 진열 개수 선택 */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">상품보기</span>
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+              {([20, 50, 100] as const).map((size) => (
+                <button
+                  key={size}
+                  onClick={() => {
+                    setPageSize(size)
+                    setCurrentPage(1)
+                  }}
+                  className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                    pageSize === size
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {size}개
+                </button>
+              ))}
             </div>
           </div>
-          {/* 쇼핑몰 카드 */}
-          <div className="bg-white rounded-lg shadow-sm border-2 border-blue-200 p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
-                <ShoppingCart size={20} className="sm:w-6 sm:h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-blue-600 font-medium">쇼핑몰</p>
-                <p className="text-xl sm:text-2xl font-bold text-blue-700">{stats.totalShops}</p>
-              </div>
-            </div>
-          </div>
-          {/* 소매채널 카드 */}
-          <div className="bg-white rounded-lg shadow-sm border-2 border-green-200 p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
-                <BandIcon size={20} className="text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-green-600 font-medium">소매채널</p>
-                <p className="text-xl sm:text-2xl font-bold text-green-700">{stats.totalChannels}</p>
-              </div>
-            </div>
-          </div>
-          {/* 발행 현황 카드 */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
-                <CheckCircle size={20} className="sm:w-6 sm:h-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">발행됨</p>
-                <p className="text-xl sm:text-2xl font-bold text-green-600">{stats.publishedCells}</p>
-              </div>
-            </div>
-          </div>
-          {/* 선택 발행 카드 */}
+
+          {/* 선택 정보 */}
+          {selectedProductIds.length > 0 && (
+            <span className="text-sm text-blue-600 font-medium">
+              {selectedProductIds.length}개 선택됨
+            </span>
+          )}
+
+          {/* 재발행 버튼 */}
           <button
-            onClick={handlePublishSelected}
-            disabled={selectedUnpublishedCount === 0 || isPublishing}
-            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 text-left transition-colors col-span-2 sm:col-span-1 min-h-[44px] ${
-              selectedUnpublishedCount > 0 && !isPublishing
-                ? 'hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
-                : 'opacity-50 cursor-not-allowed'
+            onClick={handleRepublishSelected}
+            disabled={selectedProductIds.length === 0 || isPublishing}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              selectedProductIds.length > 0 && !isPublishing
+                ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             }`}
           >
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className={`p-2 sm:p-3 rounded-lg ${selectedUnpublishedCount > 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                <Send size={20} className={`sm:w-6 sm:h-6 ${selectedUnpublishedCount > 0 ? 'text-blue-600' : 'text-gray-400'}`} />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm text-gray-500">선택 발행</p>
-                <p className={`text-base sm:text-lg font-bold ${selectedUnpublishedCount > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
-                  {selectedUnpublishedCount}개
-                </p>
-              </div>
-            </div>
+            <RefreshCw size={15} />
+            재발행
+          </button>
+
+          {/* 삭제 버튼 */}
+          <button
+            onClick={handleDeleteSelected}
+            disabled={selectedProductIds.length === 0 || isPublishing}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              selectedProductIds.length > 0 && !isPublishing
+                ? 'bg-red-500 hover:bg-red-600 text-white'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            <Trash2 size={15} />
+            삭제
           </button>
         </div>
 
@@ -1782,7 +1846,26 @@ function PublishPageContent() {
                   상품이 없습니다.
                 </div>
               ) : (
-                products.map((product) => {
+                <>
+                {/* 전체 선택 헤더 */}
+                <div className="flex items-center gap-2 px-1 pb-1">
+                  <input
+                    type="checkbox"
+                    checked={selectAllProducts && products.length > 0}
+                    onChange={() => {
+                      if (selectAllProducts) {
+                        setSelectedProductIds([])
+                        setSelectAllProducts(false)
+                      } else {
+                        setSelectedProductIds(products.map(p => p.id))
+                        setSelectAllProducts(true)
+                      }
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                  />
+                  <span className="text-xs text-gray-500">전체 선택</span>
+                </div>
+                {products.map((product) => {
                   const priceSet = hasPrice(product.id)
                   const isExpanded = expandedProductId === product.id
                   // 발행 상태 계산
@@ -1813,13 +1896,31 @@ function PublishPageContent() {
                     <div
                       key={product.id}
                       className={`bg-white border rounded-xl overflow-hidden transition-all ${
-                        hasSelection ? 'border-purple-300 ring-1 ring-purple-200' : 'border-gray-200'
+                        selectedProductIds.includes(product.id)
+                          ? 'border-blue-300 ring-1 ring-blue-200'
+                          : hasSelection ? 'border-purple-300 ring-1 ring-purple-200' : 'border-gray-200'
                       }`}
                     >
                       {/* 상품 헤더 - 탭하면 펼침 */}
-                      <button
+                      <div className="p-3 flex items-center gap-3">
+                        {/* 체크박스 */}
+                        <input
+                          type="checkbox"
+                          checked={selectedProductIds.includes(product.id)}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            setSelectedProductIds(prev =>
+                              prev.includes(product.id)
+                                ? prev.filter(id => id !== product.id)
+                                : [...prev, product.id]
+                            )
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer flex-shrink-0"
+                        />
+                        <button
                         onClick={() => setExpandedProductId(isExpanded ? null : product.id)}
-                        className="w-full p-3 flex items-center gap-3 text-left active:bg-gray-50"
+                        className="flex-1 flex items-center gap-3 text-left active:bg-gray-50"
                       >
                         {/* 썸네일 */}
                         {product.thumbnailUrl ? (
@@ -1887,6 +1988,7 @@ function PublishPageContent() {
                           className={`text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
                         />
                       </button>
+                      </div>
 
                       {/* 펼침 영역 - 발행 대상 선택 */}
                       {isExpanded && (
@@ -1969,7 +2071,8 @@ function PublishPageContent() {
                       )}
                     </div>
                   )
-                })
+                })}
+                </>
               )}
             </div>
 
@@ -1979,8 +2082,24 @@ function PublishPageContent() {
                 <thead>
                   {/* 그룹 헤더 (쇼핑몰 / 소매밴드 구분) */}
                   <tr>
-                    <th className="sticky left-0 z-20 bg-gray-100 border-b-2 border-r-2 border-gray-300 p-3 text-left min-w-[100px]">
-                      <span className="text-sm font-bold text-gray-700">상품</span>
+                    <th className="sticky left-0 z-20 bg-gray-100 border-b-2 border-r-2 border-gray-300 p-3 text-left min-w-[240px]">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectAllProducts && products.length > 0}
+                          onChange={() => {
+                            if (selectAllProducts) {
+                              setSelectedProductIds([])
+                              setSelectAllProducts(false)
+                            } else {
+                              setSelectedProductIds(products.map(p => p.id))
+                              setSelectAllProducts(true)
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                        />
+                        <span className="text-sm font-bold text-gray-700">상품</span>
+                      </div>
                     </th>
                     {groupedTargets.map((group, groupIndex) => (
                       <th
@@ -2040,13 +2159,30 @@ function PublishPageContent() {
                 </thead>
                 <tbody>
                   {products.map((product) => (
-                    <tr key={product.id} className="hover:bg-gray-50/50">
+                    <tr key={product.id} className={`hover:bg-gray-50/50 ${selectedProductIds.includes(product.id) ? 'bg-blue-50' : ''}`}>
                       <td
-                        className="sticky left-0 z-10 bg-white border-b border-r-2 border-gray-300 p-2 cursor-pointer hover:bg-gray-100 min-w-[200px] max-w-[300px]"
-                        onClick={() => handleSelectRow(product.id)}
-                        title="행 전체 선택/해제"
+                        className="sticky left-0 z-10 bg-white border-b border-r-2 border-gray-300 p-2 min-w-[240px] max-w-[340px]"
                       >
                         <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedProductIds.includes(product.id)}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              setSelectedProductIds(prev =>
+                                prev.includes(product.id)
+                                  ? prev.filter(id => id !== product.id)
+                                  : [...prev, product.id]
+                              )
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer flex-shrink-0"
+                          />
+                          <div
+                            className="flex items-center gap-2 flex-1 cursor-pointer hover:opacity-80"
+                            onClick={() => handleSelectRow(product.id)}
+                            title="행 전체 선택/해제"
+                          >
                           {product.thumbnailUrl ? (
                             <img src={product.thumbnailUrl} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
                           ) : (
@@ -2056,6 +2192,7 @@ function PublishPageContent() {
                           )}
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-medium text-gray-900 truncate" title={product.name}>{product.name}</div>
+                          </div>
                           </div>
                         </div>
                       </td>

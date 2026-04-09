@@ -415,8 +415,26 @@ export async function DELETE(request: NextRequest) {
     const userId = currentUser.userId
 
     const { searchParams } = new URL(request.url)
+    const productIdParam = searchParams.get('productId')
     const publishIds = searchParams.get('ids')?.split(',').map(Number).filter(Boolean) || []
     const publishType = searchParams.get('type') as 'shop' | 'channel' | null // 'shop' 또는 'channel'
+
+    // productId 기준 일괄 soft-delete (재발행/삭제 워크플로우용)
+    if (productIdParam) {
+      const productId = parseInt(productIdParam)
+      if (isNaN(productId)) {
+        return NextResponse.json({ success: false, error: '유효하지 않은 productId입니다.' }, { status: 400 })
+      }
+      const result = await prisma.shopProduct.updateMany({
+        where: { productId, userId, deletedAt: null },
+        data: { deletedAt: new Date() },
+      })
+      return NextResponse.json({
+        success: true,
+        deletedCount: result.count,
+        message: `${result.count}개 쇼핑몰 발행이 취소되었습니다.`,
+      })
+    }
 
     if (publishIds.length === 0) {
       return NextResponse.json(
