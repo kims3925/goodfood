@@ -233,6 +233,7 @@ function PublishPageContent() {
   }, [])
 
   // 초기 로드
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadChannels()
     loadShops()
