@@ -111,9 +111,10 @@ interface CollectedProduct {
 
 interface ProcessedProductTabProps {
   onStatsLoaded?: (stats: { total: number; published: number; unpublished: number }) => void
+  autoOpenRegister?: boolean
 }
 
-export default function ProcessedProductTab({ onStatsLoaded }: ProcessedProductTabProps) {
+export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }: ProcessedProductTabProps) {
   const router = useRouter()
   const toast = useToast()
   const [products, setProducts] = useState<Product[]>([])
@@ -244,11 +245,10 @@ export default function ProcessedProductTab({ onStatsLoaded }: ProcessedProductT
   const loadCollectedProducts = async (channelId?: string) => {
     setIsLoadingCollected(true)
     try {
-      // 가공상품으로 변환된 적 없는 오늘 수집상품만 조회
+      // 가공상품으로 변환된 적 없는 수집상품 조회
       const params = new URLSearchParams({
         limit: '1000',
         excludeConverted: 'true',
-        todayOnly: 'true',
       })
       if (channelId) {
         params.append('channelId', channelId)
@@ -578,6 +578,14 @@ export default function ProcessedProductTab({ onStatsLoaded }: ProcessedProductT
   useEffect(() => {
     fetchProducts(1)
   }, [fetchProducts])
+
+  // autoOpenRegister prop으로 게시물 선택 모달 자동 열기
+  useEffect(() => {
+    if (autoOpenRegister) {
+      setShowPostSelectionModal(true)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenRegister])
 
   // 새로고침용 함수
   const loadProducts = () => {
@@ -1244,7 +1252,22 @@ export default function ProcessedProductTab({ onStatsLoaded }: ProcessedProductT
               </div>
             </div>
           </div>
-          {/* 상품 등록 카드 */}
+          {/* 가공상품발행하기 카드 */}
+          <button
+            onClick={() => setShowPostSelectionModal(true)}
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:border-purple-300 hover:bg-purple-50 transition-colors cursor-pointer text-left min-h-[44px]"
+          >
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 bg-purple-100 rounded-lg">
+                <Plus size={20} className="sm:w-6 sm:h-6 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-xs sm:text-sm text-gray-500">가공상품</p>
+                <p className="text-base sm:text-lg font-bold text-purple-600">발행하기</p>
+              </div>
+            </div>
+          </button>
+          {/* 수집상품 등록 카드 */}
           <button
             onClick={handleOpenCollectedProductModal}
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer text-left min-h-[44px]"
@@ -1254,7 +1277,7 @@ export default function ProcessedProductTab({ onStatsLoaded }: ProcessedProductT
                 <Plus size={20} className="sm:w-6 sm:h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-xs sm:text-sm text-gray-500">상품</p>
+                <p className="text-xs sm:text-sm text-gray-500">수집상품</p>
                 <p className="text-base sm:text-lg font-bold text-blue-600">등록하기</p>
               </div>
             </div>

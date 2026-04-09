@@ -112,7 +112,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, description, isConverted } = body
+    const { name, description, isConverted, rawMetadata } = body
 
     // 수집상품 확인
     const existingProduct = await prisma.collectedProduct.findFirst({
@@ -135,6 +135,9 @@ export async function PUT(
         ...(name !== undefined && { name }),
         ...(description !== undefined && { description }),
         ...(isConverted !== undefined && { isConverted }),
+        ...(rawMetadata !== undefined && {
+          rawMetadata: rawMetadata !== null ? JSON.stringify(rawMetadata) : null,
+        }),
       },
     })
 

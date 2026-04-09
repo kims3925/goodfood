@@ -60,5 +60,26 @@ export async function register() {
       }
     }
     console.log(`[Instrumentation] 총 ${registry.getAll().length}개 에이전트 등록 완료`)
+
+    // ── AgentScheduler 등록 (cron 스케줄 활성화) ──
+    const { AgentScheduler } = await import('@/modules/agents/AgentScheduler')
+    const { default: prisma } = await import('@bandauto/db')
+    const scheduler = AgentScheduler.getInstance()
+
+    for (const agent of agents) {
+      try {
+        const definition = await prisma.agentDefinition.findUnique({
+          where: { name: agent.name },
+        })
+        if (definition?.schedule) {
+          scheduler.register(agent.name, definition.schedule, () => agent.onSchedule())
+        }
+      } catch (err) {
+        console.error(`[Instrumentation] ${agent.name} 스케줄 등록 실패:`, err)
+      }
+    }
+
+    scheduler.startAll()
+    console.log(`[Instrumentation] AgentScheduler 시작 완료: ${scheduler.size}개 cron 등록`)
   }
 }

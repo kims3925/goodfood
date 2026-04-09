@@ -9,8 +9,8 @@ function CollectedProductRedirectContent() {
   useEffect(() => {
     const openRegister = searchParams.get('openRegister') === 'true'
     const target = openRegister
-      ? '/sourcing/product/list?tab=raw&openRegister=true'
-      : '/sourcing/product/list?tab=raw'
+      ? '/sourcing/product/list?openRegister=true'
+      : '/sourcing/product/list'
     router.replace(target)
   }, [router, searchParams])
   return null

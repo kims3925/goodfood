@@ -83,9 +83,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // post 필터가 있으면 적용
+    // post 필터가 있으면 기존 조건과 병합
     if (Object.keys(postFilter).length > 0) {
-      where.post = postFilter
+      where.post = { ...where.post, ...postFilter }
     }
 
     // todayOnly가 아닌 경우에만 startDate/endDate 필터 적용

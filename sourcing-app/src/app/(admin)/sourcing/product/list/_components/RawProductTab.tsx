@@ -439,16 +439,13 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
 
         if (aiData.success) {
           const draft = aiData.draft
-          // collected-product 저장
-          const saveRes = await fetch('/api/collected-product', {
-            method: 'POST',
+          // 1. 수집상품 업데이트
+          await fetch(`/api/collected-product/${cp.id}`, {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              postId: cp.postId,
               name: draft.name,
               description: draft.description,
-              price: draft.price,
-              currency: 'KRW',
               rawMetadata: {
                 ...draft,
                 shipping: {
@@ -458,8 +455,37 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
               },
             }),
           })
-          const saveData = await saveRes.json()
-          if (saveData.success) {
+
+          // 2. 가공상품(Product) 등록
+          const options = draft.options?.flatMap((opt: { groupName: string; values: string[] }) =>
+            opt.values.map((value: string) => ({ groupName: opt.groupName, value }))
+          ) || []
+          const variants = draft.variants?.map((v: { optionSummary?: string; wholesalePrice?: number; price?: number }) => ({
+            optionSummary: v.optionSummary || null,
+            price: v.price ?? draft.price ?? 0,
+            wholesalePrice: v.wholesalePrice ?? draft.wholesalePrice ?? null,
+          })) || []
+          const shipping = draft.shipping || { shippingFee: draft.shippingFee ?? null, shippingInfo: draft.shippingInfo ?? null }
+
+          const productRes = await fetch('/api/product', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              postId: cp.postId,
+              channelId: cp.post?.channel?.id || null,
+              name: draft.name || cp.name || '상품명 미지정',
+              description: draft.description || '',
+              wholesalePrice: draft.wholesalePrice ?? null,
+              price: draft.price ?? null,
+              currency: 'KRW',
+              shippingFee: typeof shipping.shippingFee === 'number' ? shipping.shippingFee : undefined,
+              shippingInfo: typeof shipping.shippingInfo === 'string' ? shipping.shippingInfo : undefined,
+              options,
+              variants,
+            }),
+          })
+          const productData = await productRes.json()
+          if (productData.success) {
             successCount++
           } else {
             failCount++
@@ -480,8 +506,8 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
     setSelectAll(false)
     loadProducts()
 
-    if (successCount > 0) toast.success(`${successCount}개 상품이 AI 가공되었습니다.`)
-    if (failCount > 0) toast.error(`${failCount}개 가공에 실패했습니다.`)
+    if (successCount > 0) toast.success(`${successCount}개 가공상품이 발행되었습니다.`)
+    if (failCount > 0) toast.error(`${failCount}개 발행에 실패했습니다.`)
 
     if (successCount > 0 && onSwitchToProcessed) {
       onSwitchToProcessed()
@@ -978,7 +1004,7 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
             className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
           >
             <Sparkles size={15} />
-            AI로 가공하기
+            가공상품발행하기
           </button>
         </div>
 
@@ -1297,9 +1323,9 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
         isOpen={showDirectAiConfirm}
         onClose={() => setShowDirectAiConfirm(false)}
         onConfirm={confirmDirectAiProcess}
-        title="AI로 가공하기"
-        message={`선택한 ${selectedIds.length}개 수집상품을 AI로 가공합니다. 완료 후 가공완료 탭으로 이동합니다.`}
-        confirmText="가공 시작"
+        title="가공상품발행하기"
+        message={`선택한 ${selectedIds.length}개 수집상품을 AI로 가공하고 상품으로 등록합니다.`}
+        confirmText="발행 시작"
         variant="info"
       />
 
@@ -1310,7 +1336,7 @@ export default function RawProductTab({ onSwitchToProcessed, onTotalLoaded, auto
             <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Package size={24} className="text-purple-600 animate-pulse" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">AI 가공 중...</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">가공상품 발행 중...</h3>
             <p className="text-sm text-gray-500 mb-4">
               {directAiProgress.current} / {directAiProgress.total} 처리 중
               {directAiProgress.failed > 0 && (

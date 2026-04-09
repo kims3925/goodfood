@@ -91,12 +91,12 @@ export default function CollectedProductDetailClient({ id }: { id: string }) {
         setProduct(data.data)
       } else {
         toast.error('수집상품을 불러오는데 실패했습니다.')
-        router.push('/sourcing/product/list?tab=raw')
+        router.push('/sourcing/product/list')
       }
     } catch (error) {
       console.error('수집상품 조회 실패:', error)
       toast.error('수집상품을 불러오는데 실패했습니다.')
-      router.push('/sourcing/product/list?tab=raw')
+      router.push('/sourcing/product/list')
     } finally {
       setIsLoading(false)
     }
@@ -142,7 +142,7 @@ export default function CollectedProductDetailClient({ id }: { id: string }) {
 
       if (data.success) {
         toast.success('수집상품이 삭제되었습니다.')
-        router.push('/sourcing/product/list?tab=raw')
+        router.push('/sourcing/product/list')
       } else {
         toast.error('수집상품 삭제에 실패했습니다.')
       }
@@ -180,7 +180,7 @@ export default function CollectedProductDetailClient({ id }: { id: string }) {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => router.push('/sourcing/product/list?tab=raw')}
+                onClick={() => router.push('/sourcing/product/list')}
                 className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
               >
                 <ArrowLeft size={20} />
