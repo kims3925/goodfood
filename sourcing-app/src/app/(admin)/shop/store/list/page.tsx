@@ -15,6 +15,7 @@ import {
   ShoppingCart,
   Power,
   PowerOff,
+  ExternalLink,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -407,7 +408,8 @@ function ShopListContent() {
                   <TableHead className="w-[8%]">주문수</TableHead>
                   <TableHead className="w-[8%]">상태</TableHead>
                   <TableHead className="w-[12%]">생성일</TableHead>
-                  <TableHead className="w-[12%]">수정일</TableHead>
+                  <TableHead className="w-[10%]">수정일</TableHead>
+                  <TableHead className="w-[5%] text-center">바로가기</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -475,6 +477,17 @@ function ShopListContent() {
                         <span className="text-sm text-gray-600">
                           {formatDateTimeKST(shop.updatedAt)}
                         </span>
+                      </TableCell>
+                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                        <a
+                          href={`${process.env.NEXT_PUBLIC_SHOP_BASE_URL || 'https://shop.abcpharm.net'}/${shop.subdomain}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          <ExternalLink size={12} />
+                          보기
+                        </a>
                       </TableCell>
                     </TableRow>
                   ))
