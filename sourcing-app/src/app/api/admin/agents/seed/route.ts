@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth-options'
+import { authOptions } from '@/modules/auth/auth.config'
 
 /**
  * POST /api/admin/agents/seed
