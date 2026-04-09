@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2, AlertCircle, ChevronDown, ChevronRight, ChevronUp, FileText, Store, Package } from 'lucide-react'
+import { Plus, Search, Trash2, AlertCircle, ChevronDown, ChevronRight, ChevronUp, FileText, Store, Package, Send, ArrowLeft } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -49,6 +49,21 @@ interface Post {
     coverUrl: string | null
   }
   images: PostImage[]
+}
+
+interface ProcessedProduct {
+  id: number
+  name: string
+  thumbnailUrl: string | null
+  price: number | null
+  wholesalePrice: number | null
+  createdAt: string
+  channel: {
+    id: number
+    name: string
+    coverUrl: string | null
+  } | null
+  variants: Array<{ id: number; price: number }>
 }
 
 interface AvailablePost {
@@ -109,6 +124,13 @@ export default function PostsManagePage() {
   const [isAiProcessing, setIsAiProcessing] = useState(false)
   const [aiProgress, setAiProgress] = useState({ current: 0, total: 0, failed: 0 })
   const [showAiConfirm, setShowAiConfirm] = useState(false)
+
+  // 2단계 뷰: 'collecting' = 수집 게시물, 'processed' = 가공 완료 상품
+  const [viewMode, setViewMode] = useState<'collecting' | 'processed'>('collecting')
+  const [processedProducts, setProcessedProducts] = useState<ProcessedProduct[]>([])
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([])
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [publishProgress, setPublishProgress] = useState({ current: 0, total: 0, failed: 0 })
 
   // 게시물 추가 모달 관련 상태
   const [selectedPlatform, setSelectedPlatform] = useState<ChannelPlatform>('BAND')
@@ -557,20 +579,77 @@ export default function PostsManagePage() {
 
     let successCount = 0
     let failCount = 0
+    const createdProductIds: number[] = []
+
+    // 1) 채널별 가격 정책 로드
+    const policyMap = new Map<number, string>()
+    try {
+      const policyRes = await fetch('/api/policy?limit=100')
+      if (policyRes.ok) {
+        const policyData = await policyRes.json()
+        for (const p of (policyData.data || [])) {
+          if (p.isActive && !policyMap.has(p.channelId)) {
+            policyMap.set(p.channelId, p.content)
+          }
+        }
+      }
+    } catch { /* 정책 없이 진행 */ }
 
     for (let i = 0; i < selectedPostIds.length; i++) {
       const postId = selectedPostIds[i]
       setAiProgress(prev => ({ ...prev, current: i + 1 }))
 
       try {
-        const response = await fetch('/api/product/ai-generate', {
+        // 게시물의 채널 정보로 정책 찾기
+        const post = posts.find(p => p.id === postId)
+        const policyContent = post?.channel?.id ? policyMap.get(post.channel.id) : undefined
+
+        // 2) AI draft 생성
+        const aiRes = await fetch('/api/product/ai-generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ postId }),
+          body: JSON.stringify({ postId, policyContent }),
         })
-        const data = await response.json()
-        if (data.success) {
+        const aiData = await aiRes.json()
+
+        if (!aiData.success || !aiData.draft) {
+          failCount++
+          setAiProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
+          continue
+        }
+
+        const draft = aiData.draft
+
+        // 3) Product 생성 (POST /api/product)
+        const variants = (draft.variants ?? []).map((v: any) => ({
+          optionSummary: v.optionSummary,
+          price: v.price ?? draft.price ?? 0,
+          wholesalePrice: v.wholesalePrice ?? draft.wholesalePrice ?? null,
+        }))
+
+        const productRes = await fetch('/api/product', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            postId,
+            channelId: post?.channel?.id ?? null,
+            name: draft.name,
+            description: draft.description,
+            wholesalePrice: draft.wholesalePrice ?? null,
+            price: draft.price ?? null,
+            options: draft.options ?? [],
+            variants,
+            shippingFee: draft.shipping?.shippingFee ?? draft.shippingFee ?? null,
+            shippingInfo: draft.shipping?.shippingInfo ?? draft.shippingInfo ?? null,
+            categoryId: draft.categoryId ?? null,
+          }),
+        })
+
+        const productData = await productRes.json()
+
+        if (productData.success && productData.data?.id) {
           successCount++
+          createdProductIds.push(productData.data.id)
         } else {
           failCount++
           setAiProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
@@ -586,11 +665,107 @@ export default function PostsManagePage() {
     setSelectAllPosts(false)
     loadPosts()
 
-    if (successCount > 0) toast.success(`${successCount}개 상품이 AI 가공되었습니다.`)
-    if (failCount > 0) toast.error(`${failCount}개 가공에 실패했습니다.`)
+    if (successCount > 0) {
+      toast.success(`${successCount}개 상품이 AI 가공되었습니다.`)
+      // 가공된 상품 로드 후 Stage 2 뷰로 전환
+      await loadProcessedProducts(createdProductIds)
+      setViewMode('processed')
+    }
+    if (failCount > 0) {
+      toast.error(`${failCount}개 가공에 실패했습니다.`)
+    }
+  }
+
+  // 가공 완료 상품 로드 (Stage 2)
+  const loadProcessedProducts = useCallback(async (productIds: number[]) => {
+    if (productIds.length === 0) return
+    try {
+      const response = await fetch(`/api/product?limit=50&page=1`)
+      const data = await response.json()
+      if (data.success) {
+        const filtered = (data.data || []).filter((p: ProcessedProduct) =>
+          productIds.includes(p.id)
+        )
+        setProcessedProducts(filtered)
+      }
+    } catch (error) {
+      console.error('가공 상품 로드 실패:', error)
+    }
+  }, [])
+
+  // 상품 발행 (Stage 2 → 소매밴드)
+  const handlePublishProducts = async () => {
+    if (selectedProductIds.length === 0) {
+      toast.error('발행할 상품을 선택해주세요.')
+      return
+    }
+
+    setIsPublishing(true)
+    setPublishProgress({ current: 0, total: selectedProductIds.length, failed: 0 })
+
+    let successCount = 0
+    let failCount = 0
+
+    // 소매밴드 채널 목록 조회
+    let retailChannels: Array<{ id: number; name: string }> = []
+    try {
+      const chRes = await fetch('/api/channel?kind=RETAIL&limit=100')
+      const chData = await chRes.json()
+      retailChannels = chData.data || []
+    } catch {
+      toast.error('소매밴드 채널 조회에 실패했습니다.')
+      setIsPublishing(false)
+      return
+    }
+
+    if (retailChannels.length === 0) {
+      toast.error('등록된 소매밴드 채널이 없습니다. 채널 관리에서 소매밴드를 등록해주세요.')
+      setIsPublishing(false)
+      return
+    }
+
+    for (let i = 0; i < selectedProductIds.length; i++) {
+      const productId = selectedProductIds[i]
+      setPublishProgress(prev => ({ ...prev, current: i + 1 }))
+
+      let productSuccess = false
+
+      for (const channel of retailChannels) {
+        try {
+          const res = await fetch('/api/publish/template/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              productId,
+              channelId: channel.id,
+              templateType: 'standard',
+              showOrderLink: true,
+            }),
+          })
+          const data = await res.json()
+          if (data.success || res.ok) productSuccess = true
+        } catch {
+          // 채널별 실패는 무시하고 다음 채널 시도
+        }
+      }
+
+      if (productSuccess) {
+        successCount++
+      } else {
+        failCount++
+        setPublishProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
+      }
+    }
+
+    setIsPublishing(false)
+    setSelectedProductIds([])
 
     if (successCount > 0) {
-      router.push('/sourcing/product/list?tab=processed')
+      toast.success(`${successCount}개 상품이 발행되었습니다.`)
+      router.push('/sourcing/publish')
+    }
+    if (failCount > 0) {
+      toast.error(`${failCount}개 발행에 실패했습니다.`)
     }
   }
 
@@ -630,14 +805,35 @@ export default function PostsManagePage() {
           </button>
         </div>
 
-        {/* 수집상품리스트 헤더 */}
+        {/* 뒤로가기 (Stage 2에서) */}
+        {viewMode === 'processed' && (
+          <button
+            onClick={() => {
+              setViewMode('collecting')
+              setProcessedProducts([])
+              setSelectedProductIds([])
+            }}
+            className="mb-4 flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft size={16} />
+            수집 게시물 목록으로 돌아가기
+          </button>
+        )}
+
+        {/* 헤더 */}
         <div className="mb-4">
-          <h2 className="text-2xl font-bold text-gray-900">수집상품리스트</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {viewMode === 'collecting' ? '수집상품리스트' : 'AI가공 완료 상품'}
+          </h2>
           <p className="text-gray-500 text-sm mt-1">
-            소싱처에서 수집한 게시물중 AI가공이 안된 상품을 관리합니다.
+            {viewMode === 'collecting'
+              ? '소싱처에서 수집한 게시물입니다. AI로 가공하면 상품으로 변환됩니다.'
+              : 'AI 가공이 완료된 상품입니다. 발행할 상품을 선택하고 \'상품발행하기\'를 클릭하세요.'
+            }
           </p>
         </div>
 
+        {viewMode === 'collecting' ? (<>
         {/* 통계 카드 */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
@@ -666,46 +862,85 @@ export default function PostsManagePage() {
 
         {/* 액션 바 (고정) */}
         <div className="bg-gray-900 rounded-2xl px-5 py-3 mb-6 flex items-center gap-3 flex-wrap">
-          {selectedPostIds.length > 0 ? (
-            <span className="text-sm font-medium text-gray-300">
-              {selectedPostIds.length}개 선택됨
-            </span>
+          {viewMode === 'collecting' ? (
+            <>
+              {selectedPostIds.length > 0 ? (
+                <span className="text-sm font-medium text-gray-300">
+                  {selectedPostIds.length}개 선택됨
+                </span>
+              ) : (
+                <span className="text-sm text-gray-400">
+                  게시물을 선택해주세요
+                </span>
+              )}
+              <div className="w-px h-5 bg-gray-600" />
+              {selectedPostIds.length > 0 && (
+                <button
+                  onClick={() => { setSelectedPostIds([]); setSelectAllPosts(false) }}
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  선택 해제
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  if (selectedPostIds.length === 0) { toast.error('먼저 게시물을 선택해주세요.'); return }
+                  handleDeleteSelectedPosts()
+                }}
+                disabled={isAiProcessing}
+                className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+              >
+                <Trash2 size={15} />
+                삭제
+              </button>
+              <button
+                onClick={() => {
+                  if (selectedPostIds.length === 0) { toast.error('먼저 게시물을 선택해주세요.'); return }
+                  handleAiProcess()
+                }}
+                disabled={isAiProcessing}
+                className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+              >
+                <Package size={15} />
+                {isAiProcessing
+                  ? `AI 가공 중... (${aiProgress.current}/${aiProgress.total})`
+                  : 'AI로 가공하기'
+                }
+              </button>
+            </>
           ) : (
-            <span className="text-sm text-gray-400">
-              게시물을 선택해주세요
-            </span>
+            <>
+              {selectedProductIds.length > 0 ? (
+                <span className="text-sm font-medium text-gray-300">
+                  {selectedProductIds.length}개 상품 선택됨
+                </span>
+              ) : (
+                <span className="text-sm text-gray-400">
+                  발행할 상품을 선택해주세요
+                </span>
+              )}
+              <div className="w-px h-5 bg-gray-600" />
+              {selectedProductIds.length > 0 && (
+                <button
+                  onClick={() => setSelectedProductIds([])}
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  선택 해제
+                </button>
+              )}
+              <button
+                onClick={handlePublishProducts}
+                disabled={isPublishing || selectedProductIds.length === 0}
+                className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+              >
+                <Send size={15} />
+                {isPublishing
+                  ? `발행 중... (${publishProgress.current}/${publishProgress.total})`
+                  : '상품발행하기'
+                }
+              </button>
+            </>
           )}
-          <div className="w-px h-5 bg-gray-600" />
-          {selectedPostIds.length > 0 && (
-            <button
-              onClick={() => { setSelectedPostIds([]); setSelectAllPosts(false) }}
-              className="text-sm text-gray-400 hover:text-white transition-colors"
-            >
-              선택 해제
-            </button>
-          )}
-          <button
-            onClick={() => {
-              if (selectedPostIds.length === 0) { toast.error('먼저 게시물을 선택해주세요.'); return }
-              handleDeleteSelectedPosts()
-            }}
-            disabled={isAiProcessing}
-            className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-          >
-            <Trash2 size={15} />
-            삭제
-          </button>
-          <button
-            onClick={() => {
-              if (selectedPostIds.length === 0) { toast.error('먼저 게시물을 선택해주세요.'); return }
-              handleAiProcess()
-            }}
-            disabled={isAiProcessing}
-            className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-          >
-            <Package size={15} />
-            AI로 가공하기
-          </button>
         </div>
 
         {/* 컨트롤 영역 */}
@@ -964,6 +1199,96 @@ export default function PostsManagePage() {
             onPageChange={handlePageChange}
           />
         </div>
+        </>) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          {processedProducts.length === 0 ? (
+            <div className="p-12 text-center text-gray-500">
+              가공된 상품이 없습니다.
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedProductIds.length === processedProducts.length && processedProducts.length > 0}
+                      onChange={() => {
+                        if (selectedProductIds.length === processedProducts.length) {
+                          setSelectedProductIds([])
+                        } else {
+                          setSelectedProductIds(processedProducts.map(p => p.id))
+                        }
+                      }}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">이미지</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">상품명</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">소싱처</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">도매가</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">판매가</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">생성일</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {processedProducts.map(product => (
+                  <tr key={product.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedProductIds.includes(product.id)}
+                        onChange={() => {
+                          setSelectedProductIds(prev =>
+                            prev.includes(product.id)
+                              ? prev.filter(id => id !== product.id)
+                              : [...prev, product.id]
+                          )
+                        }}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      {product.thumbnailUrl ? (
+                        <img
+                          src={product.thumbnailUrl}
+                          alt={product.name}
+                          className="w-12 h-12 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center">
+                          <Package size={20} className="text-gray-300" />
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                      {product.name}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {product.channel?.name ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {product.wholesalePrice
+                        ? `${Number(product.wholesalePrice).toLocaleString()}원`
+                        : '-'
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                      {product.price
+                        ? `${product.price.toLocaleString()}원`
+                        : <span className="text-orange-500">가격 미설정</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {new Date(product.createdAt).toLocaleDateString('ko-KR')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        )}
       </div>
 
       {/* 추가 모달 */}

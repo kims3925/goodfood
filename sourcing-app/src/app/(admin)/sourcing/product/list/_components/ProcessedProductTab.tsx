@@ -2451,4 +2451,52 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }:
             </div>
 
             {/* 옵션별 가격 */}
-            {
+            {editForm.variants.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">옵션별 가격</label>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {editForm.variants.map((variant, idx) => (
+                    <div key={variant.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                      <span className="text-xs text-gray-600 flex-1 truncate">{variant.optionSummary || `옵션 ${idx + 1}`}</span>
+                      <input
+                        type="number"
+                        value={variant.price}
+                        onChange={(e) => {
+                          const newVariants = [...editForm.variants]
+                          newVariants[idx] = { ...newVariants[idx], price: Number(e.target.value) }
+                          setEditForm(prev => ({ ...prev, variants: newVariants }))
+                        }}
+                        className="w-24 px-2 py-1 border border-gray-300 rounded text-xs text-right"
+                        placeholder="판매가"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <ModalFooter>
+            <Button variant="secondary" onClick={() => { setShowEditModal(false); setEditingProduct(null) }}>
+              취소
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleEditSave}
+              disabled={isEditSaving || !editForm.name.trim()}
+            >
+              {isEditSaving ? '저장 중...' : '저장만'}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleEditAndRepublish}
+              disabled={isEditSaving || !editForm.name.trim()}
+            >
+              {isEditSaving ? '처리 중...' : '수정발행'}
+            </Button>
+          </ModalFooter>
+        </Modal>
+      )}
+    </>
+  )
+}
