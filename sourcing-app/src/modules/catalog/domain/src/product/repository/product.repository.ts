@@ -28,6 +28,7 @@ export class ProductRepository {
       sourcePlatform,
       startDate,
       endDate,
+      publishStatus,
       page = 1,
       limit = 20,
     } = params
@@ -61,6 +62,21 @@ export class ProductRepository {
         const end = new Date(endDate)
         end.setHours(23, 59, 59, 999)
         where.createdAt.lte = end
+      }
+    }
+
+    // 발행 상태 필터
+    if (publishStatus === 'published') {
+      where.channelProducts = {
+        some: {
+          channel: { kind: ChannelKind.RETAIL },
+        },
+      }
+    } else if (publishStatus === 'unpublished') {
+      where.channelProducts = {
+        none: {
+          channel: { kind: ChannelKind.RETAIL },
+        },
       }
     }
 

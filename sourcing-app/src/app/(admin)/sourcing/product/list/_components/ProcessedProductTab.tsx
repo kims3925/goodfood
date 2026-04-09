@@ -112,9 +112,10 @@ interface CollectedProduct {
 interface ProcessedProductTabProps {
   onStatsLoaded?: (stats: { total: number; published: number; unpublished: number }) => void
   autoOpenRegister?: boolean
+  publishStatus?: 'unpublished' | 'published'
 }
 
-export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }: ProcessedProductTabProps) {
+export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, publishStatus }: ProcessedProductTabProps) {
   const router = useRouter()
   const toast = useToast()
   const [products, setProducts] = useState<Product[]>([])
@@ -564,6 +565,7 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }:
 
       if (query) params.append('search', query)
       if (selectedChannelId) params.append('channelId', selectedChannelId)
+      if (publishStatus) params.append('publishStatus', publishStatus)
 
       const response = await fetch(`/api/product?${params.toString()}`)
       const data = await response.json()
@@ -588,7 +590,7 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister }:
       setIsLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedChannelId, query, itemsPerPage])
+  }, [selectedChannelId, query, itemsPerPage, publishStatus])
 
   // 필터 변경 시 1페이지로 리셋하여 조회
   useEffect(() => {

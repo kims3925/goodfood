@@ -6,6 +6,7 @@ export interface ProductListParams {
   sourcePlatform?: string
   startDate?: string
   endDate?: string
+  publishStatus?: 'all' | 'unpublished' | 'published'
   page?: number
   limit?: number
 }

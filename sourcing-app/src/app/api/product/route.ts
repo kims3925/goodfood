@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     const sourcePlatform = searchParams.get('sourcePlatform')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const publishStatus = searchParams.get('publishStatus') as 'all' | 'unpublished' | 'published' | null
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
 
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
       sourcePlatform: sourcePlatform || undefined,
       startDate: startDate || undefined,
       endDate: endDate || undefined,
+      publishStatus: publishStatus || undefined,
       page,
       limit,
     })
