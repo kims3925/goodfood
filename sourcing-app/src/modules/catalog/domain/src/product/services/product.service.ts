@@ -129,12 +129,31 @@ export class ProductService {
       price,
     })
 
-    // postId가 있으면 해당 CollectedProduct의 isConverted를 true로 변경
+    // postId가 있으면 CollectedProduct 처리 (post/list에서 제거되도록)
     if (data.postId) {
-      await prisma.collectedProduct.updateMany({
+      // 기존 CollectedProduct가 있으면 isConverted 업데이트
+      const updatedCount = await prisma.collectedProduct.updateMany({
         where: { postId: data.postId },
         data: { isConverted: true },
       })
+
+      // CollectedProduct가 없으면 새로 생성 (post/list 필터 정합성 보장)
+      if (updatedCount.count === 0) {
+        try {
+          await prisma.collectedProduct.create({
+            data: {
+              userId: data.userId,
+              postId: data.postId,
+              name: data.name || null,
+              description: data.description || null,
+              currency: data.currency || 'KRW',
+              isConverted: true,
+            },
+          })
+        } catch {
+          // unique constraint 등 실패 시 무시 (이미 존재하는 경우)
+        }
+      }
     }
 
     return product
