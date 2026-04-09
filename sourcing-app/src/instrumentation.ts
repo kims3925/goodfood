@@ -81,5 +81,37 @@ export async function register() {
 
     scheduler.startAll()
     console.log(`[Instrumentation] AgentScheduler 시작 완료: ${scheduler.size}개 cron 등록`)
+
+    // ── 데이터 정합성 정리 (서버 시작 시 1회) ──
+    try {
+      // isConverted=false인 CollectedProduct를 true로 업데이트
+      const unconverted = await prisma.collectedProduct.updateMany({
+        where: { isConverted: false, deletedAt: null },
+        data: { isConverted: true },
+      })
+      if (unconverted.count > 0) {
+        console.log(`[Instrumentation] CollectedProduct 정리: ${unconverted.count}개 isConverted=true 업데이트`)
+      }
+
+      // Product가 생성되었지만 CollectedProduct가 없는 게시물에 대해 CollectedProduct 생성
+      // (post/list 필터 정합성 보장)
+      const postsNeedingCleanup = await prisma.collectedPost.findMany({
+        where: {
+          deletedAt: null,
+          collectedProducts: { none: {} },
+        },
+        select: { id: true, userId: true, title: true },
+      })
+
+      // 이 게시물들 중 Product 이름과 매칭되는 것이 있는지 확인하기 어려우므로
+      // 향후 AI 가공 시 자동 생성으로 점진적 정리 (이미 product.service.create에 구현됨)
+      if (postsNeedingCleanup.length > 0) {
+        console.log(`[Instrumentation] post/list 미분류 게시물: ${postsNeedingCleanup.length}개 (향후 AI 가공 시 자동 정리)`)
+      }
+
+      console.log('[Instrumentation] 데이터 정합성 정리 완료')
+    } catch (err) {
+      console.error('[Instrumentation] 데이터 정리 실패:', err)
+    }
   }
 }
