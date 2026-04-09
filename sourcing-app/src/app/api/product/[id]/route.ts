@@ -141,21 +141,46 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, price, description } = body
+    const { name, price, description, shippingFee, wholesalePrice, variants } = body
 
-    const updateData: {
-      name?: string
-      price?: number | null
-      description?: string | null
-    } = {}
+    const updateData: Record<string, unknown> = {}
 
     if (name !== undefined) updateData.name = name
     if (price !== undefined) updateData.price = price
     if (description !== undefined) updateData.description = description
+    if (shippingFee !== undefined) updateData.shippingFee = shippingFee
+    if (wholesalePrice !== undefined) updateData.wholesalePrice = wholesalePrice
 
-    const updatedProduct = await prisma.product.update({
-      where: { id },
-      data: updateData,
+    // 트랜잭션으로 상품 + variant 동시 업데이트
+    const updatedProduct = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.update({
+        where: { id },
+        data: updateData,
+      })
+
+      // variants 업데이트 (id 기반)
+      if (Array.isArray(variants)) {
+        for (const v of variants) {
+          if (v.id) {
+            await tx.productVariant.updateMany({
+              where: { id: v.id, productId: id },
+              data: {
+                ...(v.price !== undefined && { price: v.price }),
+                ...(v.wholesalePrice !== undefined && { wholesalePrice: v.wholesalePrice }),
+                ...(v.optionSummary !== undefined && { optionSummary: v.optionSummary }),
+              },
+            })
+          }
+        }
+      }
+
+      return tx.product.findUnique({
+        where: { id },
+        include: {
+          variants: { where: { deletedAt: null }, orderBy: { id: 'asc' } },
+          images: { orderBy: { sortOrder: 'asc' } },
+        },
+      })
     })
 
     return NextResponse.json({

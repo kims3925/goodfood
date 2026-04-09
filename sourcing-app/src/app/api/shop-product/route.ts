@@ -94,8 +94,10 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
+            description: true,
             thumbnailUrl: true,
             price: true,
+            wholesalePrice: true,
             shippingFee: true,
             bundleShippingType: true,
             variants: {
@@ -106,6 +108,7 @@ export async function GET(request: NextRequest) {
                 id: true,
                 optionSummary: true,
                 price: true,
+                wholesalePrice: true,
               },
               orderBy: { id: 'asc' },
             },
