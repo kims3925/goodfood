@@ -233,12 +233,12 @@ function PublishPageContent() {
   }, [])
 
   // 초기 로드
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadChannels()
     loadShops()
     // Extension 설치 확인
     checkExtensionInstalled().then(setExtensionAvailable)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadChannels = async () => {
