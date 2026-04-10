@@ -67,13 +67,32 @@ ${policyContent}
  * Generate AI prompt for product extraction (simplified version)
  */
 function buildProductExtractionPrompt(input: ProductTransformationInput): string {
-  const { post, policyContent, customPrompt } = input
+  const { post, policyContent, customPrompt, sdFoodContext } = input
   const imageCount = post.images?.length || 0
+
+  // SD푸드 특수 지시문 생성
+  let sdFoodInstruction = ''
+  if (sdFoodContext) {
+    if (sdFoodContext.hasBodyPrice) {
+      sdFoodInstruction = '\n\n## SD푸드 특수 처리\n'
+        + '본문에 판매가가 명시되어 있습니다. 해당 판매가를 그대로 사용하세요.\n'
+        + '마진 구간표를 적용하지 마세요.'
+    } else if (sdFoodContext.supplyPrice !== null) {
+      sdFoodInstruction = '\n\n## SD푸드 특수 처리\n'
+        + `댓글에서 공급가 ${sdFoodContext.supplyPrice.toLocaleString()}원을 추출했습니다.\n`
+        + '이 공급가에 위 마진 구간표를 적용하여 최종 판매가를 계산하세요.\n'
+        + '(기준가 = 공급가 + 배송비)'
+    } else {
+      sdFoodInstruction = '\n\n## SD푸드 특수 처리\n'
+        + '댓글에서 공급가를 찾을 수 없습니다.\n'
+        + '본문에서 가격 정보를 최대한 추출하여 판매가를 설정하세요.'
+    }
+  }
 
   // 커스텀 프롬프트가 있으면 변수 치환 후 반환
   if (customPrompt) {
     console.log('📝 커스텀 프롬프트 사용 중')
-    return replacePromptVariables(customPrompt, input)
+    return replacePromptVariables(customPrompt, input) + sdFoodInstruction
   }
 
   // 기본 프롬프트 사용
@@ -127,7 +146,7 @@ ${SINGLE_EXAMPLE}
 
 ---
 
-${SINGLE_CHECKLIST}`
+${SINGLE_CHECKLIST}${sdFoodInstruction}`
 }
 
 // =============================================

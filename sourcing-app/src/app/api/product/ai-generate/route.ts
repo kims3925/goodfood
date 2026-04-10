@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fetch collected post with images
+    // Fetch collected post with images and comments
     const post = await prisma.collectedPost.findUnique({
       where: {
         id: postId,
@@ -237,6 +237,11 @@ export async function POST(request: NextRequest) {
         images: {
           orderBy: {
             sortOrder: 'asc',
+          },
+        },
+        comments: {
+          orderBy: {
+            createdAt: 'asc',
           },
         },
       },
@@ -312,6 +317,38 @@ export async function POST(request: NextRequest) {
     const customPrompt = promptConfig?.prompt || undefined
     console.log('[AI Product Generation] Custom prompt:', customPrompt ? '사용자 정의 프롬프트 사용' : '기본 프롬프트 사용')
 
+    // ── SD푸드 특수 처리: 댓글 공급가 추출 + 본문 판매가 검사 ──
+    const isSdFoodSpecial = policyContent?.includes('공급가_출처: 댓글에서 추출') ?? false
+    let sdFoodSupplyPrice: number | null = null
+    let sdFoodHasBodyPrice = false
+
+    if (isSdFoodSpecial) {
+      // 1) 본문에 판매가 키워드 + 금액 패턴 확인
+      const bodyPriceMatch = post.content.match(
+        /(?:판매가|판매\s*가격|Price)[\s:：]*(\d[\d,]*)\s*원/
+      )
+      sdFoodHasBodyPrice = !!bodyPriceMatch
+
+      // 2) 본문에 판매가 없으면 → 댓글에서 공급가 추출
+      if (!sdFoodHasBodyPrice && post.comments && post.comments.length > 0) {
+        for (const comment of post.comments) {
+          const supplyMatch = comment.content.match(
+            /(?:공급가|원가|공급\s*가격)[\s:：]*(\d[\d,]*)\s*원/
+          )
+          if (supplyMatch) {
+            sdFoodSupplyPrice = parseInt(supplyMatch[1].replace(/,/g, ''), 10)
+            break // 첫 번째 매칭 사용
+          }
+        }
+      }
+
+      console.log('[AI Product Generation] SD푸드 특수 처리:', {
+        hasBodyPrice: sdFoodHasBodyPrice,
+        supplyPrice: sdFoodSupplyPrice,
+        commentCount: post.comments?.length ?? 0,
+      })
+    }
+
     // Transform post to product using AI
     const config = aiConfig.config as any
     const draft = await transformPostToProduct({
@@ -324,6 +361,13 @@ export async function POST(request: NextRequest) {
       },
       policyContent: policyContent || undefined,
       customPrompt,
+      sdFoodContext: isSdFoodSpecial
+        ? {
+            hasBodyPrice: sdFoodHasBodyPrice,
+            supplyPrice: sdFoodSupplyPrice,
+            comments: (post.comments ?? []).map((c) => ({ author: c.author, content: c.content })),
+          }
+        : undefined,
     })
 
     console.log('[AI Product Generation] Draft generated:', {

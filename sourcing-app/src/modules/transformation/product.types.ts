@@ -4,11 +4,20 @@
  * This file defines all TypeScript interfaces and types for product transformation
  */
 
-import { CollectedPost, CollectedPostImage, AiProvider } from '@bandauto/db'
+import { CollectedPost, CollectedPostImage, CollectedPostComment, AiProvider } from '@bandauto/db'
 
 // =============================================
 // INPUT TYPES
 // =============================================
+
+/**
+ * SD푸드 특수 컨텍스트 (댓글 공급가 처리)
+ */
+export interface SdFoodContext {
+  hasBodyPrice: boolean
+  supplyPrice: number | null
+  comments: { author: string; content: string }[]
+}
 
 /**
  * Input data for product transformation
@@ -16,6 +25,7 @@ import { CollectedPost, CollectedPostImage, AiProvider } from '@bandauto/db'
 export interface ProductTransformationInput {
   post: CollectedPost & {
     images: CollectedPostImage[]
+    comments?: CollectedPostComment[]
   }
   aiProvider: AiProvider
   aiConfig: {
@@ -26,6 +36,7 @@ export interface ProductTransformationInput {
   }
   policyContent?: string // 가격 정책 내용
   customPrompt?: string  // 사용자 정의 프롬프트 (DB에서 가져온 것)
+  sdFoodContext?: SdFoodContext // SD푸드 특수 처리 컨텍스트
 }
 
 // =============================================
