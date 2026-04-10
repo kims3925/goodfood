@@ -70,6 +70,23 @@ function buildProductExtractionPrompt(input: ProductTransformationInput): string
   const { post, policyContent, customPrompt, sdFoodContext } = input
   const imageCount = post.images?.length || 0
 
+  // ── 글로벌 가격 제외 지시문 (모든 채널 공통) ──
+  // policyContent에서 excludeAbove 추출 (예: "40001원 이상 제외")
+  let policyExcludeAbove: number | null = null
+  if (policyContent) {
+    const exMatch = policyContent.match(/(\d[\d,]*)\s*원?\s*이상\s*제외/)
+    if (exMatch) {
+      policyExcludeAbove = parseInt(exMatch[1].replace(/,/g, ''), 10)
+    }
+  }
+  const globalExcludeInstruction = `\n\n## ⚠️ 가격 제외 규칙 (필수 준수)
+- 판매가 100,000원 이상인 옵션은 만들지 마세요. variants 배열에서 제외하세요.${
+    policyExcludeAbove !== null
+      ? `\n- 추가 정책 제한: 판매가 ${policyExcludeAbove.toLocaleString()}원 이상인 옵션도 제외하세요.`
+      : ''
+  }
+- 모든 옵션이 위 기준을 초과하면 가장 저렴한 옵션 1개만 남기되, 그것도 초과하면 빈 배열로 반환하세요.`
+
   // SD푸드 특수 지시문 생성
   let sdFoodInstruction = ''
   if (sdFoodContext) {
@@ -92,7 +109,7 @@ function buildProductExtractionPrompt(input: ProductTransformationInput): string
   // 커스텀 프롬프트가 있으면 변수 치환 후 반환
   if (customPrompt) {
     console.log('📝 커스텀 프롬프트 사용 중')
-    return replacePromptVariables(customPrompt, input) + sdFoodInstruction
+    return replacePromptVariables(customPrompt, input) + globalExcludeInstruction + sdFoodInstruction
   }
 
   // 기본 프롬프트 사용
@@ -146,7 +163,7 @@ ${SINGLE_EXAMPLE}
 
 ---
 
-${SINGLE_CHECKLIST}${sdFoodInstruction}`
+${SINGLE_CHECKLIST}${globalExcludeInstruction}${sdFoodInstruction}`
 }
 
 // =============================================

@@ -175,12 +175,17 @@ function parseKoreanNumber(s: string): number {
  * @param excludeAbove - 이 금액 이상이면 소싱 제외 (null 반환)
  * @returns 기대 판매가, 또는 null (제외 대상 / 매칭 규칙 없음)
  */
+// 글로벌 가격 상한 (모든 도매 채널 공통)
+const GLOBAL_MAX_PRICE = 100000
+
 function calcExpectedPrice(
   basePrice: number,
   rules: ParsedPolicyRule[],
   excludeAbove?: number
 ): number | null {
-  // 제외 조건 (예: 40,000원 이상 제외)
+  // 글로벌 상한: 100,000원 이상 제외 (모든 채널 공통)
+  if (basePrice >= GLOBAL_MAX_PRICE) return null
+  // 정책별 제외 조건 (예: 40,001원 이상 제외 — 가족도매방/초록이네)
   if (excludeAbove !== undefined && basePrice >= excludeAbove) return null
 
   // 범위 정렬 (오름차순) 후 매칭

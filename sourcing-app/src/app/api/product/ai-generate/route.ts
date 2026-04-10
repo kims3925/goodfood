@@ -376,6 +376,64 @@ export async function POST(request: NextRequest) {
       variantCount: draft.variants.length,
     })
 
+    // ── 가격 기준 옵션(variants) 필터링 ──
+    // 1) 모든 채널: 판매가 100,000원 이상 옵션 제외 (글로벌 상한)
+    // 2) BRACKET_MARGIN (가족도매방/초록이네): 정책 excludeAbove(40001원) 이상 옵션 제외
+    // 3) 모든 옵션이 제외되면 가공 실패 처리 (상품 생성 불가)
+    const GLOBAL_MAX_PRICE = 100000
+    let policyExcludeAbove: number | null = null
+    if (policyContent) {
+      // BRACKET_MARGIN 정책의 "40001원 이상 제외" 패턴 추출
+      const exMatch = policyContent.match(/(\d[\d,]*)\s*원?\s*이상\s*제외/)
+      if (exMatch) {
+        policyExcludeAbove = parseInt(exMatch[1].replace(/,/g, ''), 10)
+      }
+    }
+
+    if (draft.variants && draft.variants.length > 0) {
+      const originalCount = draft.variants.length
+      const filteredVariants = draft.variants.filter((v: any) => {
+        const price = typeof v.price === 'number' ? v.price : parseInt(String(v.price ?? '0').replace(/[^0-9]/g, ''), 10) || 0
+        if (price <= 0) return true // 가격 미상 옵션은 통과
+        if (price >= GLOBAL_MAX_PRICE) return false
+        if (policyExcludeAbove !== null && price >= policyExcludeAbove) return false
+        return true
+      })
+
+      const removedCount = originalCount - filteredVariants.length
+      if (removedCount > 0) {
+        console.log(`[AI Product Generation] 가격 필터: ${removedCount}개 옵션 제외 (글로벌 ${GLOBAL_MAX_PRICE.toLocaleString()}원${policyExcludeAbove ? ` / 정책 ${policyExcludeAbove.toLocaleString()}원` : ''} 이상)`)
+      }
+
+      if (filteredVariants.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `모든 옵션이 가격 제한(글로벌 ${GLOBAL_MAX_PRICE.toLocaleString()}원${policyExcludeAbove ? ` / 정책 ${policyExcludeAbove.toLocaleString()}원` : ''} 이상)으로 제외되어 가공할 수 없습니다.`,
+            code: 'ALL_VARIANTS_EXCLUDED',
+          },
+          { status: 400 }
+        )
+      }
+
+      draft.variants = filteredVariants
+    }
+
+    // 단일 상품(variants 없음)인 경우: draft.price 자체를 검증
+    if ((!draft.variants || draft.variants.length === 0) && draft.price) {
+      const singlePrice = typeof draft.price === 'number' ? draft.price : 0
+      if (singlePrice >= GLOBAL_MAX_PRICE || (policyExcludeAbove !== null && singlePrice >= policyExcludeAbove)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `상품 판매가(${singlePrice.toLocaleString()}원)가 가격 제한(글로벌 ${GLOBAL_MAX_PRICE.toLocaleString()}원${policyExcludeAbove ? ` / 정책 ${policyExcludeAbove.toLocaleString()}원` : ''} 이상)을 초과하여 가공할 수 없습니다.`,
+            code: 'PRICE_EXCEEDS_LIMIT',
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     // 가격 정책 적용 로깅 (경고만, 실패 처리하지 않음)
     // 가격 정책에서 "판매가 그대로 사용" 등의 조건이 있을 수 있으므로
     // wholesalePrice === price 인 경우도 정책에 따른 정상 결과일 수 있음
