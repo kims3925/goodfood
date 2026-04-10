@@ -89,8 +89,13 @@ interface ParsedPolicyRule {
 function parsePricingPolicyRules(content: string): ParsedPolicyRule[] {
   const rules: ParsedPolicyRule[] = []
 
+  // ── SD푸드 감지: "공급가_출처: 댓글에서 추출" 마커가 있으면 ZERO_MARGIN 분기 건너뜀 ──
+  // SD푸드 content에는 "본문판매가_표시시: 판매가 그대로 사용" 텍스트가 포함되므로
+  // /판매가\s*그대로/ 정규식이 매칭되어 마진 구간표가 무시되는 문제 방지
+  const isSdFood = content.includes('공급가_출처: 댓글에서 추출')
+
   // ── 특수: 킹도매방 "판매가 그대로" = 마진 0, 전 구간 적용 ──
-  if (/판매가\s*그대로/.test(content)) {
+  if (/판매가\s*그대로/.test(content) && !isSdFood) {
     rules.push({ minWholesale: 0, maxWholesale: null, margin: 0, marginType: 'fixed' })
     return rules
   }
