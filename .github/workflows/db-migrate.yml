@@ -1,0 +1,16 @@
+name: DB Migrate
+on: [workflow_dispatch]
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH Migration
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/bandauto
+            set -a && source .env && set +a
+            docker compose exec -T mariadb mysql -u"${DB_USER:-banduser}" -p"${DB_PASSWORD}" "${DB_NAME:-sourcing_db}" -e "ALTER TABLE guest_order_item ADD COLUMN IF NOT EXISTS is_custom_item TINYINT(1) NOT NULL DEFAULT 0; ALTER TABLE guest_order_item MODIFY COLUMN shop_product_id INT NULL;" && echo OK || echo SKIP
