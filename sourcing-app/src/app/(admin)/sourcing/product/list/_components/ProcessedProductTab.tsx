@@ -1151,18 +1151,22 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
     let bandFailCount = 0
     let shopSuccessCount = 0
     let shopFailCount = 0
+    let shopSkippedCount = 0
+    const errorMessages: string[] = []
 
     try {
       // 1) 소매밴드 채널 + 쇼핑몰 목록 동시 조회
       const [channelRes, shopRes] = await Promise.all([
         fetch('/api/channel?kind=RETAIL&limit=100'),
-        fetch('/api/shop?limit=100'),
+        fetch('/api/shop?isActive=true&limit=100'),
       ])
       const channelData = await channelRes.json()
       const shopData = await shopRes.json()
-      const retailChannels: { id: number }[] = channelData.success ? channelData.data : []
-      const shops: { id: number; isActive: boolean }[] = shopData.success ? (shopData.data || []) : []
-      const activeShops = shops.filter(s => s.isActive)
+      const retailChannels: { id: number; name: string }[] = channelData.success ? channelData.data : []
+      const allShops: { id: number; name: string; isActive: boolean }[] = shopData.success ? (shopData.data || []) : []
+      const activeShops = allShops.filter(s => s.isActive !== false)
+
+      console.log('[자동발행] 채널:', retailChannels.length, '쇼핑몰:', activeShops.length)
 
       if (retailChannels.length === 0 && activeShops.length === 0) {
         toast.error('등록된 소매밴드 또는 쇼핑몰이 없습니다.')
@@ -1185,9 +1189,11 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
               bandSuccessCount++
             } else {
               bandFailCount++
+              if (data.error) errorMessages.push(`[밴드:${channel.name}] ${data.error}`)
             }
-          } catch {
+          } catch (err) {
             bandFailCount++
+            errorMessages.push(`[밴드:${channel.name}] 네트워크 오류`)
           }
         }
 
@@ -1200,18 +1206,31 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
               body: JSON.stringify({ productIds: [productId], shopId: shop.id }),
             })
             const data = await res.json()
-            if (data.success && data.summary?.success > 0) {
-              shopSuccessCount += data.summary.success
-            } else if (data.summary?.failed > 0) {
-              shopFailCount += data.summary.failed
+            console.log(`[자동발행] shopId=${shop.id} (${shop.name}) 응답:`, data)
+
+            if (data.success && data.summary) {
+              shopSuccessCount += data.summary.success || 0
+              shopSkippedCount += data.summary.skipped || 0
+              shopFailCount += data.summary.failed || 0
+              if (data.summary.failed > 0 && data.results) {
+                data.results
+                  .filter((r: any) => r.status === 'FAILED')
+                  .forEach((r: any) => errorMessages.push(`[쇼핑몰:${shop.name}] ${r.message || '발행 실패'}`))
+              }
+            } else {
+              // success: false 또는 summary 없음
+              shopFailCount++
+              const errMsg = data.error || data.message || '알 수 없는 오류'
+              errorMessages.push(`[쇼핑몰:${shop.name}] ${errMsg}`)
             }
-          } catch {
+          } catch (err: any) {
             shopFailCount++
+            errorMessages.push(`[쇼핑몰:${shop.name}] ${err?.message || '네트워크 오류'}`)
           }
         }
       }
-    } catch {
-      toast.error('자동발행 중 오류가 발생했습니다.')
+    } catch (err: any) {
+      toast.error(`자동발행 중 오류: ${err?.message || '알 수 없는 오류'}`)
     } finally {
       setIsAutoPublishing(false)
       setSelectedProductIds([])
@@ -1221,10 +1240,13 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
       const totalSuccess = bandSuccessCount + shopSuccessCount
       const totalFail = bandFailCount + shopFailCount
       if (totalSuccess > 0) {
-        toast.success(`발행 완료: 소매밴드 ${bandSuccessCount}건, 쇼핑몰 ${shopSuccessCount}건`)
+        toast.success(`발행 완료: 소매밴드 ${bandSuccessCount}건, 쇼핑몰 ${shopSuccessCount}건${shopSkippedCount > 0 ? ` (이미 발행 ${shopSkippedCount}건)` : ''}`)
       }
       if (totalFail > 0) {
-        toast.error(`발행 실패: 소매밴드 ${bandFailCount}건, 쇼핑몰 ${shopFailCount}건`)
+        // 첫 번째 에러 메시지를 사용자에게 표시
+        const firstError = errorMessages[0] || ''
+        toast.error(`발행 실패 ${totalFail}건: ${firstError}`)
+        console.error('[자동발행] 전체 실패 목록:', errorMessages)
       }
     }
   }
