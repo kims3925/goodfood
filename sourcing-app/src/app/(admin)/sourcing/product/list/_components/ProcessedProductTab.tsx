@@ -1147,21 +1147,32 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
     setShowAutoPublishConfirm(false)
     setIsAutoPublishing(true)
 
-    let successCount = 0
-    let failCount = 0
+    let bandSuccessCount = 0
+    let bandFailCount = 0
+    let shopSuccessCount = 0
+    let shopFailCount = 0
 
     try {
-      const channelRes = await fetch('/api/channel?kind=RETAIL&limit=100')
+      // 1) 소매밴드 채널 + 쇼핑몰 목록 동시 조회
+      const [channelRes, shopRes] = await Promise.all([
+        fetch('/api/channel?kind=RETAIL&limit=100'),
+        fetch('/api/shop?limit=100'),
+      ])
       const channelData = await channelRes.json()
+      const shopData = await shopRes.json()
       const retailChannels: { id: number }[] = channelData.success ? channelData.data : []
+      const shops: { id: number; isActive: boolean }[] = shopData.success ? (shopData.data || []) : []
+      const activeShops = shops.filter(s => s.isActive)
 
-      if (retailChannels.length === 0) {
-        toast.error('등록된 소매 채널이 없습니다. 채널 관리에서 소매채널을 추가해주세요.')
+      if (retailChannels.length === 0 && activeShops.length === 0) {
+        toast.error('등록된 소매밴드 또는 쇼핑몰이 없습니다.')
         setIsAutoPublishing(false)
         return
       }
 
+      // 2) 각 상품을 모든 소매밴드 + 모든 쇼핑몰에 동시 발행
       for (const productId of selectedProductIds) {
+        // 2-1) 소매밴드 발행 (Playwright 템플릿)
         for (const channel of retailChannels) {
           try {
             const res = await fetch('/api/publish/template/publish', {
@@ -1171,12 +1182,31 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
             })
             const data = await res.json()
             if (data.success || data.publishId) {
-              successCount++
+              bandSuccessCount++
             } else {
-              failCount++
+              bandFailCount++
             }
           } catch {
-            failCount++
+            bandFailCount++
+          }
+        }
+
+        // 2-2) 쇼핑몰 발행 (Shop별 ShopProduct 생성)
+        for (const shop of activeShops) {
+          try {
+            const res = await fetch('/api/shop/publish', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ productIds: [productId], shopId: shop.id }),
+            })
+            const data = await res.json()
+            if (data.success && data.summary?.success > 0) {
+              shopSuccessCount += data.summary.success
+            } else if (data.summary?.failed > 0) {
+              shopFailCount += data.summary.failed
+            }
+          } catch {
+            shopFailCount++
           }
         }
       }
@@ -1187,8 +1217,15 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
       setSelectedProductIds([])
       setSelectAll(false)
       loadProducts()
-      if (successCount > 0) toast.success(`${successCount}건 자동발행이 완료되었습니다.`)
-      if (failCount > 0) toast.error(`${failCount}건 발행에 실패했습니다.`)
+
+      const totalSuccess = bandSuccessCount + shopSuccessCount
+      const totalFail = bandFailCount + shopFailCount
+      if (totalSuccess > 0) {
+        toast.success(`발행 완료: 소매밴드 ${bandSuccessCount}건, 쇼핑몰 ${shopSuccessCount}건`)
+      }
+      if (totalFail > 0) {
+        toast.error(`발행 실패: 소매밴드 ${bandFailCount}건, 쇼핑몰 ${shopFailCount}건`)
+      }
     }
   }
 
@@ -1719,15 +1756,21 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
                               {product.channel?.name || '-'}
                             </p>
                             <div className="flex items-center justify-between mt-2">
-                              <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  product.isActive
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-gray-100 text-gray-800'
-                                }`}
-                              >
-                                {product.isActive ? '활성' : '비활성'}
-                              </span>
+                              {(() => {
+                                const isPublished = (product.publishedChannelIds && product.publishedChannelIds.length > 0)
+                                  || (product.publishedProducts && product.publishedProducts.length > 0)
+                                return isPublished ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                    <CheckCircle size={11} />
+                                    발행완료
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                                    <Clock size={11} />
+                                    미발행
+                                  </span>
+                                )
+                              })()}
                               <span className="text-xs text-gray-500">
                                 {new Date(product.createdAt).toLocaleDateString('ko-KR')}
                               </span>
@@ -1762,11 +1805,11 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
                           className="w-4 h-4 cursor-pointer"
                         />
                       </TableHead>
-                      <TableHead className="w-[36%]">상품명</TableHead>
-                      <TableHead className="w-[18%]">출처 채널</TableHead>
-                      <TableHead className="w-[12%]">상태</TableHead>
-                      <TableHead className="w-[18%]">생성일시</TableHead>
-                      <TableHead className="w-[12%]">작업</TableHead>
+                      <TableHead className="w-[32%]">상품명</TableHead>
+                      <TableHead className="w-[15%]">출처 채널</TableHead>
+                      <TableHead className="w-[15%]">발행상태</TableHead>
+                      <TableHead className="w-[16%]">생성일시</TableHead>
+                      <TableHead className="w-[10%]">작업</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1820,15 +1863,21 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              product.isActive
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {product.isActive ? '활성' : '비활성'}
-                          </span>
+                          {(() => {
+                            const isPublished = (product.publishedChannelIds && product.publishedChannelIds.length > 0)
+                              || (product.publishedProducts && product.publishedProducts.length > 0)
+                            return isPublished ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                <CheckCircle size={12} />
+                                발행완료
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                                <Clock size={12} />
+                                미발행
+                              </span>
+                            )
+                          })()}
                         </TableCell>
                         <TableCell>
                           <span className="text-sm text-gray-600 whitespace-nowrap">
@@ -1923,7 +1972,7 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
               <div>
                 <p className="font-semibold text-gray-900 text-sm">자동발행</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  등록된 모든 소매밴드에 자동으로 일괄 발행합니다.
+                  등록된 모든 소매밴드 + 쇼핑몰에 동시 일괄 발행합니다.
                 </p>
               </div>
             </button>
@@ -1962,7 +2011,7 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
         onClose={() => setShowAutoPublishConfirm(false)}
         onConfirm={confirmAutoPublish}
         title="자동발행 확인"
-        message={`선택한 ${selectedProductIds.length}개 상품을 등록된 모든 소매 채널에 자동으로 발행합니다.`}
+        message={`선택한 ${selectedProductIds.length}개 상품을 등록된 모든 소매밴드와 쇼핑몰에 동시 발행합니다.`}
         confirmText="발행 시작"
       />
 
