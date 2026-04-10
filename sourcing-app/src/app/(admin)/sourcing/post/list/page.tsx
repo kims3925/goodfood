@@ -109,7 +109,7 @@ export default function PostsManagePage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  const itemsPerPage = 20
+  const [itemsPerPage, setItemsPerPage] = useState<20 | 50 | 100>(20)
 
   // 게시물 선택 삭제 관련 상태
   const [selectedPostIds, setSelectedPostIds] = useState<number[]>([])
@@ -173,6 +173,19 @@ export default function PostsManagePage() {
   // 조건 설정
   const [filterDays, setFilterDays] = useState(1)
   const [filterSearch, setFilterSearch] = useState('')
+
+  // 날짜+시간 범위 (KST 기준 ISO datetime-local 형식: YYYY-MM-DDTHH:mm)
+  const getKstDateTimeLocal = (date: Date) => {
+    const kstOffset = 9 * 60 * 60 * 1000
+    const kst = new Date(date.getTime() + kstOffset)
+    return kst.toISOString().slice(0, 16) // "YYYY-MM-DDTHH:mm"
+  }
+  const [filterStartDate, setFilterStartDate] = useState(() => {
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+    return getKstDateTimeLocal(now)
+  })
+  const [filterEndDate, setFilterEndDate] = useState(() => getKstDateTimeLocal(new Date()))
 
   // 채널 목록 로드
   const loadChannels = useCallback(async () => {
@@ -266,7 +279,9 @@ export default function PostsManagePage() {
 
     try {
       const params = new URLSearchParams({ platform })
-      if (filterDays) params.set('days', filterDays.toString())
+      // 날짜+시간 범위 우선 사용
+      if (filterStartDate) params.set('startDate', filterStartDate)
+      if (filterEndDate) params.set('endDate', filterEndDate)
       if (filterSearch) params.set('search', filterSearch)
 
       const response = await fetch(`/api/post/available?${params}`)
@@ -284,7 +299,7 @@ export default function PostsManagePage() {
     } finally {
       setIsLoadingPosts(false)
     }
-  }, [filterDays, filterSearch])
+  }, [filterStartDate, filterEndDate, filterSearch])
 
   // 플랫폼 선택 핸들러
   const handlePlatformSelect = (platform: ChannelPlatform) => {
@@ -861,6 +876,31 @@ export default function PostsManagePage() {
             </div>
           </div>
         </div>
+
+        {/* 페이지 크기 선택 */}
+        {viewMode === 'collecting' && (
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm text-gray-500">상품보기</span>
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+              {([20, 50, 100] as const).map((size) => (
+                <button
+                  key={size}
+                  onClick={() => {
+                    setItemsPerPage(size)
+                    setCurrentPage(1)
+                  }}
+                  className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                    itemsPerPage === size
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {size}개
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 액션 바 (고정) */}
         <div className="bg-gray-900 rounded-2xl px-5 py-3 mb-6 flex items-center gap-3 flex-wrap">
@@ -1506,23 +1546,26 @@ export default function PostsManagePage() {
           <>
           {/* 수집 조건 설정 + 조회 */}
           <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex flex-wrap items-end gap-4">
+            <div className="flex flex-wrap items-end gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">수집 기간</label>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm text-gray-500">최근</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={30}
-                    value={filterDays}
-                    onChange={e => setFilterDays(Number(e.target.value))}
-                    className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center"
-                  />
-                  <span className="text-sm text-gray-500">일</span>
-                </div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">시작 일시 (KST)</label>
+                <input
+                  type="datetime-local"
+                  value={filterStartDate}
+                  onChange={e => setFilterStartDate(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                />
               </div>
-              <div className="flex-1 min-w-[200px]">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">종료 일시 (KST)</label>
+                <input
+                  type="datetime-local"
+                  value={filterEndDate}
+                  onChange={e => setFilterEndDate(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+              <div className="flex-1 min-w-[180px]">
                 <label className="block text-xs font-medium text-gray-600 mb-1">상품 검색 키워드</label>
                 <input
                   type="text"
@@ -1538,6 +1581,49 @@ export default function PostsManagePage() {
                 className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
               >
                 {isLoadingPosts ? '조회 중...' : '조회'}
+              </button>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const now = new Date()
+                  const todayStart = new Date(now)
+                  todayStart.setHours(0, 0, 0, 0)
+                  setFilterStartDate(getKstDateTimeLocal(todayStart))
+                  setFilterEndDate(getKstDateTimeLocal(now))
+                }}
+                className="px-2.5 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+              >
+                오늘
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const now = new Date()
+                  const yesterdayStart = new Date(now)
+                  yesterdayStart.setDate(yesterdayStart.getDate() - 1)
+                  yesterdayStart.setHours(0, 0, 0, 0)
+                  setFilterStartDate(getKstDateTimeLocal(yesterdayStart))
+                  setFilterEndDate(getKstDateTimeLocal(now))
+                }}
+                className="px-2.5 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+              >
+                어제부터
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const now = new Date()
+                  const weekAgo = new Date(now)
+                  weekAgo.setDate(weekAgo.getDate() - 7)
+                  weekAgo.setHours(0, 0, 0, 0)
+                  setFilterStartDate(getKstDateTimeLocal(weekAgo))
+                  setFilterEndDate(getKstDateTimeLocal(now))
+                }}
+                className="px-2.5 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+              >
+                최근 7일
               </button>
             </div>
           </div>

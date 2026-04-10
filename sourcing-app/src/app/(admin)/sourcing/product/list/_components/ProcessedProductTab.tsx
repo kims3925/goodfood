@@ -1601,6 +1601,29 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
           )}
           <button
             onClick={() => {
+              // 미발행 상품(channelProducts/shopProducts 없음)만 전체 선택
+              const unpublishedIds = products
+                .filter(p => {
+                  const isPublished = (p.publishedChannelIds && p.publishedChannelIds.length > 0)
+                    || (p.publishedProducts && p.publishedProducts.length > 0)
+                  return !isPublished
+                })
+                .map(p => p.id)
+              if (unpublishedIds.length === 0) {
+                toast.info('현재 페이지에 미발행 상품이 없습니다.')
+                return
+              }
+              setSelectedProductIds(unpublishedIds)
+              setSelectAll(unpublishedIds.length === products.length)
+              toast.success(`미발행 상품 ${unpublishedIds.length}개 선택됨`)
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white transition-colors"
+          >
+            <Clock size={15} />
+            미발행선택
+          </button>
+          <button
+            onClick={() => {
               if (selectedProductIds.length === 0) { toast.error('먼저 상품을 선택해주세요.'); return }
               handleDeleteSelected()
             }}

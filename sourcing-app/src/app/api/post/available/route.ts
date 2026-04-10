@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
     const todayOnly = searchParams.get('todayOnly') === 'true'
     const daysParam = searchParams.get('days')
     const searchQuery = searchParams.get('search') || ''
+    const startDateParam = searchParams.get('startDate') // ISO 형식 (예: 2026-04-10T00:00:00)
+    const endDateParam = searchParams.get('endDate')
     const days = daysParam ? parseInt(daysParam) : (todayOnly ? 1 : 0)
 
     // 현재 BAND만 지원
@@ -157,8 +159,23 @@ export async function GET(request: NextRequest) {
 
     const totalAvailable = filteredPosts.length
 
-    // 기간 필터링 (days 파라미터 또는 todayOnly)
-    if (days > 0) {
+    // 날짜+시간 범위 필터링 (startDate/endDate 우선, 없으면 days)
+    if (startDateParam || endDateParam) {
+      // KST 기준 ISO 문자열을 UTC ms로 변환
+      // 클라이언트가 "2026-04-10T00:00" 형식으로 보내면 KST 시간으로 해석
+      const kstOffset = 9 * 60 * 60 * 1000
+      const startMs = startDateParam ? new Date(startDateParam).getTime() - kstOffset : 0
+      const endMs = endDateParam ? new Date(endDateParam).getTime() - kstOffset : Number.MAX_SAFE_INTEGER
+
+      filteredPosts = filteredPosts.filter((post) => {
+        if (!post.created_at) return false
+        const postTime = post.created_at
+        const postTimeMs = postTime > 9999999999999 ? postTime : (postTime > 9999999999 ? postTime : postTime * 1000)
+        return postTimeMs >= startMs && postTimeMs <= endMs
+      })
+
+      console.log(`[Post Available] 전체: ${totalAvailable}개, 범위 필터: ${filteredPosts.length}개 (${startDateParam ?? '제한없음'} ~ ${endDateParam ?? '제한없음'})`)
+    } else if (days > 0) {
       const kstOffset = 9 * 60 * 60 * 1000
       const now = new Date()
       const kstNow = new Date(now.getTime() + kstOffset)

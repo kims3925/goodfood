@@ -95,7 +95,7 @@ export default function UnifiedOrderListPage() {
 
   const router = useRouter()
 
-  const itemsPerPage = 10
+  const [itemsPerPage, setItemsPerPage] = useState<20 | 50 | 100>(20)
 
   // Shop 목록 로드
   useEffect(() => {
@@ -146,7 +146,7 @@ export default function UnifiedOrderListPage() {
       setLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- toast는 useMemo로 메모이제이션되어 안정적
-  }, [page, search, selectedShopId, statusFilter])
+  }, [page, search, selectedShopId, statusFilter, itemsPerPage])
 
   useEffect(() => {
     fetchOrders()
@@ -459,6 +459,28 @@ export default function UnifiedOrderListPage() {
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   className="pl-10"
                 />
+              </div>
+              {/* 페이지 크기 선택 */}
+              <div className="flex items-center gap-2 sm:ml-auto">
+                <span className="text-sm text-gray-500">상품보기</span>
+                <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                  {([20, 50, 100] as const).map((size) => (
+                    <button
+                      key={size}
+                      onClick={() => {
+                        setItemsPerPage(size)
+                        setPage(1)
+                      }}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        itemsPerPage === size
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {size}개
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
