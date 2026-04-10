@@ -2,95 +2,98 @@ name: CI / Deploy
 
 on:
   pull_request:
-      branches: [main]
-        push:
-            branches: [main]
-              workflow_dispatch:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
 
-              jobs:
-                ci:
-                    name: Lint & Typecheck & Build
-                        runs-on: ubuntu-latest
+jobs:
+  ci:
+    name: Lint & Typecheck & Build
+    runs-on: ubuntu-latest
 
-                            steps:
-                                  - name: Checkout
-                                          uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-                                                - name: Setup pnpm
-                                                        uses: pnpm/action-setup@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
-                                                              - name: Setup Node.js
-                                                                      uses: actions/setup-node@v4
-                                                                              with:
-                                                                                        node-version: "20"
-                                                                                                  cache: "pnpm"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
 
-                                                                                                        - name: Install dependencies
-                                                                                                                run: pnpm install --frozen-lockfile
-                                                                                                                
-                                                                                                                      - name: Lint
-                                                                                                                              run: pnpm run lint
-                                                                                                                              
-                                                                                                                                    - name: Typecheck (shop-app)
-                                                                                                                                            run: pnpm run typecheck:shop
-                                                                                                                                            
-                                                                                                                                                  - name: Build shop-app
-                                                                                                                                                          run: pnpm run build:shop
-                                                                                                                                                                  env:
-                                                                                                                                                                            NEXTAUTH_SECRET: ci-dummy-secret
-                                                                                                                                                                                      GUEST_TOKEN_SECRET: ci-dummy-secret
-                                                                                                                                                                                      
-                                                                                                                                                                                            - name: Build sourcing-app
-                                                                                                                                                                                                    run: pnpm run build:sourcing
-                                                                                                                                                                                                            env:
-                                                                                                                                                                                                                      NEXTAUTH_SECRET: ci-dummy-secret
-                                                                                                                                                                                                                                JWT_SECRET: ci-dummy-secret
-                                                                                                                                                                                                                                
-                                                                                                                                                                                                                                  deploy:
-                                                                                                                                                                                                                                      name: Deploy to EC2
-                                                                                                                                                                                                                                          needs: ci
-                                                                                                                                                                                                                                              if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-                                                                                                                                                                                                                                                  runs-on: ubuntu-latest
-                                                                                                                                                                                                                                                  
-                                                                                                                                                                                                                                                      steps:
-                                                                                                                                                                                                                                                            - name: Deploy via SSH
-                                                                                                                                                                                                                                                                    uses: appleboy/ssh-action@v1.0.3
-                                                                                                                                                                                                                                                                            with:
-                                                                                                                                                                                                                                                                                      host: ${{ secrets.EC2_HOST }}
-                                                                                                                                                                                                                                                                                                username: ${{ secrets.EC2_USER }}
-                                                                                                                                                                                                                                                                                                          key: ${{ secrets.EC2_SSH_KEY }}
-                                                                                                                                                                                                                                                                                                                    script_stop: true
-                                                                                                                                                                                                                                                                                                                              script: |
-                                                                                                                                                                                                                                                                                                                                          cd ~/bandauto
-                                                                                                                                                                                                                                                                                                                                          
-                                                                                                                                                                                                                                                                                                                                                      # GitHub PAT로 인증하여 최신 코드 가져오기
-                                                                                                                                                                                                                                                                                                                                                                  GHCR_TOKEN="${{ secrets.GHCR_PAT }}"
-                                                                                                                                                                                                                                                                                                                                                                              git remote set-url origin "https://x-access-token:${GHCR_TOKEN}@github.com/ABC-Group-Tech/bandauto.git"
-                                                                                                                                                                                                                                                                                                                                                                                          # 서버 로컬 변경사항 강제 초기화 후 최신 코드 pull
-                                                                                                                                                                                                                                                                                                                                                                                                      git fetch origin main
-                                                                                                                                                                                                                                                                                                                                                                                                                  git reset --hard origin/main
-                                                                                                                                                                                                                                                                                                                                                                                                                              git clean -fd
-                                                                                                                                                                                                                                                                                                                                                                                                                                          # 보안: pull 후 토큰 제거
-                                                                                                                                                                                                                                                                                                                                                                                                                                                      git remote set-url origin "https://github.com/ABC-Group-Tech/bandauto.git"
-                                                                                                                                                                                                                                                                                                                                                                                                                                                      
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                  # Docker 이미지 빌드 (캐시 없이)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                              docker compose build --no-cache
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          # 컨테이너 강제 재생성 & 시작
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      docker compose up -d --force-recreate
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  # 컨테이너 정상 기동 대기 (10초)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              sleep 10
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          # Prisma 스키마 동기화 (db push: 새 컬럼 추가 등 스키마 변경 자동 적용)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      docker compose exec -T sourcing-app sh -c "cd /app/db && npx prisma@6 db push --schema prisma" || true
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  # 직접 SQL 마이그레이션 (prisma db push 실패 시 백업)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              set -a && source ~/bandauto/.env && set +a
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          docker compose exec -T mariadb mysql -u"${DB_USER:-banduser}" -p"${DB_PASSWORD}" "${DB_NAME:-sourcing_db}" -e "ALTER TABLE guest_order_item ADD COLUMN IF NOT EXISTS is_custom_item TINYINT(1) NOT NULL DEFAULT 0; ALTER TABLE guest_order_item MODIFY COLUMN shop_product_id INT NULL;" && echo "SQL migration applied" || echo "SQL migration skipped"
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      # 상태 확인
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  docker compose ps
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              # 배포 완료 로그
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          echo "Deploy completed at $(date '+%Y-%m-%d %H:%M:%S %Z')"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Typecheck (shop-app)
+        run: pnpm run typecheck:shop
+
+      - name: Build shop-app
+        run: pnpm run build:shop
+        env:
+          NEXTAUTH_SECRET: ci-dummy-secret
+          GUEST_TOKEN_SECRET: ci-dummy-secret
+
+      - name: Build sourcing-app
+        run: pnpm run build:sourcing
+        env:
+          NEXTAUTH_SECRET: ci-dummy-secret
+          JWT_SECRET: ci-dummy-secret
+
+  deploy:
+    name: Deploy to EC2
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          script: |
+            cd ~/bandauto
+
+            # GitHub PAT로 인증하여 최신 코드 가져오기
+            GHCR_TOKEN="${{ secrets.GHCR_PAT }}"
+            git remote set-url origin "https://x-access-token:${GHCR_TOKEN}@github.com/ABC-Group-Tech/bandauto.git"
+            # 서버 로컬 변경사항 강제 초기화 후 최신 코드 pull
+            git fetch origin main
+            git reset --hard origin/main
+            git clean -fd
+            # 보안: pull 후 토큰 제거
+            git remote set-url origin "https://github.com/ABC-Group-Tech/bandauto.git"
+
+            # Docker 이미지 빌드 (캐시 없이)
+            docker compose build --no-cache
+
+            # 컨테이너 강제 재생성 & 시작
+            docker compose up -d --force-recreate
+
+            # 컨테이너 정상 기동 대기 (10초)
+            sleep 10
+
+            # Prisma 스키마 동기화 (db push: 새 컬럼 추가 등 스키마 변경 자동 적용)
+            docker compose exec -T sourcing-app sh -c "cd /app/db && npx prisma@6 db push --schema prisma" || true
+
+            # 직접 SQL 마이그레이션 (prisma db push 실패 시 백업)
+            set -a && source ~/bandauto/.env && set +a
+            docker compose exec -T mariadb mysql -u"${DB_USER:-banduser}" -p"${DB_PASSWORD}" "${DB_NAME:-sourcing_db}" -e "
+              ALTER TABLE guest_order_item ADD COLUMN IF NOT EXISTS is_custom_item TINYINT(1) NOT NULL DEFAULT 0;
+              ALTER TABLE guest_order_item MODIFY COLUMN shop_product_id INT NULL;
+            " && echo "SQL migration applied" || echo "SQL migration skipped (columns may already exist)"
+
+            # 상태 확인
+            docker compose ps
+
+            # 배포 완료 로그
+            echo "Deploy completed at $(date '+%Y-%m-%d %H:%M:%S %Z')"
