@@ -17,11 +17,10 @@ interface CreateExternalOrderRequest {
     addressDetail?: string
     deliveryMemo?: string
   }
-  items: Array<{
-    shopProductId: number
-    variantId?: number
-    quantity: number
-  }>
+  items: Array<
+    | { isCustom?: false; shopProductId: number; variantId?: number; quantity: number }
+    | { isCustom: true; customProductName: string; customUnitPrice: number; quantity: number }
+  >
   memo?: string
   customTotalAmount?: number
 }
@@ -111,30 +110,44 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
 
-      // shopProductId 검증: 필수, 양의 정수
-      if (!Number.isInteger(item.shopProductId) || item.shopProductId <= 0) {
-        return NextResponse.json(
-          { success: false, error: `잘못된 주문 항목: ${i + 1}번째 상품의 shopProductId가 유효하지 않습니다.` },
-          { status: 400 }
-        )
-      }
-
-      // variantId 검증: optional이지만 있으면 양의 정수
-      if (item.variantId !== undefined && item.variantId !== null) {
-        if (!Number.isInteger(item.variantId) || item.variantId <= 0) {
-          return NextResponse.json(
-            { success: false, error: `잘못된 주문 항목: ${i + 1}번째 상품의 variantId가 유효하지 않습니다.` },
-            { status: 400 }
-          )
-        }
-      }
-
-      // quantity 검증: 양의 정수
+      // quantity 검증: 공통 (양의 정수)
       if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
         return NextResponse.json(
           { success: false, error: `잘못된 주문 항목: ${i + 1}번째 상품의 수량이 유효하지 않습니다.` },
           { status: 400 }
         )
+      }
+
+      if (item.isCustom) {
+        // 커스텀 상품 검증
+        if (!item.customProductName?.trim()) {
+          return NextResponse.json(
+            { success: false, error: `잘못된 주문 항목: ${i + 1}번째 커스텀 상품의 상품명이 없습니다.` },
+            { status: 400 }
+          )
+        }
+        if (!Number.isFinite(item.customUnitPrice) || item.customUnitPrice < 0) {
+          return NextResponse.json(
+            { success: false, error: `잘못된 주문 항목: ${i + 1}번째 커스텀 상품의 가격이 유효하지 않습니다.` },
+            { status: 400 }
+          )
+        }
+      } else {
+        // 일반 상품 검증
+        if (!Number.isInteger(item.shopProductId) || item.shopProductId <= 0) {
+          return NextResponse.json(
+            { success: false, error: `잘못된 주문 항목: ${i + 1}번째 상품의 shopProductId가 유효하지 않습니다.` },
+            { status: 400 }
+          )
+        }
+        if (item.variantId !== undefined && item.variantId !== null) {
+          if (!Number.isInteger(item.variantId) || item.variantId <= 0) {
+            return NextResponse.json(
+              { success: false, error: `잘못된 주문 항목: ${i + 1}번째 상품의 variantId가 유효하지 않습니다.` },
+              { status: 400 }
+            )
+          }
+        }
       }
     }
 

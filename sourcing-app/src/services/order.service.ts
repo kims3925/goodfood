@@ -19,11 +19,20 @@ interface CreateExternalOrderParams {
     addressDetail?: string
     deliveryMemo?: string
   }
-  items: Array<{
-    shopProductId: number
-    variantId?: number
-    quantity: number
-  }>
+  items: Array<
+    | {
+        isCustom?: false
+        shopProductId: number
+        variantId?: number
+        quantity: number
+      }
+    | {
+        isCustom: true
+        customProductName: string
+        customUnitPrice: number
+        quantity: number
+      }
+  >
   memo?: string // 외부 주문 메모
   customTotalAmount?: number // 수동 입력 결제금액 (할인/협의 가격)
 }
@@ -61,40 +70,32 @@ export const orderService = {
         throw new Error('유효하지 않은 쇼핑몰입니다.')
       }
 
-      // 2. Fetch ShopProducts (without product include)
-      const shopProductIds = items.map(i => i.shopProductId)
-      const shopProducts = await tx.shopProduct.findMany({
-        where: {
-          id: { in: shopProductIds },
-          userId,
-          deletedAt: null,
-        },
-      })
+      // 2. 일반 상품 / 커스텀 상품 분리
+      const regularItems = items.filter((i): i is Extract<typeof i, { isCustom?: false }> => !i.isCustom)
+      const customItems = items.filter((i): i is Extract<typeof i, { isCustom: true }> => i.isCustom === true)
 
-      // 3. Fetch Products with soft-delete and active filter
+      // 3. Fetch ShopProducts (일반 상품만)
+      const shopProductIds = regularItems.map(i => i.shopProductId)
+      const shopProducts = shopProductIds.length > 0
+        ? await tx.shopProduct.findMany({
+            where: { id: { in: shopProductIds }, userId, deletedAt: null },
+          })
+        : []
+
+      // 4. Fetch Products with soft-delete and active filter
       const productIds = shopProducts
         .map(sp => sp.productId)
         .filter((id): id is number => id != null)
 
-      const products = await tx.product.findMany({
-        where: {
-          id: { in: productIds },
-          deletedAt: null,
-          isActive: true,
-        },
-        include: {
-          variants: {
-            where: {
-              deletedAt: null,
-            },
-          },
-        },
-      })
+      const products = productIds.length > 0
+        ? await tx.product.findMany({
+            where: { id: { in: productIds }, deletedAt: null, isActive: true },
+            include: { variants: { where: { deletedAt: null } } },
+          })
+        : []
 
-      // 4. Build productMap for quick lookup
+      // 5. Build lookup maps
       const productMap = new Map(products.map(p => [p.id, p]))
-
-      // 5. Build shopProductMap with filtered product attached
       const shopProductMap = new Map(
         shopProducts.map(sp => {
           const product = sp.productId ? productMap.get(sp.productId) : null
@@ -103,17 +104,27 @@ export const orderService = {
       )
 
       // 6. Process Items & Calculate Totals
-      const orderItemsData = []
+      const orderItemsData: Array<{
+        shopProductId: number | null
+        variantId: number | null
+        productName: string
+        optionSummary: string | null
+        thumbnailUrl: string | null
+        isCustomItem: boolean
+        quantity: number
+        unitPrice: Prisma.Decimal
+        totalPrice: Prisma.Decimal
+      }> = []
       let subtotal = new Decimal(0)
 
-      for (const item of items) {
+      // 6-A. 일반 상품 처리
+      for (const item of regularItems) {
         const shopProduct = shopProductMap.get(item.shopProductId)
 
         if (!shopProduct || !shopProduct.product) {
           throw new Error(`상품을 찾을 수 없습니다. (ID: ${item.shopProductId})`)
         }
 
-        // quantity 검증: 1 이상의 정수여야 함
         if (!Number.isInteger(item.quantity) || item.quantity < 1) {
           throw new Error(`유효하지 않은 수량입니다. (수량: ${item.quantity}, 상품ID: ${item.shopProductId})`)
         }
@@ -121,60 +132,74 @@ export const orderService = {
 
         const product = shopProduct.product
         let variant = null
-        let basePrice: number // 소매가 (배송비 제외)
-        let unitPrice: Prisma.Decimal // 판매가 (배송비 포함 가능)
+        let basePrice: number
+        let unitPrice: Prisma.Decimal
 
-        // 옵션(variant) 처리
         if (item.variantId) {
           variant = product.variants.find(v => v.id === item.variantId)
           if (!variant) {
             throw new Error(`유효하지 않은 상품 옵션입니다. (variantId: ${item.variantId})`)
           }
-          // variant.price가 null/undefined인 경우 product.price로 fallback
           if (variant.price == null) {
             if (product.price == null) {
               throw new Error(`상품 가격이 설정되지 않았습니다. (옵션: ${variant.optionSummary || item.variantId}, 상품: ${product.name})`)
             }
-            console.warn(`[External Order] variant.price가 없습니다. product.price로 대체합니다. (variantId: ${item.variantId})`)
             basePrice = product.price
           } else {
             basePrice = variant.price
           }
         } else if (product.variants.length > 0) {
-          // 옵션이 있는 상품인데 옵션을 선택하지 않은 경우 에러
           throw new Error(`상품 옵션을 선택해주세요. (상품: ${product.name})`)
         } else {
-          // 옵션이 없는 상품: product.price 사용
           if (product.price == null) {
             throw new Error(`상품 가격이 설정되지 않았습니다. (상품: ${product.name})`)
           }
           basePrice = product.price
         }
 
-        // 배송비를 포함한 판매가 계산
         const shippingFee = product.shippingFee || 0
         const bundleShippingType = product.bundleShippingType as BundleShippingType
         const sellingPrice = calculateSellingPrice(basePrice, shippingFee, bundleShippingType)
         unitPrice = new Decimal(sellingPrice)
 
-        // 합배송 규칙 적용: SEPARATE 타입은 배송비를 1회만 부과
         let totalPrice: Prisma.Decimal
         if (bundleShippingType === 'INCLUDED') {
-          // 배송비 포함 상품: unitPrice * quantity
           totalPrice = unitPrice.mul(quantity)
         } else {
-          // 배송비 별도 상품: (basePrice * quantity) + shippingFee (1회만)
           totalPrice = new Decimal(basePrice).mul(quantity).add(shippingFee)
         }
 
         subtotal = subtotal.add(totalPrice)
-
         orderItemsData.push({
           shopProductId: shopProduct.id,
           variantId: variant?.id || null,
           productName: product.name,
           optionSummary: variant?.optionSummary || null,
           thumbnailUrl: product.thumbnailUrl,
+          isCustomItem: false,
+          quantity,
+          unitPrice,
+          totalPrice,
+        })
+      }
+
+      // 6-B. 커스텀 상품 처리 (카탈로그 미등록 상품 직접 입력)
+      for (const item of customItems) {
+        if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+          throw new Error(`유효하지 않은 수량입니다. (수량: ${item.quantity}, 상품: ${item.customProductName})`)
+        }
+        const quantity = item.quantity
+        const unitPrice = new Decimal(item.customUnitPrice)
+        const totalPrice = unitPrice.mul(quantity)
+
+        subtotal = subtotal.add(totalPrice)
+        orderItemsData.push({
+          shopProductId: null,
+          variantId: null,
+          productName: item.customProductName,
+          optionSummary: null,
+          thumbnailUrl: null,
+          isCustomItem: true,
           quantity,
           unitPrice,
           totalPrice,

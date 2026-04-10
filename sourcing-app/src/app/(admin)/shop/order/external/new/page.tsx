@@ -54,7 +54,7 @@ interface ShopProduct {
 }
 
 interface OrderItem {
-  shopProductId: number
+  shopProductId: number   // 커스텀 상품이면 0
   variantId: number | null
   quantity: number
   productName: string
@@ -63,6 +63,7 @@ interface OrderItem {
   shippingFee: number
   bundleShippingType: BundleShippingType
   thumbnailUrl: string | null
+  isCustom?: boolean  // 카탈로그 미등록 직접 입력 상품
 }
 
 export default function ExternalOrderNewPage() {
@@ -102,6 +103,12 @@ export default function ExternalOrderNewPage() {
 
   // 옵션 선택 모드 (열린 상품 ID)
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null)
+
+  // 커스텀 상품 직접 입력 상태
+  const [showCustomInput, setShowCustomInput] = useState(false)
+  const [customItemName, setCustomItemName] = useState('')
+  const [customItemPrice, setCustomItemPrice] = useState('')
+  const [customItemQty, setCustomItemQty] = useState('1')
 
   // 제출 상태
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -269,6 +276,32 @@ export default function ExternalOrderNewPage() {
     setOrderItems(prev => prev.filter((_, i) => i !== index))
   }
 
+  // 커스텀 상품 추가
+  const handleAddCustomItem = () => {
+    const name = customItemName.trim()
+    const price = parseInt(customItemPrice.replace(/,/g, ''), 10)
+    const qty = parseInt(customItemQty, 10)
+    if (!name || isNaN(price) || price < 0 || isNaN(qty) || qty < 1) return
+
+    const newItem: OrderItem = {
+      shopProductId: 0,
+      variantId: null,
+      quantity: qty,
+      productName: name,
+      optionSummary: '',
+      basePrice: price,
+      shippingFee: 0,
+      bundleShippingType: 'INCLUDED',
+      thumbnailUrl: null,
+      isCustom: true,
+    }
+    setOrderItems(prev => [...prev, newItem])
+    setCustomItemName('')
+    setCustomItemPrice('')
+    setCustomItemQty('1')
+    setShowCustomInput(false)
+  }
+
   // 합배송 적용 합계 계산
   // 자동 계산된 합계
   const calculateAutoTotal = () => {
@@ -333,11 +366,20 @@ export default function ExternalOrderNewPage() {
             addressDetail: addressDetail.trim() || undefined,
             deliveryMemo: deliveryMemo.trim() || undefined,
           },
-          items: orderItems.map((item) => ({
-            shopProductId: item.shopProductId,
-            variantId: item.variantId || undefined,
-            quantity: item.quantity,
-          })),
+          items: orderItems.map((item) =>
+            item.isCustom
+              ? {
+                  isCustom: true as const,
+                  customProductName: item.productName,
+                  customUnitPrice: item.basePrice,
+                  quantity: item.quantity,
+                }
+              : {
+                  shopProductId: item.shopProductId,
+                  variantId: item.variantId || undefined,
+                  quantity: item.quantity,
+                }
+          ),
           memo: memo.trim() || undefined,
           customTotalAmount: customTotalAmount !== null ? customTotalAmount : undefined,
         }),
@@ -703,6 +745,64 @@ export default function ExternalOrderNewPage() {
                       })}
                     </div>
                   )}
+                  {/* 직접 입력 버튼 / 폼 */}
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    {!showCustomInput ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomInput(true)}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 border-dashed border-amber-400 text-amber-600 hover:bg-amber-50 transition-colors text-sm font-medium"
+                      >
+                        <Plus size={16} />
+                        카탈로그에 없는 상품 직접 입력
+                      </button>
+                    ) : (
+                      <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 space-y-3">
+                        <p className="text-sm font-semibold text-amber-800">상품 직접 입력</p>
+                        <Input
+                          placeholder="상품명 (예: 신안 곱창돌김 1톳)"
+                          value={customItemName}
+                          onChange={(e) => setCustomItemName(e.target.value)}
+                        />
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            placeholder="단가 (원)"
+                            value={customItemPrice}
+                            onChange={(e) => setCustomItemPrice(e.target.value)}
+                            className="flex-1"
+                          />
+                          <Input
+                            type="number"
+                            placeholder="수량"
+                            value={customItemQty}
+                            onChange={(e) => setCustomItemQty(e.target.value)}
+                            className="w-20"
+                            min={1}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="primary"
+                            onClick={handleAddCustomItem}
+                            disabled={!customItemName.trim() || !customItemPrice}
+                            className="flex-1"
+                          >
+                            <Plus size={16} />
+                            추가
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => { setShowCustomInput(false); setCustomItemName(''); setCustomItemPrice(''); setCustomItemQty('1') }}
+                          >
+                            취소
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
             </div>
@@ -728,8 +828,8 @@ export default function ExternalOrderNewPage() {
                 <div className="space-y-3">
                   {orderItems.map((item, index) => (
                     <div
-                      key={`${item.shopProductId}-${item.variantId}`}
-                      className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 border border-gray-200"
+                      key={item.isCustom ? `custom-${index}-${item.productName}` : `${item.shopProductId}-${item.variantId}`}
+                      className={`flex items-center gap-4 p-3 rounded-lg border ${item.isCustom ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}
                     >
                       {/* 썸네일 */}
                       <div className="w-14 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200">
@@ -748,7 +848,12 @@ export default function ExternalOrderNewPage() {
 
                       {/* 상품 정보 */}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 truncate">{item.productName}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-medium text-gray-900 truncate">{item.productName}</p>
+                          {item.isCustom && (
+                            <span className="flex-shrink-0 text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">직접입력</span>
+                          )}
+                        </div>
                         {item.optionSummary && (
                           <p className="text-sm text-gray-500">{item.optionSummary}</p>
                         )}
