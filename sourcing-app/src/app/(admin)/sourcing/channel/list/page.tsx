@@ -273,15 +273,53 @@ function ChannelListContent() {
     return platformMap[platform] || platform
   }
 
-  const getStatusBadge = (isActive: boolean) => {
-    return isActive ? (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-        활성
-      </span>
-    ) : (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-        비활성
-      </span>
+  // 활성/비활성 토글 핸들러
+  const handleToggleActive = async (channelId: number, currentActive: boolean, e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      const response = await fetch(`/api/channel/${channelId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !currentActive }),
+      })
+      const data = await response.json()
+      if (data.success) {
+        setChannels((prev) =>
+          prev.map((c) => (c.id === channelId ? { ...c, isActive: !currentActive } : c))
+        )
+        toast.success(`채널이 ${!currentActive ? '활성화' : '비활성화'}되었습니다.`)
+      } else {
+        toast.error(data.error || '상태 변경에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('채널 상태 변경 실패:', error)
+      toast.error('상태 변경 중 오류가 발생했습니다.')
+    }
+  }
+
+  const getStatusToggle = (channelId: number, isActive: boolean) => {
+    return (
+      <button
+        type="button"
+        onClick={(e) => handleToggleActive(channelId, isActive, e)}
+        className={`relative inline-flex items-center gap-2 cursor-pointer ${
+          isActive ? 'text-green-700' : 'text-gray-500'
+        }`}
+        title={isActive ? '클릭하여 비활성화' : '클릭하여 활성화'}
+      >
+        <span
+          className={`relative inline-block w-9 h-5 rounded-full transition-colors ${
+            isActive ? 'bg-green-500' : 'bg-gray-300'
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${
+              isActive ? 'translate-x-4' : 'translate-x-0'
+            }`}
+          />
+        </span>
+        <span className="text-xs font-medium">{isActive ? '활성' : '비활성'}</span>
+      </button>
     )
   }
 
@@ -582,7 +620,7 @@ function ChannelListContent() {
                           <span className="text-gray-600">{getPlatformLabel(channel.platform)}</span>
                         </TableCell>
                         <TableCell>{getKindBadge(channel.kind)}</TableCell>
-                        <TableCell>{getStatusBadge(channel.isActive)}</TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>{getStatusToggle(channel.id, channel.isActive)}</TableCell>
                         <TableCell>
                           <span className="text-sm text-gray-600">
                             {formatDateTimeKST(channel.createdAt)}
@@ -655,9 +693,9 @@ function ChannelListContent() {
 
                       {/* 정보 */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1" onClick={(e) => e.stopPropagation()}>
                           <span className="font-semibold text-gray-900 truncate">{channel.name}</span>
-                          {getStatusBadge(channel.isActive)}
+                          {getStatusToggle(channel.id, channel.isActive)}
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
                           {getKindBadge(channel.kind)}

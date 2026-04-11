@@ -481,23 +481,44 @@ export default function ChannelDetailPage({
                       <p className="text-sm text-slate-500">채널의 기본 정보와 설정을 관리합니다</p>
                     </div>
                   </div>
-                  {/* 활성화 토글 */}
-                  {isEditMode ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsActive(!isActive)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all shadow-sm ${
-                        isActive
-                          ? 'bg-emerald-500 text-white hover:bg-emerald-600'
-                          : 'bg-slate-400 text-white hover:bg-slate-500'
-                      }`}
-                    >
-                      <Power size={16} />
-                      {isActive ? '활성' : '비활성'}
-                    </button>
-                  ) : (
-                    getStatusBadge(channel.isActive)
-                  )}
+                  {/* 활성화 토글 (조회/편집 모드 모두 작동) */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const next = !isActive
+                      setIsActive(next)
+                      // 조회 모드에서는 즉시 서버 저장
+                      if (!isEditMode && channel) {
+                        try {
+                          const response = await fetch(`/api/channel/${channel.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ isActive: next }),
+                          })
+                          const data = await response.json()
+                          if (data.success) {
+                            setChannel({ ...channel, isActive: next })
+                            toast.success(`채널이 ${next ? '활성화' : '비활성화'}되었습니다.`)
+                          } else {
+                            setIsActive(!next) // 롤백
+                            toast.error(data.error || '상태 변경에 실패했습니다.')
+                          }
+                        } catch {
+                          setIsActive(!next) // 롤백
+                          toast.error('상태 변경 중 오류가 발생했습니다.')
+                        }
+                      }
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all shadow-sm ${
+                      isActive
+                        ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                        : 'bg-slate-400 text-white hover:bg-slate-500'
+                    }`}
+                    title={isActive ? '클릭하여 비활성화' : '클릭하여 활성화'}
+                  >
+                    <Power size={16} />
+                    {isActive ? '활성' : '비활성'}
+                  </button>
                 </div>
               </div>
 
