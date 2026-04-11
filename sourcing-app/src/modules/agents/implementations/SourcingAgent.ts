@@ -226,13 +226,35 @@ export class SourcingAgent extends AgentBase {
 
     stats.totalChannels = channels.length
 
-    // 자동 소싱: 각 도매 채널당 최대 20개로 제한
+    // 자동 소싱: AutomationConfig에서 전체 기본값 + 채널별 오버라이드 읽기
     // (수동 호출은 collectFromChannel 직접 호출 시 limit 파라미터 지정으로 무제한 가능)
-    const AUTO_PER_CHANNEL_LIMIT = 20
+    let defaultLimit = 20
+    let limitByChannel: Record<number, number> = {}
+    try {
+      const firstUserId = channels[0]?.userId
+      if (firstUserId) {
+        const automationConfig = await prisma.automationConfig.findUnique({
+          where: { userId: firstUserId },
+        })
+        if (automationConfig) {
+          defaultLimit = (automationConfig as any).collectionLimit ?? 20
+          const byChannelStr = (automationConfig as any).collectionLimitByChannel
+          if (byChannelStr) {
+            try {
+              limitByChannel = JSON.parse(byChannelStr)
+            } catch { limitByChannel = {} }
+          }
+        }
+      }
+    } catch (err) {
+      await this.log('WARN', `AutomationConfig 로드 실패, 기본값 ${defaultLimit} 사용`)
+    }
 
     for (const channel of channels) {
       try {
-        const result = await this.collectFromChannel(channel.id, AUTO_PER_CHANNEL_LIMIT, channel.userId ?? undefined)
+        // 채널별 오버라이드 우선, 없으면 전체 기본값
+        const channelLimit = limitByChannel[channel.id] ?? defaultLimit
+        const result = await this.collectFromChannel(channel.id, channelLimit, channel.userId ?? undefined)
 
         if (result.success) {
           stats.successCount++

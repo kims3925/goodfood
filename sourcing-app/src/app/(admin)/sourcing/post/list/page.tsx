@@ -187,6 +187,9 @@ export default function PostsManagePage() {
   })
   const [filterEndDate, setFilterEndDate] = useState(() => getKstDateTimeLocal(new Date()))
 
+  // 채널별 소싱 개수 (수동 소싱 시)
+  const [channelSourcingLimits, setChannelSourcingLimits] = useState<Record<string, number>>({})
+
   // 채널 목록 로드
   const loadChannels = useCallback(async () => {
     try {
@@ -1684,7 +1687,7 @@ export default function PostsManagePage() {
                   return (
                     <div key={channelKey} className="border rounded-lg bg-white">
                       {/* 채널 헤더 */}
-                      <div className="p-4 bg-gray-50 border-b flex items-center gap-3">
+                      <div className="p-4 bg-gray-50 border-b flex items-center gap-3 flex-wrap">
                         <input
                           type="checkbox"
                           checked={allChannelSelected}
@@ -1699,14 +1702,14 @@ export default function PostsManagePage() {
                           className="w-5 h-5 cursor-pointer"
                         />
                         <div
-                          className="flex-1 flex items-center justify-between cursor-pointer hover:bg-gray-100 rounded -m-1 p-1 transition-colors"
+                          className="flex-1 min-w-0 flex items-center justify-between cursor-pointer hover:bg-gray-100 rounded -m-1 p-1 transition-colors"
                           onClick={() => handleToggleChannelExpand(channelKey)}
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
                             {isChannelExpanded ? (
-                              <ChevronDown size={22} className="text-gray-600" />
+                              <ChevronDown size={22} className="text-gray-600 flex-shrink-0" />
                             ) : (
-                              <ChevronRight size={22} className="text-gray-600" />
+                              <ChevronRight size={22} className="text-gray-600 flex-shrink-0" />
                             )}
                             {group.channel.coverUrl ? (
                               <img
@@ -1719,11 +1722,57 @@ export default function PostsManagePage() {
                                 <Store size={20} className="text-gray-400" />
                               </div>
                             )}
-                            <h3 className="font-semibold text-gray-900 text-base">{group.channel.name}</h3>
-                            <span className="text-sm text-gray-500">
+                            <h3 className="font-semibold text-gray-900 text-base truncate">{group.channel.name}</h3>
+                            <span className="text-sm text-gray-500 flex-shrink-0">
                               ({selectedInChannel > 0 ? `${selectedInChannel}/` : ''}{group.posts.length}개)
                             </span>
                           </div>
+                        </div>
+                        {/* 채널별 소싱 개수 입력 + 빠른 선택 */}
+                        <div
+                          className="flex items-center gap-1.5 flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <label className="text-xs text-gray-500">소싱</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={group.posts.length || 100}
+                            value={channelSourcingLimits[channelKey] ?? ''}
+                            placeholder="전체"
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value, 10)
+                              setChannelSourcingLimits(prev => {
+                                const next = { ...prev }
+                                if (isNaN(v) || v <= 0) {
+                                  delete next[channelKey]
+                                } else {
+                                  next[channelKey] = v
+                                }
+                                return next
+                              })
+                            }}
+                            className="w-14 px-2 py-1 border border-gray-300 rounded text-sm text-center bg-white"
+                          />
+                          <span className="text-xs text-gray-500">개</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const limit = channelSourcingLimits[channelKey]
+                              const n = typeof limit === 'number' && limit > 0 ? limit : channelPostKeys.length
+                              const keysToSelect = channelPostKeys.slice(0, n)
+                              // 다른 채널 선택은 유지, 현재 채널만 치환
+                              setSelectedPostKeys(prev => {
+                                const other = prev.filter(k => !channelPostKeys.includes(k))
+                                return [...other, ...keysToSelect]
+                              })
+                              setSelectAll(false)
+                            }}
+                            className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded"
+                            title="입력한 개수만큼 이 채널 상단부터 선택"
+                          >
+                            선택
+                          </button>
                         </div>
                       </div>
 

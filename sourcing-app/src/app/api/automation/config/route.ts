@@ -80,6 +80,9 @@ export async function GET() {
       productCreate: true,
       publish: true,
     }
+    let collectionLimitByChannel: Record<number, number> = {}
+    let autoPublishLimitByShop: Record<number, number> = {}
+    let autoPublishLimitByChannel: Record<number, number> = {}
     try {
       channelIds = config.channelIds ? JSON.parse(config.channelIds) : []
     } catch { channelIds = [] }
@@ -92,6 +95,15 @@ export async function GET() {
     try {
       pipelineSteps = config.pipelineSteps ? JSON.parse(config.pipelineSteps) : pipelineSteps
     } catch { /* use default */ }
+    try {
+      collectionLimitByChannel = (config as any).collectionLimitByChannel ? JSON.parse((config as any).collectionLimitByChannel) : {}
+    } catch { collectionLimitByChannel = {} }
+    try {
+      autoPublishLimitByShop = (config as any).autoPublishLimitByShop ? JSON.parse((config as any).autoPublishLimitByShop) : {}
+    } catch { autoPublishLimitByShop = {} }
+    try {
+      autoPublishLimitByChannel = (config as any).autoPublishLimitByChannel ? JSON.parse((config as any).autoPublishLimitByChannel) : {}
+    } catch { autoPublishLimitByChannel = {} }
 
     return NextResponse.json({
       success: true,
@@ -106,6 +118,10 @@ export async function GET() {
         shopIds,
         pipelineSteps,
         collectionLimit: config.collectionLimit ?? 10,
+        collectionLimitByChannel,
+        autoPublishLimit: (config as any).autoPublishLimit ?? 20,
+        autoPublishLimitByShop,
+        autoPublishLimitByChannel,
       },
     })
   } catch (error) {
@@ -144,6 +160,10 @@ export async function POST(request: NextRequest) {
       shopIds,
       pipelineSteps,
       collectionLimit,
+      collectionLimitByChannel,
+      autoPublishLimit,
+      autoPublishLimitByShop,
+      autoPublishLimitByChannel,
     } = body
 
     // wholesaleChannelIds 또는 channelIds 둘 다 지원 (하위 호환성)
@@ -157,6 +177,10 @@ export async function POST(request: NextRequest) {
       publish: true,
     }
     const finalCollectionLimit = typeof collectionLimit === 'number' ? collectionLimit : 10
+    const finalCollectionLimitByChannel = collectionLimitByChannel && typeof collectionLimitByChannel === 'object' ? collectionLimitByChannel : {}
+    const finalAutoPublishLimit = typeof autoPublishLimit === 'number' ? autoPublishLimit : 20
+    const finalAutoPublishLimitByShop = autoPublishLimitByShop && typeof autoPublishLimitByShop === 'object' ? autoPublishLimitByShop : {}
+    const finalAutoPublishLimitByChannel = autoPublishLimitByChannel && typeof autoPublishLimitByChannel === 'object' ? autoPublishLimitByChannel : {}
 
     // scheduleTimes 우선, 없으면 selectedHours 하위 호환, 없으면 cronInterval
     let cronExpression: string | null = null
@@ -186,6 +210,10 @@ export async function POST(request: NextRequest) {
         shopIds: JSON.stringify(finalShopIds),
         pipelineSteps: JSON.stringify(finalPipelineSteps),
         collectionLimit: finalCollectionLimit,
+        collectionLimitByChannel: JSON.stringify(finalCollectionLimitByChannel),
+        autoPublishLimit: finalAutoPublishLimit,
+        autoPublishLimitByShop: JSON.stringify(finalAutoPublishLimitByShop),
+        autoPublishLimitByChannel: JSON.stringify(finalAutoPublishLimitByChannel),
         nextRunAt,
       },
       update: {
@@ -197,6 +225,10 @@ export async function POST(request: NextRequest) {
         shopIds: JSON.stringify(finalShopIds),
         pipelineSteps: JSON.stringify(finalPipelineSteps),
         collectionLimit: finalCollectionLimit,
+        collectionLimitByChannel: JSON.stringify(finalCollectionLimitByChannel),
+        autoPublishLimit: finalAutoPublishLimit,
+        autoPublishLimitByShop: JSON.stringify(finalAutoPublishLimitByShop),
+        autoPublishLimitByChannel: JSON.stringify(finalAutoPublishLimitByChannel),
         nextRunAt,
       },
     })

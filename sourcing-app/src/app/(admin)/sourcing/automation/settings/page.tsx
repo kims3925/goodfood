@@ -87,7 +87,13 @@ interface AutomationConfig {
   retailChannelIds: number[]
   shopIds: number[]
   pipelineSteps: PipelineSteps
+  // 수집 기본값 (전체 적용) + 채널별 오버라이드
   collectionLimit: number
+  collectionLimitByChannel: Record<number, number>
+  // 발행 기본값 (전체 적용) + 쇼핑몰/소매밴드별 오버라이드
+  autoPublishLimit: number
+  autoPublishLimitByShop: Record<number, number>
+  autoPublishLimitByChannel: Record<number, number>
 }
 
 // 12시간제 → 24시간제 변환
@@ -195,6 +201,10 @@ const defaultConfig: AutomationConfig = {
     publish: true,
   },
   collectionLimit: 10,
+  collectionLimitByChannel: {},
+  autoPublishLimit: 20,
+  autoPublishLimitByShop: {},
+  autoPublishLimitByChannel: {},
 }
 
 // 수집 개수 옵션
@@ -260,7 +270,9 @@ export default function AutomationSettingsPage() {
 
   const hasCollectionChanges = JSON.stringify((config.wholesaleChannelIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.wholesaleChannelIds || []).slice().sort()) ||
-    config.collectionLimit !== initialConfig.collectionLimit
+    config.collectionLimit !== initialConfig.collectionLimit ||
+    JSON.stringify(config.collectionLimitByChannel || {}) !==
+    JSON.stringify(initialConfig.collectionLimitByChannel || {})
 
   const hasAiChanges = config.aiProvider !== initialConfig.aiProvider
 
@@ -270,10 +282,16 @@ export default function AutomationSettingsPage() {
   const hasShopChanges = JSON.stringify((config.shopIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.shopIds || []).slice().sort())
 
+  const hasPublishLimitChanges = config.autoPublishLimit !== initialConfig.autoPublishLimit ||
+    JSON.stringify(config.autoPublishLimitByShop || {}) !==
+    JSON.stringify(initialConfig.autoPublishLimitByShop || {}) ||
+    JSON.stringify(config.autoPublishLimitByChannel || {}) !==
+    JSON.stringify(initialConfig.autoPublishLimitByChannel || {})
+
   const hasPipelineChanges = JSON.stringify(config.pipelineSteps) !== JSON.stringify(initialConfig.pipelineSteps)
 
   // 저장되지 않은 변경사항이 있는지 확인
-  const hasUnsavedChanges = hasScheduleChanges || hasCollectionChanges || hasAiChanges || hasPublishChanges || hasShopChanges || hasPipelineChanges
+  const hasUnsavedChanges = hasScheduleChanges || hasCollectionChanges || hasAiChanges || hasPublishChanges || hasShopChanges || hasPublishLimitChanges || hasPipelineChanges
 
   // 필수 설정 누락 여부 (설정이 아예 안 된 경우)
   const isScheduleMissing = config.scheduleTimes.length === 0
@@ -560,6 +578,10 @@ export default function AutomationSettingsPage() {
             shopIds: configData.data?.shopIds || [],
             pipelineSteps: configData.data?.pipelineSteps || defaultConfig.pipelineSteps,
             collectionLimit: configData.data?.collectionLimit ?? 10,
+            collectionLimitByChannel: configData.data?.collectionLimitByChannel ?? {},
+            autoPublishLimit: configData.data?.autoPublishLimit ?? 20,
+            autoPublishLimitByShop: configData.data?.autoPublishLimitByShop ?? {},
+            autoPublishLimitByChannel: configData.data?.autoPublishLimitByChannel ?? {},
           }
           setConfig(loadedConfig)
           setInitialConfig(loadedConfig)
@@ -662,13 +684,24 @@ export default function AutomationSettingsPage() {
           sectionData = { shopIds: config.shopIds }
           break
         case 'collection':
-          sectionData = { wholesaleChannelIds: config.wholesaleChannelIds, collectionLimit: config.collectionLimit }
+          sectionData = {
+            wholesaleChannelIds: config.wholesaleChannelIds,
+            collectionLimit: config.collectionLimit,
+            collectionLimitByChannel: config.collectionLimitByChannel,
+          }
           break
         case 'ai':
           sectionData = { aiProvider: config.aiProvider }
           break
         case 'publish':
           sectionData = { retailChannelIds: config.retailChannelIds }
+          break
+        case 'publishLimit':
+          sectionData = {
+            autoPublishLimit: config.autoPublishLimit,
+            autoPublishLimitByShop: config.autoPublishLimitByShop,
+            autoPublishLimitByChannel: config.autoPublishLimitByChannel,
+          }
           break
         case 'pipeline':
           sectionData = { pipelineSteps: config.pipelineSteps }
@@ -1059,6 +1092,182 @@ export default function AutomationSettingsPage() {
               </span>
             </div>
           </div>
+        </div>
+      </Card>
+
+      {/* 자동 발행 제한 (쇼핑몰/소매밴드 공통) */}
+      <Card className="overflow-hidden transition-all">
+        <div className="p-4 pb-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-200 flex-shrink-0">
+                <Settings2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900">1회 자동발행 최대 갯수</h2>
+                  {hasPublishLimitChanges && (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
+                  )}
+                  <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-700">
+                    {config.autoPublishLimit}개
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">
+                  자동화 1회 실행 시 쇼핑몰·소매밴드 각 대상당 발행할 최대 상품 개수
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => handleSaveSection('publishLimit')}
+              disabled={savingSection === 'publishLimit' || !hasPublishLimitChanges}
+              className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4 shadow-md self-end sm:self-auto"
+            >
+              {savingSection === 'publishLimit' ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+              저장
+            </Button>
+          </div>
+
+          {/* 입력 UI: 숫자 입력 + 프리셋 버튼 */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600">최대</label>
+              <input
+                type="number"
+                min={1}
+                max={500}
+                value={config.autoPublishLimit}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10)
+                  if (!isNaN(v) && v > 0) {
+                    setConfig(prev => ({ ...prev, autoPublishLimit: v }))
+                  }
+                }}
+                className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm text-center font-semibold"
+              />
+              <span className="text-sm text-gray-600">개</span>
+            </div>
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+              {[10, 20, 30, 50, 100].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setConfig(prev => ({ ...prev, autoPublishLimit: v }))}
+                  className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                    config.autoPublishLimit === v
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {v}개
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mt-2 flex items-start gap-1.5">
+            <Info size={12} className="mt-0.5 flex-shrink-0 text-amber-500" />
+            전체 기본값입니다. 아래에서 쇼핑몰/소매밴드별 개별 설정 가능. 수동 발행은 제한 없음.
+          </p>
+
+          {/* 쇼핑몰별 오버라이드 */}
+          {config.shopIds.length > 0 && shops.length > 0 && (
+            <div className="mt-4 p-3 bg-rose-50/50 rounded-lg border border-rose-100">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-rose-700">쇼핑몰별 발행 개수 (선택된 쇼핑몰만)</span>
+                <button
+                  type="button"
+                  onClick={() => setConfig(prev => ({ ...prev, autoPublishLimitByShop: {} }))}
+                  className="text-xs text-rose-600 hover:text-rose-800 underline"
+                >
+                  초기화
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {shops
+                  .filter(s => config.shopIds.includes(s.id))
+                  .map(shop => {
+                    const override = config.autoPublishLimitByShop?.[shop.id]
+                    const currentValue = override ?? config.autoPublishLimit
+                    return (
+                      <div key={shop.id} className="flex items-center gap-2 bg-white p-2 rounded-md border border-gray-200">
+                        <span className="text-xs font-medium text-gray-700 flex-1 truncate">{shop.name}</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={500}
+                          value={currentValue}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10)
+                            setConfig(prev => {
+                              const map = { ...(prev.autoPublishLimitByShop || {}) }
+                              if (isNaN(v) || v <= 0) {
+                                delete map[shop.id]
+                              } else {
+                                map[shop.id] = v
+                              }
+                              return { ...prev, autoPublishLimitByShop: map }
+                            })
+                          }}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-center"
+                        />
+                        <span className="text-xs text-gray-500">개</span>
+                      </div>
+                    )
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* 소매밴드별 오버라이드 */}
+          {config.retailChannelIds.length > 0 && retailChannels.length > 0 && (
+            <div className="mt-3 p-3 bg-purple-50/50 rounded-lg border border-purple-100">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-purple-700">소매밴드별 발행 개수 (선택된 소매밴드만)</span>
+                <button
+                  type="button"
+                  onClick={() => setConfig(prev => ({ ...prev, autoPublishLimitByChannel: {} }))}
+                  className="text-xs text-purple-600 hover:text-purple-800 underline"
+                >
+                  초기화
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {retailChannels
+                  .filter(ch => config.retailChannelIds.includes(ch.id))
+                  .map(channel => {
+                    const override = config.autoPublishLimitByChannel?.[channel.id]
+                    const currentValue = override ?? config.autoPublishLimit
+                    return (
+                      <div key={channel.id} className="flex items-center gap-2 bg-white p-2 rounded-md border border-gray-200">
+                        <span className="text-xs font-medium text-gray-700 flex-1 truncate">{channel.name}</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={500}
+                          value={currentValue}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10)
+                            setConfig(prev => {
+                              const map = { ...(prev.autoPublishLimitByChannel || {}) }
+                              if (isNaN(v) || v <= 0) {
+                                delete map[channel.id]
+                              } else {
+                                map[channel.id] = v
+                              }
+                              return { ...prev, autoPublishLimitByChannel: map }
+                            })
+                          }}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-center"
+                        />
+                        <span className="text-xs text-gray-500">개</span>
+                      </div>
+                    )
+                  })}
+              </div>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -1601,9 +1810,9 @@ export default function AutomationSettingsPage() {
             </div>
           </div>
 
-          {/* 수집 개수 설정 */}
-          <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
-            <span className="text-sm font-medium text-gray-700">채널당 수집</span>
+          {/* 수집 개수 설정 — 전체 기본값 */}
+          <div className="flex items-center gap-3 mb-3 p-3 bg-gray-50 rounded-lg">
+            <span className="text-sm font-medium text-gray-700">전체 기본</span>
             <select
               value={config.collectionLimit}
               onChange={(e) => setConfig(prev => ({ ...prev, collectionLimit: parseInt(e.target.value) }))}
@@ -1615,8 +1824,61 @@ export default function AutomationSettingsPage() {
                 </option>
               ))}
             </select>
-            <span className="text-sm text-gray-500">최신 게시물</span>
+            <span className="text-sm text-gray-500">채널당 최신 게시물 (개별 설정 시 우선)</span>
           </div>
+
+          {/* 수집 개수 설정 — 채널별 오버라이드 */}
+          {config.wholesaleChannelIds.length > 0 && (
+            <div className="mb-4 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-blue-700">채널별 수집 개수 (선택된 채널만)</span>
+                <button
+                  type="button"
+                  onClick={() => setConfig(prev => ({ ...prev, collectionLimitByChannel: {} }))}
+                  className="text-xs text-blue-600 hover:text-blue-800 underline"
+                >
+                  초기화
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {wholesaleChannels
+                  .filter(ch => config.wholesaleChannelIds.includes(ch.id))
+                  .map(channel => {
+                    const override = config.collectionLimitByChannel?.[channel.id]
+                    const currentValue = override ?? config.collectionLimit
+                    return (
+                      <div key={channel.id} className="flex items-center gap-2 bg-white p-2 rounded-md border border-gray-200">
+                        <span className="text-xs font-medium text-gray-700 flex-1 truncate">{channel.name}</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={500}
+                          value={currentValue}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10)
+                            setConfig(prev => {
+                              const map = { ...(prev.collectionLimitByChannel || {}) }
+                              if (isNaN(v) || v <= 0) {
+                                delete map[channel.id]
+                              } else {
+                                map[channel.id] = v
+                              }
+                              return { ...prev, collectionLimitByChannel: map }
+                            })
+                          }}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-center"
+                        />
+                        <span className="text-xs text-gray-500">개</span>
+                      </div>
+                    )
+                  })}
+              </div>
+              <p className="text-xs text-gray-500 mt-2 flex items-start gap-1">
+                <Info size={11} className="mt-0.5 flex-shrink-0 text-blue-500" />
+                미입력 채널은 전체 기본값({config.collectionLimit}개) 사용
+              </p>
+            </div>
+          )}
 
         {wholesaleChannels.length > 0 ? (
           showAllWholesale ? (
