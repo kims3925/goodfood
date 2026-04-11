@@ -81,14 +81,15 @@ export async function register() {
 
     // ── 원본 도매밴드 변동 감시: 1시간 주기 고정 스케줄 ──
     // DB 스케줄과 별도로 등록 (매 정각 실행: 0 * * * *)
-    // 발행 상품의 품절/가격변경/스펙변경을 감지하여 자동 조치
+    // ⚠️ autoFix=false — 감지만 하고 자동 삭제는 하지 않음 (2026-04-11)
+    // 이유: 원본 포스트 매칭 로직이 불완전하여 정상 상품이 대량 소프트 삭제되는 사고 발생
     scheduler.register(
       `${productManagerAgent.name}:source-watch`,
       '0 * * * *',
       async () => {
         try {
-          console.log('[Instrumentation] 원본 변동 감시 시작')
-          await productManagerAgent.runSourceWatch({ autoFix: true })
+          console.log('[Instrumentation] 원본 변동 감시 시작 (autoFix=false)')
+          await productManagerAgent.runSourceWatch({ autoFix: false })
         } catch (err) {
           console.error('[Instrumentation] 원본 변동 감시 실패:', err)
         }
@@ -97,5 +98,73 @@ export async function register() {
 
     scheduler.startAll()
     console.log(`[Instrumentation] AgentScheduler 시작 완료: ${scheduler.size}개 cron 등록`)
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🚨 일회성 데이터 복구: runSourceWatch autoFix 버그로 자동 삭제된
+    //    ChannelProduct / ShopProduct 레코드를 복구 (2026-04-11)
+    // ───────────────────────────────────────────────────────────────
+    // 2026-04-10 이후 자동 삭제된 레코드만 대상 (사용자 수동 삭제는 보존)
+    // 복구 플래그 파일로 중복 실행 방지
+    // ═══════════════════════════════════════════════════════════════
+    try {
+      const { existsSync, writeFileSync, mkdirSync } = await import('fs')
+      const { join, dirname } = await import('path')
+      const flagFile = join(process.cwd(), '.data-recovery-2026-04-11.done')
+
+      if (!existsSync(flagFile)) {
+        const recoveryStartDate = new Date('2026-04-10T00:00:00Z')
+
+        // ChannelProduct 복구
+        const channelRestore = await prisma.channelProduct.updateMany({
+          where: {
+            deletedAt: { gte: recoveryStartDate },
+          },
+          data: {
+            deletedAt: null,
+            isActive: true,
+          },
+        })
+
+        // ShopProduct 복구
+        const shopRestore = await prisma.shopProduct.updateMany({
+          where: {
+            deletedAt: { gte: recoveryStartDate },
+          },
+          data: {
+            deletedAt: null,
+          },
+        })
+
+        // Product 복구 (소프트 삭제된 것 중 최근 것)
+        const productRestore = await prisma.product.updateMany({
+          where: {
+            deletedAt: { gte: recoveryStartDate },
+          },
+          data: {
+            deletedAt: null,
+            isActive: true,
+          },
+        })
+
+        console.log(
+          `[Instrumentation] 🚑 데이터 복구 완료: ` +
+          `Product ${productRestore.count}개, ` +
+          `ChannelProduct ${channelRestore.count}개, ` +
+          `ShopProduct ${shopRestore.count}개`
+        )
+
+        // 플래그 파일 생성 (중복 복구 방지)
+        try {
+          mkdirSync(dirname(flagFile), { recursive: true })
+          writeFileSync(flagFile, new Date().toISOString())
+        } catch (flagErr) {
+          console.error('[Instrumentation] 복구 플래그 생성 실패 (복구는 완료됨):', flagErr)
+        }
+      } else {
+        console.log('[Instrumentation] 데이터 복구 이미 실행됨 (플래그 파일 존재)')
+      }
+    } catch (err) {
+      console.error('[Instrumentation] 데이터 복구 실패:', err)
+    }
   }
 }

@@ -226,9 +226,13 @@ export class SourcingAgent extends AgentBase {
 
     stats.totalChannels = channels.length
 
+    // 자동 소싱: 각 도매 채널당 최대 20개로 제한
+    // (수동 호출은 collectFromChannel 직접 호출 시 limit 파라미터 지정으로 무제한 가능)
+    const AUTO_PER_CHANNEL_LIMIT = 20
+
     for (const channel of channels) {
       try {
-        const result = await this.collectFromChannel(channel.id, undefined, channel.userId ?? undefined)
+        const result = await this.collectFromChannel(channel.id, AUTO_PER_CHANNEL_LIMIT, channel.userId ?? undefined)
 
         if (result.success) {
           stats.successCount++

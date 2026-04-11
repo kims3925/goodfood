@@ -451,15 +451,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 가격 이미지 필터링 (가격 텍스트가 포함된 이미지 삭제)
-    try {
-      const deletedImages = await filterPriceImages(aiConfig.apiKey, postId)
-      if (deletedImages > 0) {
-        console.log(`[AI Product Generation] 가격 이미지 ${deletedImages}개 삭제 (postId: ${postId})`)
-      }
-    } catch (filterError) {
-      console.error('[AI Product Generation] 이미지 필터링 실패 (무시):', filterError)
-    }
+    // 가격 이미지 필터링: 임시 비활성화 (2026-04-11)
+    // 사유: Gemini Vision 오탐으로 정상 상품 이미지가 대량 삭제되는 사고 발생
+    // 재활성화 시 테스트 환경에서 정확도 검증 후 신중하게 적용할 것
+    // try {
+    //   const deletedImages = await filterPriceImages(aiConfig.apiKey, postId)
+    //   if (deletedImages > 0) {
+    //     console.log(`[AI Product Generation] 가격 이미지 ${deletedImages}개 삭제 (postId: ${postId})`)
+    //   }
+    // } catch (filterError) {
+    //   console.error('[AI Product Generation] 이미지 필터링 실패 (무시):', filterError)
+    // }
 
     // Update AI config usage (총 사용량 + 일일 사용량)
     await prisma.aiApiConfig.update({

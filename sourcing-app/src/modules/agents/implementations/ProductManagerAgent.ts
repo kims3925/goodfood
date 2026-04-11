@@ -289,10 +289,10 @@ export class ProductManagerAgent extends AgentBase {
   // ─── 스케줄 실행 (onSchedule 오버라이드) ───
   async onSchedule(): Promise<void> {
     await this.log('INFO', '정기 감사 + 원본 변동 감시 시작')
-    // 가격정책 감사
-    await this.runFullAudit({ autoFix: true })
-    // 원본 도매밴드 변동 감시
-    await this.runSourceWatch({ autoFix: true })
+    // 가격정책 감사 (자동수정 OFF — 대량 삭제 방지, 2026-04-11)
+    await this.runFullAudit({ autoFix: false })
+    // 원본 도매밴드 변동 감시 (자동수정 OFF)
+    await this.runSourceWatch({ autoFix: false })
   }
 
   /**
