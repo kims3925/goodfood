@@ -587,16 +587,27 @@ export async function PATCH(
       }
 
       // 회원 주문이 없으면 비회원 주문 조회 (orderNumber로 조회)
+      // 외부주문(XORD-)은 isCustomItem=true인 경우 shopProduct가 null이므로
+      // shop.userId로 권한 검증 (OR 조건)
       const guestOrder = await prisma.guestOrder.findFirst({
         where: {
           orderNumber: id,
-          items: {
-            some: {
-              shopProduct: {
+          OR: [
+            {
+              items: {
+                some: {
+                  shopProduct: {
+                    userId: user.userId,
+                  },
+                },
+              },
+            },
+            {
+              shop: {
                 userId: user.userId,
               },
             },
-          },
+          ],
         },
         include: {
           payment: true, // 결제 취소를 위해 payment 포함

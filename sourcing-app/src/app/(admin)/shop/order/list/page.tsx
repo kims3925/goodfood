@@ -230,6 +230,32 @@ export default function UnifiedOrderListPage() {
     return orderNumber.toLowerCase().startsWith('x')
   }
 
+  // 외부주문 상태 단계 변경 (상태 뱃지/드롭다운 클릭)
+  const handleChangeExternalStatus = async (
+    e: React.MouseEvent | React.ChangeEvent<HTMLSelectElement>,
+    orderNumber: string,
+    source: string,
+    newStatus: string
+  ) => {
+    e.stopPropagation()
+    try {
+      const res = await fetch(`/api/order/unified/${orderNumber}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source, status: newStatus }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('주문 상태가 변경되었습니다.')
+        fetchOrders()
+      } else {
+        toast.error(data.error || '상태 변경에 실패했습니다.')
+      }
+    } catch {
+      toast.error('상태 변경 중 오류가 발생했습니다.')
+    }
+  }
+
   // 외부 주문 수정
   const handleEditExternalOrder = (e: React.MouseEvent, orderNumber: string) => {
     e.stopPropagation()
@@ -514,7 +540,31 @@ export default function UnifiedOrderListPage() {
                           {formatDate(order.createdAt)}
                         </span>
                       </div>
-                      {getStatusBadge(order.status, order.statusLabel)}
+                      {isExternalOrder(order.orderNumber) ? (
+                        <select
+                          value={order.status}
+                          onChange={(e) => handleChangeExternalStatus(e, order.orderNumber, order.source, e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`px-2 py-1 rounded-full text-xs font-medium border-0 cursor-pointer focus:outline-none ${
+                            order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+                            order.status === 'PAID' ? 'bg-blue-100 text-blue-700' :
+                            order.status === 'PREPARING' ? 'bg-orange-100 text-orange-700' :
+                            order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-700' :
+                            order.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
+                            order.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          <option value="PENDING">결제대기</option>
+                          <option value="PAID">결제완료</option>
+                          <option value="PREPARING">배송준비중</option>
+                          <option value="SHIPPED">배송중</option>
+                          <option value="DELIVERED">배송완료</option>
+                          <option value="CANCELLED">취소</option>
+                        </select>
+                      ) : (
+                        getStatusBadge(order.status, order.statusLabel)
+                      )}
                     </div>
 
                     {/* 출처 배지 */}
@@ -649,8 +699,33 @@ export default function UnifiedOrderListPage() {
                             {formatPrice(order.totalAmount)}
                           </span>
                         </TableCell>
-                        <TableCell className="text-center">
-                          {getStatusBadge(order.status, order.statusLabel)}
+                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                          {isExternalOrder(order.orderNumber) ? (
+                            // 외부주문: 드롭다운으로 직접 상태 변경 가능
+                            <select
+                              value={order.status}
+                              onChange={(e) => handleChangeExternalStatus(e, order.orderNumber, order.source, e.target.value)}
+                              className={`px-2 py-1 rounded-full text-xs font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+                                order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+                                order.status === 'PAID' ? 'bg-blue-100 text-blue-700' :
+                                order.status === 'PREPARING' ? 'bg-orange-100 text-orange-700' :
+                                order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-700' :
+                                order.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
+                                order.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <option value="PENDING">결제대기</option>
+                              <option value="PAID">결제완료</option>
+                              <option value="PREPARING">배송준비중</option>
+                              <option value="SHIPPED">배송중</option>
+                              <option value="DELIVERED">배송완료</option>
+                              <option value="CANCELLED">취소</option>
+                            </select>
+                          ) : (
+                            getStatusBadge(order.status, order.statusLabel)
+                          )}
                         </TableCell>
                         <TableCell className="text-center">
                           <span className="text-gray-600 text-sm">

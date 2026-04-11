@@ -166,5 +166,157 @@ export async function register() {
     } catch (err) {
       console.error('[Instrumentation] 데이터 복구 실패:', err)
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🔧 2차 복구 및 정리 (2026-04-11 v2)
+    // ───────────────────────────────────────────────────────────────
+    // 1) XORD-* 외부주문 PENDING → DELIVERED 일괄 변경
+    // 2) 2026-01-06 이후 주문된 ShopProduct 선택 복원
+    // 3) 2026-04-01 이후 발행된 ShopProduct 전체 복원
+    // ═══════════════════════════════════════════════════════════════
+    try {
+      const { existsSync, writeFileSync, mkdirSync } = await import('fs')
+      const { join, dirname } = await import('path')
+      const flagFile2 = join(process.cwd(), '.data-recovery-2026-04-11-v2.done')
+
+      if (!existsSync(flagFile2)) {
+        // ── 1) XORD-* 주문 PENDING → DELIVERED 일괄 변경 ──
+        const xordPending = await prisma.guestOrder.findMany({
+          where: {
+            orderNumber: { startsWith: 'XORD-' },
+            status: 'PENDING',
+          },
+          select: { id: true },
+        })
+        const now = new Date()
+        let xordUpdated = 0
+        if (xordPending.length > 0) {
+          const updateResult = await prisma.guestOrder.updateMany({
+            where: {
+              id: { in: xordPending.map((o) => o.id) },
+            },
+            data: {
+              status: 'DELIVERED',
+              paidAt: now,
+              preparingAt: now,
+              shippedAt: now,
+              deliveredAt: now,
+            },
+          })
+          xordUpdated = updateResult.count
+        }
+
+        // ── 2) 2026-01-06 이후 주문된 ShopProduct 선택 복원 ──
+        // GuestOrderItem + OrderItem에서 shopProductId 수집
+        const orderStartDate = new Date('2026-01-06T00:00:00+09:00')
+        const guestItems = await prisma.guestOrderItem.findMany({
+          where: {
+            guestOrder: {
+              orderedAt: { gte: orderStartDate },
+            },
+            shopProductId: { not: null },
+          },
+          select: { shopProductId: true },
+        })
+        const memberItems = await prisma.orderItem.findMany({
+          where: {
+            order: {
+              orderedAt: { gte: orderStartDate },
+            },
+          },
+          select: { shopProductId: true },
+        })
+        const orderedShopProductIds = Array.from(
+          new Set([
+            ...guestItems.map((i) => i.shopProductId).filter((id): id is number => id !== null),
+            ...memberItems.map((i) => i.shopProductId),
+          ])
+        )
+
+        let orderedShopRestored = 0
+        if (orderedShopProductIds.length > 0) {
+          const restoreResult = await prisma.shopProduct.updateMany({
+            where: {
+              id: { in: orderedShopProductIds },
+              deletedAt: { not: null },
+            },
+            data: { deletedAt: null },
+          })
+          orderedShopRestored = restoreResult.count
+
+          // 해당 Product도 복원 (soft deleted인 경우)
+          const shopProducts = await prisma.shopProduct.findMany({
+            where: { id: { in: orderedShopProductIds } },
+            select: { productId: true },
+          })
+          const productIdsToRestore = Array.from(
+            new Set(shopProducts.map((sp) => sp.productId).filter((id): id is number => id !== null))
+          )
+          if (productIdsToRestore.length > 0) {
+            await prisma.product.updateMany({
+              where: { id: { in: productIdsToRestore } },
+              data: { deletedAt: null, isActive: true },
+            })
+          }
+        }
+
+        // ── 3) 2026-04-01 이후 발행된 ShopProduct 전체 복원 ──
+        const publishStartDate = new Date('2026-04-01T00:00:00+09:00')
+        const recentShopRestore = await prisma.shopProduct.updateMany({
+          where: {
+            OR: [
+              { publishedAt: { gte: publishStartDate } },
+              { createdAt: { gte: publishStartDate } },
+            ],
+            deletedAt: { not: null },
+          },
+          data: { deletedAt: null },
+        })
+
+        // 해당 Product도 복원
+        const recentShopProducts = await prisma.shopProduct.findMany({
+          where: {
+            OR: [
+              { publishedAt: { gte: publishStartDate } },
+              { createdAt: { gte: publishStartDate } },
+            ],
+          },
+          select: { productId: true },
+        })
+        const recentProductIds = Array.from(
+          new Set(recentShopProducts.map((sp) => sp.productId).filter((id): id is number => id !== null))
+        )
+        let recentProductRestore = 0
+        if (recentProductIds.length > 0) {
+          const pr = await prisma.product.updateMany({
+            where: {
+              id: { in: recentProductIds },
+              deletedAt: { not: null },
+            },
+            data: { deletedAt: null, isActive: true },
+          })
+          recentProductRestore = pr.count
+        }
+
+        console.log(
+          `[Instrumentation] 🔧 2차 복구 완료: ` +
+          `XORD PENDING→DELIVERED ${xordUpdated}건, ` +
+          `주문상품 ShopProduct ${orderedShopRestored}개 복원, ` +
+          `2026-04-01 이후 ShopProduct ${recentShopRestore.count}개 복원, ` +
+          `관련 Product ${recentProductRestore}개 복원`
+        )
+
+        try {
+          mkdirSync(dirname(flagFile2), { recursive: true })
+          writeFileSync(flagFile2, new Date().toISOString())
+        } catch (flagErr) {
+          console.error('[Instrumentation] 2차 복구 플래그 생성 실패:', flagErr)
+        }
+      } else {
+        console.log('[Instrumentation] 2차 복구 이미 실행됨')
+      }
+    } catch (err) {
+      console.error('[Instrumentation] 2차 복구 실패:', err)
+    }
   }
 }
