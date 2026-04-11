@@ -95,7 +95,14 @@ export async function GET(request: NextRequest) {
         })
         const shopProductIds = userShopProducts.map(pp => pp.id)
 
-        if (shopProductIds.length > 0) {
+        // 사용자의 쇼핑몰 ID 목록 조회 (커스텀 아이템 외부 주문(XORD) 포함용)
+        const userShops = await prisma.shop.findMany({
+          where: { userId: user.userId, deletedAt: null },
+          select: { id: true },
+        })
+        const userShopIds = userShops.map(s => s.id)
+
+        if (shopProductIds.length > 0 || userShopIds.length > 0) {
           // 상태별 카운트 조회 (shopId, search 필터 적용, status 필터 제외)
           const countBaseWhere: any = {
             items: {
@@ -234,26 +241,38 @@ export async function GET(request: NextRequest) {
           }
 
           // 2. 비회원 주문 조회
+          // 게스트 주문 아이템 필터 조건:
+          // - 사용자 상품이 포함된 주문(GORD) OR 사용자 쇼핑몰의 커스텀 아이템 외부 주문(XORD)
+          const guestItemConditions: any[] = []
+          if (shopProductIds.length > 0) {
+            guestItemConditions.push({ items: { some: { shopProductId: { in: shopProductIds } } } })
+          }
+          if (userShopIds.length > 0) {
+            guestItemConditions.push({
+              shopId: { in: userShopIds },
+              items: { some: { isCustomItem: true } },
+            })
+          }
+          const guestItemCondition = guestItemConditions.length === 1
+            ? guestItemConditions[0]
+            : { OR: guestItemConditions }
+
           // 비회원 주문 카운트 조회 (상태별)
-          const guestCountBaseWhere: any = {
-            items: {
-              some: {
-                shopProductId: { in: shopProductIds },
-              },
-            },
-          }
-          if (shopId) {
-            guestCountBaseWhere.shopId = parseInt(shopId)
-          }
-          if (search) {
-            guestCountBaseWhere.OR = [
+          // AND 배열로 구성하여 guestItemCondition의 OR와 search OR가 충돌하지 않도록 처리
+          const guestBaseFilters: any[] = [guestItemCondition]
+          if (shopId) guestBaseFilters.push({ shopId: parseInt(shopId) })
+          if (search) guestBaseFilters.push({
+            OR: [
               { orderNumber: { contains: search } },
               { guestName: { contains: search } },
               { guestPhone: { contains: search } },
               { shippingAddress: { recipientName: { contains: search } } },
               { shippingAddress: { recipientPhone: { contains: search } } },
             ]
-          }
+          })
+          const guestCountBaseWhere: any = guestBaseFilters.length === 1
+            ? guestBaseFilters[0]
+            : { AND: guestBaseFilters }
 
           try {
             const [guestPendingCount, guestPaidCount, guestPreparingCount, guestShippedCount, guestDeliveredCount, guestCancelledCount, guestRefundedCount] = await Promise.all([
@@ -276,27 +295,31 @@ export async function GET(request: NextRequest) {
             console.error('비회원 주문 상태별 카운트 조회 실패:', guestCountError)
           }
 
-          const guestOrders = await prisma.guestOrder.findMany({
-            where: {
-              items: {
-                some: {
-                  shopProductId: { in: shopProductIds },
-                },
-              },
-              ...(shopId && { shopId: parseInt(shopId) }),
-              ...(search && {
-                OR: [
-                  { orderNumber: { contains: search } },
-                  { guestName: { contains: search } },
-                  { guestPhone: { contains: search } },
-                  { shippingAddress: { recipientName: { contains: search } } },
-                  { shippingAddress: { recipientPhone: { contains: search } } },
-                ],
-              }),
-              ...(status && status === 'CANCELLED'
+          // AND 배열로 구성하여 OR 충돌 방지 + status 조건 포함
+          const guestOrderFilters: any[] = [guestItemCondition]
+          if (shopId) guestOrderFilters.push({ shopId: parseInt(shopId) })
+          if (search) guestOrderFilters.push({
+            OR: [
+              { orderNumber: { contains: search } },
+              { guestName: { contains: search } },
+              { guestPhone: { contains: search } },
+              { shippingAddress: { recipientName: { contains: search } } },
+              { shippingAddress: { recipientPhone: { contains: search } } },
+            ]
+          })
+          if (status) {
+            guestOrderFilters.push(
+              status === 'CANCELLED'
                 ? { status: { in: ['CANCELLED', 'REFUNDED'] } }
-                : status ? { status: status as any } : {}),
-            },
+                : { status: status as any }
+            )
+          }
+          const guestOrderWhere = guestOrderFilters.length === 1
+            ? guestOrderFilters[0]
+            : { AND: guestOrderFilters }
+
+          const guestOrders = await prisma.guestOrder.findMany({
+            where: guestOrderWhere,
             include: {
               shop: {
                 select: {
@@ -414,4 +437,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+                                                   }
