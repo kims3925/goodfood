@@ -418,6 +418,7 @@ export async function DELETE(request: NextRequest) {
     const productIdParam = searchParams.get('productId')
     const publishIds = searchParams.get('ids')?.split(',').map(Number).filter(Boolean) || []
     const publishType = searchParams.get('type') as 'shop' | 'channel' | null // 'shop' 또는 'channel'
+    const keepProduct = searchParams.get('keepProduct') === 'true' // 재발행 시 상품 유지
 
     // productId 기준 완전 삭제 (쇼핑몰 취소 + 소매밴드 삭제 + 상품목록 제거)
     if (productIdParam) {
@@ -479,11 +480,13 @@ export async function DELETE(request: NextRequest) {
         data: { deletedAt: now },
       })
 
-      // 3. 상품 자체 soft-delete (발행 페이지 목록에서 제거)
-      await prisma.product.update({
-        where: { id: productId },
-        data: { deletedAt: now, isActive: false },
-      })
+      // 3. 상품 자체 soft-delete (발행 페이지 목록에서 제거 - 재발행이 아닌 경우만)
+      if (!keepProduct) {
+        await prisma.product.update({
+          where: { id: productId },
+          data: { deletedAt: now, isActive: false },
+        })
+      }
 
       const totalDeleted = shopResult.count + channelResult.count
 

@@ -1518,6 +1518,10 @@ function PublishPageContent() {
    * 1. 기존 ShopProduct soft-delete (DELETE /api/shop/publish?productId=xxx)
    * 2. 새 ShopProduct 생성 (POST /api/shop/publish) → publishedAt=now → 최상단
    */
+  // 재발행 진행 상태
+  const [republishProgress, setRepublishProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 })
+  const [republishingIds, setRepublishingIds] = useState<Set<number>>(new Set())
+
   const handleRepublishSelected = async () => {
     if (selectedProductIds.length === 0) {
       toast.error('재발행할 상품을 선택해주세요.')
@@ -1527,14 +1531,24 @@ function PublishPageContent() {
       return
     }
 
+    const targetIds = [...selectedProductIds]
     setIsPublishing(true)
+    setRepublishingIds(new Set(targetIds))
+    setRepublishProgress({ current: 0, total: targetIds.length, success: 0, failed: 0 })
+    // 선택 해제하되 목록은 유지 (loadProducts 호출 안 함)
+    setSelectedProductIds([])
+    setSelectAllProducts(false)
+
     let successCount = 0
     let failCount = 0
 
-    for (const productId of selectedProductIds) {
+    for (let i = 0; i < targetIds.length; i++) {
+      const productId = targetIds[i]
+      setRepublishProgress(prev => ({ ...prev, current: i + 1 }))
+
       try {
-        // Step 1: 기존 발행 레코드 삭제 (productId 기준)
-        const deleteRes = await fetch(`/api/shop/publish?productId=${productId}`, {
+        // Step 1: 기존 발행 레코드만 삭제 (keepProduct=true → 상품은 유지)
+        const deleteRes = await fetch(`/api/shop/publish?productId=${productId}&keepProduct=true`, {
           method: 'DELETE',
           credentials: 'include',
         })
@@ -1559,19 +1573,27 @@ function PublishPageContent() {
       } catch {
         failCount++
       }
+
+      setRepublishProgress(prev => ({ ...prev, success: successCount, failed: failCount }))
+      // 완료된 상품은 republishingIds에서 제거
+      setRepublishingIds(prev => {
+        const next = new Set(prev)
+        next.delete(productId)
+        return next
+      })
     }
 
     setIsPublishing(false)
-    setSelectedProductIds([])
-    setSelectAllProducts(false)
+    setRepublishingIds(new Set())
+    setRepublishProgress({ current: 0, total: 0, success: 0, failed: 0 })
 
     if (successCount > 0) {
       toast.success(`${successCount}개 상품이 재발행되었습니다.`)
-      loadProducts()
     }
     if (failCount > 0) {
       toast.error(`${failCount}개 재발행에 실패했습니다.`)
     }
+    loadProducts()
   }
 
   /**
@@ -1674,7 +1696,7 @@ function PublishPageContent() {
             </span>
           )}
 
-          {/* 재발행 버튼 */}
+          {/* 재발행 버튼 + 진행률 */}
           <button
             onClick={handleRepublishSelected}
             disabled={selectedProductIds.length === 0 || isPublishing}
@@ -1684,9 +1706,24 @@ function PublishPageContent() {
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             }`}
           >
-            <RefreshCw size={15} />
+            <RefreshCw size={15} className={isPublishing && republishProgress.total > 0 ? 'animate-spin' : ''} />
             재발행
           </button>
+          {isPublishing && republishProgress.total > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.round((republishProgress.current / republishProgress.total) * 100)}%` }}
+                />
+              </div>
+              <span className="text-blue-600 font-medium whitespace-nowrap">
+                {republishProgress.current}/{republishProgress.total}
+                {republishProgress.success > 0 && <span className="text-emerald-600 ml-1">({republishProgress.success}성공)</span>}
+                {republishProgress.failed > 0 && <span className="text-red-500 ml-1">({republishProgress.failed}실패)</span>}
+              </span>
+            </div>
+          )}
 
           {/* 삭제 버튼 */}
           <button
@@ -2172,7 +2209,7 @@ function PublishPageContent() {
                 </thead>
                 <tbody>
                   {products.map((product) => (
-                    <tr key={product.id} className={`hover:bg-gray-50/50 ${selectedProductIds.includes(product.id) ? 'bg-blue-50' : ''}`}>
+                    <tr key={product.id} className={`hover:bg-gray-50/50 ${republishingIds.has(product.id) ? 'bg-blue-50/70 animate-pulse' : selectedProductIds.includes(product.id) ? 'bg-blue-50' : ''}`}>
                       <td
                         className="sticky left-0 z-10 bg-white border-b border-r-2 border-gray-300 p-2 min-w-[240px] max-w-[340px]"
                       >
@@ -2204,7 +2241,15 @@ function PublishPageContent() {
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
-                            <div className="text-sm font-medium text-gray-900 truncate" title={product.name}>{product.name}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-medium text-gray-900 truncate" title={product.name}>{product.name}</span>
+                              {republishingIds.has(product.id) && (
+                                <span className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-100 text-blue-700 whitespace-nowrap flex-shrink-0">
+                                  <RefreshCw size={10} className="animate-spin" />
+                                  재발행 중
+                                </span>
+                              )}
+                            </div>
                           </div>
                           </div>
                         </div>
