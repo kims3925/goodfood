@@ -474,26 +474,28 @@ export async function DELETE(request: NextRequest) {
         data: { deletedAt: now },
       })
 
-      // 2. 쇼핑몰 발행 취소 (shopProduct soft-delete)
-      const shopResult = await prisma.shopProduct.updateMany({
-        where: { productId, userId, deletedAt: null },
-        data: { deletedAt: now },
-      })
-
-      // 3. 상품 자체 soft-delete (발행 페이지 목록에서 제거 - 재발행이 아닌 경우만)
+      // 2. 쇼핑몰 발행 취소 (재발행이 아닌 경우만 - 재발행 시 쇼핑몰은 유지)
+      let shopDeletedCount = 0
       if (!keepProduct) {
+        const shopResult = await prisma.shopProduct.updateMany({
+          where: { productId, userId, deletedAt: null },
+          data: { deletedAt: now },
+        })
+        shopDeletedCount = shopResult.count
+
+        // 3. 상품 자체 soft-delete (발행 페이지 목록에서 제거)
         await prisma.product.update({
           where: { id: productId },
           data: { deletedAt: now, isActive: false },
         })
       }
 
-      const totalDeleted = shopResult.count + channelResult.count
+      const totalDeleted = shopDeletedCount + channelResult.count
 
       return NextResponse.json({
         success: true,
         deletedCount: totalDeleted,
-        shopDeletedCount: shopResult.count,
+        shopDeletedCount: shopDeletedCount,
         channelDeletedCount: channelResult.count,
         bandDeleteErrors: bandDeleteErrors.length > 0 ? bandDeleteErrors : undefined,
         message: bandDeleteErrors.length > 0

@@ -1527,7 +1527,7 @@ function PublishPageContent() {
       toast.error('재발행할 상품을 선택해주세요.')
       return
     }
-    if (!confirm(`선택한 ${selectedProductIds.length}개 상품을 재발행합니다.\n기존 발행 정보는 삭제되고 새로운 발행으로 등록됩니다.`)) {
+    if (!confirm(`선택한 ${selectedProductIds.length}개 상품을 재발행합니다.\n\n• 쇼핑몰: 기존 발행이 있으면 유지, 없으면 신규 발행\n• 소매밴드: 기존 발행 삭제 후 신규 발행 (이미지 포함)`)) {
       return
     }
 
@@ -1535,7 +1535,6 @@ function PublishPageContent() {
     setIsPublishing(true)
     setRepublishingIds(new Set(targetIds))
     setRepublishProgress({ current: 0, total: targetIds.length, success: 0, failed: 0 })
-    // 선택 해제하되 목록은 유지 (loadProducts 호출 안 함)
     setSelectedProductIds([])
     setSelectAllProducts(false)
 
@@ -1547,35 +1546,56 @@ function PublishPageContent() {
       setRepublishProgress(prev => ({ ...prev, current: i + 1 }))
 
       try {
-        // Step 1: 기존 발행 레코드만 삭제 (keepProduct=true → 상품은 유지)
-        const deleteRes = await fetch(`/api/shop/publish?productId=${productId}&keepProduct=true`, {
+        // Step 1: 기존 밴드 발행만 삭제 (쇼핑몰은 유지, 상품도 유지)
+        // channelProduct만 soft-delete하고 Band 게시물도 삭제
+        await fetch(`/api/shop/publish?productId=${productId}&keepProduct=true`, {
           method: 'DELETE',
           credentials: 'include',
         })
-        if (!deleteRes.ok) {
-          console.warn(`재발행 - 기존 발행 삭제 실패 (productId=${productId})`)
-        }
 
-        // Step 2: 등록된 모든 쇼핑몰에 재발행
-        let allShopsOk = true
+        let productOk = true
+
+        // Step 2: 쇼핑몰 발행 (없으면 신규, 있으면 이미 존재하므로 skip됨)
         for (const shop of shops) {
-          const res = await fetch('/api/shop/publish', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ productIds: [productId], shopId: shop.id }),
-          })
-          if (!res.ok) allShopsOk = false
+          try {
+            await fetch('/api/shop/publish', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ productIds: [productId], shopId: shop.id }),
+            })
+          } catch (e) {
+            console.warn(`재발행 - 쇼핑몰 발행 실패 (shopId=${shop.id})`, e)
+          }
         }
 
-        if (allShopsOk) successCount++
+        // Step 3: 소매밴드에 신규 발행 (Playwright로 이미지 포함 발행)
+        for (const channel of channels) {
+          try {
+            const res = await fetch('/api/shop/publish', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ productIds: [productId], channelId: channel.id }),
+            })
+            const data = await res.json()
+            if (!data.success) {
+              console.warn(`재발행 - 밴드 발행 실패 (channelId=${channel.id}):`, data.message || data.error)
+              productOk = false
+            }
+          } catch (e) {
+            console.warn(`재발행 - 밴드 발행 오류 (channelId=${channel.id})`, e)
+            productOk = false
+          }
+        }
+
+        if (productOk) successCount++
         else failCount++
       } catch {
         failCount++
       }
 
       setRepublishProgress(prev => ({ ...prev, success: successCount, failed: failCount }))
-      // 완료된 상품은 republishingIds에서 제거
       setRepublishingIds(prev => {
         const next = new Set(prev)
         next.delete(productId)
@@ -1588,10 +1608,10 @@ function PublishPageContent() {
     setRepublishProgress({ current: 0, total: 0, success: 0, failed: 0 })
 
     if (successCount > 0) {
-      toast.success(`${successCount}개 상품이 재발행되었습니다.`)
+      toast.success(`${successCount}개 재발행 완료 (쇼핑몰 + 밴드)`)
     }
     if (failCount > 0) {
-      toast.error(`${failCount}개 재발행에 실패했습니다.`)
+      toast.error(`${failCount}개 재발행 실패`)
     }
     loadProducts()
   }
