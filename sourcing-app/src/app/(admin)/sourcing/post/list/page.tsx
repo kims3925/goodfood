@@ -325,6 +325,7 @@ export default function PostsManagePage() {
 
   const handleOpenAddModal = async () => {
     // 모달 상태 초기화
+    setAddMode('BAND')
     setSelectedPlatform('BAND')
     setAvailablePosts([])
     setSelectedPostKeys([])
@@ -1742,6 +1743,9 @@ export default function PostsManagePage() {
                     <span>{ch.name}</span>
                   </label>
                 ))}
+                {isLoadingChannels && (
+                  <span className="text-xs text-gray-400">도매채널 로딩 중...</span>
+                )}
                 {channels.length === 0 && !isLoadingChannels && (
                   <span className="text-xs text-gray-400">등록된 도매채널이 없습니다</span>
                 )}
