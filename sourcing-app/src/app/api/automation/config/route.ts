@@ -203,6 +203,7 @@ export async function POST(request: NextRequest) {
       nextRunAt = calculateNextRunTime(cronExpression)
     }
 
+    // 기본 필드로 upsert (DB 컬럼이 확실히 존재하는 필드만)
     const config = await prisma.automationConfig.upsert({
       where: { userId: currentUser.userId },
       create: {
@@ -215,10 +216,6 @@ export async function POST(request: NextRequest) {
         shopIds: JSON.stringify(finalShopIds),
         pipelineSteps: JSON.stringify(finalPipelineSteps),
         collectionLimit: finalCollectionLimit,
-        collectionLimitByChannel: JSON.stringify(finalCollectionLimitByChannel),
-        autoPublishLimit: finalAutoPublishLimit,
-        autoPublishLimitByShop: JSON.stringify(finalAutoPublishLimitByShop),
-        autoPublishLimitByChannel: JSON.stringify(finalAutoPublishLimitByChannel),
         nextRunAt,
       },
       update: {
@@ -230,13 +227,24 @@ export async function POST(request: NextRequest) {
         shopIds: JSON.stringify(finalShopIds),
         pipelineSteps: JSON.stringify(finalPipelineSteps),
         collectionLimit: finalCollectionLimit,
-        collectionLimitByChannel: JSON.stringify(finalCollectionLimitByChannel),
-        autoPublishLimit: finalAutoPublishLimit,
-        autoPublishLimitByShop: JSON.stringify(finalAutoPublishLimitByShop),
-        autoPublishLimitByChannel: JSON.stringify(finalAutoPublishLimitByChannel),
         nextRunAt,
       },
     })
+
+    // 신규 컬럼 별도 업데이트 (DB 마이그레이션 미적용 환경 대응)
+    try {
+      await prisma.automationConfig.update({
+        where: { userId: currentUser.userId },
+        data: {
+          collectionLimitByChannel: JSON.stringify(finalCollectionLimitByChannel),
+          autoPublishLimit: finalAutoPublishLimit,
+          autoPublishLimitByShop: JSON.stringify(finalAutoPublishLimitByShop),
+          autoPublishLimitByChannel: JSON.stringify(finalAutoPublishLimitByChannel),
+        },
+      })
+    } catch (e: any) {
+      console.warn('[AutomationConfig] 신규 컬럼 업데이트 실패 (DB 마이그레이션 필요):', e?.message)
+    }
 
     // 스케줄러 업데이트
     await updateScheduler(currentUser.userId)
