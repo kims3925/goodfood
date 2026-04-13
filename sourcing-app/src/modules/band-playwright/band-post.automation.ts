@@ -2238,6 +2238,39 @@ export class BandPostAutomation {
   }
 
   /**
+   * 본문 텍스트를 CKEditor 호환 HTML로 변환
+   * 첫 번째 비어있지 않은 줄 = 상품명 (크게 + 볼드)
+   * 나머지 = 보통 ��기
+   */
+  private contentToHtml(content: string): string {
+    const lines = content.split('\n')
+    const htmlParts: string[] = []
+    let titleDone = false
+
+    for (const line of lines) {
+      // HTML 이스케이프
+      const escaped = line
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+
+      if (!titleDone && line.trim().length > 0) {
+        // 첫 줄(상품명): 크게(18px) + 볼드
+        htmlParts.push(`<p><span style="font-size:18px"><strong>${escaped}</strong></span></p>`)
+        titleDone = true
+      } else if (line.trim().length === 0) {
+        // 빈 줄
+        htmlParts.push('<p><br></p>')
+      } else {
+        // 나머지: 보통 크기
+        htmlParts.push(`<p>${escaped}</p>`)
+      }
+    }
+
+    return htmlParts.join('')
+  }
+
+  /**
    * 글씨 스타일 초기화 (보통 크기 + 볼드 해제)
    * 상품명 입력 후 나머지 본문을 보통 스타일로 입력하기 위해 사용
    */
@@ -2386,39 +2419,59 @@ export class BandPostAutomation {
       )
     }
 
-    // contenteditable인 경우
+    // contenteditable인 경우 - HTML 직접 주입 (키보드 타이핑 대신)
     const isContentEditable = await editor.evaluate(el => el.getAttribute('contenteditable') === 'true')
     if (isContentEditable) {
       await editor.click()
       await page.waitForTimeout(300)
 
-      const lines = content.split('\n')
+      // 본문을 HTML로 변환 (첫 줄 = 상품명 크게+볼드, 나머지 보통)
+      const html = this.contentToHtml(content)
+      console.log(`[밴드자동화] HTML 주입 (${content.length}자 → ${html.length}자 HTML)`)
 
-      // 첫 번째 비어있지 않은 줄(상품명)만 크게 + 볼드로 입력
-      let titleTyped = false
-      for (let i = 0; i < lines.length; i++) {
-        if (!titleTyped && lines[i].trim().length > 0) {
-          // 상품명: 크게 + 볼드 스타일 적용
-          await this.setTextStyle(page)
-          await page.keyboard.type(lines[i], { delay: 10 })
-          titleTyped = true
+      // CKEditor에 HTML 직접 주입 + 커서를 맨 끝으로 이동
+      await editor.evaluate((el, htmlContent) => {
+        el.innerHTML = htmlContent
 
-          if (i < lines.length - 1) {
-            await page.keyboard.press('Enter')
-          }
+        // CKEditor에 변경 알림 (input/change 이벤트)
+        el.dispatchEvent(new Event('input', { bubbles: true }))
+        el.dispatchEvent(new Event('change', { bubbles: true }))
 
-          // 상품명 입력 후 스타일 초기화 (보통 크기 + 볼드 해제)
-          await this.resetTextStyle(page)
-        } else {
-          // 나머지 줄: 보통 스타일로 입력
-          await page.keyboard.type(lines[i], { delay: 10 })
-          if (i < lines.length - 1) {
-            await page.keyboard.press('Enter')
-          }
+        // 커서를 맨 끝으로 이동 (이미지가 텍스트 뒤에 삽입되도록)
+        const range = document.createRange()
+        range.selectNodeContents(el)
+        range.collapse(false)
+        const sel = window.getSelection()
+        if (sel) {
+          sel.removeAllRanges()
+          sel.addRange(range)
         }
-      }
+      }, html)
 
-      console.log('[밴드자동화] 키보드 입력으로 본문 작성 완료 (상품명만 크게/볼드)')
+      // CKEditor 내부 상태 동기화 대기
+      await page.waitForTimeout(500)
+
+      // CKEditor 인스턴스의 내부 데이터도 동기화 (게시 버튼 활성화)
+      await page.evaluate(() => {
+        try {
+          // CKEditor 인스턴스 찾기
+          if (typeof (window as any).CKEDITOR !== 'undefined') {
+            const instances = (window as any).CKEDITOR.instances
+            for (const key of Object.keys(instances)) {
+              const inst = instances[key]
+              if (inst && inst.fire) {
+                inst.fire('change')
+                console.log('[CKEditor] change 이벤트 발생:', key)
+              }
+            }
+          }
+        } catch (e) {
+          // CKEditor 인스턴스 접근 실패 — 무시
+        }
+      })
+
+      await page.waitForTimeout(300)
+      console.log('[밴드자동화] HTML 주입으로 본문 작성 완료')
     } else {
       // textarea인 경우
       await editor.fill(content)
@@ -2432,7 +2485,18 @@ export class BandPostAutomation {
       await page.waitForSelector('button._btnSubmitPost:not([disabled])', { timeout: 5000 })
       console.log('[밴드자동화] 게시 버튼 활성화됨')
     } catch {
-      console.warn('[밴드자동화] 게시 버튼이 아직 비활성화 상태일 수 있음')
+      // 게시 버튼이 비활성화 상태면 키보드 입력으로 강제 활성화 시도
+      console.warn('[밴드자동화] 게시 버튼 비활성화, 키보드 입력으로 활성화 시도')
+      await editor.click()
+      await page.keyboard.press('Space')
+      await page.keyboard.press('Backspace')
+      await page.waitForTimeout(500)
+      try {
+        await page.waitForSelector('button._btnSubmitPost:not([disabled])', { timeout: 3000 })
+        console.log('[밴드자동화] 게시 버튼 활성화됨 (키보드 트리거)')
+      } catch {
+        console.warn('[밴드자동화] 게시 버튼이 여전히 비활성화 상태')
+      }
     }
   }
 
