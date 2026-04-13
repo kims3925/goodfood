@@ -551,18 +551,16 @@ export class BandPostAutomation {
       // 취소 확인
       checkCancelled()
 
-      // === 순서: 1.텍스트 → 2.텍스트 검증 → 3.이미지 다운로드 → 4.이미지 업로드 → 5.게시 ===
-
-      // 3. 본문 입력 (텍스트를 먼저 완성)
+      // 3. 본문 입력 (먼저 입력해야 게시물 상단에 표시됨)
       await reportStage('entering')
-      console.log('[밴드자동화] 3단계: 본문 입력 (텍스트 먼저)')
+      console.log('[밴드자동화] 3단계: 본문 입력')
       await this.inputContent(page, content)
       await this.saveDebugScreenshot(page, 'step3-content-entered')
 
       // 취소 확인
       checkCancelled()
 
-      // 4. 이미지 다운로드 및 업로드 (텍스트 입력 완료 확인 후)
+      // 4. 이미지 다운로드 및 업로드 (본문 아래에 표시됨)
       const imagesToUpload = imageUrls.slice(0, MAX_IMAGES)
       const totalImages = imagesToUpload.length
       if (totalImages > 0) {
@@ -580,7 +578,7 @@ export class BandPostAutomation {
         tempFiles.push(...downloadedImages)
         console.log(`[밴드자동화] ${downloadedImages.length}/${totalImages}개 이미지 다운로드 완료`)
 
-        // 이미지 다운로드 실패 확인
+        // 이미지 다운로드 실패 확인 - 하나라도 실패하면 전체 실패
         const failedCount = totalImages - downloadedImages.length
         if (failedCount > 0) {
           console.error(`[밴드자동화] 이미지 다운로드 실패: ${failedCount}/${totalImages}개 실패`)
@@ -2240,101 +2238,6 @@ export class BandPostAutomation {
   }
 
   /**
-   * 본문 텍스트를 CKEditor 호환 HTML로 변환
-   * 첫 번째 비어있지 않은 줄 = 상품명 (크게 + 볼드)
-   * 나머지 = 보통 ��기
-   */
-  private contentToHtml(content: string): string {
-    const lines = content.split('\n')
-    const htmlParts: string[] = []
-    let titleDone = false
-
-    for (const line of lines) {
-      // HTML 이스케이프
-      const escaped = line
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-
-      if (!titleDone && line.trim().length > 0) {
-        // 첫 줄(상품명): 크게(18px) + 볼드
-        htmlParts.push(`<p><span style="font-size:18px"><strong>${escaped}</strong></span></p>`)
-        titleDone = true
-      } else if (line.trim().length === 0) {
-        // 빈 줄
-        htmlParts.push('<p><br></p>')
-      } else {
-        // 나머지: 보통 크기
-        htmlParts.push(`<p>${escaped}</p>`)
-      }
-    }
-
-    return htmlParts.join('')
-  }
-
-  /**
-   * 글씨 스타일 초기화 (보통 크기 + 볼드 해제)
-   * 상품명 입력 후 나머지 본문을 보통 스타일로 입력하기 위해 사용
-   */
-  private async resetTextStyle(page: Page): Promise<void> {
-    try {
-      // 1. 볼드 해제 (토글 - 다시 클릭하면 해제됨)
-      const boldButton = await page.$('.cke_button__bold_icon')
-      if (boldButton) {
-        const parent = await boldButton.$('xpath=..')
-        if (parent) {
-          // 볼드가 활성 상태인지 확인 후 해제
-          const isActive = await parent.evaluate(el => {
-            const a = el.closest('a')
-            return a?.classList.contains('cke_button_on') || false
-          })
-          if (isActive) {
-            await parent.click()
-            await page.waitForTimeout(200)
-            console.log('[밴드자동화] 볼드 해제 완료')
-          }
-        }
-      }
-
-      // 2. 글씨 크기를 "보통"으로 변경
-      const fontSizeButton = await page.$('.cke_button__fontsize_icon')
-      if (fontSizeButton) {
-        const parent = await fontSizeButton.$('xpath=..')
-        if (parent) {
-          await parent.click()
-          await page.waitForTimeout(500)
-
-          const panelFrame = page.frameLocator('.cke_panel_frame')
-          if (panelFrame) {
-            // "보통" 옵션 찾기
-            const normalOption = panelFrame.locator('a[title="보통"]')
-            if (await normalOption.count() > 0) {
-              await normalOption.click()
-              await page.waitForTimeout(300)
-              console.log('[밴드자동화] 글씨 크기 "보통" 선택 완료')
-            } else {
-              // 텍스트로도 시도
-              const normalByText = panelFrame.locator('a:has-text("보통")')
-              if (await normalByText.count() > 0) {
-                await normalByText.click()
-                await page.waitForTimeout(300)
-                console.log('[밴드자동화] 글씨 크기 "보통" 선택 완료 (텍스트)')
-              } else {
-                // "보통"이 없으면 ESC로 드롭다운 닫기
-                await page.keyboard.press('Escape')
-                await page.waitForTimeout(200)
-                console.warn('[밴드자동화] "보통" 옵션을 찾을 수 없음, 드롭다운 닫기')
-              }
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('[밴드자동화] 글씨 스타일 초기화 실패 (무시하고 계속):', error)
-    }
-  }
-
-  /**
    * 본문 입력
    * Band UI 패턴에 따라 레이어 팝업 내 에디터 또는 인라인 에디터에 입력
    */
@@ -2421,64 +2324,26 @@ export class BandPostAutomation {
       )
     }
 
-    // contenteditable인 경우 - 키보드 타이핑 (CKEditor 호환, 스타일 조작 없음)
+    // contenteditable인 경우
     const isContentEditable = await editor.evaluate(el => el.getAttribute('contenteditable') === 'true')
     if (isContentEditable) {
-      // 에디터 포커스
       await editor.click()
-      await page.waitForTimeout(500)
-
-      // 기존 내용 전체 선택 후 삭제 (깨끗한 상태에서 시작)
-      await page.keyboard.down('Control')
-      await page.keyboard.press('a')
-      await page.keyboard.up('Control')
-      await page.keyboard.press('Backspace')
       await page.waitForTimeout(300)
 
-      // 줄 단위로 키보드 타이핑 (스타일 조작 없이 순수 텍스트만)
-      const lines = content.split('\n')
-      console.log(`[밴드자동화] 키보드 타이핑 시작: ${lines.length}줄, ${content.length}자`)
+      // 글씨 스타일 설정 (크게 + 볼드) - 텍스트 입력 전에 설정
+      await this.setTextStyle(page)
 
+      // 타이핑으로 입력 (줄바꿈은 Enter로)
+      const lines = content.split('\n')
       for (let i = 0; i < lines.length; i++) {
-        if (lines[i].length > 0) {
-          await page.keyboard.type(lines[i], { delay: 5 })
-        }
+        await page.keyboard.type(lines[i], { delay: 10 })
+        // 마지막 줄이 아니면 Enter
         if (i < lines.length - 1) {
           await page.keyboard.press('Enter')
         }
       }
 
-      await page.waitForTimeout(500)
-
-      // 입력 검증: 에디터에 텍스트가 있는지 확인
-      const editorText = await editor.evaluate(el => el.textContent || '')
-      const expectedFirstLine = lines.find(l => l.trim().length > 0) || ''
-      if (editorText.length < 10 || !editorText.includes(expectedFirstLine.substring(0, 20))) {
-        console.error(`[밴드자동화] 텍스트 입력 검증 실패: 기대 "${expectedFirstLine.substring(0, 30)}..." / 실제 "${editorText.substring(0, 30)}..."`)
-        await this.saveDebugScreenshot(page, 'text-verify-failed')
-        // 재시도: clipboard paste
-        console.log('[밴드자동화] clipboard paste로 재시도...')
-        await editor.click()
-        await page.waitForTimeout(300)
-        await page.keyboard.down('Control')
-        await page.keyboard.press('a')
-        await page.keyboard.up('Control')
-        await page.keyboard.press('Backspace')
-        await page.waitForTimeout(300)
-        await page.evaluate((text) => {
-          navigator.clipboard.writeText(text)
-        }, content)
-        await page.waitForTimeout(200)
-        await page.keyboard.down('Control')
-        await page.keyboard.press('v')
-        await page.keyboard.up('Control')
-        await page.waitForTimeout(1000)
-        console.log('[밴드자동화] clipboard paste 완료')
-      } else {
-        console.log(`[밴드자동화] 텍스트 입력 검증 성공 (${editorText.length}자)`)
-      }
-
-      console.log('[밴드자동화] 키보드 타이핑으로 본문 작성 완료')
+      console.log('[밴드자동화] 키보드 입력으로 본문 작성 완료')
     } else {
       // textarea인 경우
       await editor.fill(content)
@@ -2487,16 +2352,12 @@ export class BandPostAutomation {
 
     await page.waitForTimeout(1000)
 
-    // 게시 버튼 활성화 대기
+    // 게시 버튼이 활성화될 때까지 대기
     try {
       await page.waitForSelector('button._btnSubmitPost:not([disabled])', { timeout: 5000 })
       console.log('[밴드자동화] 게시 버튼 활성화됨')
     } catch {
-      console.warn('[밴드자동화] 게시 버튼 비활성화, Space+Backspace로 활성화 시도')
-      await editor.click()
-      await page.keyboard.press('Space')
-      await page.keyboard.press('Backspace')
-      await page.waitForTimeout(500)
+      console.warn('[밴드자동화] 게시 버튼이 아직 비활성화 상태일 수 있음')
     }
   }
 
@@ -3060,11 +2921,7 @@ export class BandPostAutomation {
           console.log('[밴드자동화] 글쓰기 레이어 열기')
           await this.openWriteLayer(page)
 
-          // 2-2. 본문 입력 (텍스트 먼저)
-          console.log('[밴드자동화] 본문 입력 중')
-          await this.inputContent(page, item.content)
-
-          // 2-3. 이미지 다운로드
+          // 2-2. 이미지 다운로드 (먼저 준비)
           const imagesToUpload = item.imageUrls.slice(0, MAX_IMAGES)
           let downloadedImages: string[] = []
           if (imagesToUpload.length > 0) {
@@ -3073,7 +2930,11 @@ export class BandPostAutomation {
             tempFiles.push(...downloadedImages)
           }
 
-          // 2-4. 이미지 업로드 (텍스트 입력 완료 후)
+          // 2-3. 본문 입력 (이미지보다 먼저 입력 - 밴드에서 텍스트가 이미지 위에 표시됨)
+          console.log('[밴드자동화] 본문 입력 중')
+          await this.inputContent(page, item.content)
+
+          // 2-4. 이미지 업로드 (본문 입력 후 - 이미지가 본문 아래에 배치됨)
           let uploadedImageCount = 0
           if (downloadedImages.length > 0) {
             console.log(`[밴드자동화] 다운로드 완료 ${downloadedImages.length} images, now uploading...`)
