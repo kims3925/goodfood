@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const startDateParam = searchParams.get('startDate') // ISO 형식 (예: 2026-04-10T00:00:00)
     const endDateParam = searchParams.get('endDate')
     const includeExisting = searchParams.get('includeExisting') === 'true' // 기존 소싱분 포함 여부
+    const channelIdsParam = searchParams.get('channelIds') // 특정 채널만 조회 (쉼표 구분)
     const days = daysParam ? parseInt(daysParam) : (todayOnly ? 1 : 0)
 
     // 현재 BAND만 지원
@@ -38,14 +39,21 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // 사용자의 도매채널 조회 (해당 플랫폼만)
+    // 사용자의 도매채널 조회 (해당 플랫폼만, 특정 채널 필터 가능)
+    const channelFilter: any = {
+      userId: userId,
+      isActive: true,
+      kind: ChannelKind.WHOLESALE,
+      platform: platform,
+    }
+    if (channelIdsParam) {
+      const channelIds = channelIdsParam.split(',').map(Number).filter(Boolean)
+      if (channelIds.length > 0) {
+        channelFilter.id = { in: channelIds }
+      }
+    }
     const wholesaleChannels = await prisma.channel.findMany({
-      where: {
-        userId: userId,
-        isActive: true,
-        kind: ChannelKind.WHOLESALE,
-        platform: platform,
-      },
+      where: channelFilter,
     })
 
     if (wholesaleChannels.length === 0) {
@@ -191,20 +199,20 @@ export async function GET(request: NextRequest) {
 
     // 날짜+시간 범위 필터링 (startDate/endDate 우선, 없으면 days)
     if (startDateParam || endDateParam) {
-      // KST 기준 ISO 문자열을 UTC ms로 변환
-      // 클라이언트가 "2026-04-10T00:00" 형식으로 보내면 KST 시간으로 해석
-      const kstOffset = 9 * 60 * 60 * 1000
-      const startMs = startDateParam ? new Date(startDateParam).getTime() - kstOffset : 0
-      const endMs = endDateParam ? new Date(endDateParam).getTime() - kstOffset : Number.MAX_SAFE_INTEGER
+      // 클라이언트가 "2026-04-10T00:00" (KST) 형식으로 보냄
+      // new Date()가 로컬 타임존(KST)으로 파싱하므로 그대로 getTime()으로 UTC ms 변환
+      const startMs = startDateParam ? new Date(startDateParam).getTime() : 0
+      const endMs = endDateParam ? new Date(endDateParam).getTime() : Number.MAX_SAFE_INTEGER
 
       filteredPosts = filteredPosts.filter((post) => {
         if (!post.created_at) return false
         const postTime = post.created_at
+        // Band API created_at: 초 또는 밀리초 단위 UTC timestamp
         const postTimeMs = postTime > 9999999999999 ? postTime : (postTime > 9999999999 ? postTime : postTime * 1000)
         return postTimeMs >= startMs && postTimeMs <= endMs
       })
 
-      console.log(`[Post Available] 전체: ${totalAvailable}개, 범위 필터: ${filteredPosts.length}개 (${startDateParam ?? '제한없음'} ~ ${endDateParam ?? '제한없음'})`)
+      console.log(`[Post Available] 전체: ${totalAvailable}개, 범위 필터: ${filteredPosts.length}개 (${startDateParam ?? '없음'} ~ ${endDateParam ?? '없음'}, startMs=${startMs}, endMs=${endMs})`)
     } else if (days > 0) {
       const kstOffset = 9 * 60 * 60 * 1000
       const now = new Date()

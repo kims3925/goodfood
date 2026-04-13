@@ -190,6 +190,8 @@ export default function PostsManagePage() {
 
   // 채널별 소싱 개수 (수동 소싱 시)
   const [channelSourcingLimits, setChannelSourcingLimits] = useState<Record<string, number>>({})
+  // 조건 설정: 소싱할 도매밴드 선택 (빈 Set이면 전체)
+  const [filterChannelIds, setFilterChannelIds] = useState<Set<number>>(new Set())
 
   // 채널 목록 로드
   const loadChannels = useCallback(async () => {
@@ -287,6 +289,10 @@ export default function PostsManagePage() {
       if (filterStartDate) params.set('startDate', filterStartDate)
       if (filterEndDate) params.set('endDate', filterEndDate)
       if (filterSearch) params.set('search', filterSearch)
+      // 선택된 도매밴드 필터
+      if (filterChannelIds.size > 0) {
+        params.set('channelIds', Array.from(filterChannelIds).join(','))
+      }
 
       const response = await fetch(`/api/post/available?${params}`)
       const data = await response.json()
@@ -303,7 +309,7 @@ export default function PostsManagePage() {
     } finally {
       setIsLoadingPosts(false)
     }
-  }, [filterStartDate, filterEndDate, filterSearch])
+  }, [filterStartDate, filterEndDate, filterSearch, filterChannelIds])
 
   // 플랫폼 선택 핸들러
   const handlePlatformSelect = (platform: ChannelPlatform) => {
@@ -1697,10 +1703,55 @@ export default function PostsManagePage() {
           {addMode === 'BAND' && (
           <>
           {/* 수집 조건 설정 + 조회 */}
-          <div className="bg-gray-50 rounded-lg p-4">
+          <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+            {/* 도매밴드 선택 */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">도매밴드 선택</label>
+              <div className="flex flex-wrap gap-2">
+                {channels.map(ch => (
+                  <label
+                    key={ch.id}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer transition-colors text-sm ${
+                      filterChannelIds.size === 0 || filterChannelIds.has(ch.id)
+                        ? 'bg-blue-50 border-blue-300 text-blue-800'
+                        : 'bg-white border-gray-200 text-gray-500'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={filterChannelIds.size === 0 || filterChannelIds.has(ch.id)}
+                      onChange={() => {
+                        setFilterChannelIds(prev => {
+                          const next = new Set(prev)
+                          if (prev.size === 0) {
+                            // 전체 선택 → 이 채널만 해제
+                            channels.forEach(c => { if (c.id !== ch.id) next.add(c.id) })
+                          } else if (next.has(ch.id)) {
+                            next.delete(ch.id)
+                            if (next.size === 0) return new Set() // 모두 해제 → 전체로
+                          } else {
+                            next.add(ch.id)
+                            if (next.size === channels.length) return new Set() // 모두 선택 → 전체로
+                          }
+                          return next
+                        })
+                      }}
+                      className="w-3.5 h-3.5"
+                    />
+                    {ch.coverUrl && <img src={ch.coverUrl} alt="" className="w-5 h-5 rounded object-cover" />}
+                    <span>{ch.name}</span>
+                  </label>
+                ))}
+                {channels.length === 0 && !isLoadingChannels && (
+                  <span className="text-xs text-gray-400">등록된 도매채널이 없습니다</span>
+                )}
+              </div>
+            </div>
+
+            {/* 날짜 + 키워드 + 조회 버튼 */}
             <div className="flex flex-wrap items-end gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">시작 일시 (KST)</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">시작 일시</label>
                 <input
                   type="datetime-local"
                   value={filterStartDate}
@@ -1709,7 +1760,7 @@ export default function PostsManagePage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">종료 일시 (KST)</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">종료 일시</label>
                 <input
                   type="datetime-local"
                   value={filterEndDate}
@@ -1730,7 +1781,7 @@ export default function PostsManagePage() {
               <button
                 onClick={() => loadPostsByPlatform('BAND')}
                 disabled={isLoadingPosts}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                className="px-5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
               >
                 {isLoadingPosts ? '조회 중...' : '조회'}
               </button>
