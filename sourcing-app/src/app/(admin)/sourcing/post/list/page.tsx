@@ -84,6 +84,7 @@ interface AvailablePost {
     channelKey: string
     coverUrl: string | null
   }
+  isExisting?: boolean // 이미 소싱된 게시물 여부
 }
 
 const PLATFORM_OPTIONS: { value: ChannelPlatform; label: string }[] = [
@@ -281,7 +282,7 @@ export default function PostsManagePage() {
     setExpandedBandKeys([])
 
     try {
-      const params = new URLSearchParams({ platform })
+      const params = new URLSearchParams({ platform, includeExisting: 'true' })
       // 날짜+시간 범위 우선 사용
       if (filterStartDate) params.set('startDate', filterStartDate)
       if (filterEndDate) params.set('endDate', filterEndDate)
@@ -410,41 +411,69 @@ export default function PostsManagePage() {
   // 일괄 소싱 진행 상태
   const [isBulkSourcing, setIsBulkSourcing] = useState(false)
   const [bulkSourcingProgress, setBulkSourcingProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 })
+  // 일괄 소싱 옵션 패널 상태
+  const [bulkSourcingPanel, setBulkSourcingPanel] = useState<'new' | 'resource' | null>(null)
+  const [bulkSelectedChannels, setBulkSelectedChannels] = useState<Set<string>>(new Set())
+  const [bulkLimit, setBulkLimit] = useState<number | null>(null) // null=전체
+  // 개별 소싱 진행 중인 post_key
+  const [sourcingPostKey, setSourcingPostKey] = useState<string | null>(null)
 
   /**
-   * 일괄 소싱 (조건에 맞는 게시물을 자동으로 가져와서 등록)
+   * 일괄 소싱 (이미 조회된 availablePosts에서 필터링하여 등록)
    * @param includeExisting true면 기존 소싱분도 다시 가져옴 (force 덮어쓰기)
+   * @param channelFilter 특정 채널키만 소싱 (null이면 bulkSelectedChannels 사용)
+   * @param limit 채널당 소싱 개수 (null이면 전체)
    */
-  const handleBulkSourcing = async (includeExisting: boolean) => {
+  const handleBulkSourcing = async (includeExisting: boolean, channelFilter?: string | null, limit?: number | null) => {
     const modeLabel = includeExisting ? '다시소싱' : '새로운상품 소싱'
 
+    // 소싱 대상 게시물 필터링
+    let postsToRegister = [...availablePosts]
+
+    // 채널 필터
+    const targetChannels = channelFilter
+      ? new Set([channelFilter])
+      : bulkSelectedChannels.size > 0
+        ? bulkSelectedChannels
+        : null // null이면 전체
+
+    if (targetChannels) {
+      postsToRegister = postsToRegister.filter(p => targetChannels.has(p.channel.channelKey))
+    }
+
+    // 새상품만/기존포함 필터
+    if (!includeExisting) {
+      postsToRegister = postsToRegister.filter(p => !p.isExisting)
+    }
+
+    // 채널별 개수 제한
+    const effectiveLimit = limit !== undefined ? limit : bulkLimit
+    if (effectiveLimit && effectiveLimit > 0) {
+      // 채널별로 limit 적용
+      const byChannel = new Map<string, AvailablePost[]>()
+      for (const p of postsToRegister) {
+        const key = p.channel.channelKey
+        if (!byChannel.has(key)) byChannel.set(key, [])
+        byChannel.get(key)!.push(p)
+      }
+      postsToRegister = []
+      for (const posts of byChannel.values()) {
+        postsToRegister.push(...posts.slice(0, effectiveLimit))
+      }
+    }
+
+    if (postsToRegister.length === 0) {
+      toast.error('조건에 맞는 게시물이 없습니다.')
+      return
+    }
+
     setIsBulkSourcing(true)
-    setBulkSourcingProgress({ current: 0, total: 0, success: 0, failed: 0 })
+    setBulkSourcingProgress({ current: 0, total: postsToRegister.length, success: 0, failed: 0 })
+
+    let success = 0
+    let failed = 0
 
     try {
-      // 1. 조건에 맞는 게시물 조회
-      const params = new URLSearchParams({ platform: 'BAND' })
-      if (filterStartDate) params.set('startDate', filterStartDate)
-      if (filterEndDate) params.set('endDate', filterEndDate)
-      if (filterSearch) params.set('search', filterSearch)
-      if (includeExisting) params.set('includeExisting', 'true')
-
-      const response = await fetch(`/api/post/available?${params}`)
-      const data = await response.json()
-
-      if (!data.success || !data.data || data.data.length === 0) {
-        toast.error(data.error || '조건에 맞는 게시물이 없습니다.')
-        setIsBulkSourcing(false)
-        return
-      }
-
-      const postsToRegister = data.data as (AvailablePost & { isExisting?: boolean })[]
-      setBulkSourcingProgress(prev => ({ ...prev, total: postsToRegister.length }))
-
-      // 2. 게시물 순차 등록
-      let success = 0
-      let failed = 0
-
       for (let i = 0; i < postsToRegister.length; i++) {
         const post = postsToRegister[i]
         setBulkSourcingProgress(prev => ({ ...prev, current: i + 1 }))
@@ -461,16 +490,12 @@ export default function PostsManagePage() {
               author: post.author,
               comments: post.comments || [],
               images: post.images || [],
-              force: includeExisting && post.isExisting, // 기존 게시물이면 덮어쓰기
+              force: includeExisting && post.isExisting,
             }),
           })
-
           const result = await res.json()
-          if (result.success) {
-            success++
-          } else {
-            failed++
-          }
+          if (result.success) success++
+          else failed++
         } catch {
           failed++
         }
@@ -478,11 +503,11 @@ export default function PostsManagePage() {
         setBulkSourcingProgress(prev => ({ ...prev, success, failed }))
       }
 
-      // 3. 완료 처리
       if (success > 0) {
         toast.success(`${modeLabel} 완료: ${success}개 등록${failed > 0 ? `, ${failed}개 실패` : ''}`)
-        setShowAddModal(false)
         loadPosts()
+        // 조회 데이터 새로고침
+        loadPostsByPlatform('BAND')
       } else {
         toast.error(`${modeLabel} 실패: 등록된 게시물이 없습니다.`)
       }
@@ -492,6 +517,45 @@ export default function PostsManagePage() {
     } finally {
       setIsBulkSourcing(false)
       setBulkSourcingProgress({ current: 0, total: 0, success: 0, failed: 0 })
+      setBulkSourcingPanel(null)
+    }
+  }
+
+  /**
+   * 개별 게시물 소싱 (한 개씩)
+   */
+  const handleSingleSourcing = async (post: AvailablePost) => {
+    setSourcingPostKey(post.post_key)
+    try {
+      const res = await fetch('/api/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelId: post.channel.id,
+          externalId: post.post_key,
+          title: post.title,
+          content: post.content,
+          author: post.author,
+          comments: post.comments || [],
+          images: post.images || [],
+          force: post.isExisting,
+        }),
+      })
+      const result = await res.json()
+      if (result.success) {
+        toast.success('소싱 완료')
+        // 해당 게시물을 소싱완료로 마킹
+        setAvailablePosts(prev => prev.map(p =>
+          p.post_key === post.post_key ? { ...p, isExisting: true } : p
+        ))
+        loadPosts()
+      } else {
+        toast.error(result.error || '소싱 실패')
+      }
+    } catch {
+      toast.error('소싱 중 오류 발생')
+    } finally {
+      setSourcingPostKey(null)
     }
   }
 
@@ -1721,20 +1785,24 @@ export default function PostsManagePage() {
             {/* 일괄 소싱 버튼 */}
             <div className="mt-3 flex flex-wrap items-center gap-2 pt-3 border-t border-gray-200">
               <button
-                onClick={() => handleBulkSourcing(false)}
-                disabled={isBulkSourcing || isLoadingPosts}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+                onClick={() => setBulkSourcingPanel(bulkSourcingPanel === 'new' ? null : 'new')}
+                disabled={isBulkSourcing || isLoadingPosts || availablePosts.length === 0}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm ${
+                  bulkSourcingPanel === 'new' ? 'bg-emerald-700 text-white ring-2 ring-emerald-300' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                }`}
               >
                 <Download size={16} />
-                {isBulkSourcing && !bulkSourcingProgress.total ? '조회 중...' : '새로운상품만 소싱하기'}
+                새로운상품 소싱하기 {bulkSourcingPanel === 'new' ? '▲' : '▼'}
               </button>
               <button
-                onClick={() => handleBulkSourcing(true)}
-                disabled={isBulkSourcing || isLoadingPosts}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+                onClick={() => setBulkSourcingPanel(bulkSourcingPanel === 'resource' ? null : 'resource')}
+                disabled={isBulkSourcing || isLoadingPosts || availablePosts.length === 0}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm ${
+                  bulkSourcingPanel === 'resource' ? 'bg-amber-700 text-white ring-2 ring-amber-300' : 'bg-amber-600 hover:bg-amber-700 text-white'
+                }`}
               >
                 <RefreshCw size={16} />
-                기존 소싱완료 상품 다시소싱하기
+                기존소싱완료 상품 다시소싱하기 {bulkSourcingPanel === 'resource' ? '▲' : '▼'}
               </button>
               {isBulkSourcing && bulkSourcingProgress.total > 0 && (
                 <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -1747,6 +1815,83 @@ export default function PostsManagePage() {
                 </div>
               )}
             </div>
+
+            {/* 일괄 소싱 옵션 패널 */}
+            {bulkSourcingPanel && (
+              <div className={`mt-2 p-3 rounded-lg border-2 ${bulkSourcingPanel === 'new' ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">도매방 선택</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(groupedPosts).map(([channelKey, group]) => (
+                        <label key={channelKey} className="flex items-center gap-1.5 px-2 py-1 bg-white border rounded text-xs cursor-pointer hover:bg-gray-50">
+                          <input
+                            type="checkbox"
+                            checked={bulkSelectedChannels.has(channelKey)}
+                            onChange={() => {
+                              setBulkSelectedChannels(prev => {
+                                const next = new Set(prev)
+                                if (next.has(channelKey)) next.delete(channelKey)
+                                else next.add(channelKey)
+                                return next
+                              })
+                            }}
+                            className="w-3.5 h-3.5"
+                          />
+                          <span>{group.channel.name}</span>
+                          <span className="text-gray-400">({group.posts.filter(p => bulkSourcingPanel === 'new' ? !p.isExisting : true).length})</span>
+                        </label>
+                      ))}
+                      {Object.keys(groupedPosts).length > 1 && (
+                        <button
+                          onClick={() => {
+                            if (bulkSelectedChannels.size === Object.keys(groupedPosts).length) {
+                              setBulkSelectedChannels(new Set())
+                            } else {
+                              setBulkSelectedChannels(new Set(Object.keys(groupedPosts)))
+                            }
+                          }}
+                          className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 border border-blue-200 rounded"
+                        >
+                          {bulkSelectedChannels.size === Object.keys(groupedPosts).length ? '선택해제' : '전체선택'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">소싱 개수</label>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={bulkLimit === null ? 'all' : 'custom'}
+                        onChange={e => setBulkLimit(e.target.value === 'all' ? null : 10)}
+                        className="px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                      >
+                        <option value="all">전체</option>
+                        <option value="custom">개수 지정</option>
+                      </select>
+                      {bulkLimit !== null && (
+                        <input
+                          type="number"
+                          min={1}
+                          value={bulkLimit}
+                          onChange={e => setBulkLimit(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-16 px-2 py-1.5 border border-gray-300 rounded text-sm text-center"
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleBulkSourcing(bulkSourcingPanel === 'resource')}
+                    disabled={isBulkSourcing}
+                    className={`px-5 py-2 text-sm font-bold text-white rounded-lg transition-colors disabled:opacity-50 self-end ${
+                      bulkSourcingPanel === 'new' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'
+                    }`}
+                  >
+                    {isBulkSourcing ? '소싱 중...' : '실행'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 게시물 목록 영역 - 고정 높이 */}
@@ -1804,95 +1949,104 @@ export default function PostsManagePage() {
                   const someChannelSelected = selectedInChannel > 0 && selectedInChannel < channelPostKeys.length
                   return (
                     <div key={channelKey} className="border rounded-lg bg-white">
-                      {/* 채널 헤더 */}
-                      <div className="p-4 bg-gray-50 border-b flex items-center gap-3 flex-wrap">
-                        <input
-                          type="checkbox"
-                          checked={allChannelSelected}
-                          ref={(el) => {
-                            if (el) el.indeterminate = someChannelSelected
-                          }}
-                          onChange={(e) => {
-                            e.stopPropagation()
-                            handleToggleChannelSelectAll(channelKey, channelPostKeys)
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-5 h-5 cursor-pointer"
-                        />
-                        <div
-                          className="flex-1 min-w-0 flex items-center justify-between cursor-pointer hover:bg-gray-100 rounded -m-1 p-1 transition-colors"
-                          onClick={() => handleToggleChannelExpand(channelKey)}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            {isChannelExpanded ? (
-                              <ChevronDown size={22} className="text-gray-600 flex-shrink-0" />
-                            ) : (
-                              <ChevronRight size={22} className="text-gray-600 flex-shrink-0" />
-                            )}
-                            {group.channel.coverUrl ? (
-                              <img
-                                src={group.channel.coverUrl}
-                                alt={group.channel.name}
-                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                                <Store size={20} className="text-gray-400" />
+                      {/* 채널 헤더 - 소싱 현황 바 */}
+                      {(() => {
+                        const existingCount = group.posts.filter(p => p.isExisting).length
+                        const newCount = group.posts.length - existingCount
+                        const existingPct = group.posts.length > 0 ? Math.round((existingCount / group.posts.length) * 100) : 0
+                        return (
+                      <div className="p-3 bg-gray-50 border-b">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <input
+                            type="checkbox"
+                            checked={allChannelSelected}
+                            ref={(el) => {
+                              if (el) el.indeterminate = someChannelSelected
+                            }}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              handleToggleChannelSelectAll(channelKey, channelPostKeys)
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-5 h-5 cursor-pointer flex-shrink-0"
+                          />
+                          <div
+                            className="flex-1 min-w-0 cursor-pointer hover:bg-gray-100 rounded p-1 transition-colors"
+                            onClick={() => handleToggleChannelExpand(channelKey)}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              {isChannelExpanded ? (
+                                <ChevronDown size={18} className="text-gray-500 flex-shrink-0" />
+                              ) : (
+                                <ChevronRight size={18} className="text-gray-500 flex-shrink-0" />
+                              )}
+                              {group.channel.coverUrl ? (
+                                <img src={group.channel.coverUrl} alt={group.channel.name} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+                              ) : (
+                                <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                  <Store size={16} className="text-gray-400" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold text-gray-900 text-sm truncate">{group.channel.name}</h3>
+                                  <span className="text-xs text-gray-400">{group.posts.length}개</span>
+                                </div>
+                                {/* 소싱 현황 바 */}
+                                <div className="mt-1 flex items-center gap-2">
+                                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${existingPct}%` }} />
+                                  </div>
+                                  <span className="text-[10px] text-gray-500 whitespace-nowrap">
+                                    <span className="text-emerald-600 font-medium">완료 {existingCount}</span>
+                                    {' / '}
+                                    <span className="text-orange-600 font-medium">미완료 {newCount}</span>
+                                  </span>
+                                </div>
                               </div>
-                            )}
-                            <h3 className="font-semibold text-gray-900 text-base truncate">{group.channel.name}</h3>
-                            <span className="text-sm text-gray-500 flex-shrink-0">
-                              ({selectedInChannel > 0 ? `${selectedInChannel}/` : ''}{group.posts.length}개)
-                            </span>
+                            </div>
+                          </div>
+                          {/* 채널별 소싱 버튼 */}
+                          <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                            <button
+                              onClick={() => handleBulkSourcing(false, channelKey, channelSourcingLimits[channelKey] || null)}
+                              disabled={isBulkSourcing || newCount === 0}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-40"
+                              title={`새 게시물 ${newCount}개 소싱`}
+                            >
+                              새상품만
+                            </button>
+                            <button
+                              onClick={() => handleBulkSourcing(true, channelKey, channelSourcingLimits[channelKey] || null)}
+                              disabled={isBulkSourcing || group.posts.length === 0}
+                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded transition-colors disabled:opacity-40"
+                              title={`전체 ${group.posts.length}개 소싱 (기존 포함)`}
+                            >
+                              모두소싱
+                            </button>
+                            <input
+                              type="number"
+                              min={1}
+                              max={group.posts.length || 100}
+                              value={channelSourcingLimits[channelKey] ?? ''}
+                              placeholder="전체"
+                              onChange={(e) => {
+                                const v = parseInt(e.target.value, 10)
+                                setChannelSourcingLimits(prev => {
+                                  const next = { ...prev }
+                                  if (isNaN(v) || v <= 0) delete next[channelKey]
+                                  else next[channelKey] = v
+                                  return next
+                                })
+                              }}
+                              className="w-12 px-1.5 py-1 border border-gray-300 rounded text-xs text-center bg-white"
+                              title="소싱 개수 (비우면 전체)"
+                            />
                           </div>
                         </div>
-                        {/* 채널별 소싱 개수 입력 + 빠른 선택 */}
-                        <div
-                          className="flex items-center gap-1.5 flex-shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <label className="text-xs text-gray-500">소싱</label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={group.posts.length || 100}
-                            value={channelSourcingLimits[channelKey] ?? ''}
-                            placeholder="전체"
-                            onChange={(e) => {
-                              const v = parseInt(e.target.value, 10)
-                              setChannelSourcingLimits(prev => {
-                                const next = { ...prev }
-                                if (isNaN(v) || v <= 0) {
-                                  delete next[channelKey]
-                                } else {
-                                  next[channelKey] = v
-                                }
-                                return next
-                              })
-                            }}
-                            className="w-14 px-2 py-1 border border-gray-300 rounded text-sm text-center bg-white"
-                          />
-                          <span className="text-xs text-gray-500">개</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const limit = channelSourcingLimits[channelKey]
-                              const n = typeof limit === 'number' && limit > 0 ? limit : channelPostKeys.length
-                              const keysToSelect = channelPostKeys.slice(0, n)
-                              // 다른 채널 선택은 유지, 현재 채널만 치환
-                              setSelectedPostKeys(prev => {
-                                const other = prev.filter(k => !channelPostKeys.includes(k))
-                                return [...other, ...keysToSelect]
-                              })
-                              setSelectAll(false)
-                            }}
-                            className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded"
-                            title="입력한 개수만큼 이 채널 상단부터 선택"
-                          >
-                            선택
-                          </button>
-                        </div>
                       </div>
+                        )
+                      })()}
 
                       {/* 채널별 게시물 목록 */}
                       {isChannelExpanded && (
@@ -1913,36 +2067,61 @@ export default function PostsManagePage() {
                               >
                                 {/* 간략 정보 */}
                                 <div
-                                  className={`p-4 cursor-pointer transition-colors ${
+                                  className={`p-3 cursor-pointer transition-colors ${
                                     selectedPostKeys.includes(post.post_key)
                                       ? 'hover:bg-blue-100'
                                       : 'hover:bg-gray-50'
                                   }`}
                                   onClick={() => handleToggleModalPostSelection(post.post_key)}
                                 >
-                                  <div className="flex items-start justify-between gap-4">
+                                  <div className="flex items-center gap-3">
                                     <div className="flex-1 min-w-0">
-                                      <h4 className="font-medium text-gray-900 truncate">{post.title}</h4>
-                                      <p className="text-sm text-gray-500 mt-1">
-                                        작성자: {post.author || '알 수 없음'}
+                                      <div className="flex items-center gap-2">
+                                        {post.isExisting && (
+                                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-emerald-100 text-emerald-700 flex-shrink-0">완료</span>
+                                        )}
+                                        <h4 className="font-medium text-gray-900 text-sm truncate">{post.title}</h4>
+                                      </div>
+                                      <p className="text-xs text-gray-500 mt-0.5">
+                                        {post.author || '알 수 없음'}
                                         {post.created_at && (
-                                          <span className="ml-2 text-gray-400">
-                                            · {new Date(post.created_at).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                          <span className="ml-1.5 text-gray-400">
+                                            · {new Date(post.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                           </span>
+                                        )}
+                                        {post.images?.length > 0 && (
+                                          <span className="ml-1.5 text-gray-400">· 이미지 {post.images.length}</span>
                                         )}
                                       </p>
                                     </div>
+                                    {/* 개별 소싱 버튼 */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleSingleSourcing(post)
+                                      }}
+                                      disabled={sourcingPostKey === post.post_key || isBulkSourcing}
+                                      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex-shrink-0 disabled:opacity-50 ${
+                                        post.isExisting
+                                          ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                      }`}
+                                    >
+                                      {sourcingPostKey === post.post_key ? (
+                                        <RefreshCw size={12} className="animate-spin" />
+                                      ) : post.isExisting ? '다시소싱' : '소싱하기'}
+                                    </button>
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         handleToggleExpand(post.post_key)
                                       }}
-                                      className="p-1 hover:bg-gray-200 rounded transition-colors"
+                                      className="p-1 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
                                     >
                                       {isExpanded ? (
-                                        <ChevronDown size={20} className="text-gray-400" />
+                                        <ChevronDown size={16} className="text-gray-400" />
                                       ) : (
-                                        <ChevronRight size={20} className="text-gray-400" />
+                                        <ChevronRight size={16} className="text-gray-400" />
                                       )}
                                     </button>
                                   </div>
