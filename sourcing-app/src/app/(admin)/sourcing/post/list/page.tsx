@@ -332,9 +332,6 @@ export default function PostsManagePage() {
       ALIEXPRESS: false,
     })
     setShowAddModal(true)
-
-    // 기본 플랫폼(BAND)의 게시물 로드
-    loadPostsByPlatform('BAND')
   }
 
   const handleToggleSelectAll = () => {
