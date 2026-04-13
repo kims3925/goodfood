@@ -1583,12 +1583,13 @@ function PublishPageContent() {
       toast.error('삭제할 상품을 선택해주세요.')
       return
     }
-    if (!confirm(`선택한 ${selectedProductIds.length}개 상품의 발행을 취소하시겠습니까?\n쇼핑몰에서 상품이 숨겨집니다.`)) {
+    if (!confirm(`선택한 ${selectedProductIds.length}개 상품을 삭제하시겠습니까?\n\n• 쇼핑몰 발행이 취소됩니다\n• 소매밴드 게시물이 삭제됩니다\n• 상품 목록에서 제거됩니다`)) {
       return
     }
 
     let successCount = 0
     let failCount = 0
+    let bandErrors: string[] = []
 
     for (const productId of selectedProductIds) {
       try {
@@ -1596,8 +1597,15 @@ function PublishPageContent() {
           method: 'DELETE',
           credentials: 'include',
         })
-        if (res.ok) successCount++
-        else failCount++
+        const data = await res.json()
+        if (res.ok && data.success) {
+          successCount++
+          if (data.bandDeleteErrors?.length > 0) {
+            bandErrors.push(...data.bandDeleteErrors)
+          }
+        } else {
+          failCount++
+        }
       } catch {
         failCount++
       }
@@ -1607,7 +1615,11 @@ function PublishPageContent() {
     setSelectAllProducts(false)
 
     if (successCount > 0) {
-      toast.success(`${successCount}개 발행이 취소되었습니다.`)
+      if (bandErrors.length > 0) {
+        toast.success(`${successCount}개 상품 삭제 완료 (밴드 게시물 ${bandErrors.length}건 삭제 실패)`)
+      } else {
+        toast.success(`${successCount}개 상품이 삭제되었습니다.`)
+      }
       loadProducts()
     }
     if (failCount > 0) {

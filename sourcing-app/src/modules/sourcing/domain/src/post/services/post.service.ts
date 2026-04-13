@@ -86,6 +86,17 @@ export class PostService {
   }
 
   /**
+   * externalId 기준 게시물 삭제 (다시소싱하기용)
+   * 기존 게시물과 관련 이미지를 삭제하고 재등록할 수 있도록 함
+   */
+  async deleteByExternalId(channelId: number, externalId: string) {
+    const existing = await postRepository.findByExternalId(channelId, externalId)
+    if (existing) {
+      await this.delete(existing.id)
+    }
+  }
+
+  /**
    * 게시물 배치 생성
    * - 중복 체크 (externalId 기준)
    * - 이미지 다운로드 및 로컬 저장

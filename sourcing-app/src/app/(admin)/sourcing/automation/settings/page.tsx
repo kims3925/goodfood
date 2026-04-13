@@ -587,9 +587,15 @@ export default function AutomationSettingsPage() {
           setInitialConfig(loadedConfig)
         } else {
           console.error('자동화 설정 로드 실패:', configData.error)
+          // API 실패 시에도 기본값으로 초기화하여 UI 조작 허용
+          setConfig(defaultConfig)
+          setInitialConfig(defaultConfig)
         }
       } catch (e) {
         console.error('자동화 설정 파싱 실패:', e)
+        // 파싱 실패 시에도 기본값으로 초기화
+        setConfig(defaultConfig)
+        setInitialConfig(defaultConfig)
       }
 
       try {
@@ -891,6 +897,15 @@ export default function AutomationSettingsPage() {
           </button>
         </div>
       </div>
+
+      {/* 파이프라인 실행 중 패널 + 정지 버튼 */}
+      {isPipelineRunning && pipelineStatus && (
+        <PipelineStatusPanel
+          workflow={pipelineStatus}
+          onCancel={handleCancelPipeline}
+          isCancelling={isCancelling}
+        />
+      )}
 
       {/* Schedule Settings - 독립 섹션 */}
       <Card className={`overflow-hidden transition-all ${warningSections.includes('schedule') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasScheduleProblem ? 'ring-2 ring-red-300' : ''}`}>

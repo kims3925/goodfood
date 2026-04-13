@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2, AlertCircle, ChevronDown, ChevronRight, ChevronUp, FileText, Store, Package, Send, ArrowLeft } from 'lucide-react'
+import { Plus, Search, Trash2, AlertCircle, ChevronDown, ChevronRight, ChevronUp, FileText, Store, Package, Send, ArrowLeft, RefreshCw, Download } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -406,6 +406,94 @@ export default function PostsManagePage() {
     acc[channelKey].posts.push(post)
     return acc
   }, {} as Record<string, { channel: { id: number; name: string; channelKey: string; coverUrl: string | null }; posts: AvailablePost[] }>)
+
+  // 일괄 소싱 진행 상태
+  const [isBulkSourcing, setIsBulkSourcing] = useState(false)
+  const [bulkSourcingProgress, setBulkSourcingProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 })
+
+  /**
+   * 일괄 소싱 (조건에 맞는 게시물을 자동으로 가져와서 등록)
+   * @param includeExisting true면 기존 소싱분도 다시 가져옴 (force 덮어쓰기)
+   */
+  const handleBulkSourcing = async (includeExisting: boolean) => {
+    const modeLabel = includeExisting ? '다시소싱' : '새로운상품 소싱'
+
+    setIsBulkSourcing(true)
+    setBulkSourcingProgress({ current: 0, total: 0, success: 0, failed: 0 })
+
+    try {
+      // 1. 조건에 맞는 게시물 조회
+      const params = new URLSearchParams({ platform: 'BAND' })
+      if (filterStartDate) params.set('startDate', filterStartDate)
+      if (filterEndDate) params.set('endDate', filterEndDate)
+      if (filterSearch) params.set('search', filterSearch)
+      if (includeExisting) params.set('includeExisting', 'true')
+
+      const response = await fetch(`/api/post/available?${params}`)
+      const data = await response.json()
+
+      if (!data.success || !data.data || data.data.length === 0) {
+        toast.error(data.error || '조건에 맞는 게시물이 없습니다.')
+        setIsBulkSourcing(false)
+        return
+      }
+
+      const postsToRegister = data.data as (AvailablePost & { isExisting?: boolean })[]
+      setBulkSourcingProgress(prev => ({ ...prev, total: postsToRegister.length }))
+
+      // 2. 게시물 순차 등록
+      let success = 0
+      let failed = 0
+
+      for (let i = 0; i < postsToRegister.length; i++) {
+        const post = postsToRegister[i]
+        setBulkSourcingProgress(prev => ({ ...prev, current: i + 1 }))
+
+        try {
+          const res = await fetch('/api/post', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              channelId: post.channel.id,
+              externalId: post.post_key,
+              title: post.title,
+              content: post.content,
+              author: post.author,
+              comments: post.comments || [],
+              images: post.images || [],
+              force: includeExisting && post.isExisting, // 기존 게시물이면 덮어쓰기
+            }),
+          })
+
+          const result = await res.json()
+          if (result.success) {
+            success++
+          } else {
+            failed++
+          }
+        } catch {
+          failed++
+        }
+
+        setBulkSourcingProgress(prev => ({ ...prev, success, failed }))
+      }
+
+      // 3. 완료 처리
+      if (success > 0) {
+        toast.success(`${modeLabel} 완료: ${success}개 등록${failed > 0 ? `, ${failed}개 실패` : ''}`)
+        setShowAddModal(false)
+        loadPosts()
+      } else {
+        toast.error(`${modeLabel} 실패: 등록된 게시물이 없습니다.`)
+      }
+    } catch (error) {
+      console.error(`${modeLabel} 실패:`, error)
+      toast.error(`${modeLabel} 중 오류가 발생했습니다.`)
+    } finally {
+      setIsBulkSourcing(false)
+      setBulkSourcingProgress({ current: 0, total: 0, success: 0, failed: 0 })
+    }
+  }
 
   const handleAddSelectedPosts = async () => {
     if (selectedPostKeys.length === 0) {
@@ -1628,6 +1716,36 @@ export default function PostsManagePage() {
               >
                 최근 7일
               </button>
+            </div>
+
+            {/* 일괄 소싱 버튼 */}
+            <div className="mt-3 flex flex-wrap items-center gap-2 pt-3 border-t border-gray-200">
+              <button
+                onClick={() => handleBulkSourcing(false)}
+                disabled={isBulkSourcing || isLoadingPosts}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+              >
+                <Download size={16} />
+                {isBulkSourcing && !bulkSourcingProgress.total ? '조회 중...' : '새로운상품만 소싱하기'}
+              </button>
+              <button
+                onClick={() => handleBulkSourcing(true)}
+                disabled={isBulkSourcing || isLoadingPosts}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+              >
+                <RefreshCw size={16} />
+                기존 소싱완료 상품 다시소싱하기
+              </button>
+              {isBulkSourcing && bulkSourcingProgress.total > 0 && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <RefreshCw size={14} className="animate-spin" />
+                  <span>
+                    {bulkSourcingProgress.current}/{bulkSourcingProgress.total}건 처리 중
+                    {bulkSourcingProgress.success > 0 && ` (성공 ${bulkSourcingProgress.success})`}
+                    {bulkSourcingProgress.failed > 0 && ` (실패 ${bulkSourcingProgress.failed})`}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

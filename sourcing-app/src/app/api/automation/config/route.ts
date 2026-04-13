@@ -96,13 +96,13 @@ export async function GET() {
       pipelineSteps = config.pipelineSteps ? JSON.parse(config.pipelineSteps) : pipelineSteps
     } catch { /* use default */ }
     try {
-      collectionLimitByChannel = (config as any).collectionLimitByChannel ? JSON.parse((config as any).collectionLimitByChannel) : {}
+      collectionLimitByChannel = config.collectionLimitByChannel ? JSON.parse(config.collectionLimitByChannel) : {}
     } catch { collectionLimitByChannel = {} }
     try {
-      autoPublishLimitByShop = (config as any).autoPublishLimitByShop ? JSON.parse((config as any).autoPublishLimitByShop) : {}
+      autoPublishLimitByShop = config.autoPublishLimitByShop ? JSON.parse(config.autoPublishLimitByShop) : {}
     } catch { autoPublishLimitByShop = {} }
     try {
-      autoPublishLimitByChannel = (config as any).autoPublishLimitByChannel ? JSON.parse((config as any).autoPublishLimitByChannel) : {}
+      autoPublishLimitByChannel = config.autoPublishLimitByChannel ? JSON.parse(config.autoPublishLimitByChannel) : {}
     } catch { autoPublishLimitByChannel = {} }
 
     return NextResponse.json({
@@ -119,13 +119,18 @@ export async function GET() {
         pipelineSteps,
         collectionLimit: config.collectionLimit ?? 10,
         collectionLimitByChannel,
-        autoPublishLimit: (config as any).autoPublishLimit ?? 20,
+        autoPublishLimit: config.autoPublishLimit ?? 20,
         autoPublishLimitByShop,
         autoPublishLimitByChannel,
       },
     })
-  } catch (error) {
-    console.error('자동화 설정 조회 실패:', error)
+  } catch (error: any) {
+    console.error('자동화 설정 조회 실패:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+      stack: error?.stack?.split('\n').slice(0, 5),
+    })
     return NextResponse.json(
       { success: false, error: '설정을 불러오는데 실패했습니다.' },
       { status: 500 }
@@ -243,8 +248,13 @@ export async function POST(request: NextRequest) {
         cronInterval: cronInterval || '1h',
       },
     })
-  } catch (error) {
-    console.error('자동화 설정 저장 실패:', error)
+  } catch (error: any) {
+    console.error('자동화 설정 저장 실패:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+      stack: error?.stack?.split('\n').slice(0, 5),
+    })
     return NextResponse.json(
       { success: false, error: '설정 저장에 실패했습니다.' },
       { status: 500 }

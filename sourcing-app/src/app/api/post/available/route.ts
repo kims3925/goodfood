@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
     const searchQuery = searchParams.get('search') || ''
     const startDateParam = searchParams.get('startDate') // ISO 형식 (예: 2026-04-10T00:00:00)
     const endDateParam = searchParams.get('endDate')
+    const includeExisting = searchParams.get('includeExisting') === 'true' // 기존 소싱분 포함 여부
     const days = daysParam ? parseInt(daysParam) : (todayOnly ? 1 : 0)
 
     // 현재 BAND만 지원
@@ -152,10 +153,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 이미 등록된 게시물 제외
-    let filteredPosts = allPosts.filter(
-      (post) => !existingPostKeys.has(post.post_key)
-    )
+    // 이미 등록된 게시물 제외 (includeExisting이면 포함하되 마킹)
+    let filteredPosts: any[]
+    if (includeExisting) {
+      // 기존 소싱분 포함 - isExisting 플래그 추가
+      filteredPosts = allPosts.map(post => ({
+        ...post,
+        isExisting: existingPostKeys.has(post.post_key),
+      }))
+    } else {
+      filteredPosts = allPosts.filter(
+        (post) => !existingPostKeys.has(post.post_key)
+      )
+    }
 
     const totalAvailable = filteredPosts.length
 

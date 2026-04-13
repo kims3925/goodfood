@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { channelId, externalId, title, content, author, comments, images } = body
+    const { channelId, externalId, title, content, author, comments, images, force } = body
 
     const finalChannelId = parseInt(channelId)
 
@@ -67,6 +67,11 @@ export async function POST(request: NextRequest) {
         { success: false, error: '필수 필드가 누락되었습니다.' },
         { status: 400 }
       )
+    }
+
+    // force=true: 기존 게시물 삭제 후 재등록 (다시소싱하기)
+    if (force) {
+      await postService.deleteByExternalId(finalChannelId, externalId)
     }
 
     const post = await postService.create({

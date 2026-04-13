@@ -419,20 +419,83 @@ export async function DELETE(request: NextRequest) {
     const publishIds = searchParams.get('ids')?.split(',').map(Number).filter(Boolean) || []
     const publishType = searchParams.get('type') as 'shop' | 'channel' | null // 'shop' 또는 'channel'
 
-    // productId 기준 일괄 soft-delete (재발행/삭제 워크플로우용)
+    // productId 기준 완전 삭제 (쇼핑몰 취소 + 소매밴드 삭제 + 상품목록 제거)
     if (productIdParam) {
       const productId = parseInt(productIdParam)
       if (isNaN(productId)) {
         return NextResponse.json({ success: false, error: '유효하지 않은 productId입니다.' }, { status: 400 })
       }
-      const result = await prisma.shopProduct.updateMany({
+
+      const now = new Date()
+      const bandDeleteErrors: string[] = []
+
+      // 1. 소매밴드 게시물 삭제 (Band API + DB soft-delete)
+      const channelProducts = await prisma.channelProduct.findMany({
         where: { productId, userId, deletedAt: null },
-        data: { deletedAt: new Date() },
+        include: {
+          channel: {
+            select: {
+              id: true,
+              channelKey: true,
+              name: true,
+            },
+          },
+        },
       })
+
+      // Band API로 실제 게시물 삭제 시도
+      if (channelProducts.length > 0) {
+        const apiConfig = await prisma.sourcingApiConfig.findFirst({
+          where: { userId, platform: 'BAND', isActive: true },
+        })
+
+        if (apiConfig?.accessToken) {
+          const bandClient = new NaverBandClient(apiConfig.accessToken)
+
+          for (const cp of channelProducts) {
+            if (cp.postKey && cp.channel?.channelKey) {
+              try {
+                await bandClient.removePost(cp.channel.channelKey, cp.postKey)
+                console.log(`[Unpublish] 밴드 게시물 삭제 성공: channel=${cp.channel.name}, postKey=${cp.postKey}`)
+              } catch (error: any) {
+                const errorMsg = `${cp.channel.name}: ${error.message || '밴드 게시물 삭제 실패'}`
+                bandDeleteErrors.push(errorMsg)
+                console.error(`[Unpublish] 밴드 게시물 삭제 실패: ${errorMsg}`)
+              }
+            }
+          }
+        }
+      }
+
+      // channelProduct soft-delete (밴드 삭제 성공 여부와 무관하게 DB는 삭제)
+      const channelResult = await prisma.channelProduct.updateMany({
+        where: { productId, userId, deletedAt: null },
+        data: { deletedAt: now },
+      })
+
+      // 2. 쇼핑몰 발행 취소 (shopProduct soft-delete)
+      const shopResult = await prisma.shopProduct.updateMany({
+        where: { productId, userId, deletedAt: null },
+        data: { deletedAt: now },
+      })
+
+      // 3. 상품 자체 soft-delete (발행 페이지 목록에서 제거)
+      await prisma.product.update({
+        where: { id: productId },
+        data: { deletedAt: now, isActive: false },
+      })
+
+      const totalDeleted = shopResult.count + channelResult.count
+
       return NextResponse.json({
         success: true,
-        deletedCount: result.count,
-        message: `${result.count}개 쇼핑몰 발행이 취소되었습니다.`,
+        deletedCount: totalDeleted,
+        shopDeletedCount: shopResult.count,
+        channelDeletedCount: channelResult.count,
+        bandDeleteErrors: bandDeleteErrors.length > 0 ? bandDeleteErrors : undefined,
+        message: bandDeleteErrors.length > 0
+          ? `발행 취소 완료 (밴드 게시물 ${bandDeleteErrors.length}건 삭제 실패)`
+          : `${totalDeleted}개 발행이 취소되고 상품이 삭제되었습니다.`,
       })
     }
 

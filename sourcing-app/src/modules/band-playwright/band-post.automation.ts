@@ -2238,6 +2238,68 @@ export class BandPostAutomation {
   }
 
   /**
+   * 글씨 스타일 초기화 (보통 크기 + 볼드 해제)
+   * 상품명 입력 후 나머지 본문을 보통 스타일로 입력하기 위해 사용
+   */
+  private async resetTextStyle(page: Page): Promise<void> {
+    try {
+      // 1. 볼드 해제 (토글 - 다시 클릭하면 해제됨)
+      const boldButton = await page.$('.cke_button__bold_icon')
+      if (boldButton) {
+        const parent = await boldButton.$('xpath=..')
+        if (parent) {
+          // 볼드가 활성 상태인지 확인 후 해제
+          const isActive = await parent.evaluate(el => {
+            const a = el.closest('a')
+            return a?.classList.contains('cke_button_on') || false
+          })
+          if (isActive) {
+            await parent.click()
+            await page.waitForTimeout(200)
+            console.log('[밴드자동화] 볼드 해제 완료')
+          }
+        }
+      }
+
+      // 2. 글씨 크기를 "보통"으로 변경
+      const fontSizeButton = await page.$('.cke_button__fontsize_icon')
+      if (fontSizeButton) {
+        const parent = await fontSizeButton.$('xpath=..')
+        if (parent) {
+          await parent.click()
+          await page.waitForTimeout(500)
+
+          const panelFrame = page.frameLocator('.cke_panel_frame')
+          if (panelFrame) {
+            // "보통" 옵션 찾기
+            const normalOption = panelFrame.locator('a[title="보통"]')
+            if (await normalOption.count() > 0) {
+              await normalOption.click()
+              await page.waitForTimeout(300)
+              console.log('[밴드자동화] 글씨 크기 "보통" 선택 완료')
+            } else {
+              // 텍스트로도 시도
+              const normalByText = panelFrame.locator('a:has-text("보통")')
+              if (await normalByText.count() > 0) {
+                await normalByText.click()
+                await page.waitForTimeout(300)
+                console.log('[밴드자동화] 글씨 크기 "보통" 선택 완료 (텍스트)')
+              } else {
+                // "보통"이 없으면 ESC로 드롭다운 닫기
+                await page.keyboard.press('Escape')
+                await page.waitForTimeout(200)
+                console.warn('[밴드자동화] "보통" 옵션을 찾을 수 없음, 드롭다운 닫기')
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[밴드자동화] 글씨 스타일 초기화 실패 (무시하고 계속):', error)
+    }
+  }
+
+  /**
    * 본문 입력
    * Band UI 패턴에 따라 레이어 팝업 내 에디터 또는 인라인 에디터에 입력
    */
@@ -2330,20 +2392,33 @@ export class BandPostAutomation {
       await editor.click()
       await page.waitForTimeout(300)
 
-      // 글씨 스타일 설정 (크게 + 볼드) - 텍스트 입력 전에 설정
-      await this.setTextStyle(page)
-
-      // 타이핑으로 입력 (줄바꿈은 Enter로)
       const lines = content.split('\n')
+
+      // 첫 번째 비어있지 않은 줄(상품명)만 크게 + 볼드로 입력
+      let titleTyped = false
       for (let i = 0; i < lines.length; i++) {
-        await page.keyboard.type(lines[i], { delay: 10 })
-        // 마지막 줄이 아니면 Enter
-        if (i < lines.length - 1) {
-          await page.keyboard.press('Enter')
+        if (!titleTyped && lines[i].trim().length > 0) {
+          // 상품명: 크게 + 볼드 스타일 적용
+          await this.setTextStyle(page)
+          await page.keyboard.type(lines[i], { delay: 10 })
+          titleTyped = true
+
+          if (i < lines.length - 1) {
+            await page.keyboard.press('Enter')
+          }
+
+          // 상품명 입력 후 스타일 초기화 (보통 크기 + 볼드 해제)
+          await this.resetTextStyle(page)
+        } else {
+          // 나머지 줄: 보통 스타일로 입력
+          await page.keyboard.type(lines[i], { delay: 10 })
+          if (i < lines.length - 1) {
+            await page.keyboard.press('Enter')
+          }
         }
       }
 
-      console.log('[밴드자동화] 키보드 입력으로 본문 작성 완료')
+      console.log('[밴드자동화] 키보드 입력으로 본문 작성 완료 (상품명만 크게/볼드)')
     } else {
       // textarea인 경우
       await editor.fill(content)
