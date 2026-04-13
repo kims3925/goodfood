@@ -105,31 +105,40 @@ export async function GET(request: NextRequest) {
     })
     const existingPostKeys = new Set(existingPosts.map((post) => post.externalId))
 
-    // 모든 도매채널에서 게시물 조회
+    // 모든 도매채널에서 게시물 조회 (페이지네이션으로 전체 가져오기)
     const allPosts: any[] = []
+    const MAX_PAGES = 20 // 무한루프 방지 (최대 20페이지 × 100개 = 2000개)
 
     for (const channel of wholesaleChannels) {
       try {
-        // Band API 호출
         const bandApiUrl = `https://openapi.band.us/v2/band/posts`
-        const apiUrl = `${bandApiUrl}?access_token=${accessToken}&band_key=${channel.channelKey}&locale=ko_KR&limit=100`
+        let afterParam = ''
+        let pageCount = 0
 
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
+        // 페이지네이션 루프: after 커서로 다음 페이지 조회
+        while (pageCount < MAX_PAGES) {
+          const params = new URLSearchParams({
+            access_token: accessToken,
+            band_key: channel.channelKey,
+            locale: 'ko_KR',
+            limit: '100',
+          })
+          if (afterParam) params.set('after', afterParam)
 
-        if (!response.ok) {
-          console.error(`Band API 오류 (${channel.name}):`, await response.text())
-          continue
-        }
+          const response = await fetch(`${bandApiUrl}?${params}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          })
 
-        const data = await response.json()
+          if (!response.ok) {
+            console.error(`Band API 오류 (${channel.name}):`, await response.text())
+            break
+          }
 
-        if (data.result_data && data.result_data.items) {
-          // 게시물 데이터 변환 (채널 정보 포함)
+          const data = await response.json()
+
+          if (!data.result_data?.items?.length) break
+
           const posts = data.result_data.items.map((item: any) => ({
             post_key: item.post_key,
             title: item.content ? item.content.substring(0, 100) : '(제목 없음)',
@@ -147,7 +156,18 @@ export async function GET(request: NextRequest) {
           }))
 
           allPosts.push(...posts)
+          pageCount++
+
+          // 다음 페이지가 있는지 확인
+          const paging = data.result_data.paging
+          if (paging?.next_params?.after) {
+            afterParam = paging.next_params.after
+          } else {
+            break // 더 이상 페이지 없음
+          }
         }
+
+        console.log(`[Post Available] ${channel.name}: ${pageCount}페이지, 총 ${allPosts.length}개 조회`)
       } catch (error) {
         console.error(`채널 ${channel.name}의 게시물 조회 실패:`, error)
       }
