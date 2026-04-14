@@ -6,25 +6,45 @@ import { getCurrentUser } from '@/modules/auth/auth.service'
 import { postService } from '@/modules/sourcing/domain/src/post'
 
 /**
- * Band API로 단일 게시물 조회
+ * Band API 목록에서 특정 post_key에 해당하는 게시물 검색
+ * /v2/band/posts를 페이지네이션하며 찾음
  */
-async function fetchBandPost(accessToken: string, bandKey: string, postKey: string) {
-  const apiUrl = new URL('https://openapi.band.us/v2/band/post')
-  apiUrl.searchParams.set('access_token', accessToken)
-  apiUrl.searchParams.set('band_key', bandKey)
-  apiUrl.searchParams.set('post_key', postKey)
+async function findPostByKey(accessToken: string, bandKey: string, targetPostKey: string) {
+  const MAX_PAGES = 30
+  let afterParam = ''
 
-  const response = await fetch(apiUrl.toString(), {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-  })
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const params = new URLSearchParams({
+      access_token: accessToken,
+      band_key: bandKey,
+      locale: 'ko_KR',
+      limit: '100',
+    })
+    if (afterParam) params.set('after', afterParam)
 
-  if (!response.ok) return null
+    const response = await fetch(`https://openapi.band.us/v2/band/posts?${params}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    })
 
-  const data = await response.json()
-  if (data.result_code === 1 && data.result_data?.post) {
-    return data.result_data.post
+    if (!response.ok) return null
+
+    const data = await response.json()
+    if (data.result_code !== 1 || !data.result_data?.items?.length) return null
+
+    const items = data.result_data.items
+    const found = items.find((item: any) => String(item.post_key) === targetPostKey)
+    if (found) return found
+
+    // 다음 페이지
+    const paging = data.result_data.paging
+    if (paging?.next_params?.after) {
+      afterParam = paging.next_params.after
+    } else {
+      break
+    }
   }
+
   return null
 }
 
@@ -33,7 +53,7 @@ async function fetchBandPost(accessToken: string, bandKey: string, postKey: stri
  * Body: { url: string, channelId: number }
  * URL 형식: https://band.us/band/{bandNumber}/post/{postKey}
  *
- * 프론트에서 선택한 도매채널의 channelKey(band_key)를 사용하여 Band API 호출
+ * 선택한 도매채널의 band_key로 게시물 목록을 검색하여 해당 post_key를 찾아 수집
  */
 export async function POST(request: NextRequest) {
   try {
@@ -111,12 +131,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 선택된 채널의 channelKey(band_key)로 게시물 조회
-    const fetchedPost = await fetchBandPost(apiConfig.accessToken, channel.channelKey, postKey)
+    // 게시물 목록에서 post_key로 검색
+    console.log(`[Post Collect URL] 검색 시작: channelKey=${channel.channelKey}, postKey=${postKey}`)
+    const fetchedPost = await findPostByKey(apiConfig.accessToken, channel.channelKey, postKey)
 
     if (!fetchedPost) {
       return NextResponse.json(
-        { success: false, error: `선택한 도매밴드(${channel.name})에서 게시물을 찾을 수 없습니다. 올바른 채널을 선택했는지 확인해주세요.` },
+        { success: false, error: `선택한 도매밴드(${channel.name})에서 게시물(${postKey})을 찾을 수 없습니다. URL과 채널이 일치하는지 확인해주세요.` },
         { status: 404 }
       )
     }
@@ -135,7 +156,7 @@ export async function POST(request: NextRequest) {
       await postService.create({
         userId,
         channelId: channel.id,
-        externalId: fetchedPost.post_key || postKey,
+        externalId: String(fetchedPost.post_key || postKey),
         title,
         content,
         author,
