@@ -9,10 +9,19 @@ import { postService } from '@/modules/sourcing/domain/src/post'
  * Band API 목록에서 특정 post_key에 해당하는 게시물 검색
  * /v2/band/posts를 페이지네이션하며 찾음
  */
-async function findPostByKey(accessToken: string, bandKey: string, targetPostKey: string) {
+interface SearchDebugInfo {
+  bandKey: string
+  totalSearched: number
+  pagesSearched: number
+  samplePostKeys: string[]
+  apiError?: string
+}
+
+async function findPostByKey(accessToken: string, bandKey: string, targetPostKey: string): Promise<{ post: any; debug: SearchDebugInfo } | null> {
   const MAX_PAGES = 30
   let afterParam = ''
   let totalSearched = 0
+  let samplePostKeys: string[] = []
 
   for (let page = 0; page < MAX_PAGES; page++) {
     const params = new URLSearchParams({
@@ -29,35 +38,28 @@ async function findPostByKey(accessToken: string, bandKey: string, targetPostKey
     })
 
     if (!response.ok) {
-      console.log(`[Post Collect URL] API 응답 실패: status=${response.status}, bandKey=${bandKey}`)
-      return null
+      return { post: null, debug: { bandKey, totalSearched, pagesSearched: page, samplePostKeys, apiError: `HTTP ${response.status}` } } as any
     }
 
     const data = await response.json()
     if (data.result_code !== 1) {
-      console.log(`[Post Collect URL] API 에러: result_code=${data.result_code}, message=${data.message}`)
-      return null
+      return { post: null, debug: { bandKey, totalSearched, pagesSearched: page, samplePostKeys, apiError: `result_code=${data.result_code}: ${data.message || ''}` } } as any
     }
 
     const items = data.result_data?.items
-    if (!items?.length) {
-      console.log(`[Post Collect URL] 게시물 없음: bandKey=${bandKey}, page=${page}`)
-      return null
-    }
+    if (!items?.length) break
 
     totalSearched += items.length
 
-    // 첫 페이지에서 post_key 샘플 로깅
+    // 첫 페이지에서 post_key 샘플 저장
     if (page === 0) {
-      const sampleKeys = items.slice(0, 5).map((item: any) => String(item.post_key))
-      console.log(`[Post Collect URL] 검색 중: bandKey=${bandKey}, 찾는키=${targetPostKey}, 샘플post_keys=[${sampleKeys.join(', ')}]`)
+      samplePostKeys = items.slice(0, 5).map((item: any) => String(item.post_key))
     }
 
     // post_key를 문자열로 비교
     const found = items.find((item: any) => String(item.post_key) === targetPostKey)
     if (found) {
-      console.log(`[Post Collect URL] 발견! page=${page}, totalSearched=${totalSearched}`)
-      return found
+      return { post: found, debug: { bandKey, totalSearched, pagesSearched: page + 1, samplePostKeys } }
     }
 
     // 다음 페이지
@@ -69,8 +71,7 @@ async function findPostByKey(accessToken: string, bandKey: string, targetPostKey
     }
   }
 
-  console.log(`[Post Collect URL] 미발견: bandKey=${bandKey}, postKey=${targetPostKey}, totalSearched=${totalSearched}`)
-  return null
+  return { post: null, debug: { bandKey, totalSearched, pagesSearched: Math.min(MAX_PAGES, totalSearched > 0 ? Math.ceil(totalSearched / 100) : 0), samplePostKeys } } as any
 }
 
 /**
@@ -162,18 +163,21 @@ export async function POST(request: NextRequest) {
     const accessToken = apiConfig.accessToken
     let fetchedPost: any = null
     let matchedChannel = selectedChannel
+    const debugInfo: any[] = []
 
     // 1단계: 선택한 채널의 channelKey로 검색
-    console.log(`[Post Collect URL] 1단계: 선택 채널(${selectedChannel.name}, key=${selectedChannel.channelKey})에서 postKey=${postKey} 검색`)
-    fetchedPost = await findPostByKey(accessToken, selectedChannel.channelKey, postKey)
+    const result1 = await findPostByKey(accessToken, selectedChannel.channelKey, postKey)
+    debugInfo.push({ step: 1, channel: selectedChannel.name, ...result1?.debug })
+    if (result1?.post) {
+      fetchedPost = result1.post
+    }
 
     // 2단계: 실패 시 URL의 밴드 번호를 band_key로 직접 시도
     if (!fetchedPost && selectedChannel.channelKey !== bandNumber) {
-      console.log(`[Post Collect URL] 2단계: URL 밴드번호(${bandNumber})를 band_key로 검색`)
-      fetchedPost = await findPostByKey(accessToken, bandNumber, postKey)
-
-      if (fetchedPost) {
-        // 해당 밴드 번호로 채널을 찾거나 새로 등록
+      const result2 = await findPostByKey(accessToken, bandNumber, postKey)
+      debugInfo.push({ step: 2, channel: `URL밴드(${bandNumber})`, ...result2?.debug })
+      if (result2?.post) {
+        fetchedPost = result2.post
         const existingChannel = await prisma.channel.findFirst({
           where: { userId, channelKey: bandNumber, isActive: true },
         })
@@ -195,9 +199,10 @@ export async function POST(request: NextRequest) {
       })
 
       for (const ch of otherChannels) {
-        console.log(`[Post Collect URL] 3단계: 다른 채널(${ch.name}, key=${ch.channelKey})에서 검색`)
-        fetchedPost = await findPostByKey(accessToken, ch.channelKey, postKey)
-        if (fetchedPost) {
+        const result3 = await findPostByKey(accessToken, ch.channelKey, postKey)
+        debugInfo.push({ step: 3, channel: ch.name, ...result3?.debug })
+        if (result3?.post) {
+          fetchedPost = result3.post
           matchedChannel = ch
           break
         }
@@ -209,6 +214,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: `게시물(${postKey})을 찾을 수 없습니다. 선택한 채널(${selectedChannel.name}, key=${selectedChannel.channelKey})과 URL의 밴드(${bandNumber})를 모두 검색했습니다. Band API 연동 앱에 해당 밴드가 포함되어 있는지 확인해주세요.`,
+          debug: debugInfo,
         },
         { status: 404 }
       )

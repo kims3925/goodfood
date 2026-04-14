@@ -1599,11 +1599,15 @@ export default function PostsManagePage() {
                         })
                         const data = await res.json()
                         if (data.success) {
-                          setUrlResult({ success: true, message: '게시물이 수집되었습니다.' })
+                          setUrlResult({ success: true, message: data.message || '게시물이 수집되었습니다.' })
                           setUrlInput('')
                           loadPosts()
                         } else {
-                          setUrlResult({ success: false, message: data.error || '수집에 실패했습니다.' })
+                          let msg = data.error || '수집에 실패했습니다.'
+                          if (data.debug) {
+                            msg += '\n\n[디버그] ' + JSON.stringify(data.debug, null, 2)
+                          }
+                          setUrlResult({ success: false, message: msg })
                         }
                       } catch {
                         setUrlResult({ success: false, message: '네트워크 오류' })
@@ -1623,7 +1627,7 @@ export default function PostsManagePage() {
                   </div>
                 )}
                 {urlResult && (
-                  <div className={`mt-3 px-4 py-2 rounded-lg text-sm ${
+                  <div className={`mt-3 px-4 py-2 rounded-lg text-sm whitespace-pre-wrap ${
                     urlResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
                   }`}>
                     {urlResult.message}
