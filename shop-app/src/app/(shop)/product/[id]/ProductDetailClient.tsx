@@ -75,20 +75,32 @@ export default function ProductDetailClient() {
   }, [params.id, bandId, getApiPath])
 
   const checkWishlistStatus = useCallback(async () => {
-    if (!session) return
+    const productIdNum = parseInt(params.id as string)
 
-    try {
-      const response = await fetch(getApiPath('/api/mypage/wishlist'))
-      const data = await response.json()
+    if (session) {
+      // 로그인 사용자: DB에서 확인
+      try {
+        const response = await fetch(getApiPath('/api/mypage/wishlist'))
+        const data = await response.json()
 
-      if (data.success) {
-        const isInWishlist = data.wishlists.some(
-          (item: any) => item.product.id === parseInt(params.id as string)
-        )
-        setIsWishlisted(isInWishlist)
+        if (data.success) {
+          const isInWishlist = data.wishlists.some(
+            (item: any) => item.product.id === productIdNum
+          )
+          setIsWishlisted(isInWishlist)
+        }
+      } catch (error) {
+        console.error('Failed to check wishlist status:', error)
       }
-    } catch (error) {
-      console.error('Failed to check wishlist status:', error)
+    } else {
+      // 비로그인 사용자: localStorage에서 확인
+      try {
+        const stored = localStorage.getItem('guest_wishlist')
+        const ids: number[] = stored ? JSON.parse(stored) : []
+        setIsWishlisted(ids.includes(productIdNum))
+      } catch {
+        setIsWishlisted(false)
+      }
     }
   }, [session, params.id, getApiPath])
 
@@ -120,7 +132,7 @@ export default function ProductDetailClient() {
   }, [loadProduct])
 
   useEffect(() => {
-    if (session && product) {
+    if (product) {
       checkWishlistStatus()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- product?.id만 의존성으로 사용하여 불필요한 재실행 방지
@@ -248,11 +260,6 @@ export default function ProductDetailClient() {
   }
 
   const handleToggleWishlist = async () => {
-    if (!session) {
-      window.location.href = getPath('/auth/login')
-      return
-    }
-
     if (wishlistLoading) return
 
     // productId를 숫자로 확실하게 변환
@@ -262,6 +269,28 @@ export default function ProductDetailClient() {
       return
     }
 
+    // 비로그인 사용자: localStorage로 처리
+    if (!session) {
+      try {
+        const stored = localStorage.getItem('guest_wishlist')
+        const ids: number[] = stored ? JSON.parse(stored) : []
+
+        if (isWishlisted) {
+          const updated = ids.filter(id => id !== productIdNum)
+          localStorage.setItem('guest_wishlist', JSON.stringify(updated))
+          setIsWishlisted(false)
+        } else {
+          ids.push(productIdNum)
+          localStorage.setItem('guest_wishlist', JSON.stringify(ids))
+          setIsWishlisted(true)
+        }
+      } catch (error) {
+        console.error('[Wishlist] localStorage error:', error)
+      }
+      return
+    }
+
+    // 로그인 사용자: DB로 처리
     try {
       setWishlistLoading(true)
 
