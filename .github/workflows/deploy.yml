@@ -7,6 +7,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  ECR_REGISTRY: 178788708152.dkr.ecr.ap-northeast-2.amazonaws.com
+
 jobs:
   ci:
     name: Lint & Typecheck & Build
@@ -46,10 +49,55 @@ jobs:
           NEXTAUTH_SECRET: ci-dummy-secret
           JWT_SECRET: ci-dummy-secret
 
-  deploy:
-    name: Deploy to EC2
+  build-and-push:
+    name: Build and Push to ECR
     needs: ci
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & Push shop-app
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.shop
+          push: true
+          tags: ${{ env.ECR_REGISTRY }}/bandauto-shop:latest
+          build-args: |
+            APP_NAME=shop
+            APP_PORT=3000
+          cache-from: type=gha,scope=bandauto-shop
+          cache-to: type=gha,mode=max,scope=bandauto-shop
+
+      - name: Build & Push sourcing-app
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.sourcing
+          push: true
+          tags: ${{ env.ECR_REGISTRY }}/bandauto-sourcing:latest
+          cache-from: type=gha,scope=bandauto-sourcing
+          cache-to: type=gha,mode=max,scope=bandauto-sourcing
+
+  deploy:
+    name: Deploy to EC2
+    needs: build-and-push
     runs-on: ubuntu-latest
 
     steps:
@@ -60,13 +108,28 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
+      - name: Get ECR login password
+        id: ecr-auth
+        run: echo "password=$(aws ecr get-login-password --region ap-northeast-2)" >> $GITHUB_OUTPUT
+
       - name: Deploy via SSM
         uses: ABC-Group-Tech/.github/actions/ssm-deploy@main
         with:
           instance-id: 'i-0e6ef7c646a61356f'
+          timeout: '600'
           script: |
             set -e
-            export HOME=/root
+
+            ECR_REGISTRY=178788708152.dkr.ecr.ap-northeast-2.amazonaws.com
+            ECR_PASSWORD=${{ steps.ecr-auth.outputs.password }}
+
+            echo "$ECR_PASSWORD" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+            docker pull "$ECR_REGISTRY/bandauto-shop:latest"
+            docker pull "$ECR_REGISTRY/bandauto-sourcing:latest"
+
+            docker tag "$ECR_REGISTRY/bandauto-shop:latest" bandauto-shop:latest
+            docker tag "$ECR_REGISTRY/bandauto-sourcing:latest" bandauto-sourcing:latest
 
             git config --global --add safe.directory /home/ubuntu/bandauto
             cd /home/ubuntu/bandauto
@@ -78,7 +141,6 @@ jobs:
             git clean -fd
             git remote set-url origin "https://github.com/ABC-Group-Tech/bandauto.git"
 
-            docker compose build --no-cache
             docker compose up -d --force-recreate
 
             sleep 10
