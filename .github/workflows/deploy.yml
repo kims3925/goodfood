@@ -37,6 +37,9 @@ jobs:
       - name: Typecheck (shop-app)
         run: pnpm run typecheck:shop
 
+      - name: Typecheck (sourcing-app)
+        run: pnpm run typecheck:sourcing
+
       - name: Build shop-app
         run: pnpm run build:shop
         env:
@@ -147,15 +150,7 @@ jobs:
 
             docker compose exec -T sourcing-app sh -c "cd /app/db && npx prisma@6 db push --schema prisma" || true
 
-            set -a && source /home/ubuntu/bandauto/.env && set +a
-            docker compose exec -T mariadb mysql -u"${DB_USER:-banduser}" -p"${DB_PASSWORD}" "${DB_NAME:-sourcing_db}" -e "
-              ALTER TABLE guest_order_item ADD COLUMN IF NOT EXISTS is_custom_item TINYINT(1) NOT NULL DEFAULT 0;
-              ALTER TABLE guest_order_item MODIFY COLUMN shop_product_id INT NULL;
-              ALTER TABLE automation_config ADD COLUMN IF NOT EXISTS collection_limit_by_channel LONGTEXT NULL;
-              ALTER TABLE automation_config ADD COLUMN IF NOT EXISTS auto_publish_limit INT NOT NULL DEFAULT 20;
-              ALTER TABLE automation_config ADD COLUMN IF NOT EXISTS auto_publish_limit_by_shop LONGTEXT NULL;
-              ALTER TABLE automation_config ADD COLUMN IF NOT EXISTS auto_publish_limit_by_channel LONGTEXT NULL;
-            " && echo "SQL migration applied" || echo "SQL migration skipped (columns may already exist)"
+            bash scripts/db-migrate.sh
 
             docker compose ps
             echo "Deploy completed at $(date '+%Y-%m-%d %H:%M:%S %Z')"
