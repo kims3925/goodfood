@@ -53,39 +53,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script_stop: true
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Deploy via SSM
+        uses: ABC-Group-Tech/.github/actions/ssm-deploy@main
+        with:
+          instance-id: 'i-0e6ef7c646a61356f'
           script: |
+            set -e
             cd ~/bandauto
 
-            # GitHub PAT로 인증하여 최신 코드 가져오기
             GHCR_TOKEN="${{ secrets.GHCR_PAT }}"
             git remote set-url origin "https://x-access-token:${GHCR_TOKEN}@github.com/ABC-Group-Tech/bandauto.git"
-            # 서버 로컬 변경사항 강제 초기화 후 최신 코드 pull
             git fetch origin main
             git reset --hard origin/main
             git clean -fd
-            # 보안: pull 후 토큰 제거
             git remote set-url origin "https://github.com/ABC-Group-Tech/bandauto.git"
 
-            # Docker 이미지 빌드 (캐시 없이)
             docker compose build --no-cache
-
-            # 컨테이너 강제 재생성 & 시작
             docker compose up -d --force-recreate
 
-            # 컨테이너 정상 기동 대기 (10초)
             sleep 10
 
-            # Prisma 스키마 동기화 (db push: 새 컬럼 추가 등 스키마 변경 자동 적용)
             docker compose exec -T sourcing-app sh -c "cd /app/db && npx prisma@6 db push --schema prisma" || true
 
-            # 직접 SQL 마이그레이션 (prisma db push 실패 시 백업)
             set -a && source ~/bandauto/.env && set +a
             docker compose exec -T mariadb mysql -u"${DB_USER:-banduser}" -p"${DB_PASSWORD}" "${DB_NAME:-sourcing_db}" -e "
               ALTER TABLE guest_order_item ADD COLUMN IF NOT EXISTS is_custom_item TINYINT(1) NOT NULL DEFAULT 0;
@@ -96,8 +92,5 @@ jobs:
               ALTER TABLE automation_config ADD COLUMN IF NOT EXISTS auto_publish_limit_by_channel LONGTEXT NULL;
             " && echo "SQL migration applied" || echo "SQL migration skipped (columns may already exist)"
 
-            # 상태 확인
             docker compose ps
-
-            # 배포 완료 로그
             echo "Deploy completed at $(date '+%Y-%m-%d %H:%M:%S %Z')"
