@@ -92,9 +92,9 @@ export async function GET(
           totalAmount: Number(guestOrder.totalAmount),
           items: guestOrder.items.map(item => ({
             id: item.id,
-            productName: item.shopProduct.product?.name || item.productName,
+            productName: item.shopProduct?.product?.name || item.productName,
             optionSummary: item.variant?.optionSummary || null,
-            thumbnailUrl: item.shopProduct.product?.thumbnailUrl || item.thumbnailUrl,
+            thumbnailUrl: item.shopProduct?.product?.thumbnailUrl || item.thumbnailUrl,
             quantity: item.quantity,
             unitPrice: Number(item.unitPrice),
           })),
@@ -170,9 +170,9 @@ export async function GET(
           totalAmount: Number(memberOrder.totalAmount),
           items: memberOrder.items.map(item => ({
             id: item.id,
-            productName: item.shopProduct.product?.name || item.productName,
+            productName: item.shopProduct?.product?.name || item.productName,
             optionSummary: item.variant?.optionSummary || null,
-            thumbnailUrl: item.shopProduct.product?.thumbnailUrl || item.thumbnailUrl,
+            thumbnailUrl: item.shopProduct?.product?.thumbnailUrl || item.thumbnailUrl,
             quantity: item.quantity,
             unitPrice: Number(item.unitPrice),
           })),

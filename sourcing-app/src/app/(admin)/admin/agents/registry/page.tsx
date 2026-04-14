@@ -215,7 +215,7 @@ export default function AgentRegistryPage() {
 
   const layerCounts = useMemo(() => {
     const counts: Record<LayerFilter, number> = { ALL: agents.length, CORE: 0, BUSINESS: 0, INTELLIGENCE: 0 }
-    agents.forEach(a => { counts[a.layer]++ })
+    agents.forEach(a => { (counts as Record<string, number>)[a.layer] = ((counts as Record<string, number>)[a.layer] ?? 0) + 1 })
     return counts
   }, [agents])
 

@@ -205,7 +205,7 @@ export async function GET(request: NextRequest) {
     const dateLabel = `${startDate.replace(/-/g, '').slice(2)}`
     const fileName = encodeURIComponent(`${channel.name}정산서_${dateLabel}.xlsx`)
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename*=UTF-8''${fileName}`,

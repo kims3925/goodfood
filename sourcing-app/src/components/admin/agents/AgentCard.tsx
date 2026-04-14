@@ -6,7 +6,7 @@ import StatusToggle from './StatusToggle'
 import MiniKpi from './MiniKpi'
 
 type AgentLayer = 'COMMAND' | 'SOURCING' | 'COMMERCE' | 'INFRA' | string
-type AgentStatus = 'ACTIVE' | 'INACTIVE' | 'ERROR' | 'STARTING'
+type AgentStatus = 'ACTIVE' | 'INACTIVE' | 'ERROR' | 'STARTING' | 'MAINTENANCE'
 
 interface KpiTarget {
   label: string
@@ -49,12 +49,13 @@ const LAYER_COLORS: Record<string, { bg: string; text: string; border: string }>
 const STATUS_COLORS: Record<AgentStatus, string> = {
   ACTIVE: 'bg-green-500',
   STARTING: 'bg-yellow-500',
+  MAINTENANCE: 'bg-yellow-400',
   ERROR: 'bg-red-500',
   INACTIVE: 'bg-gray-400',
 }
 
 function getIcon(iconName: string) {
-  const icons = LucideIcons as Record<string, React.ComponentType<{ className?: string; size?: number }>>
+  const icons = LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string; size?: number }>>
   const Icon = icons[iconName]
   return Icon || LucideIcons.Bot
 }

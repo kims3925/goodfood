@@ -21,7 +21,7 @@ interface AgentEvent {
 }
 
 const EVENT_STYLES: Record<AgentEvent['eventType'], {
-  icon: React.ComponentType<{ className?: string; size?: number }>
+  icon: React.ElementType
   color: string
   bg: string
   label: string

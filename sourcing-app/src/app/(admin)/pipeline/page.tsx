@@ -213,7 +213,7 @@ export default function PipelineDashboardPage() {
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-gray-500">
         <AlertCircle className="w-12 h-12 mb-4" />
         <p>데이터를 불러올 수 없습니다.</p>
-        <Button variant="outline" className="mt-4" onClick={fetchData}>
+        <Button variant="secondary" className="mt-4" onClick={fetchData}>
           다시 시도
         </Button>
       </div>
@@ -268,7 +268,7 @@ export default function PipelineDashboardPage() {
         </div>
         <div className="flex items-center gap-3">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={fetchData}
           >
@@ -302,7 +302,7 @@ export default function PipelineDashboardPage() {
           </h2>
           <div className="flex gap-2">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={() => handleExecutePipeline('collect')}
               disabled={executing}
@@ -311,7 +311,7 @@ export default function PipelineDashboardPage() {
               수집
             </Button>
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={() => handleExecutePipeline('transform')}
               disabled={executing}
@@ -460,7 +460,7 @@ export default function PipelineDashboardPage() {
                     <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                     <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
                     <Tooltip
-                      formatter={(value: number) => [`${value}건`, '주문']}
+                      formatter={(value: number | undefined) => [`${value ?? 0}건`, '주문']}
                       contentStyle={{ fontSize: 12, borderRadius: 8 }}
                     />
                     <Bar dataKey="orders" fill="#6366f1" radius={[4, 4, 0, 0]} />
@@ -535,13 +535,13 @@ export default function PipelineDashboardPage() {
           </h2>
           <div className="flex gap-2">
             <Link href="/shop/settlement/wholesale">
-              <Button variant="outline" size="sm">
+              <Button variant="secondary" size="sm">
                 <FileSpreadsheet className="w-3.5 h-3.5 mr-1" />
                 도매 정산서
               </Button>
             </Link>
             <Link href="/shop/settlement/list">
-              <Button variant="outline" size="sm">
+              <Button variant="secondary" size="sm">
                 전체 정산 <ChevronRight className="w-3.5 h-3.5 ml-1" />
               </Button>
             </Link>

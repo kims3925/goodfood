@@ -13,7 +13,7 @@ interface AgentEvent {
 
 const MAX_EVENTS = 100
 
-const EVENT_STYLES: Record<AgentEvent['eventType'], { icon: React.ComponentType<{ className?: string; size?: number }>; color: string; bg: string }> = {
+const EVENT_STYLES: Record<AgentEvent['eventType'], { icon: React.ElementType; color: string; bg: string }> = {
   success: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50' },
   error: { icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
   info: { icon: Info, color: 'text-blue-600', bg: 'bg-blue-50' },

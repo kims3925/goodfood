@@ -207,7 +207,6 @@ export async function GET(request: NextRequest) {
             startedAt: wf.startedAt,
             completedAt: wf.completedAt,
             totalItems: wf.totalItems,
-            processedItems: wf.processedItems,
             successCount: wf.successCount,
             failedCount: wf.failedCount,
             steps: wf.steps.map((s) => ({
