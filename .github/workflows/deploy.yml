@@ -39,6 +39,8 @@ jobs:
 
       - name: Typecheck (sourcing-app)
         run: pnpm run typecheck:sourcing
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
 
       - name: Build shop-app
         run: pnpm run build:shop

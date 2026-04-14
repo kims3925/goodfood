@@ -16,7 +16,7 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx --ignore-path .gitignore",
     "typecheck": "pnpm run typecheck:shop && pnpm run typecheck:sourcing",
     "typecheck:shop": "pnpm --filter shop-app exec tsc --noEmit",
-    "typecheck:sourcing": "pnpm --filter sourcing-app exec tsc --noEmit",
+    "typecheck:sourcing": "NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter sourcing-app exec tsc --noEmit",
     "test": "npx playwright test",
     "test:headed": "npx playwright test --headed",
     "test:ui": "npx playwright test --ui",
