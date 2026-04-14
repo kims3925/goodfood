@@ -66,10 +66,9 @@ jobs:
           instance-id: 'i-0e6ef7c646a61356f'
           script: |
             set -e
+            export HOME=/root
 
-            # SSM은 root로 실행되므로 ubuntu 소유 디렉토리에 대해 git safe.directory 설정
             git config --global --add safe.directory /home/ubuntu/bandauto
-
             cd /home/ubuntu/bandauto
 
             GHCR_TOKEN="${{ secrets.GHCR_PAT }}"
