@@ -4,68 +4,117 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { postService } from '@/modules/sourcing/domain/src/post'
+import { browserPool, sessionManager } from '@/modules/band-playwright'
 
 /**
- * Band API로 단일 게시물 조회 (1회 API 호출)
+ * Playwright로 Band 게시물 페이지를 직접 스크래핑하여 내용 추출
  */
-async function fetchSinglePost(accessToken: string, bandKey: string, postKey: string) {
-  const apiUrl = new URL('https://openapi.band.us/v2/band/post')
-  apiUrl.searchParams.set('access_token', accessToken)
-  apiUrl.searchParams.set('band_key', bandKey)
-  apiUrl.searchParams.set('post_key', postKey)
-
-  const response = await fetch(apiUrl.toString())
-  if (!response.ok) return { post: null, error: `HTTP ${response.status}` }
-
-  const data = await response.json()
-  if (data.result_code === 1 && data.result_data?.post) {
-    return { post: data.result_data.post, error: null }
+async function scrapeBandPost(channelId: number, bandUrl: string) {
+  const session = await sessionManager.getValidSession(channelId)
+  if (!session) {
+    throw new Error('밴드 세션이 없습니다. 채널 설정에서 쿠키를 등록해주세요.')
   }
-  return { post: null, error: `result_code=${data.result_code}` }
-}
 
-/**
- * Band API 목록에서 최근 게시물만 검색 (최대 3페이지 = 300개)
- */
-async function findPostInList(accessToken: string, bandKey: string, targetPostKey: string) {
-  const MAX_PAGES = 3
-  let afterParam = ''
+  const context = await browserPool.getContext(channelId, session.cookies)
+  const page = await context.newPage()
 
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const params = new URLSearchParams({
-      access_token: accessToken,
-      band_key: bandKey,
-      locale: 'ko_KR',
-      limit: '100',
+  try {
+    await page.goto(bandUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
+
+    // 게시물 본문이 로드될 때까지 대기
+    await page.waitForSelector('.postBody, .postText, .dPostBody, [class*="postBody"]', { timeout: 15000 }).catch(() => null)
+
+    // 추가 로딩 대기
+    await page.waitForTimeout(2000)
+
+    // 게시물 내용 추출
+    const postData = await page.evaluate(() => {
+      // 본문 텍스트 추출 (여러 셀렉터 시도)
+      const contentSelectors = [
+        '.postBody .postText',
+        '.dPostBody .dPostText',
+        '.postText',
+        '[class*="postBody"] [class*="postText"]',
+        '.postBody',
+        '.dPostBody',
+      ]
+      let content = ''
+      for (const sel of contentSelectors) {
+        const el = document.querySelector(sel)
+        if (el?.textContent?.trim()) {
+          content = el.textContent.trim()
+          break
+        }
+      }
+
+      // 작성자 추출
+      const authorSelectors = [
+        '.postWriter .text',
+        '.postAuthor .uName',
+        '.dPostWriter .text',
+        '[class*="postWriter"] .text',
+        '.uName',
+      ]
+      let author = ''
+      for (const sel of authorSelectors) {
+        const el = document.querySelector(sel)
+        if (el?.textContent?.trim()) {
+          author = el.textContent.trim()
+          break
+        }
+      }
+
+      // 이미지 URL 추출
+      const imageSelectors = [
+        '.postBody img.postPhoto',
+        '.dPostBody img',
+        '.postPhotoArea img',
+        '[class*="postPhoto"] img',
+        '.postBody img[src*="band"]',
+        '.postBody img[src*="dthumb"]',
+      ]
+      const images: string[] = []
+      const seenUrls = new Set<string>()
+      for (const sel of imageSelectors) {
+        document.querySelectorAll(sel).forEach((img) => {
+          const src = (img as HTMLImageElement).src
+          if (src && !seenUrls.has(src) && !src.includes('profile') && !src.includes('emoji')) {
+            seenUrls.add(src)
+            images.push(src)
+          }
+        })
+        if (images.length > 0) break
+      }
+
+      // post_key 추출 (URL 또는 data 속성에서)
+      let postKey = ''
+      const urlMatch = window.location.href.match(/\/post\/(\w+)/)
+      if (urlMatch) postKey = urlMatch[1]
+
+      // data-post-key 속성에서 추출 시도
+      if (!postKey) {
+        const postEl = document.querySelector('[data-post-key], [data-postkey]')
+        if (postEl) {
+          postKey = postEl.getAttribute('data-post-key') || postEl.getAttribute('data-postkey') || ''
+        }
+      }
+
+      return { content, author, images, postKey, url: window.location.href }
     })
-    if (afterParam) params.set('after', afterParam)
 
-    const response = await fetch(`https://openapi.band.us/v2/band/posts?${params}`)
-    if (!response.ok) return null
-
-    const data = await response.json()
-    if (data.result_code === 1001) return null // 쿼터 초과 시 즉시 중단
-    if (data.result_code !== 1 || !data.result_data?.items?.length) return null
-
-    const found = data.result_data.items.find((item: any) => String(item.post_key) === targetPostKey)
-    if (found) return found
-
-    const paging = data.result_data.paging
-    if (paging?.next_params?.after) {
-      afterParam = paging.next_params.after
-    } else {
-      break
-    }
+    return postData
+  } finally {
+    await page.close()
+    await browserPool.releaseContext(channelId)
   }
-  return null
 }
 
 /**
- * POST: Band URL로 단일 게시물 수집
+ * POST: Band URL로 단일 게시물 수집 (Playwright 스크래핑)
  * Body: { url: string, channelId: number }
  *
- * 1) 단일 게시물 API로 직접 조회 (1회 호출)
- * 2) 실패 시 최근 게시물 목록에서 검색 (최대 3페이지)
+ * Band API의 post_key 형식(24자 알파벳)과 URL의 숫자 ID가 다르므로
+ * Playwright로 직접 페이지를 방문하여 게시물 내용을 추출
  */
 export async function POST(request: NextRequest) {
   try {
@@ -95,7 +144,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // URL 파싱
+    // URL 검증
     const urlMatch = url.match(/band\.us\/band\/(\d+)\/post\/(\w+)/)
     if (!urlMatch) {
       return NextResponse.json(
@@ -104,8 +153,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const bandNumber = urlMatch[1]
-    const postKey = urlMatch[2]
+    const postKeyFromUrl = urlMatch[2]
 
     // 선택된 채널 조회
     const channel = await prisma.channel.findFirst({
@@ -125,74 +173,44 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Band API 설정 조회
-    const apiConfig = await prisma.sourcingApiConfig.findFirst({
-      where: {
-        userId,
-        platform: 'BAND',
-        isActive: true,
-      },
-      select: { accessToken: true },
-    })
-
-    if (!apiConfig?.accessToken) {
+    // Playwright로 게시물 스크래핑
+    let postData
+    try {
+      postData = await scrapeBandPost(channel.id, url)
+    } catch (error: any) {
+      const msg = error.message || '스크래핑 실패'
+      if (msg.includes('세션')) {
+        return NextResponse.json(
+          { success: false, error: msg },
+          { status: 400 }
+        )
+      }
       return NextResponse.json(
-        { success: false, error: 'Band API 설정을 찾을 수 없습니다.' },
-        { status: 400 }
+        { success: false, error: `게시물 페이지 접근에 실패했습니다: ${msg}` },
+        { status: 500 }
       )
     }
 
-    const accessToken = apiConfig.accessToken
-    let fetchedPost: any = null
-
-    // 1단계: 단일 게시물 API로 직접 조회 (채널의 band_key 사용)
-    const result1 = await fetchSinglePost(accessToken, channel.channelKey, postKey)
-    if (result1.post) {
-      fetchedPost = result1.post
-    }
-
-    // 2단계: 실패 시 URL의 밴드 번호로 시도
-    if (!fetchedPost && channel.channelKey !== bandNumber) {
-      const result2 = await fetchSinglePost(accessToken, bandNumber, postKey)
-      if (result2.post) {
-        fetchedPost = result2.post
-      }
-    }
-
-    // 3단계: 단일 조회 실패 시 목록에서 검색 (선택 채널만, 최대 3페이지)
-    if (!fetchedPost) {
-      fetchedPost = await findPostInList(accessToken, channel.channelKey, postKey)
-    }
-
-    if (!fetchedPost) {
+    if (!postData.content) {
       return NextResponse.json(
-        {
-          success: false,
-          error: `게시물(${postKey})을 찾을 수 없습니다. 단일조회(key=${channel.channelKey}) 결과: ${result1.error}. Band API 쿼터가 초과되었을 수 있습니다. 잠시 후 다시 시도해주세요.`,
-        },
+        { success: false, error: '게시물 내용을 추출할 수 없습니다. 밴드 세션이 만료되었거나 접근 권한이 없을 수 있습니다.' },
         { status: 404 }
       )
     }
 
     // 게시물 생성
-    const title = fetchedPost.content
-      ? fetchedPost.content.substring(0, 100)
-      : '(제목 없음)'
-    const content = fetchedPost.content || ''
-    const author = fetchedPost.author?.name || '알 수 없음'
-    const images = fetchedPost.photos
-      ? fetchedPost.photos.map((photo: any) => photo.url)
-      : []
+    const title = postData.content.substring(0, 100)
+    const externalId = postData.postKey || `url_${postKeyFromUrl}`
 
     try {
       await postService.create({
         userId,
         channelId: channel.id,
-        externalId: String(fetchedPost.post_key || postKey),
+        externalId,
         title,
-        content,
-        author,
-        images,
+        content: postData.content,
+        author: postData.author || '알 수 없음',
+        images: postData.images || [],
       })
     } catch (error: any) {
       if (error.message === '이미 등록된 게시물입니다.') {
@@ -208,10 +226,10 @@ export async function POST(request: NextRequest) {
       success: true,
       message: `게시물이 수집되었습니다. (채널: ${channel.name})`,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Post Collect URL] 오류:', error)
     return NextResponse.json(
-      { success: false, error: '게시물 수집 중 오류가 발생했습니다.' },
+      { success: false, error: error.message || '게시물 수집 중 오류가 발생했습니다.' },
       { status: 500 }
     )
   }
