@@ -9,13 +9,37 @@ import { browserPool, sessionManager } from '@/modules/band-playwright'
 /**
  * Playwright로 Band 게시물 페이지를 직접 스크래핑하여 내용 추출
  */
-async function scrapeBandPost(channelId: number, bandUrl: string) {
-  const session = await sessionManager.getValidSession(channelId)
+async function findSessionChannelId(userId: number, preferredChannelId: number): Promise<number> {
+  // 1) 선택된 채널에 세션이 있으면 사용
+  const preferred = await prisma.channel.findFirst({
+    where: { id: preferredChannelId, bandSessionCookie: { not: null } },
+    select: { id: true },
+  })
+  if (preferred) return preferred.id
+
+  // 2) 사용자의 아무 채널에서 세션 쿠키가 있는 것 사용
+  const anyChannel = await prisma.channel.findFirst({
+    where: {
+      userId,
+      isActive: true,
+      platform: 'BAND',
+      bandSessionCookie: { not: null },
+    },
+    select: { id: true },
+  })
+  if (anyChannel) return anyChannel.id
+
+  throw new Error('밴드 세션이 없습니다. 소매밴드 채널 설정에서 쿠키를 등록해주세요.')
+}
+
+async function scrapeBandPost(userId: number, channelId: number, bandUrl: string) {
+  const sessionChannelId = await findSessionChannelId(userId, channelId)
+  const session = await sessionManager.getValidSession(sessionChannelId)
   if (!session) {
-    throw new Error('밴드 세션이 없습니다. 채널 설정에서 쿠키를 등록해주세요.')
+    throw new Error('밴드 세션이 만료되었습니다. 채널 설정에서 쿠키를 다시 등록해주세요.')
   }
 
-  const context = await browserPool.getContext(channelId, session.cookies)
+  const context = await browserPool.getContext(sessionChannelId, session.cookies)
   const page = await context.newPage()
 
   try {
@@ -176,7 +200,7 @@ export async function POST(request: NextRequest) {
     // Playwright로 게시물 스크래핑
     let postData
     try {
-      postData = await scrapeBandPost(channel.id, url)
+      postData = await scrapeBandPost(userId, channel.id, url)
     } catch (error: any) {
       const msg = error.message || '스크래핑 실패'
       if (msg.includes('세션')) {
