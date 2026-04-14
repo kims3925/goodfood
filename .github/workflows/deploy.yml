@@ -66,7 +66,7 @@ jobs:
           instance-id: 'i-0e6ef7c646a61356f'
           script: |
             set -e
-            cd ~/bandauto
+            cd /home/ubuntu/bandauto
 
             GHCR_TOKEN="${{ secrets.GHCR_PAT }}"
             git remote set-url origin "https://x-access-token:${GHCR_TOKEN}@github.com/ABC-Group-Tech/bandauto.git"
@@ -82,7 +82,7 @@ jobs:
 
             docker compose exec -T sourcing-app sh -c "cd /app/db && npx prisma@6 db push --schema prisma" || true
 
-            set -a && source ~/bandauto/.env && set +a
+            set -a && source /home/ubuntu/bandauto/.env && set +a
             docker compose exec -T mariadb mysql -u"${DB_USER:-banduser}" -p"${DB_PASSWORD}" "${DB_NAME:-sourcing_db}" -e "
               ALTER TABLE guest_order_item ADD COLUMN IF NOT EXISTS is_custom_item TINYINT(1) NOT NULL DEFAULT 0;
               ALTER TABLE guest_order_item MODIFY COLUMN shop_product_id INT NULL;
