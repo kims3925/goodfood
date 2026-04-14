@@ -159,6 +159,7 @@ export default function PostsManagePage() {
 
   // URL 수집 폼
   const [urlInput, setUrlInput] = useState('')
+  const [urlChannelId, setUrlChannelId] = useState('')
   const [urlSubmitting, setUrlSubmitting] = useState(false)
   const [urlResult, setUrlResult] = useState<{ success: boolean; message: string } | null>(null)
 
@@ -1563,6 +1564,17 @@ export default function PostsManagePage() {
           {addMode === 'URL' && (
             <div className="space-y-4 py-4">
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">도매밴드 선택 *</label>
+                <select
+                  value={urlChannelId}
+                  onChange={e => setUrlChannelId(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm mb-3"
+                >
+                  <option value="">도매밴드를 선택하세요</option>
+                  {channels.map(ch => (
+                    <option key={ch.id} value={ch.id}>{ch.name}</option>
+                  ))}
+                </select>
                 <label className="block text-sm font-medium text-gray-700 mb-2">상품 URL 입력</label>
                 <p className="text-xs text-gray-500 mb-3">밴드 게시물 URL을 입력하면 자동으로 수집합니다.</p>
                 <div className="flex gap-2">
@@ -1576,14 +1588,14 @@ export default function PostsManagePage() {
                   <Button
                     variant="primary"
                     onClick={async () => {
-                      if (!urlInput.trim()) return
+                      if (!urlInput.trim() || !urlChannelId) return
                       setUrlSubmitting(true)
                       setUrlResult(null)
                       try {
                         const res = await fetch('/api/post/collect-url', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ url: urlInput.trim() }),
+                          body: JSON.stringify({ url: urlInput.trim(), channelId: Number(urlChannelId) }),
                         })
                         const data = await res.json()
                         if (data.success) {
@@ -1599,7 +1611,7 @@ export default function PostsManagePage() {
                         setUrlSubmitting(false)
                       }
                     }}
-                    disabled={urlSubmitting || !urlInput.trim()}
+                    disabled={urlSubmitting || !urlInput.trim() || !urlChannelId}
                   >
                     {urlSubmitting ? '수집 중...' : '수집하기'}
                   </Button>

@@ -29,35 +29,11 @@ async function fetchBandPost(accessToken: string, bandKey: string, postKey: stri
 }
 
 /**
- * Band API로 밴드 정보 조회하여 이름 가져오기
- */
-async function fetchBandName(accessToken: string, bandKey: string): Promise<string> {
-  try {
-    const apiUrl = new URL('https://openapi.band.us/v2.1/bands')
-    apiUrl.searchParams.set('access_token', accessToken)
-
-    const response = await fetch(apiUrl.toString())
-    if (!response.ok) return `밴드 ${bandKey}`
-
-    const data = await response.json()
-    if (data.result_code === 1 && data.result_data?.bands) {
-      const band = data.result_data.bands.find((b: any) => b.band_key === bandKey)
-      if (band) return band.name
-    }
-  } catch {
-    // 이름 조회 실패 시 기본값 사용
-  }
-  return `밴드 ${bandKey}`
-}
-
-/**
  * POST: Band URL로 단일 게시물 수집
- * Body: { url: string }
+ * Body: { url: string, channelId: number }
  * URL 형식: https://band.us/band/{bandNumber}/post/{postKey}
  *
- * 1) 등록된 도매채널에서 먼저 검색
- * 2) 없으면 URL의 밴드 번호를 band_key로 직접 API 호출
- * 3) 해당 밴드가 채널로 미등록이면 자동으로 도매채널 등록
+ * 프론트에서 선택한 도매채널의 channelKey(band_key)를 사용하여 Band API 호출
  */
 export async function POST(request: NextRequest) {
   try {
@@ -71,11 +47,18 @@ export async function POST(request: NextRequest) {
     const userId = currentUser.userId
 
     const body = await request.json()
-    const { url } = body
+    const { url, channelId } = body
 
     if (!url || typeof url !== 'string') {
       return NextResponse.json(
         { success: false, error: 'URL을 입력해주세요.' },
+        { status: 400 }
+      )
+    }
+
+    if (!channelId) {
+      return NextResponse.json(
+        { success: false, error: '도매밴드를 선택해주세요.' },
         { status: 400 }
       )
     }
@@ -89,8 +72,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const bandNumber = urlMatch[1]
     const postKey = urlMatch[2]
+
+    // 선택된 채널 조회
+    const channel = await prisma.channel.findFirst({
+      where: {
+        id: Number(channelId),
+        userId,
+        isActive: true,
+        kind: ChannelKind.WHOLESALE,
+        platform: ChannelPlatform.BAND,
+      },
+    })
+
+    if (!channel) {
+      return NextResponse.json(
+        { success: false, error: '유효하지 않은 도매채널입니다.' },
+        { status: 400 }
+      )
+    }
 
     // Band API 설정 조회
     const apiConfig = await prisma.sourcingApiConfig.findFirst({
@@ -111,72 +111,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const accessToken = apiConfig.accessToken
+    // 선택된 채널의 channelKey(band_key)로 게시물 조회
+    const fetchedPost = await fetchBandPost(apiConfig.accessToken, channel.channelKey, postKey)
 
-    // 사용자의 도매채널 조회
-    const wholesaleChannels = await prisma.channel.findMany({
-      where: {
-        userId,
-        isActive: true,
-        kind: ChannelKind.WHOLESALE,
-        platform: ChannelPlatform.BAND,
-      },
-    })
-
-    let fetchedPost: any = null
-    let matchedChannel: typeof wholesaleChannels[0] | null = null
-
-    // 1단계: 등록된 도매채널에서 검색
-    // channelKey가 bandNumber와 일치하는 채널 우선
-    const sortedChannels = [...wholesaleChannels].sort((a, b) => {
-      if (a.channelKey === bandNumber) return -1
-      if (b.channelKey === bandNumber) return 1
-      return 0
-    })
-
-    for (const channel of sortedChannels) {
-      const post = await fetchBandPost(accessToken, channel.channelKey, postKey)
-      if (post) {
-        fetchedPost = post
-        matchedChannel = channel
-        break
-      }
-    }
-
-    // 2단계: 등록된 채널에서 못 찾으면, URL의 밴드 번호를 직접 band_key로 사용
     if (!fetchedPost) {
-      const alreadyTried = wholesaleChannels.some(ch => ch.channelKey === bandNumber)
-      if (!alreadyTried) {
-        fetchedPost = await fetchBandPost(accessToken, bandNumber, postKey)
-      }
-
-      if (fetchedPost) {
-        // 해당 밴드에 대한 도매채널 자동 등록
-        const bandName = await fetchBandName(accessToken, bandNumber)
-        matchedChannel = await prisma.channel.upsert({
-          where: {
-            userId_channelKey: {
-              userId,
-              channelKey: bandNumber,
-            },
-          },
-          update: {},
-          create: {
-            userId,
-            kind: ChannelKind.WHOLESALE,
-            platform: ChannelPlatform.BAND,
-            channelKey: bandNumber,
-            name: bandName,
-            isActive: true,
-          },
-        })
-        console.log(`[Post Collect URL] 도매채널 자동 등록: ${bandName} (${bandNumber})`)
-      }
-    }
-
-    if (!fetchedPost || !matchedChannel) {
       return NextResponse.json(
-        { success: false, error: '게시물을 찾을 수 없습니다. Band API 접근 권한이 있는 밴드의 게시물인지 확인해주세요.' },
+        { success: false, error: `선택한 도매밴드(${channel.name})에서 게시물을 찾을 수 없습니다. 올바른 채널을 선택했는지 확인해주세요.` },
         { status: 404 }
       )
     }
@@ -194,7 +134,7 @@ export async function POST(request: NextRequest) {
     try {
       await postService.create({
         userId,
-        channelId: matchedChannel.id,
+        channelId: channel.id,
         externalId: fetchedPost.post_key || postKey,
         title,
         content,
