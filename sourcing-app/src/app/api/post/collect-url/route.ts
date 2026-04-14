@@ -43,17 +43,23 @@ async function scrapeBandPost(userId: number, channelId: number, bandUrl: string
   const page = await context.newPage()
 
   try {
-    await page.goto(bandUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
+    await page.goto(bandUrl, { waitUntil: 'networkidle', timeout: 30000 })
 
     // 게시물 본문이 로드될 때까지 대기
     await page.waitForSelector('.postBody, .postText, .dPostBody, [class*="postBody"]', { timeout: 15000 }).catch(() => null)
 
-    // 추가 로딩 대기
+    // 이미지 lazy-loading 트리거를 위해 스크롤
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
     await page.waitForTimeout(2000)
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.waitForTimeout(1000)
+
+    // 이미지 완전 로딩 대기
+    await page.waitForLoadState('networkidle').catch(() => null)
 
     // 게시물 내용 추출
     const postData = await page.evaluate(() => {
-      // 본문 텍스트 추출 (여러 셀렉터 시도)
+      // 본문 텍스트 추출
       const contentSelectors = [
         '.postBody .postText',
         '.dPostBody .dPostText',
@@ -88,34 +94,60 @@ async function scrapeBandPost(userId: number, channelId: number, bandUrl: string
         }
       }
 
-      // 이미지 URL 추출
-      const imageSelectors = [
-        '.postBody img.postPhoto',
-        '.dPostBody img',
-        '.postPhotoArea img',
-        '[class*="postPhoto"] img',
-        '.postBody img[src*="band"]',
-        '.postBody img[src*="dthumb"]',
-      ]
+      // 이미지 URL 추출 (다양한 방법)
       const images: string[] = []
       const seenUrls = new Set<string>()
-      for (const sel of imageSelectors) {
-        document.querySelectorAll(sel).forEach((img) => {
-          const src = (img as HTMLImageElement).src
-          if (src && !seenUrls.has(src) && !src.includes('profile') && !src.includes('emoji')) {
-            seenUrls.add(src)
-            images.push(src)
-          }
-        })
-        if (images.length > 0) break
+
+      const addImage = (url: string) => {
+        if (!url || seenUrls.has(url)) return
+        // 프로필, 이모지, 아이콘 제외
+        if (url.includes('profile') || url.includes('emoji') || url.includes('icon') || url.includes('sticker')) return
+        // 작은 이미지 제외 (1x1, spacer 등)
+        if (url.includes('spacer') || url.includes('blank')) return
+        seenUrls.add(url)
+        // 썸네일 URL을 원본 URL로 변환 시도
+        const originalUrl = url
+          .replace(/\/dthumb-[^/]+\//, '/')
+          .replace(/\?type=.*$/, '')
+          .replace(/&type=.*$/, '')
+        images.push(originalUrl || url)
       }
 
-      // post_key 추출 (URL 또는 data 속성에서)
+      // 1) img 태그의 src, data-src
+      document.querySelectorAll('img').forEach((img) => {
+        const src = img.src || img.getAttribute('data-src') || img.getAttribute('data-original') || ''
+        if (src && (src.includes('phinf') || src.includes('band') || src.includes('naver') || src.includes('dthumb'))) {
+          addImage(src)
+        }
+      })
+
+      // 2) background-image 스타일
+      document.querySelectorAll('[style*="background-image"]').forEach((el) => {
+        const style = (el as HTMLElement).style.backgroundImage
+        const match = style.match(/url\(["']?([^"')]+)["']?\)/)
+        if (match?.[1]) {
+          addImage(match[1])
+        }
+      })
+
+      // 3) a 태그의 href (이미지 링크)
+      document.querySelectorAll('a[href*="phinf"], a[href*="dthumb"]').forEach((a) => {
+        const href = a.getAttribute('href')
+        if (href) addImage(href)
+      })
+
+      // 4) data-url, data-image 속성
+      document.querySelectorAll('[data-url], [data-image], [data-photo-url]').forEach((el) => {
+        const url = el.getAttribute('data-url') || el.getAttribute('data-image') || el.getAttribute('data-photo-url') || ''
+        if (url && (url.includes('phinf') || url.includes('band') || url.includes('naver'))) {
+          addImage(url)
+        }
+      })
+
+      // post_key 추출
       let postKey = ''
       const urlMatch = window.location.href.match(/\/post\/(\w+)/)
       if (urlMatch) postKey = urlMatch[1]
-
-      // data-post-key 속성에서 추출 시도
       if (!postKey) {
         const postEl = document.querySelector('[data-post-key], [data-postkey]')
         if (postEl) {
@@ -123,7 +155,7 @@ async function scrapeBandPost(userId: number, channelId: number, bandUrl: string
         }
       }
 
-      return { content, author, images, postKey, url: window.location.href }
+      return { content, author, images, postKey, url: window.location.href, debugImageCount: document.querySelectorAll('img').length }
     })
 
     return postData
