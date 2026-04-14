@@ -210,11 +210,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (!fetchedPost) {
+      const debugSummary = debugInfo.map((d: any) =>
+        `[${d.step}단계] ${d.channel}: ${d.totalSearched}개 검색, 샘플키=[${(d.samplePostKeys || []).join(', ')}]${d.apiError ? ' 에러:' + d.apiError : ''}`
+      ).join(' | ')
       return NextResponse.json(
         {
           success: false,
-          error: `게시물(${postKey})을 찾을 수 없습니다. 선택한 채널(${selectedChannel.name}, key=${selectedChannel.channelKey})과 URL의 밴드(${bandNumber})를 모두 검색했습니다. Band API 연동 앱에 해당 밴드가 포함되어 있는지 확인해주세요.`,
-          debug: debugInfo,
+          error: `게시물(${postKey})을 찾을 수 없습니다. ${debugSummary}`,
         },
         { status: 404 }
       )
