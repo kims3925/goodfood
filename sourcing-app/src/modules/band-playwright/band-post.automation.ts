@@ -624,6 +624,55 @@ export class BandPostAutomation {
 
       console.log(`[밴드자동화] 게시물 작성 성공: ${postKey}`)
 
+      // 6-1. 발행된 게시물 이미지 검증
+      const expectedImageCount = tempFiles.length
+      if (expectedImageCount > 0) {
+        try {
+          // 피드로 이동하여 방금 작성한 게시물 확인
+          await page.goto(`https://band.us/band/${currentBandNo}`, { waitUntil: 'load' })
+          await page.waitForTimeout(3000)
+
+          // 최신 게시물의 이미지 수 확인
+          const actualImageCount = await page.evaluate(() => {
+            // 첫 번째(최신) 게시물에서 이미지 찾기
+            const firstPost = document.querySelector('article._postMainWrap:first-of-type, .cCard:first-of-type')
+            if (!firstPost) return -1
+
+            // 게시물 내 이미지 카운트 (썸네일/본문 이미지)
+            const postImages = firstPost.querySelectorAll('.cPostBody img[src*="phinf"], .photoArea img, .postPhotoView img, [data-viewname*="Photo"] img')
+            if (postImages.length > 0) return postImages.length
+
+            // 사진 영역 자체 확인
+            const photoArea = firstPost.querySelector('.photoArea, .postPhotoArea, [class*="photoGrid"]')
+            if (photoArea) {
+              const imgs = photoArea.querySelectorAll('img')
+              return imgs.length
+            }
+
+            // 사진 개수 텍스트 (예: "+5" 표시) 확인
+            const photoCount = firstPost.querySelector('[class*="photoCount"], .moreView')
+            if (photoCount) {
+              const text = photoCount.textContent?.trim() || ''
+              const match = text.match(/\+?(\d+)/)
+              if (match) return parseInt(match[1]) + 1 // "+5"는 6개 이상을 의미
+            }
+
+            return 0
+          })
+
+          if (actualImageCount === 0) {
+            console.error(`[밴드자동화] ⚠️ 이미지 누락 감지! 예상: ${expectedImageCount}개, 실제: 0개 (post_key=${postKey})`)
+            await this.saveDebugScreenshot(page, 'image-missing-verification')
+          } else if (actualImageCount > 0) {
+            console.log(`[밴드자동화] ✅ 이미지 검증 완료: ${actualImageCount}개 확인 (예상: ${expectedImageCount}개, post_key=${postKey})`)
+          } else {
+            console.warn(`[밴드자동화] 이미지 검증 불가: 게시물을 찾을 수 없음 (post_key=${postKey})`)
+          }
+        } catch (verifyError: any) {
+          console.warn(`[밴드자동화] 이미지 검증 실패 (게시물은 정상 발행됨): ${verifyError.message}`)
+        }
+      }
+
       // 7. 댓글 작성 (commentContent가 있는 경우)
       const { commentContent } = params
       if (commentContent) {
@@ -631,9 +680,12 @@ export class BandPostAutomation {
         console.log('[밴드자동화] 7단계: 댓글 작성')
 
         try {
-          // 피드로 이동하여 방금 작성한 게시물(최신 글) 확인
-          await page.goto(`https://band.us/band/${currentBandNo}`, { waitUntil: 'load' })
-          await page.waitForTimeout(2000)
+          // 피드로 이동하여 방금 작성한 게시물(최신 글) 확인 (이미지 검증에서 이미 이동했을 수 있음)
+          const currentPageUrl = page.url()
+          if (!currentPageUrl.includes(`/band/${currentBandNo}`)) {
+            await page.goto(`https://band.us/band/${currentBandNo}`, { waitUntil: 'load' })
+            await page.waitForTimeout(2000)
+          }
 
           // 첫 번째(최신) 게시물의 댓글 버튼 클릭
           const commentButtonSelectors = [
@@ -2493,7 +2545,7 @@ export class BandPostAutomation {
     }
 
     // API 응답 모니터링 설정
-    type ApiResponseType = { success: boolean; postNo?: number; error?: string } | null
+    type ApiResponseType = { success: boolean; postNo?: number; photoCount?: number; error?: string } | null
     let apiResponse: ApiResponseType = null
 
     const responseHandler = async (response: import('playwright').Response) => {
@@ -2508,11 +2560,15 @@ export class BandPostAutomation {
 
           if (status === 200 && json) {
             if (json.result_code === 1 && json.result_data?.post?.post_no) {
+              // 이미지 수 확인 (photo_count 또는 photos 배열)
+              const postData = json.result_data.post
+              const photoCount = postData.photo_count ?? postData.photos?.length ?? 0
               apiResponse = {
                 success: true,
-                postNo: json.result_data.post.post_no,
+                postNo: postData.post_no,
+                photoCount,
               }
-              console.log(`[밴드자동화] API 성공! post_no=${apiResponse.postNo}`)
+              console.log(`[밴드자동화] API 성공! post_no=${apiResponse.postNo}, photo_count=${photoCount}`)
             } else {
               apiResponse = {
                 success: false,
@@ -2555,7 +2611,10 @@ export class BandPostAutomation {
       const response = apiResponse as ApiResponseType // 명시적 타입 단언
       if (response !== null) {
         if (response.success) {
-          console.log(`[밴드자동화] API로 게시물 생성 성공! post_no=${response.postNo}`)
+          console.log(`[밴드자동화] API로 게시물 생성 성공! post_no=${response.postNo}, photos=${response.photoCount ?? '확인불가'}`)
+          if (response.photoCount !== undefined && response.photoCount === 0) {
+            console.warn(`[밴드자동화] ⚠️ 게시물이 이미지 없이 등록됨! post_no=${response.postNo}`)
+          }
           return // 성공
         } else {
           throw new BandPlaywrightError(
