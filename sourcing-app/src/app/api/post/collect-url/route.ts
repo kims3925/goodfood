@@ -94,18 +94,17 @@ async function scrapeBandPost(userId: number, channelId: number, bandUrl: string
         }
       }
 
-      // 이미지 URL 추출 (다양한 방법)
+      // 이미지 URL 추출 — 게시물 영역 내부에서만
       const images: string[] = []
       const seenUrls = new Set<string>()
 
       const addImage = (url: string) => {
         if (!url || seenUrls.has(url)) return
-        // 프로필, 이모지, 아이콘 제외
         if (url.includes('profile') || url.includes('emoji') || url.includes('icon') || url.includes('sticker')) return
-        // 작은 이미지 제외 (1x1, spacer 등)
-        if (url.includes('spacer') || url.includes('blank')) return
+        if (url.includes('spacer') || url.includes('blank') || url.includes('logo') || url.includes('banner')) return
+        // 작은 크기 썸네일 제외 (cover, 40x40 등)
+        if (/\/[cC]\d+x\d+\//.test(url) || /type=f40_40/.test(url)) return
         seenUrls.add(url)
-        // 썸네일 URL을 원본 URL로 변환 시도
         const originalUrl = url
           .replace(/\/dthumb-[^/]+\//, '/')
           .replace(/\?type=.*$/, '')
@@ -113,36 +112,35 @@ async function scrapeBandPost(userId: number, channelId: number, bandUrl: string
         images.push(originalUrl || url)
       }
 
-      // 1) img 태그의 src, data-src
-      document.querySelectorAll('img').forEach((img) => {
-        const src = img.src || img.getAttribute('data-src') || img.getAttribute('data-original') || ''
-        if (src && (src.includes('phinf') || src.includes('band') || src.includes('naver') || src.includes('dthumb'))) {
-          addImage(src)
-        }
-      })
+      // 게시물 본문 영역 찾기
+      const postArea = document.querySelector('.postBody, .dPostBody, [class*="postBody"], .postWrap, .postView, #post_detail')
 
-      // 2) background-image 스타일
-      document.querySelectorAll('[style*="background-image"]').forEach((el) => {
-        const style = (el as HTMLElement).style.backgroundImage
-        const match = style.match(/url\(["']?([^"')]+)["']?\)/)
-        if (match?.[1]) {
-          addImage(match[1])
-        }
-      })
+      if (postArea) {
+        // 게시물 영역 내 img
+        postArea.querySelectorAll('img').forEach((img) => {
+          const src = img.src || img.getAttribute('data-src') || img.getAttribute('data-original') || ''
+          if (src && (src.includes('phinf') || src.includes('dthumb'))) {
+            addImage(src)
+          }
+        })
 
-      // 3) a 태그의 href (이미지 링크)
-      document.querySelectorAll('a[href*="phinf"], a[href*="dthumb"]').forEach((a) => {
-        const href = a.getAttribute('href')
-        if (href) addImage(href)
-      })
+        // 게시물 영역 내 background-image
+        postArea.querySelectorAll('[style*="background-image"]').forEach((el) => {
+          const style = (el as HTMLElement).style.backgroundImage
+          const match = style.match(/url\(["']?([^"')]+)["']?\)/)
+          if (match?.[1] && (match[1].includes('phinf') || match[1].includes('dthumb'))) {
+            addImage(match[1])
+          }
+        })
 
-      // 4) data-url, data-image 속성
-      document.querySelectorAll('[data-url], [data-image], [data-photo-url]').forEach((el) => {
-        const url = el.getAttribute('data-url') || el.getAttribute('data-image') || el.getAttribute('data-photo-url') || ''
-        if (url && (url.includes('phinf') || url.includes('band') || url.includes('naver'))) {
-          addImage(url)
-        }
-      })
+        // 게시물 영역 내 data 속성
+        postArea.querySelectorAll('[data-url], [data-image], [data-photo-url]').forEach((el) => {
+          const url = el.getAttribute('data-url') || el.getAttribute('data-image') || el.getAttribute('data-photo-url') || ''
+          if (url && (url.includes('phinf') || url.includes('dthumb'))) {
+            addImage(url)
+          }
+        })
+      }
 
       // post_key 추출
       let postKey = ''
@@ -254,29 +252,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 게시물 생성
+    // 게시물 생성 (기존에 같은 게시물이 있으면 삭제 후 재생성)
     const title = postData.content.substring(0, 100)
     const externalId = postData.postKey || `url_${postKeyFromUrl}`
 
-    try {
-      await postService.create({
-        userId,
-        channelId: channel.id,
-        externalId,
-        title,
-        content: postData.content,
-        author: postData.author || '알 수 없음',
-        images: postData.images || [],
-      })
-    } catch (error: any) {
-      if (error.message === '이미 등록된 게시물입니다.') {
+    // 기존 게시물이 있는지 확인하고, 가공상품이 없으면 삭제 후 재생성
+    const existingPost = await prisma.collectedPost.findFirst({
+      where: { channelId: channel.id, externalId },
+      include: { collectedProducts: { where: { isConverted: true } } },
+    })
+
+    if (existingPost) {
+      const hasActiveProducts = existingPost.collectedProducts.length > 0
+      if (hasActiveProducts) {
         return NextResponse.json(
-          { success: false, error: '이미 수집된 게시물입니다.' },
+          { success: false, error: '이미 수집되어 가공된 게시물입니다.' },
           { status: 409 }
         )
       }
-      throw error
+      // 가공상품이 없으면 기존 게시물 삭제 후 재생성
+      await prisma.collectedPostImage.deleteMany({ where: { postId: existingPost.id } })
+      await prisma.collectedPostComment.deleteMany({ where: { postId: existingPost.id } }).catch(() => null)
+      await prisma.collectedProduct.deleteMany({ where: { postId: existingPost.id } }).catch(() => null)
+      await prisma.collectedPost.delete({ where: { id: existingPost.id } })
     }
+
+    await postService.create({
+      userId,
+      channelId: channel.id,
+      externalId,
+      title,
+      content: postData.content,
+      author: postData.author || '알 수 없음',
+      images: postData.images || [],
+    })
 
     return NextResponse.json({
       success: true,
