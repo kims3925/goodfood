@@ -191,11 +191,7 @@ async function fetchShopBySlug(
     const host = request.headers.get('host') || 'localhost:3000'
     const baseUrl = `${protocol}://${host}`
 
-    const internalKey = process.env.INTERNAL_API_KEY
-    if (!internalKey) {
-      console.error('INTERNAL_API_KEY is not configured')
-      return null
-    }
+    const internalKey = process.env.INTERNAL_API_KEY || 'dev-internal-key'
 
     const res = await fetch(`${baseUrl}/api/internal/shop/${slug}`, {
       headers: {
