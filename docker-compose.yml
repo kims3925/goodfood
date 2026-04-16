@@ -47,6 +47,7 @@ services:
       args:
         APP_NAME: shop
         APP_PORT: 3000
+        NEXT_PUBLIC_SHOP_DOMAIN: ${NEXT_PUBLIC_SHOP_DOMAIN}
     container_name: bandauto-shop
     ports:
       - "3000:3000"

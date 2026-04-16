@@ -87,6 +87,7 @@ jobs:
           build-args: |
             APP_NAME=shop
             APP_PORT=3000
+            NEXT_PUBLIC_SHOP_DOMAIN=${{ secrets.NEXT_PUBLIC_SHOP_DOMAIN }}
           cache-from: type=gha,scope=bandauto-shop
           cache-to: type=gha,mode=max,scope=bandauto-shop
 

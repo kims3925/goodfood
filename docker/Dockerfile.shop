@@ -33,9 +33,11 @@ ARG APP_NAME=shop
 ARG APP_PORT=3000
 ARG NEXTAUTH_SECRET=build-dummy-secret
 ARG GUEST_TOKEN_SECRET=build-dummy-secret
+ARG NEXT_PUBLIC_SHOP_DOMAIN=localhost:3000
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV STANDALONE=true
+ENV NEXT_PUBLIC_SHOP_DOMAIN=${NEXT_PUBLIC_SHOP_DOMAIN}
 
 RUN apk add --no-cache openssl
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
