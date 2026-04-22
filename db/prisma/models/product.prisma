@@ -3,6 +3,7 @@ model Product {
   userId             Int               @map("user_id")
   channelId          Int?              @map("channel_id")
   name               String            @db.VarChar(500)
+  sourceProductName  String?           @map("source_product_name") @db.VarChar(500) // 도매방 원본 품명 (발주 텍스트용)
   description        String?           @db.Text
   thumbnailUrl       String?           @map("thumbnail_url") @db.VarChar(1000)
   categoryId         String?           @map("category_id") @db.VarChar(100)

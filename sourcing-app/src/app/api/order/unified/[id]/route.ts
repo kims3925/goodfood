@@ -169,6 +169,7 @@ export async function GET(
           items: order.items.map((item) => ({
             id: item.id,
             productName: item.productName,
+            sourceProductName: item.shopProduct?.product?.sourceProductName ?? null,
             optionSummary: item.optionSummary,
             thumbnailUrl: item.thumbnailUrl || item.shopProduct?.product?.thumbnailUrl || null,
             quantity: item.quantity,
@@ -314,6 +315,7 @@ export async function GET(
         items: guestOrder.items.map((item) => ({
           id: item.id,
           productName: item.productName,
+          sourceProductName: item.shopProduct?.product?.sourceProductName ?? null,
           optionSummary: item.optionSummary,
           thumbnailUrl: item.thumbnailUrl || item.shopProduct?.product?.thumbnailUrl || null,
           quantity: item.quantity,

@@ -17,13 +17,16 @@ import {
   Plus,
   Trash2,
   Edit3,
+  Download,
 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import Input from '@/components/ui/Input'
 import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table'
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 import { getChannelColor } from '@/lib/channel-utils'
+import { generateOrderText } from '@/lib/order-text'
 
 type OrderSource = 'SHOPPING_MALL'
 
@@ -96,6 +99,196 @@ export default function UnifiedOrderListPage() {
   const router = useRouter()
 
   const [itemsPerPage, setItemsPerPage] = useState<20 | 50 | 100>(20)
+
+  // 저장하기용: 선택된 주문 + 드롭다운 메뉴 상태
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set())
+  const [showSaveMenu, setShowSaveMenu] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const toggleOrder = (orderNumber: string) => {
+    setSelectedOrders(prev => {
+      const next = new Set(prev)
+      if (next.has(orderNumber)) {
+        next.delete(orderNumber)
+      } else {
+        next.add(orderNumber)
+      }
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    if (selectedOrders.size === orders.length && orders.length > 0) {
+      setSelectedOrders(new Set())
+    } else {
+      setSelectedOrders(new Set(orders.map(o => o.orderNumber)))
+    }
+  }
+
+  // 페이지 이동 시 선택 초기화 (선택한 주문번호가 현재 페이지에 없으면 혼란 방지)
+  useEffect(() => {
+    setSelectedOrders(new Set())
+  }, [page, search, selectedShopId, statusFilter, itemsPerPage])
+
+  // 저장 메뉴 외부 클릭 시 닫기
+  useEffect(() => {
+    if (!showSaveMenu) return
+    const handler = () => setShowSaveMenu(false)
+    window.addEventListener('click', handler)
+    return () => window.removeEventListener('click', handler)
+  }, [showSaveMenu])
+
+  // 선택한 주문의 상세 정보 로드
+  const fetchSelectedDetails = async () => {
+    const selected = orders.filter(o => selectedOrders.has(o.orderNumber))
+    const details = await Promise.all(
+      selected.map(async (o) => {
+        const res = await fetch(`/api/order/unified/${o.orderNumber}?source=${o.source}`)
+        const data = await res.json()
+        return data.success ? data.data : null
+      })
+    )
+    return details.filter(Boolean)
+  }
+
+  // 파일명용 타임스탬프 (YYYYMMDD_HHmm)
+  const buildTimestamp = () => {
+    const now = new Date()
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    return (
+      `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}` +
+      `_${pad(now.getHours())}${pad(now.getMinutes())}`
+    )
+  }
+
+  const handleSaveAsText = async () => {
+    setShowSaveMenu(false)
+    if (selectedOrders.size === 0) {
+      toast.error('저장할 주문을 선택해주세요.')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const details = await fetchSelectedDetails()
+      if (details.length === 0) {
+        toast.error('주문 상세 정보를 불러오지 못했습니다.')
+        return
+      }
+
+      const texts = details.map((order: any) => {
+        const wholesaleItem = (order.items || []).find(
+          (i: any) => i?.channel?.kind === 'WHOLESALE'
+        )
+        return generateOrderText({
+          orderNumber: order.orderNumber,
+          items: (order.items || []).map((i: any) => ({
+            productName: i.productName,
+            sourceProductName: i.sourceProductName,
+            optionSummary: i.optionSummary,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            shippingFee: i.shippingFee ?? 0,
+          })),
+          shipping: order.shippingAddress,
+          wholesaleChannelName: wholesaleItem?.channel?.name,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone ?? undefined,
+        })
+      })
+
+      const divider = '\n\n' + '='.repeat(30) + '\n\n'
+      const content = texts.join(divider)
+
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `BandAuto_발주_${buildTimestamp()}.txt`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      toast.success(`${details.length}건 텍스트 저장 완료`)
+    } catch (err) {
+      console.error('텍스트 저장 실패:', err)
+      toast.error('텍스트 저장 중 오류가 발생했습니다.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSaveAsExcel = async () => {
+    setShowSaveMenu(false)
+    if (selectedOrders.size === 0) {
+      toast.error('저장할 주문을 선택해주세요.')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const details = await fetchSelectedDetails()
+      if (details.length === 0) {
+        toast.error('주문 상세 정보를 불러오지 못했습니다.')
+        return
+      }
+
+      const rows = details.flatMap((order: any) =>
+        (order.items || []).map((item: any) => {
+          const addr = order.shippingAddress
+          const addressStr = addr
+            ? `[${addr.postalCode}] ${addr.address}${addr.addressDetail ? ' ' + addr.addressDetail : ''}`
+            : ''
+          const wholesaleName = (order.items || []).find(
+            (i: any) => i?.channel?.kind === 'WHOLESALE'
+          )?.channel?.name || ''
+
+          return {
+            주문번호: order.orderNumber,
+            품명: item.sourceProductName || item.productName,
+            옵션: item.optionSummary || '',
+            수량: item.quantity,
+            금액: item.unitPrice * item.quantity,
+            배송비: item.shippingFee ?? 0,
+            받는분: addr?.recipientName || '',
+            연락처: addr?.recipientPhone || '',
+            주소: addressStr,
+            보내는분: order.customerName || '',
+            '보내는분 연락처': order.customerPhone || '',
+            도매방: wholesaleName,
+          }
+        })
+      )
+
+      const ws = XLSX.utils.json_to_sheet(rows)
+      ws['!cols'] = [
+        { wch: 24 }, // 주문번호
+        { wch: 30 }, // 품명
+        { wch: 15 }, // 옵션
+        { wch: 6 },  // 수량
+        { wch: 10 }, // 금액
+        { wch: 8 },  // 배송비
+        { wch: 10 }, // 받는분
+        { wch: 15 }, // 연락처
+        { wch: 40 }, // 주소
+        { wch: 10 }, // 보내는분
+        { wch: 15 }, // 보내는분 연락처
+        { wch: 20 }, // 도매방
+      ]
+
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '발주목록')
+
+      XLSX.writeFile(wb, `BandAuto_발주_${buildTimestamp()}.xlsx`)
+      toast.success(`${details.length}건 엑셀 저장 완료`)
+    } catch (err) {
+      console.error('엑셀 저장 실패:', err)
+      toast.error('엑셀 저장 중 오류가 발생했습니다.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   // Shop 목록 로드
   useEffect(() => {
@@ -309,13 +502,45 @@ export default function UnifiedOrderListPage() {
               주문 현황을 확인하고 관리합니다.
             </p>
           </div>
-          <Link
-            href="/shop/order/external/new"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
-          >
-            <Plus size={18} />
-            <span>외부 주문 추가</span>
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* 저장하기 드롭다운 */}
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => setShowSaveMenu((v) => !v)}
+                disabled={selectedOrders.size === 0 || isSaving}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm font-medium"
+              >
+                <Download size={18} />
+                <span>저장하기{selectedOrders.size > 0 ? ` (${selectedOrders.size})` : ''}</span>
+              </button>
+              {showSaveMenu && (
+                <div className="absolute right-0 mt-1 w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-10 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={handleSaveAsText}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 text-gray-700"
+                  >
+                    텍스트로 저장 (.txt)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveAsExcel}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 text-gray-700 border-t border-gray-100"
+                  >
+                    엑셀로 저장 (.xlsx)
+                  </button>
+                </div>
+              )}
+            </div>
+            <Link
+              href="/shop/order/external/new"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
+            >
+              <Plus size={18} />
+              <span>외부 주문 추가</span>
+            </Link>
+          </div>
         </div>
 
         {/* 상태 필터 버튼 */}
@@ -532,13 +757,23 @@ export default function UnifiedOrderListPage() {
                   >
                     {/* 상단: 주문번호 + 상태 */}
                     <div className="flex items-start justify-between mb-3">
-                      <div className="flex flex-col gap-1">
-                        <span className="font-mono text-sm font-medium text-gray-900">
-                          {order.orderNumber}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {formatDate(order.createdAt)}
-                        </span>
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedOrders.has(order.orderNumber)}
+                          onChange={() => toggleOrder(order.orderNumber)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded border-gray-300 cursor-pointer mt-1"
+                          aria-label={`주문 ${order.orderNumber} 선택`}
+                        />
+                        <div className="flex flex-col gap-1">
+                          <span className="font-mono text-sm font-medium text-gray-900">
+                            {order.orderNumber}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {formatDate(order.createdAt)}
+                          </span>
+                        </div>
                       </div>
                       {isExternalOrder(order.orderNumber) ? (
                         <select
@@ -636,15 +871,25 @@ export default function UnifiedOrderListPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[3%] text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedOrders.size === orders.length && orders.length > 0}
+                          onChange={toggleAll}
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded border-gray-300 cursor-pointer"
+                          aria-label="전체 선택"
+                        />
+                      </TableHead>
                       <TableHead className="w-[4%] text-center">No.</TableHead>
                       <TableHead className="w-[9%] text-center">출처</TableHead>
                       <TableHead className="w-[9%] text-center">주문번호</TableHead>
-                      <TableHead className="w-[8%] text-center">고객명</TableHead>
-                      <TableHead className="w-[7%] text-center">회원유형</TableHead>
-                      <TableHead className="w-[10%] text-center">전화번호</TableHead>
-                      <TableHead className="w-[19%] text-center">상품</TableHead>
-                      <TableHead className="w-[8%] text-center">금액</TableHead>
-                      <TableHead className="w-[8%] text-center">상태</TableHead>
+                      <TableHead className="w-[7%] text-center">고객명</TableHead>
+                      <TableHead className="w-[6%] text-center">회원유형</TableHead>
+                      <TableHead className="w-[9%] text-center">전화번호</TableHead>
+                      <TableHead className="w-[18%] text-center">상품</TableHead>
+                      <TableHead className="w-[7%] text-center">금액</TableHead>
+                      <TableHead className="w-[7%] text-center">상태</TableHead>
                       <TableHead className="w-[12%] text-center">주문일시</TableHead>
                       <TableHead className="w-[6%] text-center">작업</TableHead>
                     </TableRow>
@@ -656,6 +901,16 @@ export default function UnifiedOrderListPage() {
                         className="hover:bg-gray-50 cursor-pointer"
                         onClick={() => router.push(`/shop/order/detail/${order.orderNumber}?source=${order.source}`)}
                       >
+                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedOrders.has(order.orderNumber)}
+                            onChange={() => toggleOrder(order.orderNumber)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="rounded border-gray-300 cursor-pointer"
+                            aria-label={`주문 ${order.orderNumber} 선택`}
+                          />
+                        </TableCell>
                         <TableCell className="text-center text-gray-500">
                           {(page - 1) * itemsPerPage + index + 1}
                         </TableCell>

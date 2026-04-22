@@ -27,7 +27,7 @@ import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
-import KakaoOrderButton from '@/components/order/KakaoOrderButton'
+import OrderTextCopyButton from '@/components/order/OrderTextCopyButton'
 
 type OrderSource = 'SHOPPING_MALL' | 'GOOGLE_FORM'
 
@@ -41,6 +41,7 @@ interface ChannelInfo {
 interface OrderItem {
   id: number
   productName: string
+  sourceProductName?: string | null
   optionSummary: string | null
   thumbnailUrl: string | null
   quantity: number
@@ -847,13 +848,15 @@ export default function UnifiedOrderDetailPage() {
               </div>
             )}
 
-            {/* 카톡 발주 */}
+            {/* 텍스트 복사 (발주용) */}
             {isShoppingMall && (
-              <KakaoOrderButton
+              <OrderTextCopyButton
                 orderNumber={order.orderNumber}
                 items={order.items}
                 shippingAddress={order.shippingAddress}
                 orderStatus={order.status}
+                customerName={order.customerName}
+                customerPhone={order.customerPhone ?? undefined}
               />
             )}
 
