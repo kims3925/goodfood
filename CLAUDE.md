@@ -240,6 +240,46 @@ ChannelProduct / ShopProduct (product/list 발행완료 탭, publish 페이지)
 - `scheduler.register()` → `scheduler.startAll()`
 - Seed API 호출 필수: `POST /api/admin/agents/seed`
 
+## 주문 발주 (텍스트 복사 / 다건 저장)
+
+쇼핑몰 주문을 도매처에 발주하기 위한 텍스트/엑셀 출력 기능.
+
+### 발주 텍스트 양식 규칙 (`sourcing-app/src/lib/order-text.ts`)
+
+- **품명**: 도매방 원본 품명 우선 — `Product.sourceProductName` 또는 `CollectedPost.title` (폴백). AI 가공 품명 사용 금지.
+- **금액**: 배송비가 포함된 **합산 단일 값**. 기존의 "(배송비 X원)" 별도 괄호 표기 제거.
+- **합배송 전제**: 배송비는 주문 전체에 1회만 반영. `items[].shippingFee` 최대값을 주문 배송비로 간주.
+- **받는분/보내는분**: 다를 때만 `받는분(보내는분)` 괄호 표기, 같으면 "보내는분" 줄 생략.
+- **도매방**: 주문 아이템의 `channel.kind === 'WHOLESALE'`에서 자동 감지 (수동 선택 없음).
+
+### 발주 텍스트 생성 함수
+
+- `generateOrderText(data)` — 주문 전체를 단일 블록으로 생성. 금액은 전체 합산.
+- `generateOrderTextsPerItem(data)` — **품목마다 개별 발주서** 배열 반환 (도매처 개별 전달용).
+  - 단일 품목: 금액 = 상품가 + 배송비
+  - 여러 품목: 각 발주서는 해당 품목 상품가만, 하단에 "합배송 배송비 N원 (주문 전체 1회)" 공통 안내
+
+### 주요 사용 위치
+
+| 위치 | 컴포넌트 / 동작 |
+|-----|---------------|
+| `/shop/order/detail/[id]` | `OrderTextCopyButton` — 품목별 발주서를 `===` 구분선으로 연결한 통합 텍스트 클립보드 복사 |
+| `/shop/order/list` 우측 상단 "저장하기" | 체크박스로 선택한 주문들을 .txt 또는 .xlsx로 다건 저장 |
+
+### 저장 포맷
+
+- **`.txt`**: `details.flatMap(order => generateOrderTextsPerItem(order))` → 모든 품목별 발주서를 `\n\n====\n\n` 구분선으로 연결.
+- **`.xlsx`**: **주문당 1행** 통합. 품명/옵션/수량은 셀 내 `\n` 줄바꿈 + wrapText. `금액` 컬럼은 배송비 포함 합산, `배송비`는 주문 전체 1회 값.
+- 파일명: `BandAuto_발주_{YYYYMMDD_HHmm}.{txt,xlsx}`
+- xlsx 패키지: `sourcing-app`의 `xlsx@0.18.5` 사용.
+
+### 발주용 DB 스키마
+
+- `Product.sourceProductName VarChar(500)?` — 도매방 원본 품명 (발주 텍스트용)
+- `Product.collectedPostId Int?` — 원본 게시물 FK (`CollectedPost`, `onDelete: SetNull`)
+- AI 가공 시점(`productService.create`)에 `post.title`을 `sourceProductName`에 자동 저장하고 `collectedPostId`도 채움.
+- `/api/order/unified/[id]` 응답의 `items[].sourceProductName`은 `Product.sourceProductName ?? Product.collectedPost.title ?? null` 순으로 폴백. 기존 상품도 `collectedPostId`가 있으면 원본 제목으로 즉시 표시됨.
+
 ## 핵심 원칙
 
 1. **Soft Delete 기본** - Hard Delete 금지
