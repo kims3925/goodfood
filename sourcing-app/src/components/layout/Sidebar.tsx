@@ -368,7 +368,10 @@ export default function Sidebar({
                 <Link
                   key={child.label}
                   href={child.href || '#'}
-                  onClick={() => setClickedItem(null)}
+                  onClick={() => {
+                    setClickedItem(null)
+                    onClose?.()
+                  }}
                   className={`
                     flex items-center gap-3
                     px-4 py-3 min-h-[44px]
@@ -400,6 +403,7 @@ export default function Sidebar({
       >
         <Link
           href={item.href || '#'}
+          onClick={() => onClose?.()}
           className={`
             flex items-center
             ${collapsed ? 'justify-center px-2' : 'gap-3 px-4'}
@@ -502,7 +506,10 @@ export default function Sidebar({
                     {sections.map(section => (
                       <button
                         key={section}
-                        onClick={() => onSectionChange(section)}
+                        onClick={() => {
+                          onSectionChange(section)
+                          onClose?.()
+                        }}
                         className={`
                           w-full flex items-center justify-center p-2 min-h-[44px] rounded-md transition-colors
                           ${currentSection === section
