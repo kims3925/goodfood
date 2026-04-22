@@ -125,6 +125,7 @@ export default function PostsManagePage() {
   const [isAiProcessing, setIsAiProcessing] = useState(false)
   const [aiProgress, setAiProgress] = useState({ current: 0, total: 0, failed: 0 })
   const [showAiConfirm, setShowAiConfirm] = useState(false)
+  const [aiCompleteModal, setAiCompleteModal] = useState<{ show: boolean; success: number; failed: number }>({ show: false, success: 0, failed: 0 })
 
   // 2단계 뷰: 'collecting' = 수집 게시물, 'processed' = 가공 완료 상품
   const [viewMode, setViewMode] = useState<'collecting' | 'processed'>('collecting')
@@ -843,13 +844,13 @@ export default function PostsManagePage() {
     loadPosts()
 
     if (successCount > 0) {
-      toast.success(`${successCount}개 상품이 AI 가공되었습니다.`)
-      // 가공된 상품 로드 후 Stage 2 뷰로 전환
+      // 가공된 상품 로드 후 Stage 2 뷰로 전환 (사용자가 머무르기 선택 시를 대비)
       await loadProcessedProducts(createdProductIds)
       setViewMode('processed')
     }
-    if (failCount > 0) {
-      toast.error(`${failCount}개 가공에 실패했습니다.`)
+    // 완료 팝업 표시 (성공/실패 요약 + 가공상품 페이지로 이동 제안)
+    if (successCount > 0 || failCount > 0) {
+      setAiCompleteModal({ show: true, success: successCount, failed: failCount })
     }
   }
 
@@ -2306,8 +2307,39 @@ export default function PostsManagePage() {
         onClose={() => setShowAiConfirm(false)}
         onConfirm={confirmAiProcess}
         title="AI로 가공하기"
-        message={`선택한 ${selectedPostIds.length}개 게시물을 AI로 가공합니다. 가공 완료 후 가공상품 탭으로 이동합니다.`}
+        message={`선택한 ${selectedPostIds.length}개 게시물을 AI로 가공합니다. 가공 완료 후 가공상품 페이지로 이동할 수 있습니다.`}
         confirmText="가공 시작"
+        variant="info"
+      />
+
+      {/* AI 가공 완료 모달 — 가공상품 페이지로 이동 */}
+      <ConfirmModal
+        isOpen={aiCompleteModal.show}
+        onClose={() => setAiCompleteModal({ show: false, success: 0, failed: 0 })}
+        onConfirm={() => {
+          setAiCompleteModal({ show: false, success: 0, failed: 0 })
+          router.push('/sourcing/product/list?tab=unpublished')
+        }}
+        title="AI 가공 완료"
+        message={
+          <span>
+            {aiCompleteModal.success > 0 && (
+              <>
+                <strong>{aiCompleteModal.success}개</strong> 상품이 AI 가공되었습니다.
+                <br />
+              </>
+            )}
+            {aiCompleteModal.failed > 0 && (
+              <>
+                <span className="text-red-600">{aiCompleteModal.failed}개 가공 실패</span>
+                <br />
+              </>
+            )}
+            <span className="mt-2 block text-gray-600">가공상품 페이지로 이동하시겠습니까?</span>
+          </span>
+        }
+        confirmText="가공상품 페이지로 이동"
+        cancelText="여기 머무르기"
         variant="info"
       />
 
