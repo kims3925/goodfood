@@ -30,6 +30,7 @@ export class ProductService {
     let price: number | undefined = data.price ?? undefined
 
     // postId 기반 생성 시 channelId와 이미지 가져오기
+    let sourceProductName: string | undefined = undefined
     if (data.postId) {
       const post = await productRepository.getCollectedPostWithImages(data.postId, data.userId)
       if (!post) {
@@ -40,6 +41,9 @@ export class ProductService {
       if (!channelId && post.channelId) {
         channelId = post.channelId
       }
+
+      // 도매방 원본 품명 (발주 텍스트용)
+      sourceProductName = post.title
 
       // 이미지 가져오기
       if (!thumbnailUrl && post.images?.[0]?.url) {
@@ -127,6 +131,8 @@ export class ProductService {
       categoryId,
       wholesalePrice,
       price,
+      sourceProductName,
+      collectedPostId: data.postId,
     })
 
     // postId가 있으면 CollectedProduct 처리 (post/list에서 제거되도록)

@@ -2,6 +2,7 @@ model Product {
   id                 Int               @id @default(autoincrement())
   userId             Int               @map("user_id")
   channelId          Int?              @map("channel_id")
+  collectedPostId    Int?              @map("collected_post_id") // 원본 도매 게시물 (발주 텍스트 품명 출처)
   name               String            @db.VarChar(500)
   sourceProductName  String?           @map("source_product_name") @db.VarChar(500) // 도매방 원본 품명 (발주 텍스트용)
   description        String?           @db.Text
@@ -19,6 +20,7 @@ model Product {
   bundleMaxQty       Int?              @default(1) @map("bundle_max_qty") // 합배송 최대 수량
   bundleShippingType BundleShippingType @default(NONE) @map("bundle_shipping_type") // 합배송 타입
   channel            Channel?          @relation(fields: [channelId], references: [id])
+  collectedPost      CollectedPost?    @relation(fields: [collectedPostId], references: [id], onDelete: SetNull)
   user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   images             ProductImage[]
   options            ProductOption[]
@@ -29,6 +31,7 @@ model Product {
 
   @@index([userId], name: "product_user_id_idx")
   @@index([channelId], name: "product_channel_id_idx")
+  @@index([collectedPostId], name: "product_collected_post_id_idx")
   @@index([categoryId], name: "product_category_id_idx")
   @@index([createdAt], name: "product_created_at_idx")
   @@index([deletedAt], name: "product_deleted_at_idx")

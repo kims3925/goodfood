@@ -266,7 +266,9 @@ export class ProductRepository {
       data: {
         userId: data.userId,
         channelId: data.channelId || null,
+        collectedPostId: data.collectedPostId ?? null,
         name: data.name,
+        sourceProductName: data.sourceProductName ?? null,
         description: data.description || null,
         categoryId: data.categoryId || null,
         currency: data.currency || 'KRW',

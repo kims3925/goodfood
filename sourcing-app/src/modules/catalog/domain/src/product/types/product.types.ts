@@ -29,6 +29,8 @@ export interface ProductCreateInput {
   postId?: number
   channelId?: number
   name: string
+  sourceProductName?: string
+  collectedPostId?: number
   description?: string
   categoryId?: string
   currency?: string
