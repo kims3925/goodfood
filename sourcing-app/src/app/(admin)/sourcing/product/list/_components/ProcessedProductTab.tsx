@@ -40,6 +40,7 @@ interface Product {
   currency: string
   createdAt: string
   isActive: boolean
+  republishedAt?: string | null
   images?: ProductImage[]
   channel?: {
     id: number
@@ -1804,6 +1805,15 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
                               {(() => {
                                 const isPublished = (product.publishedChannelIds && product.publishedChannelIds.length > 0)
                                   || (product.publishedProducts && product.publishedProducts.length > 0)
+                                const isRepublished = !!product.republishedAt
+                                if (isPublished && isRepublished) {
+                                  return (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                      <CheckCircle size={11} />
+                                      재발행완료
+                                    </span>
+                                  )
+                                }
                                 return isPublished ? (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
                                     <CheckCircle size={11} />
@@ -1911,6 +1921,15 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
                           {(() => {
                             const isPublished = (product.publishedChannelIds && product.publishedChannelIds.length > 0)
                               || (product.publishedProducts && product.publishedProducts.length > 0)
+                            const isRepublished = !!product.republishedAt
+                            if (isPublished && isRepublished) {
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                  <CheckCircle size={12} />
+                                  재발행완료
+                                </span>
+                              )
+                            }
                             return isPublished ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
                                 <CheckCircle size={12} />

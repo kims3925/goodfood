@@ -1419,17 +1419,18 @@ function PublishPageContent() {
           }
         }
 
-        // Step 3: 소매밴드에 신규 발행 (Playwright로 이미지 포함 발행)
+        // Step 3: 소매밴드에 신규 발행 (자동발행과 동일한 /api/publish/template/publish 사용)
+        // 기존의 /api/shop/publish with channelId 경로는 첫 채널만 성공하고 나머지 실패하는 이슈가 있었음
         for (const channel of channels) {
           try {
-            const res = await fetch('/api/shop/publish', {
+            const res = await fetch('/api/publish/template/publish', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
-              body: JSON.stringify({ productIds: [productId], channelId: channel.id }),
+              body: JSON.stringify({ productId, channelId: channel.id }),
             })
             const data = await res.json()
-            if (!data.success) {
+            if (!(data.success || data.publishId)) {
               console.warn(`재발행 - 밴드 발행 실패 (channelId=${channel.id}):`, data.message || data.error)
               productOk = false
             }
@@ -1439,8 +1440,20 @@ function PublishPageContent() {
           }
         }
 
-        if (productOk) successCount++
-        else failCount++
+        // Step 4: 성공 시 republishedAt 마킹 (가공상품 목록 "재발행완료" 표시용)
+        if (productOk) {
+          try {
+            await fetch(`/api/product/${productId}/republish-mark`, {
+              method: 'POST',
+              credentials: 'include',
+            })
+          } catch (e) {
+            console.warn(`재발행 - republish-mark 실패 (productId=${productId})`, e)
+          }
+          successCount++
+        } else {
+          failCount++
+        }
       } catch {
         failCount++
       }
@@ -2132,6 +2145,7 @@ function PublishPageContent() {
                           const priceSet = hasPrice(product.id)
                           const isLastInGroup = itemIndex === group.items.length - 1
                           const hasNextGroup = groupIndex < groupedTargets.length - 1
+                          const isRepublishingRow = republishingIds.has(product.id)
 
                           return (
                             <td
@@ -2142,8 +2156,11 @@ function PublishPageContent() {
                             >
                               <button
                                 onClick={() => handleCellClick(product.id, group.type, item.id)}
+                                disabled={isRepublishingRow}
                                 className={`w-8 h-8 rounded transition-all ${
-                                  selected
+                                  isRepublishingRow
+                                    ? 'bg-gray-300 animate-pulse cursor-wait'
+                                    : selected
                                     ? 'bg-purple-500 hover:bg-purple-600 cursor-pointer ring-2 ring-purple-300'
                                     : published
                                     ? (group.type === 'shop'
@@ -2153,14 +2170,18 @@ function PublishPageContent() {
                                     ? 'bg-amber-100 hover:bg-amber-200 cursor-pointer border-2 border-dashed border-amber-300'
                                     : 'bg-gray-200 hover:bg-gray-300 cursor-pointer'
                                 }`}
-                                title={`${product.name} → ${item.name}: ${
-                                  published
-                                    ? (group.type === 'shop' ? '발행됨 (클릭하여 취소)' : '발행됨')
-                                    : !priceSet ? '가격 미설정 (설정 필요)' : '미발행'
-                                }`}
+                                title={
+                                  isRepublishingRow
+                                    ? '재발행 중…'
+                                    : `${product.name} → ${item.name}: ${
+                                        published
+                                          ? (group.type === 'shop' ? '발행됨 (클릭하여 취소)' : '발행됨')
+                                          : !priceSet ? '가격 미설정 (설정 필요)' : '미발행'
+                                      }`
+                                }
                               >
-                                {published && <Check size={16} className="text-white mx-auto" />}
-                                {!published && !priceSet && <AlertTriangle size={12} className="text-amber-500 mx-auto" />}
+                                {!isRepublishingRow && published && <Check size={16} className="text-white mx-auto" />}
+                                {!isRepublishingRow && !published && !priceSet && <AlertTriangle size={12} className="text-amber-500 mx-auto" />}
                               </button>
                             </td>
                           )
