@@ -13,7 +13,9 @@ import {
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
-import { generateOrderText, type OrderTextData } from '@/lib/order-text'
+import { generateOrderTextsPerItem, type OrderTextData } from '@/lib/order-text'
+
+const ORDER_DIVIDER = '\n\n' + '='.repeat(30) + '\n\n'
 
 interface ChannelInfo {
   id: number
@@ -73,7 +75,7 @@ export default function OrderTextCopyButton({
   // 결제 완료 이상 상태에서만 텍스트 복사 가능
   const canOrder = ['PAID', 'PREPARING', 'SHIPPED', 'DELIVERED'].includes(orderStatus)
 
-  // 발주 텍스트 생성
+  // 발주 텍스트 생성 (품목별 분리, 여러 개면 구분선으로 연결)
   const orderText = useMemo(() => {
     if (!shippingAddress) return ''
 
@@ -93,7 +95,7 @@ export default function OrderTextCopyButton({
       customerPhone,
     }
 
-    return generateOrderText(data)
+    return generateOrderTextsPerItem(data).join(ORDER_DIVIDER)
   }, [orderNumber, items, shippingAddress, defaultChannel, customerName, customerPhone])
 
   // 클립보드 복사

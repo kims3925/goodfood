@@ -26,7 +26,9 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmp
 import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 import { getChannelColor } from '@/lib/channel-utils'
-import { generateOrderText } from '@/lib/order-text'
+import { generateOrderTextsPerItem } from '@/lib/order-text'
+
+const ORDER_DIVIDER = '\n\n' + '='.repeat(30) + '\n\n'
 
 type OrderSource = 'SHOPPING_MALL'
 
@@ -176,11 +178,12 @@ export default function UnifiedOrderListPage() {
         return
       }
 
-      const texts = details.map((order: any) => {
+      // 주문마다 품목별로 분리 발주서 생성 → 모두 하나의 .txt 파일에 구분선으로 연결
+      const texts = details.flatMap((order: any) => {
         const wholesaleItem = (order.items || []).find(
           (i: any) => i?.channel?.kind === 'WHOLESALE'
         )
-        return generateOrderText({
+        return generateOrderTextsPerItem({
           orderNumber: order.orderNumber,
           items: (order.items || []).map((i: any) => ({
             productName: i.productName,
@@ -197,8 +200,7 @@ export default function UnifiedOrderListPage() {
         })
       })
 
-      const divider = '\n\n' + '='.repeat(30) + '\n\n'
-      const content = texts.join(divider)
+      const content = texts.join(ORDER_DIVIDER)
 
       const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
       const url = URL.createObjectURL(blob)
@@ -246,11 +248,12 @@ export default function UnifiedOrderListPage() {
         const productNames = items.map((i: any) => i.sourceProductName || i.productName).join('\n')
         const optionSummaries = items.map((i: any) => i.optionSummary || '').join('\n')
         const quantities = items.map((i: any) => i.quantity).join('\n')
-        const totalAmount = items.reduce(
+        const productTotal = items.reduce(
           (sum: number, i: any) => sum + (i.unitPrice * i.quantity), 0
         )
-        const totalShipping = items.reduce(
-          (sum: number, i: any) => sum + (i.shippingFee ?? 0), 0
+        // 합배송: item.shippingFee 중 최대값을 주문 전체 배송비로 1회만 반영
+        const commonShip = items.reduce(
+          (max: number, i: any) => Math.max(max, i.shippingFee ?? 0), 0
         )
 
         return {
@@ -258,8 +261,8 @@ export default function UnifiedOrderListPage() {
           품명: productNames,
           옵션: optionSummaries,
           수량: quantities,
-          금액: totalAmount,
-          배송비: totalShipping,
+          금액: productTotal + commonShip, // 배송비 포함 합산 금액
+          배송비: commonShip,
           받는분: addr?.recipientName || '',
           연락처: addr?.recipientPhone || '',
           주소: addressStr,
