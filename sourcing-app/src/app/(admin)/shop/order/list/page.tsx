@@ -234,38 +234,46 @@ export default function UnifiedOrderListPage() {
         return
       }
 
-      const rows = details.flatMap((order: any) =>
-        (order.items || []).map((item: any) => {
-          const addr = order.shippingAddress
-          const addressStr = addr
-            ? `[${addr.postalCode}] ${addr.address}${addr.addressDetail ? ' ' + addr.addressDetail : ''}`
-            : ''
-          const wholesaleName = (order.items || []).find(
-            (i: any) => i?.channel?.kind === 'WHOLESALE'
-          )?.channel?.name || ''
+      // 주문당 1행. 품목이 여러 개면 품명/옵션/수량은 줄바꿈으로 합치고, 금액·배송비는 합계.
+      const rows = details.map((order: any) => {
+        const items = order.items || []
+        const addr = order.shippingAddress
+        const addressStr = addr
+          ? `[${addr.postalCode}] ${addr.address}${addr.addressDetail ? ' ' + addr.addressDetail : ''}`
+          : ''
+        const wholesaleName = items.find((i: any) => i?.channel?.kind === 'WHOLESALE')?.channel?.name || ''
 
-          return {
-            주문번호: order.orderNumber,
-            품명: item.sourceProductName || item.productName,
-            옵션: item.optionSummary || '',
-            수량: item.quantity,
-            금액: item.unitPrice * item.quantity,
-            배송비: item.shippingFee ?? 0,
-            받는분: addr?.recipientName || '',
-            연락처: addr?.recipientPhone || '',
-            주소: addressStr,
-            보내는분: order.customerName || '',
-            '보내는분 연락처': order.customerPhone || '',
-            도매방: wholesaleName,
-          }
-        })
-      )
+        const productNames = items.map((i: any) => i.sourceProductName || i.productName).join('\n')
+        const optionSummaries = items.map((i: any) => i.optionSummary || '').join('\n')
+        const quantities = items.map((i: any) => i.quantity).join('\n')
+        const totalAmount = items.reduce(
+          (sum: number, i: any) => sum + (i.unitPrice * i.quantity), 0
+        )
+        const totalShipping = items.reduce(
+          (sum: number, i: any) => sum + (i.shippingFee ?? 0), 0
+        )
+
+        return {
+          주문번호: order.orderNumber,
+          품명: productNames,
+          옵션: optionSummaries,
+          수량: quantities,
+          금액: totalAmount,
+          배송비: totalShipping,
+          받는분: addr?.recipientName || '',
+          연락처: addr?.recipientPhone || '',
+          주소: addressStr,
+          보내는분: order.customerName || '',
+          '보내는분 연락처': order.customerPhone || '',
+          도매방: wholesaleName,
+        }
+      })
 
       const ws = XLSX.utils.json_to_sheet(rows)
       ws['!cols'] = [
         { wch: 24 }, // 주문번호
-        { wch: 30 }, // 품명
-        { wch: 15 }, // 옵션
+        { wch: 34 }, // 품명
+        { wch: 18 }, // 옵션
         { wch: 6 },  // 수량
         { wch: 10 }, // 금액
         { wch: 8 },  // 배송비
@@ -276,6 +284,28 @@ export default function UnifiedOrderListPage() {
         { wch: 15 }, // 보내는분 연락처
         { wch: 20 }, // 도매방
       ]
+      // 품목 수에 맞춰 행 높이 자동 조정 (기본 18pt × 품목수)
+      ws['!rows'] = [
+        { hpt: 18 }, // 헤더
+        ...details.map((order: any) => {
+          const n = Math.max(1, (order.items || []).length)
+          return { hpt: Math.max(22, n * 18) }
+        }),
+      ]
+      // 모든 데이터 셀에 wrapText + 상단 정렬 적용 (줄바꿈 렌더링)
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
+      for (let R = range.s.r + 1; R <= range.e.r; R++) {
+        for (let C = range.s.c; C <= range.e.c; C++) {
+          const addr = XLSX.utils.encode_cell({ r: R, c: C })
+          const cell = ws[addr]
+          if (cell) {
+            cell.s = {
+              ...(cell.s || {}),
+              alignment: { wrapText: true, vertical: 'top' },
+            }
+          }
+        }
+      }
 
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, '발주목록')
