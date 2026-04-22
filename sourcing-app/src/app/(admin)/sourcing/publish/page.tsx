@@ -849,235 +849,85 @@ function PublishPageContent() {
         }
       }
 
-      // 채널 발행 처리 (SSE 스트리밍)
+      // 채널 발행 처리 (자동발행과 동일한 /api/publish/template/publish 사용)
+      // SSE 스트리밍 대신 상품별 단순 POST 호출 — 자동발행에서 검증된 양식/이미지 레이아웃/쇼핑몰 링크 포함
       for (const [channelId, productIds] of Object.entries(channelToProducts)) {
-        // 취소 확인
         if (publishCancelledRef.current) {
           console.log('[발행 취소] 채널 발행 루프 중단')
           break
         }
+        if (productIds.length === 0) continue
 
-        if (productIds.length > 0) {
-          // 현재 발행 중인 항목들을 대기 상태로 설정
-          const channelItems = progressItems.filter(
-            (item) => item.targetType === 'channel' && item.targetId === Number(channelId)
+        for (const productId of productIds) {
+          if (publishCancelledRef.current) break
+
+          const itemIdx = progressItems.findIndex(
+            (p) => p.productId === productId &&
+                   p.targetId === Number(channelId) &&
+                   p.targetType === 'channel'
           )
 
-          // SSE 스트리밍으로 발행
+          // publishing 상태 표시
+          if (itemIdx !== -1) {
+            setPublishProgressItems((prev) => {
+              const updated = [...prev]
+              updated[itemIdx] = { ...updated[itemIdx], status: 'publishing' }
+              return updated
+            })
+            setCurrentPublishIndex(itemIdx)
+          }
+
           try {
-            // AbortController 생성 (취소 지원)
             const abortController = new AbortController()
             abortControllerRef.current = abortController
 
-            const response = await fetch('/api/shop/publish/stream', {
+            const res = await fetch('/api/publish/template/publish', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ productIds, channelId: Number(channelId) }),
+              body: JSON.stringify({ productId, channelId: Number(channelId) }),
               signal: abortController.signal,
             })
+            const data = await res.json()
 
-            if (!response.ok) {
-              const errorData = await response.json()
-              throw new Error(errorData.error || '발행 요청 실패')
-            }
-
-            const reader = response.body?.getReader()
-            if (!reader) throw new Error('스트림을 읽을 수 없습니다.')
-
-            const decoder = new TextDecoder()
-            let buffer = ''
-
-            while (true) {
-              // 취소 확인
-              if (publishCancelledRef.current) {
-                console.log('[발행 취소] SSE 스트림 읽기 중단')
-                reader.cancel()
-                break
+            if (data.success || data.publishId) {
+              successfulCells.add(cellKey(productId, 'channel', Number(channelId)))
+              totalSuccess++
+              if (itemIdx !== -1) {
+                setPublishProgressItems((prev) => {
+                  const updated = [...prev]
+                  updated[itemIdx] = { ...updated[itemIdx], status: 'success' }
+                  return updated
+                })
               }
-
-              const { done, value } = await reader.read()
-              if (done) break
-
-              buffer += decoder.decode(value, { stream: true })
-              const lines = buffer.split('\n\n')
-              buffer = lines.pop() || ''
-
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  try {
-                    const event = JSON.parse(line.slice(6))
-
-                    if (event.type === 'product_start') {
-                      // 상품 발행 시작
-                      const itemIdx = progressItems.findIndex(
-                        (p) => p.productId === event.data.progress.productId &&
-                               p.targetId === Number(channelId) &&
-                               p.targetType === 'channel'
-                      )
-                      if (itemIdx !== -1) {
-                        setPublishProgressItems((prev) => {
-                          const updated = [...prev]
-                          updated[itemIdx] = {
-                            ...updated[itemIdx],
-                            status: 'publishing',
-                            stage: event.data.progress.stage,
-                            stageLabel: event.data.progress.stageLabel,
-                            imageProgress: event.data.progress.imageProgress,
-                            uploadProgress: event.data.progress.uploadProgress,
-                          }
-                          return updated
-                        })
-                        setCurrentPublishIndex(itemIdx)
-                      }
-                    } else if (event.type === 'stage_update' || event.type === 'image_progress') {
-                      // 단계 변경 또는 이미지 진행률 업데이트
-                      const itemIdx = progressItems.findIndex(
-                        (p) => p.productId === event.data.progress.productId &&
-                               p.targetId === Number(channelId) &&
-                               p.targetType === 'channel'
-                      )
-                      if (itemIdx !== -1) {
-                        setPublishProgressItems((prev) => {
-                          const updated = [...prev]
-                          updated[itemIdx] = {
-                            ...updated[itemIdx],
-                            stage: event.data.progress.stage,
-                            stageLabel: event.data.progress.stageLabel,
-                            imageProgress: event.data.progress.imageProgress,
-                            uploadProgress: event.data.progress.uploadProgress,
-                            publishMethod: event.data.progress.publishMethod,
-                          }
-                          return updated
-                        })
-                      }
-                    } else if (event.type === 'product_complete') {
-                      // 상품 발행 완료
-                      const progress = event.data.progress
-                      const itemIdx = progressItems.findIndex(
-                        (p) => p.productId === progress.productId &&
-                               p.targetId === Number(channelId) &&
-                               p.targetType === 'channel'
-                      )
-
-                      if (progress.stage === 'completed') {
-                        successfulCells.add(cellKey(progress.productId, 'channel', Number(channelId)))
-                        totalSuccess++
-                        if (itemIdx !== -1) {
-                          setPublishProgressItems((prev) => {
-                            const updated = [...prev]
-                            updated[itemIdx] = {
-                              ...updated[itemIdx],
-                              status: 'success',
-                              stage: progress.stage,
-                              stageLabel: progress.stageLabel,
-                              imageProgress: progress.imageProgress,
-                              publishMethod: progress.publishMethod,
-                            }
-                            return updated
-                          })
-                        }
-                      } else if (progress.stage === 'skipped') {
-                        successfulCells.add(cellKey(progress.productId, 'channel', Number(channelId)))
-                        totalSkipped++
-                        if (itemIdx !== -1) {
-                          setPublishProgressItems((prev) => {
-                            const updated = [...prev]
-                            updated[itemIdx] = {
-                              ...updated[itemIdx],
-                              status: 'success',
-                              message: '이미 발행됨',
-                              stage: progress.stage,
-                              stageLabel: progress.stageLabel,
-                            }
-                            return updated
-                          })
-                        }
-                      } else if (progress.stage === 'failed') {
-                        totalFailed++
-                        if (progress.error) {
-                          errorMessages.push(progress.error)
-
-                          // 세션 만료 감지 시 자동 재시도 또는 모달 표시
-                          const isSessionError = progress.error.includes('세션') &&
-                            (progress.error.includes('만료') || progress.error.includes('없'))
-                          if (isSessionError && !showSessionExpiredModal && !autoRetryAttemptedRef.current) {
-                            const channel = channels.find(ch => ch.id === Number(channelId))
-                            setExpiredChannelInfo({
-                              channelId: Number(channelId),
-                              channelName: channel?.name || `채널 ${channelId}`
-                            })
-                            // 세션 만료로 실패한 채널의 모든 pending/failed 항목 저장 (재시도용)
-                            const failedItems = progressItems.filter(
-                              (p) => p.targetType === 'channel' &&
-                                     p.targetId === Number(channelId) &&
-                                     (p.status === 'pending' || p.status === 'failed' || p.status === 'publishing')
-                            )
-                            setFailedPublishItems(failedItems)
-
-                            // Extension 설치되어 있으면 자동 재시도, 아니면 모달 표시
-                            if (extensionAvailable) {
-                              console.log('[발행] 세션 만료 감지 - 기존 스트림 중단 후 자동 재시도 시작')
-                              // 기존 SSE 스트림 중단 (레이스 컨디션 방지)
-                              if (abortControllerRef.current) {
-                                abortControllerRef.current.abort()
-                                abortControllerRef.current = null
-                              }
-                              publishCancelledRef.current = true
-                              setAutoRetryTriggered(true)
-                            } else {
-                              setShowSessionExpiredModal(true)
-                            }
-                          }
-                        }
-                        if (itemIdx !== -1) {
-                          setPublishProgressItems((prev) => {
-                            const updated = [...prev]
-                            updated[itemIdx] = {
-                              ...updated[itemIdx],
-                              status: 'failed',
-                              message: progress.error,
-                              stage: progress.stage,
-                              stageLabel: progress.stageLabel,
-                            }
-                            return updated
-                          })
-                        }
-                      }
-                      processedIndex++
-                    } else if (event.type === 'error') {
-                      // 에러 발생
-                      errorMessages.push(event.data.error)
-                    }
-                  } catch (parseError) {
-                    console.error('SSE 파싱 오류:', parseError)
-                  }
-                }
-              }
-            }
-          } catch (error: any) {
-            // AbortError는 사용자 취소이므로 별도 처리
-            if (error.name === 'AbortError' || publishCancelledRef.current) {
-              console.log('[발행 취소] SSE 스트림 취소됨')
-              // 취소된 경우 실패 처리하지 않음 (handleCancelPublish에서 이미 처리)
             } else {
-              console.error('SSE 스트림 오류:', error)
-              totalFailed += productIds.length
-              errorMessages.push(error.message || '발행 중 오류가 발생했습니다.')
-              // 모든 항목 실패 처리
-              channelItems.forEach((item) => {
-                const idx = progressItems.findIndex(
-                  (p) => p.productId === item.productId && p.targetId === item.targetId && p.targetType === item.targetType
-                )
-                if (idx !== -1) {
-                  setPublishProgressItems((prev) => {
-                    const updated = [...prev]
-                    updated[idx] = { ...updated[idx], status: 'failed', message: error.message }
-                    return updated
-                  })
-                }
+              totalFailed++
+              const errMsg = data.error || data.message || '발행 실패'
+              errorMessages.push(errMsg)
+              if (itemIdx !== -1) {
+                setPublishProgressItems((prev) => {
+                  const updated = [...prev]
+                  updated[itemIdx] = { ...updated[itemIdx], status: 'failed', message: errMsg }
+                  return updated
+                })
+              }
+            }
+          } catch (err: any) {
+            if (err?.name === 'AbortError' || publishCancelledRef.current) {
+              console.log('[발행 취소] template/publish 요청 취소됨')
+              break
+            }
+            totalFailed++
+            const errMsg = err?.message || '네트워크 오류'
+            errorMessages.push(errMsg)
+            if (itemIdx !== -1) {
+              setPublishProgressItems((prev) => {
+                const updated = [...prev]
+                updated[itemIdx] = { ...updated[itemIdx], status: 'failed', message: errMsg }
+                return updated
               })
             }
           }
+          processedIndex++
         }
       }
 
