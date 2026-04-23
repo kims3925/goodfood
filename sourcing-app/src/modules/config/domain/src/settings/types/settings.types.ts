@@ -24,6 +24,11 @@ export interface AiSettings {
     model: string
     temperature: number
   }
+  claude: {
+    apiKey: string
+    model: string
+    temperature: number
+  }
 }
 
 export interface BandApiSettingsInput {

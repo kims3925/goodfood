@@ -37,6 +37,7 @@ enum ChannelPlatform {
 enum AiProvider {
   GEMINI
   OPENAI
+  CLAUDE
 }
 
 enum WorkflowType {

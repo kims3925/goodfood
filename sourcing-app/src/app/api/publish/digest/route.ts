@@ -10,6 +10,11 @@ import prisma, { ChannelKind } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { bandPlaywrightService } from '@/modules/band-playwright/band-playwright.service'
 import { buildDigest, type DigestProduct } from '@/modules/publish/digest-builder.service'
+import {
+  renderDigestCards,
+  cleanupDigestCards,
+  type DigestCardProduct,
+} from '@/modules/publish/digest-card-renderer'
 import { CATEGORY_MAP, CATEGORY_CODES, CATEGORY_LIST, type CategoryCode } from '@/modules/category/category.keywords'
 
 export const dynamic = 'force-dynamic'
@@ -224,24 +229,66 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // ── 상품별 "사진(최대 4장 2×2 그리드) + 번호/제목/가격/마감/주문링크" 카드를
+    //    PNG 1장으로 렌더링하고, Band에 20장까지 첨부. 본문 텍스트는 카드 밑에 첨부.
+    const cardProducts: DigestCardProduct[] = orderedProducts.slice(0, 20).map((p) => {
+      const firstShop = p.shopProducts[0]
+      const orderUrl = firstShop?.shop?.subdomain
+        ? `https://${shopDomain}/${firstShop.shop.subdomain}/product/${p.id}`
+        : undefined
+      const variantPrices = p.variants.map((v) => v.price).filter((x) => x > 0)
+      let priceText: string | undefined
+      if (variantPrices.length > 1) {
+        const min = Math.min(...variantPrices)
+        const max = Math.max(...variantPrices)
+        priceText = min === max ? `${min.toLocaleString()}원` : `${min.toLocaleString()}원 ~ ${max.toLocaleString()}원`
+      } else if (p.price) {
+        priceText = `${p.price.toLocaleString()}원`
+      }
+      return {
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        priceText,
+        deadline: null,
+        orderUrl,
+        imageUrls: p.images
+          .slice(0, 4)
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map((i) => i.url),
+      }
+    })
+
     let status: 'SUCCESS' | 'FAILED' = 'FAILED'
     let postKey: string | undefined
     let message: string | undefined
+    const renderedCards = await renderDigestCards({ products: cardProducts }).catch((err) => {
+      message = `카드 이미지 렌더링 실패: ${err?.message || err}`
+      return []
+    })
+
+    if (renderedCards.length === 0 && !message) {
+      message = '카드 이미지 0장 생성됨'
+    }
 
     try {
-      const r = await bandPlaywrightService.publishWithImages({
-        channelId: channel.id,
-        bandKey: channel.channelKey,
-        bandName: channel.name,
-        content: digest.content,
-        imageUrls: digest.imageUrls,
-      })
-      status = r.success ? 'SUCCESS' : 'FAILED'
-      postKey = r.postKey
-      message = r.error
+      if (renderedCards.length > 0) {
+        const r = await bandPlaywrightService.publishWithImages({
+          channelId: channel.id,
+          bandKey: channel.channelKey,
+          bandName: channel.name,
+          content: digest.content,
+          imageUrls: renderedCards.map((c) => c.filePath), // 로컬 파일 경로 전달
+        })
+        status = r.success ? 'SUCCESS' : 'FAILED'
+        postKey = r.postKey
+        message = r.error || message
+      }
     } catch (err: any) {
       status = 'FAILED'
       message = err?.message || '발행 중 오류'
+    } finally {
+      cleanupDigestCards(renderedCards)
     }
 
     // 발행 성공 시 선택된 상품들에 lastDigestPublishedAt 기록

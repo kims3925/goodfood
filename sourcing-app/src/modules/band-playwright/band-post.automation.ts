@@ -863,6 +863,25 @@ export class BandPostAutomation {
     index: number
   ): Promise<string | null> {
     try {
+      // 로컬 파일 경로 지원 (file:// 프리픽스 또는 fs.existsSync로 감지)
+      // digest-publish 등이 Playwright로 렌더링한 PNG 임시 파일을 직접 전달할 때 사용
+      if (imageUrl.startsWith('file://')) {
+        const localPath = imageUrl.replace(/^file:\/\//, '')
+        if (fs.existsSync(localPath)) {
+          console.log(`[밴드자동화] 로컬 파일 사용(file://): ${localPath}`)
+          return localPath
+        }
+        return null
+      }
+      // 윈도우 절대 경로(C:\...) 또는 POSIX 절대 경로(/...)가 실제 파일이면 그대로 반환
+      const looksLocal =
+        /^[a-zA-Z]:[\\/]/.test(imageUrl) ||
+        (imageUrl.startsWith('/') && !imageUrl.startsWith('//'))
+      if (looksLocal && fs.existsSync(imageUrl)) {
+        console.log(`[밴드자동화] 로컬 파일 사용(abs): ${imageUrl}`)
+        return imageUrl
+      }
+
       // 상대 경로를 절대 URL로 변환
       let fullUrl = imageUrl
       if (imageUrl.startsWith('/')) {
