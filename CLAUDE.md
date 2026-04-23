@@ -280,6 +280,95 @@ ChannelProduct / ShopProduct (product/list 발행완료 탭, publish 페이지)
 - AI 가공 시점(`productService.create`)에 `post.title`을 `sourceProductName`에 자동 저장하고 `collectedPostId`도 채움.
 - `/api/order/unified/[id]` 응답의 `items[].sourceProductName`은 `Product.sourceProductName ?? Product.collectedPost.title ?? null` 순으로 폴백. 기존 상품도 `collectedPostId`가 있으면 원본 제목으로 즉시 표시됨.
 
+## 발행 경로 통일 (자동발행 = 수동발행 = 재발행)
+
+밴드 발행은 `/sourcing/publish` 수동, `/sourcing/product/list` 자동, "재발행" 세 경로에서 일어나지만 모두 **동일한 `/api/publish/template/publish` 엔드포인트**를 호출합니다.
+
+- 과거 존재했던 `/api/shop/publish/stream` (SSE) 경로는 본문 폰트 굵기가 깨지고 이미지가 글 중간에 삽입되는 포맷 이슈가 있어 **모든 프론트엔드 호출을 제거**했습니다. API 파일은 `/src/app/api/shop/publish/stream/route.ts`에 남아 있지만 사용하지 않음.
+- 세션 만료 자동/수동 재시도(`handleAutoRetry`, `handleRetryWithSessionSave`)도 template/publish 단순 POST 루프로 통일. stage/imageProgress 세부 표시는 포기(template은 단일 응답), pending/publishing/success/failed 3-state만 유지.
+- 재발행 플로우(`handleRepublishSelected`)도 자동발행과 동일한 순서(밴드 → 쇼핑몰)와 파라미터로 재작성. 기존의 "Step 1 Playwright DELETE"는 세션을 훼손해 글 깨짐을 유발하므로 제거.
+
+## 카테고리 자동 분류 (Phase 1)
+
+`Product.categoryId`에 영문 코드 체계(`SEA`/`AGR`/`MEA`/`MKT`/`PRC`/`HLT`/`ETC`)를 일관되게 사용합니다.
+
+### 카테고리 체계
+
+| 코드 | 이름 | 이모지 | 사용처 |
+|-----|------|-------|--------|
+| `SEA` | 수산물 | 🐟 | 오늘의 수산물 |
+| `AGR` | 농산물 | 🥬 | 오늘의 농산물 |
+| `MEA` | 축산물 | 🥩 | 오늘의 축산물 |
+| `MKT` | 밀키트/반찬/간편식 | 🍱 | 오늘의 밀키트/반찬 |
+| `PRC` | 가공식품 | 🫙 | 오늘의 가공식품 |
+| `HLT` | 건강식품 | 💊 | 오늘의 건강식품 |
+| `ETC` | 기타 | 📦 | 오늘의 추천상품 |
+
+### 모듈
+
+- `sourcing-app/src/modules/category/category.keywords.ts` — 7개 카테고리 × 키워드 사전(`as const`), `CATEGORY_MAP`/`CATEGORY_CODES`/`CATEGORY_LIST` export
+- `sourcing-app/src/modules/category/category.classifier.ts` — `classifyProduct(name, description)` 매칭 키워드 수 최대값 선택, 0건이면 `ETC`, `confidence = min(match_count/3, 1.0)`
+- 산지/지명 키워드(포항/통영/제주 등)는 타 카테고리 산지 표기와 오탐 방지를 위해 **SEA에서 제외**
+
+### 연동
+
+- `buildProductDraft()` (transformation 모듈)에서 AI 응답의 자연어 category("수산물" 등)를 무시하고 `classifyProduct()` 영문 코드로 덮어씀 → 단일/배치 모두 일관 처리
+- `/api/shop/publish` GET의 `categoryId` 쿼리 파라미터로 필터 지원 (`all`은 무필터)
+- `/sourcing/publish` 페이지에 카테고리 버튼 필터 UI (`CATEGORY_LIST` 기반)
+- 기존 한글값(수산물 437, 가공식품 119 등 총 730건)은 영문 코드로 백필 완료. `NULL` 89건은 분류기 재실행 또는 수동 관리 필요
+
+## 종합 발행 (Digest Publish, Phase 2)
+
+여러 상품을 하나의 밴드 게시글로 묶어 발행하는 기능. `/sourcing/publish/digest` 페이지에서 동작.
+
+### 규칙
+
+- 상품별 개별 발행과 **공존** — 기존 `/sourcing/publish`는 그대로 유지
+- 게시글당 최대 **20개 상품 / 총 20장 이미지** (Band 제약)
+- 제목 자동 생성: `🐟 오늘의 수산물 - 4월 23일 (수)` 형식
+- 본문: 번호 매긴 상품 블록 (품명·설명 요약·가격·마감·쇼핑몰 링크) + 상하단 구분선 `━━` + 편집 가능한 헤더/푸터
+- 이미지: 기본 **상품당 1장** (MVP). `maxImagesPerProduct` 옵션(1/2/3)으로 선택
+- 선택 순서 유지 — 사용자가 체크한 순서가 게시글의 번호 순서
+
+### 핵심 파일
+
+| 파일 | 역할 |
+|------|-----|
+| `sourcing-app/src/modules/publish/digest-builder.service.ts` | `buildDigest({category, products, headerText, footerText, maxImagesPerProduct})` → `{ title, content, imageUrls, productCount, truncated }` |
+| `sourcing-app/src/app/api/publish/digest/route.ts` | `GET` 카테고리별 발행 후보 + 분포, `POST` 실제 발행 |
+| `sourcing-app/src/app/(admin)/sourcing/publish/digest/page.tsx` | 메인 페이지 (카테고리 탭 / 좌 상품 / 우 미리보기 / 하단 발행 바) |
+| `sourcing-app/src/app/(admin)/sourcing/publish/digest/_components/*` | CategoryTabs, DigestProductList, DigestPreview, DigestPublishBar |
+
+### 발행 경로
+
+- `POST /api/publish/digest` 내부에서 각 채널마다 `bandPlaywrightService.publishWithImages({ channelId, bandKey, bandName, content, imageUrls })` 호출
+- 즉 개별 발행과 **같은 Playwright 자동화 함수 재사용**. 글 포맷 깨짐 이슈 없음
+- 쇼핑몰 링크: `ShopProduct.shop.subdomain`이 있으면 `https://{NEXT_PUBLIC_SHOP_DOMAIN}/{subdomain}/product/{id}` 자동 생성
+- 현재 종합 발행 이력은 DB에 별도 기록하지 않음(Band 발행만). 필요 시 `DigestPublish` 모델 추가 가능
+
+## 쇼핑몰 체크아웃 변경
+
+`shop-app/src/app/(shop)/checkout/page.tsx`:
+
+- **이메일 입력란 제거** — 비회원 주문자 정보 블록에서 삭제. `formData.customerEmail`은 빈 문자열로 유지되고 기존 `validateEmail`이 빈 값을 선택사항으로 통과시키므로 API/DB 영향 없음
+- **"보내는사람 정보 (선택)" 섹션** — 기존 비회원 "주문자 정보"를 재구성
+  - 체크박스 **"받는사람과 동일"** (기본 체크) + 안내문구
+  - 체크 O: 이름/휴대폰 입력란 숨김, 제출 시 수령인 값으로 자동 대체
+  - 체크 X: 입력란 표시, 미입력 시 수령인 값으로 폴백
+  - 필수 표시(*) 제거 — 값이 있을 때만 형식 검증
+  - 체크 해제 시 기존 `sameAsCustomer`(customer→recipient 자동 덮어쓰기)도 동시 해제 → 별도 입력한 보내는사람이 받는사람을 덮어쓰지 않도록
+
+## 배송비 추론 로직 강화
+
+`product.repository.ts::create()` — 상품 저장 시 `bundleShippingType` / `shippingFee` 자동 추론:
+
+1. `shippingInfo`에 **"배송비 별도" / "N원 추가/별도/부과"** 같은 명시적 별도 키워드가 있으면 INCLUDED 분류 제외 (우선순위 최상위)
+2. `shippingFee`가 0일 때 `"배송비 N,NNN원"` 패턴에서 금액 자동 추출해 보강
+3. 별도 키워드가 없을 때만 `"배송비 포함" / "무료배송"` 키워드로 INCLUDED 판정
+4. 결과: `INCLUDED` / `SEPARATE` / `NONE`
+
+이전엔 "합배송 시 4,000원 포함"처럼 다른 맥락의 "포함" 문구까지 INCLUDED로 오분류되는 이슈가 있었음. 기존 저장된 데이터 중 오분류 의심 건은 3건(id=3417, 3595 등)만 수동 수정.
+
 ## 핵심 원칙
 
 1. **Soft Delete 기본** - Hard Delete 금지
