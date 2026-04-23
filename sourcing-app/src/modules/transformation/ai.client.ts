@@ -241,6 +241,140 @@ export class GeminiClient extends BaseAiClient {
 }
 
 // =============================================
+// CLAUDE CLIENT
+// =============================================
+
+export class ClaudeClient extends BaseAiClient {
+  private timeout: number
+
+  constructor(config: AiClientConfig) {
+    super(config)
+    this.timeout = config.timeout ?? 120000
+  }
+
+  async generateContentWithImages(prompt: string, images: AiImagePart[]): Promise<AiResponse> {
+    try {
+      const Anthropic = (await import('@anthropic-ai/sdk')).default
+      const client = new Anthropic({ apiKey: this.config.apiKey })
+
+      const content: any[] = images.map((img) => ({
+        type: 'image' as const,
+        source: { type: 'base64' as const, media_type: img.mimeType, data: img.base64 },
+      }))
+      content.push({ type: 'text' as const, text: prompt })
+
+      const message = await client.messages.create({
+        model: this.config.model || 'claude-sonnet-4-20250514',
+        max_tokens: this.config.maxTokens ?? 1024,
+        messages: [{ role: 'user', content }],
+      })
+
+      const text = message.content
+        .filter((block: any) => block.type === 'text')
+        .map((block: any) => block.text)
+        .join('')
+
+      return {
+        content: text,
+        tokensUsed: (message.usage?.input_tokens ?? 0) + (message.usage?.output_tokens ?? 0),
+        model: this.config.model,
+        provider: 'CLAUDE' as AiProvider,
+      }
+    } catch (error: any) {
+      if (error instanceof ProductTransformationError) throw error
+      throw new ProductTransformationError(
+        `Claude Vision 오류: ${error.message}`,
+        TransformationErrorCode.AI_API_ERROR,
+        { originalError: error }
+      )
+    }
+  }
+
+  async generateContent(prompt: string): Promise<AiResponse> {
+    try {
+      const Anthropic = (await import('@anthropic-ai/sdk')).default
+      const client = new Anthropic({ apiKey: this.config.apiKey })
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout)
+
+      const message = await client.messages.create({
+        model: this.config.model || 'claude-sonnet-4-20250514',
+        max_tokens: this.config.maxTokens ?? 4096,
+        temperature: this.config.temperature ?? 0.7,
+        messages: [{ role: 'user', content: prompt }],
+      })
+
+      clearTimeout(timeoutId)
+
+      const text = message.content
+        .filter((block: any) => block.type === 'text')
+        .map((block: any) => block.text)
+        .join('')
+
+      if (!text || text.trim() === '') {
+        throw new ProductTransformationError(
+          'Claude가 응답을 생성하지 못했습니다.',
+          TransformationErrorCode.AI_API_ERROR,
+          { stopReason: message.stop_reason }
+        )
+      }
+
+      return {
+        content: text,
+        tokensUsed: (message.usage?.input_tokens ?? 0) + (message.usage?.output_tokens ?? 0),
+        model: this.config.model,
+        provider: 'CLAUDE' as AiProvider,
+      }
+    } catch (error: any) {
+      if (error instanceof ProductTransformationError) throw error
+
+      const errorMsg = error.message || ''
+
+      if (error.name === 'AbortError') {
+        throw new ProductTransformationError(
+          `AI 응답 대기 시간이 초과되었습니다 (${this.timeout / 1000}초).`,
+          TransformationErrorCode.AI_API_ERROR,
+          { timeout: this.timeout },
+          TransformationErrorType.TRANSIENT
+        )
+      }
+      if (errorMsg.includes('rate_limit') || errorMsg.includes('overloaded')) {
+        throw new ProductTransformationError(
+          'Claude API 요청 한도에 도달했습니다. 잠시 후 다시 시도해주세요.',
+          TransformationErrorCode.AI_API_ERROR,
+          { originalError: error },
+          TransformationErrorType.TRANSIENT
+        )
+      }
+      if (errorMsg.includes('authentication') || errorMsg.includes('invalid x-api-key') || errorMsg.includes('401')) {
+        throw new ProductTransformationError(
+          'Claude API 키가 유효하지 않습니다. 설정에서 확인해주세요.',
+          TransformationErrorCode.AI_API_ERROR,
+          { originalError: error },
+          TransformationErrorType.PERMANENT
+        )
+      }
+      if (errorMsg.includes('insufficient_quota') || errorMsg.includes('billing')) {
+        throw new ProductTransformationError(
+          'Claude API 크레딧이 부족합니다. Anthropic 콘솔에서 확인해주세요.',
+          TransformationErrorCode.AI_API_ERROR,
+          { originalError: error },
+          TransformationErrorType.PERMANENT
+        )
+      }
+
+      throw new ProductTransformationError(
+        `Claude API 오류: ${error.message}`,
+        TransformationErrorCode.AI_API_ERROR,
+        { originalError: error },
+        TransformationErrorType.PERMANENT
+      )
+    }
+  }
+}
+
+// =============================================
 // OPENAI CLIENT
 // =============================================
 
@@ -369,6 +503,9 @@ export function createAiClient(config: AiClientConfig): BaseAiClient {
 
     case AiProvider.OPENAI:
       return new OpenAiClient(config)
+
+    case 'CLAUDE' as AiProvider:
+      return new ClaudeClient(config)
 
     default:
       throw new ProductTransformationError(

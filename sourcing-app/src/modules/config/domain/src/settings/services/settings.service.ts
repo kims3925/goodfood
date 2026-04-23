@@ -106,6 +106,11 @@ export class SettingsService {
         model: 'gpt-4o-mini',
         temperature: 0.7,
       },
+      claude: {
+        apiKey: '',
+        model: 'claude-sonnet-4-20250514',
+        temperature: 0.7,
+      },
     }
 
     const geminiConfig = aiConfigs.find((c) => c.provider === 'GEMINI')
@@ -138,6 +143,21 @@ export class SettingsService {
       }
     }
 
+    const claudeConfig = aiConfigs.find((c) => c.provider === 'CLAUDE')
+    if (claudeConfig) {
+      let config: any = {}
+      try {
+        config = claudeConfig.config ? JSON.parse(claudeConfig.config) : {}
+      } catch {
+        config = {}
+      }
+      settings.claude = {
+        apiKey: claudeConfig.apiKey || '',
+        model: claudeConfig.model || 'claude-sonnet-4-20250514',
+        temperature: config?.temperature || 0.7,
+      }
+    }
+
     return settings
   }
 
@@ -146,6 +166,7 @@ export class SettingsService {
     const aiProviderMap: Record<string, string> = {
       gemini: 'GEMINI',
       openai: 'OPENAI',
+      claude: 'CLAUDE',
     }
 
     const aiProvider = aiProviderMap[provider]
