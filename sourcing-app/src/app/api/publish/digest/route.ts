@@ -312,24 +312,18 @@ export async function POST(request: NextRequest) {
       message = '카드 이미지 0장 생성됨'
     }
 
-    // ─── 발행 본문 구성 ──────────────────────────────────────
+    // ─── 발행 본문/댓글 구성 ──────────────────────────────────
     // Band 웹 에디터는 paste/drop 해도 모든 이미지를 갤러리로 강제 분리한다.
     // 따라서 각 카드 PNG 안에 QR·URL 텍스트까지 포함시키고(digest-card-renderer),
-    // 본문에는 번호 매긴 상품 링크 목록을 둔다(Band 자동 링크 프리뷰 활용).
-    const buildDigestContent = () => {
-      const linkLines: string[] = []
-      cardProducts.forEach((p, idx) => {
-        if (p.orderUrl) {
-          linkLines.push(`${idx + 1}. ${p.name}`)
-          linkLines.push(`   🛒 ${p.orderUrl}`)
-        }
-      })
+    // 상품 주문 링크는 **댓글**로 분리해 본문 가독성을 확보한다(Band 자동 링크 프리뷰는
+    // 댓글에서도 동일하게 적용됨).
+    const buildDigestBody = () => {
+      const linkCount = cardProducts.filter((p) => p.orderUrl).length
       return [
         digest.title,
         (headerText || '').trim(),
         `총 ${digest.productCount}개 상품 | 신선 직송`,
-        '━━━━━━━━━━━━━━━━━━━━',
-        ...linkLines,
+        linkCount > 0 ? `👇 주문 링크 ${linkCount}개는 댓글을 확인해주세요` : '',
         '━━━━━━━━━━━━━━━━━━━━',
         (footerText || '').trim() ||
           '📦 배송: 마감 전 주문시 당일 출고, 마감 이후 익일 출고\n💳 결제: 카드결제 / 무통장입금',
@@ -339,6 +333,28 @@ export async function POST(request: NextRequest) {
           return idx > 0 && arr[idx - 1] !== ''
         })
         .join('\n')
+    }
+
+    // Band 댓글 길이 한도 안전 마진(실측 ~2000자). 넘으면 뒷부분 잘라낸다.
+    const MAX_COMMENT_CHARS = 1800
+    const buildDigestComment = (): string | undefined => {
+      const lines: string[] = []
+      cardProducts.forEach((p, idx) => {
+        if (p.orderUrl) {
+          lines.push(`${idx + 1}. ${p.name}`)
+          lines.push(`🛒 ${p.orderUrl}`)
+        }
+      })
+      if (lines.length === 0) return undefined
+
+      let body = lines.join('\n')
+      if (body.length > MAX_COMMENT_CHARS) {
+        // 한도 초과 시 잘라내고 안내 문구 추가
+        const cut = body.slice(0, MAX_COMMENT_CHARS)
+        const lastBreak = cut.lastIndexOf('\n')
+        body = (lastBreak > 0 ? cut.slice(0, lastBreak) : cut) + '\n… (길이 초과로 일부 생략됨)'
+      }
+      return body
     }
 
     // 개별 발행용 본문 생성기 (상품 1개당 게시글 1개)
@@ -441,14 +457,15 @@ export async function POST(request: NextRequest) {
         const runDigest = publishMode === 'digest' || publishMode === 'both'
         const runIndividual = publishMode === 'individual' || publishMode === 'both'
 
-        // 1) 종합 발행 — 카드 전체를 하나의 게시글로
+        // 1) 종합 발행 — 카드 전체를 하나의 게시글로, 주문 링크는 댓글에 작성
         if (runDigest) {
           const r = await bandPlaywrightService.publishWithImages({
             channelId: channel.id,
             bandKey: channel.channelKey,
             bandName: channel.name,
-            content: buildDigestContent(),
+            content: buildDigestBody(),
             imageUrls: renderedCards.map((c) => c.filePath),
+            commentContent: buildDigestComment(),
           })
           subResults.push({
             mode: 'digest',

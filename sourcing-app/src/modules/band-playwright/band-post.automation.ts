@@ -723,9 +723,19 @@ export class BandPostAutomation {
                 // 입력창 클릭 후 type()으로 입력 (이벤트 발생하여 버튼 활성화)
                 await input.click()
                 await page.waitForTimeout(300)
-                await input.type(commentContent, { delay: 10 })
+                // 멀티라인 댓글 안전 입력: \n을 Enter로 보내면 Band가 조기 전송할 수 있어
+                // 줄 단위로 type → 줄 사이는 Shift+Enter(줄바꿈 유지)
+                const lines = commentContent.split('\n')
+                for (let li = 0; li < lines.length; li++) {
+                  if (lines[li].length > 0) {
+                    await page.keyboard.type(lines[li], { delay: 5 })
+                  }
+                  if (li < lines.length - 1) {
+                    await page.keyboard.press('Shift+Enter')
+                  }
+                }
                 inputFound = true
-                console.log(`[밴드자동화] 댓글 입력 완료: ${selector}`)
+                console.log(`[밴드자동화] 댓글 입력 완료 (${lines.length}줄): ${selector}`)
                 break
               }
             }
