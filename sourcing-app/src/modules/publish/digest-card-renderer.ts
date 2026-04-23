@@ -80,20 +80,29 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function buildImageStackHtml(imageUrls: string[]): string {
+function buildImageGridHtml(imageUrls: string[]): string {
   const imgs = imageUrls.slice(0, 4)
   if (imgs.length === 0) {
-    return `<div style="width:100%;height:400px;background:#E5E7EB;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:22px;">이미지 없음</div>`
+    return `<div style="width:100%;aspect-ratio:1/1;background:#E5E7EB;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:22px;">이미지 없음</div>`
   }
-  // 이미지를 세로로 1장씩 쌓음 (정사각형 기준 크롭)
-  return `<div style="width:100%;display:flex;flex-direction:column;gap:4px;background:#F3F4F6;">
-    ${imgs
-      .map(
-        (u) => `<div style="width:100%;aspect-ratio:4/3;overflow:hidden;background:#f9fafb;">
-      <img src="${u}" style="width:100%;height:100%;object-fit:cover;display:block;">
+  // 1장: 정사각형 단일, 그 외는 2×2 그리드 (3장이면 4번째 슬롯은 회색 placeholder)
+  if (imgs.length === 1) {
+    return `<div style="width:100%;aspect-ratio:1/1;overflow:hidden;">
+      <img src="${imgs[0]}" style="width:100%;height:100%;object-fit:cover;display:block;">
     </div>`
-      )
-      .join('')}
+  }
+  const cells: string[] = []
+  for (let i = 0; i < 4; i++) {
+    if (i < imgs.length) {
+      cells.push(`<div style="width:100%;aspect-ratio:1/1;overflow:hidden;">
+        <img src="${imgs[i]}" style="width:100%;height:100%;object-fit:cover;display:block;">
+      </div>`)
+    } else {
+      cells.push(`<div style="width:100%;aspect-ratio:1/1;background:#F3F4F6;"></div>`)
+    }
+  }
+  return `<div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#F3F4F6;">
+    ${cells.join('')}
   </div>`
 }
 
@@ -118,7 +127,7 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
 #card {
   width: 800px; background: #ffffff;
 }
-.image-stack { width: 100%; background: #f9fafb; }
+.image-grid { width: 100%; background: #f9fafb; }
 .text-area {
   padding: 40px 40px 48px;
   background: #ffffff;
@@ -169,8 +178,8 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
 </head>
 <body>
 <div id="card">
-  <div class="image-stack">
-    ${buildImageStackHtml(product.imageUrls)}
+  <div class="image-grid">
+    ${buildImageGridHtml(product.imageUrls)}
   </div>
   <div class="text-area">
     <div class="row">
