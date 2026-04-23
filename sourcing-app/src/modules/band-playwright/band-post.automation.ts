@@ -797,6 +797,150 @@ export class BandPostAutomation {
   }
 
   /**
+   * 블록(텍스트/이미지) 순서대로 교차 삽입하여 게시글 작성
+   * 종합발행에서 "카드 이미지 → 그 상품의 URL 텍스트 → 다음 카드 이미지 ..."
+   * 패턴으로 인라인 배치할 때 사용
+   */
+  async createPostInterleaved(
+    page: Page,
+    params: import('./types').BandInterleavedPublishParams
+  ): Promise<BandPublishResult> {
+    const { bandKey, bandName, blocks, signal } = params
+    let uploadedImageCount = 0
+
+    const checkCancelled = () => {
+      if (signal?.aborted) {
+        throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+    }
+
+    try {
+      checkCancelled()
+      console.log(`[밴드자동화:interleaved] 시작 - ${bandName} (blocks=${blocks.length})`)
+
+      // 1. 밴드 이동 + 글쓰기 에디터 열기
+      try {
+        await this.navigateToBand(page, bandKey, bandName)
+      } catch (navError: any) {
+        console.warn(`[밴드자동화:interleaved] 밴드 찾기 실패, 1회 재시도: ${navError.message}`)
+        await page.waitForTimeout(2000)
+        await this.navigateToBand(page, bandKey, bandName)
+      }
+
+      const currentUrl = page.url()
+      const bandNoMatch = currentUrl.match(/\/band\/(\d+)/)
+      const currentBandNo = bandNoMatch ? bandNoMatch[1] : ''
+      const beforePostKey = await this.getLatestPostKey(page, currentBandNo)
+
+      if (currentUrl.includes('signin') || currentUrl.includes('login')) {
+        throw new BandPlaywrightError(
+          '로그인이 필요합니다. 세션이 만료되었을 수 있습니다.',
+          BandPlaywrightErrorCode.SESSION_EXPIRED
+        )
+      }
+
+      // 2. 글쓰기 창 열기 (기존 createPostWithImages와 동일 흐름)
+      await this.openWriteEditor(page)
+
+      const editor = await page.$('[data-viewname="DPostWriteLayerView"] [contenteditable="true"], .cPostWrite [contenteditable="true"].cke_editable')
+      if (!editor) {
+        throw new BandPlaywrightError('글쓰기 에디터를 찾을 수 없습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+
+      // 3. 블록 순회하며 입력
+      for (let i = 0; i < blocks.length; i++) {
+        checkCancelled()
+        const block = blocks[i]
+
+        if (block.type === 'text') {
+          await editor.click()
+          await page.waitForTimeout(150)
+          // 블록 앞에 줄바꿈 한 줄 (첫 블록이 텍스트이면 제외)
+          if (i > 0) {
+            await page.keyboard.press('End')
+            await page.keyboard.press('Enter')
+          }
+          // Playwright는 멀티라인 문자열을 type으로 넣으면 개행이 Enter로 처리됨
+          await page.keyboard.type(block.content, { delay: 8 })
+          console.log(`[밴드자동화:interleaved] 텍스트 블록 입력 (${i + 1}/${blocks.length}, ${block.content.length}자)`)
+        } else if (block.type === 'image') {
+          if (!fs.existsSync(block.filePath)) {
+            console.warn(`[밴드자동화:interleaved] 이미지 없음, 건너뜀: ${block.filePath}`)
+            continue
+          }
+          if (uploadedImageCount >= MAX_IMAGES) {
+            console.warn(`[밴드자동화:interleaved] Band 최대 이미지 수(${MAX_IMAGES}) 도달, 이하 이미지 건너뜀`)
+            continue
+          }
+          // 에디터 포커스 확보 후 이미지 1장 업로드
+          await editor.click()
+          await page.waitForTimeout(150)
+          await this.uploadImages(page, [block.filePath], signal)
+          uploadedImageCount++
+          // 업로드 직후 커서를 끝으로 이동 (다음 블록 입력을 위해)
+          await page.waitForTimeout(300)
+          await page.keyboard.press('End')
+          console.log(`[밴드자동화:interleaved] 이미지 업로드 완료 (${i + 1}/${blocks.length}, 누적 ${uploadedImageCount})`)
+        }
+      }
+
+      checkCancelled()
+
+      // 4. 게시
+      console.log('[밴드자동화:interleaved] 게시 버튼 클릭')
+      await this.submitPost(page)
+      await this.saveDebugScreenshot(page, 'interleaved-post-submitted')
+
+      // 5. 결과 확인
+      const postKey = await this.extractNewPostKey(page, currentBandNo, beforePostKey)
+
+      return {
+        success: true,
+        postKey,
+        imageCount: uploadedImageCount,
+      }
+    } catch (error: any) {
+      console.error('[밴드자동화:interleaved] 실패:', error)
+      await this.saveDebugScreenshot(page, 'interleaved-error')
+      if (error instanceof BandPlaywrightError) {
+        return { success: false, error: error.message }
+      }
+      return { success: false, error: error.message || '게시물 작성 중 오류' }
+    }
+  }
+
+  /**
+   * 글쓰기 레이어(에디터) 열기 — createPostWithImages 내부 로직을 재사용하기 위한 헬퍼.
+   * 실제 구현은 간소화하여 핵심 버튼 클릭만 수행. 실패 시 에러 throw.
+   */
+  private async openWriteEditor(page: Page): Promise<void> {
+    // 글쓰기 버튼 셀렉터 후보
+    const writeButtonSelectors = [
+      'a._postWriteBtn',
+      '.postWrite ._postWriteBtn',
+      'button.uPostWriteBtn',
+      '[data-uiselector="postWriteBtn"]',
+      'a[href*="postwrite"]',
+    ]
+    for (const sel of writeButtonSelectors) {
+      const btn = await page.$(sel)
+      if (btn && await btn.isVisible()) {
+        await btn.click()
+        break
+      }
+    }
+    // 에디터 렌더 대기 (최대 10초)
+    try {
+      await page.waitForSelector(
+        '[data-viewname="DPostWriteLayerView"] [contenteditable="true"], .cPostWrite [contenteditable="true"].cke_editable',
+        { timeout: 10_000 }
+      )
+    } catch {
+      throw new BandPlaywrightError('글쓰기 에디터 대기 실패', BandPlaywrightErrorCode.POST_FAILED)
+    }
+  }
+
+  /**
    * 이미지 다운로드
    */
   private async downloadImages(imageUrls: string[]): Promise<string[]> {

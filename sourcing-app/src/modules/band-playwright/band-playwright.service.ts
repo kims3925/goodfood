@@ -9,6 +9,7 @@ import { postAutomation } from './band-post.automation'
 import {
   BandPublishParams,
   BandPublishResult,
+  BandInterleavedPublishParams,
   BandBatchPublishParams,
   BandBatchPublishResult,
   BandDeleteParams,
@@ -142,6 +143,40 @@ export class BandPlaywrightService {
         success: false,
         error: error.message || '발행 중 오류가 발생했습니다.',
       }
+    }
+  }
+
+  /**
+   * 블록 단위 교차 삽입 발행
+   * - 종합발행 등에서 "이미지 → 해당 상품 링크 텍스트 → 다음 이미지 → ..." 패턴 구현
+   */
+  async publishInterleaved(
+    params: BandInterleavedPublishParams
+  ): Promise<BandPublishResult> {
+    const { channelId } = params
+
+    console.log(`[BandPlaywrightService] Interleaved publish to band ${params.bandKey} (blocks=${params.blocks.length})`)
+
+    try {
+      const session = await sessionManager.getValidSession(channelId)
+      if (!session) {
+        return { success: false, error: '세션을 획득할 수 없습니다.' }
+      }
+      const context = await browserPool.getContext(channelId, session.cookies)
+      const page = await context.newPage()
+      try {
+        return await postAutomation.createPostInterleaved(page, params)
+      } finally {
+        await page.close()
+        await browserPool.releaseContext(channelId)
+      }
+    } catch (error: any) {
+      console.error('[BandPlaywrightService] Interleaved publish failed:', error)
+      await browserPool.closeContext(channelId)
+      if (error instanceof BandPlaywrightError && error.code === BandPlaywrightErrorCode.SESSION_EXPIRED) {
+        return { success: false, error: 'Band 세션이 만료되었습니다.' }
+      }
+      return { success: false, error: error?.message || '발행 중 오류' }
     }
   }
 

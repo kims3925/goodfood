@@ -34,6 +34,19 @@ export interface BandPublishResult {
   imageCount?: number
 }
 
+/** 텍스트/이미지를 교차 삽입하는 블록 단위 발행 — 종합발행 카드·링크 쌍 배치에 사용 */
+export type PostBlock =
+  | { type: 'text'; content: string }
+  | { type: 'image'; filePath: string } // 로컬 PNG/JPG 파일 절대 경로
+
+export interface BandInterleavedPublishParams {
+  channelId: number
+  bandKey: string
+  bandName: string
+  blocks: PostBlock[]
+  signal?: AbortSignal
+}
+
 export interface BandBatchPublishParams {
   channelId: number
   bandKey: string       // Band API의 band_key (AAC... 형식)

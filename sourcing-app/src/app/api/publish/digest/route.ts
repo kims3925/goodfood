@@ -288,43 +288,44 @@ export async function POST(request: NextRequest) {
       message = '카드 이미지 0장 생성됨'
     }
 
-    // Band 본문 구성:
-    // - 상단 제목/안내
-    // - 상품별 번호 + 이름 + 쇼핑몰 링크 (Band가 URL을 자동 링크화하여 클릭 가능)
-    // - 하단 배송/결제 안내
-    const linkLines: string[] = []
-    cardProducts.forEach((p, idx) => {
-      if (p.orderUrl) {
-        linkLines.push(`${idx + 1}. ${p.name}`)
-        linkLines.push(`   🛒 ${p.orderUrl}`)
-      }
-    })
-
-    const shortContent = [
+    // 블록 단위 교차 삽입 — 이미지 → 해당 상품 링크 텍스트 → 이미지 → 링크 ...
+    // 블록 순서:
+    //   [텍스트: 제목/헤더]
+    //   [이미지: 카드 PNG] + [텍스트: "1. 상품명\n🛒 URL"]  × N
+    //   [텍스트: 푸터(배송/결제)]
+    const topHeader = [
       digest.title,
-      '',
       (headerText || '').trim(),
       `총 ${digest.productCount}개 상품 | 신선 직송`,
       '━━━━━━━━━━━━━━━━━━━━',
-      ...linkLines,
-      '━━━━━━━━━━━━━━━━━━━━',
-      (footerText || '').trim() || '📦 배송: 마감 전 주문시 당일 출고, 마감 이후 익일 출고\n💳 결제: 카드결제 / 무통장입금',
-    ]
-      .filter((line, idx, arr) => {
-        // 빈 문자열 2연속 방지
-        if (line !== '') return true
-        return idx > 0 && arr[idx - 1] !== ''
-      })
-      .join('\n')
+    ].filter(Boolean).join('\n')
+
+    const footer = '━━━━━━━━━━━━━━━━━━━━\n' + ((footerText || '').trim() ||
+      '📦 배송: 마감 전 주문시 당일 출고, 마감 이후 익일 출고\n💳 결제: 카드결제 / 무통장입금')
+
+    const blocks: Array<{ type: 'text'; content: string } | { type: 'image'; filePath: string }> = []
+    blocks.push({ type: 'text', content: topHeader })
+
+    renderedCards.forEach((card, i) => {
+      const cp = cardProducts.find((c) => c.id === card.productId) || cardProducts[i]
+      blocks.push({ type: 'image', filePath: card.filePath })
+      const name = cp?.name || `상품 ${i + 1}`
+      const url = cp?.orderUrl || ''
+      const textLine = url
+        ? `${i + 1}. ${name}\n🛒 ${url}`
+        : `${i + 1}. ${name}`
+      blocks.push({ type: 'text', content: textLine })
+    })
+
+    blocks.push({ type: 'text', content: footer })
 
     try {
       if (renderedCards.length > 0) {
-        const r = await bandPlaywrightService.publishWithImages({
+        const r = await bandPlaywrightService.publishInterleaved({
           channelId: channel.id,
           bandKey: channel.channelKey,
           bandName: channel.name,
-          content: shortContent,
-          imageUrls: renderedCards.map((c) => c.filePath), // 로컬 파일 경로 전달
+          blocks,
         })
         status = r.success ? 'SUCCESS' : 'FAILED'
         postKey = r.postKey
