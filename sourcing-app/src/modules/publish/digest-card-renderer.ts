@@ -128,46 +128,78 @@ function buildCardHtml(product: DigestCardProduct, orderNumber: number): string 
 ${FONT_CSS}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, system-ui, sans-serif; }
-#card { width: 800px; background: #ffffff; }
+#card {
+  width: 800px; background: #ffffff;
+  /* 상하 여백 + 카드 테두리로 다음 카드와 시각적 구분 */
+  padding: 24px;
+  border-bottom: 8px solid #F3F4F6;
+}
+.card-inner {
+  border: 2px solid #E5E7EB;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #ffffff;
+}
 .image-area { width: 100%; background: #f9fafb; }
-.text-area { padding: 28px 32px 32px; }
-.row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.divider {
+  height: 3px; background: #E5E7EB;
+}
+.text-area {
+  padding: 28px 32px 32px;
+  background: #ffffff;
+}
+.row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
 .order-num {
   flex: 0 0 auto;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px; border-radius: 50%;
-  background: #2563EB; color: #fff; font-size: 22px; font-weight: 800;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: #2563EB; color: #fff; font-size: 24px; font-weight: 800;
 }
 .title {
-  font-size: 30px; font-weight: 800; color: #111827; line-height: 1.25;
+  font-size: 32px; font-weight: 800; color: #111827; line-height: 1.25;
   word-break: keep-all;
 }
 .price {
-  font-size: 28px; font-weight: 700; color: #DC2626; margin: 12px 0 8px;
+  font-size: 30px; font-weight: 800; color: #DC2626; margin: 14px 0 10px;
 }
 .meta {
-  font-size: 20px; color: #4B5563; margin-top: 4px;
+  font-size: 20px; color: #4B5563; margin-top: 6px;
 }
-.link {
-  margin-top: 14px; padding: 12px 16px; background: #EFF6FF; border-radius: 10px;
-  font-size: 18px; font-weight: 600; color: #1D4ED8; word-break: break-all;
+.order-btn {
+  margin-top: 22px;
+  padding: 18px 22px;
+  background: linear-gradient(90deg, #2563EB 0%, #1D4ED8 100%);
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 22px; font-weight: 800;
+  display: flex; align-items: center; justify-content: space-between;
+  box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+}
+.order-btn .arrow {
+  font-size: 28px; font-weight: 800;
 }
 .empty-placeholder { color: #9CA3AF; font-size: 20px; }
 </style>
 </head>
 <body>
 <div id="card">
-  <div class="image-area">
-    ${buildImageGridHtml(product.imageUrls)}
-  </div>
-  <div class="text-area">
-    <div class="row">
-      <span class="order-num">${orderNumber}</span>
-      <span class="title">${name}</span>
+  <div class="card-inner">
+    <div class="image-area">
+      ${buildImageGridHtml(product.imageUrls)}
     </div>
-    ${priceLine ? `<div class="price">💰 ${priceLine}</div>` : ''}
-    ${deadline ? `<div class="meta">⏰ 마감: ${deadline}</div>` : ''}
-    ${orderUrl ? `<div class="link">🛒 주문 👉 ${escapeHtml(orderUrl)}</div>` : ''}
+    <div class="divider"></div>
+    <div class="text-area">
+      <div class="row">
+        <span class="order-num">${orderNumber}</span>
+        <span class="title">${name}</span>
+      </div>
+      ${priceLine ? `<div class="price">💰 ${priceLine}</div>` : ''}
+      ${deadline ? `<div class="meta">⏰ 마감: ${deadline}</div>` : ''}
+      ${orderUrl ? `<div class="order-btn">
+        <span>🛒 상품 자세히 보기</span>
+        <span class="arrow">→</span>
+      </div>` : ''}
+    </div>
   </div>
 </div>
 </body>

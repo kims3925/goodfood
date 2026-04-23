@@ -131,7 +131,7 @@ export function buildDigest(options: DigestOptions): DigestResult {
   if (footerText && footerText.trim()) {
     lines.push(footerText.trim())
   } else {
-    lines.push('📦 배송: 주문 당일 또는 익일 출고')
+    lines.push('📦 배송: 마감 전 주문시 당일 출고, 마감 이후 익일 출고')
     lines.push('💳 결제: 카드결제 / 무통장입금')
   }
 
