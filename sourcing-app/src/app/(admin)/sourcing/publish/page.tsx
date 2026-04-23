@@ -994,113 +994,70 @@ function PublishPageContent() {
       setIsPublishing(true)
       publishCancelledRef.current = false
 
-      // SSE 스트리밍으로 재발행
+      // 자동발행과 동일한 /api/publish/template/publish 사용 (SSE는 본문 포맷이 깨지는 이슈)
       const abortController = new AbortController()
       abortControllerRef.current = abortController
 
-      const response = await fetch('/api/shop/publish/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productIds, channelId }),
-        signal: abortController.signal,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || '재시도 요청 실패')
-      }
-
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error('스트림을 읽을 수 없습니다.')
-
-      const decoder = new TextDecoder()
-      let buffer = ''
       let successCount = 0
       let failCount = 0
 
-      while (true) {
-        if (publishCancelledRef.current) {
-          reader.cancel()
-          break
+      for (const productId of productIds) {
+        if (publishCancelledRef.current) break
+
+        const itemIdx = failedPublishItems.findIndex((p) => p.productId === productId)
+        if (itemIdx !== -1) {
+          setPublishProgressItems((prev) => {
+            const updated = [...prev]
+            updated[itemIdx] = { ...updated[itemIdx], status: 'publishing' }
+            return updated
+          })
+          setCurrentPublishIndex(itemIdx)
         }
 
-        const { done, value } = await reader.read()
-        if (done) break
+        try {
+          const res = await fetch('/api/publish/template/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ productId, channelId }),
+            signal: abortController.signal,
+          })
+          const data = await res.json()
 
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const event = JSON.parse(line.slice(6))
-
-              if (event.type === 'product_start' || event.type === 'stage_update' || event.type === 'image_progress') {
-                const itemIdx = failedPublishItems.findIndex(
-                  (p) => p.productId === event.data.progress.productId
-                )
-                if (itemIdx !== -1) {
-                  setPublishProgressItems((prev) => {
-                    const updated = [...prev]
-                    updated[itemIdx] = {
-                      ...updated[itemIdx],
-                      status: 'publishing',
-                      stage: event.data.progress.stage,
-                      stageLabel: event.data.progress.stageLabel,
-                      imageProgress: event.data.progress.imageProgress,
-                      uploadProgress: event.data.progress.uploadProgress,
-                      publishMethod: event.data.progress.publishMethod,
-                    }
-                    return updated
-                  })
-                  setCurrentPublishIndex(itemIdx)
-                }
-              } else if (event.type === 'product_complete') {
-                const progress = event.data.progress
-                const itemIdx = failedPublishItems.findIndex(
-                  (p) => p.productId === progress.productId
-                )
-
-                if (progress.stage === 'completed' || progress.stage === 'skipped') {
-                  successCount++
-                  if (itemIdx !== -1) {
-                    setPublishProgressItems((prev) => {
-                      const updated = [...prev]
-                      updated[itemIdx] = {
-                        ...updated[itemIdx],
-                        status: 'success',
-                        stage: progress.stage,
-                        stageLabel: progress.stageLabel,
-                      }
-                      return updated
-                    })
-                  }
-                } else if (progress.stage === 'failed') {
-                  failCount++
-                  if (itemIdx !== -1) {
-                    setPublishProgressItems((prev) => {
-                      const updated = [...prev]
-                      updated[itemIdx] = {
-                        ...updated[itemIdx],
-                        status: 'failed',
-                        message: progress.error,
-                        stage: progress.stage,
-                        stageLabel: progress.stageLabel,
-                      }
-                      return updated
-                    })
-                  }
-                }
-              }
-            } catch (parseError) {
-              console.error('SSE 파싱 오류:', parseError)
+          if (data.success || data.publishId) {
+            successCount++
+            if (itemIdx !== -1) {
+              setPublishProgressItems((prev) => {
+                const updated = [...prev]
+                updated[itemIdx] = { ...updated[itemIdx], status: 'success' }
+                return updated
+              })
             }
+          } else {
+            failCount++
+            const errMsg = data.error || data.message || '발행 실패'
+            if (itemIdx !== -1) {
+              setPublishProgressItems((prev) => {
+                const updated = [...prev]
+                updated[itemIdx] = { ...updated[itemIdx], status: 'failed', message: errMsg }
+                return updated
+              })
+            }
+          }
+        } catch (err: any) {
+          if (err?.name === 'AbortError' || publishCancelledRef.current) break
+          failCount++
+          const errMsg = err?.message || '네트워크 오류'
+          if (itemIdx !== -1) {
+            setPublishProgressItems((prev) => {
+              const updated = [...prev]
+              updated[itemIdx] = { ...updated[itemIdx], status: 'failed', message: errMsg }
+              return updated
+            })
           }
         }
       }
 
-      // 완료
       loadProducts()
       if (successCount > 0) {
         toast.success(`자동 재시도 완료: ${successCount}개 성공` + (failCount > 0 ? `, ${failCount}개 실패` : ''))
@@ -1168,113 +1125,70 @@ function PublishPageContent() {
       setIsPublishing(true)
       publishCancelledRef.current = false
 
-      // SSE 스트리밍으로 재발행
+      // 자동발행과 동일한 /api/publish/template/publish 사용 (SSE 경로는 본문 포맷 깨짐)
       const abortController = new AbortController()
       abortControllerRef.current = abortController
 
-      const response = await fetch('/api/shop/publish/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productIds, channelId }),
-        signal: abortController.signal,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || '재시도 요청 실패')
-      }
-
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error('스트림을 읽을 수 없습니다.')
-
-      const decoder = new TextDecoder()
-      let buffer = ''
       let successCount = 0
       let failCount = 0
 
-      while (true) {
-        if (publishCancelledRef.current) {
-          reader.cancel()
-          break
+      for (const productId of productIds) {
+        if (publishCancelledRef.current) break
+
+        const itemIdx = failedPublishItems.findIndex((p) => p.productId === productId)
+        if (itemIdx !== -1) {
+          setPublishProgressItems((prev) => {
+            const updated = [...prev]
+            updated[itemIdx] = { ...updated[itemIdx], status: 'publishing' }
+            return updated
+          })
+          setCurrentPublishIndex(itemIdx)
         }
 
-        const { done, value } = await reader.read()
-        if (done) break
+        try {
+          const res = await fetch('/api/publish/template/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ productId, channelId }),
+            signal: abortController.signal,
+          })
+          const data = await res.json()
 
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const event = JSON.parse(line.slice(6))
-
-              if (event.type === 'product_start' || event.type === 'stage_update' || event.type === 'image_progress') {
-                const itemIdx = failedPublishItems.findIndex(
-                  (p) => p.productId === event.data.progress.productId
-                )
-                if (itemIdx !== -1) {
-                  setPublishProgressItems((prev) => {
-                    const updated = [...prev]
-                    updated[itemIdx] = {
-                      ...updated[itemIdx],
-                      status: 'publishing',
-                      stage: event.data.progress.stage,
-                      stageLabel: event.data.progress.stageLabel,
-                      imageProgress: event.data.progress.imageProgress,
-                      uploadProgress: event.data.progress.uploadProgress,
-                      publishMethod: event.data.progress.publishMethod,
-                    }
-                    return updated
-                  })
-                  setCurrentPublishIndex(itemIdx)
-                }
-              } else if (event.type === 'product_complete') {
-                const progress = event.data.progress
-                const itemIdx = failedPublishItems.findIndex(
-                  (p) => p.productId === progress.productId
-                )
-
-                if (progress.stage === 'completed' || progress.stage === 'skipped') {
-                  successCount++
-                  if (itemIdx !== -1) {
-                    setPublishProgressItems((prev) => {
-                      const updated = [...prev]
-                      updated[itemIdx] = {
-                        ...updated[itemIdx],
-                        status: 'success',
-                        stage: progress.stage,
-                        stageLabel: progress.stageLabel,
-                      }
-                      return updated
-                    })
-                  }
-                } else if (progress.stage === 'failed') {
-                  failCount++
-                  if (itemIdx !== -1) {
-                    setPublishProgressItems((prev) => {
-                      const updated = [...prev]
-                      updated[itemIdx] = {
-                        ...updated[itemIdx],
-                        status: 'failed',
-                        message: progress.error,
-                        stage: progress.stage,
-                        stageLabel: progress.stageLabel,
-                      }
-                      return updated
-                    })
-                  }
-                }
-              }
-            } catch (parseError) {
-              console.error('SSE 파싱 오류:', parseError)
+          if (data.success || data.publishId) {
+            successCount++
+            if (itemIdx !== -1) {
+              setPublishProgressItems((prev) => {
+                const updated = [...prev]
+                updated[itemIdx] = { ...updated[itemIdx], status: 'success' }
+                return updated
+              })
             }
+          } else {
+            failCount++
+            const errMsg = data.error || data.message || '발행 실패'
+            if (itemIdx !== -1) {
+              setPublishProgressItems((prev) => {
+                const updated = [...prev]
+                updated[itemIdx] = { ...updated[itemIdx], status: 'failed', message: errMsg }
+                return updated
+              })
+            }
+          }
+        } catch (err: any) {
+          if (err?.name === 'AbortError' || publishCancelledRef.current) break
+          failCount++
+          const errMsg = err?.message || '네트워크 오류'
+          if (itemIdx !== -1) {
+            setPublishProgressItems((prev) => {
+              const updated = [...prev]
+              updated[itemIdx] = { ...updated[itemIdx], status: 'failed', message: errMsg }
+              return updated
+            })
           }
         }
       }
 
-      // 완료
       loadProducts()
       toast.success(`재시도 완료: ${successCount}개 성공, ${failCount}개 실패`)
 
