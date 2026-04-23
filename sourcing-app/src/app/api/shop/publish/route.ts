@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const channelId = searchParams.get('channelId')
+    const categoryId = searchParams.get('categoryId') // SEA/AGR/MEA/MKT/PRC/HLT/ETC
     const daysWithin = searchParams.get('daysWithin') // 최근 N일 필터
 
     // Build where clause
@@ -57,6 +58,11 @@ export async function GET(request: NextRequest) {
     // 도매밴드 필터 (상품의 채널 기준)
     if (channelId) {
       where.channelId = parseInt(channelId)
+    }
+
+    // 카테고리 필터 (SEA/AGR/MEA/MKT/PRC/HLT/ETC)
+    if (categoryId && categoryId !== 'all') {
+      where.categoryId = categoryId
     }
 
     // Get total count

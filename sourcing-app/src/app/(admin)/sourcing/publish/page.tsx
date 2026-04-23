@@ -28,6 +28,7 @@ import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import { checkExtensionInstalled, saveSessionViaExtension } from '@/lib/band-extension'
+import { CATEGORY_LIST } from '@/modules/category/category.keywords'
 
 const BandIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -118,6 +119,9 @@ function PublishPageContent() {
 
   // 날짜 필터 (기본값: 오늘)
   const [daysWithin, setDaysWithin] = useState<number | null>(1)
+
+  // 카테고리 필터 ('all' 또는 SEA/AGR/MEA/MKT/PRC/HLT/ETC)
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
   // 페이징
   const [currentPage, setCurrentPage] = useState(1)
@@ -288,6 +292,7 @@ function PublishPageContent() {
       if (searchTerm) params.append('search', searchTerm)
       if (selectedWholesaleChannel) params.append('channelId', String(selectedWholesaleChannel))
       if (daysWithin !== null) params.append('daysWithin', String(daysWithin))
+      if (selectedCategory && selectedCategory !== 'all') params.append('categoryId', selectedCategory)
 
       const response = await fetch(`/api/shop/publish?${params.toString()}`)
       const data = await response.json()
@@ -320,7 +325,7 @@ function PublishPageContent() {
       setIsLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- searchTerm은 Enter 키를 눌러야 적용됨
-  }, [currentPage, pageSize, selectedWholesaleChannel, daysWithin])
+  }, [currentPage, pageSize, selectedWholesaleChannel, daysWithin, selectedCategory])
 
   // 페이지/필터 변경 시 상품 로���
   useEffect(() => {
@@ -1646,6 +1651,41 @@ function PublishPageContent() {
                   }`}
                 >
                   {option.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 카테고리 필터 */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs sm:text-sm text-gray-500">카테고리:</span>
+              <button
+                onClick={() => {
+                  setSelectedCategory('all')
+                  setCurrentPage(1)
+                }}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors min-h-[36px] sm:min-h-[32px] ${
+                  selectedCategory === 'all'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                전체
+              </button>
+              {CATEGORY_LIST.map((cat) => (
+                <button
+                  key={cat.code}
+                  onClick={() => {
+                    setSelectedCategory(cat.code)
+                    setCurrentPage(1)
+                  }}
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors min-h-[36px] sm:min-h-[32px] ${
+                    selectedCategory === cat.code
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title={cat.name}
+                >
+                  {cat.emoji} {cat.name}
                 </button>
               ))}
             </div>
