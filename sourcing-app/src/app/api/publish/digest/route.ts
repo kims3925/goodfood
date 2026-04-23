@@ -163,6 +163,12 @@ interface DigestPublishRequest {
   publishMode?: 'digest' | 'individual' | 'both' | 'incremental'
   /** 개별/점진 발행 시 각 게시글 사이 대기 시간(초). 기본 3초 */
   individualIntervalSec?: number
+  /**
+   * 각 사진(카드) 옆 댓글 아이콘에 개별 댓글 자동 작성 여부. 기본 false.
+   * - 실제 Band 셀렉터 검증 전까지 비활성. 켜면 20장 × (아이콘 탐색 실패 시 폴백 재로드)로
+   *   발행이 150-250초 추가되어 nginx 600초 타임아웃에 걸릴 수 있음.
+   */
+  enablePerPhotoComments?: boolean
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -185,6 +191,7 @@ export async function POST(request: NextRequest) {
       date,
       publishMode = 'digest',
       individualIntervalSec = 3,
+      enablePerPhotoComments = false,
     } = body
 
     if (!categoryId || !(CATEGORY_CODES as readonly string[]).includes(categoryId)) {
@@ -490,8 +497,11 @@ export async function POST(request: NextRequest) {
             postKey = r.postKey
             message = r.error || message
 
-            // 1-1) 사진별 댓글 — 각 사진에 해당 상품의 주문 링크 달기
-            if (r.postKey) {
+            // 1-1) 사진별 댓글 — 각 사진에 해당 상품의 주문 링크 달기 (옵션)
+            //     기본 비활성: 인라인 아이콘 셀렉터가 실제 Band DOM과 안 맞을 경우
+            //     사진당 풀 페이지 재로드 폴백이 돌아 nginx 타임아웃(600s)을 넘김.
+            //     enablePerPhotoComments=true 로 호출해야만 실행.
+            if (enablePerPhotoComments && r.postKey) {
               const perPhotoComments = cardProducts.map((cp, idx) => {
                 if (!cp.orderUrl) return ''
                 return `${idx + 1}. ${cp.name}\n🛒 ${cp.orderUrl}`
