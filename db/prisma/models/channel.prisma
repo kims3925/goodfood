@@ -14,6 +14,7 @@ model Channel {
   shopId            Int?             @map("shop_id")
   bandSessionCookie String?          @map("band_session_cookie") @db.Text
   sessionExpiresAt  DateTime?        @map("session_expires_at")
+  orderDeadline     String?          @map("order_deadline") @db.VarChar(50) // 도매방 주문 마감시간 (예: "오후 3시", "14:00")
   shop              Shop?            @relation(fields: [shopId], references: [id])
   user              User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   collectedPosts    CollectedPost[]

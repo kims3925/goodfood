@@ -1,6 +1,6 @@
 'use client'
 
-import { CheckCircle, Clock, Package } from 'lucide-react'
+import { CheckCircle, Clock, Package, Store } from 'lucide-react'
 
 export interface DigestProductItem {
   id: number
@@ -10,6 +10,11 @@ export interface DigestProductItem {
   images: { url: string; sortOrder: number }[]
   createdAt?: string | null
   lastDigestPublishedAt?: string | null
+  channel?: {
+    id: number
+    name: string
+    orderDeadline?: string | null
+  } | null
 }
 
 function formatShortDate(iso: string | null | undefined): string {
@@ -33,29 +38,33 @@ interface Props {
 
 export default function DigestProductList({ products, selectedIds, onToggle, onSelectAll, maxProducts = 20 }: Props) {
   const allVisibleIds = products.map((p) => p.id)
-  const allSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedIds.includes(id))
-
-  const handleSelectAll = () => {
-    if (allSelected) {
-      onSelectAll([])
-    } else {
-      onSelectAll(allVisibleIds.slice(0, maxProducts))
-    }
-  }
+  const someSelected = selectedIds.length > 0
+  const hasAnyVisible = allVisibleIds.length > 0
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-gray-900">
           상품 선택 <span className="text-gray-500">({products.length}개 / 최대 {maxProducts})</span>
         </h3>
-        <button
-          type="button"
-          onClick={handleSelectAll}
-          className="text-xs px-2.5 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700"
-        >
-          {allSelected ? '전체 해제' : `상위 ${maxProducts}개 선택`}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={!hasAnyVisible}
+            onClick={() => onSelectAll(allVisibleIds.slice(0, maxProducts))}
+            className="text-xs px-2.5 py-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            상위 {maxProducts}개 선택
+          </button>
+          <button
+            type="button"
+            disabled={!someSelected}
+            onClick={() => onSelectAll([])}
+            className="text-xs px-2.5 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            선택 취소{someSelected ? ` (${selectedIds.length})` : ''}
+          </button>
+        </div>
       </div>
 
       {products.length === 0 && (
@@ -103,6 +112,23 @@ export default function DigestProductList({ products, selectedIds, onToggle, onS
                     {product.price ? `${product.price.toLocaleString()}원~` : '가격 미설정'}
                   </p>
                   <div className="flex items-center gap-1 flex-wrap mt-1">
+                    {product.channel && (
+                      <span
+                        className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 max-w-[180px]"
+                        title={`도매방: ${product.channel.name}${product.channel.orderDeadline ? ` · 마감 ${product.channel.orderDeadline}` : ''}`}
+                      >
+                        <Store size={10} />
+                        <span className="truncate">{product.channel.name}</span>
+                      </span>
+                    )}
+                    {product.channel?.orderDeadline && (
+                      <span
+                        className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700"
+                        title={`주문 마감: ${product.channel.orderDeadline}`}
+                      >
+                        ⏰ {product.channel.orderDeadline}
+                      </span>
+                    )}
                     <span className="inline-flex items-center text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">
                       이미지 {product.images?.length || 0}장
                     </span>

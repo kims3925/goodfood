@@ -64,6 +64,9 @@ export async function GET(request: NextRequest) {
       include: {
         images: { orderBy: { sortOrder: 'asc' } },
         variants: { where: { deletedAt: null }, orderBy: { id: 'asc' } },
+        channel: {
+          select: { id: true, name: true, platform: true, kind: true, orderDeadline: true },
+        },
         shopProducts: {
           where: { deletedAt: null },
           include: { shop: { select: { id: true, subdomain: true, name: true } } },
@@ -102,6 +105,15 @@ export async function GET(request: NextRequest) {
       price: p.price,
       createdAt: p.createdAt,
       lastDigestPublishedAt: p.lastDigestPublishedAt,
+      channel: p.channel
+        ? {
+            id: p.channel.id,
+            name: p.channel.name,
+            platform: p.channel.platform,
+            kind: p.channel.kind,
+            orderDeadline: p.channel.orderDeadline || null,
+          }
+        : null,
       variants: p.variants.map((v) => ({
         id: v.id,
         optionSummary: v.optionSummary,
@@ -168,6 +180,7 @@ export async function POST(request: NextRequest) {
       include: {
         images: { orderBy: { sortOrder: 'asc' } },
         variants: { where: { deletedAt: null } },
+        channel: { select: { orderDeadline: true } },
         shopProducts: {
           where: { deletedAt: null },
           include: { shop: { select: { id: true, subdomain: true } } },
@@ -192,6 +205,7 @@ export async function POST(request: NextRequest) {
         variants: p.variants.map((v) => ({ optionSummary: v.optionSummary || '', price: v.price })),
         images: p.images.map((img) => ({ url: img.url, sortOrder: img.sortOrder })),
         shopProductUrl,
+        deadline: p.channel?.orderDeadline || undefined,
       }
     })
 
@@ -250,7 +264,7 @@ export async function POST(request: NextRequest) {
         name: p.name,
         price: p.price,
         priceText,
-        deadline: null,
+        deadline: p.channel?.orderDeadline || null,
         orderUrl,
         imageUrls: p.images
           .slice(0, 4)

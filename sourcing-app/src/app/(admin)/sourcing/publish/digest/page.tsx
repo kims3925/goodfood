@@ -20,6 +20,13 @@ interface FetchedProduct {
   price: number | null
   createdAt?: string | null
   lastDigestPublishedAt?: string | null
+  channel?: {
+    id: number
+    name: string
+    platform?: string
+    kind?: string
+    orderDeadline?: string | null
+  } | null
   variants: { id: number; optionSummary: string | null; price: number }[]
   images: { url: string; sortOrder: number }[]
   shopProducts: {
@@ -59,6 +66,10 @@ export default function DigestPublishPage() {
   // 발행 진행 상태
   const [progressOpen, setProgressOpen] = useState(false)
   const [progressItems, setProgressItems] = useState<DigestProgressItem[]>([])
+
+  // 상품 필터 (카테고리 아래)
+  const [wholesaleFilter, setWholesaleFilter] = useState<number | 'all'>('all')
+  const [deadlineFilter, setDeadlineFilter] = useState<string | 'all'>('all')
 
   // ─── Load products + categories for a given category ───────────────────
   const loadCategory = useCallback(
@@ -232,7 +243,46 @@ export default function DigestPublishPage() {
     }
   }
 
-  const productItems: DigestProductItem[] = products.map((p) => ({
+  // 도매방(WHOLESALE) 옵션 추출
+  const wholesaleOptions = useMemo(() => {
+    const map = new Map<number, { id: number; name: string; count: number }>()
+    for (const p of products) {
+      if (!p.channel?.id) continue
+      const existing = map.get(p.channel.id)
+      if (existing) {
+        existing.count++
+      } else {
+        map.set(p.channel.id, { id: p.channel.id, name: p.channel.name, count: 1 })
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count)
+  }, [products])
+
+  // 마감시간 옵션 추출 ("(미설정)"도 한 카테고리로)
+  const deadlineOptions = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const p of products) {
+      const key = p.channel?.orderDeadline?.trim() || '(미설정)'
+      map.set(key, (map.get(key) || 0) + 1)
+    }
+    return Array.from(map.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count)
+  }, [products])
+
+  // 필터 적용된 상품
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      if (wholesaleFilter !== 'all' && p.channel?.id !== wholesaleFilter) return false
+      if (deadlineFilter !== 'all') {
+        const key = p.channel?.orderDeadline?.trim() || '(미설정)'
+        if (key !== deadlineFilter) return false
+      }
+      return true
+    })
+  }, [products, wholesaleFilter, deadlineFilter])
+
+  const productItems: DigestProductItem[] = filteredProducts.map((p) => ({
     id: p.id,
     name: p.name,
     price: p.price,
@@ -240,6 +290,9 @@ export default function DigestPublishPage() {
     images: p.images,
     createdAt: p.createdAt,
     lastDigestPublishedAt: p.lastDigestPublishedAt,
+    channel: p.channel
+      ? { id: p.channel.id, name: p.channel.name, orderDeadline: p.channel.orderDeadline || null }
+      : null,
   }))
 
   return (
@@ -255,6 +308,65 @@ export default function DigestPublishPage() {
         <div className="mb-4">
           <CategoryTabs categories={categories} active={activeCategory} onChange={setActiveCategory} />
         </div>
+
+        {/* 도매방 / 마감시간 필터 */}
+        {(wholesaleOptions.length > 0 || deadlineOptions.length > 0) && (
+          <div className="mb-4 space-y-2 bg-white border border-gray-200 rounded-lg p-3">
+            {wholesaleOptions.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-500 flex-shrink-0">🏪 도매방:</span>
+                <button
+                  type="button"
+                  onClick={() => setWholesaleFilter('all')}
+                  className={`text-xs px-2.5 py-1.5 rounded-md transition-colors ${
+                    wholesaleFilter === 'all' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  전체 ({products.length})
+                </button>
+                {wholesaleOptions.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setWholesaleFilter(opt.id)}
+                    className={`text-xs px-2.5 py-1.5 rounded-md transition-colors ${
+                      wholesaleFilter === opt.id ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    title={opt.name}
+                  >
+                    {opt.name} ({opt.count})
+                  </button>
+                ))}
+              </div>
+            )}
+            {deadlineOptions.length > 1 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-500 flex-shrink-0">⏰ 마감시간:</span>
+                <button
+                  type="button"
+                  onClick={() => setDeadlineFilter('all')}
+                  className={`text-xs px-2.5 py-1.5 rounded-md transition-colors ${
+                    deadlineFilter === 'all' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  전체
+                </button>
+                {deadlineOptions.map((opt) => (
+                  <button
+                    key={opt.label}
+                    type="button"
+                    onClick={() => setDeadlineFilter(opt.label)}
+                    className={`text-xs px-2.5 py-1.5 rounded-md transition-colors ${
+                      deadlineFilter === opt.label ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {opt.label} ({opt.count})
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {isLoading ? (
           <div className="py-20">
