@@ -40,6 +40,7 @@ interface Product {
   currency: string
   createdAt: string
   isActive: boolean
+  categoryId?: string | null
   republishedAt?: string | null
   images?: ProductImage[]
   channel?: {
@@ -176,6 +177,11 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
   // 자동발행 상태
   const [isAutoPublishing, setIsAutoPublishing] = useState(false)
   const [showAutoPublishConfirm, setShowAutoPublishConfirm] = useState(false)
+  // 자동발행 모드 선택 (개별/종합/둘다)
+  const [autoPublishMode, setAutoPublishMode] = useState<{ individual: boolean; digest: boolean }>({
+    individual: true,
+    digest: false,
+  })
 
   // 발행 방식 선택 모달
   const [showPublishMethodModal, setShowPublishMethodModal] = useState(false)
@@ -1146,6 +1152,12 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
 
   const confirmAutoPublish = async () => {
     setShowAutoPublishConfirm(false)
+
+    if (!autoPublishMode.individual && !autoPublishMode.digest) {
+      toast.error('개별발행 또는 종합발행 중 하나 이상을 선택하세요.')
+      return
+    }
+
     setIsAutoPublishing(true)
 
     let bandSuccessCount = 0
@@ -1154,6 +1166,11 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
     let shopFailCount = 0
     let shopSkippedCount = 0
     const errorMessages: string[] = []
+
+    // 종합발행 결과 집계
+    let digestSuccessCount = 0
+    let digestFailCount = 0
+    let digestPostCount = 0 // 생성된 게시글 수
 
     try {
       // 1) 소매밴드 채널 + 쇼핑몰 목록 동시 조회
@@ -1175,7 +1192,9 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
         return
       }
 
-      // 2) 각 상품을 모든 소매밴드 + 모든 쇼핑몰에 동시 발행
+
+      // 2) 개별발행 (선택 시) — 각 상품을 모든 소매밴드 + 모든 쇼핑몰에 발행
+      if (autoPublishMode.individual) {
       for (const productId of selectedProductIds) {
         // 2-1) 소매밴드 발행 (Playwright 템플릿)
         for (const channel of retailChannels) {
@@ -1230,6 +1249,53 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
           }
         }
       }
+      } // end if (autoPublishMode.individual)
+
+      // 3) 종합발행 (선택 시) — 개별발행 완료 후 실행
+      //    카테고리별로 그룹화 → 20개씩 청크 → 각 청크를 각 채널에 POST /api/publish/digest
+      if (autoPublishMode.digest && retailChannels.length > 0) {
+        const CHUNK_SIZE = 20
+        // 선택 상품 → 카테고리별 그룹핑
+        const byCategory: Record<string, number[]> = {}
+        for (const pid of selectedProductIds) {
+          const p = products.find((x) => x.id === pid)
+          const cat = (p?.categoryId && /^(SEA|AGR|MEA|MKT|PRC|HLT|ETC)$/.test(p.categoryId)) ? p.categoryId : 'ETC'
+          if (!byCategory[cat]) byCategory[cat] = []
+          byCategory[cat].push(pid)
+        }
+
+        for (const [category, ids] of Object.entries(byCategory)) {
+          for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+            const chunk = ids.slice(i, i + CHUNK_SIZE)
+            digestPostCount++
+            for (const channel of retailChannels) {
+              try {
+                const res = await fetch('/api/publish/digest', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    categoryId: category,
+                    productIds: chunk,
+                    channelId: channel.id,
+                    maxImagesPerProduct: 4,
+                  }),
+                })
+                const data = await res.json()
+                if (data.success && data.result?.status === 'SUCCESS') {
+                  digestSuccessCount++
+                } else {
+                  digestFailCount++
+                  const msg = data.result?.message || data.error || '종합발행 실패'
+                  errorMessages.push(`[종합:${channel.name}/${category}] ${msg}`)
+                }
+              } catch (err: any) {
+                digestFailCount++
+                errorMessages.push(`[종합:${channel.name}/${category}] ${err?.message || '네트워크 오류'}`)
+              }
+            }
+          }
+        }
+      }
     } catch (err: any) {
       toast.error(`자동발행 중 오류: ${err?.message || '알 수 없는 오류'}`)
     } finally {
@@ -1238,10 +1304,18 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
       setSelectAll(false)
       loadProducts()
 
-      const totalSuccess = bandSuccessCount + shopSuccessCount
-      const totalFail = bandFailCount + shopFailCount
+      const totalSuccess = bandSuccessCount + shopSuccessCount + digestSuccessCount
+      const totalFail = bandFailCount + shopFailCount + digestFailCount
       if (totalSuccess > 0) {
-        toast.success(`발행 완료: 소매밴드 ${bandSuccessCount}건, 쇼핑몰 ${shopSuccessCount}건${shopSkippedCount > 0 ? ` (이미 발행 ${shopSkippedCount}건)` : ''}`)
+        const parts: string[] = []
+        if (autoPublishMode.individual) {
+          parts.push(`소매밴드 ${bandSuccessCount}`)
+          parts.push(`쇼핑몰 ${shopSuccessCount}`)
+        }
+        if (autoPublishMode.digest) {
+          parts.push(`종합 ${digestSuccessCount}건/${digestPostCount}게시글`)
+        }
+        toast.success(`발행 완료: ${parts.join(', ')}${shopSkippedCount > 0 ? ` (이미 발행 ${shopSkippedCount}건)` : ''}`)
       }
       if (totalFail > 0) {
         // 첫 번째 에러 메시지를 사용자에게 표시
@@ -2069,15 +2143,80 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
         </div>
       )}
 
-      {/* 자동발행 확인 모달 */}
-      <ConfirmModal
-        isOpen={showAutoPublishConfirm}
-        onClose={() => setShowAutoPublishConfirm(false)}
-        onConfirm={confirmAutoPublish}
-        title="자동발행 확인"
-        message={`선택한 ${selectedProductIds.length}개 상품을 등록된 모든 소매밴드와 쇼핑몰에 동시 발행합니다.`}
-        confirmText="발행 시작"
-      />
+      {/* 자동발행 모드 선택 모달 */}
+      {showAutoPublishConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">자동발행 모드 선택</h3>
+            <p className="text-sm text-gray-500 mb-5">
+              선택한 <span className="font-semibold text-gray-900">{selectedProductIds.length}개</span> 상품의 발행 방식을 선택하세요.
+            </p>
+
+            <div className="space-y-3 mb-5">
+              <label className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${
+                autoPublishMode.individual ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={autoPublishMode.individual}
+                  onChange={(e) => setAutoPublishMode((prev) => ({ ...prev, individual: e.target.checked }))}
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600"
+                />
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-900 text-sm">개별발행</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    각 상품별로 독립된 게시글 작성. 모든 소매밴드 + 쇼핑몰 대상.
+                  </p>
+                </div>
+              </label>
+
+              <label className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${
+                autoPublishMode.digest ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 hover:border-gray-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={autoPublishMode.digest}
+                  onChange={(e) => setAutoPublishMode((prev) => ({ ...prev, digest: e.target.checked }))}
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-emerald-600"
+                />
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-900 text-sm">
+                    종합발행
+                    <span className="ml-2 text-xs font-normal text-gray-500">
+                      (카테고리별 20개씩 묶어 1게시글 / {selectedProductIds.length > 0 ? Math.ceil(selectedProductIds.length / 20) : 0}개 게시글 예상)
+                    </span>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    SEA/AGR/... 카테고리별로 자동 분류 후 20개 단위로 카드 이미지 게시글 발행.
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {autoPublishMode.individual && autoPublishMode.digest && (
+              <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                ℹ️ 둘 다 선택하면 <b>개별발행 → 종합발행</b> 순서로 실행됩니다. 시간이 오래 걸릴 수 있습니다.
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowAutoPublishConfirm(false)}
+                className="flex-1 py-2.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={confirmAutoPublish}
+                disabled={!autoPublishMode.individual && !autoPublishMode.digest}
+                className="flex-1 py-2.5 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
+              >
+                발행 시작
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ��제 확인 모달 */}
       <ConfirmModal
