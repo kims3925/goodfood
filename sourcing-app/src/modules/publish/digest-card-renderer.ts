@@ -306,10 +306,10 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
         ${deadline ? `<div class="deadline">⏰ 주문 마감: ${deadline}</div>` : ''}
         ${description ? `<div class="desc">${description}</div>` : ''}
         <div class="guide-box">
-          <div class="guide-title">🛒 상품 자세히 보기 / 주문하기</div>
+          <div class="guide-title">🛒 상품보기 / 주문</div>
           <div class="guide-text">
-            맨 아래 <span class="hl">${orderNumber}번 ${shortName}</span> 링크<br>
-            또는 댓글의 <span class="hl">(${orderNumber})번</span> 링크를 탭하세요
+            <span class="hl">사진 댓글</span>에 링크가 있고,<br>
+            댓글란에도 <span class="hl">(${orderNumber})번</span> 주문링크가 있습니다
           </div>
           <div class="guide-arrow">↓</div>
         </div>

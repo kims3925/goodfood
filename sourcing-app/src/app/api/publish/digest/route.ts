@@ -320,7 +320,7 @@ export async function POST(request: NextRequest) {
     const buildDigestBody = () => {
       const linkCount = cardProducts.filter((p) => p.orderUrl).length
       // 본문 텍스트는 Band CKEditor의 "크게 + 볼드" 스타일이 setTextStyle()에서 일괄 적용됨.
-      // 그 안에서 '상품보기/주문' 안내를 최대한 눈에 띄게 하려고 상단 배너 + 이모지 + 구분선 조합.
+      // '상품보기/주문' 배너를 제목 위(상단)와 푸터 위(하단) 양쪽에 배치해 스크롤 어디서든 보이게.
       const guidanceBanner = [
         '━━━━━━━━━━━━━━━━━━━━',
         '📢 ▶ 상품보기 / 주문 ◀',
@@ -330,6 +330,8 @@ export async function POST(request: NextRequest) {
         '━━━━━━━━━━━━━━━━━━━━',
       ]
       return [
+        ...(linkCount > 0 ? guidanceBanner : []),
+        '',
         digest.title,
         (headerText || '').trim(),
         `총 ${digest.productCount}개 상품 | 신선 직송`,
