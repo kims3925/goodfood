@@ -319,13 +319,23 @@ export async function POST(request: NextRequest) {
     // 댓글에서도 동일하게 적용됨).
     const buildDigestBody = () => {
       const linkCount = cardProducts.filter((p) => p.orderUrl).length
+      // 본문 텍스트는 Band CKEditor의 "크게 + 볼드" 스타일이 setTextStyle()에서 일괄 적용됨.
+      // 그 안에서 '상품보기/주문' 안내를 최대한 눈에 띄게 하려고 상단 배너 + 이모지 + 구분선 조합.
+      const guidanceBanner = [
+        '━━━━━━━━━━━━━━━━━━━━',
+        '📢 ▶ 상품보기 / 주문 ◀',
+        '',
+        '🛒 사진 댓글에 링크가 있고,',
+        '🛒 댓글란에도 번호별 주문링크가 있습니다',
+        '━━━━━━━━━━━━━━━━━━━━',
+      ]
       return [
         digest.title,
         (headerText || '').trim(),
         `총 ${digest.productCount}개 상품 | 신선 직송`,
-        linkCount > 0 ? '📷 사진을 탭하면 해당 상품 댓글에 주문 링크가 있습니다.' : '',
-        linkCount > 0 ? `💬 맨 아래 댓글에 번호별 전체 주문 링크(${linkCount}개)가 모여있습니다.` : '',
-        '━━━━━━━━━━━━━━━━━━━━',
+        '',
+        ...(linkCount > 0 ? guidanceBanner : []),
+        '',
         (footerText || '').trim() ||
           '📦 배송: 마감 전 주문시 당일 출고, 마감 이후 익일 출고\n💳 결제: 카드결제 / 무통장입금',
       ]
