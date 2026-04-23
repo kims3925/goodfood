@@ -3,6 +3,7 @@ import localFont from 'next/font/local'
 import './globals.css'
 import SessionProvider from '@/modules/common/providers/SessionProvider'
 import { ToastProvider } from '@/modules/common/ui-kit/src/ui'
+import { Toaster } from 'react-hot-toast'
 
 // Pretendard 폰트 로컬 로딩 (CDN 불필요)
 const pretendard = localFont({
@@ -29,6 +30,7 @@ export default function RootLayout({
         <SessionProvider>
           <ToastProvider>
             {children}
+            <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
           </ToastProvider>
         </SessionProvider>
       </body>
