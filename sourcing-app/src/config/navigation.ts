@@ -5,6 +5,7 @@ import {
   Package,
   FileText,
   Upload,
+  LayoutList,
 
   ClipboardList,
   Truck,
@@ -66,6 +67,7 @@ export const sourcingMenuItems: MenuItem[] = [
       { label: '소싱작업', href: '/sourcing/post/list', icon: FileText },
       { label: '가공 상품', href: '/sourcing/product/list', icon: Package },
       { label: '가공상품 발행', href: '/sourcing/publish', icon: Upload },
+      { label: '종합 발행', href: '/sourcing/publish/digest', icon: LayoutList },
     ],
   },
   {
