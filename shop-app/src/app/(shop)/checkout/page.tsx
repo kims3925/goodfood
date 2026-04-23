@@ -96,6 +96,13 @@ function CheckoutContent() {
   // 결제 방식 관련
   const [paymentMethod, setPaymentMethod] = useState<'TOSS' | 'BANK_TRANSFER'>('BANK_TRANSFER')
 
+  // 쇼핑몰 계좌정보가 없으면 자동으로 토스결제로 전환 (버튼 비활성 방지)
+  useEffect(() => {
+    if (!shop?.bankInfo && paymentMethod === 'BANK_TRANSFER') {
+      setPaymentMethod('TOSS')
+    }
+  }, [shop?.bankInfo, paymentMethod])
+
   // 회원 배송지 관련
   const [addresses, setAddresses] = useState<Address[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
@@ -545,6 +552,18 @@ function CheckoutContent() {
     // 비회원 주문 지원: 로그인 체크 제거
     const isGuest = !session?.user?.id
 
+    // 무통장입금인데 쇼핑몰 계좌정보가 없는 경우
+    if (paymentMethod === 'BANK_TRANSFER' && !shop?.bankInfo) {
+      toast.error('쇼핑몰에 계좌정보가 등록되어 있지 않습니다. 다른 결제 방식을 선택해주세요.')
+      return
+    }
+
+    // 회원인데 배송지가 없는 경우 주소 입력 안내
+    if (!isGuest && addresses.length === 0 && !formData.shippingAddress.address) {
+      toast.error('배송지가 등록되어 있지 않습니다. 마이페이지에서 배송지를 먼저 등록해주세요.')
+      return
+    }
+
     // 에러 초기화
     const newErrors: {
       customerName?: string
@@ -607,6 +626,17 @@ function CheckoutContent() {
     // 에러가 있으면 상태 업데이트 후 첫 번째 에러 섹션으로 스크롤
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
+
+      // 첫 번째 에러 메시지를 토스트로 안내 (사용자가 즉각 인지하도록)
+      const firstError =
+        newErrors.customerName ||
+        newErrors.customerPhone ||
+        newErrors.customerEmail ||
+        newErrors.recipientName ||
+        newErrors.recipientPhone ||
+        newErrors.shippingAddress ||
+        newErrors.detailAddress
+      if (firstError) toast.error(firstError)
 
       // 첫 번째 에러 섹션으로 스크롤
       if ((newErrors.customerName || newErrors.customerPhone || newErrors.customerEmail) && customerInfoRef.current) {
@@ -728,6 +758,7 @@ function CheckoutContent() {
       }
     } catch (error) {
       console.error('주문 준비 오류:', error)
+      toast.error('주문 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
       setIsSubmitting(false)
     }
@@ -1065,29 +1096,6 @@ function CheckoutContent() {
                           <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
                             <AlertCircle className="w-3.5 h-3.5" />
                             {errors.customerPhone}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          이메일
-                        </label>
-                        <input
-                          type="email"
-                          value={formData.customerEmail}
-                          onChange={(e) => {
-                            handleFormChange('customerEmail', e.target.value)
-                            if (errors.customerEmail) setErrors(prev => ({ ...prev, customerEmail: undefined }))
-                          }}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent ${
-                            errors.customerEmail ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                          }`}
-                          placeholder="example@email.com"
-                        />
-                        {errors.customerEmail && (
-                          <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            {errors.customerEmail}
                           </p>
                         )}
                       </div>
@@ -1578,7 +1586,7 @@ function CheckoutContent() {
                     <div className="p-5 pb-4">
                       <button
                         onClick={handleSubmit}
-                        disabled={isSubmitting || (paymentMethod === 'BANK_TRANSFER' && !shop?.bankInfo)}
+                        disabled={isSubmitting}
                         className="w-full py-4 rounded-lg text-center font-semibold text-base transition-colors bg-[#FF6B6B] text-white hover:bg-[#FF5252] disabled:bg-gray-300 disabled:cursor-not-allowed"
                       >
                         {isSubmitting
