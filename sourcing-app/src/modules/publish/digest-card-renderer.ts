@@ -65,7 +65,28 @@ export interface DigestCardProduct {
   priceText?: string | null // 이미 포맷팅된 가격 라인 (예: "13,000원 ~ 25,000원")
   deadline?: string | null
   orderUrl?: string | null
+  description?: string | null // 간단한 설명 (카드에 1-2줄로 표시)
   imageUrls: string[] // 0~4장. 0장이면 회색 플레이스홀더
+}
+
+/** 설명을 카드 표시용으로 요약. 줄바꿈·과도 공백 제거 + maxLen 글자로 절단 */
+function summarizeDescription(raw: string | null | undefined, maxLen = 75): string {
+  if (!raw) return ''
+  const cleaned = raw
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (cleaned.length <= maxLen) return cleaned
+  // 단어 경계에서 자르기 (한글은 공백 단위가 유의미할 수 있음)
+  const sliced = cleaned.slice(0, maxLen)
+  const lastSpace = sliced.lastIndexOf(' ')
+  return (lastSpace > maxLen * 0.6 ? sliced.slice(0, lastSpace) : sliced) + '…'
+}
+
+/** 안내 문구 내 상품명이 너무 길면 축약 */
+function truncateName(name: string, maxLen = 20): string {
+  const n = name || ''
+  return n.length <= maxLen ? n : n.slice(0, maxLen) + '…'
 }
 
 /**
@@ -133,14 +154,17 @@ function buildCardHtml(
   orderNumber: number,
   qrDataUri: string | null
 ): string {
-  const name = escapeHtml(product.name || '')
+  const rawName = product.name || ''
+  const name = escapeHtml(rawName)
+  const shortName = escapeHtml(truncateName(rawName, 20))
   const priceLine = product.priceText
     ? escapeHtml(product.priceText)
     : product.price
     ? `${product.price.toLocaleString()}원`
     : ''
+  // 마감시간은 도매글에 표기가 있을 때(= deadline 값 존재)만 렌더
   const deadline = product.deadline ? escapeHtml(product.deadline) : ''
-  const orderUrl = product.orderUrl || ''
+  const description = escapeHtml(summarizeDescription(product.description, 75))
 
   return `<!doctype html>
 <html lang="ko">
@@ -155,59 +179,19 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
 }
 .image-grid { width: 100%; background: #f9fafb; }
 .text-area {
-  padding: 40px 40px 48px;
+  padding: 36px 36px 44px;
   background: #ffffff;
   border-top: 6px solid #F3F4F6;
 }
-.row { display: flex; align-items: baseline; gap: 14px; margin-bottom: 16px; }
-.order-num {
-  flex: 0 0 auto;
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 56px; height: 56px; border-radius: 50%;
-  background: #2563EB; color: #fff; font-size: 28px; font-weight: 800;
-}
-.title {
-  font-size: 34px; font-weight: 800; color: #111827; line-height: 1.25;
-  word-break: keep-all;
-}
-.price {
-  font-size: 32px; font-weight: 800; color: #DC2626; margin: 18px 0 10px;
-}
-.meta {
-  font-size: 22px; color: #4B5563; margin-top: 6px;
-}
-.order-btn {
-  padding: 20px 24px;
-  background: linear-gradient(90deg, #2563EB 0%, #1D4ED8 100%);
-  border-radius: 14px;
-  color: #ffffff;
-  font-size: 24px; font-weight: 800;
-  display: flex; align-items: center; justify-content: space-between;
-  box-shadow: 0 4px 12px rgba(37,99,235,0.25);
-}
-.order-btn .arrow { font-size: 32px; font-weight: 800; }
-.order-url {
-  margin-top: 12px;
-  padding: 14px 16px;
-  background: #EFF6FF;
-  border: 2px dashed #93C5FD;
-  border-radius: 10px;
-  color: #1D4ED8;
-  font-size: 18px;
-  font-weight: 600;
-  word-break: break-all;
-  font-family: 'Pretendard', monospace;
-  text-align: center;
-}
-.order-block {
-  margin-top: 24px;
+/* 좌: QR / 우: 상품 정보 + 안내 박스 */
+.main-block {
   display: flex;
-  gap: 20px;
+  gap: 22px;
   align-items: stretch;
 }
-.order-qr {
-  flex: 0 0 240px;
-  width: 240px;
+.qr-panel {
+  flex: 0 0 220px;
+  width: 220px;
   padding: 12px;
   background: #FFFFFF;
   border: 3px solid #2563EB;
@@ -218,19 +202,87 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
   justify-content: center;
   box-shadow: 0 4px 12px rgba(37,99,235,0.15);
 }
-.order-qr img { width: 100%; height: auto; display: block; }
-.order-qr .qr-label {
+.qr-panel img { width: 100%; height: auto; display: block; }
+.qr-panel .qr-label {
   margin-top: 10px;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   color: #1D4ED8;
   text-align: center;
 }
-.order-right {
+.info-panel {
   flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.order-num {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: #2563EB;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 800;
+}
+.title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.2;
+  word-break: keep-all;
+}
+.price {
+  font-size: 26px;
+  font-weight: 800;
+  color: #DC2626;
+  margin-top: 2px;
+}
+.deadline {
+  font-size: 18px;
+  color: #4B5563;
+}
+.desc {
+  font-size: 17px;
+  color: #374151;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+.guide-box {
+  margin-top: auto;
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  color: #ffffff;
+  padding: 16px 18px 14px;
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+}
+.guide-title {
+  font-size: 20px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+.guide-text {
+  font-size: 15px;
+  line-height: 1.5;
+  opacity: 0.96;
+}
+.guide-text .hl { font-weight: 800; }
+.guide-arrow {
+  font-size: 36px;
+  font-weight: 900;
+  text-align: center;
+  line-height: 1;
+  margin-top: 4px;
 }
 </style>
 </head>
@@ -240,25 +292,29 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
     ${buildImageGridHtml(product.imageUrls)}
   </div>
   <div class="text-area">
-    <div class="row">
-      <span class="order-num">${orderNumber}</span>
-      <span class="title">${name}</span>
-    </div>
-    ${priceLine ? `<div class="price">💰 ${priceLine}</div>` : ''}
-    ${deadline ? `<div class="meta">⏰ 주문 마감: ${deadline}</div>` : ''}
-    ${orderUrl ? `<div class="order-block">
-      ${qrDataUri ? `<div class="order-qr">
+    <div class="main-block">
+      ${qrDataUri ? `<div class="qr-panel">
         <img src="${qrDataUri}" alt="QR">
-        <div class="qr-label">📱 QR 스캔 주문</div>
+        <div class="qr-label">📱 QR 스캔</div>
       </div>` : ''}
-      <div class="order-right">
-        <div class="order-btn">
-          <span>🛒 상품 자세히 보기</span>
-          <span class="arrow">→</span>
+      <div class="info-panel">
+        <div class="title-row">
+          <span class="order-num">${orderNumber}</span>
+          <span class="title">${name}</span>
         </div>
-        <div class="order-url">${escapeHtml(orderUrl)}</div>
+        ${priceLine ? `<div class="price">💰 ${priceLine}</div>` : ''}
+        ${deadline ? `<div class="deadline">⏰ 주문 마감: ${deadline}</div>` : ''}
+        ${description ? `<div class="desc">${description}</div>` : ''}
+        <div class="guide-box">
+          <div class="guide-title">🛒 상품 자세히 보기 / 주문하기</div>
+          <div class="guide-text">
+            맨 아래 <span class="hl">${orderNumber}번 ${shortName}</span> 링크<br>
+            또는 댓글의 <span class="hl">(${orderNumber})번</span> 링크를 탭하세요
+          </div>
+          <div class="guide-arrow">↓</div>
+        </div>
       </div>
-    </div>` : ''}
+    </div>
   </div>
 </div>
 </body>

@@ -282,6 +282,7 @@ export async function POST(request: NextRequest) {
         priceText = `${p.price.toLocaleString()}원`
       }
       // 도매방 마감시간의 30분 전을 쇼핑몰 주문 마감으로 표시
+      // 도매글에 마감시간 미표기일 경우 null → 카드에 미렌더
       const displayDeadline = shiftDeadlineEarlier(p.channel?.orderDeadline, 30)
       return {
         id: p.id,
@@ -290,6 +291,7 @@ export async function POST(request: NextRequest) {
         priceText,
         deadline: displayDeadline,
         orderUrl,
+        description: p.description,
         imageUrls: p.images
           .slice(0, 4)
           .sort((a, b) => a.sortOrder - b.sortOrder)
