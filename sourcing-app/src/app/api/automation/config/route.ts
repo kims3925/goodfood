@@ -122,6 +122,10 @@ export async function GET() {
         autoPublishLimit: config.autoPublishLimit ?? 20,
         autoPublishLimitByShop,
         autoPublishLimitByChannel,
+        // 종합발행 설정 (DB 마이그레이션 전이면 기본값 반환)
+        digestMode: (config as any).digestMode ?? 'individual',
+        digestProductsPerPost: (config as any).digestProductsPerPost ?? 20,
+        digestImagesPerProduct: (config as any).digestImagesPerProduct ?? 1,
       },
     })
   } catch (error: any) {
@@ -169,7 +173,18 @@ export async function POST(request: NextRequest) {
       autoPublishLimit,
       autoPublishLimitByShop,
       autoPublishLimitByChannel,
+      digestMode,
+      digestProductsPerPost,
+      digestImagesPerProduct,
     } = body
+
+    // 종합발행 설정 검증/기본값
+    const validDigestModes = ['individual', 'digest', 'both']
+    const finalDigestMode = validDigestModes.includes(digestMode) ? digestMode : 'individual'
+    const finalDigestProductsPerPost = typeof digestProductsPerPost === 'number' && digestProductsPerPost > 0
+      ? Math.min(digestProductsPerPost, 20)
+      : 20
+    const finalDigestImagesPerProduct = [1, 2, 4].includes(digestImagesPerProduct) ? digestImagesPerProduct : 1
 
     // wholesaleChannelIds 또는 channelIds 둘 다 지원 (하위 호환성)
     const finalChannelIds = wholesaleChannelIds || channelIds || []
@@ -244,6 +259,20 @@ export async function POST(request: NextRequest) {
       })
     } catch (e: any) {
       console.warn('[AutomationConfig] 신규 컬럼 업데이트 실패 (DB 마이그레이션 필요):', e?.message)
+    }
+
+    // 종합발행 컬럼 별도 업데이트 (DB 마이그레이션 미적용 환경 대응)
+    try {
+      await prisma.automationConfig.update({
+        where: { userId: currentUser.userId },
+        data: {
+          digestMode: finalDigestMode,
+          digestProductsPerPost: finalDigestProductsPerPost,
+          digestImagesPerProduct: finalDigestImagesPerProduct,
+        } as any,
+      })
+    } catch (e: any) {
+      console.warn('[AutomationConfig] digest 컬럼 업데이트 실패 (DB 마이그레이션 필요):', e?.message)
     }
 
     // 스케줄러 업데이트

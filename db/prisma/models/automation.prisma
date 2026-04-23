@@ -35,6 +35,10 @@ model AutomationConfig {
   autoPublishLimit              Int        @default(20) @map("auto_publish_limit")
   autoPublishLimitByShop        String?    @map("auto_publish_limit_by_shop") @db.LongText
   autoPublishLimitByChannel     String?    @map("auto_publish_limit_by_channel") @db.LongText
+  // 종합발행(digest) 설정
+  digestMode                    String     @default("individual") @map("digest_mode") @db.VarChar(20) // individual | digest | both
+  digestProductsPerPost         Int        @default(20) @map("digest_products_per_post")
+  digestImagesPerProduct        Int        @default(1) @map("digest_images_per_product") // 1 | 2 | 4
   user                          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([isEnabled])

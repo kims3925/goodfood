@@ -94,6 +94,10 @@ interface AutomationConfig {
   autoPublishLimit: number
   autoPublishLimitByShop: Record<number, number>
   autoPublishLimitByChannel: Record<number, number>
+  // 종합발행(digest) 설정
+  digestMode: 'individual' | 'digest' | 'both'
+  digestProductsPerPost: number
+  digestImagesPerProduct: 1 | 2 | 4
 }
 
 // 12시간제 → 24시간제 변환
@@ -205,6 +209,9 @@ const defaultConfig: AutomationConfig = {
   autoPublishLimit: 20,
   autoPublishLimitByShop: {},
   autoPublishLimitByChannel: {},
+  digestMode: 'individual',
+  digestProductsPerPost: 20,
+  digestImagesPerProduct: 1,
 }
 
 // 수집 개수 옵션
@@ -287,6 +294,11 @@ export default function AutomationSettingsPage() {
     JSON.stringify(initialConfig.autoPublishLimitByShop || {}) ||
     JSON.stringify(config.autoPublishLimitByChannel || {}) !==
     JSON.stringify(initialConfig.autoPublishLimitByChannel || {})
+
+  const hasDigestChanges =
+    config.digestMode !== initialConfig.digestMode ||
+    config.digestProductsPerPost !== initialConfig.digestProductsPerPost ||
+    config.digestImagesPerProduct !== initialConfig.digestImagesPerProduct
 
   const hasPipelineChanges = JSON.stringify(config.pipelineSteps) !== JSON.stringify(initialConfig.pipelineSteps)
 
@@ -582,6 +594,9 @@ export default function AutomationSettingsPage() {
             autoPublishLimit: configData.data?.autoPublishLimit ?? 20,
             autoPublishLimitByShop: configData.data?.autoPublishLimitByShop ?? {},
             autoPublishLimitByChannel: configData.data?.autoPublishLimitByChannel ?? {},
+            digestMode: (configData.data?.digestMode as any) ?? 'individual',
+            digestProductsPerPost: configData.data?.digestProductsPerPost ?? 20,
+            digestImagesPerProduct: (configData.data?.digestImagesPerProduct as 1 | 2 | 4) ?? 1,
           }
           setConfig(loadedConfig)
           setInitialConfig(loadedConfig)
@@ -707,6 +722,9 @@ export default function AutomationSettingsPage() {
             autoPublishLimit: config.autoPublishLimit,
             autoPublishLimitByShop: config.autoPublishLimitByShop,
             autoPublishLimitByChannel: config.autoPublishLimitByChannel,
+            digestMode: config.digestMode,
+            digestProductsPerPost: config.digestProductsPerPost,
+            digestImagesPerProduct: config.digestImagesPerProduct,
           }
           break
         case 'pipeline':
@@ -1283,6 +1301,139 @@ export default function AutomationSettingsPage() {
               </div>
             </div>
           )}
+        </div>
+      </Card>
+
+      {/* 종합발행 설정 */}
+      <Card className="overflow-hidden transition-all">
+        <div className="p-4 pb-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200 flex-shrink-0">
+                <Settings2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900">종합발행 설정</h2>
+                  {hasDigestChanges && (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 animate-pulse">변경됨</span>
+                  )}
+                  <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-700">
+                    {config.digestMode === 'individual' ? '개별만' : config.digestMode === 'digest' ? '종합만' : '개별+종합'}
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">
+                  자동발행 시 개별발행/종합발행 방식, 게시글당 상품 수·이미지 수 설정
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => handleSaveSection('digest')}
+              disabled={savingSection === 'digest' || !hasDigestChanges}
+              className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4 shadow-md self-end sm:self-auto"
+            >
+              {savingSection === 'digest' ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+              저장
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            {/* 발행 모드 */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">발행 모드</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  { value: 'individual', label: '개별발행만', desc: '상품마다 독립된 게시글' },
+                  { value: 'digest', label: '종합발행만', desc: '카테고리별 20개 묶음 1게시글' },
+                  { value: 'both', label: '개별+종합', desc: '개별 먼저 → 종합 나중' },
+                ].map((opt) => {
+                  const active = config.digestMode === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setConfig(prev => ({ ...prev, digestMode: opt.value as any }))}
+                      className={`p-3 rounded-lg border-2 text-left transition-all ${
+                        active
+                          ? 'border-emerald-500 bg-emerald-50'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-sm font-semibold text-gray-900">{opt.label}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{opt.desc}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* 종합발행 옵션 (digest 또는 both 모드일 때만) */}
+            {config.digestMode !== 'individual' && (
+              <>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">게시글당 상품 수 (최대 20)</label>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={config.digestProductsPerPost}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10)
+                        if (!isNaN(v) && v > 0 && v <= 20) {
+                          setConfig(prev => ({ ...prev, digestProductsPerPost: v }))
+                        }
+                      }}
+                      className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm text-center font-semibold"
+                    />
+                    <span className="text-sm text-gray-600">개</span>
+                    <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                      {[10, 15, 20].map(v => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setConfig(prev => ({ ...prev, digestProductsPerPost: v }))}
+                          className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                            config.digestProductsPerPost === v
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {v}개
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">선택된 상품이 이 수를 초과하면 여러 게시글로 나눠서 발행됩니다.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">상품당 이미지 수</label>
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 4].map(v => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setConfig(prev => ({ ...prev, digestImagesPerProduct: v as 1 | 2 | 4 }))}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          config.digestImagesPerProduct === v
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {v === 1 ? '1장 (단일)' : v === 2 ? '2장 (좌우)' : '4장 (2×2 그리드)'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    각 상품 카드 이미지에 몇 장의 사진을 배치할지 선택 (밴드 최대 20장 제약 고려)
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </Card>
 
