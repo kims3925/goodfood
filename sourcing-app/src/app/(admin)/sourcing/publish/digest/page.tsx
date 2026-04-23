@@ -70,6 +70,7 @@ export default function DigestPublishPage() {
   // 상품 필터 (카테고리 아래)
   const [wholesaleFilter, setWholesaleFilter] = useState<number | 'all'>('all')
   const [deadlineFilter, setDeadlineFilter] = useState<string | 'all'>('all')
+  const [publishStatusFilter, setPublishStatusFilter] = useState<'all' | 'unpublished' | 'republish'>('all')
 
   // ─── Load products + categories for a given category ───────────────────
   const loadCategory = useCallback(
@@ -270,6 +271,17 @@ export default function DigestPublishPage() {
       .sort((a, b) => b.count - a.count)
   }, [products])
 
+  // 발행 상태별 카운트
+  const publishStatusCounts = useMemo(() => {
+    let unpublished = 0
+    let republish = 0
+    for (const p of products) {
+      if (p.lastDigestPublishedAt) republish++
+      else unpublished++
+    }
+    return { unpublished, republish }
+  }, [products])
+
   // 필터 적용된 상품
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -278,9 +290,11 @@ export default function DigestPublishPage() {
         const key = p.channel?.orderDeadline?.trim() || '(미설정)'
         if (key !== deadlineFilter) return false
       }
+      if (publishStatusFilter === 'unpublished' && p.lastDigestPublishedAt) return false
+      if (publishStatusFilter === 'republish' && !p.lastDigestPublishedAt) return false
       return true
     })
-  }, [products, wholesaleFilter, deadlineFilter])
+  }, [products, wholesaleFilter, deadlineFilter, publishStatusFilter])
 
   const productItems: DigestProductItem[] = filteredProducts.map((p) => ({
     id: p.id,
@@ -309,9 +323,40 @@ export default function DigestPublishPage() {
           <CategoryTabs categories={categories} active={activeCategory} onChange={setActiveCategory} />
         </div>
 
-        {/* 도매방 / 마감시간 필터 */}
-        {(wholesaleOptions.length > 0 || deadlineOptions.length > 0) && (
+        {/* 도매방 / 마감시간 / 발행상태 필터 */}
+        {(wholesaleOptions.length > 0 || deadlineOptions.length > 0 || products.length > 0) && (
           <div className="mb-4 space-y-2 bg-white border border-gray-200 rounded-lg p-3">
+            {/* 발행 상태 */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-500 flex-shrink-0">📌 발행상태:</span>
+              <button
+                type="button"
+                onClick={() => setPublishStatusFilter('all')}
+                className={`text-xs px-2.5 py-1.5 rounded-md transition-colors ${
+                  publishStatusFilter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                전체 ({products.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPublishStatusFilter('unpublished')}
+                className={`text-xs px-2.5 py-1.5 rounded-md transition-colors ${
+                  publishStatusFilter === 'unpublished' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                }`}
+              >
+                미발행 ({publishStatusCounts.unpublished})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPublishStatusFilter('republish')}
+                className={`text-xs px-2.5 py-1.5 rounded-md transition-colors ${
+                  publishStatusFilter === 'republish' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                }`}
+              >
+                재발행 대상 ({publishStatusCounts.republish})
+              </button>
+            </div>
             {wholesaleOptions.length > 0 && (
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-gray-500 flex-shrink-0">🏪 도매방:</span>

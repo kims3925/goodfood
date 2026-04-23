@@ -1,6 +1,6 @@
 'use client'
 
-import { CheckCircle, Clock, Package, Store } from 'lucide-react'
+import { CheckCircle, Clock, Package, RefreshCw, Store } from 'lucide-react'
 
 export interface DigestProductItem {
   id: number
@@ -92,8 +92,26 @@ export default function DigestProductList({ products, selectedIds, onToggle, onS
                   className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
                 />
                 {isSelected && (
-                  <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center flex-shrink-0">
+                  <span
+                    className={`w-6 h-6 rounded-full text-white text-xs flex items-center justify-center flex-shrink-0 ${
+                      product.lastDigestPublishedAt ? 'bg-orange-500' : 'bg-blue-600'
+                    }`}
+                    title={
+                      product.lastDigestPublishedAt
+                        ? '이 상품은 이미 종합발행됨 — 선택 시 재발행됩니다'
+                        : undefined
+                    }
+                  >
                     {orderIdx + 1}
+                  </span>
+                )}
+                {isSelected && product.lastDigestPublishedAt && (
+                  <span
+                    className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 rounded bg-orange-50 text-orange-700 flex-shrink-0"
+                    title="선택 시 재발행됨"
+                  >
+                    <RefreshCw size={9} />
+                    재발행
                   </span>
                 )}
                 <div className="w-14 h-14 flex-shrink-0 rounded overflow-hidden bg-gray-100 flex items-center justify-center">
