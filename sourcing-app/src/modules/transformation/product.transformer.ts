@@ -16,6 +16,7 @@ import {
 } from './product.types'
 import { createAiClient, AiResponse } from './ai.client'
 import { generateVariants } from './variant.generator'
+import { classifyProduct } from '../category/category.classifier'
 import {
   EXTRACTION_RULES,
   SINGLE_RESPONSE_FORMAT,
@@ -927,11 +928,14 @@ function buildProductDraft(
     }]
   }
 
+  // 카테고리 자동 분류 (AI가 넘긴 자연어 값 대신 영문 코드 체계 사용)
+  const classification = classifyProduct(analysis.productName, analysis.description)
+
   // Build product draft
   const draft: ProductDraft = {
     name: analysis.productName,
     description: analysis.description,
-    categoryId: analysis.category,
+    categoryId: classification.categoryId, // SEA/AGR/MEA/MKT/PRC/HLT/ETC
     thumbnailUrl: thumbnailUrl || undefined,
     currency: analysis.pricing.currency || 'KRW',
     wholesalePrice: analysis.pricing.basePrice, // 도매가 (원가)
