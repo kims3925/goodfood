@@ -11,6 +11,8 @@ import {
   BandPublishResult,
   BandInterleavedPublishParams,
   BandAppendParams,
+  BandPerPhotoCommentParams,
+  BandPerPhotoCommentResult,
   BandBatchPublishParams,
   BandBatchPublishResult,
   BandDeleteParams,
@@ -178,6 +180,51 @@ export class BandPlaywrightService {
         return { success: false, error: 'Band 세션이 만료되었습니다.' }
       }
       return { success: false, error: error?.message || '발행 중 오류' }
+    }
+  }
+
+  /**
+   * 게시글의 각 사진별 댓글 작성 래퍼
+   * 종합발행 후 "사진 N장 각각에 해당 상품 링크 댓글"을 다는 용도
+   */
+  async addPerPhotoComments(
+    params: BandPerPhotoCommentParams
+  ): Promise<BandPerPhotoCommentResult> {
+    const { channelId } = params
+
+    console.log(
+      `[BandPlaywrightService] Per-photo comments band=${params.bandKey} postKey=${params.postKey} (${params.comments.length}장)`
+    )
+
+    try {
+      const session = await sessionManager.getValidSession(channelId)
+      if (!session) {
+        return {
+          success: false,
+          total: params.comments.length,
+          successCount: 0,
+          failedCount: params.comments.length,
+          error: '세션을 획득할 수 없습니다.',
+        }
+      }
+      const context = await browserPool.getContext(channelId, session.cookies)
+      const page = await context.newPage()
+      try {
+        return await postAutomation.addPerPhotoComments(page, params)
+      } finally {
+        await page.close()
+        await browserPool.releaseContext(channelId)
+      }
+    } catch (error: any) {
+      console.error('[BandPlaywrightService] addPerPhotoComments failed:', error)
+      await browserPool.closeContext(channelId)
+      return {
+        success: false,
+        total: params.comments.length,
+        successCount: 0,
+        failedCount: params.comments.length,
+        error: error?.message || '사진별 댓글 작성 중 오류',
+      }
     }
   }
 

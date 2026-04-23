@@ -60,6 +60,28 @@ export interface BandAppendParams {
   signal?: AbortSignal
 }
 
+/**
+ * 게시글의 각 사진별로 댓글을 작성 — 종합발행에서 카드 N장 각각에
+ * 해당 상품의 주문 링크 댓글을 다는 용도.
+ * comments 배열의 i번째 항목이 게시글의 i번째 사진에 매핑된다.
+ */
+export interface BandPerPhotoCommentParams {
+  channelId: number
+  bandKey: string
+  bandName: string
+  postKey: string
+  comments: string[]        // 사진 순서대로 댓글 내용
+  signal?: AbortSignal
+}
+
+export interface BandPerPhotoCommentResult {
+  success: boolean
+  total: number
+  successCount: number
+  failedCount: number
+  error?: string
+}
+
 export interface BandBatchPublishParams {
   channelId: number
   bandKey: string       // Band API의 band_key (AAC... 형식)

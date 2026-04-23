@@ -4220,6 +4220,339 @@ export class BandPostAutomation {
   }
 
   /**
+   * 게시글의 각 사진별로 댓글 작성
+   *
+   * Band 게시글에서는 각 사진 오른쪽 하단에 작은 댓글 아이콘이 보인다.
+   * 이 아이콘을 직접 클릭하면 해당 사진에 대한 댓글을 바로 달 수 있다.
+   * (사진을 탭해서 뷰어를 열 필요가 없음)
+   *
+   * comments[i]가 게시글의 i번째 사진에 매핑된다.
+   *
+   * 흐름:
+   * 1) 게시글 페이지로 이동
+   * 2) 사진 컨테이너들을 찾음
+   * 3) 각 사진마다:
+   *    a) 해당 컨테이너 안의 "댓글 아이콘" 클릭 → 인라인 댓글 입력 UI 노출
+   *    b) 댓글 입력창에 텍스트 입력 (Shift+Enter로 안전 개행)
+   *    c) 등록 버튼 클릭
+   *    d) 실패 시 폴백: 사진 썸네일 클릭 → 포토 뷰어에서 댓글
+   *
+   * 실패 처리: 사진별 실패는 개별 skip, 부분 성공 허용.
+   */
+  async addPerPhotoComments(
+    page: Page,
+    params: import('./types').BandPerPhotoCommentParams
+  ): Promise<import('./types').BandPerPhotoCommentResult> {
+    const { bandKey, bandName, postKey, comments, signal } = params
+
+    const checkCancelled = () => {
+      if (signal?.aborted) {
+        throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+    }
+
+    try {
+      checkCancelled()
+      console.log(
+        `[밴드자동화:photoComment] 시작 - ${bandName}/${postKey} (사진 ${comments.length}장)`
+      )
+
+      // 1. 밴드 이동 (세션 체크)
+      await this.navigateToBand(page, bandKey, bandName)
+      const currentUrl = page.url()
+      const bandNoMatch = currentUrl.match(/\/band\/(\d+)/)
+      if (!bandNoMatch) {
+        return {
+          success: false,
+          total: comments.length,
+          successCount: 0,
+          failedCount: comments.length,
+          error: '밴드 번호를 찾을 수 없습니다.',
+        }
+      }
+      if (currentUrl.includes('signin') || currentUrl.includes('login')) {
+        return {
+          success: false,
+          total: comments.length,
+          successCount: 0,
+          failedCount: comments.length,
+          error: '로그인이 필요합니다.',
+        }
+      }
+      const bandNo = bandNoMatch[1]
+      const postUrl = `https://band.us/band/${bandNo}/post/${postKey}`
+
+      // 게시글 페이지로 이동 (사진별 반복은 같은 페이지에서 처리 시도)
+      await page.goto(postUrl, { waitUntil: 'networkidle', timeout: 30000 })
+      await page.waitForTimeout(1500)
+      await this.saveDebugScreenshot(page, 'photoComment-post-loaded')
+
+      let successCount = 0
+      let failedCount = 0
+
+      for (let i = 0; i < comments.length; i++) {
+        checkCancelled()
+        const commentText = comments[i]
+        if (!commentText || !commentText.trim()) continue
+
+        try {
+          console.log(`[밴드자동화:photoComment] 사진 ${i + 1}/${comments.length} 처리`)
+
+          const ok = await this.tryInlinePhotoComment(page, i, commentText)
+          if (ok) {
+            successCount++
+            continue
+          }
+
+          // 폴백: 사진 탭 → 뷰어에서 댓글
+          const okFallback = await this.tryPhotoViewerComment(page, postUrl, i, commentText)
+          if (okFallback) {
+            successCount++
+          } else {
+            failedCount++
+          }
+        } catch (err: any) {
+          console.error(`[밴드자동화:photoComment] 사진 ${i + 1} 예외:`, err.message)
+          failedCount++
+          // 상태 복구 시도
+          await page.keyboard.press('Escape').catch(() => {})
+          await page.waitForTimeout(500)
+        }
+      }
+
+      console.log(
+        `[밴드자동화:photoComment] 완료: 성공 ${successCount}/${comments.length}, 실패 ${failedCount}`
+      )
+
+      return {
+        success: successCount > 0,
+        total: comments.length,
+        successCount,
+        failedCount,
+      }
+    } catch (error: any) {
+      console.error('[밴드자동화:photoComment] 실패:', error)
+      await this.saveDebugScreenshot(page, 'photoComment-error')
+      return {
+        success: false,
+        total: comments.length,
+        successCount: 0,
+        failedCount: comments.length,
+        error: error?.message || '사진별 댓글 작성 중 오류',
+      }
+    }
+  }
+
+  /**
+   * 1순위: 사진 오른쪽 하단의 작은 댓글 아이콘으로 인라인 댓글 입력
+   * i번째 사진의 컨테이너 안에서 댓글 버튼을 찾아 클릭 → 입력창 대기 → 입력/제출
+   */
+  private async tryInlinePhotoComment(
+    page: Page,
+    photoIndex: number,
+    commentText: string
+  ): Promise<boolean> {
+    // 사진 컨테이너 후보 (부모 컨테이너 단위로 접근)
+    const photoContainerSelectors = [
+      '.cPostBody [class*="photoItem"]',
+      '.cPostBody [class*="photoGrid"] > *',
+      '.cPostBody [class*="photoArea"] > *',
+      '.cPostBody ._photoItem',
+      '.cPostBody [class*="attachPhoto"] [class*="item"]',
+      '.postMain [class*="photoItem"]',
+    ]
+
+    let containers: Array<import('playwright').ElementHandle> = []
+    for (const sel of photoContainerSelectors) {
+      const els = await page.$$(sel)
+      if (els.length > 0) {
+        containers = els
+        break
+      }
+    }
+
+    if (containers.length === 0 || photoIndex >= containers.length) {
+      return false
+    }
+
+    const target = containers[photoIndex]
+    await target.scrollIntoViewIfNeeded().catch(() => {})
+    // 아이콘이 hover에서만 보일 수 있어 마우스 진입 이벤트 유도
+    await target.hover().catch(() => {})
+    await page.waitForTimeout(200)
+
+    // 컨테이너 내부의 댓글 아이콘/버튼 후보
+    // Band의 사진별 댓글 아이콘 클래스 이름이 공개 문서로 확정되지 않아 다수 폴백
+    const iconSelectors = [
+      'button._btnPhotoComment',
+      'a._btnPhotoComment',
+      'button[class*="photoComment"]',
+      'a[class*="photoComment"]',
+      'button[class*="btnComment"]',
+      'a[class*="btnComment"]',
+      'button[aria-label*="댓글"]',
+      'a[aria-label*="댓글"]',
+      '[class*="comment"] button',
+      // 가장 범용적인 폴백: 컨테이너 안 댓글 아이콘 SVG/img
+      'button svg[aria-label*="댓글"]',
+    ]
+
+    let iconClicked = false
+    for (const sel of iconSelectors) {
+      try {
+        const icon = await target.$(sel)
+        if (icon && (await icon.isVisible().catch(() => false))) {
+          await icon.click({ timeout: 3000 })
+          iconClicked = true
+          console.log(`[밴드자동화:photoComment:inline] 아이콘 클릭 성공 (${sel})`)
+          break
+        }
+      } catch {
+        /* noop */
+      }
+    }
+
+    if (!iconClicked) {
+      // 아이콘을 컨테이너 안에서 못 찾았으면 실패 반환 → 뷰어 폴백으로
+      return false
+    }
+
+    await page.waitForTimeout(800)
+
+    // 댓글 입력창 대기 (인라인 입력 UI가 뜨는 경우)
+    return await this.typeAndSubmitComment(page, commentText)
+  }
+
+  /**
+   * 2순위: 사진 썸네일 클릭 → 포토 뷰어 진입 → 뷰어 내 댓글 입력
+   */
+  private async tryPhotoViewerComment(
+    page: Page,
+    postUrl: string,
+    photoIndex: number,
+    commentText: string
+  ): Promise<boolean> {
+    // 뷰어 폴백은 상태 간섭을 피하려고 매번 포스트 페이지로 돌아가 시작
+    await page.goto(postUrl, { waitUntil: 'networkidle', timeout: 30000 })
+    await page.waitForTimeout(1000)
+
+    const photoSelectors = [
+      '.cPostBody img[src*="phinf"]',
+      '.photoArea img',
+      '.postPhotoView img',
+      '[data-viewname*="Photo"] img',
+      '[class*="photoGrid"] img',
+      '._photoItem img',
+      '.cCard img[src*="phinf"]',
+    ]
+
+    let photoEls: Array<import('playwright').ElementHandle> = []
+    for (const sel of photoSelectors) {
+      const els = await page.$$(sel)
+      if (els.length > 0) {
+        photoEls = els
+        break
+      }
+    }
+
+    if (photoEls.length === 0 || photoIndex >= photoEls.length) {
+      return false
+    }
+
+    const target = photoEls[photoIndex]
+    await target.scrollIntoViewIfNeeded().catch(() => {})
+    await target.click({ timeout: 5000 }).catch(() => {})
+    await page.waitForTimeout(1500)
+
+    // 뷰어 오픈 확인
+    const viewerSelectors = [
+      '[data-viewname*="PhotoView"]',
+      '[data-viewname*="Photo"]',
+      '.photoViewer',
+      '.cPhotoViewer',
+      '.uPhotoView',
+      '.uLayer.photoView',
+      '[class*="photoView"][class*="Layer"]',
+    ]
+    let viewerFound = false
+    for (const sel of viewerSelectors) {
+      const el = await page.$(sel)
+      if (el && (await el.isVisible().catch(() => false))) {
+        viewerFound = true
+        break
+      }
+    }
+    if (!viewerFound) {
+      await this.saveDebugScreenshot(page, `photoComment-viewer-missing-${photoIndex + 1}`)
+      await page.keyboard.press('Escape').catch(() => {})
+      return false
+    }
+
+    const ok = await this.typeAndSubmitComment(page, commentText)
+    // 뷰어 닫기
+    await page.keyboard.press('Escape').catch(() => {})
+    await page.waitForTimeout(500)
+    return ok
+  }
+
+  /**
+   * 댓글 입력창 탐색 + 멀티라인 안전 입력 + 등록 버튼 클릭
+   * 게시글 댓글 / 포토 뷰어 댓글 / 사진 인라인 댓글 모두에서 공용
+   */
+  private async typeAndSubmitComment(page: Page, commentText: string): Promise<boolean> {
+    const commentInputSelectors = [
+      'textarea._messageTextArea',
+      'textarea.commentWrite',
+      'textarea[placeholder*="댓글"]',
+      'div._commentInputRegion textarea',
+      '[contenteditable="true"][placeholder*="댓글"]',
+    ]
+
+    let inputEl: import('playwright').ElementHandle | null = null
+    for (let waitRound = 0; waitRound < 5 && !inputEl; waitRound++) {
+      for (const sel of commentInputSelectors) {
+        const el = await page.$(sel)
+        if (el && (await el.isVisible().catch(() => false))) {
+          inputEl = el
+          break
+        }
+      }
+      if (!inputEl) await page.waitForTimeout(500)
+    }
+
+    if (!inputEl) {
+      return false
+    }
+
+    await inputEl.click()
+    await page.waitForTimeout(300)
+
+    const lines = commentText.split('\n')
+    for (let li = 0; li < lines.length; li++) {
+      if (lines[li].length > 0) {
+        await page.keyboard.type(lines[li], { delay: 5 })
+      }
+      if (li < lines.length - 1) {
+        await page.keyboard.press('Shift+Enter')
+      }
+    }
+
+    try {
+      await page.waitForSelector('button._sendMessageButton.-active', { timeout: 5000 })
+    } catch {
+      /* noop */
+    }
+
+    const submitBtn = await page.$('button._sendMessageButton.-active')
+    if (submitBtn && (await submitBtn.isVisible().catch(() => false))) {
+      await submitBtn.click()
+      await page.waitForTimeout(1500)
+      return true
+    }
+    return false
+  }
+
+  /**
    * 최신 게시물에 댓글 작성 (Playwright 사용)
    * 밴드 피드에서 첫 번째(최신) 글에 댓글 작성
    */

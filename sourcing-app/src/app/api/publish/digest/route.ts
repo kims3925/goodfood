@@ -323,7 +323,8 @@ export async function POST(request: NextRequest) {
         digest.title,
         (headerText || '').trim(),
         `총 ${digest.productCount}개 상품 | 신선 직송`,
-        linkCount > 0 ? `👇 주문 링크 ${linkCount}개는 댓글을 확인해주세요` : '',
+        linkCount > 0 ? '📷 사진을 탭하면 해당 상품 댓글에 주문 링크가 있습니다.' : '',
+        linkCount > 0 ? `💬 맨 아래 댓글에 번호별 전체 주문 링크(${linkCount}개)가 모여있습니다.` : '',
         '━━━━━━━━━━━━━━━━━━━━',
         (footerText || '').trim() ||
           '📦 배송: 마감 전 주문시 당일 출고, 마감 이후 익일 출고\n💳 결제: 카드결제 / 무통장입금',
@@ -476,6 +477,32 @@ export async function POST(request: NextRequest) {
           if (r.success) {
             postKey = r.postKey
             message = r.error || message
+
+            // 1-1) 사진별 댓글 — 각 사진에 해당 상품의 주문 링크 달기
+            if (r.postKey) {
+              const perPhotoComments = cardProducts.map((cp, idx) => {
+                if (!cp.orderUrl) return ''
+                return `${idx + 1}. ${cp.name}\n🛒 ${cp.orderUrl}`
+              })
+              const hasAny = perPhotoComments.some((s) => s.length > 0)
+              if (hasAny) {
+                try {
+                  const ppr = await bandPlaywrightService.addPerPhotoComments({
+                    channelId: channel.id,
+                    bandKey: channel.channelKey,
+                    bandName: channel.name,
+                    postKey: r.postKey,
+                    comments: perPhotoComments,
+                  })
+                  console.log(
+                    `[digest] 사진별 댓글: 성공 ${ppr.successCount}/${ppr.total}, 실패 ${ppr.failedCount}`
+                  )
+                } catch (err: any) {
+                  // 사진별 댓글 실패해도 본 게시물은 성공
+                  console.warn(`[digest] 사진별 댓글 작성 실패: ${err?.message || err}`)
+                }
+              }
+            }
           } else {
             message = r.error || message
           }
