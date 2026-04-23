@@ -185,6 +185,16 @@ export default function DigestPublishPage() {
       if (!window.confirm(msg)) return
     }
 
+    // 점진 모드: 게시글 1개지만 N-1회 수정이 순차 실행됨 → 소요시간 안내
+    if (publishMode === 'incremental') {
+      const editCount = Math.max(selectedIds.length - 1, 0)
+      const msg =
+        `선택한 ${selectedChannels.length}개 밴드 각각에 게시글 1개를 먼저 게시하고,\n` +
+        `이후 ${editCount}회 "수정"으로 상품을 1개씩 추가합니다.\n` +
+        `(실험적 모드 — Band 수정 모드의 이미지 삽입 경로가 동작하는지 검증용)\n\n계속 진행할까요?`
+      if (!window.confirm(msg)) return
+    }
+
     // 진행 모달 초기화 — 선택한 채널마다 pending 행 생성
     const initItems: DigestProgressItem[] = selectedChannels.map((channelId) => {
       const ch = channels.find((c) => c.id === channelId)

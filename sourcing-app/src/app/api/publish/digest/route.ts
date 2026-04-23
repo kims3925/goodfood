@@ -158,9 +158,10 @@ interface DigestPublishRequest {
    * - 'digest' (기본): 종합 카드 20장 + 본문 URL 목록 (1개 게시글)
    * - 'individual': 상품 1개당 게시글 1개 (N개 게시글, 각각 이미지1+URL1 자동 프리뷰)
    * - 'both': digest 1개 먼저, 이어서 individual N개
+   * - 'incremental': 1개 상품으로 먼저 게시 후, 나머지 상품을 "수정"으로 1개씩 덧붙임 (1 게시글, N-1회 수정)
    */
-  publishMode?: 'digest' | 'individual' | 'both'
-  /** 개별 발행 시 각 게시글 사이 대기 시간(초). 기본 3초 */
+  publishMode?: 'digest' | 'individual' | 'both' | 'incremental'
+  /** 개별/점진 발행 시 각 게시글 사이 대기 시간(초). 기본 3초 */
   individualIntervalSec?: number
 }
 
@@ -353,7 +354,7 @@ export async function POST(request: NextRequest) {
 
     // 결과 누적 (both 모드에서 양쪽 결과 기록)
     const subResults: Array<{
-      mode: 'digest' | 'individual'
+      mode: 'digest' | 'individual' | 'incremental'
       index?: number
       productId?: number
       status: 'SUCCESS' | 'FAILED'
@@ -364,6 +365,78 @@ export async function POST(request: NextRequest) {
     try {
       if (renderedCards.length === 0) {
         status = 'FAILED'
+      } else if (publishMode === 'incremental') {
+        // ── 점진발행 PoC ──────────────────────────────────────
+        // 1상품 게시 후, 나머지 상품을 "게시글 수정"으로 1장씩 본문 끝에 덧붙인다.
+        // 장점: 부분 성공 보장(중간 실패해도 앞까지는 이미 반영됨).
+        // 단점: Band 수정모드의 이미지 삽입 경로(paste/drop)가 먹는지는 런타임 검증 필요.
+        const intervalMs = Math.max(0, individualIntervalSec * 1000)
+
+        // 첫 카드: 이미지 1 + 본문 텍스트 1 (publishWithImages로 자동 링크 프리뷰 활용)
+        const firstCard = renderedCards[0]
+        const firstCp =
+          cardProducts.find((c) => c.id === firstCard.productId) || cardProducts[0]
+        const firstContent = firstCp ? buildIndividualContent(firstCp, 0) : ''
+
+        const firstRes = await bandPlaywrightService.publishWithImages({
+          channelId: channel.id,
+          bandKey: channel.channelKey,
+          bandName: channel.name,
+          content: firstContent,
+          imageUrls: [firstCard.filePath],
+        })
+        subResults.push({
+          mode: 'incremental',
+          index: 1,
+          productId: firstCp?.id,
+          status: firstRes.success ? 'SUCCESS' : 'FAILED',
+          postKey: firstRes.postKey,
+          message: firstRes.error,
+        })
+
+        if (!firstRes.success || !firstRes.postKey) {
+          status = 'FAILED'
+          message = firstRes.error || '첫 게시글 발행 실패'
+        } else {
+          postKey = firstRes.postKey
+
+          // 나머지 카드: 수정모드로 이미지+텍스트 덧붙이기
+          for (let i = 1; i < renderedCards.length; i++) {
+            const card = renderedCards[i]
+            const cp = cardProducts.find((c) => c.id === card.productId) || cardProducts[i]
+            if (!cp) continue
+            if (intervalMs > 0) await sleep(intervalMs)
+
+            try {
+              const appendRes = await bandPlaywrightService.appendToExistingPost({
+                channelId: channel.id,
+                bandKey: channel.channelKey,
+                bandName: channel.name,
+                postKey: firstRes.postKey,
+                blocks: [
+                  { type: 'image', filePath: card.filePath },
+                  { type: 'text', content: buildIndividualContent(cp, i) },
+                ],
+              })
+              subResults.push({
+                mode: 'incremental',
+                index: i + 1,
+                productId: cp.id,
+                status: appendRes.success ? 'SUCCESS' : 'FAILED',
+                postKey: firstRes.postKey,
+                message: appendRes.error,
+              })
+            } catch (err: any) {
+              subResults.push({
+                mode: 'incremental',
+                index: i + 1,
+                productId: cp.id,
+                status: 'FAILED',
+                message: err?.message || '점진 수정 오류',
+              })
+            }
+          }
+        }
       } else {
         const runDigest = publishMode === 'digest' || publishMode === 'both'
         const runIndividual = publishMode === 'individual' || publishMode === 'both'
@@ -426,18 +499,31 @@ export async function POST(request: NextRequest) {
             }
           }
         }
+      }
 
-        // 전체 상태 판정: 하나라도 성공하면 SUCCESS
+      // ── 전체 상태 판정 + 집계 메시지 (모든 모드 공통) ──
+      if (subResults.length > 0) {
         status = subResults.some((r) => r.status === 'SUCCESS') ? 'SUCCESS' : 'FAILED'
 
-        // 집계 메시지
         const digestRes = subResults.find((r) => r.mode === 'digest')
         const indivResults = subResults.filter((r) => r.mode === 'individual')
+        const incrResults = subResults.filter((r) => r.mode === 'incremental')
         const indivSuccess = indivResults.filter((r) => r.status === 'SUCCESS').length
         const indivFail = indivResults.filter((r) => r.status === 'FAILED').length
+        const incrSuccess = incrResults.filter((r) => r.status === 'SUCCESS').length
+        const incrFail = incrResults.filter((r) => r.status === 'FAILED').length
         const parts: string[] = []
         if (digestRes) parts.push(`종합 ${digestRes.status === 'SUCCESS' ? '성공' : '실패'}`)
-        if (indivResults.length > 0) parts.push(`개별 ${indivSuccess}/${indivResults.length} 성공${indivFail > 0 ? `, ${indivFail} 실패` : ''}`)
+        if (indivResults.length > 0) {
+          parts.push(
+            `개별 ${indivSuccess}/${indivResults.length} 성공${indivFail > 0 ? `, ${indivFail} 실패` : ''}`
+          )
+        }
+        if (incrResults.length > 0) {
+          parts.push(
+            `점진 ${incrSuccess}/${incrResults.length} 성공${incrFail > 0 ? `, ${incrFail} 실패` : ''}`
+          )
+        }
         if (parts.length > 0) message = parts.join(' · ')
       }
     } catch (err: any) {

@@ -47,6 +47,19 @@ export interface BandInterleavedPublishParams {
   signal?: AbortSignal
 }
 
+/**
+ * 기존 게시글 본문 끝에 블록(텍스트/이미지)을 덧붙이는 수정 발행
+ * — 점진발행(incremental) 모드: 1개 게시 후 수정으로 1개씩 추가
+ */
+export interface BandAppendParams {
+  channelId: number
+  bandKey: string
+  bandName: string
+  postKey: string           // 수정할 기존 게시글 key
+  blocks: PostBlock[]       // 본문 끝에 덧붙일 블록들
+  signal?: AbortSignal
+}
+
 export interface BandBatchPublishParams {
   channelId: number
   bandKey: string       // Band API의 band_key (AAC... 형식)

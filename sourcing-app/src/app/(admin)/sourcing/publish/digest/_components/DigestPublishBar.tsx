@@ -8,7 +8,7 @@ interface Channel {
   name: string
 }
 
-export type PublishMode = 'digest' | 'individual' | 'both'
+export type PublishMode = 'digest' | 'individual' | 'both' | 'incremental'
 
 interface Props {
   selectedCount: number
@@ -30,6 +30,11 @@ const MODE_OPTIONS: Array<{
   { value: 'digest', label: '종합 1개', desc: '카드 20장+링크 목록 게시글 1개' },
   { value: 'individual', label: '개별 N개', desc: '상품당 게시글 1개 (자동 링크 프리뷰)' },
   { value: 'both', label: '둘 다', desc: '종합 1개 + 개별 N개 순차' },
+  {
+    value: 'incremental',
+    label: '점진 1+수정',
+    desc: '1개 먼저 게시 후 "수정"으로 1개씩 추가 (실험적 · 이미지-텍스트 인라인 배치)',
+  },
 ]
 
 export default function DigestPublishBar({
@@ -50,6 +55,8 @@ export default function DigestPublishBar({
       ? '종합 발행하기'
       : publishMode === 'individual'
       ? `개별 ${selectedCount}건 발행`
+      : publishMode === 'incremental'
+      ? `점진 발행 (1+${Math.max(selectedCount - 1, 0)}회 수정)`
       : `종합+개별 발행 (1+${selectedCount}건)`
 
   return (

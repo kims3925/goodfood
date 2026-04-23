@@ -3981,6 +3981,235 @@ export class BandPostAutomation {
   }
 
   /**
+   * 기존 게시글 본문 끝에 블록(텍스트/이미지)을 덧붙이는 수정 발행 (PoC: 점진발행)
+   *
+   * 흐름:
+   * 1) 게시글 페이지로 이동 → 더보기 메뉴 → "수정" 클릭
+   * 2) 에디터 오픈 대기 → 에디터 포커스 + Ctrl+End 로 본문 끝으로 이동
+   * 3) blocks 순회하며 텍스트/이미지 삽입 (createPostInterleaved와 동일한 paste/drop 경로)
+   * 4) "수정 완료"(_btnSubmitPost) 클릭
+   */
+  async appendBlocksToExistingPost(
+    page: Page,
+    params: import('./types').BandAppendParams
+  ): Promise<BandPublishResult> {
+    const { bandKey, bandName, postKey, blocks, signal } = params
+    let appendedImageCount = 0
+
+    const checkCancelled = () => {
+      if (signal?.aborted) {
+        throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+    }
+
+    try {
+      checkCancelled()
+      console.log(`[밴드자동화:append] 시작 - ${bandName}/${postKey} (blocks=${blocks.length})`)
+
+      // 1. 밴드 이동 (세션 체크)
+      await this.navigateToBand(page, bandKey, bandName)
+
+      const currentUrl = page.url()
+      const bandNoMatch = currentUrl.match(/\/band\/(\d+)/)
+      if (!bandNoMatch) {
+        throw new BandPlaywrightError('밴드 번호를 찾을 수 없습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+      if (currentUrl.includes('signin') || currentUrl.includes('login')) {
+        throw new BandPlaywrightError(
+          '로그인이 필요합니다. 세션이 만료되었을 수 있습니다.',
+          BandPlaywrightErrorCode.SESSION_EXPIRED
+        )
+      }
+      const bandNo = bandNoMatch[1]
+
+      // 2. 게시글 페이지로 이동
+      const postUrl = `https://band.us/band/${bandNo}/post/${postKey}`
+      console.log(`[밴드자동화:append] 게시글 이동: ${postUrl}`)
+      await page.goto(postUrl, { waitUntil: 'networkidle', timeout: 30000 })
+      await page.waitForTimeout(1500)
+
+      const notFound =
+        (await page.$('text=삭제된 글입니다')) ||
+        (await page.$('text=존재하지 않는 글입니다')) ||
+        (await page.$('text=없는 게시글'))
+      if (notFound) {
+        throw new BandPlaywrightError(
+          `게시글을 찾을 수 없습니다(postKey=${postKey}).`,
+          BandPlaywrightErrorCode.POST_FAILED
+        )
+      }
+
+      // 3. 더보기 메뉴 클릭 (deletePost의 셀렉터 재사용)
+      const moreButtonSelectors = [
+        'button._btnPostMore',
+        '.postMore button',
+        'button[class*="more"]',
+        '.cPost ._btnMore',
+        '.cPostBody button._btnMore',
+        '[data-viewname="DPostView"] button._btnMore',
+        '.cPostHeader button',
+        'button.uButton.-more',
+      ]
+
+      let moreClicked = false
+      for (const selector of moreButtonSelectors) {
+        const btn = await page.$(selector)
+        if (btn && (await btn.isVisible())) {
+          console.log(`[밴드자동화:append] 더보기 버튼 클릭: ${selector}`)
+          await btn.click()
+          await page.waitForTimeout(700)
+          moreClicked = true
+          break
+        }
+      }
+      if (!moreClicked) {
+        await this.saveDebugScreenshot(page, 'append-no-more-button')
+        throw new BandPlaywrightError('더보기 버튼을 찾을 수 없습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+
+      await this.saveDebugScreenshot(page, 'append-more-menu-opened')
+
+      // 4. "수정" 메뉴 클릭
+      let editMenuClicked = false
+      const editByText = await page.locator('text=수정').first()
+      if (await editByText.isVisible().catch(() => false)) {
+        console.log('[밴드자동화:append] 수정 메뉴 클릭: text=수정')
+        await editByText.click()
+        await page.waitForTimeout(1000)
+        editMenuClicked = true
+      }
+      if (!editMenuClicked) {
+        const editMenuSelectors = [
+          'button._btnEdit',
+          'a._btnEdit',
+          '.uLayerList li:has-text("수정")',
+          '.uLayerList button:has-text("수정")',
+          '.layerMenu li:has-text("수정")',
+          '.uLayer li:has-text("수정")',
+          '[class*="layer"] li:has-text("수정")',
+          '[class*="menu"] li:has-text("수정")',
+          'li button:has-text("수정")',
+          '[data-action="edit"]',
+        ]
+        for (const selector of editMenuSelectors) {
+          try {
+            const el = await page.$(selector)
+            if (el && (await el.isVisible())) {
+              console.log(`[밴드자동화:append] 수정 메뉴 클릭: ${selector}`)
+              await el.click()
+              await page.waitForTimeout(1000)
+              editMenuClicked = true
+              break
+            }
+          } catch {
+            /* noop */
+          }
+        }
+      }
+      if (!editMenuClicked) {
+        await this.saveDebugScreenshot(page, 'append-no-edit-menu')
+        throw new BandPlaywrightError(
+          '수정 메뉴를 찾을 수 없습니다. 수정 권한이 없거나 UI가 변경되었을 수 있습니다.',
+          BandPlaywrightErrorCode.POST_FAILED
+        )
+      }
+
+      // 5. 에디터 대기
+      const editorSelector =
+        '[data-viewname="DPostWriteLayerView"] [contenteditable="true"], .cPostWrite [contenteditable="true"].cke_editable'
+      try {
+        await page.waitForSelector(editorSelector, { timeout: 10000, state: 'visible' })
+      } catch {
+        await this.saveDebugScreenshot(page, 'append-no-editor')
+        throw new BandPlaywrightError('수정 에디터를 열 수 없습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+
+      const editor = await page.$(editorSelector)
+      if (!editor) {
+        throw new BandPlaywrightError('수정 에디터를 찾을 수 없습니다.', BandPlaywrightErrorCode.POST_FAILED)
+      }
+
+      await this.saveDebugScreenshot(page, 'append-editor-opened')
+
+      // 6. 커서를 본문 끝으로 이동 (Ctrl+End)
+      await editor.click()
+      await page.waitForTimeout(200)
+      await page.keyboard.press('Control+End')
+      await page.waitForTimeout(150)
+      // 본문 끝 다음 줄 확보
+      await page.keyboard.press('Enter')
+
+      // 7. 블록 순회하며 본문 끝에 삽입 (createPostInterleaved와 동일 경로)
+      for (let i = 0; i < blocks.length; i++) {
+        checkCancelled()
+        const block = blocks[i]
+
+        if (block.type === 'text') {
+          await editor.click()
+          await page.waitForTimeout(100)
+          await page.keyboard.press('End')
+          if (i > 0) {
+            await page.keyboard.press('Enter')
+          }
+          await page.keyboard.type(block.content, { delay: 8 })
+          console.log(`[밴드자동화:append] 텍스트 블록 입력 (${i + 1}/${blocks.length}, ${block.content.length}자)`)
+        } else if (block.type === 'image') {
+          if (!fs.existsSync(block.filePath)) {
+            console.warn(`[밴드자동화:append] 이미지 없음, 건너뜀: ${block.filePath}`)
+            continue
+          }
+          await editor.click()
+          await page.keyboard.press('End')
+          await page.waitForTimeout(100)
+
+          let inserted = await this.pasteImageAtCursor(page, block.filePath)
+          if (!inserted) {
+            console.warn(`[밴드자동화:append] paste 실패, drop으로 재시도`)
+            inserted = await this.dropImageAtCursor(page, block.filePath)
+          }
+          if (!inserted) {
+            console.warn(`[밴드자동화:append] paste/drop 모두 실패, uploadImages 폴백`)
+            await this.uploadImages(page, [block.filePath], signal)
+          }
+          appendedImageCount++
+          await page.waitForTimeout(500)
+          await page.keyboard.press('End')
+          console.log(`[밴드자동화:append] 이미지 삽입 완료 (${i + 1}/${blocks.length}, 누적 ${appendedImageCount})`)
+        }
+      }
+
+      checkCancelled()
+
+      // 8. "수정 완료" 버튼 클릭 (_btnSubmitPost 동일)
+      console.log('[밴드자동화:append] 수정 완료 버튼 클릭')
+      await this.submitPost(page)
+      await this.saveDebugScreenshot(page, 'append-submitted')
+
+      // 9. 수정 완료 대기 - 에디터 모달이 닫혔는지 확인
+      try {
+        await page.waitForSelector(editorSelector, { state: 'hidden', timeout: 15000 })
+      } catch {
+        console.warn('[밴드자동화:append] 수정 에디터가 닫히지 않음 (계속 진행)')
+      }
+
+      await page.waitForTimeout(1500)
+
+      return {
+        success: true,
+        postKey,
+        imageCount: appendedImageCount,
+      }
+    } catch (error: any) {
+      console.error('[밴드자동화:append] 실패:', error)
+      await this.saveDebugScreenshot(page, 'append-error')
+      if (error instanceof BandPlaywrightError) {
+        return { success: false, error: error.message }
+      }
+      return { success: false, error: error?.message || '수정 발행 중 오류' }
+    }
+  }
+
+  /**
    * 최신 게시물에 댓글 작성 (Playwright 사용)
    * 밴드 피드에서 첫 번째(최신) 글에 댓글 작성
    */

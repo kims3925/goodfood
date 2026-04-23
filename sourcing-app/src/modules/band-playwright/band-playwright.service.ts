@@ -10,6 +10,7 @@ import {
   BandPublishParams,
   BandPublishResult,
   BandInterleavedPublishParams,
+  BandAppendParams,
   BandBatchPublishParams,
   BandBatchPublishResult,
   BandDeleteParams,
@@ -177,6 +178,40 @@ export class BandPlaywrightService {
         return { success: false, error: 'Band 세션이 만료되었습니다.' }
       }
       return { success: false, error: error?.message || '발행 중 오류' }
+    }
+  }
+
+  /**
+   * 기존 게시글 본문 끝에 블록을 덧붙이는 수정 발행
+   * - 점진발행(incremental) 모드: 첫 게시글 생성 후 상품마다 수정으로 추가
+   */
+  async appendToExistingPost(params: BandAppendParams): Promise<BandPublishResult> {
+    const { channelId } = params
+
+    console.log(
+      `[BandPlaywrightService] Append to existing post band=${params.bandKey} postKey=${params.postKey} (blocks=${params.blocks.length})`
+    )
+
+    try {
+      const session = await sessionManager.getValidSession(channelId)
+      if (!session) {
+        return { success: false, error: '세션을 획득할 수 없습니다.' }
+      }
+      const context = await browserPool.getContext(channelId, session.cookies)
+      const page = await context.newPage()
+      try {
+        return await postAutomation.appendBlocksToExistingPost(page, params)
+      } finally {
+        await page.close()
+        await browserPool.releaseContext(channelId)
+      }
+    } catch (error: any) {
+      console.error('[BandPlaywrightService] Append failed:', error)
+      await browserPool.closeContext(channelId)
+      if (error instanceof BandPlaywrightError && error.code === BandPlaywrightErrorCode.SESSION_EXPIRED) {
+        return { success: false, error: 'Band 세션이 만료되었습니다.' }
+      }
+      return { success: false, error: error?.message || '수정 발행 중 오류' }
     }
   }
 
